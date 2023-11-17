@@ -379,6 +379,16 @@ set(SWIFT_TOOLS_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH
   "Path for binary subdirectory to use during installation.
   Used by add_swift_tool_symlink in AddSwift.cmake so that llvm_install_symlink generates the installation script properly.")
 
+  set(SWIFT_PLATFORM_ID "$<CONFIG> $<PLATFORM_ID>" CACHE STRING "")
+
+if((NOT CMAKE_BUILD_TYPE STREQUAL "Debug"))
+  set(SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26_default ON)
+else()
+  set(SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26_default OFF)
+endif()
+option(SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26
+       "Enable Whole Module Optimization (WMO) - requires swift-driver"
+       ${SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26_default})
 #
 # User-configurable Swift Standard Library specific options.
 #

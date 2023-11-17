@@ -57,6 +57,11 @@ function(_add_host_swift_compile_options name)
 
   target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
   _add_host_variant_swift_sanitizer_flags(${name})
+
+  if(CMAKE_VERSION VERSION_LESS 3.26.0 AND SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26)
+    target_compile_options(${name} PRIVATE
+        $<$<COMPILE_LANGUAGE:Swift>:-wmo>)
+  endif()
 endfunction()
 
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)
@@ -173,10 +178,16 @@ function(add_pure_swift_host_library name)
 
   # Workaround to touch the library and its objects so that we don't
   # continually rebuild (again, see corresponding change in swift-syntax).
+  set(output_files $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>)
+  if(APSHL_EMIT_MODULE)
+    list(APPEND output_files "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${name}.swiftmodule")
+  else()
+    list(APPEND output_files "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule")
+  endif()
   add_custom_command(
       TARGET ${name}
       POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}> "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${name}.swiftmodule" "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule"
+      COMMAND "${CMAKE_COMMAND}" -E touch ${output_files}
       COMMAND_EXPAND_LISTS
       COMMENT "Update mtime of library outputs workaround")
 
@@ -340,7 +351,7 @@ function(add_pure_swift_host_tool name)
   add_custom_command(
       TARGET ${name}
       POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>
+      COMMAND "${CMAKE_COMMAND}" -E touch $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>
       COMMAND_EXPAND_LISTS
       COMMENT "Update mtime of executable outputs workaround")
 
