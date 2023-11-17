@@ -278,7 +278,7 @@ extension ASTGenVisitor {
       ),
       asyncLoc: (node.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsLoc: (node.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(optional: node.effectSpecifiers?.thrownError?.type).asNullable,
+      thrownType: self.generate(type: node.effectSpecifiers?.thrownError?.type),
       arrowLoc: node.returnClause.arrow.bridgedSourceLoc(in: self),
       resultType: generate(type: node.returnClause.type)
     )

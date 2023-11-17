@@ -69,10 +69,10 @@ someClass/*sub:ref*/[1, y: 2] = 2
 
 class AnotherClass {
     let bar = AnotherClass()
-    func /*nested:def*/bar(b: Int) -> AnotherClass {}
+    func /*nested:def*/<base>foo</base>(<arglabel index=0>a</arglabel><param index=0></param>: Int) -> AnotherClass {}
 }
 
-AnotherClass() . /*nested:call*/bar(b: 1) . /*nested2*/bar . /*nested2*/bar . /*nested:call*/bar(b: 2) . /*nested:call*/bar(b: 3) . /*nested:unknown*/foo . foo(a: 4)
+AnotherClass() . /*nested:call*/<base>foo</base>(<callarg index=0>a</callarg><callcolon index=0>: </callcolon>1) . /*nested2*/bar . /*nested2*/bar . /*nested:call*/<base>foo</base>(<callarg index=0>a</callarg><callcolon index=0>: </callcolon>2) . /*nested:call*/<base>foo</base>(<callarg index=0>a</callarg><callcolon index=0>: </callcolon>3) . /*nested:unknown*/foo . foo(a: 4)
 
 struct Memberwise {
     let /*memberwise-x:def*/x: Int

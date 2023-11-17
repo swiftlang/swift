@@ -100,7 +100,8 @@ struct Printer {
 };
 } // end anonymous namespace
 
-void SILCoverageMap::printCounter(llvm::raw_ostream &OS,
-                                  llvm::coverage::Counter C) const {
-  OS << Printer(C, getExpressions());
+void SILCoverageMap::printCounter(
+    llvm::raw_ostream &OS, llvm::coverage::Counter C,
+    ArrayRef<llvm::coverage::CounterExpression> Expressions) {
+  OS << Printer(C, Expressions);
 }

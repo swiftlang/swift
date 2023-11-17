@@ -4,7 +4,7 @@
 // RUN: %{python} %utils/process-stats-dir.py --set-csv-baseline %t/stats.csv %t
 // RUN: %FileCheck -input-file %t/stats.csv %s
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 // Make sure we can skip in all of the below cases.
 

@@ -26,39 +26,56 @@ extension BridgedIdentifier: ExpressibleByNilLiteral {
   }
 }
 
-extension BridgedStmt? {
-  var asNullable: BridgedNullableStmt {
-    .init(raw: self?.raw)
+/// Protocol that declares that there's a "Nullable" variation of the type.
+///
+/// E.g. BridgedExpr vs BridgedNullableExpr.
+protocol HasNullable {
+  associatedtype Nullable
+
+  /// Convert an `Optional<Self>` to `Nullable`.
+  static func asNullable(_ node: Self?) -> Nullable
+}
+
+extension Optional where Wrapped: HasNullable {
+  /// Convert an Optional to Nullable variation of the wrapped type.
+  var asNullable: Wrapped.Nullable {
+    Wrapped.asNullable(self)
   }
 }
 
-extension BridgedExpr? {
-  var asNullable: BridgedNullableExpr {
-    .init(raw: self?.raw)
+extension BridgedStmt: HasNullable {
+  static func asNullable(_ node: Self?) -> BridgedNullableStmt {
+    .init(raw: node?.raw)
   }
 }
 
-extension BridgedTypeRepr? {
-  var asNullable: BridgedNullableTypeRepr {
-    .init(raw: self?.raw)
+extension BridgedExpr: HasNullable {
+  static func asNullable(_ node: Self?) -> BridgedNullableExpr {
+    .init(raw: node?.raw)
   }
 }
 
-extension BridgedGenericParamList? {
-  var asNullable: BridgedNullableGenericParamList {
-    .init(raw: self?.raw)
+extension BridgedTypeRepr: HasNullable {
+  static func asNullable(_ node: Self?) -> BridgedNullableTypeRepr {
+    .init(raw: node?.raw)
   }
 }
 
-extension BridgedTrailingWhereClause? {
-  var asNullable: BridgedNullableTrailingWhereClause {
-    .init(raw: self?.raw)
+extension BridgedGenericParamList: HasNullable {
+  static func asNullable(_ node: Self?) -> BridgedNullableGenericParamList {
+    .init(raw: node?.raw)
   }
 }
 
-extension BridgedParameterList? {
-  var asNullable: BridgedNullableParameterList {
-    .init(raw: self?.raw)
+extension BridgedTrailingWhereClause: HasNullable {
+  static func asNullable(_ node: Self?) -> BridgedNullableTrailingWhereClause {
+    .init(raw: node?.raw)
+  }
+}
+
+extension BridgedParameterList: HasNullable {
+  static func asNullable(_ node: Self?) -> BridgedNullableParameterList {
+    .init(raw: node?.raw)
   }
 }
 
@@ -81,6 +98,13 @@ extension BridgedSourceRange {
 }
 
 extension String {
+  init(bridged: BridgedStringRef) {
+    self.init(
+      decoding: UnsafeBufferPointer(start: bridged.data, count: bridged.count),
+      as: UTF8.self
+    )
+  }
+
   mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))

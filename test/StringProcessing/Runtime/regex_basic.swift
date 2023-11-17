@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-bare-slash-regex)
 
-// REQUIRES: swift_in_compiler,string_processing,executable_test
+// REQUIRES: swift_swift_parser,string_processing,executable_test
 
 import StdlibUnittest
 

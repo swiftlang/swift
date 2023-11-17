@@ -83,7 +83,7 @@ extension ASTGenVisitor {
 
     let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
 
-    var type = self.generate(optional: node.optionalType)
+    var type = node.optionalType.map(generate(type:))
     if let ellipsis = node.ellipsis, let base = type {
       type = BridgedVarargTypeRepr.createParsed(
         self.ctx,
@@ -101,7 +101,7 @@ extension ASTGenVisitor {
       secondName: secondName,
       secondNameLoc: secondNameLoc,
       type: type.asNullable,
-      defaultValue: self.generate(optional: node.defaultValue?.value).asNullable
+      defaultValue: self.generate(expr: node.defaultValue?.value)
     )
   }
 }

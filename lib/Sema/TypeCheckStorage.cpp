@@ -585,41 +585,48 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   return &pbe;
 }
 
-Expr *PatternBindingCheckedExecutableInitRequest::evaluate(
-    Evaluator &eval, PatternBindingDecl *binding, unsigned i) const {
+static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
+                                                    unsigned i) {
   // Force the entry to be checked.
   (void)binding->getCheckedPatternBindingEntry(i);
   if (binding->isInvalid())
-    return nullptr;
+    return;
 
   if (!binding->isInitialized(i))
-    return nullptr;
+    return;
 
   if (!binding->isInitializerChecked(i))
     TypeChecker::typeCheckPatternBinding(binding, i);
 
   if (binding->isInvalid())
-    return nullptr;
+    return;
 
   // If we entered an initializer context, contextualize any auto-closures we
   // might have created. Note that we don't contextualize the initializer for a
   // property with a wrapper, because the initializer will have been subsumed by
   // the backing storage property.
-  auto *init = binding->getInit(i);
+  if (binding->getDeclContext()->isLocalContext())
+    return;
 
-  if (!binding->getDeclContext()->isLocalContext() &&
-      !(binding->getSingleVar() &&
-        binding->getSingleVar()->hasAttachedPropertyWrapper())) {
-    auto *initContext =
-        cast_or_null<PatternBindingInitializer>(binding->getInitContext(i));
-    if (initContext) {
-      TypeChecker::contextualizeInitializer(initContext, init);
-      (void)binding->getInitializerIsolation(i);
-      TypeChecker::checkInitializerEffects(initContext, init);
-    }
+  if (auto *var = binding->getSingleVar()) {
+    if (var->hasAttachedPropertyWrapper())
+      return;
   }
 
-  return binding->getExecutableInit(i);
+  auto *initContext =
+      cast_or_null<PatternBindingInitializer>(binding->getInitContext(i));
+  if (initContext) {
+    auto *init = binding->getInit(i);
+    TypeChecker::contextualizeInitializer(initContext, init);
+    (void)binding->getInitializerIsolation(i);
+    TypeChecker::checkInitializerEffects(initContext, init);
+  }
+}
+
+Expr *PatternBindingCheckedAndContextualizedInitRequest::evaluate(
+    Evaluator &eval, PatternBindingDecl *binding, unsigned i) const {
+  checkAndContextualizePatternBindingInit(binding, i);
+  return binding->getInit(i);
 }
 
 bool

@@ -3595,6 +3595,13 @@ ThrownErrorSubtyping
 swift::compareThrownErrorsForSubtyping(
     Type subThrownError, Type superThrownError, DeclContext *dc
 ) {
+  // Deal with NULL errors. This should only occur when there is no standard
+  // library.
+  if (!subThrownError || !superThrownError) {
+    assert(!dc->getASTContext().getStdlibModule() && "NULL thrown error type");
+    return ThrownErrorSubtyping::ExactMatch;
+  }
+
   // Easy case: exact match.
   if (superThrownError->isEqual(subThrownError))
     return ThrownErrorSubtyping::ExactMatch;

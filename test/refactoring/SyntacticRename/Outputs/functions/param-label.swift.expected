@@ -4,7 +4,7 @@ func /*no-args:def*/aFunc() -> Int {
     return 1
 }
 
-func /*param-label:def*/anotherFunc(param: Int) {}
+func /*param-label:def*/<base>aFunc</base>(<arglabel index=0>a</arglabel><param index=0></param>: Int) {}
 
 func /*arg-label:def*/aFunc(b a:Int) {}
 
@@ -39,7 +39,7 @@ class AStruct {
 
 let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/+ AStruct()
 /*no-args:call*/aFunc()
-/*param-label:call*/anotherFunc(param: 2)
+/*param-label:call*/<base>aFunc</base>(<callarg index=0>a</callarg><callcolon index=0>: </callcolon>2)
 /*arg-label:call*/aFunc(b: /*no-args:call*/aFunc() * /*no-args:call*/aFunc())
 let _ = /*no-label:call*/aFunc(3)
 /*whitespace-labels:call*/aFunc( a  :  2 ,2,  c:  4 )
@@ -50,7 +50,7 @@ let _ = aStruct . /*bar:call*/bar(/*no-args:call*/aFunc())(/*no-label:call*/aFun
 
 var a = /*referenced*/bar
 var b = /*referenced*/bar(a:)
-let _ = "Some text \(/*param-label:call*/anotherFunc(param:1)) around"
+let _ = "Some text \(/*param-label:call*/<base>aFunc</base>(<callarg index=0>a</callarg><callcolon index=0>:</callcolon>1)) around"
 
 class SomeClass {
     init() {}

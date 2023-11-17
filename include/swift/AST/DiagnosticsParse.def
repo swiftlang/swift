@@ -2074,13 +2074,6 @@ ERROR(expected_multiple_closures_block_rbrace,none,
       "expected '}' at the end of a trailing closures block", ())
 
 //------------------------------------------------------------------------------
-// MARK: diagnostics emitted by Swift libraries
-//------------------------------------------------------------------------------
-
-ERROR(foreign_diagnostic,none,
-      "%0", (StringRef))
-
-//------------------------------------------------------------------------------
 // MARK: macros
 //------------------------------------------------------------------------------
 ERROR(expected_lparen_macro,PointsToFirstBadToken,

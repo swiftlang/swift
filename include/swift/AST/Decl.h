@@ -1918,7 +1918,7 @@ public:
 /// the initializer can be null if there is none.
 class PatternBindingEntry {
   enum class Flags {
-    Checked = 1 << 0,
+    // 1 << 0 is available
     Removed = 1 << 1,
     /// Whether the contents of this initializer were subsumed by
     /// some other initialization, e.g., a lazy property's initializer
@@ -1926,6 +1926,15 @@ class PatternBindingEntry {
     Subsumed = 1 << 2,
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
+
+  enum class InitializerStatus {
+    /// The init expression has not been typechecked.
+    NotChecked = 0,
+    /// The init expression has been typechecked but not contextualized.
+    Checked,
+    /// The init expression has been typechecked and contextualized.
+    CheckedAndContextualized,
+  };
 
   struct InitializerAndEqualLoc {
     // When the initializer is removed we don't actually clear the pointers
@@ -1936,7 +1945,7 @@ class PatternBindingEntry {
     Expr *originalInit;
     /// Might be transformed, e.g. for a property wrapper. In the absence of
     /// transformation or synthesis, holds the expr as parsed.
-    Expr *initAfterSynthesis;
+    llvm::PointerIntPair<Expr *, 2, InitializerStatus> initAfterSynthesis;
     /// The location of the equal '=' token.
     SourceLoc EqualLoc;
   };
@@ -1974,6 +1983,7 @@ private:
   // typeCheckPatternBinding are requestified, merge this bit with
   // Flags::Checked.
   friend class PatternBindingEntryRequest;
+  friend class PatternBindingCheckedAndContextualizedInitRequest;
 
   bool isFullyValidated() const {
     return InitContextAndFlags.getInt().contains(
@@ -1996,7 +2006,8 @@ public:
   /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-      : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
+      : PatternAndFlags(P, {}),
+        InitExpr({E, {E, InitializerStatus::NotChecked}, EqualLoc}),
         InitContextAndFlags({InitContext, llvm::None}) {}
 
 private:
@@ -2013,7 +2024,7 @@ private:
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndFlags.getInt().contains(PatternFlags::IsText))
       return nullptr;
-    return InitExpr.initAfterSynthesis;
+    return InitExpr.initAfterSynthesis.getPointer();
   }
   /// Retrieve the initializer if it should be executed to initialize this
   /// particular pattern binding.
@@ -2060,11 +2071,26 @@ private:
   /// Set the initializer after the = as it was written in the source.
   void setOriginalInit(Expr *);
 
+  InitializerStatus initializerStatus() const {
+    if (InitContextAndFlags.getInt().contains(PatternFlags::IsText))
+      return InitializerStatus::NotChecked;
+    return InitExpr.initAfterSynthesis.getInt();
+  }
   bool isInitializerChecked() const {
-    return PatternAndFlags.getInt().contains(Flags::Checked);
+    return initializerStatus() != InitializerStatus::NotChecked;
   }
   void setInitializerChecked() {
-    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
+    assert(!InitContextAndFlags.getInt().contains(PatternFlags::IsText));
+    InitExpr.initAfterSynthesis.setInt(InitializerStatus::Checked);
+  }
+
+  bool isInitializerCheckedAndContextualized() const {
+    return initializerStatus() == InitializerStatus::CheckedAndContextualized;
+  }
+  void setInitializerCheckedAndContextualized() {
+    assert(!InitContextAndFlags.getInt().contains(PatternFlags::IsText));
+    InitExpr.initAfterSynthesis.setInt(
+        InitializerStatus::CheckedAndContextualized);
   }
 
   bool isInitializerSubsumed() const {
@@ -2128,6 +2154,7 @@ class PatternBindingDecl final : public Decl,
   friend TrailingObjects;
   friend class Decl;
   friend class PatternBindingEntryRequest;
+  friend class PatternBindingCheckedAndContextualizedInitRequest;
 
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
@@ -2276,9 +2303,13 @@ public:
     getMutablePatternList()[i].setOriginalInit(E);
   }
 
-  /// Returns a fully typechecked executable init expression for the pattern at
-  /// the given index.
-  Expr *getCheckedExecutableInit(unsigned i) const;
+  /// Returns a fully typechecked init expression for the pattern at the given
+  /// index.
+  Expr *getCheckedAndContextualizedInit(unsigned i) const;
+
+  /// Returns the result of `getCheckedAndContextualizedInit()` if the init is
+  /// not subsumed. Otherwise, returns `nullptr`.
+  Expr *getCheckedAndContextualizedExecutableInit(unsigned i) const;
 
   Pattern *getPattern(unsigned i) const {
     return getPatternList()[i].getPattern();

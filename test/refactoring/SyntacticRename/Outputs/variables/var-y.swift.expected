@@ -1,5 +1,5 @@
-var /*var-y:def*/yack = 3
-/*var-y*/yack = /*var-y*/yack + 2 + /*var-y*/yack
+var /*var-y:def*/<base>y</base> = 3
+/*var-y*/<base>y</base> = /*var-y*/<base>y</base> + 2 + /*var-y*/<base>y</base>
 
 struct Struct {
 	let /*ivar-x:def*/x: Int

@@ -134,6 +134,20 @@ swift::Stmt *_Nullable swift_ASTGen_buildStmt(
     BridgedASTContext astContext, BridgedLegacyParser legacyParser,
     BridgedSourceLoc *_Nonnull endSourceLoc);
 
+// MARK: - Regex parsing
+
+bool swift_ASTGen_lexRegexLiteral(const char *_Nonnull *_Nonnull curPtrPtr,
+                                  const char *_Nonnull bufferEndPtr,
+                                  bool mustBeRegex,
+                                  BridgedNullableDiagnosticEngine diagEngine);
+
+bool swift_ASTGen_parseRegexLiteral(BridgedStringRef inputPtr,
+                                    size_t *_Nonnull versionOut,
+                                    void *_Nonnull UnsafeMutableRawPointer,
+                                    size_t captureStructureSize,
+                                    BridgedSourceLoc diagLoc,
+                                    BridgedDiagnosticEngine diagEngine);
+
 #ifdef __cplusplus
 }
 #endif

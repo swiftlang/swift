@@ -258,7 +258,7 @@ SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
 SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
               const PatternBindingEntry *(PatternBindingDecl *, unsigned, bool),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, PatternBindingCheckedExecutableInitRequest,
+SWIFT_REQUEST(TypeChecker, PatternBindingCheckedAndContextualizedInitRequest,
               Expr *(PatternBindingDecl *, unsigned),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,

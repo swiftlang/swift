@@ -27,9 +27,9 @@ func /*foo:def*/foo() {
 }
 
 #if false
-class /*MyClass:unknown*/YourClass {}
+class /*MyClass:unknown*/<base>MyClass</base> {}
 _ = /*MyClass:unknown*/Mismatch()
-_ = /*MyClass:unknown*/YourClass()
+_ = /*MyClass:unknown*/<base>MyClass</base>()
 #else
 class /*MyClass:unknown*/MyClass {}
 _ = /*MyClass:unknown*/Mismatch()
