@@ -202,6 +202,10 @@ struct ActorReferenceResult {
 
     /// The declaration is being accessed from a @preconcurrency context.
     Preconcurrency = 1 << 3,
+
+    /// Only arguments cross an isolation boundary, e.g. because they
+    /// escape into an actor in a nonisolated actor initializer.
+    OnlyArgsCrossIsolation = 1 << 4,
   };
 
   using Options = OptionSet<Flags>;
@@ -212,13 +216,13 @@ struct ActorReferenceResult {
 
 private:
   static ActorReferenceResult forSameConcurrencyDomain(
-      ActorIsolation isolation);
+      ActorIsolation isolation, Options options = llvm::None);
 
   static ActorReferenceResult forEntersActor(
       ActorIsolation isolation, Options options);
 
   static ActorReferenceResult forExitsActorToNonisolated(
-      ActorIsolation isolation);
+      ActorIsolation isolation, Options options = llvm::None);
 
 public:
   /// Determine what happens when referencing the given declaration from the

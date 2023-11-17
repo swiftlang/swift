@@ -1055,15 +1055,7 @@ static void checkDefaultArguments(ParameterList *params) {
 
     // If the default argument has isolation, it must match the
     // isolation of the decl context.
-    auto defaultArgIsolation = param->getInitializerIsolation();
-    if (defaultArgIsolation.isActorIsolated()) {
-      auto *dc = param->getDeclContext();
-      auto enclosingIsolation = getActorIsolationOfContext(dc);
-      if (enclosingIsolation != defaultArgIsolation) {
-        param->diagnose(diag::isolated_default_argument_context,
-            defaultArgIsolation, enclosingIsolation);
-      }
-    }
+    (void)param->getInitializerIsolation();
 
     if (!ifacety->hasPlaceholder()) {
       continue;
