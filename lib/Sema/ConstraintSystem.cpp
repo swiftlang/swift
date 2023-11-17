@@ -2266,6 +2266,86 @@ Type constraints::typeEraseOpenedExistentialReference(
   });
 }
 
+Type constraints::typeEraseOpenedArchetypesWithRoot(
+    Type type, const OpenedArchetypeType *root) {
+  assert(root->isRoot() && "Expected a root archetype");
+
+  if (!type->hasOpenedExistential())
+    return type;
+
+  auto *env = root->getGenericEnvironment();
+  auto sig = env->getGenericSignature();
+
+  unsigned metatypeDepth = 0;
+
+  std::function<Type(Type)> transformFn;
+  transformFn = [&](Type type) -> Type {
+    return type.transformRec([&](TypeBase *ty) -> llvm::Optional<Type> {
+      // Don't recurse into children unless we have to.
+      if (!ty->hasOpenedExistential())
+        return Type(ty);
+
+      if (isa<MetatypeType>(ty)) {
+        const auto instanceTy = ty->getMetatypeInstanceType();
+        ++metatypeDepth;
+        const auto erasedTy = transformFn(instanceTy);
+        --metatypeDepth;
+
+        if (instanceTy.getPointer() == erasedTy.getPointer()) {
+          return Type(ty);
+        }
+
+        return Type(ExistentialMetatypeType::get(erasedTy));
+      }
+
+      // Opaque types whose substitutions involve this type parameter are
+      // erased to their upper bound.
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(ty)) {
+        for (auto replacementType :
+                 opaque->getSubstitutions().getReplacementTypes()) {
+          if (replacementType->hasOpenedExistentialWithRoot(root)) {
+            return opaque->getExistentialType();
+          }
+        }
+      }
+
+      if (auto lvalue = dyn_cast<LValueType>(type)) {
+        auto objTy = lvalue->getObjectType();
+        auto erased = transformFn(objTy);
+        if (erased.getPointer() == objTy.getPointer())
+          return Type(lvalue);
+
+        return erased;
+      }
+
+      auto *const archetype = dyn_cast<OpenedArchetypeType>(ty);
+      if (!archetype) {
+        // Recurse.
+        return llvm::None;
+      }
+
+      if (archetype->getGenericEnvironment() != env)
+        return Type(ty);
+
+      Type erasedTy;
+      if (root->isEqual(archetype)) {
+        erasedTy = root->getExistentialType();
+      } else {
+        erasedTy = sig->getUpperBound(archetype->getInterfaceType());
+      }
+
+      if (metatypeDepth) {
+        if (const auto existential = erasedTy->getAs<ExistentialType>())
+          return existential->getConstraintType();
+      }
+
+      return erasedTy;
+    });
+  };
+
+  return transformFn(type);
+}
+
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
     ConstraintLocator *locator, bool hasAppliedSelf,
