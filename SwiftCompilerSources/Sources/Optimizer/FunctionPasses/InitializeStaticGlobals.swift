@@ -44,6 +44,11 @@ import SIL
 let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals") {
   (function: Function, context: FunctionPassContext) in
 
+  if context.hadError {
+    // In case of a preceding error, there is no guarantee that the SIL is valid.
+    return
+  }
+
   if !function.isGlobalInitOnceFunction {
     return
   }
