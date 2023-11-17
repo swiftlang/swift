@@ -145,12 +145,30 @@ struct UseDefChainVisitor
       case ProjectionKind::Tuple: {
         // These are merges if we have multiple fields.
         auto *tti = cast<TupleElementAddrInst>(inst);
+
+        // See if our result type is a sendable type. In such a case, we do not
+        // want to look through the tuple_element_addr since we do not want to
+        // identify the sendable type with the non-sendable operand. These we
+        // are always going to ignore anyways since a sendable let/var field of
+        // a struct can always be used.
+        if (!isNonSendableType(tti->getType(), tti->getFunction()))
+          return SILValue();
+
         isMerge |= tti->getOperand()->getType().getNumTupleElements() > 1;
         break;
       }
       case ProjectionKind::Struct:
-        // These are merges if we have multiple fields.
         auto *sea = cast<StructElementAddrInst>(inst);
+
+        // See if our result type is a sendable type. In such a case, we do not
+        // want to look through the struct_element_addr since we do not want to
+        // identify the sendable type with the non-sendable operand. These we
+        // are always going to ignore anyways since a sendable let/var field of
+        // a struct can always be used.
+        if (!isNonSendableType(sea->getType(), sea->getFunction()))
+          return SILValue();
+
+        // These are merges if we have multiple fields.
         isMerge |= sea->getOperand()->getType().getNumNominalFields() > 1;
         break;
       }
@@ -1147,12 +1165,20 @@ public:
     case SILInstructionKind::EndInitLetRefInst:
     case SILInstructionKind::InitEnumDataAddrInst:
     case SILInstructionKind::OpenExistentialAddrInst:
-    case SILInstructionKind::StructElementAddrInst:
-    case SILInstructionKind::TupleElementAddrInst:
     case SILInstructionKind::UncheckedRefCastInst:
     case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     case SILInstructionKind::UpcastInst:
       return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
+
+    case SILInstructionKind::TupleElementAddrInst:
+    case SILInstructionKind::StructElementAddrInst: {
+      auto *svi = cast<SingleValueInstruction>(inst);
+      // If we have a sendable field... we can always access it after
+      // transferring... so do not track this.
+      if (!isNonSendableType(svi->getType()))
+        return;
+      return translateSILLookThrough(svi->getResult(0), svi->getOperand(0));
+    }
 
     // We identify tuple results with their operand's id.
     case SILInstructionKind::DestructureTupleInst:
@@ -1183,7 +1209,6 @@ public:
     case SILInstructionKind::PointerToAddressInst:
     case SILInstructionKind::ProjectBlockStorageInst:
     case SILInstructionKind::RefToUnmanagedInst:
-    case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::TailAddrInst:
     case SILInstructionKind::ThickToObjCMetatypeInst:
     case SILInstructionKind::ThinToThickFunctionInst:
@@ -1191,6 +1216,7 @@ public:
     case SILInstructionKind::UncheckedEnumDataInst:
     case SILInstructionKind::UncheckedOwnershipConversionInst:
     case SILInstructionKind::UnmanagedToRefInst:
+      return translateSILAssign(inst);
 
     // RefElementAddrInst is not considered to be a lookThrough since we want to
     // consider the address projected from the class to be a separate value that
@@ -1198,8 +1224,29 @@ public:
     // do this is to ensure that if we assign into the ref_element_addr memory,
     // we do not consider writes into the struct that contains the
     // ref_element_addr to be merged into.
-    case SILInstructionKind::RefElementAddrInst:
+    case SILInstructionKind::RefElementAddrInst: {
+      auto *reai = cast<RefElementAddrInst>(inst);
+      // If we are accessing a let of a Sendable type, do not treat the
+      // ref_element_addr as a require use.
+      if (reai->getField()->isLet() && !isNonSendableType(reai->getType())) {
+        LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
+        return;
+      }
       return translateSILAssign(inst);
+    }
+
+    case SILInstructionKind::TupleExtractInst:
+    case SILInstructionKind::StructExtractInst: {
+      auto *svi = cast<SingleValueInstruction>(inst);
+      // If our result is a Sendable type regardless of if it is a let or a var,
+      // we do not need to track it.
+      if (!isNonSendableType(svi->getType())) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "    Found a sendable field... Not Tracking!\n");
+        return;
+      }
+      return translateSILAssign(inst);
+    }
 
     /// Enum inst is handled specially since if it does not have an argument,
     /// we must assign fresh. Otherwise, we must propagate.
