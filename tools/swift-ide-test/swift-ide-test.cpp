@@ -871,6 +871,11 @@ static llvm::cl::list<std::string>
                              llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+  EnableUpcomingFeatures("enable-upcoming-feature",
+      llvm::cl::desc("Enable a feature that will be introduced in an upcoming language version"),
+      llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
 
@@ -4431,6 +4436,12 @@ int main(int argc, char *argv[]) {
 
   for (const auto &featureArg : options::EnableExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureArg)) {
+      InitInvok.getLangOptions().Features.insert(*feature);
+    }
+  }
+
+  for (const auto &featureArg : options::EnableUpcomingFeatures) {
+    if (auto feature = getUpcomingFeature(featureArg)) {
       InitInvok.getLangOptions().Features.insert(*feature);
     }
   }
