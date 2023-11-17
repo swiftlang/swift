@@ -12,17 +12,17 @@ struct ConformsToMainActorProto: MainActorProtocol {
 }
 
 func testGlobalFunctions() {
-  _ = publicFunc()
-  _ = publicFuncWithDefaultArg()
+  let _: Int = publicFunc()
+  let _: Int = publicFuncWithDefaultArg()
   #if TEST_PACKAGE
-  _ = packageFunc()
+  let _: Int = packageFunc()
   #endif
   constrainedGenericPublicFunction(ConformsToPublicProto())
-  _ = publicSpecializedFunc(4)
-  _ = publicSpecializedFunc(ConformsToPublicProto())
+  let _: Int = publicSpecializedFunc(4)
+  let _: ConformsToPublicProto = publicSpecializedFunc(ConformsToPublicProto())
   if #available(SwiftStdlib 5.1, *) {
-    _ = publicFuncWithOpaqueReturnType()
-    _ = publicAEICFuncWithOpaqueReturnType()
+    let _: any PublicProto = publicFuncWithOpaqueReturnType()
+    let _: Any = publicAEICFuncWithOpaqueReturnType()
   }
 }
 
