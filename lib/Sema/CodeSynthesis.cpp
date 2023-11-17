@@ -337,13 +337,64 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   ctor->setSynthesized();
   ctor->setAccess(accessLevel);
 
+  if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues)) {
+    // If any of the type's actor-isolated properties:
+    //   1. Have non-Sendable type, or
+    //   2. Have an isolated initial value
+    // then the initializer must also be actor-isolated. If all
+    // isolated properties have Sendable type and a nonisolated
+    // default value, then the initializer can be nonisolated.
+    //
+    // These rules only apply for global actor isolation, because actor
+    // initializers apply Sendable checking to arguments at the call-site,
+    // and actor initializers do not run on the actor, so initial values
+    // cannot be actor-instance-isolated.
+    bool shouldAddNonisolated = true;
+    llvm::Optional<ActorIsolation> existingIsolation = llvm::None;
+    VarDecl *previousVar = nullptr;
+
+    // The memberwise init properties are also effectively what the
+    // default init uses, e.g. default initializers initialize via
+    // properties wrapped and init accessors.
+    for (auto var : decl->getMemberwiseInitProperties()) {
+      auto type = var->getTypeInContext();
+      auto isolation = getActorIsolation(var);
+      if (isolation.isGlobalActor()) {
+        if (!isSendableType(decl->getModuleContext(), type) ||
+            var->getInitializerIsolation().isGlobalActor()) {
+          // If different isolated stored properties require different
+          // global actors, it is impossible to initialize this type.
+          if (existingIsolation &&
+              *existingIsolation != isolation) {
+            ctx.Diags.diagnose(decl->getLoc(),
+                diag::conflicting_stored_property_isolation,
+                ICK == ImplicitConstructorKind::Memberwise,
+                decl->getDeclaredType(), *existingIsolation, isolation);
+            previousVar->diagnose(
+                diag::property_requires_actor,
+                previousVar->getDescriptiveKind(),
+                previousVar->getName(), *existingIsolation);
+            var->diagnose(
+                diag::property_requires_actor,
+                var->getDescriptiveKind(),
+                var->getName(), isolation);
+          }
+
+          existingIsolation = isolation;
+          previousVar = var;
+          shouldAddNonisolated = false;
+        }
+      }
+    }
+
+    if (shouldAddNonisolated) {
+      addNonIsolatedToSynthesized(decl, ctor);
+    }
+  }
+
   if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
 
-    // FIXME: If 'IsolatedDefaultValues' is enabled, the memberwise init
-    // should be 'nonisolated' if none of the memberwise-initialized properties
-    // are global actor isolated and have non-Sendable type, and none of the
-    // initial values require global actor isolation.
     if (!ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues)) {
       addNonIsolatedToSynthesized(decl, ctor);
     }
