@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 %import gyb
+
 @available(*, unavailable, renamed: "UnsafeMutableRawBufferPointer")
 typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
 % for mutable in (True, False):
