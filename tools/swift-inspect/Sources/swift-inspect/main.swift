@@ -46,8 +46,11 @@ internal struct GenericMetadataOptions: ParsableArguments {
   @Flag(help: "Show allocations in mangled form")
   var mangled: Bool = false
 
-  @Option(help: "Path to output JSON file")
-  var outputJson: String? = nil
+  @Flag(help: "Output JSON")
+  var json: Bool = false
+
+  @Option(help: "Output to a file")
+  var outputFile: String? = nil
 }
 
 internal func inspect(options: UniversalOptions,

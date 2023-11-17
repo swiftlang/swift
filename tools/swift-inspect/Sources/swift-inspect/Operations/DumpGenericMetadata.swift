@@ -55,6 +55,29 @@ private struct Metadata: Encodable {
   }
 }
 
+internal struct Output: TextOutputStream {
+  let fileHandle: FileHandle
+  init(_ outputFile: String? = nil) throws {
+    if let outputFile {
+      if FileManager().createFile(atPath: outputFile, contents: nil) {
+        self.fileHandle = try FileHandle(forWritingAtPath: outputFile)!
+      } else {
+        print("Unable to create file \(outputFile)")
+        exit(1)
+      }
+    } else {
+      self.fileHandle = FileHandle.standardOutput
+    }
+  }
+
+  mutating func write(_ string: String) {
+    if let encodedString = string.data(using: .utf8) {
+      fileHandle.write(encodedString)
+    }
+  }
+
+}
+
 internal struct DumpGenericMetadata: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Print the target's generic metadata allocations.")
@@ -96,47 +119,45 @@ internal struct DumpGenericMetadata: ParsableCommand {
                         backtrace: currentBacktrace)
       }
 
-      if let outputFile = genericMetadataOptions.outputJson {
-        try dumpToJson(process: process, generics: generics,
-                       outputPath: outputFile)
+      if genericMetadataOptions.json {
+        try dumpJson(process: process, generics: generics)
       } else {
-        try dumpToStdout(process: process, generics: generics)
+        try dumpText(process: process, generics: generics)
       }
     }
   }
 
-  private func dumpToStdout(process: any RemoteProcess, generics: [Metadata]) throws {
+  private func dumpText(process: any RemoteProcess, generics: [Metadata]) throws {
     var errorneousMetadata: [(ptr: swift_reflection_ptr_t, name: String)] = []
-
-    print("Address", "Allocation", "Size", "Offset", "isArrayOfClass", "Name", separator: "\t")
+    var output = try Output(genericMetadataOptions.outputFile)
+    print("Address", "Allocation", "Size", "Offset", "isArrayOfClass", "Name", separator: "\t", to: &output)
     generics.forEach {
-      print("\(hex: $0.ptr)", terminator: "\t")
+      print("\(hex: $0.ptr)", terminator: "\t", to: &output)
       if let allocation = $0.allocation, let offset = $0.offset {
-        print("\(hex: allocation.ptr)\t\(allocation.size)\t\(offset)", terminator: "\t")
+        print("\(hex: allocation.ptr)\t\(allocation.size)\t\(offset)", terminator: "\t", to: &output)
       } else {
         if $0.garbage {
           errorneousMetadata.append((ptr: $0.ptr, name: $0.name))
         }
-        print("???\t??\t???", terminator: "\t")
+        print("???\t??\t???", terminator: "\t", to: &output)
       }
-      print($0.isArrayOfClass, terminator: "\t")
-      print($0.name)
+      print($0.isArrayOfClass, terminator: "\t", to: &output)
+      print($0.name, to: &output)
       if let _ = backtraceOptions.style, let _ = $0.allocation {
-        print($0.backtrace ?? "  No stacktrace available")
+        print($0.backtrace ?? "  No stacktrace available", to: &output)
       }
     }
 
     if errorneousMetadata.count > 0 {
-      print("Error: The following metadata was not found in any DATA or AUTH segments, may be garbage.")
+      print("Error: The following metadata was not found in any DATA or AUTH segments, may be garbage.", to: &output)
       errorneousMetadata.forEach {
-        print("\(hex: $0.ptr)\t\($0.name)")
+        print("\(hex: $0.ptr)\t\($0.name)", to: &output)
       }
     }
   }
 
-  private func dumpToJson(process: any RemoteProcess,
-                          generics: [Metadata],
-                          outputPath: String) throws {
+  private func dumpJson(process: any RemoteProcess,
+                        generics: [Metadata]) throws {
     struct AllMetadataEntries: Encodable {
       var metadata: [Metadata]
     }
@@ -144,8 +165,12 @@ internal struct DumpGenericMetadata: ParsableCommand {
     let encoder = JSONEncoder()
     encoder.outputFormatting = .prettyPrinted
     let data = try encoder.encode(allMetadataEntries)
-    try String(data: data, encoding: .utf8)!
-      .write(toFile: outputPath, atomically: true, encoding: .utf8)
+    let jsonOutput = String(data: data, encoding: .utf8)!
+    if let outputFile = genericMetadataOptions.outputFile {
+      try jsonOutput.write(toFile: outputFile, atomically: true, encoding: .utf8)
+    } else {
+      print(jsonOutput)
+    }
   }
 
 }
