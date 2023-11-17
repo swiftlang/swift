@@ -2,4 +2,4 @@
 
 import VirtualMethods
 
-VirtualNonAbstractBase().nonAbstractMethod() // expected-error {{'nonAbstractMethod()' is unavailable: virtual functions are not yet available in Swift}}
+VirtualNonAbstractBase().nonAbstractMethod()
