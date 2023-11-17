@@ -20,11 +20,11 @@ func requiresMainActor() -> Int { 0 }
 @SomeGlobalActor
 func requiresSomeGlobalActor() -> Int { 0 }
 
-// expected-error@+1 {{main actor-isolated default argument in a nonisolated context}}
+// expected-error@+1 {{main actor-isolated default value in a nonisolated context}}
 func mainActorDefaultArgInvalid(value: Int = requiresMainActor()) {}
 
 func mainActorClosureInvalid(
-  closure: () -> Int = { // expected-error {{main actor-isolated default argument in a nonisolated context}}
+  closure: () -> Int = { // expected-error {{main actor-isolated default value in a nonisolated context}}
     requiresMainActor()
   }
 ) {}
@@ -41,7 +41,7 @@ func mainActorDefaultArg(value: Int = requiresMainActor()) {}
 ) {}
 
 func mainActorClosureCall(
-  closure: Int = { // expected-error {{main actor-isolated default argument in a nonisolated context}}
+  closure: Int = { // expected-error {{main actor-isolated default value in a nonisolated context}}
     requiresMainActor()
   }()
 ) {}
@@ -153,6 +153,11 @@ struct S2 {
 struct S3 {
   // expected-error@+1 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
   var (x, y, z) = (requiresMainActor(), requiresSomeGlobalActor(), 10)
+}
+
+struct S4 {
+  // expected-error@+1 {{main actor-isolated default value in a nonisolated context}}
+  var x: Int = requiresMainActor()
 }
 
 @MainActor

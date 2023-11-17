@@ -5201,7 +5201,7 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "non-isolated context",
       (const ValueDecl *))
 ERROR(isolated_default_argument_context,none,
-      "%0 default argument in a %1 context", 
+      "%0 default value in a %1 context", 
       (ActorIsolation, ActorIsolation))
 ERROR(conflicting_default_argument_isolation,none,
       "default argument cannot be both %0 and %1",

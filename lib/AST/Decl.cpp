@@ -10289,6 +10289,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     DeclContext *dc,
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
+  auto &ctx = dc->getASTContext();
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
   if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
@@ -10309,6 +10310,13 @@ ActorIsolation swift::getActorIsolationOfContext(
   //     actor isolation as the field itself. That default expression may only
   //     be used from inits that meet the required isolation.
   if (auto *var = dcToUse->getNonLocalVarDecl()) {
+    // If IsolatedDefaultValues are enabled, treat this context as having
+    // unspecified isolation. We'll compute the required isolation for
+    // the initializer and validate that it matches the isolation of the
+    // var itself in the DefaultInitializerIsolation request.
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues))
+      return ActorIsolation::forUnspecified();
+
     return getActorIsolation(var);
   }
 

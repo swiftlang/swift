@@ -19,11 +19,11 @@ func requiresMainActor() -> Int { 0 }
 @SomeGlobalActor
 func requiresSomeGlobalActor() -> Int { 0 }
 
-struct S1 {
+class C1 {
   // expected-note@+1 2 {{'self.x' not initialized}}
-  var x = requiresMainActor()
+  @MainActor var x = requiresMainActor()
   // expected-note@+1 2 {{'self.y' not initialized}}
-  var y = requiresSomeGlobalActor()
+  @SomeGlobalActor var y = requiresSomeGlobalActor()
   var z = 10
 
   // expected-error@+1 {{return from initializer without initializing all stored properties}}
@@ -36,9 +36,9 @@ struct S1 {
   @SomeGlobalActor init(c: Int) {}
 }
 
-struct S2 {
-  var x = requiresMainActor()
-  var y = requiresSomeGlobalActor()
+class C2 {
+  @MainActor var x = requiresMainActor()
+  @SomeGlobalActor var y = requiresSomeGlobalActor()
   var z = 10
 
   nonisolated init(x: Int, y: Int) {
