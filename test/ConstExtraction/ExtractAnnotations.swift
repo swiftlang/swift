@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: echo "[MyProto, _ConstExtractable]" > %t/protocols.json
+// RUN: echo "[]" > %t/protocols.json
 
-// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractAnnotations.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
+// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractAnnotations.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s -enable-experimental-feature ExtractConstantsFromMembers
 // RUN: cat %t/ExtractAnnotations.swiftconstvalues 2>&1 | %FileCheck %s
 
-protocol MyProto {}
+@extractConstantsFromMembers protocol MyProto {}
 
 public struct Annotations: MyProto {
     @available(iOS 10.0, OSX 10.12, *)
@@ -25,7 +25,7 @@ public struct Annotations: MyProto {
 @available(OSX, deprecated: 10.12, renamed: "Annotations", message: "Please use Annotations")
 @available(tvOS, deprecated)
 @available(*, unavailable)
-public struct DeprecatedAnnotations: _ConstExtractable {}
+public struct DeprecatedAnnotations: MyProto {}
 
 // CHECK: [
 // CHECK-NEXT:  {
@@ -137,7 +137,7 @@ public struct DeprecatedAnnotations: _ConstExtractable {}
 // CHECK-NEXT:    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractAnnotations.swift",
 // CHECK-NEXT:    "line": 28,
 // CHECK-NEXT:    "conformances": [
-// CHECK-NEXT:      "Swift._ConstExtractable"
+// CHECK-NEXT:      "ExtractAnnotations.MyProto"
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [],

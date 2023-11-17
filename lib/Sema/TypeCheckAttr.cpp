@@ -330,6 +330,8 @@ public:
   
   void visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr);
 
+  void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
+
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
@@ -427,6 +429,10 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
 }
 
 void AttributeChecker::visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr) {
+  return;
+}
+
+void AttributeChecker::visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr) {
   return;
 }
 

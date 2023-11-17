@@ -263,6 +263,9 @@ EXPERIMENTAL_FEATURE(InferSendableFromCaptures, false)
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
+/// Enable the @extractConstantsFromMembers attribute.
+EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

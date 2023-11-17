@@ -533,6 +533,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_resultDependsOnSelf, ResultDependsOnSelf,
 SIMPLE_DECL_ATTR(_staticExclusiveOnly, StaticExclusiveOnly,
   OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   151)
+SIMPLE_DECL_ATTR(extractConstantsFromMembers, ExtractConstantsFromMembers,
+  OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  152)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
