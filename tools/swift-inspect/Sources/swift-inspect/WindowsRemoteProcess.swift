@@ -529,30 +529,12 @@ internal final class WindowsRemoteProcess: RemoteProcess {
   }
 
   private func createEventPair(_ dwProcessId: DWORD) -> (HANDLE, HANDLE)? {
-    let readEventName = READ_EVENT_NAME_PREFIX + "-" + String(dwProcessId)
-    let writeEventName = WRITE_EVENT_NAME_PREFIX + "-" + String(dwProcessId)
-    let hReadEvent: HANDLE = CreateEventA(
-      LPSECURITY_ATTRIBUTES(bitPattern: 0),
-      false,  // Auto-reset
-      false,  // Initial state is nonsignaled
-      readEventName)
-    if hReadEvent == HANDLE(bitPattern: 0) {
-      print("CreateEvent failed \(GetLastError())")
-      return nil
-    }
-    let hWriteEvent: HANDLE = CreateEventA(
-      LPSECURITY_ATTRIBUTES(bitPattern: 0),
-      false,  // Auto-reset
-      false,  // Initial state is nonsignaled
-      writeEventName)
-    if hWriteEvent == HANDLE(bitPattern: 0) {
-      print("CreateEvent failed \(GetLastError())")
-      CloseHandle(hReadEvent)
-      return nil
-    }
+    let hReadEvent = CreateEvent("\(READ_EVENT_NAME_PREFIX)-\(dwProcessId)")
+    guard let hReadEvent else { return nil }
+    let hWriteEvent = CreateEvent("\(WRITE_EVENT_NAME_PREFIX)-\(dwProcessId)")
+    guard let hWriteEvent else { CloseHandle(hReadEvent);  return nil }
     return (hReadEvent, hWriteEvent)
   }
-
 }
 
 #endif
