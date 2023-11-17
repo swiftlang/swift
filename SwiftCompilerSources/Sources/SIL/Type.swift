@@ -90,8 +90,14 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
-  public func getNominalFields(in function: Function) -> NominalFieldsArray {
-    NominalFieldsArray(type: self, function: function)
+  /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
+  /// Returns nil if the nominal is a resilient type because in this case the complete list
+  /// of fields is not known.
+  public func getNominalFields(in function: Function) -> NominalFieldsArray? {
+    if nominal.isResilient(in: function) {
+      return nil
+    }
+    return NominalFieldsArray(type: self, function: function)
   }
 
   public typealias MetatypeRepresentation = BridgedType.MetatypeRepresentation
@@ -225,6 +231,10 @@ public struct NominalTypeDecl : Equatable, Hashable {
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(bridged.raw)
+  }
+
+  public func isResilient(in function: Function) -> Bool {
+    function.bridged.isResilientNominalDecl(bridged)
   }
 
   public var isStructWithUnreferenceableStorage: Bool {

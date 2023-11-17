@@ -320,6 +320,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool hasValidLinkageForFragileRef() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
+  BRIDGED_INLINE bool isResilientNominalDecl(BridgedNominalTypeDecl decl) const;
 
   enum class ParseEffectsMode {
     argumentEffectsFromSource,

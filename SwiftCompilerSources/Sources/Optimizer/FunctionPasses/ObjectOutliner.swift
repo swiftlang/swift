@@ -410,7 +410,7 @@ private extension AllocRefInstBase {
 
   var numClassFields: Int {
     assert(type.isClass)
-    return type.getNominalFields(in: parentFunction).count
+    return type.getNominalFields(in: parentFunction)!.count
   }
 
   var numStoresPerTailElement: Int {
@@ -475,7 +475,7 @@ private func replace(findStringCall: ApplyInst,
                      with cachedFindStringFunc: Function,
                      _ context: FunctionPassContext) {
   let cacheType = cachedFindStringFunc.argumentTypes[2].objectType
-  let wordTy = cacheType.getNominalFields(in: findStringCall.parentFunction)[0]
+  let wordTy = cacheType.getNominalFields(in: findStringCall.parentFunction)![0]
 
   let name = context.mangleOutlinedVariable(from: findStringCall.parentFunction)
 

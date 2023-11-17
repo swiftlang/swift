@@ -529,6 +529,11 @@ void BridgedFunction::setNeedStackProtection(bool needSP) const {
   getFunction()->setNeedStackProtection(needSP);
 }
 
+bool BridgedFunction::isResilientNominalDecl(BridgedNominalTypeDecl decl) const {
+  return decl.unbridged()->isResilient(getFunction()->getModule().getSwiftModule(),
+                                       getFunction()->getResilienceExpansion());
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                BridgedGlobalVar
