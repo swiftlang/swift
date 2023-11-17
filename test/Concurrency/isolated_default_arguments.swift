@@ -195,3 +195,37 @@ extension A {
     _ = S2(required: 10)
   }
 }
+
+// expected-error@+1 {{default initializer for 'C1' cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+class C1 {
+  // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
+  @MainActor var x = requiresMainActor()
+  // expected-note@+1 {{initializer for property 'y' is global actor 'SomeGlobalActor'-isolated}}
+  @SomeGlobalActor var y = requiresSomeGlobalActor()
+}
+
+class NonSendable {}
+
+// expected-error@+1 {{default initializer for 'C2' cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+class C2 {
+  // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
+  @MainActor var x = NonSendable()
+  // expected-note@+1 {{initializer for property 'y' is global actor 'SomeGlobalActor'-isolated}}
+  @SomeGlobalActor var y = NonSendable()
+}
+
+class C3 {
+  @MainActor var x = 1
+  @SomeGlobalActor var y = 2
+}
+
+@MainActor struct NonIsolatedInit {
+  var x = 0
+  var y = 0
+}
+
+func callDefaultInit() async {
+  _ = C2()
+  _ = NonIsolatedInit()
+  _ = NonIsolatedInit(x: 10)
+}
