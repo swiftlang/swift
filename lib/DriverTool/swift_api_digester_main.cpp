@@ -652,6 +652,9 @@ public:
         DebugMapping(DebugMapping) {}
 
   void diagnoseMissingAvailable(SDKNodeDecl *D) {
+    PrettyStackTraceSDKNode trace(
+        "diagnosing missing availability on SDK node", D);
+
     // For extensions of external types, we diagnose individual member's missing
     // available attribute instead of the extension itself.
     // The reason is we may merge several extensions into a single one; some
@@ -677,6 +680,9 @@ public:
     }
   }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
+    PrettyStackTraceSDKNodes trace(
+        "processing match between SDK nodes", Left, Right);
+
     if (DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
     switch (Reason) {
@@ -1916,6 +1922,9 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
                                 bool DebugMapping) {
+  PrettyStackTraceSDKNodes trace(
+       "diagnosing changes between modules", LeftModule, RightModule);
+
   assert(LeftModule);
   assert(RightModule);
   llvm::raw_ostream *OS = &llvm::errs();
