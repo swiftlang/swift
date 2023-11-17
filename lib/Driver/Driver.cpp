@@ -1849,6 +1849,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_stable_abi_EQ)) {
+    OI.SanitizerUseStableABI =
+        parseSanitizerUseStableABI(A, OI.SelectedSanitizers, Diags);
+  }
+
   if (TC.getTriple().isOSWindows()) {
     if (const Arg *A = Args.getLastArg(options::OPT_libc)) {
       OI.RuntimeVariant =
