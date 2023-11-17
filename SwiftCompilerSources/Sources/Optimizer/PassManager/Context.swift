@@ -21,6 +21,10 @@ protocol Context {
 extension Context {
   var options: Options { Options(_bridged: _bridged) }
 
+  var diagnosticEngine: DiagnosticEngine {
+    return DiagnosticEngine(bridged: _bridged.getDiagnosticEngine())
+  }
+
   // The calleeAnalysis is not specific to a function and therefore can be provided in
   // all contexts.
   var calleeAnalysis: CalleeAnalysis {
