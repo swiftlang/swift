@@ -106,7 +106,8 @@ bool CheckerLivenessInfo::compute() {
       case OperandOwnership::NonUse:
         break;
       case OperandOwnership::TrivialUse:
-        llvm_unreachable("this operand cannot handle ownership");
+        liveness->updateForUse(user, /*lifetimeEnding*/ false);
+        break;
 
       // Conservatively treat a conversion to an unowned value as a pointer
       // escape. Is it legal to canonicalize ForwardingUnowned?
@@ -409,13 +410,12 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
 
   for (auto &block : *fn) {
     for (auto &ii : block) {
-      if (auto *bbi = dyn_cast<BeginBorrowInst>(&ii)) {
-        if (bbi->isLexical() && !bbi->getType().isMoveOnly()) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Found lexical lifetime to check: " << *bbi);
-          valuesToCheck.insert(bbi);
-        }
-        continue;
+      if (auto *mvi = dyn_cast<MoveValueInst>(&ii)) {
+        if (!mvi->getAllowDiagnostics())
+          continue;
+
+        LLVM_DEBUG(llvm::dbgs() << "Found move_value to check: " << *mvi);
+        valuesToCheck.insert(mvi);
       }
     }
   }
@@ -443,8 +443,45 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
         livenessInfo.liveness, fn, nullptr,
         &livenessInfo.nonLifetimeEndingUsesInLiveOut);
 
-    auto lexicalValue = valuesToProcess.front();
+    SILValue lexicalValue = valuesToProcess.front();
     valuesToProcess = valuesToProcess.drop_front(1);
+
+    {
+      auto isDebugValue = [](SILInstruction *i) -> bool {
+        return isa<DebugValueInst>(i);
+      };
+
+      // Walk use-def chain until we find something that might resemble a def.
+      SILInstruction *inst = lexicalValue.getDefiningInstruction();
+      while (inst && isa<MoveValueInst,
+                         CopyValueInst,
+                         ExplicitCopyValueInst,
+                         LoadInst,
+                         LoadBorrowInst,
+                         ProjectBoxInst>(inst)) {
+
+        // NOTE(kavon): If this `load [take]` is marked with a debug_value, then
+        // it's a "lexical value" and we can stop the walk.
+        if (auto *load = dyn_cast<LoadInst>(inst))
+          if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
+            if (llvm::any_of(load->getUsers(), isDebugValue))
+              break;
+
+        assert(inst->getNumOperands() == 1);
+        lexicalValue = inst->getOperand(0);
+        inst = lexicalValue.getDefiningInstruction();
+      }
+
+      // Filter-out non-lexical storage
+      if (auto allocStack = dyn_cast_or_null<AllocStackInst>(inst))
+        if (!allocStack->isLexical())
+          continue;
+
+      if (auto borrow = dyn_cast_or_null<BeginBorrowInst>(inst))
+        if (!borrow->isLexical())
+          continue;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *lexicalValue);
 
     // Then compute liveness.
