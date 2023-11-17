@@ -20,6 +20,18 @@ func testStringify(a: Int, b: Int) {
   _ = #stringify(a + b)
 }
 
+@propertyWrapper
+struct declareVarValuePeer {
+  var wrappedValue: Int
+}
+
+struct TestShadowUnqualified {
+  @declareVarValuePeer
+  var shouldFindMacro: Int = 2
+}
+
+_ = TestShadowUnqualified().value
+
 enum macro_library {
   @propertyWrapper
   struct declareVarValuePeerShadowed {

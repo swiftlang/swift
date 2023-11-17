@@ -1630,11 +1630,6 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
 
-  // When performing lookup for freestanding macro roles, only consider
-  // macro names, ignoring types.
-  bool onlyMacros = static_cast<bool>(roles & getFreestandingMacroRoles()) &&
-      !(roles - getFreestandingMacroRoles());
-
   auto addChoiceIfApplicable = [&](ValueDecl *decl) {
     if (auto macro = dyn_cast<MacroDecl>(decl)) {
       auto candidateRoles = macro->getMacroRoles();
@@ -1658,12 +1653,9 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
     if (!moduleDecl)
       return {};
 
-    auto options = NL_ExcludeMacroExpansions;
-    if (onlyMacros)
-      options |= NL_OnlyMacros;
-
     ModuleQualifiedLookupRequest req{moduleScopeDC, moduleDecl, macroName,
-                                     SourceLoc(), options};
+                                     SourceLoc(),
+                                     NL_ExcludeMacroExpansions | NL_OnlyMacros};
     auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
     for (auto *found : lookup)
       addChoiceIfApplicable(found);
@@ -1675,10 +1667,8 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
     // the source location here doesn't matter.
     UnqualifiedLookupDescriptor descriptor{
         macroName, moduleScopeDC, SourceLoc(),
-        UnqualifiedLookupFlags::ExcludeMacroExpansions};
-
-    if (onlyMacros)
-      descriptor.Options |= UnqualifiedLookupFlags::MacroLookup;
+        UnqualifiedLookupFlags::ExcludeMacroExpansions |
+            UnqualifiedLookupFlags::MacroLookup};
 
     auto lookup = evaluateOrDefault(ctx.evaluator,
                                     UnqualifiedLookupRequest{descriptor}, {});
@@ -1726,9 +1716,9 @@ void namelookup::forEachPotentialResolvedMacro(
 ) {
   ASTContext &ctx = moduleScopeCtx->getASTContext();
   UnqualifiedLookupDescriptor lookupDesc{
-    macroName, moduleScopeCtx, SourceLoc(),
-    UnqualifiedLookupFlags::ExcludeMacroExpansions
-  };
+      macroName, moduleScopeCtx, SourceLoc(),
+      UnqualifiedLookupFlags::ExcludeMacroExpansions |
+          UnqualifiedLookupFlags::MacroLookup};
 
   auto lookup = evaluateOrDefault(
       ctx.evaluator, UnqualifiedLookupRequest{lookupDesc}, {});
