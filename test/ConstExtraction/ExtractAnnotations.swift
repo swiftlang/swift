@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: echo "[]" > %t/protocols.json
+// RUN: echo "[MyProto]" > %t/protocols.json
 
-// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractAnnotations.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s -enable-experimental-feature ExtractConstantsFromMembers
+// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractAnnotations.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
 // RUN: cat %t/ExtractAnnotations.swiftconstvalues 2>&1 | %FileCheck %s
 
-@extractConstantsFromMembers protocol MyProto {}
+protocol MyProto {}
 
 public struct Annotations: MyProto {
     @available(iOS 10.0, OSX 10.12, *)
