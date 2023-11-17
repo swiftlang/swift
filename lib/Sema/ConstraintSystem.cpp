@@ -6097,6 +6097,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::OptionalPayload:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
+    case ConstraintLocator::KeyPathSubscriptIndex:
       break;
     }
 
