@@ -26,9 +26,6 @@ The path to a directory that mimics a file system image root,
 under which "Library" and "Program Files" subdirectories will be created
 with the files installed by CMake.
 
-.PARAMETER BuildType
-The CMake build type to use, one of: Release, RelWithDebInfo, Debug.
-
 .PARAMETER CDebugFormat
 The debug information format for C/C++ code: dwarf or codeview.
 
@@ -62,6 +59,12 @@ If set, skips building the msi's and installer
 .PARAMETER DefaultsLLD
 If false, use `link.exe` as the default linker with the SDK (with SPM)
 
+.PARAMETER DebugInfo
+If set, debug information will be generated for the builds.
+
+.PARAMETER EnableCaching
+If true, use `sccache` to cache the build rules.
+
 .PARAMETER Test
 An array of names of projects to run tests for.
 '*' runs all tests
@@ -91,7 +94,6 @@ param(
   [string] $SourceCache = "S:\SourceCache",
   [string] $BinaryCache = "S:\b",
   [string] $ImageRoot = "S:",
-  [string] $BuildType = "Release",
   [string] $CDebugFormat = "dwarf",
   [string] $SwiftDebugFormat = "dwarf",
   [string[]] $SDKs = @("X64","X86","Arm64"),
@@ -106,6 +108,8 @@ param(
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
+  [switch] $DebugInfo,
+  [switch] $EnableCaching,
   [switch] $ToBatch,
   [string] $PinnedLayout = "old"
 )
@@ -577,21 +581,30 @@ function Build-CMakeProject {
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
   
-    TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE $BuildType
+    TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
     TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
-    $GenerateDebugInfo = $Defines["CMAKE_BUILD_TYPE"] -ne "Release"
-
     $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
-    if ($GenerateDebugInfo) { $CFlags += "/Zi" }
+    if ($DebugInfo) { $CFlags += if ($EnableCaching) { "/Z7" } else { "/Zi" } }
     $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
+
+    if ($EnableCaching) {
+      $env:SCCACHE_DIRECT = "true"
+      $env:SCCACHE_DIR = "$BinaryCache\sccache"
+    }
 
     if ($UseMSVCCompilers.Contains("C")) {
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER cl
+      if ($EnableCaching) {
+        TryAdd-KeyValue $Defines CMAKE_C_COMPILER_LAUNCHER sccache
+      }
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UseMSVCCompilers.Contains("CXX")) {
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER cl
+      if ($EnableCaching) {
+        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
+      }
       Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
     }
     if ($UsePinnedCompilers.Contains("ASM") -Or $UseBuiltCompilers.Contains("ASM")) {
@@ -616,7 +629,7 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
       }
 
-      if ($GenerateDebugInfo -and $CDebugFormat -eq "dwarf") {
+      if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_C_FLAGS "-gdwarf"
       }
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
@@ -634,7 +647,7 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
       }
 
-      if ($GenerateDebugInfo -and $CDebugFormat -eq "dwarf") {
+      if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_CXX_FLAGS "-gdwarf"
       }
       Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
@@ -664,7 +677,7 @@ function Build-CMakeProject {
       }
 
       # Debug Information
-      if ($GenerateDebugInfo) {
+      if ($DebugInfo) {
         if ($SwiftDebugFormat -eq "dwarf") {
           $SwiftArgs += @("-g", "-Xlinker", "/DEBUG:DWARF", "-use-ld=lld-link")
         } else {
@@ -779,14 +792,14 @@ function Build-SPMProject {
         "-Xcc", "-I$SDKInstallRoot\usr\lib\swift",
         "-Xlinker", "-L$SDKInstallRoot\usr\lib\swift\windows"
     )
-    if ($BuildType -eq "Release") {
-      $Arguments += @("-debug-info-format", "none")
-    } else {
+    if ($DebugInfo) {
       if ($SwiftDebugFormat -eq "dwarf") {
         $Arguments += @("-debug-info-format", "dwarf")
       } else {
         $Arguments += @("-debug-info-format", "codeview")
       }
+    } else {
+      $Arguments += @("-debug-info-format", "none")
     }
 
     Invoke-Program "$ToolchainInstallRoot\usr\bin\swift.exe" "build" @Arguments @AdditionalArguments
@@ -847,6 +860,7 @@ function Build-BuildTools($Arch) {
     -Src $SourceCache\llvm-project\llvm `
     -Bin $BinaryCache\0 `
     -Arch $Arch `
+    -UseMSVCCompilers C,CXX `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       LLDB_ENABLE_PYTHON = "NO";
@@ -898,11 +912,6 @@ function Build-Compilers($Arch, [switch]$Test = $false) {
 
     $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
 
-    $LLVM_ENABLE_PDB = switch ($BuildType) {
-      "Release" { "NO" }
-      default { "YES" }
-    }
-
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
       -Bin $BinaryCache\1 `
@@ -913,10 +922,6 @@ function Build-Compilers($Arch, [switch]$Test = $false) {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = "$BinaryCache\0\bin\clang-tblgen.exe";
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = "$BinaryCache\0\bin\clang-tidy-confusable-chars-gen.exe";
-        # LLVM plays tricks with flags and prefers to use `LLVM_ENABLE_PDB` for
-        # debug information on Windows rather than the CMake handling.  This
-        # give us a sligtly faster build.
-        CMAKE_BUILD_TYPE = "Release";
         CMAKE_INSTALL_PREFIX = "$($Arch.ToolchainInstallRoot)\usr";
         CMAKE_Swift_COMPILER = (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "swiftc.exe");
         CMAKE_Swift_FLAGS = @("-sdk", (Get-PinnedToolchainSDK));
@@ -925,7 +930,6 @@ function Build-Compilers($Arch, [switch]$Test = $false) {
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
         LLDB_TABLEGEN = "$BinaryCache\0\bin\lldb-tblgen.exe";
         LLVM_CONFIG_PATH = "$BinaryCache\0\bin\llvm-config.exe";
-        LLVM_ENABLE_PDB = $LLVM_ENABLE_PDB;
         LLVM_EXTERNAL_CMARK_SOURCE_DIR = "$SourceCache\cmark";
         LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
         LLVM_NATIVE_TOOL_DIR = "$BinaryCache\0\bin";

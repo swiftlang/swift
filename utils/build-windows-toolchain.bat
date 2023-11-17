@@ -18,7 +18,6 @@ echo Reeinvoking script in the default environment
 set TEMP=%~dp0..\..\tmp
 mkdir %TEMP% 2>&1 1>nul
 echo set PYTHON_HOME=%PYTHON_HOME%> %TEMP%\call-build.cmd
-echo set CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%>> %TEMP%\call-build.cmd
 echo set SKIP_TESTS=%SKIP_TESTS%>> %TEMP%\call-build.cmd
 echo set SKIP_PACKAGING=%SKIP_PACKAGING%>> %TEMP%\call-build.cmd
 echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
@@ -60,8 +59,6 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
-if "%CMAKE_BUILD_TYPE%"=="" (set CMAKE_BUILD_TYPE=Release)
-
 :: Build the -Test argument, if any, by subtracting skipped tests
 set TestArg=-Test swift,dispatch,foundation,xctest,
 for %%I in (%SKIP_TESTS%) do (call set TestArg=%%TestArg:%%I,=%%)
@@ -78,7 +75,6 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
-  -BuildType %CMAKE_BUILD_TYPE% ^
   %SkipPackagingArg% ^
   %TestArg% ^
   -Stage %PackageRoot% || (exit /b 1)
