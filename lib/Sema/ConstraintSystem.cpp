@@ -2133,19 +2133,6 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
 
   unsigned metatypeDepth = 0;
 
-  /// Check whether the given type has a reference to the generic parameter
-  /// that we are erasing.
-  auto hasErasedGenericParameter = [&](Type type) {
-    if (!type->hasTypeParameter())
-      return false;
-
-    return type.findIf([&](Type type) {
-      if (auto gp = type->getAs<GenericTypeParamType>())
-        return gp->getDepth() == 0;
-      return false;
-    });
-  };
-
   std::function<Type(Type, TypePosition)> transformFn;
   transformFn = [&](Type type, TypePosition initialPos) -> Type {
     return type.transformWithPosition(
@@ -2173,7 +2160,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
           if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
             for (auto replacementType :
                  opaque->getSubstitutions().getReplacementTypes()) {
-              if (hasErasedGenericParameter(replacementType)) {
+              if (replacementType->hasTypeParameter()) {
                 return opaque->getExistentialType();
               }
             }
@@ -2193,12 +2180,9 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
             return llvm::None;
           }
 
-          if (t->getRootGenericParam()->getDepth() > 0) {
-            return Type(t);
-          }
+          assert(t->getRootGenericParam()->getDepth() == 0);
 
-          // If the type parameter is beyond the domain of the existential
-          // generic signature, ignore it.
+          // This can happen with invalid code.
           if (!existentialSig->isValidTypeParameter(t)) {
             return Type(t);
           }
