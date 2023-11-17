@@ -1193,24 +1193,25 @@ extension Collection {
   public func map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    // TODO: swift-3-indexing-model - review the following
     let n = self.count
     if n == 0 {
       return []
     }
 
-    var result = ContiguousArray<T>()
-    result.reserveCapacity(n)
+    return try Array(unsafeUninitializedCapacity: n) { buffer, resultCount in
+      var i = self.startIndex
 
-    var i = self.startIndex
+      for offset in 0..<n {
+        (buffer.baseAddress! + offset).initialize(to: try transform(self[i]))
+        formIndex(after: &i)
 
-    for _ in 0..<n {
-      result.append(try transform(self[i]))
-      formIndex(after: &i)
+        // `resultCount` needs to keep pace with the number of initialized
+        // elements, in case `transform` throws.
+        resultCount &+= 1
+      }
+
+      _expectEnd(of: self, is: i)
     }
-
-    _expectEnd(of: self, is: i)
-    return Array(result)
   }
 
   /// Returns a subsequence containing all but the given number of initial
