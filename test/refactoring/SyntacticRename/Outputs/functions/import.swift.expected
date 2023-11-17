@@ -1,4 +1,4 @@
-import func SomeModule . /*import*/otherFunc
+import func SomeModule . /*import*/<base>someFunc</base>
 
 func /*no-args:def*/aFunc() -> Int {
     return 1

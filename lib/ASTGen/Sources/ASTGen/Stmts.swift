@@ -66,7 +66,7 @@ extension ASTGenVisitor {
   func makeIfStmt(_ node: IfExprSyntax) -> BridgedIfStmt {
     // FIXME: handle multiple coniditons.
     // FIXME: handle non-expression conditions.
-    let conditions = node.conditions.map(self.generate)
+    let conditions = node.conditions.map(self.generate(conditionElement:))
     assert(conditions.count == 1)
 
     return .createParsed(
@@ -75,7 +75,14 @@ extension ASTGenVisitor {
       condition: conditions.first!.castToExpr,
       thenStmt: self.generate(codeBlock: node.body).asStmt,
       elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
-      elseStmt: (self.generate(optional: node.elseBody)?.castToStmt).asNullable
+      elseStmt: node.elseBody.map {
+        switch $0 {
+        case .codeBlock(let node):
+          return self.generate(codeBlock: node).asStmt
+        case .ifExpr(let node):
+          return self.makeIfStmt(node).asStmt
+        }
+      }.asNullable
     )
   }
 
@@ -92,7 +99,7 @@ extension ASTGenVisitor {
     .createParsed(
       self.ctx,
       returnKeywordLoc: node.returnKeyword.bridgedSourceLoc(in: self),
-      expr: self.generate(optional: node.expression).asNullable
+      expr: self.generate(expr: node.expression)
     )
   }
 }
