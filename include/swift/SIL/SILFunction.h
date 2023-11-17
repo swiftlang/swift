@@ -38,6 +38,7 @@ class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
 class NodeBitfield;
+class OperandBitfield;
 class SILPassManager;
 
 namespace Lowering {
@@ -203,6 +204,7 @@ private:
   template <class, class> friend class SILBitfield;
   friend class BasicBlockBitfield;
   friend class NodeBitfield;
+  friend class OperandBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -278,9 +280,12 @@ private:
   /// The head of a single-linked list of currently alive NodeBitfield.
   NodeBitfield *newestAliveNodeBitfield = nullptr;
 
+  /// The head of a single-linked list of currently alive OperandBitfields.
+  OperandBitfield *newestAliveOperandBitfield = nullptr;
+
   /// A monotonically increasing ID which is incremented whenever a
-  /// BasicBlockBitfield or NodeBitfield is constructed.
-  /// For details see SILBitfield::bitfieldID;
+  /// BasicBlockBitfield, NodeBitfield, or OperandBitfield is constructed.  For
+  /// details see SILBitfield::bitfieldID;
   int64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.

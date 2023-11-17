@@ -474,6 +474,10 @@ void Operand::print(llvm::raw_ostream &os) const {
      << "Is Type Dependent: " << (isTypeDependent() ? "yes" : "no") << '\n';
 }
 
+SILFunction *Operand::getFunction() const {
+  return getUser()->getFunction();
+}
+
 //===----------------------------------------------------------------------===//
 //                             OperandConstraint
 //===----------------------------------------------------------------------===//

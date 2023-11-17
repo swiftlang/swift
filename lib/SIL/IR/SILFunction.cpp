@@ -248,6 +248,8 @@ SILFunction::~SILFunction() {
          "Not all BasicBlockBitfields deleted at function destruction");
   assert(!newestAliveNodeBitfield &&
          "Not all NodeBitfields deleted at function destruction");
+  assert(!newestAliveOperandBitfield &&
+         "Not all OperandBitfields deleted at function destruction");
 
   if (destroyFunction)
     destroyFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
