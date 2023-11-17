@@ -26,8 +26,7 @@
 // RUN: %target-swift-emit-module-interface(%t/NoSkip.swiftinterface) %s  -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/NoSkip.swiftinterface
 // RUN: diff -u %t/Skip.noninlinable.swiftinterface %t/NoSkip.swiftinterface
-// FIXME: Skipping all function bodies causes the interfaces not to match.
-// diff -u %t/Skip.all.swiftinterface %t/NoSkip.swiftinterface
+// RUN: diff -u %t/Skip.all.swiftinterface %t/NoSkip.swiftinterface
 
 // Skipping all function bodies should skip *all* SIL.
 // CHECK-SIL-SKIP-ALL: sil_stage canonical
@@ -479,6 +478,16 @@ public struct Struct {
   // CHECK-SIL-NO-SKIP: "Struct.varWithInlinableSetter.setter"
   // CHECK-SIL-SKIP-NONINLINE: "Struct.varWithInlinableSetter.setter"
   // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.varWithInlinableSetter.setter"
+
+  public lazy var varWithLazyInitializer: Int = {
+    // We currently don't have a way to skip typechecking a pattern binding
+    // initializer expression
+    _blackHole("Struct.varWithLazyInitializer.init")
+    return 0
+  }()
+  // CHECK-TEXTUAL-NOT: "Struct.varWithLazyInitializer.init"
+  // CHECK-SIL-NO-SKIP: "Struct.varWithLazyInitializer.init"
+  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.varWithLazyInitializer.init"
 
   public var varWithObserverDidSet: Int = 1 {
     didSet {

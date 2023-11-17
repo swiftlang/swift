@@ -9188,13 +9188,6 @@ bool IsFunctionBodySkippedRequest::evaluate(
     // typecheck them.
     if (accessor->hasForcedStaticDispatch())
       return false;
-
-    if (auto *varDecl = dyn_cast<VarDecl>(accessor->getStorage())) {
-      // FIXME: If we don't typecheck the synthesized accessors of lazy storage
-      // properties then SILGen crashes when emitting the initializer.
-      if (varDecl->getAttrs().hasAttribute<LazyAttr>() && accessor->isSynthesized())
-        return false;
-    }
   }
 
   // Actor initializers need to be checked to determine delegation status.

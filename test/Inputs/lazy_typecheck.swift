@@ -133,6 +133,8 @@ protocol InternalProtoConformingToPublicProto: PublicProto {
 public struct PublicStruct {
   public var publicProperty: Int = NoTypecheck.int
   public var publicPropertyInferredType = ""
+  public var publicLazyProperty: Int = NoTypecheck.int
+  public var publicLazyPropertyInferred = 1
   @PublicWrapper public var publicWrappedProperty = 3.14
   @_transparent public var publicTransparentProperty: Int {
     get { return 1 }
@@ -192,6 +194,8 @@ struct InternalStruct: NoTypecheckProto {
 public class PublicClass {
   public var publicProperty: Int = NoTypecheck.int
   public var publicPropertyInferredType = ""
+  public var publicLazyProperty: Int = NoTypecheck.int
+  public var publicLazyPropertyInferred = 1
   @PublicWrapper public final var publicFinalWrappedProperty: Bool = false
   public static let publicStaticProperty: Int = NoTypecheck.int
   public static let publicStaticPropertyInferred = 2
