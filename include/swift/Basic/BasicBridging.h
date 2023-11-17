@@ -22,14 +22,16 @@
 //
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/SourceLoc.h"
+// Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
+// when including VirtualFileSystem.h
+#include "llvm/CAS/CASReference.h"
 
 #include <stddef.h>
 #include <stdint.h>
+#include <vector>
 #ifdef USED_IN_CPP_SOURCE
-// Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
-// when including VirtualFileSystem.h
 #include <cassert>
-#include "llvm/CAS/CASReference.h"
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
@@ -303,6 +305,10 @@ public:
 #endif
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: CharSourceRange
+//===----------------------------------------------------------------------===//
+
 class BridgedCharSourceRange {
 public:
   SWIFT_UNAVAILABLE("Use '.start' instead")
@@ -336,6 +342,26 @@ inline SwiftInt
 BridgedCharSourceRange_byteLength(BridgedCharSourceRange range) {
   return static_cast<SwiftInt>(range.ByteLength);
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: std::vector<CharSourceRange>
+//===----------------------------------------------------------------------===//
+
+typedef std::vector<swift::CharSourceRange> CharSourceRangeVector;
+
+/// Create an empty `std::vector<ResolvedLoc>`.
+///
+/// - Note: This can't be imported as an initializer on
+/// `BridgedResolvedLocVector`
+///   because initializers without any arguments aren't imported to Swift
+SWIFT_NAME("CharSourceRangeVector.empty()")
+CharSourceRangeVector CharSourceRangeVector_createEmpty();
+
+/// Convert the `BridgedCharSourceRange` to a `CharSourceRange` and append it
+/// to `vector`.
+SWIFT_NAME("CharSourceRangeVector.push_back(self:_:)")
+void CharSourceRangeVector_push_back_BridgedCharSourceRange(
+    CharSourceRangeVector &vector, BridgedCharSourceRange range);
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins

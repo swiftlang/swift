@@ -17,9 +17,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Effects.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IDE/IDEBridging.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -299,25 +300,6 @@ struct ResolvedStmtStartCursorInfo : public ResolvedCursorInfo {
 };
 
 void simple_display(llvm::raw_ostream &out, ResolvedCursorInfoPtr info);
-
-enum class LabelRangeType {
-  None,
-  CallArg,    // foo([a: ]2) or .foo([a: ]String)
-  Param,  // func([a b]: Int)
-  NoncollapsibleParam, // subscript([a a]: Int)
-  Selector,   // #selector(foo.func([a]:))
-};
-
-enum class ResolvedLocContext { Default, Selector, Comment, StringLiteral };
-
-struct ResolvedLoc {
-  CharSourceRange range;
-  std::vector<CharSourceRange> labelRanges;
-  llvm::Optional<unsigned> firstTrailingLabel;
-  LabelRangeType labelType;
-  bool isActive;
-  ResolvedLocContext context;
-};
 
 /// Used by NameMatcher to track parent CallExprs when walking a checked AST.
 struct CallingParent {

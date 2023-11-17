@@ -24,15 +24,6 @@
 
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
-#else // USED_IN_CPP_SOURCE
-
-#ifdef SWIFT_SIL_SILVALUE_H
-#error "should not include swift headers into bridging header"
-#endif
-#ifdef LLVM_SUPPORT_COMPILER_H
-#error "should not include llvm headers into bridging header"
-#endif
-
 #endif // USED_IN_CPP_SOURCE
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS

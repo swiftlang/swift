@@ -63,6 +63,19 @@ add_pure_swift_host_library(swiftASTGen STATIC
     ${ASTGen_Swift_dependencies}
 )
 
+add_pure_swift_host_library(swiftIDEUtilsBridging GENERATE_CXX_BRIDGING_HEADER
+  Sources/SwiftIDEUtilsBridging/NameMatcherBridging.swift
+  
+  DEPENDENCIES
+    swiftAST
+    swiftASTGen
+
+  SWIFT_DEPENDENCIES
+    SwiftIDEUtils
+    SwiftSyntax
+)
+
+
 set(c_include_paths
   # LLVM modules and headers.
   "${LLVM_MAIN_INCLUDE_DIR}"
@@ -99,7 +112,7 @@ set(compile_options
 )
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
-  foreach(target swiftASTGen swiftLLVMJSON)
+  foreach(target swiftASTGen swiftLLVMJSON swiftIDEUtilsBridging)
     target_compile_options(${target} PRIVATE ${compile_options})
   endforeach()
 endif()

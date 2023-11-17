@@ -13,7 +13,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/CxxToSwift/IDEUtilsBridging.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDE/IDEBridging.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Refactoring/Refactoring.h"
 
@@ -70,8 +72,35 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
     UnresolvedLocs.push_back({Location});
   }
 
-  NameMatcher Resolver(SF);
-  return Resolver.resolve(UnresolvedLocs, SF.getAllTokens());
+  std::vector<BridgedSourceLoc> BridgedUnresolvedLocs;
+  BridgedUnresolvedLocs.reserve(UnresolvedLocs.size());
+  for (SourceLoc Loc : UnresolvedLocs) {
+    BridgedUnresolvedLocs.push_back(BridgedSourceLoc(Loc));
+  }
+
+  std::vector<ResolvedLoc> resolvedLocsInSourceOrder =
+      swiftIDEUtilsBridging::runNameMatcher(SF.getExportedSourceFile(),
+                                            BridgedUnresolvedLocs);
+
+  // Callers expect the resolved locs in the same order as the unresolved locs.
+  // Sort them.
+  // FIXME: (NameMatcher) Can we change the callers to not rely on this?
+  std::vector<ResolvedLoc> resolvedLocsInRequestedOrder;
+  for (SourceLoc unresolvedLoc : UnresolvedLocs) {
+    auto found = llvm::find_if(
+        resolvedLocsInSourceOrder, [unresolvedLoc](ResolvedLoc &resolved) {
+          return resolved.range.getStart() == unresolvedLoc;
+        });
+    if (found == resolvedLocsInSourceOrder.end()) {
+      resolvedLocsInRequestedOrder.push_back(
+          ResolvedLoc(CharSourceRange(),
+                      /*LabelRanges=*/{}, llvm::None, LabelRangeType::None,
+                      /*IsActive=*/true, ResolvedLocContext::Comment));
+    } else {
+      resolvedLocsInRequestedOrder.push_back(*found);
+    }
+  }
+  return resolvedLocsInRequestedOrder;
 }
 
 CancellableResult<std::vector<SyntacticRenameRangeDetails>>
