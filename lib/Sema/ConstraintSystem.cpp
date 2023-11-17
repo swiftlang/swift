@@ -2115,30 +2115,28 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
 }
 
 /// Type-erase occurrences of covariant 'Self'-rooted type parameters to their
-/// most specific non-dependent bounds throughout the given type, using
-/// \p baseTy as the existential base object type.
+/// most specific upper bounds throughout the given type, using \p baseTy as
+/// the existential base object type.
 ///
 /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
 /// routine will recurse into the concrete type.
 static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
-                                               TypePosition outermostPosition) {
+                                               TypePosition outermostPosition,
+                                               GenericSignature existentialSig,
+                                               llvm::function_ref<bool(Type)> containsFn,
+                                               llvm::function_ref<bool(Type)> predicateFn,
+                                               llvm::function_ref<Type(Type)> projectionFn,
+                                               bool force, unsigned metatypeDepth = 0) {
   assert(baseTy->isExistentialType());
-  if (!refTy->hasTypeParameter()) {
+  if (!containsFn(refTy))
     return refTy;
-  }
-
-  const auto existentialSig =
-      baseTy->getASTContext().getOpenedExistentialSignature(baseTy,
-                                                            GenericSignature());
-
-  unsigned metatypeDepth = 0;
 
   std::function<Type(Type, TypePosition)> transformFn;
   transformFn = [&](Type type, TypePosition initialPos) -> Type {
     return type.transformWithPosition(
         initialPos,
         [&](TypeBase *t, TypePosition currPos) -> llvm::Optional<Type> {
-          if (!t->hasTypeParameter()) {
+          if (!containsFn(t)) {
             return Type(t);
           }
 
@@ -2160,9 +2158,10 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
           if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
             for (auto replacementType :
                  opaque->getSubstitutions().getReplacementTypes()) {
-              if (replacementType->hasTypeParameter()) {
+              auto erasedReplacementType = transformFn(replacementType,
+                                                       TypePosition::Covariant);
+              if (erasedReplacementType.getPointer() != replacementType.getPointer())
                 return opaque->getExistentialType();
-              }
             }
           }
 
@@ -2175,21 +2174,31 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
             return erased;
           }
 
-          if (!t->isTypeParameter()) {
+          if (!predicateFn(t)) {
             // Recurse.
             return llvm::None;
           }
 
-          assert(t->getRootGenericParam()->getDepth() == 0);
+          auto paramTy = projectionFn(t);
+          if (!paramTy)
+            return Type(t);
 
           // This can happen with invalid code.
-          if (!existentialSig->isValidTypeParameter(t)) {
+          if (!existentialSig->isValidTypeParameter(paramTy)) {
             return Type(t);
           }
 
-          // If the type parameter is bound to a concrete type, recurse into it.
-          if (const auto concreteTy = existentialSig->getConcreteType(t)) {
-            const auto erasedTy = transformFn(concreteTy, currPos);
+          // If the type parameter is fixed to a concrete type, recurse into it.
+          if (const auto concreteTy = existentialSig->getConcreteType(paramTy)) {
+            auto erasedTy = typeEraseExistentialSelfReferences(
+                concreteTy, baseTy, currPos, existentialSig,
+                [](Type t) { return t->hasTypeParameter(); },
+                [](Type t) { return t->isTypeParameter(); },
+                [](Type t) {
+                  assert(t->isTypeParameter());
+                  return t;
+                },
+                metatypeDepth);
             if (erasedTy.getPointer() == concreteTy.getPointer()) {
               // Don't return the concrete type if we haven't type-erased
               // anything inside it, or else we might inadvertently transform a
@@ -2200,23 +2209,25 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
             return erasedTy;
           }
 
-          switch (currPos) {
-          case TypePosition::Covariant:
-            break;
+          if (!force) {
+            switch (currPos) {
+            case TypePosition::Covariant:
+              break;
 
-          case TypePosition::Contravariant:
-          case TypePosition::Invariant:
-          case TypePosition::Shape:
-            return Type(t);
+            case TypePosition::Contravariant:
+            case TypePosition::Invariant:
+            case TypePosition::Shape:
+              return Type(t);
+            }
           }
 
           Type erasedTy;
 
           // The upper bounds of 'Self' is the existential base type.
-          if (t->is<GenericTypeParamType>()) {
+          if (paramTy->is<GenericTypeParamType>()) {
             erasedTy = baseTy;
           } else {
-            erasedTy = existentialSig->getUpperBound(t);
+            erasedTy = existentialSig->getUpperBound(paramTy);
           }
 
           if (metatypeDepth) {
@@ -2233,117 +2244,61 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
 Type constraints::typeEraseOpenedExistentialReference(
     Type type, Type existentialBaseType, TypeVariableType *openedTypeVar,
     TypePosition outermostPosition) {
-  Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
+  auto existentialSig =
+    type->getASTContext().getOpenedExistentialSignature(
+      existentialBaseType, GenericSignature());
+  auto selfGP = existentialSig.getGenericParams()[0];
 
-  // First, temporarily reconstitute the 'Self' generic parameter.
-  type = type.transformRec([&](TypeBase *t) -> llvm::Optional<Type> {
-    // Don't recurse into children unless we have to.
-    if (!type->hasTypeVariable())
-      return Type(t);
+  return typeEraseExistentialSelfReferences(
+      type, existentialBaseType, outermostPosition, existentialSig,
+      /*containsFn=*/[](Type t) {
+        return t->hasTypeVariable();
+      },
+      /*predicateFn=*/[](Type t) {
+        return t->isTypeVariableOrMember();
+      },
+      /*projectionFn=*/[&](Type t) {
+        bool found = false;
+        auto result = t.transformRec([&](Type t) -> llvm::Optional<Type> {
+          if (t.getPointer() == openedTypeVar) {
+            found = true;
+            return selfGP;
+          }
+          return llvm::None;
+        });
 
-    if (isa<TypeVariableType>(t) && t->isEqual(openedTypeVar))
-      return selfGP;
+        if (!found)
+          return Type();
 
-    // Recurse.
-    return llvm::None;
-  });
-
-  // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-  type = typeEraseExistentialSelfReferences(type, existentialBaseType,
-                                            outermostPosition);
-
-  // Finally, swap the 'Self'-corresponding type variable back in.
-  return type.transformRec([&](TypeBase *t) -> llvm::Optional<Type> {
-    // Don't recurse into children unless we have to.
-    if (!type->hasTypeParameter())
-      return Type(t);
-
-    if (isa<GenericTypeParamType>(t) && t->isEqual(selfGP))
-      return Type(openedTypeVar);
-
-    // Recurse.
-    return llvm::None;
-  });
+        assert(result->isTypeParameter());
+        return result;
+      },
+      /*force=*/false);
 }
 
 Type constraints::typeEraseOpenedArchetypesWithRoot(
     Type type, const OpenedArchetypeType *root) {
   assert(root->isRoot() && "Expected a root archetype");
 
-  if (!type->hasOpenedExistential())
-    return type;
-
   auto *env = root->getGenericEnvironment();
   auto sig = env->getGenericSignature();
 
-  unsigned metatypeDepth = 0;
+  return typeEraseExistentialSelfReferences(
+      type, root->getExistentialType(), TypePosition::Covariant, sig,
+      /*containsFn=*/[](Type t) {
+        return t->hasOpenedExistential();
+      },
+      /*predicateFn=*/[](Type t) {
+        return t->is<OpenedArchetypeType>();
+      },
+      /*projectionFn=*/[&](Type t) {
+        auto *openedTy = t->castTo<OpenedArchetypeType>();
+        if (openedTy->getGenericEnvironment() == env)
+          return openedTy->getInterfaceType();
 
-  std::function<Type(Type)> transformFn;
-  transformFn = [&](Type type) -> Type {
-    return type.transformRec([&](TypeBase *ty) -> llvm::Optional<Type> {
-      // Don't recurse into children unless we have to.
-      if (!ty->hasOpenedExistential())
-        return Type(ty);
-
-      if (isa<MetatypeType>(ty)) {
-        const auto instanceTy = ty->getMetatypeInstanceType();
-        ++metatypeDepth;
-        const auto erasedTy = transformFn(instanceTy);
-        --metatypeDepth;
-
-        if (instanceTy.getPointer() == erasedTy.getPointer()) {
-          return Type(ty);
-        }
-
-        return Type(ExistentialMetatypeType::get(erasedTy));
-      }
-
-      // Opaque types whose substitutions involve this type parameter are
-      // erased to their upper bound.
-      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(ty)) {
-        for (auto replacementType :
-                 opaque->getSubstitutions().getReplacementTypes()) {
-          if (replacementType->hasOpenedExistentialWithRoot(root)) {
-            return opaque->getExistentialType();
-          }
-        }
-      }
-
-      if (auto lvalue = dyn_cast<LValueType>(type)) {
-        auto objTy = lvalue->getObjectType();
-        auto erased = transformFn(objTy);
-        if (erased.getPointer() == objTy.getPointer())
-          return Type(lvalue);
-
-        return erased;
-      }
-
-      auto *const archetype = dyn_cast<OpenedArchetypeType>(ty);
-      if (!archetype) {
-        // Recurse.
-        return llvm::None;
-      }
-
-      if (archetype->getGenericEnvironment() != env)
-        return Type(ty);
-
-      Type erasedTy;
-      if (root->isEqual(archetype)) {
-        erasedTy = root->getExistentialType();
-      } else {
-        erasedTy = sig->getUpperBound(archetype->getInterfaceType());
-      }
-
-      if (metatypeDepth) {
-        if (const auto existential = erasedTy->getAs<ExistentialType>())
-          return existential->getConstraintType();
-      }
-
-      return erasedTy;
-    });
-  };
-
-  return transformFn(type);
+        return Type();
+      },
+      /*force=*/true);
 }
 
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
