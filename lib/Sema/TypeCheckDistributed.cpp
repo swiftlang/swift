@@ -385,9 +385,17 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
 
 static bool checkDistributedTargetResultType(
     ModuleDecl *module, ValueDecl *valueDecl,
-    const llvm::SmallPtrSetImpl<ProtocolDecl *> &serializationRequirements,
+    Type serializationRequirement,
+    llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements,
     bool diagnose) {
   auto &C = valueDecl->getASTContext();
+
+  if (serializationRequirement && serializationRequirement->hasError()) {
+    return false;
+  }
+  if ((!serializationRequirement || serializationRequirement->hasError()) && serializationRequirements.empty()) {
+    return false; // error of the type would be diagnosed elsewhere
+  }
 
   Type resultType;
   if (auto func = dyn_cast<FuncDecl>(valueDecl)) {
@@ -401,18 +409,27 @@ static bool checkDistributedTargetResultType(
   if (resultType->isVoid())
     return false;
 
+
+  // Collect extra "SerializationRequirement: SomeProtocol" requirements
+  if (serializationRequirement && !serializationRequirement->hasError()) {
+    auto srl = serializationRequirement->getExistentialLayout();
+    for (auto s: srl.getProtocols()) {
+      serializationRequirements.insert(s);
+    }
+  }
+
   auto isCodableRequirement =
       checkDistributedSerializationRequirementIsExactlyCodable(
-          C, serializationRequirements);
+          C, serializationRequirement);
 
-  for(auto serializationReq : serializationRequirements) {
+  for (auto serializationReq: serializationRequirements) {
     auto conformance =
         TypeChecker::conformsToProtocol(resultType, serializationReq, module);
     if (conformance.isInvalid()) {
       if (diagnose) {
         llvm::StringRef conformanceToSuggest = isCodableRequirement ?
-            "Codable" : // Codable is a typealias, easier to diagnose like that
-            serializationReq->getNameStr();
+                                               "Codable" : // Codable is a typealias, easier to diagnose like that
+                                               serializationReq->getNameStr();
 
         auto diag = valueDecl->diagnose(
             diag::distributed_actor_target_result_not_codable,
@@ -427,12 +444,12 @@ static bool checkDistributedTargetResultType(
           }
         }
       } // end if: diagnose
-      
+
       return true;
     }
   }
 
-  return false;
+    return false;
 }
 
 bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
@@ -496,66 +513,42 @@ bool CheckDistributedFunctionRequest::evaluate(
   }
 
   auto &C = func->getASTContext();
-  auto DC = func->getDeclContext();
   auto module = func->getParentModule();
 
   /// If no distributed module is available, then no reason to even try checks.
   if (!C.getLoadedModule(C.Id_Distributed))
     return true;
 
-  // === All parameters and the result type must conform
-  // SerializationRequirement
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements;
-  if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
-    serializationRequirements = extractDistributedSerializationRequirements(
-        C, extension->getGenericRequirements());
-  } else if (auto actor = dyn_cast<ClassDecl>(DC)) {
-    serializationRequirements = getDistributedSerializationRequirementProtocols(
-        getDistributedActorSystemType(actor)->getAnyNominal(),
-        C.getProtocol(KnownProtocolKind::DistributedActorSystem));
-  } else if (isa<ProtocolDecl>(DC)) {
-    if (auto seqReqTy =
-        getConcreteReplacementForMemberSerializationRequirement(func)) {
-      auto seqReqTyDes = seqReqTy->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
-      for (auto req : flattenDistributedSerializationTypeToRequiredProtocols(seqReqTyDes)) {
-        serializationRequirements.insert(req);
-      }
-    }
+  Type serializationReqType = getSerializationRequirementTypesForMember(func, serializationRequirements);
 
-    // The distributed actor constrained protocol has no serialization requirements
-    // or actor system defined, so these will only be enforced, by implementations
-    // of DAs conforming to it, skip checks here.
-    if (serializationRequirements.empty()) {
-      return false;
-    }
-  } else {
-    llvm_unreachable("Distributed function detected in type other than extension, "
-                     "distributed actor, or protocol! This should not be possible "
-                     ", please file a bug.");
-  }
+  for (auto param: *func->getParameters()) {
+    // --- Check the parameter conforming to serialization requirements
+    if (serializationReqType && !serializationReqType->hasError()) {
+      // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
+      auto serializationRequirementIsCodable =
+          checkDistributedSerializationRequirementIsExactlyCodable(
+              C, serializationReqType);
 
-  // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
-  auto serializationRequirementIsCodable =
-      checkDistributedSerializationRequirementIsExactlyCodable(
-          C, serializationRequirements);
+      // --- Check parameters for 'SerializationRequirement' conformance
+      auto paramTy = func->mapTypeIntoContext(param->getInterfaceType());
 
-  for (auto param : *func->getParameters()) {
-    // --- Check parameters for 'Codable' conformance
-    auto paramTy = func->mapTypeIntoContext(param->getInterfaceType());
+      auto srl = serializationReqType->getExistentialLayout();
+      for (auto req: srl.getProtocols()) {
+        if (TypeChecker::conformsToProtocol(paramTy, req, module).isInvalid()) {
+          auto diag = func->diagnose(
+              diag::distributed_actor_func_param_not_codable,
+              param->getArgumentName().str(), param->getInterfaceType(),
+              func->getDescriptiveKind(),
+              serializationRequirementIsCodable ? "Codable"
+                                                : req->getNameStr());
 
-    for (auto req : serializationRequirements) {
-      if (TypeChecker::conformsToProtocol(paramTy, req, module).isInvalid()) {
-        auto diag = func->diagnose(
-            diag::distributed_actor_func_param_not_codable,
-            param->getArgumentName().str(), param->getInterfaceType(),
-            func->getDescriptiveKind(),
-            serializationRequirementIsCodable ? "Codable"
-                                              : req->getNameStr());
+          if (auto paramNominalTy = paramTy->getAnyNominal()) {
+            addCodableFixIt(paramNominalTy, diag);
+          } // else, no nominal type to suggest the fixit for, e.g. a closure
 
-        if (auto paramNominalTy = paramTy->getAnyNominal()) {
-          addCodableFixIt(paramNominalTy, diag);
-        } // else, no nominal type to suggest the fixit for, e.g. a closure
-        return true;
+          return true;
+        }
       }
     }
 
@@ -592,9 +585,10 @@ bool CheckDistributedFunctionRequest::evaluate(
     }
   }
 
-  // --- Result type must be either void or a codable type
-  if (checkDistributedTargetResultType(module, func, serializationRequirements,
-                                       /*diagnose=*/true)) {
+  // --- Result type must be either void or a serialization requirement conforming type
+  if (checkDistributedTargetResultType(
+      module, func, serializationReqType, serializationRequirements,
+      /*diagnose=*/true)) {
     return true;
   }
 
@@ -648,8 +642,11 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
           systemDecl,
           C.getProtocol(KnownProtocolKind::DistributedActorSystem));
 
+  auto serializationRequirement =
+      getSerializationRequirementTypesForMember(systemVar, serializationRequirements);
+
   auto module = var->getModuleContext();
-  if (checkDistributedTargetResultType(module, var, serializationRequirements, diagnose)) {
+  if (checkDistributedTargetResultType(module, var, serializationRequirement, serializationRequirements, diagnose)) {
     return true;
   }
 
@@ -749,13 +746,14 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   (void)nominal->getDistributedActorIDProperty();
 }
 
-void TypeChecker::checkDistributedFunc(FuncDecl *func) {
+bool TypeChecker::checkDistributedFunc(FuncDecl *func) {
   if (!func->isDistributed())
-    return;
+    return false;
 
-  swift::checkDistributedFunction(func);
+  return swift::checkDistributedFunction(func);
 }
 
+// TODO(distributed): Remove this entirely and rely on generic signature and getConcrete to implement checks
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::getDistributedSerializationRequirementProtocols(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
@@ -768,11 +766,13 @@ swift::getDistributedSerializationRequirementProtocols(
     return {};
   }
 
-  auto serialReqType =
-      ty->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
-
   // TODO(distributed): check what happens with Any
-  return flattenDistributedSerializationTypeToRequiredProtocols(serialReqType);
+  auto layout = ty->getExistentialLayout();
+  llvm::SmallPtrSet<ProtocolDecl *, 2> result;
+  for (auto p : layout.getProtocols()) {
+    result.insert(p);
+  }
+  return result;
 }
 
 ConstructorDecl*
@@ -896,8 +896,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
       continue;
 
     auto paramTy = genericParamList->getParams()[0]
-                       ->getInterfaceType()
-                       ->getMetatypeInstanceType();
+                       ->getDeclaredInterfaceType();
 
     // `decodeNextArgument` should return its generic parameter value
     if (!FD->getResultInterfaceType()->isEqual(paramTy))
@@ -905,20 +904,16 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
 
     // Let's find out how many serialization requirements does this method cover
     // e.g. `Codable` is two requirements - `Encodable` and `Decodable`.
-    unsigned numSerializationReqsCovered = llvm::count_if(
-        FD->getGenericRequirements(), [&](const Requirement &requirement) {
-          if (!(requirement.getFirstType()->isEqual(paramTy) &&
-                requirement.getKind() == RequirementKind::Conformance))
-            return 0;
-
-          return serializationReqs.count(requirement.getProtocolDecl()) ? 1 : 0;
-        });
+    bool okay = llvm::all_of(serializationReqs,
+                            [&](ProtocolDecl *p) -> bool {
+                              return FD->getGenericSignature()->requiresProtocol(paramTy, p);
+                            });
 
     // If the current method covers all of the serialization requirements,
     // it's a match. Note that it might also have other requirements, but
     // we let that go as long as there are no two candidates that differ
     // only in generic requirements.
-    if (numSerializationReqsCovered == serializationReqs.size())
+    if (okay)
       candidates.push_back(FD);
   }
 

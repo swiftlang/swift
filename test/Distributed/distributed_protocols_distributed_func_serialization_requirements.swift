@@ -82,6 +82,13 @@ extension NoSerializationRequirementYet
 
 extension NoSerializationRequirementYet
   where SerializationRequirement: Codable {
+  // expected-error@+1{{result type 'NotCodable' of distributed instance method 'test4' does not conform to serialization requirement 'Decodable'}}
+  distributed func test4() -> NotCodable {
+    .init()
+  }
+}
+
+extension ProtocolWithChecksSeqReqDA {
   // expected-error@+1{{result type 'NotCodable' of distributed instance method 'test4' does not conform to serialization requirement 'Codable'}}
   distributed func test4() -> NotCodable {
     .init()
