@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _RegexParserBridging
 import ASTBridging
 import BasicBridging
 

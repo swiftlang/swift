@@ -22,9 +22,7 @@ public struct S {
   // CHECK-LABEL: sil [transparent]{{.*}} @$s4Test1SV12instanceVar2Sivpfi : $@convention(thin) () -> Int {
   public var instanceVar2 = internalFunc(.b)
 
-  // FIXME: This initializer should be subsumed.
-  // CHECK-LAZY: sil [transparent] [ossa] @$s4Test1SV15lazyInstanceVarSivpfi : $@convention(thin) () -> Int {
-  // CHECK-NON-LAZY-NOT: sil [transparent] [ossa] @$s4Test1SV15lazyInstanceVarSivpfi : $@convention(thin) () -> Int {
+  // CHECK-NOT: s4Test1SV15lazyInstanceVarSivpfi
   // CHECK-LABEL: sil [transparent]{{.*}} @$s4Test1SV018$__lazy_storage_$_B11InstanceVar33_0E4F053AA3AB7D4CDE3A37DBA8EF0430LLSiSgvpfi : $@convention(thin) () -> Optional<Int> {
   public lazy var lazyInstanceVar = internalFunc()
 

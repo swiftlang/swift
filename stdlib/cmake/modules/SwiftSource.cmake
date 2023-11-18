@@ -978,7 +978,8 @@ function(_compile_swift_files
     add_custom_command_target(unused_var
       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}"
       CUSTOM_TARGET_NAME ${file_path_target}
-      OUTPUT "${file_path}")
+      OUTPUT "${file_path}"
+      DEPENDS "${file_path}.tmp")
   endif()
 
   # If this platform/architecture combo supports backward deployment to old

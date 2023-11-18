@@ -15,8 +15,8 @@ import Swift
 
 // CHECK: sil_global @$s4Test15publicGlobalVarSivp : $Int
 
-// CHECK-NO-SKIP: sil private{{.*}} @$s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF : $@convention(thin) () -> () {
-// CHECK-SKIP-NOT: s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF
+// CHECK-NO-SKIP: sil private{{.*}} @$s4Test11privateFunc33_CFB3F9DC47F5EF9E1D08B58758351A08LLyyF : $@convention(thin) () -> () {
+// CHECK-SKIP-NOT: s4Test11privateFunc33_CFB3F9DC47F5EF9E1D08B58758351A08LLyyF
 private func privateFunc() {}
 
 // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test12internalFuncyyF : $@convention(thin) () -> () {
@@ -71,17 +71,17 @@ public var publicGlobalVar = 1
 // CHECK: sil shared [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF6nestedL_yyF : $@convention(thin) () -> () {
 
 private class PrivateClass {
-  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCfd : $@convention(method) (@guaranteed PrivateClass) -> @owned Builtin.NativeObject {
-  // CHECK-SKIP-NOT: s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCfd
+  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCfd : $@convention(method) (@guaranteed PrivateClass) -> @owned Builtin.NativeObject {
+  // CHECK-SKIP-NOT: s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCfd
 
-  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCfD : $@convention(method) (@owned PrivateClass) -> () {
-  // CHECK-SKIP-NOT: s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCfD
+  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCfD : $@convention(method) (@owned PrivateClass) -> () {
+  // CHECK-SKIP-NOT: s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCfD
 
-  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCADycfC : $@convention(method) (@thick PrivateClass.Type) -> @owned PrivateClass {
-  // CHECK-SKIP-NOT: s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCADycfC
+  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCADycfC : $@convention(method) (@thick PrivateClass.Type) -> @owned PrivateClass {
+  // CHECK-SKIP-NOT: s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCADycfC
 
-  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCADycfc : $@convention(method) (@owned PrivateClass) -> @owned PrivateClass {
-  // CHECK-SKIP-NOT: s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCADycfc
+  // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCADycfc : $@convention(method) (@owned PrivateClass) -> @owned PrivateClass {
+  // CHECK-SKIP-NOT: s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCADycfc
 }
 
 public class PublicClass {
