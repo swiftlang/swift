@@ -3688,7 +3688,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // the mutability of the base.
     auto keyPathIndexTy = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::KeyPathSubscriptIndex),
-        TVO_CanBindToInOut);
+        /*options=*/0);
     auto elementTy = createTypeVariable(
             getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
