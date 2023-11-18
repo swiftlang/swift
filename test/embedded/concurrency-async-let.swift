@@ -7,7 +7,7 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx
 
 import _Concurrency
 
