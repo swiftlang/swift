@@ -17,7 +17,7 @@ import os
 import sys
 
 from cmpcodesize.compare import \
-    compare_function_sizes, compare_sizes_of_file, list_function_sizes,\
+    compare_function_sizes, compare_sizes_of_file, list_function_sizes, \
     read_sizes
 
 
