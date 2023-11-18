@@ -6,8 +6,7 @@
 // RUN: %target-swift-frontend -enable-import-ptrauth-field-function-pointers -O -emit-ir %t/Main.swift -I%t -enable-experimental-feature Embedded -import-objc-header %t/header.h
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: CPU=arm64e
 
 // BEGIN header.h

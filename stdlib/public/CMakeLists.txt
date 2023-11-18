@@ -138,7 +138,7 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       "Enable build of the embedded Swift standard library and runtime"
       TRUE)
 
-if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND (NOT SWIFT_HOST_VARIANT STREQUAL "linux"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(NOT SWIFT_INCLUDE_TOOLS)
   # Temporarily, only build embedded stdlib when building the compiler, to
@@ -151,12 +151,36 @@ endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(EMBEDDED_STDLIB_TARGET_TRIPLES
     # arch    module_name               target triple
+    "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
+    "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
     "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+    "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
     "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
-    "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
-    "arm64    arm64-apple-macos         arm64-apple-macos10.13"
-    "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+
+    # the following are all ELF targets
+    "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
+    "armv6m   armv6m-none-none-eabi     armv6-none-none-eabi"
+    "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
+    "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+    "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
+    "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
+    "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
     )
+
+  if (SWIFT_HOST_VARIANT STREQUAL "linux")
+    set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
+      "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
+      # In practice this expands to either:
+      # "x86_64   x86_64-unknown-linux-gnu  x86_64-unknown-linux-gnu"
+      # "aarch64  aarch64-unknown-linux-gnu aarch64-unknown-linux-gnu"
+      )
+  elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
+    set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
+      "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
+      "arm64    arm64-apple-macos         arm64-apple-macos10.13"
+      "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+      )
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB)

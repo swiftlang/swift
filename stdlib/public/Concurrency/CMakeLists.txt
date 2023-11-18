@@ -198,9 +198,14 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     list(GET list 1 mod)
     list(GET list 2 triple)
 
-    # TODO: Only build embedded Swift Concurrency for macOS, for now.
-    if(NOT "${mod}" MATCHES "-macos$")
-      continue()
+    if (SWIFT_HOST_VARIANT STREQUAL "linux")
+      if(NOT "${mod}" MATCHES "-linux-gnu$")
+        continue()
+      endif()
+    elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
+      if(NOT "${mod}" MATCHES "-macos$")
+        continue()
+      endif()
     endif()
     
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")

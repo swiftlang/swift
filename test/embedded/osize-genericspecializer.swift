@@ -1,8 +1,7 @@
 // RUN: %target-swift-emit-ir -Osize %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 public func foo<T>(n: T) {
     bar(n: 42)
