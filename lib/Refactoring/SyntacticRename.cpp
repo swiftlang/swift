@@ -63,7 +63,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
         return {};
       }
 
-      if (RenameLoc.Usage == NameUsage::Call && !RenameLoc.IsFunctionLike) {
+      if (RenameLoc.Usage == RenameLocUsage::Call && !OldName.isFunction()) {
         Diags.diagnose(Location, diag::name_not_functionlike, NewName);
         return {};
       }

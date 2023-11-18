@@ -695,7 +695,7 @@ public:
 
   CancellableResult<std::vector<CategorizedRenameRanges>>
   findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                   ArrayRef<RenameLocations> RenameLocations,
+                   ArrayRef<RenameLoc> RenameLocations,
                    ArrayRef<const char *> Args) override;
 
   void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,

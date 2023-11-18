@@ -219,7 +219,6 @@ private:
           locations.push_back(std::move(*loc));
         } else {
           assert(existingLoc->OldName == loc->OldName &&
-                 existingLoc->IsFunctionLike == loc->IsFunctionLike &&
                  "Asked to do a different rename for the same location?");
         }
       }
@@ -241,37 +240,19 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
     return llvm::None;
   }
 
-  NameUsage usage = NameUsage::Unknown;
+  RenameLocUsage usage = RenameLocUsage::Unknown;
   if (symbol.roles & (unsigned)index::SymbolRole::Call) {
-    usage = NameUsage::Call;
+    usage = RenameLocUsage::Call;
   } else if (symbol.roles & (unsigned)index::SymbolRole::Definition) {
-    usage = NameUsage::Definition;
+    usage = RenameLocUsage::Definition;
   } else if (symbol.roles & (unsigned)index::SymbolRole::Reference) {
-    usage = NameUsage::Reference;
+    usage = RenameLocUsage::Reference;
   } else {
     llvm_unreachable("unexpected role");
   }
 
-  bool isFunctionLike = false;
-
-  switch (symbol.symInfo.Kind) {
-  case index::SymbolKind::EnumConstant:
-  case index::SymbolKind::Function:
-  case index::SymbolKind::Constructor:
-  case index::SymbolKind::ConversionFunction:
-  case index::SymbolKind::InstanceMethod:
-  case index::SymbolKind::ClassMethod:
-  case index::SymbolKind::StaticMethod:
-    isFunctionLike = true;
-    break;
-  case index::SymbolKind::Class:
-  case index::SymbolKind::Enum:
-  case index::SymbolKind::Struct:
-  default:
-    break;
-  }
   StringRef oldName = stringStorage->copyString(symbol.name);
-  return RenameLoc{symbol.line, symbol.column, usage, oldName, isFunctionLike};
+  return RenameLoc{symbol.line, symbol.column, usage, oldName};
 }
 
 /// Get the decl context that we need to walk when renaming \p VD.

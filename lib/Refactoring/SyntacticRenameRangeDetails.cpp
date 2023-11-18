@@ -396,13 +396,13 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
   if (!resolved.range.isValid())
     return RegionType::Unmatched;
 
-  NameUsage usage = config.Usage;
+  RenameLocUsage usage = config.Usage;
 
   auto regionKind = getSyntacticRenameRegionType(resolved);
 
   SpecialBaseName specialBaseName = specialBaseNameFor(Old);
 
-  if (usage == NameUsage::Unknown) {
+  if (usage == RenameLocUsage::Unknown) {
     // Unknown name usage occurs if we don't have an entry in the index that
     // tells us whether the location is a call, reference or a definition. The
     // most common reasons why this happens is if the editor is adding syntactic
@@ -440,7 +440,8 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
       // be called as `myStruct()`, so even if the base fails to be renamed,
       // continue.
       // But the names do need to match for definitions and references.
-      if (usage == NameUsage::Definition || usage == NameUsage::Reference) {
+      if (usage == RenameLocUsage::Definition ||
+          usage == RenameLocUsage::Reference) {
         return RegionType::Mismatch;
       }
     }
@@ -450,7 +451,7 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
     // Accesses to the subscript are modelled as references with `[` as the
     // base name, which does not match. Subscripts are never called in the
     // index.
-    if (usage == NameUsage::Definition) {
+    if (usage == RenameLocUsage::Definition) {
       if (renameBase(resolved.range, RefactoringRangeKind::KeywordBaseName)) {
         return RegionType::Mismatch;
       }
@@ -462,18 +463,18 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
   bool isCallSite = false;
   if (Old.isFunction()) {
     switch (usage) {
-    case NameUsage::Call:
+    case RenameLocUsage::Call:
       // All calls except for operators have argument labels that should be
       // renamed.
       handleLabels = !Lexer::isOperator(Old.base());
       isCallSite = true;
       break;
-    case NameUsage::Definition:
+    case RenameLocUsage::Definition:
       // All function definitions have argument labels that should be renamed.
       handleLabels = true;
       isCallSite = false;
       break;
-    case NameUsage::Reference:
+    case RenameLocUsage::Reference:
       if (resolved.labelType == LabelRangeType::CompoundName) {
         // If we have a compound name that specifies argument labels to
         // disambiguate functions with the same base name, we always need to
@@ -491,7 +492,7 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
         isCallSite = false;
       }
       break;
-    case NameUsage::Unknown:
+    case RenameLocUsage::Unknown:
       // If we don't know where the function is used, fall back to trying to
       // rename labels if there are some.
       handleLabels = resolved.labelType != LabelRangeType::None;
@@ -505,8 +506,8 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
         renameLabels(resolved.labelRanges, resolved.firstTrailingLabel,
                      resolved.labelType, isCallSite);
     if (renameLabelsFailed) {
-      return usage == NameUsage::Unknown ? RegionType::Unmatched
-                                         : RegionType::Mismatch;
+      return usage == RenameLocUsage::Unknown ? RegionType::Unmatched
+                                              : RegionType::Mismatch;
     }
   }
 
