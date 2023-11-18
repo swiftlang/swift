@@ -101,10 +101,10 @@ func unsafeRawBufferPointerConversions(
   mrp: UnsafeMutableRawPointer,
   rp: UnsafeRawPointer,
   mrbp: UnsafeMutableRawBufferPointer,
+	rmbp: UnsafeRawMutableBufferPointer,
   rbp: UnsafeRawBufferPointer,
   mbpi: UnsafeMutableBufferPointer<Int>,
-  bpi: UnsafeBufferPointer<Int>,
-  rmbp: UnsafeRawMutableBufferPointer) {
+  bpi: UnsafeBufferPointer<Int>) {
 
   let omrp: UnsafeMutableRawPointer? = mrp
   let orp: UnsafeRawPointer? = rp
