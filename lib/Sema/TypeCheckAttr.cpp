@@ -433,7 +433,10 @@ void AttributeChecker::visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConforma
 }
 
 void AttributeChecker::visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr) {
-  return;
+  if (!Ctx.LangOpts.hasFeature(Feature::ExtractConstantsFromMembers)) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_extractConstantsFromMembers_experimental);
+  }
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {

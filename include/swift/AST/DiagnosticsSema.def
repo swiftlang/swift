@@ -1935,6 +1935,10 @@ ERROR(attr_static_exclusive_only_let_only_param,none,
 ERROR(attr_static_exclusive_only_mutating,none,
       "type %0 cannot have mutating function %1", (Type, ValueDecl *))
 
+// @extractConstantsFromMembers
+ERROR(attr_extractConstantsFromMembers_experimental,none,
+      "@extractConstantsFromMembers requires '-enable-experimental-feature ExtractConstantsFromMembers'", ())
+
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
