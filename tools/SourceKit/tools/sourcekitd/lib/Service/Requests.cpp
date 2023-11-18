@@ -2867,20 +2867,21 @@ static void findRelatedIdents(StringRef PrimaryFilePath,
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findRelatedIdentifiersInFile(
       PrimaryFilePath, InputBufferName, Offset, CancelOnSubsequentRequest, Args,
-      CancellationToken, [Rec](const RequestResult<RelatedIdentsInfo> &Result) {
+      CancellationToken,
+      [Rec](const RequestResult<ArrayRef<RelatedIdentInfo>> &Result) {
         if (Result.isCancelled())
           return Rec(createErrorRequestCancelled());
         if (Result.isError())
           return Rec(createErrorRequestFailed(Result.getError()));
 
-        const RelatedIdentsInfo &Info = Result.value();
+        const ArrayRef<RelatedIdentInfo> &Info = Result.value();
 
         ResponseBuilder RespBuilder;
         auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
-        for (auto R : Info.Ranges) {
+        for (auto R : Info) {
           auto Elem = Arr.appendDictionary();
-          Elem.set(KeyOffset, R.first);
-          Elem.set(KeyLength, R.second);
+          Elem.set(KeyOffset, R.Offset);
+          Elem.set(KeyLength, R.Length);
         }
 
         Rec(RespBuilder.createResponse());

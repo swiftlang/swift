@@ -684,8 +684,8 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
       SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
-      override;
+      std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
+          Receiver) override;
 
   void findActiveRegionsInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName,

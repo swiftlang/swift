@@ -781,9 +781,9 @@ struct SemanticRefactoringInfo {
   StringRef PreferredName;
 };
 
-struct RelatedIdentsInfo {
-  /// (Offset,Length) pairs.
-  ArrayRef<std::pair<unsigned, unsigned>> Ranges;
+struct RelatedIdentInfo {
+  unsigned Offset;
+  unsigned Length;
 };
 
 /// Represent one branch of an if config.
@@ -1170,7 +1170,7 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
       SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)>
+      std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
           Receiver) = 0;
 
   virtual void findActiveRegionsInFile(

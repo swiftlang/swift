@@ -2493,27 +2493,30 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
     SourceKitCancellationToken CancellationToken,
-    std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) {
+    std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
+        Receiver) {
 
   std::string Error;
   SwiftInvocationRef Invok =
       ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver(RequestResult<RelatedIdentsInfo>::fromError(Error));
+    Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::fromError(Error));
     return;
   }
 
   class RelatedIdConsumer : public SwiftASTConsumer {
     std::string InputFile;
     unsigned Offset;
-    std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver;
+    std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
+        Receiver;
     SwiftInvocationRef Invok;
 
   public:
     RelatedIdConsumer(
         StringRef InputFile, unsigned Offset,
-        std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver,
+        std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
+            Receiver,
         SwiftInvocationRef Invok)
         : InputFile(InputFile.str()), Offset(Offset),
           Receiver(std::move(Receiver)), Invok(Invok) {}
@@ -2528,12 +2531,12 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 
       auto *SrcFile = retrieveInputFile(InputFile, CompInst);
       if (!SrcFile) {
-        Receiver(RequestResult<RelatedIdentsInfo>::fromError(
+        Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::fromError(
             "Unable to find input file"));
         return;
       }
 
-      SmallVector<std::pair<unsigned, unsigned>, 8> Ranges;
+      SmallVector<RelatedIdentInfo, 8> Ranges;
 
       auto Action = [&]() {
         unsigned BufferID = SrcFile->getBufferID().value();
@@ -2583,29 +2586,28 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         std::vector<ResolvedLoc> ResolvedLocs = resolveRenameLocations(
             Locs.getLocations(), /*NewName=*/StringRef(), *SrcFile, Diags);
 
+        assert(ResolvedLocs.size() == Locs.getLocations().size());
         for (auto ResolvedLoc : ResolvedLocs) {
           if (ResolvedLoc.range.isInvalid()) {
             continue;
           }
           unsigned Offset = SrcMgr.getLocOffsetInBuffer(
               ResolvedLoc.range.getStart(), BufferID);
-          Ranges.emplace_back(Offset, ResolvedLoc.range.getByteLength());
+          Ranges.push_back({Offset, ResolvedLoc.range.getByteLength()});
         }
       };
       Action();
-      RelatedIdentsInfo Info;
-      Info.Ranges = Ranges;
-      Receiver(RequestResult<RelatedIdentsInfo>::fromResult(Info));
+      Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::fromResult(Ranges));
 #endif
     }
 
     void cancelled() override {
-      Receiver(RequestResult<RelatedIdentsInfo>::cancelled());
+      Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::cancelled());
     }
 
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("related idents failed: " << Error);
-      Receiver(RequestResult<RelatedIdentsInfo>::fromError(Error));
+      Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::fromError(Error));
     }
 
     static CaseStmt *getCaseStmtOfCanonicalVar(Decl *D) {
