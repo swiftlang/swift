@@ -1102,7 +1102,7 @@ static const InitFn initWithTakeTable[] = {
   nullptr,
   nullptr,
   &unknownWeakInitWithTake,
-  &bridgeRetainBranchless,
+  nullptr,
   nullptr,
   nullptr,
   nullptr, // Custom
