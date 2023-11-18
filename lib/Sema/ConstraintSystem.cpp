@@ -3690,12 +3690,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         getConstraintLocator(locator, ConstraintLocator::KeyPathSubscriptIndex),
         /*options=*/0);
     auto elementTy = createTypeVariable(
-            getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-            TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-    auto elementObjTy = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
-    addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
+        TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
     // The element result is an lvalue or rvalue based on the key path class.
     addKeyPathApplicationConstraint(
