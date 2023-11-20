@@ -402,9 +402,11 @@ public:
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it.
   void flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor, TaskExecutorRef taskExecutor);
-  /// Same as `flagAsAndEnqueueOnTaskExecutor` with an `undefined` task executor.
+  /// Same as `flagAsAndEnqueueOnTaskExecutor` with an `undefined` task
+  /// executor.
   inline void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
-    return flagAsAndEnqueueOnTaskExecutor(newExecutor, TaskExecutorRef::undefined());
+    return flagAsAndEnqueueOnTaskExecutor(newExecutor,
+                                          TaskExecutorRef::undefined());
   }
 
   /// Flag that this task is now completed. This normally does not do anything
@@ -420,19 +422,22 @@ public:
   /// Get the preferred task executor reference if there is one set for this task.
   TaskExecutorRef getPreferredTaskExecutor();
 
-  /// WARNING: Only to be used during task creation, in other situations prefer to use
-  /// `swift_task_pushTaskExecutorPreference` and `swift_task_popTaskExecutorPreference`.
+  /// WARNING: Only to be used during task creation, in other situations prefer
+  /// to use `swift_task_pushTaskExecutorPreference` and
+  /// `swift_task_popTaskExecutorPreference`.
   void pushInitialTaskExecutorPreference(TaskExecutorRef preferred);
 
   /// WARNING: Only to be used during task completion (destroy).
   ///
-  /// This is because between task creation and its destory, we cannot carry the exact record to
-  /// `pop(record)`, and instead assume that there will be exactly one record remaining --
-  /// the "initial" record (added during creating the task), and it must be that record
-  /// that is removed by this api.
+  /// This is because between task creation and its destory, we cannot carry the
+  /// exact record to `pop(record)`, and instead assume that there will be
+  /// exactly one record remaining -- the "initial" record (added during
+  /// creating the task), and it must be that record that is removed by this
+  /// api.
   ///
-  /// All other situations from user code should be using the `swift_task_pushTaskExecutorPreference`,
-  /// and `swift_task_popTaskExecutorPreference(record)` method pair.
+  /// All other situations from user code should be using the
+  /// `swift_task_pushTaskExecutorPreference`, and
+  /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
 
   // ==== Task Local Values ----------------------------------------------------
