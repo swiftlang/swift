@@ -2438,21 +2438,21 @@ public:
 class JobFlags : public FlagSet<uint32_t> {
 public:
   enum {
-    Kind           = 0,
-    Kind_width     = 8,
+    Kind = 0,
+    Kind_width = 8,
 
-    Priority       = 8,
+    Priority = 8,
     Priority_width = 8,
 
     // 8 bits reserved for more generic job flags.
 
     // Kind-specific flags.
 
-    Task_IsChildTask                    = 24,
-    Task_IsFuture                       = 25,
-    Task_IsGroupChildTask               = 26,
+    Task_IsChildTask = 24,
+    Task_IsFuture = 25,
+    Task_IsGroupChildTask = 26,
     // 27 is currently unused
-    Task_IsAsyncLetTask                 = 28,
+    Task_IsAsyncLetTask = 28,
     Task_HasInitialTaskExecutorPreference = 29,
   };
 
