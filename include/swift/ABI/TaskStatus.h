@@ -280,6 +280,9 @@ public:
 /// This preference may be added or removed at runtime, e.g. when multiple
 /// `withTaskExecutor { ... }` blocks are nested, they add more executor
 /// preferences.
+///
+/// Any number of these preferences may be present at runtime, and the
+/// innermost preference takes priority.
 class TaskExecutorPreferenceStatusRecord : public TaskStatusRecord {
 private:
   const TaskExecutorRef Preferred;
