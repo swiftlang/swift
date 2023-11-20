@@ -401,7 +401,8 @@ private:
 public:
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it.
-  void flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor, TaskExecutorRef taskExecutor);
+  void flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor,
+                                      TaskExecutorRef taskExecutor);
   /// Same as `flagAsAndEnqueueOnTaskExecutor` with an `undefined` task
   /// executor.
   inline void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
@@ -419,7 +420,8 @@ public:
 
   // ==== Task Executor Preference ---------------------------------------------
 
-  /// Get the preferred task executor reference if there is one set for this task.
+  /// Get the preferred task executor reference if there is one set for this
+  /// task.
   TaskExecutorRef getPreferredTaskExecutor();
 
   /// WARNING: Only to be used during task creation, in other situations prefer

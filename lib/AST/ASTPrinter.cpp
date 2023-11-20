@@ -3109,9 +3109,7 @@ static bool usesFeatureBuiltinExecutor(Decl *decl) {
   return usesBuiltinType(decl, BuiltinTypeKind::BuiltinExecutor);
 }
 
-static bool usesFeatureBuiltinBuildTaskExecutor(Decl *decl) {
-  return false;
-}
+static bool usesFeatureBuiltinBuildTaskExecutor(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
@@ -3133,9 +3131,7 @@ static bool usesFeatureBuiltinHopToActor(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinHopToExecutor(Decl *decl) {
-  return false;
-}
+static bool usesFeatureBuiltinHopToExecutor(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
   return false;

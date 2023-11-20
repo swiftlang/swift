@@ -453,7 +453,8 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 
 }
 
-// Convenience wrapper for when client hasn't already done the load of the status
+// Convenience wrapper for when client hasn't already done the load of the
+// status
 SWIFT_CC(swift)
 void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
@@ -526,9 +527,10 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
   TaskExecutorRef preference = TaskExecutorRef::undefined();
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
-    for (auto record: status.records()) {
+    for (auto record : status.records()) {
       if (record->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
-        auto executorPreferenceRecord = cast<TaskExecutorPreferenceStatusRecord>(record);
+        auto executorPreferenceRecord =
+            cast<TaskExecutorPreferenceStatusRecord>(record);
         preference = executorPreferenceRecord->getPreferredExecutor();
         return;
       }
@@ -547,22 +549,25 @@ TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
 }
 
 SWIFT_CC(swift)
-TaskExecutorPreferenceStatusRecord*
+TaskExecutorPreferenceStatusRecord *
 swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
   auto task = swift_task_getCurrent();
   assert(task && "Executor preference can only be called from async contexts.");
 
   // return task->pushTaskExecutorPreference(taskExecutor);
 
-  void *allocation = _swift_task_alloc_specific(task, sizeof(class TaskExecutorPreferenceStatusRecord));
-  auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(taskExecutor);
+  void *allocation = _swift_task_alloc_specific(
+      task, sizeof(class TaskExecutorPreferenceStatusRecord));
+  auto record =
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(taskExecutor);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor "
                        "preference record %p for task:%p",
                        allocation, task);
 
-  addStatusRecord(task, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
-    return true;
-  });
+  addStatusRecord(task, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    return true;
+                  });
 
   return record;
 }
@@ -579,19 +584,23 @@ void swift::swift_task_popTaskExecutorPreference(
 
 void AsyncTask::pushInitialTaskExecutorPreference(
     TaskExecutorRef preferredExecutor) {
-  void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
-  auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
+  void *allocation = _swift_task_alloc_specific(
+      this, sizeof(class TaskExecutorPreferenceStatusRecord));
+  auto record =
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Create a task "
                        "preference record %p for task:%p",
                        record, this);
 
-  addStatusRecord(this, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
-    return true;
-  });
+  addStatusRecord(this, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    return true;
+                  });
 }
 
-// ONLY use this method while destroying task and removing the "initial" preference.
-// In all other situations prefer a balanced "push / pop" pair of calls.
+// ONLY use this method while destroying task and removing the "initial"
+// preference. In all other situations prefer a balanced "push / pop" pair of
+// calls.
 void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Drop initial task "
                        "preference record from task:%p",

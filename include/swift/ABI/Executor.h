@@ -232,9 +232,7 @@ public:
     return Identity == 0;
   }
 
-  bool isDefined() const {
-    return !isUndefined();
-  }
+  bool isDefined() const { return !isUndefined(); }
 
   TaskExecutorKind getExecutorKind() const {
     return static_cast<TaskExecutorKind>(Implementation & ~WitnessTableMask);

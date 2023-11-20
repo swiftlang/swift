@@ -136,18 +136,16 @@ void swift::swift_task_enqueueGlobalWithDeadline(
 //
 // We could inline this with effort, though.
 extern "C" SWIFT_CC(swift)
-SerialExecutorRef _task_serialExecutor_getExecutorRef( // TODO: don't rename?
-    HeapObject *executor,
-    const Metadata *selfType,
-    const SerialExecutorWitnessTable *wtable);
+SerialExecutorRef _task_serialExecutor_getExecutorRef(
+        HeapObject *executor, const Metadata *selfType,
+        const SerialExecutorWitnessTable *wtable);
 
 // Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
 //
 // We could inline this with effort, though.
 extern "C" SWIFT_CC(swift)
 TaskExecutorRef _task_executor_getTaskExecutorRef(
-    HeapObject *executor,
-    const Metadata *selfType,
+    HeapObject *executor, const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
 SWIFT_CC(swift)
@@ -223,7 +221,6 @@ bool SerialExecutorRef::isMainExecutor() const {
 TaskExecutorRef swift::swift_task_getUndefinedTaskExecutor() {
   return TaskExecutorRef::undefined();
 }
-
 
 /*****************************************************************************/
 /************************ GENERIC EXECUTOR ***********************************/

@@ -50,7 +50,7 @@ enum SingletonTypeSynthesizer {
   _void,
   _word,
   _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
-  _taskExecutor, // the '_Concurrency.TaskExecutor' protocol
+  _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
