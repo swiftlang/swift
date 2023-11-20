@@ -1778,13 +1778,14 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
 }
 
 SWIFT_CC(swift)
-static void swift_job_run_on_task_executorImpl(Job *job,
+static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
+                                               SerialExecutorRef serialExecutor,
                                                TaskExecutorRef taskExecutor) {
   ExecutorTrackingInfo trackingInfo;
 
   // TODO: we don't allow switching
   trackingInfo.disallowSwitching();
-  trackingInfo.enterAndShadow(SerialExecutorRef::generic(), taskExecutor);
+  trackingInfo.enterAndShadow(serialExecutor, taskExecutor);
 
   SWIFT_TASK_DEBUG_LOG("job %p", job);
   runJobInEstablishedExecutorContext(job);
@@ -1798,6 +1799,13 @@ static void swift_job_run_on_task_executorImpl(Job *job,
   if (trackingInfo.allowsSwitching() && currentExecutor.isDefaultActor()) {
     asImpl(currentExecutor.getDefaultActor())->unlock(true);
   }
+}
+
+SWIFT_CC(swift)
+static void swift_job_run_on_task_executorImpl(Job *job,
+                                               TaskExecutorRef taskExecutor) {
+  swift_job_run_on_serial_and_task_executor(
+      job, SerialExecutorRef::generic(), taskExecutor);
 }
 
 void swift::swift_defaultActor_initialize(DefaultActor *_actor) {

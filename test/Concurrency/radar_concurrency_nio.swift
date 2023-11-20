@@ -57,7 +57,6 @@ extension NIODefaultSerialEventLoopExecutor: SerialExecutor {
   @inlinable
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(complexEquality: self)
-
   }
 
   @inlinable

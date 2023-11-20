@@ -159,6 +159,12 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
   swift_job_run_on_task_executor(&fakeJob, TaskExecutorRef::undefined());
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_job_run_on_serial_and_task_executor) {
+  swift_job_run_on_serial_and_task_executor(
+      &fakeJob, SerialExecutorRef::generic(), TaskExecutorRef::undefined());
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCurrentExecutor) {
   swift_task_getCurrentExecutor();
 }

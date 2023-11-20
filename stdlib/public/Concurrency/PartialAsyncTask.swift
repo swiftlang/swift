@@ -27,6 +27,13 @@ internal func _swiftJobRun(_ job: UnownedJob,
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ executor: UnownedTaskExecutor) -> ()
 
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_job_run_on_serial_and_task_executor")
+@usableFromInline
+internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
+                                         _ serialExecutor: UnownedSerialExecutor,
+                                         _ taskExecutor: UnownedTaskExecutor) -> ()
+
 // ==== -----------------------------------------------------------------------
 // MARK: UnownedJob
 
@@ -105,6 +112,14 @@ public struct UnownedJob: Sendable {
   @inlinable
   public func runSynchronously(on executor: UnownedTaskExecutor) {
     _swiftJobRunOnTaskExecutor(self, executor)
+  }
+
+  @available(SwiftStdlib 9999, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  public func runSynchronously(isolated serialExecutor: UnownedSerialExecutor,
+                               taskExecutor taskExecutor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
   }
 
 }

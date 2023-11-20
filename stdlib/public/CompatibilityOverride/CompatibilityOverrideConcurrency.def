@@ -121,6 +121,13 @@ OVERRIDE_ACTOR(job_run_on_task_executor, void,
                swift::, (Job *job, TaskExecutorRef executor),
                (job, executor))
 
+OVERRIDE_ACTOR(job_run_on_serial_and_task_executor, void,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (Job *job,
+                         SerialExecutorRef serialExecutor,
+                         TaskExecutorRef taskExecutor),
+               (job, serialExecutor, taskExecutor))
+
 OVERRIDE_ACTOR(task_getCurrentExecutor, SerialExecutorRef,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, ,)
