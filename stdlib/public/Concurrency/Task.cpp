@@ -627,12 +627,12 @@ static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
 
 /// Implementation of task creation.
 SWIFT_CC(swift)
-static AsyncTaskAndContext swift_task_create_commonImpl(
-    size_t rawTaskCreateFlags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultTypeMetadata,
-    TaskContinuationFunction *function, void *closureContext,
-    size_t initialContextSize) {
+static AsyncTaskAndContext
+swift_task_create_commonImpl(size_t rawTaskCreateFlags,
+                             TaskOptionRecord *options,
+                             const Metadata *futureResultTypeMetadata,
+                             TaskContinuationFunction *function,
+                             void *closureContext, size_t initialContextSize) {
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
   JobFlags jobFlags(JobKind::Task, JobPriority::Unspecified);
 
@@ -654,7 +654,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::InitialTaskExecutor:
-      taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)->getExecutorRef();
+      taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
+                         ->getExecutorRef();
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
@@ -1038,7 +1039,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     assert(false && "Should not be enqueuing tasks in task-to-thread model");
 #endif
     swift_retain(task);
-    task->flagAsAndEnqueueOnExecutor(serialExecutor); // FIXME: pass the task executor explicitly?
+    task->flagAsAndEnqueueOnExecutor(
+        serialExecutor); // FIXME: pass the task executor explicitly?
   }
 
   return {task, initialContext};
@@ -1292,8 +1294,8 @@ static AsyncTask *swift_task_suspendImpl() {
 }
 
 SWIFT_CC(swift)
-static void
-swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task, SerialExecutorRef executor) {
+static void swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task,
+                                                 SerialExecutorRef executor) {
   // TODO: is 'swift_task_enqueueTaskOnExecutorImpl' used at all, outside tests?
   task->flagAsAndEnqueueOnExecutor(executor);
 }

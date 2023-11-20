@@ -408,12 +408,15 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 
 #if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     /// Whether the task is actively running. On systems which cannot track the
-    /// identity of the drainer (see above), we use one bit in the flags to track
+    /// identity of the drainer (see above), we use one bit in the flags to
+    /// track
     /// whether or not task is running. Otherwise, the drain lock tells us
     /// whether or not it is running.
     IsRunning = 0x800,
 #endif
-    // FIXME: should we use this to know that we have such record set? This way we can avoid scanning the task to look for a record if we know there isn't one.
+    // FIXME: should we use this to know that we have such record set? This way
+    // we can avoid scanning the task to look for a record if we know there
+    // isn't one.
     HasTaskExecutorPreference = 0x1600, // FIXME what bits to use
 
     /// Task is intrusively enqueued somewhere - either in the default executor
@@ -949,7 +952,9 @@ inline void AsyncTask::flagAsRunning() {
 /// onto by the original enqueueing thread.
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
-inline void AsyncTask::flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor, TaskExecutorRef taskExecutor) {
+inline void
+AsyncTask::flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor,
+                                          TaskExecutorRef taskExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
@@ -987,7 +992,8 @@ inline void AsyncTask::flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecu
     // dependency record (Eg. newly created)
     assert(_private().dependencyRecord == nullptr);
 
-    // TODO: do we need to do tracking for task executors...? I guess no since they can't escalate.
+    // TODO: do we need to do tracking for task executors...? I guess no since
+    // they can't escalate.
     void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
     TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(this, newExecutor);
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() with dependencyRecord %p", this,
@@ -1027,11 +1033,7 @@ inline void AsyncTask::flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecu
       Flags.task_isFuture(), Flags.task_isGroupChildTask(),
       Flags.task_isAsyncLetTask());
 
-//  if (taskExecutor.isDefined()) {
-    swift_task_enqueue(this, newExecutor);
-//  } else {
-//    swift_task_enqueue(this, newExecutor);
-//  }
+  swift_task_enqueue(this, newExecutor);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 

@@ -694,10 +694,6 @@ swift_task_enqueueTaskOnExecutor(AsyncTask *task, SerialExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueue(Job *job, SerialExecutorRef executor);
 
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_enqueue2(Job *job, SerialExecutorRef executor, TaskExecutorRef taskExecutor);
-// FIXME: make sure we have a hook for this method
-
 /// Enqueue the given job to run asynchronously on the global
 /// execution pool.
 ///
@@ -904,7 +900,8 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run(Job *job, SerialExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_job_run_on_task_executor(Job *job, TaskExecutorRef executor);
+void swift_job_run_on_task_executor(Job *job,
+                                    TaskExecutorRef executor);
 
 /// Return the current thread's active task reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

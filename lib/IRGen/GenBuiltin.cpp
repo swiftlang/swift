@@ -327,15 +327,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskGroup =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
          Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
-        ? args.claimNext()
-        : nullptr;
+            ? args.claimNext()
+            : nullptr;
 
     // ExecutorRef is two pointers: {Identity, Implementation}
-    std::pair<llvm::Value*, llvm::Value*> executorRef =
+    std::pair<llvm::Value *, llvm::Value *> executorRef =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
          Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
-        ? std::pair(args.claimNext(), args.claimNext())
-        : std::pair(nullptr, nullptr);
+            ? std::pair(args.claimNext(), args.claimNext())
+            : std::pair(nullptr, nullptr);
 
     // In embedded Swift, futureResultType is a thin metatype, not backed by any
     // actual value.
@@ -348,15 +348,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskContext = args.claimNext();
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF,
-        flags,
-        taskGroup,
-        executorRef.first,
-        executorRef.second,
-        futureResultType,
-        taskFunction,
-        taskContext,
-        substitutions);
+        IGF, flags, taskGroup, executorRef.first, executorRef.second,
+        futureResultType, taskFunction, taskContext, substitutions);
 
     // Cast back to NativeObject/RawPointer.
     auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });

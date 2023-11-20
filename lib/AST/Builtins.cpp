@@ -1458,9 +1458,8 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
-static ValueDecl *getCreateAsyncTask(
-    ASTContext &ctx, Identifier id,
-    bool inGroup, bool withTaskExecutor) {
+static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
+                                     bool inGroup, bool withTaskExecutor) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder); // <T>
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
@@ -1472,7 +1471,7 @@ static ValueDecl *getCreateAsyncTask(
   }
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // operation
+      makeConcrete(FunctionType::get({}, genericParam, extInfo))); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
   return builder.build(id);
 }
@@ -1962,16 +1961,7 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getHopToExecutor(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _async(_thin),
-                            _parameters(_optional(_executor)),
-                            _void);
-//  BuiltinFunctionBuilder builder(ctx);
-//  auto *actorProto = ctx.getExecutor;
-//  // Create type parameters and add conformance constraints.
-//  auto actorParam = makeGenericParam();
-//  builder.addParameter(actorParam);
-//  builder.addConformanceRequirement(actorParam, actorProto);
-//  builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
-//  return builder.build(id);
+                            _parameters(_optional(_executor)), _void);
 }
 
 static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
@@ -2912,13 +2902,17 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getCancelAsyncTask(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTask:
-    return getCreateAsyncTask(Context, Id, /*inGroup=*/false, /*withExecutor=*/false);
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
+                              /*withExecutor=*/false);
   case BuiltinValueKind::CreateAsyncTaskInGroup:
-    return getCreateAsyncTask(Context, Id, /*inGroup=*/true, /*withExecutor=*/false);
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/false);
   case BuiltinValueKind::CreateAsyncTaskWithExecutor:
-    return getCreateAsyncTask(Context, Id, /*inGroup=*/false, /*withExecutor=*/true);
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
+                              /*withExecutor=*/true);
   case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
-    return getCreateAsyncTask(Context, Id, /*inGroup=*/true, /*withExecutor=*/true);
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/true);
 
   case BuiltinValueKind::TaskRunInline:
     return getTaskRunInline(Context, Id);

@@ -1082,7 +1082,8 @@ public:
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
   ///
-  /// This hop instruction may take into account current tasks' executor preference.
+  /// This hop instruction may take into account current tasks' executor
+  /// preference.
   ExecutorBreadcrumb emitHopToTargetExecutor(SILLocation loc,
                                              SILValue executor);
 

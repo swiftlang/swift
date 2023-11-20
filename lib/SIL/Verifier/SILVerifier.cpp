@@ -1285,8 +1285,10 @@ public:
                 "kind since guaranteed and owned values can always be passed "
                 "in unowned positions");
 
-        require(operand.getOperandOwnership() != OperandOwnership::InteriorPointer ||
-                    InteriorPointerOperandKind::get(&operand) != InteriorPointerOperandKind::Invalid,
+        require(operand.getOperandOwnership() !=
+                        OperandOwnership::InteriorPointer ||
+                    InteriorPointerOperandKind::get(&operand) !=
+                        InteriorPointerOperandKind::Invalid,
                 "All operands with InteriorPointer operand ownership should be "
                 "added to the InteriorPointerOperand utility");
       }
@@ -2114,7 +2116,8 @@ public:
 
     if (builtinKind == BuiltinValueKind::BuildOrdinaryTaskExecutorRef ||
         builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
-        builtinKind == BuiltinValueKind::BuildComplexEqualitySerialExecutorRef ||
+        builtinKind ==
+            BuiltinValueKind::BuildComplexEqualitySerialExecutorRef ||
         builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {
       require(arguments.size() == 1,
               "builtin expects one argument");
