@@ -30,7 +30,6 @@ final class NaiveQueueExecutor: TaskExecutor {
 
 nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
   dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
-  // expectedExecutor.preconditionIsolated()
 }
 
 @main struct Main {

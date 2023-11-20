@@ -1714,15 +1714,6 @@ static ManagedValue emitBuiltinHopToActor(SILGenFunction &SGF, SILLocation loc,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
-static ManagedValue emitBuiltinHopToExecutor(SILGenFunction &SGF,
-                                             SILLocation loc,
-                                             SubstitutionMap subs,
-                                             ArrayRef<ManagedValue> args,
-                                             SGFContext C) {
-  SGF.emitHopToExecutorValue(loc, args[0].getValue());
-  return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
-}
-
 static ManagedValue emitBuiltinPackLength(SILGenFunction &SGF, SILLocation loc,
                                           SubstitutionMap subs,
                                           ArrayRef<ManagedValue> args,

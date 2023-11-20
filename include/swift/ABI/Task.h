@@ -401,14 +401,7 @@ private:
 public:
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it.
-  void flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor,
-                                      TaskExecutorRef taskExecutor);
-  /// Same as `flagAsAndEnqueueOnTaskExecutor` with an `undefined` task
-  /// executor.
-  inline void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
-    return flagAsAndEnqueueOnTaskExecutor(newExecutor,
-                                          TaskExecutorRef::undefined());
-  }
+  void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.

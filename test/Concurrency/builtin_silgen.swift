@@ -32,18 +32,3 @@ func runDetached() {
 func testRunInline<T>(_ cl: () async -> T) -> T {
   return Builtin.taskRunInline(cl)
 }
-
-// Builtin.hopToActor should generate a mandatory hop_to_executor
-// before releasing the actor and reaching a suspend.
-//
-// CHECK-LABEL: sil private @$s14builtin_silgen11runDetachedHopyyFyyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> @out τ_0_0 for <()>
-// CHECK:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK:   hop_to_executor [mandatory] [[ACTOR]] : $MainActor
-// CHECK:   apply %{{.*}}() : $@convention(thin) @async () -> ()
-@available(SwiftStdlib 5.1, *)
-func runDetachedHop() {
-  Task.detached {
-    await Builtin.hopToExecutor(MainActor.sharedUnownedExecutor._executor)
-    await suspend()
-  }
-}

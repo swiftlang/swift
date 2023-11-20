@@ -2040,7 +2040,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
       "switch failed, task %p enqueued on executor %p (task executor: %p)",
       task, newExecutor.getIdentity(), currentTaskExecutor.getIdentity());
 
-  task->flagAsAndEnqueueOnTaskExecutor(newExecutor, currentTaskExecutor);
+  task->flagAsAndEnqueueOnExecutor(newExecutor);
   _swift_task_clearCurrent();
 }
 

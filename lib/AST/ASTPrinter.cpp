@@ -3132,8 +3132,6 @@ static bool usesFeatureBuiltinHopToActor(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinHopToExecutor(Decl *decl) { return false; }
-
 static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
   return false;
 }

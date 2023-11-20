@@ -542,8 +542,9 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_hasTaskGroupStatusRecord();
 
 /// Push an executor preference onto the current task.
-/// The pushed reference does not keep the executor alive, and it is the responsibility of the end user
-/// to ensure that the task executor reference remains valid throughout the time it may be used by any task.
+/// The pushed reference does not keep the executor alive, and it is the
+/// responsibility of the end user to ensure that the task executor reference
+/// remains valid throughout the time it may be used by any task.
 ///
 /// Runtime availability: Swift 9999.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

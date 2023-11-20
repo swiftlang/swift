@@ -951,8 +951,7 @@ inline void AsyncTask::flagAsRunning() {
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
 inline void
-AsyncTask::flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor,
-                                          TaskExecutorRef taskExecutor) {
+AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */

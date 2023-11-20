@@ -538,9 +538,6 @@ BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinu
 /// Force the current task to be rescheduled on the specified actor.
 BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
-/// Force the current task to be rescheduled on the specified executor.
-BUILTIN_SIL_OPERATION(HopToExecutor, "hopToExecutor", None)
-
 /// packLength: <each T>(_: repeat each T) -> Int
 ///
 /// Returns the number of items in a pack.

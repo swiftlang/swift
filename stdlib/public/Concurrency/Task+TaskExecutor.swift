@@ -41,35 +41,27 @@ public func withTaskExecutor<T: Sendable>(
   _ executor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
-    let taskExecutorBuiltin: Builtin.Executor =
-        if let executor {
-          // We need to go through the asUnowned... for serial executors,
-          // because they encode certain behavior in the reference bits,
-          // so we cannot just cast and assume it'll be correct.
-          executor.asUnownedTaskExecutor().executor
-        } else {
-          // we must push a "no preference" record onto the task
-          // because there may be other records issuing a preference already,
-          // so by pushing this "no preference" (undefined task executor),
-          // we turn off the task executor preference for the scope of `operation`.
-          _getUndefinedTaskExecutor()
-        }
-
-    let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
-    defer {
-      _popTaskExecutorPreference(record: record)
+  let taskExecutorBuiltin: Builtin.Executor =
+    if let executor {
+      // We need to go through the asUnowned... for serial executors,
+      // because they encode certain behavior in the reference bits,
+      // so we cannot just cast and assume it'll be correct.
+      executor.asUnownedTaskExecutor().executor
+    } else {
+      // we must push a "no preference" record onto the task
+      // because there may be other records issuing a preference already,
+      // so by pushing this "no preference" (undefined task executor),
+      // we turn off the task executor preference for the scope of `operation`.
+      _getUndefinedTaskExecutor()
     }
 
-  #if $BuiltinHopToExecutor
-  if executor == nil {
-    let defaultGenericExecutor = _getGenericSerialExecutor()
-    await Builtin.hopToExecutor(defaultGenericExecutor)
-  } else {
-    await Builtin.hopToExecutor(taskExecutorBuiltin)
+  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  defer {
+    _popTaskExecutorPreference(record: record)
   }
-  #else
-  fatalError("Unsupported Swift compiler")
-  #endif
+
+  // No need to manually hop to the target executor, because as we execute
+  // the operation, its enqueue will respect the attached executor preference.
 
   return try await operation()
 }
@@ -129,7 +121,7 @@ extension Task where Failure == Never {
       flags, taskExecutorRef.executor, operation)
     self._task = task
     #else
-    fatalError("Unsupported Swift compiler, missing support for $BuiltinHopToExecutor")
+    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor")
     #endif
   }
 }
@@ -157,7 +149,7 @@ extension Task where Failure == Error {
       flags, taskExecutorRef.executor, operation)
     self._task = task
     #else
-    fatalError("Unsupported Swift compiler, missing support for $BuiltinHopToExecutor")
+    fatalError("Unsupported Swift compiler, missing support for $BuiltinCreateAsyncTaskWithExecutor")
     #endif
   }
 }

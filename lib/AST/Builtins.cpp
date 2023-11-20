@@ -1959,11 +1959,6 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
-static ValueDecl *getHopToExecutor(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _async(_thin),
-                            _parameters(_optional(_executor)), _void);
-}
-
 static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1,
                                  /* anyObject */ false,
@@ -3002,8 +2997,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);
-  case BuiltinValueKind::HopToExecutor:
-    return getHopToExecutor(Context, Id);
 
   case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     return getAutoDiffCreateLinearMapContext(Context, Id);
