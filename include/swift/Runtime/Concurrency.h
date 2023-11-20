@@ -915,6 +915,20 @@ SerialExecutorRef swift_task_getCurrentExecutor(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 SerialExecutorRef swift_task_getMainExecutor(void);
 
+/// Return the preferred task executor of the current task,
+/// or ``TaskExecutorRef::undefined()`` if no preference.
+///
+/// A stored preference may be `undefined` explicitly,
+/// which is semantically equivalent to having no preference.
+///
+/// The returned reference must be treated carefully,
+/// because it is *unmanaged*, meaning that the fact
+/// that the task "has" this preference does not imply its lifetime.
+///
+/// Developers who use task executor preference MUST guarantee
+/// their lifetime exceeds any use of such executor. For example,
+/// they should be created as "forever" alive singletons, or otherwise
+/// guarantee their lifetime extends beyond all potential uses of them by tasks.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 
