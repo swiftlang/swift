@@ -222,18 +222,5 @@ TaskExecutorRef swift::swift_task_getUndefinedTaskExecutor() {
   return TaskExecutorRef::undefined();
 }
 
-/*****************************************************************************/
-/************************ GENERIC EXECUTOR ***********************************/
-/*****************************************************************************/
-
-SerialExecutorRef swift::swift_task_getGenericExecutor() {
-#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  // FIXME: this isn't right for the non-cooperative environment
-  return SerialExecutorRef::generic();
-#else
-  return SerialExecutorRef::generic();
-#endif
-}
-
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

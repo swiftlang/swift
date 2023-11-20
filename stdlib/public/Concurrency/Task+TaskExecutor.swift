@@ -62,7 +62,7 @@ public func withTaskExecutor<T: Sendable>(
 
   #if $BuiltinHopToExecutor
   if executor == nil {
-    let defaultGenericExecutor = _getGenericExecutor()
+    let defaultGenericExecutor = _getGenericSerialExecutor()
     await Builtin.hopToExecutor(defaultGenericExecutor)
   } else {
     await Builtin.hopToExecutor(taskExecutorBuiltin)
