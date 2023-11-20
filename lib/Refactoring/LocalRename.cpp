@@ -207,21 +207,25 @@ private:
   bool finishDependency(bool isClangModule) override { return true; }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
-    if (symbol.USR == usr) {
-      if (auto loc = indexSymbolToRenameLoc(symbol)) {
-        // Inside capture lists like `{ [test] in }`, 'test' refers to both the
-        // newly declared, captured variable and the referenced variable it is
-        // initialized from. Make sure to only rename it once.
-        auto existingLoc = llvm::find_if(locations, [&](RenameLoc searchLoc) {
-          return searchLoc.Line == loc->Line && searchLoc.Column == loc->Column;
-        });
-        if (existingLoc == locations.end()) {
-          locations.push_back(std::move(*loc));
-        } else {
-          assert(existingLoc->OldName == loc->OldName &&
-                 "Asked to do a different rename for the same location?");
-        }
-      }
+    if (symbol.USR != usr) {
+      return IndexDataConsumer::Continue;
+    }
+    auto loc = indexSymbolToRenameLoc(symbol);
+    if (!loc) {
+      return IndexDataConsumer::Continue;
+    }
+    
+    // Inside capture lists like `{ [test] in }`, 'test' refers to both the
+    // newly declared, captured variable and the referenced variable it is
+    // initialized from. Make sure to only rename it once.
+    auto existingLoc = llvm::find_if(locations, [&](RenameLoc searchLoc) {
+      return searchLoc.Line == loc->Line && searchLoc.Column == loc->Column;
+    });
+    if (existingLoc == locations.end()) {
+      locations.push_back(std::move(*loc));
+    } else {
+      assert(existingLoc->OldName == loc->OldName &&
+             "Asked to do a different rename for the same location?");
     }
     return IndexDataConsumer::Continue;
   }

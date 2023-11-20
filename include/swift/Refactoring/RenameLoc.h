@@ -53,7 +53,7 @@ struct RenameLoc {
   /// The column at which the base name (excluding trivia) starts (1-based).
   unsigned Column;
 
-  ///  /// The offset at which the related name starts.
+  /// The offset at which the related name starts.
   unsigned Offset;
 
   /// The length of the base name in the related identifier. For functions,
