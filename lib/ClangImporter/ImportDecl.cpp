@@ -2710,13 +2710,13 @@ namespace {
                       ctorUsingShadowDecl->getTargetDecl());
                   if (!baseCtorDecl || baseCtorDecl->isDeleted())
                     continue;
+                  auto loc = ctorUsingShadowDecl->getLocation();
+
                   auto derivedCtorDecl = clangSema.findInheritingConstructor(
-                      clang::SourceLocation(), baseCtorDecl,
-                      ctorUsingShadowDecl);
+                      loc, baseCtorDecl, ctorUsingShadowDecl);
                   if (!derivedCtorDecl->isDefined() &&
                       !derivedCtorDecl->isDeleted())
-                    clangSema.DefineInheritingConstructor(
-                        clang::SourceLocation(), derivedCtorDecl);
+                    clangSema.DefineInheritingConstructor(loc, derivedCtorDecl);
                 }
               }
             }
