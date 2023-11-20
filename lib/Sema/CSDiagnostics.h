@@ -3128,6 +3128,24 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose attempts to pass non-keypath as an argument to key path subscript:
+///
+/// \code
+/// func test(data: Int) {
+///   data[keyPath: 42] // error `42` is not a key path
+/// }
+/// \endcode
+class InvalidTypeAsKeyPathSubscriptIndex final : public FailureDiagnostic {
+  Type ArgType;
+
+public:
+  InvalidTypeAsKeyPathSubscriptIndex(const Solution &solution, Type argType,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ArgType(resolveType(argType)) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
