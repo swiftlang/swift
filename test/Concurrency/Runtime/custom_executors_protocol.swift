@@ -10,7 +10,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
-@preconcurrency import Dispatch
+import Dispatch
 
 protocol WithSpecifiedExecutor: Actor {
   nonisolated var executor: any SpecifiedExecutor { get }
