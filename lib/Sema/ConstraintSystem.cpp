@@ -3686,11 +3686,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // Key path application looks like a subscript(keyPath: KeyPath<Base, T>).
     // The element type is T or @lvalue T based on the key path subtype and
     // the mutability of the base.
-    auto keyPathIndexTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::KeyPathSubscriptIndex),
-        /*options=*/0);
+    auto *keyPathIndexLoc =
+        getConstraintLocator(locator, ConstraintLocator::KeyPathSubscriptIndex);
+    auto keyPathIndexTy = createTypeVariable(keyPathIndexLoc,
+                                             /*options=*/0);
     auto elementTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        getConstraintLocator(keyPathIndexLoc, ConstraintLocator::KeyPathValue),
         TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
     // The element result is an lvalue or rvalue based on the key path class.
