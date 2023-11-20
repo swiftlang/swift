@@ -57,7 +57,7 @@ public enum CommandLine {
   // Use lazy initialization of static properties to
   // safely initialize the swift arguments.
   @usableFromInline
-  internal static let _arguments: [String]
+  internal static var _arguments: [String]
     = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
  
   /// An array that provides access to this program's command line arguments.
