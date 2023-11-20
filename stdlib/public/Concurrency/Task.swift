@@ -1109,10 +1109,21 @@ internal func _asyncMainDrainQueue() -> Never
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
-@available(SwiftStdlib 5.1, *)
+/// Get the default generic serial executor.
+///
+/// It is used by default used by tasks and default actors,
+/// unless other executors are specified.
+@available(SwiftStdlib 9999, *)
 @usableFromInline
-@_silgen_name("swift_task_getGenericExecutor")
-internal func _getGenericExecutor() -> Builtin.Executor
+internal func _getGenericSerialExecutor() -> Builtin.Executor {
+  // The `SerialExecutorRef` to "default generic executor" is guaranteed
+  // to be a zero value;
+  //
+  // As the runtime relies on this in multiple places,
+  // so instead of a runtime call to get this executor ref, we bitcast a "zero"
+  // of expected size to the builtin executor type.
+  unsafeBitCast((uintptr_t(0), uintptr_t(0)), Builtin.Executor.self)
+}
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
