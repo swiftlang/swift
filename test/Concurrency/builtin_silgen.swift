@@ -43,7 +43,7 @@ func testRunInline<T>(_ cl: () async -> T) -> T {
 @available(SwiftStdlib 5.1, *)
 func runDetachedHop() {
   Task.detached {
-    Builtin.hopToExecutor(MainActor.sharedUnownedExecutor.executor)
+    await Builtin.hopToExecutor(MainActor.sharedUnownedExecutor._executor)
     await suspend()
   }
 }

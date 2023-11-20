@@ -655,7 +655,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     switch (option->getKind()) {
     case TaskOptionRecordKind::InitialTaskExecutor:
       taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)->getExecutorRef();
-      jobFlags.task_setHasInitialTaskExecutorPreferenceRecord(true);
+      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
     case TaskOptionRecordKind::TaskGroup:
@@ -888,12 +888,12 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // Only attempt to inherit parent's executor preference if we didn't set one explicitly,
   // which we've recorded in the flag by noticing a task create option higher up in this func.
-  if (!jobFlags.task_hasInitialTaskExecutorPreferenceRecord()) {
+  if (!jobFlags.task_hasInitialTaskExecutorPreference()) {
     // do we have a parent we can inherit the task executor from?
     if (parent) {
       auto parentTaskExecutor = parent->getPreferredTaskExecutor();
       if (parentTaskExecutor.isDefined()) {
-        jobFlags.task_setHasInitialTaskExecutorPreferenceRecord(true);
+        jobFlags.task_setHasInitialTaskExecutorPreference(true);
         taskExecutor = parentTaskExecutor;
       }
     }
@@ -1024,10 +1024,10 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // and there is a task executor preference set in the parent,
   // we inherit it by deep-copying the preference record.
   // if (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
-  if (jobFlags.task_hasInitialTaskExecutorPreferenceRecord()) {
+  if (jobFlags.task_hasInitialTaskExecutorPreference()) {
     // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
     // because the group takes a fast-path when attaching the child record.
-    assert(jobFlags.task_hasInitialTaskExecutorPreferenceRecord());
+    assert(jobFlags.task_hasInitialTaskExecutorPreference());
     task->pushInitialTaskExecutorPreference(taskExecutor);
   }
 

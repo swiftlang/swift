@@ -2453,7 +2453,7 @@ public:
     Task_IsGroupChildTask               = 26,
     // 27 is currently unused
     Task_IsAsyncLetTask                 = 28,
-    Task_HasInheritedExecutorPreference = 29,
+    Task_HasInitialTaskExecutorPreference = 29,
   };
 
   explicit JobFlags(uint32_t bits) : FlagSet(bits) {}
@@ -2486,9 +2486,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsAsyncLetTask,
                                 task_isAsyncLetTask,
                                 task_setIsAsyncLetTask)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInheritedExecutorPreference,
-                                task_hasInitialTaskExecutorPreferenceRecord,
-                                task_setHasInitialTaskExecutorPreferenceRecord)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskExecutorPreference,
+                                task_hasInitialTaskExecutorPreference,
+                                task_setHasInitialTaskExecutorPreference)
 };
 
 /// Kinds of task status record.

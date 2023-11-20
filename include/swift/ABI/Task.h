@@ -425,7 +425,14 @@ public:
   void pushInitialTaskExecutorPreference(TaskExecutorRef preferred);
 
   /// WARNING: Only to be used during task completion (destroy).
-  /// This is because this API assumes that we have an executor prefer
+  ///
+  /// This is because between task creation and its destory, we cannot carry the exact record to
+  /// `pop(record)`, and instead assume that there will be exactly one record remaining --
+  /// the "initial" record (added during creating the task), and it must be that record
+  /// that is removed by this api.
+  ///
+  /// All other situations from user code should be using the `swift_task_pushTaskExecutorPreference`,
+  /// and `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
 
   // ==== Task Local Values ----------------------------------------------------
@@ -541,7 +548,7 @@ public:
   /// This means that during task tear down the record should be deallocated
   /// because it was not set with a
   bool hasInitialTaskExecutorPreferenceRecord() const {
-    return Flags.task_hasInitialTaskExecutorPreferenceRecord();
+    return Flags.task_hasInitialTaskExecutorPreference();
   }
 
   // ==== Future ---------------------------------------------------------------
