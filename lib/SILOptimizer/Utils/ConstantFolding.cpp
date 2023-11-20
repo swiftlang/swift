@@ -612,7 +612,7 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
     }
   }
 
-  // Everything is less than, less than equal to or unequal to positive infinity
+  // Everything is less than or less than equal to positive infinity
   if (match(BI,
             m_CombineOr(
                 // Inf > x
@@ -627,12 +627,6 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                 // x <= Inf
                 m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x != Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // Inf != x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // Inf > x
                 m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
@@ -644,13 +638,7 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x <= Inf
                 m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x != Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // Inf != x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
+                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg)))))) {
     APInt val = builtinArg->getValue();
     if (hasIEEEFloatPosInfBitRepr(val)) {
       // One of the operands is infinity, but unless the other operand is not
@@ -666,7 +654,7 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
     }
   }
 
-  // Positive infinity is not less than, less than equal to or equal to anything
+  // Positive infinity is not less than or less than equal to anything
   if (match(BI, 
             m_CombineOr(
                 // x > Inf
@@ -681,12 +669,6 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                 // Inf <= x
                 m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // x == Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // Inf == x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // x > Inf
                 m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
@@ -698,12 +680,6 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // Inf <= x
                 m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // x == Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // Inf == x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
     APInt val = builtinArg->getValue();
     if (hasIEEEFloatPosInfBitRepr(val)) {

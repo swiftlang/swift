@@ -270,6 +270,9 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
             for op in FPOperation.allCases {
                 for op1 in FPOperand.allCases {
                     for op2 in FPOperand.allCases {
+                        if checkIfEqCmpBetweenInfAndNonInf(op: op, op1: op1, op2: op2) {
+                            continue
+                        }
                         generateFuncDeclWithCheckDirectives(fpType: fpType, op: op, op1: op1, op2: op2, isopt: true)
                     }
                 }
@@ -282,6 +285,9 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
             for op in FPOperation.allCases {
                 for op1 in FPOperand.allCases {
                     for op2 in FPOperand.allCases {
+                        if checkIfEqCmpBetweenInfAndNonInf(op: op, op1: op1, op2: op2) {
+                            continue
+                        }
                         generateFuncDeclWithCheckDirectives(fpType: fpType, op: op, op1: op1, op2: op2, isopt: false)
                     }
                 }
@@ -294,6 +300,9 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
             for op in FPOperation.allCases {
                 for op1 in FPOperand.allCases {
                     for op2 in FPOperand.allCases {
+                        if checkIfEqCmpBetweenInfAndNonInf(op: op, op1: op1, op2: op2) {
+                            continue
+                        }
                         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let optFuncName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let unoptFuncName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
@@ -316,6 +325,9 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
             for op in FPOperation.allCases {
                 for op1 in FPOperand.allCases {
                     for op2 in FPOperand.allCases {
+                        if checkIfEqCmpBetweenInfAndNonInf(op: op, op1: op1, op2: op2) {
+                            continue
+                        }
                         let comparison = resultComparisonCheck(fpType: fpType, op: op, op1: op1, op2: op2)
 
                         print("""
@@ -371,6 +383,20 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
         \(checkDirectives)
                 
         """)
+    }
+
+    // Equality comparisons b/w infinity and non-infinity are not constant folded.
+    // In such comparisons, special floating point types - Float80 and Float16, may 
+    // come into play and pattern matching againt them complicates the constant folding
+    // logic more than we'd like.
+    private func checkIfEqCmpBetweenInfAndNonInf(op: FPOperation, op1: FPOperand, op2: FPOperand) -> Bool {
+        if op == .Equal || op == .NotEqual {
+            // If only one of the operands is infinity
+            if (op1 == .Infinity || op2 == .Infinity) && !(op1 == .Infinity && op2 == .Infinity) {
+                return true
+            }
+        }
+        return false
     }
 }
 
