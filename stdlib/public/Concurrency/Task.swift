@@ -1122,7 +1122,7 @@ internal func _getGenericSerialExecutor() -> Builtin.Executor {
   // As the runtime relies on this in multiple places,
   // so instead of a runtime call to get this executor ref, we bitcast a "zero"
   // of expected size to the builtin executor type.
-  unsafeBitCast((uintptr_t(0), uintptr_t(0)), Builtin.Executor.self)
+  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

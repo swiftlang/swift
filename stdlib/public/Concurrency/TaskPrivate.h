@@ -1,5 +1,3 @@
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "UnreachableCode"
 //===--- TaskPrivate.h - Concurrency library internal interface -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -1156,5 +1154,3 @@ inline bool AsyncTask::localValuePop() {
 } // end namespace swift
 
 #endif
-
-#pragma clang diagnostic pop

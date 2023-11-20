@@ -334,7 +334,6 @@ extension ThrowingDiscardingTaskGroup {
     #endif
   }
 
-
   /// Adds a child task to the group and set it up with the passed in task executor preference,
   /// unless the group has been canceled.
   ///

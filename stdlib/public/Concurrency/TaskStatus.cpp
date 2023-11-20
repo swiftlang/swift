@@ -554,8 +554,6 @@ swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
   auto task = swift_task_getCurrent();
   assert(task && "Executor preference can only be called from async contexts.");
 
-  // return task->pushTaskExecutorPreference(taskExecutor);
-
   void *allocation = _swift_task_alloc_specific(
       task, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record =

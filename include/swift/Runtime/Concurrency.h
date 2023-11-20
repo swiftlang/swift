@@ -915,13 +915,6 @@ SerialExecutorRef swift_task_getCurrentExecutor(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 SerialExecutorRef swift_task_getMainExecutor(void);
 
-/// Return the "undefined" task executor reference.
-///
-/// It can be used used to store a record indicating that
-/// there is no task executor preference in the current scope.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-TaskExecutorRef swift_task_getUndefinedTaskExecutor(void);
-
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 

@@ -22,7 +22,7 @@ final class MyTaskExecutor: TaskExecutor, @unchecked Sendable {
   func enqueue(_ job: consuming ExecutorJob) {
     let job = UnownedJob(job)
     queue.async {
-      job.runSynchronously(on: self .asUnownedTaskExecutor())
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
 }

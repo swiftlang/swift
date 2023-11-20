@@ -214,13 +214,5 @@ bool SerialExecutorRef::isMainExecutor() const {
 #endif
 }
 
-/*****************************************************************************/
-/************************* TASK EXECUTOR *************************************/
-/*****************************************************************************/
-
-TaskExecutorRef swift::swift_task_getUndefinedTaskExecutor() {
-  return TaskExecutorRef::undefined();
-}
-
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

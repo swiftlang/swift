@@ -197,9 +197,22 @@ internal func _popTaskExecutorPreference(
   record: TaskExecutorPreferenceStatusRecord
 )
 
+/// Get the "undefined" task executor reference.
+///
+/// It can be used to compare against, and is semantically equivalent to
+/// "no preference".
 @available(SwiftStdlib 9999, *)
 @usableFromInline
-@_silgen_name("swift_task_getUndefinedTaskExecutor")
-internal func _getUndefinedTaskExecutor() -> Builtin.Executor
+internal func _getUndefinedTaskExecutor() -> Builtin.Executor {
+  // Similar to the `_getGenericSerialExecutor` this method relies
+  // on the runtime representation of the "undefined" executor
+  // to be specifically `{0, 0}` (a null-pointer to an executor and witness
+  // table).
+  //
+  // Rather than call into the runtime to return the
+  // `TaskExecutorRef::undefined()`` we this information to bitcast
+  // and return it directly.
+  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
+}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
