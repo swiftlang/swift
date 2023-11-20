@@ -553,7 +553,9 @@ public:
   /// setting it during creation (`Task(on:...)`).
   ///
   /// This means that during task tear down the record should be deallocated
-  /// because it was not set with a
+  /// because it will not be taken care of by a paired "pop" as the normal
+  /// user-land "push / pop" pair of setting a task executor preference would
+  /// have been.
   bool hasInitialTaskExecutorPreferenceRecord() const {
     return Flags.task_hasInitialTaskExecutorPreference();
   }
