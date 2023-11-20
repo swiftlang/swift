@@ -541,14 +541,25 @@ bool swift_taskGroup_hasTaskGroupRecord(); // FIXME: not used? we have swift_tas
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_hasTaskGroupStatusRecord();
 
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-TaskExecutorRef swift_task_getPreferredTaskExecutor();
-
 /// Push an executor preference onto the current task.
+/// The pushed reference does not keep the executor alive, and it is the responsibility of the end user
+/// to ensure that the task executor reference remains valid throughout the time it may be used by any task.
+///
+/// Runtime availability: Swift 9999.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskExecutorPreferenceStatusRecord*
 swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 
+/// Remove a single task executor preference record from the current task.
+///
+/// Must be passed the record intended to be removed (returned by
+/// `swift_task_pushTaskExecutorPreference`).
+///
+/// Failure to remove the expected record should result in a runtime crash as it
+/// signals a bug in record handling by the concurrency library -- a record push
+/// must always be paired with a record pop.
+///
+/// Runtime availability: Swift 9999.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
