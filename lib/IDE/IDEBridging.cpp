@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/IDEBridging.h"
+#include "llvm/Support/raw_ostream.h"
 #include <climits>
 
 ResolvedLoc::ResolvedLoc(BridgedCharSourceRange range,
@@ -36,4 +37,21 @@ ResolvedLoc::ResolvedLoc() {}
 
 ResolvedLocVector ResolvedLocVector_createEmpty() {
   return ResolvedLocVector();
+}
+
+BridgedResolvedLocVector::BridgedResolvedLocVector(
+    const std::vector<ResolvedLoc> &vector)
+    : vector(new std::vector<ResolvedLoc>(vector)) {}
+
+BridgedResolvedLocVector::BridgedResolvedLocVector(const void *opaqueValue)
+    : vector(static_cast<const std::vector<ResolvedLoc> *>(opaqueValue)) {}
+
+const std::vector<ResolvedLoc> &BridgedResolvedLocVector::unbridged() {
+  return *vector;
+}
+
+void BridgedResolvedLocVector::destroy() { delete vector; }
+
+const void *BridgedResolvedLocVector::getOpaqueValue() const {
+  return static_cast<const void *>(vector);
 }

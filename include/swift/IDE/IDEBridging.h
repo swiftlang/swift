@@ -90,6 +90,41 @@ typedef std::vector<ResolvedLoc> ResolvedLocVector;
 SWIFT_NAME("ResolvedLocVector.empty()")
 ResolvedLocVector ResolvedLocVector_createEmpty();
 
+/// A heap-allocated `std::vector<ResoledLoc>` that can be represented by an
+/// opaque pointer value.
+///
+/// This allows us to perform all the memory management for the heap-allocated
+/// vector in C++. This makes it easier to manage because creating and
+/// destorying an object in C++ is consistent with whether elements within the
+/// vector are destroyed as well.
+///
+/// - Note: This should no longer be necessary when we use C++ to Swift interop.
+///   In that case `swift_SwiftIDEUtilsBridging_runNameMatcher` can return a
+///   `ResolvedLocVector`.
+class BridgedResolvedLocVector {
+  const std::vector<ResolvedLoc> *vector;
+
+public:
+  /// Create heap-allocaed vector with the same elements as `vector`.
+  BridgedResolvedLocVector(const std::vector<ResolvedLoc> &vector);
+
+  /// Create a `BridgedResolvedLocVector` from an opaque value obtained from
+  /// `getOpaqueValue`.
+  BridgedResolvedLocVector(const void *opaqueValue);
+
+  /// Get the underlying vector.
+  const std::vector<ResolvedLoc> &unbridged();
+
+  /// Delete the heap-allocated memory owned by this object. Accessing
+  /// `unbridged` is illegal after calling `destroy`.
+  void destroy();
+
+  /// Get an opaque pointer value that describes this 
+  /// `BridgedResolvedLocVector`. This opaque value can be returned by a
+  /// `@_cdecl` function in Swift.
+  const void *getOpaqueValue() const;
+};
+
 typedef std::vector<BridgedSourceLoc> SourceLocVector;
 
 /// Needed so that we can manually conform `SourceLocVectorIterator` to
@@ -102,5 +137,25 @@ inline bool SourceLocVectorIterator_equal(const SourceLocVectorIterator &lhs,
                                           const SourceLocVectorIterator &rhs) {
   return lhs == rhs;
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/// Entry point to run the NameMatcher written in swift-syntax.
+/// 
+/// - Parameters:
+///   - sourceFilePtr: A pointer to an `ExportedSourceFile`, used to access the
+///     syntax tree
+///   - locations: Pointer to a buffer of `BridgedSourceLoc` that should be
+///     resolved by the name matcher.
+///   - locationsCount: Number of elements in `locations`.
+/// - Returns: The opaque value of a `BridgedResolvedLocVector`.
+void *swift_SwiftIDEUtilsBridging_runNameMatcher(const void *sourceFilePtr,
+                                                 BridgedSourceLoc *locations,
+                                                 size_t locationsCount);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

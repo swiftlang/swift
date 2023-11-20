@@ -106,10 +106,6 @@ endfunction()
 # EMIT_MODULE
 #   Emit '.swiftmodule' to
 #
-# GENERATE_CXX_BRIDGING_HEADER
-#   Emit a briding header with all public declarations for this library that can
-#   be imported from C++ to include/ASTGen/<target-name>-Swift.h
-#
 # DEPENDENCIES
 #   Target names to pass target_link_library
 #
@@ -129,8 +125,7 @@ function(add_pure_swift_host_library name)
   set(options
         SHARED
         STATIC
-        EMIT_MODULE
-        GENERATE_CXX_BRIDGING_HEADER)
+        EMIT_MODULE)
   set(single_parameter_options)
   set(multiple_parameter_options
         DEPENDENCIES
@@ -234,34 +229,6 @@ function(add_pure_swift_host_library name)
         -emit-module-source-info-path;${module_sourceinfo_file};
         -emit-module-interface-path;${module_interface_file}
         >)
-  endif()
-
-  if(APSHL_GENERATE_CXX_BRIDGING_HEADER)
-    set(bridging_header_dir "${CMAKE_BINARY_DIR}/include/swift/ASTGen")
-    set(bridging_header_path "${bridging_header_dir}/${name}-Swift.h")
-	  file(MAKE_DIRECTORY ${bridging_header_dir})
-    target_compile_options(${name} PRIVATE 
-      "SHELL: -Xfrontend -emit-clang-header-path -Xfrontend ${bridging_header_path}"
-    )
-    if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-      # The 5.8 compiler does not expose all public declarations in the bridging header by default.
-      target_compile_options(${name} PRIVATE 
-        "SHELL: -Xfrontend -clang-header-expose-decls=all-public"
-      )
-      # Explicitly link swiftCxx because it's not automatically liked by a Swift 5.8 compiler
-      target_link_libraries(${name} PRIVATE -lswiftCxx)
-    endif()
-
-    add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND ""
-      BYPRODUCTS ${bridging_header_path}
-      DEPENDS ${name}
-      COMMENT "Empty command that targets can depend on so that the C++ bridging header gets generate before they are built"
-    )
-
-    add_custom_target("${name}-cxx-briding-header" DEPENDS ${bridging_header_path})
   endif()
 
   if(LLVM_USE_LINKER)

@@ -55,7 +55,5 @@ target_link_libraries(swiftRefactoring PRIVATE
   swiftParse
   swiftSema)
 
-add_dependencies(swiftRefactoring "swiftIDEUtilsBridging-cxx-briding-header")
-
 set_swift_llvm_is_available(swiftRefactoring)
 

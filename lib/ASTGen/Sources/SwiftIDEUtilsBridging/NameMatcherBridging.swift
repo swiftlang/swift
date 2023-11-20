@@ -109,12 +109,15 @@ fileprivate extension IDEBridging.ResolvedLocContext {
 
 // MARK: - Run NameMatcher
 
+@_cdecl("swift_SwiftIDEUtilsBridging_runNameMatcher")
 public func runNameMatcher(
   sourceFilePtr: UnsafeRawPointer,
-  locations: SourceLocVector
-) -> ResolvedLocVector {
+  locations: UnsafePointer<BridgedSourceLoc>,
+  locationsCount: UInt
+) -> UnsafeRawPointer {
   let sourceFile = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1).pointee
-  let positions: [AbsolutePosition] = locations.compactMap { sourceFile.position(of: $0) }
+  let locations = UnsafeBufferPointer(start: locations, count: Int(locationsCount))
+  let positions: [AbsolutePosition] =  locations.compactMap { sourceFile.position(of: $0) }
   let resolvedLocs = NameMatcher.resolve(baseNamePositions: positions, in: sourceFile.syntax)
-  return ResolvedLocVector(from: resolvedLocs, in: sourceFile)
+  return BridgedResolvedLocVector(ResolvedLocVector(from: resolvedLocs, in: sourceFile)).getOpaqueValue()
 }

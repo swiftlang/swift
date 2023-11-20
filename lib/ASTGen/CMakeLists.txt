@@ -63,7 +63,7 @@ add_pure_swift_host_library(swiftASTGen STATIC
     ${ASTGen_Swift_dependencies}
 )
 
-add_pure_swift_host_library(swiftIDEUtilsBridging GENERATE_CXX_BRIDGING_HEADER
+add_pure_swift_host_library(swiftIDEUtilsBridging
   Sources/SwiftIDEUtilsBridging/NameMatcherBridging.swift
   
   DEPENDENCIES
