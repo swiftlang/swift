@@ -273,18 +273,18 @@ public struct UnownedTaskExecutor: Sendable {
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    // #if compiler(>=9999) && $BuiltinExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
+    #if $BuiltinExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
     self.executor = executor
-    // #endif
+    #endif
   }
 
   @inlinable
   public init<E: TaskExecutor>(ordinary executor: __shared E) {
-    // #if compiler(>=9999) && $BuiltinBuildExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
+    #if $BuiltinBuildTaskExecutor
     self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
-    // #else
-    // fatalError("Swift compiler is incompatible with this SDK version")
-    // #endif
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 }
 
