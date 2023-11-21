@@ -1437,12 +1437,14 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     // a valid key path type of its subtype.
     if (kind == AllowedBindingKind::Supertypes) {
       if (type->isExistentialType()) {
-        type = type->getExistentialLayout().explicitSuperclass;
+        auto layout = type->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass) {
+          type = superclass;
+        } else if (!CS.shouldAttemptFixes()) {
+          return llvm::None;
+        }
       }
     }
-
-    if (!type)
-      return llvm::None;
   }
 
   if (auto *locator = TypeVar->getImpl().getLocator()) {
