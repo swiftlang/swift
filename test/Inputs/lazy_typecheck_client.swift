@@ -13,6 +13,7 @@ struct ConformsToMainActorProto: MainActorProtocol {
 
 func testGlobalFunctions() {
   let _: Int = publicFunc()
+  let _: Int = publicFuncReturnsTypealias()
   let _: Int = publicFuncWithDefaultArg()
   #if TEST_PACKAGE
   let _: Int = packageFunc()
@@ -28,7 +29,10 @@ func testGlobalFunctions() {
 
 func testGobalVars() {
   let _: Int = publicGlobalVar
+  let _: Int = publicGlobalVarTypealias
   let _: String = publicGlobalVarInferredType
+  let _: [Int] = publicGlobalVarInferredInferredGeneric
+  let _: Int? = publicGlobalVarTypealiasGeneric
   let _: (Int, Int) = (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY)
 }
 
@@ -36,6 +40,7 @@ func testPublicStructs() {
   let s = PublicStruct(x: 1)
   let _: Int = s.publicMethod()
   let _: Int = s.publicProperty
+  let _: Int = s.publicTypealiasProperty
   let _: String = s.publicPropertyInferredType
   let _: Int = s.publicLazyProperty
   let _: Int = s.publicLazyPropertyInferred

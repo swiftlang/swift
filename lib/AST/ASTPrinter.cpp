@@ -3926,9 +3926,20 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   for (auto idx : range(decl->getNumPatternEntries())) {
     auto *pattern = decl->getPattern(idx);
 
-    // Force the entry to be typechecked before attempting to print.
-    if (shouldPrintAllSemanticDetails(Options) && !pattern->hasType())
-      (void)decl->getCheckedPatternBindingEntry(idx);
+    if (shouldPrintAllSemanticDetails(Options)) {
+      // Force the entry to be typechecked before attempting to print.
+      if (!pattern->hasType())
+        (void)decl->getCheckedPatternBindingEntry(idx);
+
+      // HACK: If the pattern type is a typealias, trigger a request that will
+      // fully typecheck the init. This ensures typealiases are desguared
+      // consistently.
+      if (decl->isInitialized(idx)) {
+        if (auto type = pattern->getType())
+          if (type->getKind() == TypeKind::TypeAlias)
+            (void)decl->getCheckedAndContextualizedInit(idx);
+      }
+    }
 
     if (!shouldPrintPattern(pattern))
       continue;
