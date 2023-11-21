@@ -1172,6 +1172,20 @@ public:
     return Action::Continue();
   }
 
+  class SetParentRAII final {
+    ASTWalker &Walker;
+    decltype(ASTWalker::Parent) PriorParent;
+
+  public:
+    template <typename T>
+    SetParentRAII(ASTWalker &walker, T *newParent)
+        : Walker(walker), PriorParent(walker.Parent) {
+      walker.Parent = newParent;
+    }
+
+    ~SetParentRAII() { Walker.Parent = PriorParent; }
+  };
+
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (S->isImplicit() && S != ImplicitTopLevelBody)
       return Action::Continue(S);
@@ -1186,21 +1200,42 @@ public:
         pushRegion(SourceMappingRegion::forNode(BS, SM));
 
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
-      if (auto *Cond = getConditionNode(IS->getCond()))
-        assignCounter(Cond, getCurrentCounter());
-
       // The counter for the if statement itself tracks the number of jumps to
       // it by break statements.
       assignCounter(IS, CounterExpr::Zero());
 
-      // We emit a counter for the then block, and define the else block in
-      // terms of it.
-      auto ThenCounter = assignKnownCounter(IS->getThenStmt());
-      if (IS->getElseStmt()) {
-        auto ElseCounter =
-            CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterBuilder);
-        assignCounter(IS->getElseStmt(), ElseCounter);
+      // FIXME: This is a redundant region.
+      if (auto *Cond = getConditionNode(IS->getCond()))
+        assignCounter(Cond, getCurrentCounter());
+
+      // Visit the children.
+      // FIXME: This is a hack.
+      {
+        SetParentRAII R(*this, S);
+        for (auto Cond : IS->getCond())
+          Cond.walk(*this);
+
+        // The parent counter is taken after the condition in case e.g
+        // it threw an error.
+        auto ParentCounter = getCurrentCounter();
+
+        // We emit a counter for the then block, and define the else block in
+        // terms of it.
+        auto ThenCounter = assignKnownCounter(IS->getThenStmt());
+        IS->getThenStmt()->walk(*this);
+
+        if (auto *Else = IS->getElseStmt()) {
+          auto ElseCounter = CounterExpr::Sub(ParentCounter, ThenCounter,
+                                              CounterBuilder);
+          assignCounter(Else, ElseCounter);
+          Else->walk(*this);
+        }
       }
+      // Already visited the children.
+      // FIXME: The ASTWalker should do a post-walk for SkipChildren.
+      walkToStmtPost(S);
+      return Action::SkipChildren(S);
+
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       assignCounter(GS, CounterExpr::Zero());
       assignKnownCounter(GS->getBody());
@@ -1235,6 +1270,7 @@ public:
       // cases.
       assignCounter(SS, CounterExpr::Zero());
 
+      // FIXME: This is a redundant region.
       assignCounter(SS->getSubjectExpr(), getCurrentCounter());
 
       // Assign counters for cases so they're available for fallthrough.
@@ -1393,11 +1429,35 @@ public:
 
     assert(!RegionStack.empty() && "Must be within a region");
 
-    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
-      auto ThenCounter = assignKnownCounter(IE->getThenExpr());
-      auto ElseCounter =
-          CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterBuilder);
-      assignCounter(IE->getElseExpr(), ElseCounter);
+    if (auto *TE = dyn_cast<TernaryExpr>(E)) {
+      assert(shouldWalkIntoExpr(TE, Parent, Constant).Action.Action ==
+                 PreWalkAction::Continue &&
+             "Currently this only returns false for closures");
+
+      // Visit the children.
+      // FIXME: This is a hack.
+      {
+        SetParentRAII R(*this, TE);
+        TE->getCondExpr()->walk(*this);
+
+        // The parent counter is taken after the condition in case e.g
+        // it threw an error.
+        auto ParentCounter = getCurrentCounter();
+
+        auto *Then = TE->getThenExpr();
+        auto ThenCounter = assignKnownCounter(Then);
+        Then->walk(*this);
+
+        auto *Else = TE->getElseExpr();
+        auto ElseCounter =
+            CounterExpr::Sub(ParentCounter, ThenCounter, CounterBuilder);
+        assignCounter(Else, ElseCounter);
+        Else->walk(*this);
+      }
+      // Already visited the children.
+      // FIXME: The ASTWalker should do a post-walk for SkipChildren.
+      walkToExprPost(TE);
+      return Action::SkipChildren(TE);
     }
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
     if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {

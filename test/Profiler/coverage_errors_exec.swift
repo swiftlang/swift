@@ -27,6 +27,9 @@ func noThrowingFn() throws -> Int { 0 }
 @discardableResult
 func throwingFn() throws -> Int { throw Err() }
 
+func throwingBool() throws -> Bool { throw Err() }
+func noThrowingBool() throws -> Bool { true }
+
 var throwingProp: Int {
   get throws { throw Err() }
 }
@@ -251,3 +254,192 @@ func test24() -> Int? {                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   return x                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 }                                          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 _ = test24()                               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test25() -> Int {        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  let x = try! noThrowingFn() // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return x                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = test25()                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test26() throws -> Int {
+  let x = if try throwingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()              // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  } else {                        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    try throwingFn()              // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                               // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  return x                        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test26()                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test27() throws -> Int {
+  let x = if try noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()                // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  } else {                          // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    try throwingFn()                // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  return x                          // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test27()                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test28() throws -> Int {
+  let x = if try !noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  } else {                           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                                  // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  return x                           // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test28()                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test29() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  try throwingBool()          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    ? try throwingFn()        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    : try throwingFn()        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test29()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test30() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  try noThrowingBool()        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    ? try throwingFn()        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    : try throwingFn()        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test30()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// FIXME: The line execution count is misleading here (rdar://118654503).
+func test31() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  try !noThrowingBool()       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    ? try throwingFn()        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    : try throwingFn()        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test31()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test32() throws {     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  if try throwingBool(),   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      try throwingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    try throwingFn()       // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  } else {                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    try throwingFn()       // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                          // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test32()          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test33() throws {     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  if try noThrowingBool(), // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      try throwingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()       // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  } else {                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    try throwingFn()       // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                          // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test33()          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test34() throws {       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  if try noThrowingBool(),   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      try noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()         // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  } else {                   // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    try throwingFn()         // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                          // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                            // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test34()            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test35() throws {       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  if try !noThrowingBool(),  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      try noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()         // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  } else {                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()         // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                          // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                            // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test35()            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test36() throws -> Int {     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  guard try throwingBool() else { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 1                      // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                               // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  return 0                        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test36()                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test37() throws -> Int {       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  guard try noThrowingBool() else { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 1                        // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return 0                          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test37()                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test38() throws -> Int {        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  guard try !noThrowingBool() else { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 1                         // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return 0                           // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test38()                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test39() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  switch try throwingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case true:                  // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    return 0                  // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  case false:                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    return 1                  // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                           // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test39()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// FIXME: The line coverage for the second case isn't great (rdar://118654503).
+func test40() throws -> Int {   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  switch try noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case true:                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 0                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case false:                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 1                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test40()               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// FIXME: The line coverage for the first case isn't great (rdar://118654503).
+func test41() throws -> Int {    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  switch try !noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case true:                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 0                     // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  case false:                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 1                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                              // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                                // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test41()                // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test42() throws -> Int {         // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  let x = switch try throwingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case true:                          // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    0                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  case false:                         // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    1                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                                   // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  return x                            // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test42()                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// FIXME: The line coverage for the second case isn't great (rdar://118654503).
+func test43() throws -> Int {           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  let x = switch try noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case true:                            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    0                                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case false:                           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    1                                   // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return x                              // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                                       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test43()                       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// FIXME: The line coverage for the first case isn't great (rdar://118654503).
+func test44() throws -> Int {            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  let x = switch try !noThrowingBool() { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  case true:                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    0                                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  case false:                            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    1                                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                                      // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return x                               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                                        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test44()                        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
