@@ -121,14 +121,6 @@ func test11() throws {  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 }                       // CHECK: {{ *}}[[@LINE]]|{{ *}}0
 try? test11()           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 
-func test21() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-  try {                       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-    throw Err()               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-  }()                         // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-  return 1                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
-}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-_ = try? test21()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-
 // rdar://100470244 - Make sure we don't underflow the counter here.
 func test12() -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   do {                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
@@ -206,3 +198,56 @@ func test18() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   return x                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 }                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 _ = try? test18()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+@discardableResult
+func takesOptInts(_ x: Int?, _ y: Int?) -> Int { 0 }
+
+func test19() {        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  takesOptInts(        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try? throwingFn(), // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try? throwingFn()  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  )                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                      // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+test19()               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test20(
+) throws -> Int {     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  try takesOptInts(   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    throwingFn(),     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try? throwingFn() // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  )                   // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                     // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+_ = try? test20()     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test21() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  try {                       // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    throw Err()               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }()                         // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return 1                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test21()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test22(
+) throws -> Int {     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  try takesOptInts(   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    noThrowingFn(),   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try? throwingFn() // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  )                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test22()     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test23() -> Int? {                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  guard let x = try? throwingFn() else { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return nil                           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                                      // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return x                               // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                                        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = test23()                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test24() -> Int? {                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  guard let x = try? noThrowingFn() else { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return nil                             // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                                        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return x                                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                                          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = test24()                               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
