@@ -152,17 +152,6 @@ public:
     ActiveInfoInThread.set(this);
   }
 
-  //  void enterAndShadowTaskExecutorOnly(TaskExecutorRef taskExecutor) {
-  //    TaskExecutor = taskExecutor;
-  //    SavedInfo = ActiveInfoInThread.get();
-  //    ActiveInfoInThread.set(this);
-  //  }
-
-  // FIXME: uncomment
-  //  void enterAndShadow(SerialExecutorRef currentExecutor) {
-  //    enterAndShadow(currentExecutor, TaskExecutorRef::undefined());
-  //  }
-
   void swapToJob(Job *job) { voucherManager.swapToJob(job); }
 
   void restoreVoucher(AsyncTask *task) { voucherManager.restoreVoucher(task); }
@@ -1477,7 +1466,6 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
       break;
     }
 
-    // TODO: maybe use some flag to detect if we need to do this?
     if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
       auto taskExecutor = task->getPreferredTaskExecutor();
       trackingInfo.setTaskExecutor(taskExecutor);
@@ -1496,7 +1484,6 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
       break;
     }
     currentActor = asImpl(currentExecutor.getDefaultActor());
-    // TODO: anything to do for task executor here?
   }
 
   // Leave the tracking info.

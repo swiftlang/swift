@@ -213,6 +213,30 @@ SWIFT_CC(swift)
 void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
 
+/// Update the status record by scanning through all records and removing
+/// those which match the condition. This can also be used to inspect
+/// "remaining" records.
+///
+/// The `whenRemoved` function is called after a record indicated by
+/// `condition` returning `true` was removed. It can be used to e.g.
+/// deallocate or perform additional cleanup.
+///
+/// The `updateStatus` function can be used to update the status after all
+/// records have been inspected. It may be invoked multiple times inside a RMW
+/// loop, therefore must be idempotent.
+SWIFT_CC(swift)
+void removeStatusRecordWhere(
+    AsyncTask *task,
+    ActiveTaskStatus& status,
+    llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
+
+SWIFT_CC(swift)
+void removeStatusRecordWhere(
+    AsyncTask *task,
+    llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
+
 /// Remove a status record from the current task. This must be called
 /// synchronously with the task.
 SWIFT_CC(swift)
@@ -412,11 +436,6 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// whether or not it is running.
     IsRunning = 0x800,
 #endif
-    // FIXME: should we use this to know that we have such record set? This way
-    // we can avoid scanning the task to look for a record if we know there
-    // isn't one.
-    HasTaskExecutorPreference = 0x1600, // FIXME what bits to use
-
     /// Task is intrusively enqueued somewhere - either in the default executor
     /// pool, or in an actor. Currently, due to lack of task stealers, this bit
     /// is cleared when a task starts running on a thread, suspends or is
@@ -435,6 +454,16 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// The task has a dependency and therefore, also a
     /// TaskDependencyStatusRecord in the status record list.
     HasTaskDependency = 0x4000,
+
+    /// Whether the task has a task executor preference record stored.
+    /// By storing this flag we can avoid taking the task record lock
+    /// when running a task when we know there is no task executor preference
+    /// to look for.
+    ///
+    /// If a task has a task executor preference, we must find the record and
+    /// use the task executor preference when we'd otherwise be running on
+    /// the generic global pool.
+    HasTaskExecutorPreference = 0x8000,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -597,6 +626,25 @@ public:
     return ActiveTaskStatus(Record, Flags & ~HasTaskDependency, ExecutionLock);
 #else
     return ActiveTaskStatus(Record, Flags & ~HasTaskDependency);
+#endif
+  }
+
+  /// Is there a task preference record in the linked list of status records?
+  bool hasTaskExecutorPreference() const {
+    return Flags & HasTaskExecutorPreference;
+  }
+  ActiveTaskStatus withTaskExecutorPreference() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference);
+#endif
+  }
+  ActiveTaskStatus withoutTaskExecutorPreference() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference);
 #endif
   }
 
@@ -1124,6 +1172,20 @@ inline void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {
   _private().dependencyRecord = record;
 
   this->flagAsSuspended(record);
+}
+
+/// Returns true if the task has any kind of task executor preference,
+/// including an initial task executor preference (set during task creation).
+inline bool AsyncTask::hasTaskExecutorPreferenceRecord() const {
+  if (hasInitialTaskExecutorPreferenceRecord()) {
+    // an "initial" setting is valid for the entire lifetime of a task,
+    // so we don't need to check anything else; there definitely is at
+    // least one preference record.
+    return true;
+  }
+
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+  return oldStatus.hasTaskExecutorPreference();
 }
 
 // READ ME: This is not a dead function! Do not remove it! This is a function

@@ -284,11 +284,13 @@ static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
 /// A convenience version of the above for contexts that haven't already
 /// done the load.
 template <class Fn>
-static bool withStatusRecordLock(AsyncTask *task, Fn &&fn) {
+static bool withStatusRecordLock(
+    AsyncTask *task, Fn &&fn,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)> statusUpdate = nullptr) {
   ActiveTaskStatus status = task->_private()._status().load(std::memory_order_relaxed);
   return withStatusRecordLock(task, status, [&](ActiveTaskStatus taskStatus) {
     fn(taskStatus);
-  });
+  }, /*statusUpdate=*/statusUpdate);
 }
 
 /**************************************************************************/
@@ -453,6 +455,65 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 
 }
 
+// For when we are trying to remove a record and also optionally trying to
+// modify some flags in the ActiveTaskStatus at the same time.
+SWIFT_CC(swift)
+void swift::removeStatusRecordWhere(
+     AsyncTask *task,
+     ActiveTaskStatus& oldStatus,
+     llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+     llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)> updateStatus) {
+  assert(condition && "condition is required");
+  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
+                       record, task);
+
+  if (oldStatus.isStatusRecordLocked() &&
+        waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus)) {
+    SWIFT_TASK_DEBUG_LOG("[StatusRecordLock] Lock for task %p is already owned by thread", task);
+    // Case 1: Top record is status record lock and this thread owns it.
+    //
+    // Since we have the lock, we can just remove the record we care about which
+    // should be in the list somewhere and then modify the flags
+    for (auto cur : oldStatus.records()) {
+      if (condition(oldStatus, cur)) {
+        removeStatusRecordLocked(oldStatus, cur);
+      }
+    }
+
+    if (updateStatus) {
+      // Client wants to modify the flags on the status - do it in a loop to
+      // make sure we handle other concurrent updates.
+      while (true) {
+        auto newStatus = oldStatus;
+        updateStatus(oldStatus, newStatus);
+
+        // We should still remain status record locked no matter what since we
+        // came in with the lock already
+        assert(newStatus.isStatusRecordLocked());
+
+        if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
+               /*success*/ std::memory_order_relaxed,
+               /*failure*/ std::memory_order_relaxed)) {
+          newStatus.traceStatusChanged(task);
+          return;
+        }
+      }
+    }
+  }
+
+  assert(!oldStatus.isStatusRecordLocked());
+  // Case 2: Since we're expected to look at more than jut the innermost record,
+  // we need to acquire the status record lock; there's no way to splice the
+  // record list safely otherwise
+  withStatusRecordLock(task, oldStatus, [&](ActiveTaskStatus status) {
+    for (auto curr : status.records()) {
+      if (condition(status, curr)) {
+        removeStatusRecordLocked(status, curr);
+      }
+    }
+  }, updateStatus);
+}
+
 // Convenience wrapper for when client hasn't already done the load of the
 // status
 SWIFT_CC(swift)
@@ -460,6 +521,16 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   return removeStatusRecord(task, record, oldStatus, fn);
+}
+
+
+SWIFT_CC(swift)
+void swift::removeStatusRecordWhere(
+    AsyncTask *task,
+    llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus) {
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  return removeStatusRecordWhere(task, status, condition, updateStatus);
 }
 
 // Convenience wrapper for modifications on current task
@@ -525,6 +596,16 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///**************************************************************************/
 
 TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
+  // We first check the executor preference status flag, in order to avoid
+  // having to scan through the records of the task checking if there was
+  // such record.
+  //
+  // This is an optimization in order to make the enqueue/run
+  // path of a task avoid excessive work if a task had many records.
+  if (!hasTaskExecutorPreferenceRecord()) {
+    return TaskExecutorRef::undefined(); // "no executor preference"
+  }
+
   TaskExecutorRef preference = TaskExecutorRef::undefined();
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto record : status.records()) {
@@ -543,9 +624,9 @@ TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
 TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
   if (auto task = swift_task_getCurrent()) {
     return task->getPreferredTaskExecutor();
-  } else {
-    return TaskExecutorRef::undefined(); // "no executor preference"
   }
+
+  return TaskExecutorRef::undefined(); // "no executor preference"
 }
 
 SWIFT_CC(swift)
@@ -562,9 +643,16 @@ swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
                        "preference record %p for task:%p",
                        allocation, task);
 
+
   addStatusRecord(task, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
-                    return true;
+                    // We use a flag to mark a task executor preference is
+                    // present in order to avoid looking for task executor
+                    // records when running the task, and we know there is no
+                    // task executor preference present.
+                    newStatus = newStatus.withTaskExecutorPreference();
+
+                    return true; // always add the record
                   });
 
   return record;
@@ -576,7 +664,32 @@ void swift::swift_task_popTaskExecutorPreference(
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task executor "
                        "preference record %p from task:%p",
                        allocation, swift_task_getCurrent());
-  removeStatusRecordFromSelf(record);
+  // We keep count of how many records there are because if there is more than
+  // one, it means the task status flag should still be "has task preference".
+  int preferenceRecordsCount = 0;
+
+  auto task = swift_task_getCurrent();
+  removeStatusRecordWhere(
+      task,
+      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
+        assert(status.hasTaskExecutorPreference() && "does not have record!");
+
+          if (cur->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
+            preferenceRecordsCount += 1;
+
+            return preferenceRecordsCount == 1 &&
+                   record == cast<TaskExecutorPreferenceStatusRecord>(cur);
+          }
+          return false;
+      },
+      /*updateStatus==*/[&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+        if (preferenceRecordsCount == 1) {
+          // if this was the last record removed, we flip the flag to off.
+          assert(oldStatus.hasTaskExecutorPreference());
+          newStatus = newStatus.withoutTaskExecutorPreference();
+        }
+      });
+
   swift_task_dealloc(record);
 }
 
@@ -592,6 +705,12 @@ void AsyncTask::pushInitialTaskExecutorPreference(
 
   addStatusRecord(this, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    // We use a flag to mark a task executor preference is
+                    // present in order to avoid looking for task executor
+                    // records when running the task, and we know there is no
+                    // task executor preference present.
+                    newStatus = newStatus.withTaskExecutorPreference();
+
                     return true;
                   });
 }

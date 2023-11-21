@@ -553,6 +553,11 @@ public:
     return Flags.task_hasInitialTaskExecutorPreference();
   }
 
+  /// Returns true if the current task has any task preference record,
+  /// including if it has an initial task preference record or onces
+  /// set during the lifetime of the task.
+  bool hasTaskExecutorPreferenceRecord() const;
+
   // ==== Future ---------------------------------------------------------------
 
   class FutureFragment {
