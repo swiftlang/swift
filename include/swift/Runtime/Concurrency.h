@@ -911,10 +911,18 @@ void swift_task_asyncMainDrainQueue [[noreturn]]();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run(Job *job, SerialExecutorRef executor);
 
+/// Establish that the current thread is running as the given
+/// executor, then run a job.
+///
+/// Runtime availability: Swift 9999
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run_on_task_executor(Job *job,
                                     TaskExecutorRef executor);
 
+/// Establish that the current thread is running as the given
+/// executor, then run a job.
+///
+/// Runtime availability: Swift 9999
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run_on_serial_and_task_executor(Job *job,
                                     SerialExecutorRef serialExecutor,
@@ -946,6 +954,8 @@ SerialExecutorRef swift_task_getMainExecutor(void);
 /// their lifetime exceeds any use of such executor. For example,
 /// they should be created as "forever" alive singletons, or otherwise
 /// guarantee their lifetime extends beyond all potential uses of them by tasks.
+///
+/// Runtime availability: Swift 9999
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 
