@@ -12417,7 +12417,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   }
   if (!keyPathTy->isTypeVariableOrMember())
     return SolutionKind::Error;
-  
+
   return unsolved();
 }
 
@@ -14900,7 +14900,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowConcreteTypeSpecialization:
-  case FixKind::IgnoreGenericSpecializationArityMismatch: {
+  case FixKind::IgnoreGenericSpecializationArityMismatch:
+  case FixKind::IgnoreKeyPathSubscriptIndexMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreThrownErrorMismatch: {
