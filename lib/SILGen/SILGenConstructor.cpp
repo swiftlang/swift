@@ -1062,8 +1062,6 @@ void SILGenFunction::emitConstructorPrologActorHop(
   if (!ExpectedExecutor)
     ExpectedExecutor = emitGenericExecutor(loc);
 
-  // FIXME: handle task executor???
-
   B.createHopToExecutor(loc, ExpectedExecutor, /*mandatory*/ false);
 }
 

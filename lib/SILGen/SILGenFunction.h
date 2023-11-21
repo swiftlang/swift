@@ -1091,10 +1091,6 @@ public:
   /// inside an async actor-independent function. No hop-back is expected.
   void emitHopToActorValue(SILLocation loc, ManagedValue actor);
 
-  /// Generate a hop directly to a specific executor. This can only be done
-  /// inside an async actor-independent function. No hop-back is expected.
-  void emitHopToExecutorValue(SILLocation loc, SILValue executor);
-
   /// Return true if the function being emitted is an async function
   /// that unsafely inherits its executor.
   bool unsafelyInheritsExecutor();
