@@ -433,6 +433,23 @@ public:
 
 /// A region of source code that can be mapped to a counter.
 class SourceMappingRegion {
+public:
+  enum class Kind {
+    /// A region that is associated with an ASTNode, and defines a scope under
+    /// which the region is active.
+    Node,
+
+    /// A node region that is only present for scoping of child regions, and
+    /// doesn't need to be included in the resulting set of regions.
+    ScopingOnly,
+
+    /// A region that refines the counter of a node region. This doesn't have
+    /// an ASTNode of its own.
+    Refined,
+  };
+
+private:
+  Kind RegionKind;
   ASTNode Node;
 
   /// The counter for an incomplete region. Note we do not store counters
@@ -445,20 +462,53 @@ class SourceMappingRegion {
   /// The region's ending location.
   llvm::Optional<SourceLoc> EndLoc;
 
-public:
-  SourceMappingRegion(ASTNode Node, llvm::Optional<CounterExpr> Counter,
-                      llvm::Optional<SourceLoc> StartLoc,
-                      llvm::Optional<SourceLoc> EndLoc)
-      : Node(Node), Counter(std::move(Counter)), StartLoc(StartLoc),
-        EndLoc(EndLoc) {
+  SourceMappingRegion(Kind RegionKind, llvm::Optional<CounterExpr> Counter,
+                      llvm::Optional<SourceLoc> StartLoc)
+      : RegionKind(RegionKind), Counter(Counter), StartLoc(StartLoc) {
     assert((!StartLoc || StartLoc->isValid()) &&
            "Expected start location to be valid");
-    assert((!EndLoc || EndLoc->isValid()) &&
-           "Expected end location to be valid");
+  }
+
+  SourceMappingRegion(Kind RegionKind, ASTNode Node, SourceRange Range,
+                      const SourceManager &SM)
+      : RegionKind(RegionKind), Node(Node) {
+    assert(Range.isValid());
+    StartLoc = Range.Start;
+    EndLoc = Lexer::getLocForEndOfToken(SM, Range.End);
+  }
+
+public:
+  /// Create a regular source region for an ASTNode.
+  static SourceMappingRegion forNode(ASTNode Node, const SourceManager &SM,
+                                     SourceRange Range = SourceRange()) {
+    if (Range.isInvalid())
+      Range = Node.getSourceRange();
+
+    // Note we don't store counters for nodes, as we need to be able to fix them
+    // up later.
+    return SourceMappingRegion(Kind::Node, Node, Range, SM);
+  }
+
+  /// Create a source region for an ASTNode that is only present for scoping of
+  /// child regions, and doesn't need to be included in the resulting set of
+  /// regions.
+  static SourceMappingRegion scopingOnly(ASTNode Node,
+                                         const SourceManager &SM) {
+    return SourceMappingRegion(Kind::ScopingOnly, Node, Node.getSourceRange(),
+                               SM);
+  }
+
+  /// Create a refined region for a given counter.
+  static SourceMappingRegion refined(CounterExpr Counter,
+                                     llvm::Optional<SourceLoc> StartLoc) {
+    return SourceMappingRegion(Kind::Refined, Counter, StartLoc);
   }
 
   SourceMappingRegion(SourceMappingRegion &&Region) = default;
   SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
+
+  /// Whether this region is for scoping only.
+  bool isForScopingOnly() const { return RegionKind == Kind::ScopingOnly; }
 
   ASTNode getNode() const { return Node; }
 
@@ -867,6 +917,13 @@ private:
   /// Returns the delta of the count on entering \c Node and exiting, or null if
   /// there was no change.
   llvm::Optional<CounterExpr> setExitCount(ASTNode Node) {
+    // A `try?` absorbs child error branches, so we can assume the exit count is
+    // the same as the entry count in that case.
+    // NOTE: This assumes there is no other kind of control flow that can happen
+    // in a nested expression, which is true today, but may not always be.
+    if (Node.isExpr(ExprKind::OptionalTry))
+      return llvm::None;
+
     ExitCounter = getCurrentCounter();
     if (hasCounter(Node) && getRegion().getNode() != Node)
       return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterBuilder);
@@ -914,20 +971,14 @@ private:
     replaceCount(Count, getEndLoc(Scope));
   }
 
-  /// Push a region covering \c Node onto the stack.
-  void pushRegion(ASTNode Node, SourceRange Range = SourceRange()) {
-    if (Range.isInvalid())
-      Range = Node.getSourceRange();
-
-    // Note we don't store counters for nodes, as we need to be able to fix
-    // them up later.
-    RegionStack.emplace_back(Node, /*Counter*/ llvm::None, Range.Start,
-                             Lexer::getLocForEndOfToken(SM, Range.End));
+  /// Push a region onto the stack.
+  void pushRegion(SourceMappingRegion Region) {
     LLVM_DEBUG({
       llvm::dbgs() << "Pushed region: ";
-      RegionStack.back().print(llvm::dbgs(), SM);
+      Region.print(llvm::dbgs(), SM);
       llvm::dbgs() << "\n";
     });
+    RegionStack.push_back(std::move(Region));
   }
 
   /// Replace the current region at \p Start with a new counter. If \p Start is
@@ -940,7 +991,7 @@ private:
     if (Start && Counter.isZero())
       Start = llvm::None;
 
-    RegionStack.emplace_back(ASTNode(), Counter, Start, llvm::None);
+    pushRegion(SourceMappingRegion::refined(Counter, Start));
   }
 
   /// Get the location for the end of the last token in \c Node.
@@ -955,6 +1006,10 @@ private:
       Region.print(llvm::dbgs(), SM);
       llvm::dbgs() << "\n";
     });
+
+    // Don't bother recording regions that are only present for scoping.
+    if (Region.isForScopingOnly())
+      return;
 
     // Don't record incomplete regions.
     if (!Region.hasStartLoc())
@@ -1128,7 +1183,7 @@ public:
 
     if (auto *BS = dyn_cast<BraceStmt>(S)) {
       if (hasCounter(BS))
-        pushRegion(BS);
+        pushRegion(SourceMappingRegion::forNode(BS, SM));
 
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
       if (auto *Cond = getConditionNode(IS->getCond()))
@@ -1222,7 +1277,7 @@ public:
         Range = CS->getSourceRange();
         break;
       }
-      pushRegion(CS, Range);
+      pushRegion(SourceMappingRegion::forNode(CS, SM, Range));
     }
     return Action::Continue(S);
   }
@@ -1326,8 +1381,15 @@ public:
     if (isa<LazyInitializerExpr>(E))
       assignKnownCounter(E);
 
-    if (hasCounter(E))
-      pushRegion(E);
+    if (hasCounter(E)) {
+      pushRegion(SourceMappingRegion::forNode(E, SM));
+    } else if (isa<OptionalTryExpr>(E)) {
+      // If we have a `try?`, that doesn't already have a counter, record it
+      // as a scoping-only region. We need it to scope child error branches,
+      // but don't need it in the resulting set of regions.
+      assignCounter(E, getCurrentCounter());
+      pushRegion(SourceMappingRegion::scopingOnly(E, SM));
+    }
 
     assert(!RegionStack.empty() && "Must be within a region");
 

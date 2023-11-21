@@ -177,6 +177,26 @@ enum SomeErr : Error {
 // CHECK:       [[BB_ERR]]
 // CHECK:       increment_profiler_counter 2
 
+// func test43() -> Int? {
+//   let x = try? throwingS.throwingMethod()
+//   return x
+// }
+// CHECK-LABEL: sil hidden @$s15coverage_errors6test43SiSgyF : $@convention(thin) () -> Optional<Int>
+// CHECK:       bb0:
+// CHECK:       increment_profiler_counter 0
+// CHECK:       [[GETTER:%[0-9]+]] = function_ref @$s15coverage_errors9throwingSAA1SVvg : $@convention(thin) () -> (S, @error any Error)
+// CHECK:       try_apply [[GETTER]]() : $@convention(thin) () -> (S, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
+//
+// CHECK:       [[BB_ERR]]
+// CHECK:       increment_profiler_counter 1
+//
+// CHECK:       [[BB_NORMAL]]
+// CHECK:       [[METHOD:%[0-9]+]] = function_ref @$s15coverage_errors1SV14throwingMethodSiyKF : $@convention(method) (S) -> (Int, @error any Error) // user: %5
+// CHECK:       try_apply [[METHOD]]({{%[0-9]+}}) : $@convention(method) (S) -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
+//
+// CHECK:       [[BB_ERR]]
+// CHECK:       increment_profiler_counter 2
+
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors5test1SiyF"
 func test1() -> Int {        // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+7]]:2  : 0
   do {                       // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+3]]:4  : 0
@@ -491,6 +511,129 @@ func test30() throws -> (Int, Int) { // CHECK-NEXT: [[@LINE]]:36   -> [[@LINE+6]
                                      // CHECK-NEXT: [[@LINE-2]]:7  -> [[@LINE-2]]:13 : (0 - 1)
 }                                    // CHECK-NEXT: }
 
+@discardableResult
+func takesOptInts(_ x: Int?, _ y: Int?) -> Int { 0 }
+
+// `throwingFn` is within a `try?`, so the non-error branch is empty.
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test31yyF"
+func test31() {                      // CHECK-NEXT: [[@LINE]]:15 -> [[@LINE+2]]:2 : 0
+  takesOptInts(try? throwingFn(), 0)
+}                                    // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test32yyF"
+func test32() {        // CHECK-NEXT: [[@LINE]]:15 -> [[@LINE+5]]:2 : 0
+  takesOptInts(
+    try? throwingFn(),
+    try? throwingFn()
+  )
+}                      // CHECK-NEXT: }
+
+// Here the throws region extends into the second arg.
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test33SiSgyF"
+func test33() -> Int? {              // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+2]]:2 : 0
+  try? takesOptInts(throwingFn(), 0) // CHECK-NEXT: [[@LINE]]:33 -> [[@LINE]]:37  : (0 - 1)
+}                                    // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test34SiSgyF"
+func test34() -> Int? {                         // CHECK-NEXT: [[@LINE]]:23   -> [[@LINE+3]]:2  : 0
+  try? takesOptInts(throwingFn(), throwingFn()) // CHECK-NEXT: [[@LINE]]:33   -> [[@LINE]]:48   : (0 - 1)
+                                                // CHECK-NEXT: [[@LINE-1]]:47 -> [[@LINE-1]]:48 : ((0 - 1) - 2)
+}                                               // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test35SiSgyF"
+func test35() -> Int? { // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+5]]:2 : 0
+  try? takesOptInts(
+    throwingFn(),       // CHECK-NEXT: [[@LINE]]:17 -> [[@LINE+2]]:4 : (0 - 1)
+    throwingFn()        // CHECK-NEXT: [[@LINE]]:17 -> [[@LINE+1]]:4 : ((0 - 1) - 2)
+  )
+}                       // CHECK-NEXT: }
+
+// The 'try's here are redundant.
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test36SiSgyF"
+func test36() -> Int? { // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+5]]:2 : 0
+  try? takesOptInts(
+    try throwingFn(),   // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+2]]:4 : (0 - 1)
+    try throwingFn()    // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+1]]:4 : ((0 - 1) - 2)
+  )
+}                       // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test37SiSgyF"
+func test37() -> Int? { // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+5]]:2 : 0
+  try? takesOptInts(
+    try throwingFn(),   // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+2]]:4 : (0 - 1)
+    try? S[]
+  )
+}                       // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test38SiSgyF"
+func test38() -> Int? { // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+5]]:2 : 0
+  try? takesOptInts(
+    try? throwingFn(),
+    try S[]             // CHECK-NEXT: [[@LINE]]:12 -> [[@LINE+1]]:4 : (0 - 2)
+  )
+}                       // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test39Si_SitSgyF"
+func test39(
+) -> (Int, Int)? {    // CHECK-NEXT: [[@LINE]]:18 -> [[@LINE+5]]:2 : 0
+  try? (takesOptInts(
+    throwingFn(),     // CHECK-NEXT: [[@LINE]]:17 -> [[@LINE+2]]:8 : (0 - 1)
+    try? throwingProp
+  ), 0)
+}                     // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test40SiyKF"
+func test40(
+) throws -> Int {      // CHECK-NEXT: [[@LINE]]:17 -> [[@LINE+5]]:2 : 0
+  try takesOptInts(
+    try? throwingFn(),
+    throwingProp       // CHECK-NEXT: [[@LINE]]:17 -> [[@LINE+2]]:2 : (0 - 2)
+  )
+}                      // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test41SiyKF"
+func test41(
+) throws -> Int {      // CHECK-NEXT: [[@LINE]]:17 -> [[@LINE+5]]:2 : 0
+  try takesOptInts(
+    throwingFn(),      // CHECK-NEXT: [[@LINE]]:17 -> [[@LINE+3]]:2 : (0 - 1)
+    try? throwingFn()
+  )
+}                      // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test42SiSgyF"
+func test42() -> Int? {                  // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+5]]:2  : 0
+  guard let x = try? throwingFn() else { // CHECK-NEXT: [[@LINE]]:40 -> [[@LINE+2]]:4  : 1
+    return nil
+  }                                      // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+1]]:11 : (0 - 1)
+  return x
+}                                        // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test43SiSgyF"
+func test43() -> Int? {                   // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+3]]:2 : 0
+  let x = try? throwingS.throwingMethod() // CHECK-NEXT: [[@LINE]]:25 -> [[@LINE]]:42  : (0 - 1)
+  return x
+}                                         // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test44SiSgyKF"
+func test44() throws -> Int? {                   // CHECK-NEXT: [[@LINE]]:30 -> [[@LINE+3]]:2  : 0
+  let x = try (try? throwingS)?.throwingMethod() // CHECK-NEXT: [[@LINE]]:49 -> [[@LINE+1]]:11 : (0 - 2)
+  return x
+}
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test45yyF"
+func test45() {                      // CHECK-NEXT: [[@LINE]]:15 -> [[@LINE+2]]:2 : 0
+  _ = try? { throw SomeErr.Err1 }()
+}                                    // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test45yyFyyKXEfU_"
+// CHECK-NEXT:    [[@LINE-4]]:12 -> [[@LINE-4]]:34 : 0
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test46Si_SitSgyF"
+func test46() -> (Int, Int)? {       // CHECK-NEXT: [[@LINE]]:30 -> [[@LINE+2]]:2 : 0
+  try? ({ throw SomeErr.Err1 }(), 0) // CHECK-NEXT: [[@LINE]]:33 -> [[@LINE]]:37  : (0 - 1)
+}                                    // CHECK-NEXT: }
+
 struct TestInit {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_errors.TestInit.init() -> coverage_errors.TestInit
   init() {               // CHECK-NEXT: [[@LINE]]:10 -> [[@LINE+5]]:4 : 0
@@ -499,4 +642,33 @@ struct TestInit {
     } catch {            // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+1]]:6 : 1
     }                    // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:4 : 1
   }                      // CHECK-NEXT: }
+}
+
+struct TestProp {
+  let a = try? throwingFn()
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1aSiSgvpfi"
+  // CHECK-NEXT: [[@LINE-2]]:11 -> [[@LINE-2]]:28 : 0
+  // CHECK-NEXT: }
+
+  let b = try? (throwingFn(), 0)
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1bSi_SitSgvpfi"
+  // CHECK-NEXT:   [[@LINE-2]]:11 -> [[@LINE-2]]:33 : 0
+  // CHECK-NEXT:   [[@LINE-3]]:29 -> [[@LINE-3]]:33 : (0 - 1)
+  // CHECK-NEXT: }
+
+  let c = try? (throwingFn(), .random() ? 0 : 1)
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1cSi_SitSgvpfi"
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:49 : 0
+  // CHECK-NEXT:  [[@LINE-3]]:29 -> [[@LINE-3]]:49 : (0 - 1)
+  // CHECK-NEXT:  [[@LINE-4]]:43 -> [[@LINE-4]]:44 : 2
+  // CHECK-NEXT:  [[@LINE-5]]:47 -> [[@LINE-5]]:48 : ((0 - 1) - 2)
+  // CHECK-NEXT: }
+
+  let d = (try? (throwingFn(), .random() ? 0 : 1), 0)
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1dSi_SitSg_Sitvpfi"
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:54 : 0
+  // CHECK-NEXT:  [[@LINE-3]]:30 -> [[@LINE-3]]:50 : (0 - 1)
+  // CHECK-NEXT:  [[@LINE-4]]:44 -> [[@LINE-4]]:45 : 2
+  // CHECK-NEXT:  [[@LINE-5]]:48 -> [[@LINE-5]]:49 : ((0 - 1) - 2)
+  // CHECK-NEXT: }
 }
