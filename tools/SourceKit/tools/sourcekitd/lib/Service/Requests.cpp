@@ -212,6 +212,7 @@ static void reportNameInfo(const RequestResult<NameTranslatingInfo> &Result, Res
 
 static void findRelatedIdents(StringRef PrimaryFilePath,
                               StringRef InputBufferName, int64_t Offset,
+                              bool IncludeNonEditableBaseNames,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
@@ -1787,14 +1788,18 @@ handleRequestRelatedIdents(const RequestDict &Req,
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
 
+    int64_t IncludeNonEditableBaseNames = 0;
+    Req.getInt64(KeyIncludeNonEditableBaseNames, IncludeNonEditableBaseNames,
+                 /*isOptional=*/true);
+
     // For backwards compatibility, the default is 1.
     int64_t CancelOnSubsequentRequest = 1;
     Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
                  /*isOptional=*/true);
 
-    return findRelatedIdents(*PrimaryFilePath, InputBufferName, Offset,
-                             CancelOnSubsequentRequest, Args, CancellationToken,
-                             Rec);
+    return findRelatedIdents(
+        *PrimaryFilePath, InputBufferName, Offset, IncludeNonEditableBaseNames,
+        CancelOnSubsequentRequest, Args, CancellationToken, Rec);
   });
 }
 
@@ -2873,14 +2878,15 @@ static sourcekitd_uid_t renameLocUsageUID(swift::ide::RenameLocUsage Usage) {
 
 static void findRelatedIdents(StringRef PrimaryFilePath,
                               StringRef InputBufferName, int64_t Offset,
+                              bool IncludeNonEditableBaseNames,
                               bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               SourceKitCancellationToken CancellationToken,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findRelatedIdentifiersInFile(
-      PrimaryFilePath, InputBufferName, Offset, CancelOnSubsequentRequest, Args,
-      CancellationToken,
+      PrimaryFilePath, InputBufferName, Offset, IncludeNonEditableBaseNames,
+      CancelOnSubsequentRequest, Args, CancellationToken,
       [Rec](const RequestResult<RelatedIdentsResult> &Result) {
         if (Result.isCancelled())
           return Rec(createErrorRequestCancelled());

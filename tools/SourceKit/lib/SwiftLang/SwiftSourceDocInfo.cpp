@@ -2491,8 +2491,8 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken,
+    bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver) {
 
   std::string Error;
@@ -2507,6 +2507,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
   class RelatedIdConsumer : public SwiftASTConsumer {
     std::string InputFile;
     unsigned Offset;
+    bool IncludeNonEditableBaseNames;
     std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver;
     SwiftInvocationRef Invok;
 
@@ -2538,7 +2539,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         return RelatedIdentsResult::empty(); // This was a module reference.
 
       // Only accept pointing to an identifier.
-      if (!ValueRefCursorInfo->isRef() &&
+      if (!IncludeNonEditableBaseNames && !ValueRefCursorInfo->isRef() &&
           (isa<ConstructorDecl>(VD) || isa<DestructorDecl>(VD) ||
            isa<SubscriptDecl>(VD)))
         return RelatedIdentsResult::empty();
@@ -2588,11 +2589,12 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 
   public:
     RelatedIdConsumer(
-        StringRef InputFile, unsigned Offset,
+        StringRef InputFile, unsigned Offset, bool IncludeNonEditableBaseNames,
         std::function<void(const RequestResult<RelatedIdentsResult> &)>
             Receiver,
         SwiftInvocationRef Invok)
         : InputFile(InputFile.str()), Offset(Offset),
+          IncludeNonEditableBaseNames(IncludeNonEditableBaseNames),
           Receiver(std::move(Receiver)), Invok(Invok) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
@@ -2637,8 +2639,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     }
   };
 
-  auto Consumer = std::make_shared<RelatedIdConsumer>(InputBufferName, Offset,
-                                                      Receiver, Invok);
+  auto Consumer = std::make_shared<RelatedIdConsumer>(
+      InputBufferName, Offset, IncludeNonEditableBaseNames, Receiver, Invok);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

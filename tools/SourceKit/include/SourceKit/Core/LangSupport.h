@@ -1162,10 +1162,19 @@ public:
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
+  /// - Parameters:
+  ///   - IncludeNonEditableBaseNames: If `true` also return results if the
+  ///     referenced declaration is an initializer or subscript. This is
+  ///     intended if the related identifiers response is used for rename, which
+  ///     allows renaming parameter labels of these declaration.
+  ///     If the function's base name should be highlighted, this should be
+  ///     `false` because e.g. highlighting a subscript with
+  ///     `IncludeNonEditableBaseNames = true` would return the locations of all
+  ///     `[` that call that subscript.
   virtual void findRelatedIdentifiersInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RelatedIdentsResult> &)>
           Receiver) = 0;
 
