@@ -150,6 +150,33 @@ enum SomeErr : Error {
 // CHECK:       [[BB_ERR]]
 // CHECK-NEXT:  increment_profiler_counter 1
 
+// func test28() throws -> Int {
+//   let x = try .random()
+//     ? throwingFn()
+//     : throwingFn()
+//   return x
+// }
+// CHECK-LABEL: sil hidden @$s15coverage_errors6test28SiyKF : $@convention(thin) () -> (Int, @error any Error)
+// CHECK:       bb0:
+// CHECK:       increment_profiler_counter 0
+// CHECK:       function_ref @$sSb6randomSbyFZ
+// CHECK:       cond_br {{%[0-9]+}}, [[BB_TRUE:bb[0-9]+]], [[BB_FALSE:bb[0-9]+]]
+//
+// CHECK:       [[BB_FALSE]]
+// CHECK:       [[THROW_FN:%[0-9]+]] = function_ref @$s15coverage_errors10throwingFnSiyKF
+// CHECK:       try_apply [[THROW_FN]]() : $@convention(thin) () -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
+//
+// CHECK:       [[BB_ERR]]
+// CHECK:       increment_profiler_counter 3
+//
+// CHECK:       [[BB_TRUE]]
+// CHECK:       increment_profiler_counter 1
+// CHECK:       [[THROW_FN:%[0-9]+]] = function_ref @$s15coverage_errors10throwingFnSiyKF
+// CHECK:       try_apply [[THROW_FN]]() : $@convention(thin) () -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
+//
+// CHECK:       [[BB_ERR]]
+// CHECK:       increment_profiler_counter 2
+
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors5test1SiyF"
 func test1() -> Int {        // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+7]]:2  : 0
   do {                       // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+3]]:4  : 0
@@ -401,6 +428,68 @@ func test23() throws -> Int { // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+11]]:2 : 0
   }                           // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+1]]:11 : ((0 + 3) - 1)
   return 2
 }                             // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test24SiyKF"
+func test24() throws -> Int {              // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+4]]:2  : 0
+  let x = .random() ? try throwingFn() : 0 // CHECK-NEXT: [[@LINE]]:23   -> [[@LINE]]:39   : 1
+  return x                                 // CHECK-NEXT: [[@LINE-1]]:39 -> [[@LINE]]:11   : (0 - 2)
+                                           // CHECK-NEXT: [[@LINE-2]]:42 -> [[@LINE-2]]:43 : (0 - 1)
+}                                          // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test25SiyKF"
+func test25() throws -> Int {              // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+4]]:2  : 0
+  let x = .random() ? 0 : try throwingFn() // CHECK-NEXT: [[@LINE]]:23   -> [[@LINE]]:24   : 1
+  return x                                 // CHECK-NEXT: [[@LINE-1]]:27 -> [[@LINE-1]]:43 : (0 - 1)
+                                           // CHECK-NEXT: [[@LINE-2]]:43 -> [[@LINE-1]]:11 : (0 - 2)
+}                                          // CHECK-NEXT: }
+
+// Note in this case the throws region of the first branch overlaps the
+// second branch, which isn't ideal, but it matches what we already do
+// for e.g if statements and returns, and doesn't impact the resulting
+// coverage since we always take the counter for the smallest subrange,
+// which in this case is the region for the second branch.
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test26SiyKF"
+func test26() throws -> Int {                             // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+5]]:2   : 0
+  let x = .random() ? try throwingFn() : try throwingFn() // CHECK-NEXT: [[@LINE]]:23   -> [[@LINE]]:39    : 1
+  return x                                                // CHECK-NEXT: [[@LINE-1]]:39 -> [[@LINE]]:11    : (0 - 2)
+                                                          // CHECK-NEXT: [[@LINE-2]]:42 -> [[@LINE-2]]:58  : (0 - 1)
+                                                          // CHECK-NEXT: [[@LINE-3]]:58 -> [[@LINE-2]]:11  : ((0 - 2) - 3)
+}                                                         // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test27SiyKF"
+func test27() throws -> Int {                         // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+5]]:2  : 0
+  let x = try .random() ? throwingFn() : throwingFn() // CHECK-NEXT: [[@LINE]]:27   -> [[@LINE]]:39   : 1
+  return x                                            // CHECK-NEXT: [[@LINE-1]]:39 -> [[@LINE]]:11   : (0 - 2)
+                                                      // CHECK-NEXT: [[@LINE-2]]:42 -> [[@LINE-2]]:54 : (0 - 1)
+                                                      // CHECK-NEXT: [[@LINE-3]]:54 -> [[@LINE-2]]:11 : ((0 - 2) - 3)
+}                                                     // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test28SiyKF"
+func test28() throws -> Int { // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+5]]:2  : 0
+  let x = try .random()       // CHECK-NEXT: [[@LINE+1]]:7  -> [[@LINE+1]]:19 : 1
+    ? throwingFn()            // CHECK-NEXT: [[@LINE]]:19   -> [[@LINE+2]]:11 : (0 - 2)
+    : throwingFn()            // CHECK-NEXT: [[@LINE]]:7    -> [[@LINE]]:19   : (0 - 1)
+  return x                    // CHECK-NEXT: [[@LINE-1]]:19 -> [[@LINE]]:11   : ((0 - 2) - 3)
+}                             // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test29Si_SityKF"
+func test29() throws -> (Int, Int) { // CHECK-NEXT: [[@LINE]]:36   -> [[@LINE+7]]:2  : 0
+  let x = try .random()              // CHECK-NEXT: [[@LINE+1]]:7  -> [[@LINE+1]]:24 : 1
+    ? (throwingFn(), 0)              // CHECK-NEXT: [[@LINE]]:20   -> [[@LINE]]:24   : (1 - 2)
+    : (0, throwingFn())              // CHECK-NEXT: [[@LINE-1]]:24 -> [[@LINE+1]]:11 : (0 - 2)
+  return x                           // CHECK-NEXT: [[@LINE-1]]:7  -> [[@LINE-1]]:24 : (0 - 1)
+                                     // CHECK-NEXT: [[@LINE-2]]:23 -> [[@LINE-2]]:24 : ((0 - 1) - 3)
+                                     // CHECK-NEXT: [[@LINE-3]]:24 -> [[@LINE-2]]:11 : ((0 - 2) - 3)
+}                                    // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test30Si_SityKF"
+func test30() throws -> (Int, Int) { // CHECK-NEXT: [[@LINE]]:36   -> [[@LINE+6]]:2  : 0
+  let x = try .random()              // CHECK-NEXT: [[@LINE+1]]:7  -> [[@LINE+1]]:35 : 1
+    ? (throwingFn(), throwingFn())   // CHECK-NEXT: [[@LINE]]:20   -> [[@LINE]]:35   : (1 - 2)
+    : (0, 0)                         // CHECK-NEXT: [[@LINE-1]]:34 -> [[@LINE-1]]:35 : ((1 - 2) - 3)
+  return x                           // CHECK-NEXT: [[@LINE-2]]:35 -> [[@LINE]]:11   : ((0 - 2) - 3)
+                                     // CHECK-NEXT: [[@LINE-2]]:7  -> [[@LINE-2]]:13 : (0 - 1)
+}                                    // CHECK-NEXT: }
 
 struct TestInit {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_errors.TestInit.init() -> coverage_errors.TestInit

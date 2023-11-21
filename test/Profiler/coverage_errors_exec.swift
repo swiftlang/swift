@@ -178,3 +178,31 @@ func test15() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   return 2                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 }                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 _ = try? test15()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test16() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  let x = try true            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    ? throwingFn()            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    : throwingFn()            // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  return x                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test16()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// FIXME: The line execution count is misleading here as it includes the
+// trailing edge of the thrown error from the first branch (rdar://118654503).
+func test17() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  let x = try false           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    ? throwingFn()            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    : throwingFn()            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return x                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test17()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// FIXME: The line execution count is misleading here as it includes the
+// trailing edge of the thrown error from the first branch (rdar://118654503).
+func test18() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  let x = try true            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    ? noThrowingFn()          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    : noThrowingFn()          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return x                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test18()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1

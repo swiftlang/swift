@@ -876,22 +876,28 @@ private:
   /// Adjust the count for control flow when exiting a scope.
   void adjustForNonLocalExits(ASTNode Scope,
                               llvm::Optional<CounterExpr> ControlFlowAdjust) {
-    if (Parent.getAsDecl())
+    // If there are no regions left, there's nothing to adjust.
+    if (RegionStack.empty())
       return;
 
+    // If the region is for a brace, check to see if we have a parent labeled
+    // statement, in which case the exit count needs to account for any direct
+    // jumps to it though e.g break statements.
     llvm::Optional<CounterExpr> JumpsToLabel;
-    if (auto *ParentStmt = Parent.getAsStmt()) {
-      if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
-        // We need to handle the brace of a DoCatchStmt here specially,
-        // applying the same logic we apply to the catch clauses (handled by
-        // the CaseStmt logic), we add on the exit count of the branch to the
-        // statement's exit count.
-        addToCounter(DCS, getExitCounter());
-        return;
-      }
+    if (Scope.isStmt(StmtKind::Brace)) {
+      if (auto *ParentStmt = Parent.getAsStmt()) {
+        if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
+          // We need to handle the brace of a DoCatchStmt here specially,
+          // applying the same logic we apply to the catch clauses (handled by
+          // the CaseStmt logic), we add on the exit count of the branch to the
+          // statement's exit count.
+          addToCounter(DCS, getExitCounter());
+          return;
+        }
 
-      if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
-        JumpsToLabel = getCounter(LS);
+        if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
+          JumpsToLabel = getCounter(LS);
+      }
     }
 
     if (!ControlFlowAdjust && !JumpsToLabel)
@@ -942,46 +948,55 @@ private:
     return Lexer::getLocForEndOfToken(SM, Node.getEndLoc());
   }
 
+  /// Record a popped region in the resulting list of regions.
+  void takePoppedRegion(SourceMappingRegion &&Region, SourceLoc ParentEndLoc) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "Popped region: ";
+      Region.print(llvm::dbgs(), SM);
+      llvm::dbgs() << "\n";
+    });
+
+    // Don't record incomplete regions.
+    if (!Region.hasStartLoc())
+      return;
+
+    // Set the region end location to the end location of the parent.
+    if (!Region.hasEndLoc())
+      Region.setEndLoc(ParentEndLoc);
+
+    // If the range ended up being empty, ignore it (this can happen when we
+    // replace the counter, and don't extend the region any further).
+    if (!Region.hasNonEmptyRange())
+      return;
+
+    SourceRegions.push_back(std::move(Region));
+  }
+
   /// Pop regions from the stack into the function's list of regions.
   ///
   /// Adds all regions from \c ParentNode to the top of the stack to the
   /// function's \c SourceRegions.
   void popRegions(ASTNode ParentNode) {
-    auto I = RegionStack.begin(), E = RegionStack.end();
-    while (I != E &&
-           I->getNode().getOpaqueValue() != ParentNode.getOpaqueValue())
-      ++I;
-    assert(I != E && "parent not in stack");
-    auto ParentIt = I;
-    SourceLoc EndLoc = ParentIt->getEndLoc();
-    assert(ParentIt->hasNonEmptyRange() && "Pushed node with empty range?");
-
-    unsigned FirstPoppedIndex = SourceRegions.size();
-    (void)FirstPoppedIndex;
-    SourceRegions.push_back(std::move(*I++));
-    for (; I != E; ++I) {
-      if (!I->hasStartLoc())
-        continue;
-      if (!I->hasEndLoc())
-        I->setEndLoc(EndLoc);
-
-      // If the range ended up being empty, ignore it (this can happen when we
-      // replace the counter, and don't extend the region any further).
-      if (!I->hasNonEmptyRange())
-        continue;
-
-      SourceRegions.push_back(std::move(*I));
-    }
-
-    LLVM_DEBUG({
-      for (unsigned Idx = FirstPoppedIndex; Idx < SourceRegions.size(); ++Idx) {
-        llvm::dbgs() << "Popped region: ";
-        SourceRegions[Idx].print(llvm::dbgs(), SM);
-        llvm::dbgs() << "\n";
-      }
+    auto I = llvm::find_if(RegionStack, [&](const SourceMappingRegion &Region) {
+      return Region.getNode().getOpaqueValue() == ParentNode.getOpaqueValue();
     });
+    auto E = RegionStack.end();
+    assert(I != E && "parent not in stack");
+    assert(I->hasNonEmptyRange() && "Pushed node with empty range?");
 
-    RegionStack.erase(ParentIt, E);
+    auto EndLoc = I->getEndLoc();
+    for (auto &Region : llvm::make_range(I, E))
+      takePoppedRegion(std::move(Region), EndLoc);
+
+    RegionStack.erase(I, E);
+  }
+
+  /// Exit the given region, popping it and its children from the region stack,
+  /// and adjusting the following counter if needed.
+  void exitRegion(ASTNode Node) {
+    auto Adjust = setExitCount(Node);
+    popRegions(Node);
+    adjustForNonLocalExits(Node, Adjust);
   }
 
   /// Return the currently active region.
@@ -1217,11 +1232,8 @@ public:
       return Action::Continue(S);
 
     if (isa<BraceStmt>(S)) {
-      if (hasCounter(S)) {
-        auto Adjust = setExitCount(S);
-        popRegions(S);
-        adjustForNonLocalExits(S, Adjust);
-      }
+      if (hasCounter(S))
+        exitRegion(S);
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       // Update the condition with the backedge count.
@@ -1339,17 +1351,17 @@ public:
     if (shouldSkipExpr(E))
       return Action::Continue(E);
 
-    if (hasCounter(E))
-      popRegions(E);
-
-    // The region following the expression gets current counter minus the
-    // error branch counter, i.e the number of times we didn't throw an error.
-    if (!RegionStack.empty() && mayExpressionThrow(E)) {
+    // The region following the expression gets current counter minus the error
+    // branch counter, i.e the number of times we didn't throw an error.
+    if (mayExpressionThrow(E)) {
       auto ThrowCount = assignKnownCounter(ProfileCounterRef::errorBranchOf(E));
       replaceCount(
           CounterExpr::Sub(getCurrentCounter(), ThrowCount, CounterBuilder),
           Lexer::getLocForEndOfToken(SM, E->getEndLoc()));
     }
+
+    if (hasCounter(E))
+      exitRegion(E);
 
     return Action::Continue(E);
   }
