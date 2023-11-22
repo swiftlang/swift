@@ -470,8 +470,13 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
       isCallSite = true;
       break;
     case RenameLocUsage::Definition:
-      // All function definitions have argument labels that should be renamed.
-      handleLabels = true;
+      // Don't rename labels of operators. There is a mismatch between the
+      // indexer reporting all labels as `_` even if they are spelled as e.g.
+      // `x: Int` in the function declaration. Since the labels only appear
+      // on the operator declaration and in no calls, just don't rename them for
+      // now.
+      // For all other (normal) function declarations, always rename the labels.
+      handleLabels = !Lexer::isOperator(Old.base());
       isCallSite = false;
       break;
     case RenameLocUsage::Reference:
