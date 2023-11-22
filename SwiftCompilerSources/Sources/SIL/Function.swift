@@ -55,9 +55,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
 
-  /// The number of indirect result arguments.
   public var numIndirectResultArguments: Int { bridged.getNumIndirectFormalResults() }
-  
+  public var hasIndirectErrorArgument: Bool { bridged.hasIndirectErrorResult() }
+
   /// The number of arguments which correspond to parameters (and not to indirect results).
   public var numParameterArguments: Int { bridged.getNumParameters() }
 
@@ -66,7 +66,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// This is the sum of indirect result arguments and parameter arguments.
   /// If the function is a definition (i.e. it has at least an entry block), this is the
   /// number of arguments of the function's entry block.
-  public var numArguments: Int { numIndirectResultArguments + numParameterArguments }
+  public var numArguments: Int {
+    numIndirectResultArguments + (hasIndirectErrorArgument ? 1 : 0) + numParameterArguments
+  }
 
   public var hasSelfArgument: Bool {
     bridged.getSelfArgumentIndex() >= 0

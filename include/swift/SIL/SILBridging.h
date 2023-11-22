@@ -295,6 +295,7 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getFirstBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getLastBlock() const;
   BRIDGED_INLINE SwiftInt getNumIndirectFormalResults() const;
+  BRIDGED_INLINE bool hasIndirectErrorResult() const;
   BRIDGED_INLINE SwiftInt getNumParameters() const;
   BRIDGED_INLINE SwiftInt getSelfArgumentIndex() const;
   BRIDGED_INLINE SwiftInt getNumSILArguments() const;
