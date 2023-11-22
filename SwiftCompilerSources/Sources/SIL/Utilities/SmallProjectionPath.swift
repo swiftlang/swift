@@ -12,6 +12,10 @@
 
 import Basic
 
+// Needed to make some important utility functions in `Basic` available to importers of `SIL`.
+// For example, let `Basic.assert` be used in Optimizer module.
+@_exported import Basic
+
 /// A small and very efficient representation of a projection path.
 ///
 /// A `SmallProjectionPath` can be parsed and printed in SIL syntax and parsed from Swift

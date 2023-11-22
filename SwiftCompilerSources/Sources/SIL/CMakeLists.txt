@@ -22,9 +22,9 @@ add_swift_compiler_module(SIL
     Location.swift
     Operand.swift
     Registration.swift
+    SILStage.swift
     SubstitutionMap.swift
     Type.swift
-    Utils.swift
     Value.swift
     VTable.swift
     WitnessTable.swift)
