@@ -1972,10 +1972,11 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
   if (!useFunctionReference && funcTy) {
     // We know that the CodeCompletionResultType is AST-based so we can pass
     // nullptr for USRTypeContext.
-    auto maxRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
+    auto maxFuncTyRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
         &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
-    useFunctionReference =
-        maxRel >= CodeCompletionResultTypeRelation::Convertible;
+    auto maxResultTyRel = CodeCompletionResultType(funcTy->getResult()).calculateTypeRelation(
+        &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
+    useFunctionReference = maxFuncTyRel > maxResultTyRel;
   }
   if (!useFunctionReference)
     return false;
