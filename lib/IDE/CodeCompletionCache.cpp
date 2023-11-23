@@ -104,7 +104,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
 static constexpr uint32_t onDiskCompletionCacheVersion =
-    11; // Added macro roles
+    12; // Only allow a single result type for results
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -179,6 +179,9 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   llvm::DenseMap<uint32_t, const USRBasedType *> knownTypes;
   std::function<const USRBasedType *(uint32_t)> getType =
       [&](uint32_t index) -> const USRBasedType * {
+    if (index == UINT32_MAX) {
+      return nullptr;
+    }
     auto found = knownTypes.find(index);
     if (found != knownTypes.end()) {
       return found->second;
@@ -251,12 +254,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       assocUSRs.push_back(getString(read32le(cursor)));
     }
 
-    auto resultTypesCount = read32le(cursor);
-    SmallVector<const USRBasedType *, 1> resultTypes;
-    resultTypes.reserve(resultTypesCount);
-    for (size_t i = 0; i < resultTypesCount; i++) {
-      resultTypes.push_back(getType(read32le(cursor)));
-    }
+    const USRBasedType *resultType = getType(read32le(cursor));
 
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
@@ -270,7 +268,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
             kind, associatedKind, opKind, roles, isSystem, isAsync,
             hasAsyncAlternative, string, moduleName, briefDocComment,
             makeArrayRef(assocUSRs).copy(*V.Allocator),
-            CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
+            CodeCompletionResultType(resultType), notRecommended, diagSeverity,
             diagMessage, filterName, nameForDiagnostics);
 
     V.Results.push_back(result);
@@ -365,6 +363,9 @@ static void writeCachedModule(llvm::raw_ostream &out,
 
   std::function<uint32_t(const USRBasedType *)> addType =
       [&types, &knownTypes, &addType](const USRBasedType *type) -> uint32_t {
+    if (type == nullptr) {
+      return UINT32_MAX;
+    }
     auto found = knownTypes.find(type);
     if (found != knownTypes.end()) {
       return found->second;
@@ -443,12 +444,9 @@ static void writeCachedModule(llvm::raw_ostream &out,
         LE.write(addString(R->getAssociatedUSRs()[i]));
       }
 
-      auto resultTypes =
-          R->getResultType().getUSRBasedResultTypes(V.USRTypeArena);
-      LE.write(static_cast<uint32_t>(resultTypes.size()));
-      for (auto resultType : resultTypes) {
-        LE.write(addType(resultType)); // index into types
-      }
+      auto resultType =
+          R->getResultType().getUSRBasedResultType(V.USRTypeArena);
+      LE.write(addType(resultType)); // index into types
     }
   }
   LE.write(static_cast<uint32_t>(results.tell()));
