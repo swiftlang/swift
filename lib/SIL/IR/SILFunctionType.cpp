@@ -264,7 +264,7 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
           SILParameterInfo::NotDifferentiable))
       resultIndices.push_back(numSemanticResults + yieldAndIndex.index());
 
-  numSemanticResults += getNumIndirectFormalYields();
+  numSemanticResults += getNumYields();
   return IndexSubset::get(getASTContext(), numSemanticResults, resultIndices);
 }
 

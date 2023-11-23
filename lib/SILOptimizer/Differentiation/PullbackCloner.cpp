@@ -1160,7 +1160,7 @@ public:
     BeginApplyInst *bai = aai->getBeginApply();
     assert(getPullbackInfo().shouldDifferentiateApplySite(bai));
 
-    // Coroutine differentiation is not yet supported.
+    // abort_apply differentiation is not yet supported.
     getContext().emitNondifferentiabilityError(
         bai, getInvoker(), diag::autodiff_coroutines_not_supported);
     errorOccurred = true;

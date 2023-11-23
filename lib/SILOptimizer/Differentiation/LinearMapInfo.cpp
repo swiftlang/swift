@@ -242,8 +242,11 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
       SILType remappedResultType;
       if (resultIndex >= firstYieldResultIndex) {
         auto yieldResultIdx = resultIndex - firstYieldResultIndex;
-        remappedResultType =
-          origFnTy->getYields()[yieldResultIdx].getSILStorageInterfaceType();
+        const auto& yield = origFnTy->getYields()[yieldResultIdx];
+        // We do not have a good way to differentiate direct yields
+        if (!yield.isAutoDiffSemanticResult())
+          return true;
+        remappedResultType = yield.getSILStorageInterfaceType();
       } else if (resultIndex >= firstSemanticParamResultIdx) {
         auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
         auto semanticResultArg =

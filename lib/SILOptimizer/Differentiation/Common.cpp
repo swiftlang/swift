@@ -244,14 +244,11 @@ void collectMinimalIndicesForFunctionCall(
     resultIndices.push_back(semanticResultParamResultIndex++);
   }
 
-  // Record all indirect yields
+  // Record all yields. While we do not have a way to represent direct yields
+  // (_read accessors) we run activity analysis for them. These will be
+  // diagnosed later.
   if (BeginApplyInst *bai = dyn_cast<BeginApplyInst>(*ai)) {
     for (const auto &yieldAndIdx : enumerate(calleeConvs.getYields())) {
-      auto &yield = yieldAndIdx.value();
-      // We do not have a way to represent non @inout yields
-      if (!yield.isAutoDiffSemanticResult())
-        continue;
-
       results.push_back(bai->getYieldedValues()[yieldAndIdx.index()]);
       resultIndices.push_back(semanticResultParamResultIndex++);
     }

@@ -156,9 +156,16 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
         isa<CheckedCastBranchInst>(term) ||
         isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
-    
-    if (isa<YieldInst>(term)) {
-      // FIXME: diagnose proper yields
+
+    // We can differentiate only indirect yields
+    if (auto *yi = dyn_cast<YieldInst>(term)) {
+      for (const auto &val : yi->getAllOperands())
+        if (!yi->getYieldInfoForOperand(val).isAutoDiffSemanticResult()) {
+          context.emitNondifferentiabilityError(
+            term, invoker, diag::autodiff_control_flow_not_supported);
+          return true;
+        }
+
       continue;
     }
     
@@ -554,8 +561,10 @@ emitDerivativeFunctionReference(
         SILType resultType;
         if (resultIndex >= firstYieldResultIndex) {
           auto yieldResultIndex = resultIndex - firstYieldResultIndex;
-          resultType = originalFnTy->getYields()[yieldResultIndex]
-                           .getSILStorageInterfaceType();
+          auto yield = originalFnTy->getYields()[yieldResultIndex];
+          // We can only differentiate indirect yields
+          if (yield.isAutoDiffSemanticResult())
+            resultType = yield.getSILStorageInterfaceType();
         } else if (resultIndex >= firstSemanticParamResultIdx) {
           auto semanticResultParamIdx = resultIndex - firstSemanticParamResultIdx;
           auto semanticResultParam =
@@ -566,7 +575,7 @@ emitDerivativeFunctionReference(
           resultType = originalFnTy->getResults()[resultIndex]
                            .getSILStorageInterfaceType();
         }
-        if (!resultType.isDifferentiable(context.getModule())) {
+        if (!resultType || !resultType.isDifferentiable(context.getModule())) {
           context.emitNondifferentiabilityError(
               original, invoker, diag::autodiff_nondifferentiable_result);
           return std::nullopt;
