@@ -339,11 +339,13 @@ enum TypeVariableOptions {
   TVO_PackExpansion = 0x40,
 };
 
-enum class KeyPathCapability : uint8_t {
+enum class KeyPathMutability : uint8_t {
   ReadOnly,
   Writable,
   ReferenceWritable
 };
+
+using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
 
 /// The implementation object for a type variable used within the
 /// constraint-solving type checker.

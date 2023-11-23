@@ -534,16 +534,16 @@ void BindingSet::inferTransitiveBindings(
 static BoundGenericType *getKeyPathType(ASTContext &ctx,
                                         KeyPathCapability capability,
                                         Type rootType, Type valueType) {
-  switch (capability) {
-  case KeyPathCapability::ReadOnly:
+  switch (capability.first) {
+  case KeyPathMutability::ReadOnly:
     return BoundGenericType::get(ctx.getKeyPathDecl(), /*parent=*/Type(),
                                  {rootType, valueType});
 
-  case KeyPathCapability::Writable:
+  case KeyPathMutability::Writable:
     return BoundGenericType::get(ctx.getWritableKeyPathDecl(),
                                  /*parent=*/Type(), {rootType, valueType});
 
-  case KeyPathCapability::ReferenceWritable:
+  case KeyPathMutability::ReferenceWritable:
     return BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
                                  /*parent=*/Type(), {rootType, valueType});
   }

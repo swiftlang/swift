@@ -7454,15 +7454,16 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     return std::make_pair(true, llvm::None);
   };
 
-  auto success = [](KeyPathCapability capability)
+  auto success = [](KeyPathMutability mutability)
       -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    KeyPathCapability capability(mutability, /*isSendable=*/true);
     return std::make_pair(true, capability);
   };
 
   if (keyPath->hasSingleInvalidComponent())
     return fail();
 
-  auto capability = KeyPathCapability::Writable;
+  auto mutability = KeyPathMutability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
 
@@ -7513,13 +7514,13 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
         return fail();
 
       if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
-        capability = KeyPathCapability::ReadOnly;
+        mutability = KeyPathMutability::ReadOnly;
         continue;
       }
 
       // A nonmutating setter indicates a reference-writable base.
       if (!storage->isSetterMutating()) {
-        capability = KeyPathCapability::ReferenceWritable;
+        mutability = KeyPathMutability::ReferenceWritable;
         continue;
       }
 
@@ -7552,9 +7553,9 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
 
   // Optional chains force the entire key path to be read-only.
   if (didOptionalChain)
-    capability = KeyPathCapability::ReadOnly;
+    mutability = KeyPathMutability::ReadOnly;
 
-  return success(capability);
+  return success(mutability);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
