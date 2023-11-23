@@ -1310,8 +1310,7 @@ public:
       DiagnosticTransaction transaction(diagEngine);
 
       HasError |= ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/false);
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
 
       HasError |= transaction.hasErrors();
 

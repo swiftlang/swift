@@ -10514,8 +10514,7 @@ static bool inferEnumMemberThroughTildeEqualsOperator(
 
   DiagnosticTransaction diagnostics(ctx.Diags);
   {
-    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true,
-                          /*leaveClosureBodyUnchecked=*/false)) {
+    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true)) {
       // Skip diagnostics if they are disabled, otherwise it would result in
       // duplicate diagnostics, since this operation is going to be repeated
       // in diagnostic mode.

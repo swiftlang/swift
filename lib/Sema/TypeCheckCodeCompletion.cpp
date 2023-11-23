@@ -77,9 +77,6 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
-  if (!Context.CompletionCallback) {
-    options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
-  }
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(dc, options);
@@ -223,8 +220,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // expression and folding sequence expressions.
     auto failedPreCheck =
         ConstraintSystem::preCheckTarget(target,
-                                         /*replaceInvalidRefsWithErrors=*/true,
-                                         /*leaveClosureBodiesUnchecked=*/true);
+                                         /*replaceInvalidRefsWithErrors=*/true);
 
     if (failedPreCheck)
       return false;
@@ -238,10 +234,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
     options |= ConstraintSystemFlags::ForCodeCompletion;
-    if (!Context.CompletionCallback) {
-      options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
-    }
-
+    
     ConstraintSystem cs(DC, options);
 
     llvm::SmallVector<Solution, 4> solutions;
@@ -309,8 +302,7 @@ getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
                                ConcreteDeclRef &referencedDecl) {
   if (constraints::ConstraintSystem::preCheckExpression(
           parsedExpr, DC,
-          /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/true))
+          /*replaceInvalidRefsWithErrors=*/true))
     return llvm::None;
 
   switch (kind) {
