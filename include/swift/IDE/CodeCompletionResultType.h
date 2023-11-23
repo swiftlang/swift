@@ -347,20 +347,14 @@ public:
   }
 
   static CodeCompletionResultType unknown() {
-    return CodeCompletionResultType(ArrayRef<Type>());
-  }
-
-  explicit CodeCompletionResultType(ArrayRef<Type> Types)
-      : CodeCompletionResultType(
-            /*IsApplicable=*/false,
-            /*ResultType1=*/Types.size() > 0 ? Types[0] : nullptr,
-            /*ResultType2=*/Types.size() > 1 ? Types[1] : nullptr) {
-    assert(Types.size() <= 2 && "Can only store two different result types in "
-                                "CodeCompletionResultType");
+    return CodeCompletionResultType(Type());
   }
 
   explicit CodeCompletionResultType(Type Ty)
-      : CodeCompletionResultType(ArrayRef<Type>(Ty)) {}
+      : CodeCompletionResultType(
+            /*IsApplicable=*/false,
+            /*ResultType1=*/Ty,
+            /*ResultType2=*/nullptr) {}
 
   explicit CodeCompletionResultType(ArrayRef<const USRBasedType *> Types)
       : CodeCompletionResultType(

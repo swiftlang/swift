@@ -71,10 +71,10 @@ func getNSError() -> NSError { return NSError(domain: "", code: 1, userInfo: [:]
 func test001() {
   do {} catch #^CATCH1^#
 
-// CATCH1-DAG:  Decl[Enum]/CurrModule/TypeRelation[Convertible]:              Error4[#Error4#]; name=Error4{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error3[#Error3#]; name=Error3{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error2[#Error2#]; name=Error2{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error1[#Error1#]; name=Error1{{$}}
+// CATCH1-DAG:  Decl[Enum]/CurrModule:              Error4[#Error4#]; name=Error4{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 // CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem: NSError[#NSError#]{{; name=.+$}}
@@ -86,11 +86,11 @@ func test002() {
   let e2 = Error2()
   throw #^THROW1^#
 
-// THROW1-DAG:  Decl[Enum]/CurrModule/TypeRelation[Convertible]:              Error4[#Error4#]; name=Error4{{$}}
-// THROW1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error3[#Error3#]; name=Error3{{$}}
-// THROW1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error2[#Error2#]; name=Error2{{$}}
-// THROW1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error1[#Error1#]; name=Error1{{$}}
-// THROW1-DAG:  Decl[Protocol]/CurrModule/Flair[RareType]/TypeRelation[Convertible]: ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
+// THROW1-DAG:  Decl[Enum]/CurrModule:              Error4[#Error4#]; name=Error4{{$}}
+// THROW1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
+// THROW1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
+// THROW1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
+// THROW1-DAG:  Decl[Protocol]/CurrModule/Flair[RareType]: ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]:      getError1()[#Error1#]{{; name=.+$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]:      getNSError()[#NSError#]{{; name=.+$}}
 

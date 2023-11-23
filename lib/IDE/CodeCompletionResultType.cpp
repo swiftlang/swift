@@ -383,7 +383,7 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
   if (Ty->isVoid() && typeContext.requiresNonVoid())
     return TypeRelation::Invalid;
   if (typeContext.getExpectedCustomAttributeKinds()) {
-    return (getCustomAttributeKinds(Ty) &
+    return (getCustomAttributeKinds(Ty->getMetatypeInstanceType()) &
             typeContext.getExpectedCustomAttributeKinds())
                ? TypeRelation::Convertible
                : TypeRelation::Unrelated;

@@ -434,7 +434,7 @@ func testSubType() {
 }
 // SUBTYPE_1: Begin completions, 6 items
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#BaseClass#];
-// SUBTYPE_1-DAG: Decl[Class]/CurrNominal/TypeRelation[Convertible]: SubClass[#BaseClass.SubClass#];
+// SUBTYPE_1-DAG: Decl[Class]/CurrNominal: SubClass[#BaseClass.SubClass#];
 // SUBTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: subInstance[#BaseClass.SubClass#];
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init({#failable: Void#})[#BaseClass?#];
 // SUBTYPE_1-DAG: Decl[TypeAlias]/Super/TypeRelation[Convertible]: Concrete1[#BaseClass#];

@@ -517,7 +517,7 @@ void CompletionLookup::addTypeAnnotation(CodeCompletionResultBuilder &Builder,
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     PO.setBaseType(typeContext->getDeclaredTypeInContext());
   Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
-  Builder.setResultTypes(T);
+  Builder.setResultType(T);
 }
 
 void CompletionLookup::addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -539,7 +539,7 @@ void CompletionLookup::addTypeAnnotationForImplicitlyUnwrappedOptional(
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     PO.setBaseType(typeContext->getDeclaredTypeInContext());
   Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
-  Builder.setResultTypes(T);
+  Builder.setResultType(T);
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1129,7 +1129,7 @@ void CompletionLookup::addPoundSelector(bool needPound) {
   Builder.addRightParen();
   Builder.addTypeAnnotation("Selector");
   // This function is called only if the context type is 'Selector'.
-  Builder.setResultTypes(Ctx.getSelectorType());
+  Builder.setResultType(Ctx.getSelectorType());
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1149,7 +1149,7 @@ void CompletionLookup::addPoundKeyPath(bool needPound) {
                                   /*IsVarArg=*/false);
   Builder.addRightParen();
   Builder.addTypeAnnotation("String");
-  Builder.setResultTypes(Ctx.getStringType());
+  Builder.setResultType(Ctx.getStringType());
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1472,7 +1472,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       Builder.addTypeAnnotation(TypeStr);
     }
 
-    Builder.setResultTypes(ResultType);
+    Builder.setResultType(ResultType);
     Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 
     if (isUnresolvedMemberIdealType(ResultType))
@@ -1711,15 +1711,7 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
     addTypeAnnotation(Builder, NTD->getDeclaredType());
   }
 
-  // Override the type relation for NominalTypes. Use the better relation
-  // for the metatypes and the instance type. For example,
-  //
-  //   func receiveInstance(_: Int) {}
-  //   func receiveMetatype(_: Int.Type) {}
-  //
-  // We want to suggest 'Int' as 'Identical' for both arguments.
-  Builder.setResultTypes(
-      {NTD->getInterfaceType(), NTD->getDeclaredInterfaceType()});
+  Builder.setResultType(NTD->getInterfaceType());
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -2596,7 +2588,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
   }
   if (literalType) {
     addTypeAnnotation(builder, literalType);
-    builder.setResultTypes(literalType);
+    builder.setResultType(literalType);
     builder.setTypeContext(expectedTypeContext, CurrDeclContext);
   }
 }
@@ -2696,7 +2688,7 @@ void CompletionLookup::addValueLiteralCompletions() {
     for (auto T : expectedTypeContext.getPossibleTypes()) {
       if (T && T->is<TupleType>() && !T->isVoid()) {
         addTypeAnnotation(builder, T);
-        builder.setResultTypes(T);
+        builder.setResultType(T);
         builder.setTypeContext(expectedTypeContext, CurrDeclContext);
         break;
       }
