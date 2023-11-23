@@ -55,14 +55,25 @@ private struct Metadata: Encodable {
   }
 }
 
+private struct ProcessMetadata: Encodable {
+  var name: String
+  var pid: ProcessIdentifier
+  var metadata: [Metadata]
+}
+
+private struct MetadataSummary: Encodable {
+  var totalSize: Int
+  var processes: Set<String>
+}
+
 internal struct Output: TextOutputStream {
   let fileHandle: FileHandle
   init(_ outputFile: String? = nil) throws {
     if let outputFile {
       if FileManager().createFile(atPath: outputFile, contents: nil) {
-        self.fileHandle = try FileHandle(forWritingAtPath: outputFile)!
+        self.fileHandle = FileHandle(forWritingAtPath: outputFile)!
       } else {
-        print("Unable to create file \(outputFile)")
+        print("Unable to create file \(outputFile)", to: &Std.err)
         exit(1)
       }
     } else {
@@ -75,7 +86,6 @@ internal struct Output: TextOutputStream {
       fileHandle.write(encodedString)
     }
   }
-
 }
 
 internal struct DumpGenericMetadata: ParsableCommand {
@@ -92,6 +102,9 @@ internal struct DumpGenericMetadata: ParsableCommand {
   var genericMetadataOptions: GenericMetadataOptions
 
   func run() throws {
+    disableStdErrBuffer()
+    var metadataSummary = [String: MetadataSummary]()
+    var allProcesses = [ProcessMetadata]()
     try inspect(options: options) { process in
       let allocations: [swift_metadata_allocation_t] =
           try process.context.allocations.sorted()
@@ -117,19 +130,47 @@ internal struct DumpGenericMetadata: ParsableCommand {
                         isArrayOfClass: process.context.isArrayOfClass(pointer),
                         garbage: garbage,
                         backtrace: currentBacktrace)
+      } // generics
+
+      // Update summary
+      generics.forEach { metadata in
+        if let allocation = metadata.allocation {
+          let name = metadata.name
+          if metadataSummary.keys.contains(name) {
+            metadataSummary[name]!.totalSize += allocation.size
+            metadataSummary[name]!.processes.insert(process.processName)
+          } else {
+            metadataSummary[name] = MetadataSummary(totalSize: allocation.size,
+                                                    processes: Set([process.processName]))
+            }
+        }
       }
 
       if genericMetadataOptions.json {
-        try dumpJson(process: process, generics: generics)
-      } else {
+        let processMetadata = ProcessMetadata(name: process.processName,
+                                              pid: process.processIdentifier as! ProcessIdentifier,
+                                              metadata: generics)
+        allProcesses.append(processMetadata)
+      } else if !genericMetadataOptions.summary {
         try dumpText(process: process, generics: generics)
-      }
+        }
+    } // inspect
+
+    if genericMetadataOptions.json {
+      if genericMetadataOptions.summary {
+        try dumpJson(of: metadataSummary)
+      } else {
+        try dumpJson(of: allProcesses)
+        }
+    } else if genericMetadataOptions.summary {
+      try dumpTextSummary(of: metadataSummary)
     }
   }
 
   private func dumpText(process: any RemoteProcess, generics: [Metadata]) throws {
     var errorneousMetadata: [(ptr: swift_reflection_ptr_t, name: String)] = []
     var output = try Output(genericMetadataOptions.outputFile)
+    print("\(process.processName)(\(process.processIdentifier)):\n", to: &output)
     print("Address", "Allocation", "Size", "Offset", "isArrayOfClass", "Name", separator: "\t", to: &output)
     generics.forEach {
       print("\(hex: $0.ptr)", terminator: "\t", to: &output)
@@ -149,22 +190,18 @@ internal struct DumpGenericMetadata: ParsableCommand {
     }
 
     if errorneousMetadata.count > 0 {
-      print("Error: The following metadata was not found in any DATA or AUTH segments, may be garbage.", to: &output)
+      print("Warning: The following metadata was not found in any DATA or AUTH segments, may be garbage.", to: &output)
       errorneousMetadata.forEach {
         print("\(hex: $0.ptr)\t\($0.name)", to: &output)
       }
     }
+    print("", to: &output)
   }
 
-  private func dumpJson(process: any RemoteProcess,
-                        generics: [Metadata]) throws {
-    struct AllMetadataEntries: Encodable {
-      var metadata: [Metadata]
-    }
-    let allMetadataEntries = AllMetadataEntries(metadata: generics)
+  private func dumpJson(of: (any Encodable)) throws {
     let encoder = JSONEncoder()
-    encoder.outputFormatting = .prettyPrinted
-    let data = try encoder.encode(allMetadataEntries)
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try encoder.encode(of)
     let jsonOutput = String(data: data, encoding: .utf8)!
     if let outputFile = genericMetadataOptions.outputFile {
       try jsonOutput.write(toFile: outputFile, atomically: true, encoding: .utf8)
@@ -173,4 +210,23 @@ internal struct DumpGenericMetadata: ParsableCommand {
     }
   }
 
+  private func dumpTextSummary(of: [String: MetadataSummary]) throws {
+    var output = try Output(genericMetadataOptions.outputFile)
+    print("Size", "Owners", "Name", separator: "\t", to: &output)
+    var totalSize = 0
+    var unknownSize = 0
+    of.sorted { first, second in
+      first.value.processes.count > second.value.processes.count
+    }
+    .forEach { summary in
+      totalSize += summary.value.totalSize
+      if summary.key == "<unknown>" {
+        unknownSize += summary.value.totalSize
+      }
+      print(summary.value.totalSize, summary.value.processes.count, summary.key,
+        separator: "\t", to: &output)
+    }
+    print("\nTotal size:\t\(totalSize / 1024) KiB", to: &output)
+    print("Unknown size:\t\(unknownSize / 1024) KiB", to: &output)
+  }
 }
