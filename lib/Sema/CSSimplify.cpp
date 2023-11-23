@@ -12415,8 +12415,17 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     // Otherwise, we don't have a key path type at all.
     return SolutionKind::Error;
   }
-  if (!keyPathTy->isTypeVariableOrMember())
+
+  if (!keyPathTy->isTypeVariableOrMember()) {
+    if (shouldAttemptFixes()) {
+      auto *fix = IgnoreKeyPathSubscriptIndexMismatch::create(
+          *this, keyPathTy, getConstraintLocator(locator));
+      recordAnyTypeVarAsPotentialHole(valueTy);
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
     return SolutionKind::Error;
+  }
 
   return unsolved();
 }
