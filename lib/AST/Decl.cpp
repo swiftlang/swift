@@ -2220,12 +2220,11 @@ bool PatternBindingDecl::hasStorage() const {
   return false;
 }
 
-const PatternBindingEntry *PatternBindingDecl::getCheckedPatternBindingEntry(
-    unsigned i, bool leaveClosureBodiesUnchecked) const {
+const PatternBindingEntry *
+PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
   return evaluateOrDefault(
       getASTContext().evaluator,
-      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
-                                 leaveClosureBodiesUnchecked},
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i},
       nullptr);
 }
 
@@ -2428,8 +2427,7 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
     const VarDecl *vd) const {
   unsigned i = getPatternEntryIndexForVarDecl(vd);
   return getASTContext().evaluator.hasActiveRequest(
-      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
-                                 /*LeaveClosureBodyUnchecked=*/false});
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
 }
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
