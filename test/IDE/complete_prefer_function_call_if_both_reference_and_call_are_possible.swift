@@ -28,3 +28,16 @@ func testTask(route: Route) {
     route.#^IN_TASK?check=COMPLETE^#
   }
 }
+
+protocol Builder {
+  func recv<T>(_: (T) throws -> Void)
+}
+
+struct S {
+  func foo(x: Int) throws {}
+  func test(builder: Builder) {
+    builder.recv(#^IN_CONTEXT_FOR_UNAPPLIED_REF^#)
+  }
+}
+// IN_CONTEXT_FOR_UNAPPLIED_REF-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: foo(x:)[#(Int) throws -> ()#]; name=foo(x:)
+// IN_CONTEXT_FOR_UNAPPLIED_REF-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: test(builder:)[#(any Builder) -> ()#]; name=test(builder:)
