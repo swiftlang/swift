@@ -80,16 +80,6 @@ struct ResolvedLoc {
   ResolvedLoc();
 };
 
-typedef std::vector<ResolvedLoc> ResolvedLocVector;
-
-/// Create an empty `std::vector<ResolvedLoc>`.
-///
-/// - Note: This can't be imported as an initializer on
-/// `BridgedResolvedLocVector`
-///   because initializers without any arguments aren't imported to Swift
-SWIFT_NAME("ResolvedLocVector.empty()")
-ResolvedLocVector ResolvedLocVector_createEmpty();
-
 /// A heap-allocated `std::vector<ResoledLoc>` that can be represented by an
 /// opaque pointer value.
 ///
@@ -102,7 +92,9 @@ ResolvedLocVector ResolvedLocVector_createEmpty();
 ///   In that case `swift_SwiftIDEUtilsBridging_runNameMatcher` can return a
 ///   `ResolvedLocVector`.
 class BridgedResolvedLocVector {
-  const std::vector<ResolvedLoc> *vector;
+  friend void *BridgedResolvedLocVector_getOpaqueValue(const BridgedResolvedLocVector &vector);
+
+  std::vector<ResolvedLoc> *vector;
 
 public:
   /// Create heap-allocaed vector with the same elements as `vector`.
@@ -110,7 +102,9 @@ public:
 
   /// Create a `BridgedResolvedLocVector` from an opaque value obtained from
   /// `getOpaqueValue`.
-  BridgedResolvedLocVector(const void *opaqueValue);
+  BridgedResolvedLocVector(void *opaqueValue);
+
+  void push_back(const ResolvedLoc &Loc);
 
   /// Get the underlying vector.
   const std::vector<ResolvedLoc> &unbridged();
@@ -118,12 +112,19 @@ public:
   /// Delete the heap-allocated memory owned by this object. Accessing
   /// `unbridged` is illegal after calling `destroy`.
   void destroy();
-
-  /// Get an opaque pointer value that describes this 
-  /// `BridgedResolvedLocVector`. This opaque value can be returned by a
-  /// `@_cdecl` function in Swift.
-  const void *getOpaqueValue() const;
 };
+
+
+SWIFT_NAME("BridgedResolvedLocVector.empty()")
+BridgedResolvedLocVector BridgedResolvedLocVector_createEmpty();
+
+/// Get an opaque pointer value that describes this
+/// `BridgedResolvedLocVector`. This opaque value can be returned by a
+/// `@_cdecl` function in Swift.
+/// 
+/// - Note: Cannot be defined as a member on BridgedResolvecLocVector because 
+///   Swift 5.8 does not import methods that return pointers. 
+void *BridgedResolvedLocVector_getOpaqueValue(const BridgedResolvedLocVector &vector);
 
 typedef std::vector<BridgedSourceLoc> SourceLocVector;
 

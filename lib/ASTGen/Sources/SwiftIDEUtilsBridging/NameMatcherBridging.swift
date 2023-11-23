@@ -15,19 +15,6 @@ import SwiftSyntax
 import swiftASTGen
 import IDEBridging
 
-// MARK: - SourceLocVector Sequence conformance
-
-#if swift(<5.9)
-
-/// Needed because C++ interop does not automatically conform SourceLocVector to CxxSequence with a Swift 5.8 compiler.
-extension SourceLocVectorIterator: UnsafeCxxInputIterator {
-   public static func ==(lhs: SourceLocVectorIterator, rhs: SourceLocVectorIterator) -> Bool { Self.equals(lhs, rhs) }
-}
-extension SourceLocVector: CxxSequence {
-  public typealias RawIterator = SourceLocVectorIterator
-}
-#endif
-
 // MARK: - Bridged type initializers
 
 fileprivate extension BridgedCharSourceRange {
@@ -48,7 +35,7 @@ fileprivate extension CharSourceRangeVector {
   }
 }
 
-fileprivate extension ResolvedLocVector {
+fileprivate extension BridgedResolvedLocVector {
   init(from resolvedLocs: some Sequence<DeclNameLocation>, in sourceFile: ExportedSourceFile) {
     self = .empty()
     for resolvedLoc in resolvedLocs {
@@ -114,10 +101,11 @@ public func runNameMatcher(
   sourceFilePtr: UnsafeRawPointer,
   locations: UnsafePointer<BridgedSourceLoc>,
   locationsCount: UInt
-) -> UnsafeRawPointer {
+) -> UnsafeMutableRawPointer? {
   let sourceFile = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1).pointee
   let locations = UnsafeBufferPointer(start: locations, count: Int(locationsCount))
   let positions: [AbsolutePosition] =  locations.compactMap { sourceFile.position(of: $0) }
   let resolvedLocs = NameMatcher.resolve(baseNamePositions: positions, in: sourceFile.syntax)
-  return BridgedResolvedLocVector(ResolvedLocVector(from: resolvedLocs, in: sourceFile)).getOpaqueValue()
+  let bridged = BridgedResolvedLocVector(from: resolvedLocs, in: sourceFile)
+  return BridgedResolvedLocVector_getOpaqueValue(bridged)
 }

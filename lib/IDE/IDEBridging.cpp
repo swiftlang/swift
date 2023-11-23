@@ -35,16 +35,20 @@ ResolvedLoc::ResolvedLoc(swift::CharSourceRange range,
 
 ResolvedLoc::ResolvedLoc() {}
 
-ResolvedLocVector ResolvedLocVector_createEmpty() {
-  return ResolvedLocVector();
+BridgedResolvedLocVector BridgedResolvedLocVector_createEmpty() {
+  return BridgedResolvedLocVector(new std::vector<ResolvedLoc>());
+}
+
+void BridgedResolvedLocVector::push_back(const ResolvedLoc &Loc) {
+  this->vector->push_back(Loc);
 }
 
 BridgedResolvedLocVector::BridgedResolvedLocVector(
     const std::vector<ResolvedLoc> &vector)
     : vector(new std::vector<ResolvedLoc>(vector)) {}
 
-BridgedResolvedLocVector::BridgedResolvedLocVector(const void *opaqueValue)
-    : vector(static_cast<const std::vector<ResolvedLoc> *>(opaqueValue)) {}
+BridgedResolvedLocVector::BridgedResolvedLocVector(void *opaqueValue)
+    : vector(static_cast<std::vector<ResolvedLoc> *>(opaqueValue)) {}
 
 const std::vector<ResolvedLoc> &BridgedResolvedLocVector::unbridged() {
   return *vector;
@@ -52,6 +56,6 @@ const std::vector<ResolvedLoc> &BridgedResolvedLocVector::unbridged() {
 
 void BridgedResolvedLocVector::destroy() { delete vector; }
 
-const void *BridgedResolvedLocVector::getOpaqueValue() const {
-  return static_cast<const void *>(vector);
+void *BridgedResolvedLocVector_getOpaqueValue(const BridgedResolvedLocVector &vector) {
+  return static_cast<void *>(vector.vector);
 }
