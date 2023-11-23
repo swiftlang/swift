@@ -109,6 +109,8 @@ set(compile_options
 
   # Necessary to avoid treating IBOutlet and IBAction as keywords
   "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
+
+  "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
 )
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
