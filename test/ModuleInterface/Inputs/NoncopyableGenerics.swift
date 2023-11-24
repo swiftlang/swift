@@ -20,4 +20,16 @@ public struct Toys {
     (x, y) = (10, 11)
   }
 
+  public struct rdar118697289_S1<Element> {
+    let element: Element
+    func f() -> Element { element }
+  }
+
+  public struct rdar118697289_S2<Element> {
+      let element: Element
+      subscript(i: Int) -> Element {
+          element
+      }
+  }
+
 }
