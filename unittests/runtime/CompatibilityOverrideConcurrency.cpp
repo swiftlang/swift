@@ -297,7 +297,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, task_pushTaskExecutorPreference) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, task_popTaskExecutorPreference) {
-  swift_task_popTaskExecutorPreference();
+  swift_task_popTaskExecutorPreference(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel) {
