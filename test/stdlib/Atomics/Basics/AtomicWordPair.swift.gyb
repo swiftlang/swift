@@ -1,0 +1,12 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+%{
+  from gyb import expand
+
+  types = [
+    # Label      Type        a                                       b
+    ("WordPair", "WordPair", "WordPair(highWord: 100, lowWord: 64)", "WordPair(highWord: 50, lowWord: 32)"),
+  ]
+}%
+${expand("Tests.gyb-template", line_directive='', types=types)}

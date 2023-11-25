@@ -22,24 +22,36 @@
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || _pointerBitWidth(_64)
 % end
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension ${intType}: AtomicValue {
+  /// The storage representation type that `Self` encodes to and decodes from
+  /// which is a suitable type when used in atomic operations.
 %   if intType == "Int" or intType == "UInt":
 #if _pointerBitWidth(_64)
-  @available(SwiftStdlib 5.10, *)
-  public typealias AtomicRepresentation = _AtomicStorage64
+  @available(SwiftStdlib 5.11, *)
+  public typealias AtomicRepresentation = UInt64.AtomicRepresentation
 #elseif _pointerBitWidth(_32)
-  @available(SwiftStdlib 5.10, *)
-  public typealias AtomicRepresentation = _AtomicStorage32
+  @available(SwiftStdlib 5.11, *)
+  public typealias AtomicRepresentation = UInt32.AtomicRepresentation
 #else
 #error("Unsupported platform")
 #endif
-%   else:
-  @available(SwiftStdlib 5.10, *)
-  public typealias AtomicRepresentation = ${intStorage}
+%   elif not intType.startswith("U"):
+  @available(SwiftStdlib 5.11, *)
+  public typealias AtomicRepresentation = ${intStorage}.AtomicRepresentation
 %   end
 
-  @available(SwiftStdlib 5.10, *)
+  /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
+  /// type to be used for atomic operations.
+  ///
+  /// - Note: This is not an atomic operation. This simply encodes the logical
+  ///   type `Self` into its storage representation suitable for atomic
+  ///   operations, `AtomicRepresentation`.
+  ///
+  /// - Parameter value: A valid instance of `Self` that's about to be destroyed
+  ///   to encode an instance of its `AtomicRepresentation`.
+  /// - Returns: The newly encoded `AtomicRepresentation` storage.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -48,42 +60,52 @@ extension ${intType}: AtomicValue {
     AtomicRepresentation(value._value)
   }
 
-  @available(SwiftStdlib 5.10, *)
+  /// Recovers the logical atomic type `Self` by destroying some
+  /// `AtomicRepresentation` storage instance returned from an atomic operation.
+  ///
+  /// - Note: This is not an atomic operation. This simply decodes the storage
+  ///   representation used in atomic operations back into the logical type for
+  ///   normal use, `Self`.
+  ///
+  /// - Parameter storage: The storage representation for `Self` that's used
+  ///   within atomic operations.
+  /// - Returns: The newly decoded logical type `Self`.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> ${intType} {
-    ${intType}(representation.storage)
+    ${intType}(representation._storage)
   }
 }
 
 //===----------------------------------------------------------------------===//
-// ${intType} load then atomic operations
+// ${intType} atomic operations
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension Atomic where Value == ${intType} {
-% for (name, builtinName, op, label, doc) in integerOperations:
+% for (name, builtinName, op, doc) in integerOperations:
   /// Perform an atomic ${doc} operation and return the old and new value,
   /// applying the specified memory ordering.
   ///
 %   if "Wrapping" in name:
-  /// Note: This operation silently wraps around on overflow, like the
-  /// `${op}` operator does on `${intType}` values.
+  /// - Note: This operation silently wraps around on overflow, like the
+  ///   `${op}` operator does on `${intType}` values.
   ///
 %   end
   /// - Parameter operand: An integer value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple containing the original value before the operation and
   ///   the new value after the operation.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
   public func ${lowerFirst(name)}(
-    ${label} operand: ${intType}${" = 1" if "crement" in name else ""},
+    _ operand: ${intType}${" = 1" if "crement" in name else ""},
     ordering: AtomicUpdateOrdering
   ) -> (oldValue: ${intType}, newValue: ${intType}) {
     let original = switch ordering {
@@ -131,15 +153,15 @@ extension Atomic where Value == ${intType} {
   /// Perform an atomic add operation and return the old and new value,
   /// applying the specified memory ordering.
   ///
-  /// Note: This operation checks for overflow at runtime and will trap if an
-  /// overflow does occur. In `-Ounchecked` builds, overflow checking is not
-  /// performed.
+  /// - Note: This operation checks for overflow at runtime and will trap if an
+  ///   overflow does occur. In `-Ounchecked` builds, overflow checking is not
+  ///   performed.
   ///
   /// - Parameter operand: An integer value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple containing the original value before the operation and
   ///   the new value after the operation.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
@@ -150,7 +172,7 @@ extension Atomic where Value == ${intType} {
   ) -> (oldValue: ${intType}, newValue: ${intType}) {
     var result = (
       exchanged: false,
-      original: load(ordering: ._failureOrdering(for: ordering))
+      original: load(ordering: .relaxed)
     )
     var new: ${intType}
 
@@ -170,15 +192,15 @@ extension Atomic where Value == ${intType} {
   /// Perform an atomic subtract operation and return the old and new value,
   /// applying the specified memory ordering.
   ///
-  /// Note: This operation checks for overflow at runtime and will trap if an
-  /// overflow does occur. In `-Ounchecked` builds, overflow checking is not
-  /// performed.
+  /// - Note: This operation checks for overflow at runtime and will trap if an
+  ///   overflow does occur. In `-Ounchecked` builds, overflow checking is not
+  ///   performed.
   ///
   /// - Parameter operand: An integer value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple containing the original value before the operation and
   ///   the new value after the operation.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
@@ -189,7 +211,7 @@ extension Atomic where Value == ${intType} {
   ) -> (oldValue: ${intType}, newValue: ${intType}) {
     var result = (
       exchanged: false,
-      original: load(ordering: ._failureOrdering(for: ordering))
+      original: load(ordering: .relaxed)
     )
     var new: ${intType}
 

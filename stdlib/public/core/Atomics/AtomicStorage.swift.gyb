@@ -18,30 +18,37 @@
 // ${size} bit Atomic Storage
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.10, *)
-@_alignment(${alignment})
-@frozen
-public struct ${type} {
-  @usableFromInline
-  var storage: ${builtin}
+% if type == "WordPair":
+@available(SwiftStdlib 5.11, *)
+% end
+extension ${type} {
+  /// The storage representation type that `Self` encodes to and decodes from
+  /// which is a suitable type when used in atomic operations.
+  @available(SwiftStdlib 5.11, *)
+  @_alignment(${alignment})
+  @frozen
+  public struct AtomicRepresentation {
+    public var _storage: ${builtin}
 
-  @available(SwiftStdlib 5.10, *)
-  @inlinable
-  init(_ builtin: ${builtin}) {
-    self.storage = builtin
+    @available(SwiftStdlib 5.11, *)
+    @_alwaysEmitIntoClient
+    @_transparent
+    public init(_ _builtin: ${builtin}) {
+      self._storage = _builtin
+    }
   }
 }
 
 // ${size} bit atomic loads
 
-@available(SwiftStdlib 5.10, *)
-extension Atomic where Value.AtomicRepresentation == ${type} {
+@available(SwiftStdlib 5.11, *)
+extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
   /// Atomically loads and returns the current value, applying the specified
   /// memory ordering.
   ///
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The current value.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -56,20 +63,20 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
       Builtin.unreachable()
     }
 
-    return Value.decodeAtomicRepresentation(${type}(result))
+    return Value.decodeAtomicRepresentation(Value.AtomicRepresentation(result))
   }
 }
 
 // ${size} bit atomic stores
 
-@available(SwiftStdlib 5.10, *)
-extension Atomic where Value.AtomicRepresentation == ${type} {
+@available(SwiftStdlib 5.11, *)
+extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
   /// Atomically sets the current value to `desired`, applying the specified
   /// memory ordering.
   ///
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -82,7 +89,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
     case .${name}:
       Builtin.atomicstore_${llvm}_Int${size}(
         rawAddress,
-        Value.encodeAtomicRepresentation(desired).storage
+        Value.encodeAtomicRepresentation(desired)._storage
       )
 %   end
 
@@ -94,15 +101,15 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 
 // ${size} bit atomic exchanges
 
-@available(SwiftStdlib 5.10, *)
-extension Atomic where Value.AtomicRepresentation == ${type} {
+@available(SwiftStdlib 5.11, *)
+extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
   /// Atomically sets the current value to `desired` and returns the original
   /// value, applying the specified memory ordering.
   ///
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: The original value.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -110,7 +117,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
     _ desired: consuming Value,
     ordering: AtomicUpdateOrdering
   ) -> Value {
-    let desired = Value.encodeAtomicRepresentation(desired).storage
+    let desired = Value.encodeAtomicRepresentation(desired)._storage
 
     let result = switch ordering {
 %   for (name, api, _, llvm, _) in updateOrderings:
@@ -122,7 +129,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
       Builtin.unreachable()
     }
 
-    let atomicStorage = ${type}(result)
+    let atomicStorage = Value.AtomicRepresentation(result)
 
     return Value.decodeAtomicRepresentation(atomicStorage)
   }
@@ -130,32 +137,30 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 
 // ${size} bit atomic compare and exchanges
 
-@available(SwiftStdlib 5.10, *)
-extension Atomic where Value.AtomicRepresentation == ${type} {
+@available(SwiftStdlib 5.11, *)
+extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
   /// Perform an atomic compare and exchange operation on the current value,
   /// applying the specified memory ordering.
   ///
   /// This operation performs the following algorithm as a single atomic
   /// transaction:
   ///
-  /// ```
-  /// atomic(self) { currentValue in
-  ///   let original = currentValue
-  ///   guard original == expected else { return (false, original) }
-  ///   currentValue = desired
-  ///   return (true, original)
-  /// }
-  /// ```
+  ///     atomic(self) { currentValue in
+  ///       let original = currentValue
+  ///       guard original == expected else { return (false, original) }
+  ///       currentValue = desired
+  ///       return (true, original)
+  ///     }
   ///
-  /// This method implements a "strong" compare and exchange operation
-  /// that does not permit spurious failures.
+  /// - Note: This method implements a "strong" compare and exchange operation
+  ///   that does not permit spurious failures.
   ///
   /// - Parameter expected: The expected current value.
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -173,29 +178,27 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   }
 }
 
-@available(SwiftStdlib 5.10, *)
-extension Atomic where Value.AtomicRepresentation == ${type} {
+@available(SwiftStdlib 5.11, *)
+extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
   /// Perform an atomic compare and exchange operation on the current value,
   /// applying the specified success/failure memory orderings.
   ///
   /// This operation performs the following algorithm as a single atomic
   /// transaction:
   ///
-  /// ```
-  /// atomic(self) { currentValue in
-  ///   let original = currentValue
-  ///   guard original == expected else { return (false, original) }
-  ///   currentValue = desired
-  ///   return (true, original)
-  /// }
-  /// ```
+  ///     atomic(self) { currentValue in
+  ///       let original = currentValue
+  ///       guard original == expected else { return (false, original) }
+  ///       currentValue = desired
+  ///       return (true, original)
+  ///     }
   ///
   /// The `successOrdering` argument specifies the memory ordering to use when
   /// the operation manages to update the current value, while `failureOrdering`
   /// will be used when the operation leaves the value intact.
   ///
-  /// This method implements a "strong" compare and exchange operation
-  /// that does not permit spurious failures.
+  /// - Note: This method implements a "strong" compare and exchange operation
+  ///   that does not permit spurious failures.
   ///
   /// - Parameter expected: The expected current value.
   /// - Parameter desired: The desired new value.
@@ -205,7 +208,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -215,8 +218,8 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
     successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
-    let expected = Value.encodeAtomicRepresentation(expected).storage
-    let desired = Value.encodeAtomicRepresentation(desired).storage
+    let expected = Value.encodeAtomicRepresentation(expected)._storage
+    let desired = Value.encodeAtomicRepresentation(desired)._storage
 
     let (ov, won) = switch (successOrdering, failureOrdering) {
 %   for (successName, _, _, successLLVM, successFailure) in updateOrderings:
@@ -236,15 +239,15 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 
     return (
       exchanged: Bool(won),
-      original: Value.decodeAtomicRepresentation(${type}(ov))
+      original: Value.decodeAtomicRepresentation(Value.AtomicRepresentation(ov))
     )
   }
 }
 
 // ${size} bit atomic weak compare and exchanges
 
-@available(SwiftStdlib 5.10, *)
-extension Atomic where Value.AtomicRepresentation == ${type} {
+@available(SwiftStdlib 5.11, *)
+extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
   /// Perform an atomic weak compare and exchange operation on the current
   /// value, applying the memory ordering. This compare-exchange variant is
   /// allowed to spuriously fail; it is designed to be called in a loop until
@@ -253,25 +256,29 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   /// This operation performs the following algorithm as a single atomic
   /// transaction:
   ///
-  /// ```
-  /// atomic(self) { currentValue in
-  ///   let original = currentValue
-  ///   guard original == expected else { return (false, original) }
-  ///   currentValue = desired
-  ///   return (true, original)
-  /// }
-  /// ```
+  ///     atomic(self) { currentValue in
+  ///       let original = currentValue
+  ///       guard original == expected else { return (false, original) }
+  ///       currentValue = desired
+  ///       return (true, original)
+  ///     }
   ///
-  /// (In this weak form, transient conditions may cause the `original ==
-  /// expected` check to sometimes return false when the two values are in fact
-  /// the same.)
+  /// - Note: The weakCompareExchange form may sometimes return false even when
+  ///   the original and expected values are equal. (Such failures may happen
+  ///   when some transient condition prevents the underlying operation from
+  ///   succeeding -- such as an incoming interrupt during a
+  ///   load-link/store-conditional instruction sequence.) This variant is
+  ///   designed to be called in a loop that only exits when the exchange is
+  ///   successful; in such loops, using weakCompareExchange may lead to a
+  ///   performance improvement by eliminating a nested loop in the regular,
+  ///   "strong", compareExchange variants.
   ///
   /// - Parameter expected: The expected current value.
   /// - Parameter desired: The desired new value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -289,32 +296,37 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   }
 }
 
-@available(SwiftStdlib 5.10, *)
-extension Atomic where Value.AtomicRepresentation == ${type} {
+@available(SwiftStdlib 5.11, *)
+extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
   /// Perform an atomic weak compare and exchange operation on the current
   /// value, applying the specified success/failure memory orderings. This
   /// compare-exchange variant is allowed to spuriously fail; it is designed to
   /// be called in a loop until it indicates a successful exchange has happened.
   ///
+  ///
   /// This operation performs the following algorithm as a single atomic
   /// transaction:
   ///
-  /// ```
-  /// atomic(self) { currentValue in
-  ///   let original = currentValue
-  ///   guard original == expected else { return (false, original) }
-  ///   currentValue = desired
-  ///   return (true, original)
-  /// }
-  /// ```
-  ///
-  /// (In this weak form, transient conditions may cause the `original ==
-  /// expected` check to sometimes return false when the two values are in fact
-  /// the same.)
+  ///     atomic(self) { currentValue in
+  ///       let original = currentValue
+  ///       guard original == expected else { return (false, original) }
+  ///       currentValue = desired
+  ///       return (true, original)
+  ///     }
   ///
   /// The `ordering` argument specifies the memory ordering to use when the
   /// operation manages to update the current value, while `failureOrdering`
   /// will be used when the operation leaves the value intact.
+  ///
+  /// - Note: The weakCompareExchange form may sometimes return false even when
+  ///   the original and expected values are equal. (Such failures may happen
+  ///   when some transient condition prevents the underlying operation from
+  ///   succeeding -- such as an incoming interrupt during a
+  ///   load-link/store-conditional instruction sequence.) This variant is
+  ///   designed to be called in a loop that only exits when the exchange is
+  ///   successful; in such loops, using weakCompareExchange may lead to a
+  ///   performance improvement by eliminating a nested loop in the regular,
+  ///   "strong", compareExchange variants.
   ///
   /// - Parameter expected: The expected current value.
   /// - Parameter desired: The desired new value.
@@ -324,7 +336,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
   ///    operation does not perform the exchange.
   /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
   ///   the exchange was successful, and `original` is the original value.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
@@ -334,8 +346,8 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
     successOrdering: AtomicUpdateOrdering,
     failureOrdering: AtomicLoadOrdering
   ) -> (exchanged: Bool, original: Value) {
-    let expected = Value.encodeAtomicRepresentation(expected).storage
-    let desired = Value.encodeAtomicRepresentation(desired).storage
+    let expected = Value.encodeAtomicRepresentation(expected)._storage
+    let desired = Value.encodeAtomicRepresentation(desired)._storage
 
     let (ov, won) = switch (successOrdering, failureOrdering) {
 %   for (successName, _, _, successLLVM, _) in updateOrderings:
@@ -355,7 +367,7 @@ extension Atomic where Value.AtomicRepresentation == ${type} {
 
     return (
       exchanged: Bool(won),
-      original: Value.decodeAtomicRepresentation(${type}(ov))
+      original: Value.decodeAtomicRepresentation(Value.AtomicRepresentation(ov))
     )
   }
 }

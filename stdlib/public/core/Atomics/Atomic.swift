@@ -11,18 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 /// An atomic value.
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 @_rawLayout(like: Value.AtomicRepresentation)
 @frozen
 public struct Atomic<Value: AtomicValue>: ~Copyable {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   var address: UnsafeMutablePointer<Value.AtomicRepresentation> {
     UnsafeMutablePointer<Value.AtomicRepresentation>(rawAddress)
   }
 
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   var rawAddress: Builtin.RawPointer {
@@ -32,17 +32,25 @@ public struct Atomic<Value: AtomicValue>: ~Copyable {
   /// Initializes a value of this atomic with the given initial value.
   ///
   /// - Parameter initialValue: The initial value to set this atomic.
-  @available(SwiftStdlib 5.10, *)
-  @inlinable
+  @available(SwiftStdlib 5.11, *)
+  @_alwaysEmitIntoClient
+  @_transparent
   public init(_ initialValue: consuming Value) {
     address.initialize(to: Value.encodeAtomicRepresentation(initialValue))
   }
 
+  // Deinit's can't be marked @_transparent. Do these things need all of these
+  // attributes..?
+  @available(SwiftStdlib 5.11, *)
+  @_alwaysEmitIntoClient
   @inlinable
   deinit {
+    let oldValue = Value.decodeAtomicRepresentation(address.pointee)
+    _ = consume oldValue
+
     address.deinitialize(count: 1)
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension Atomic: @unchecked Sendable where Value: Sendable {}

@@ -14,13 +14,13 @@
 ///
 /// These values can be set (initialized) exactly once, but read many
 /// times.
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 @frozen
 public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   @usableFromInline
   let storage: Atomic<Unmanaged<Instance>?>
 
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @inlinable
   public init() {
     storage = Atomic<Unmanaged<Instance>?>(nil)
@@ -34,7 +34,7 @@ public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicLazyReference {
   /// Atomically initializes this reference if its current value is nil, then
   /// returns the initialized value. If this reference is already initialized,
@@ -44,23 +44,28 @@ extension AtomicLazyReference {
   /// The following example demonstrates how this can be used to implement a
   /// thread-safe lazily initialized reference:
   ///
-  /// ```
-  /// class Image {
-  ///   var _histogram: AtomicLazyReference<Histogram> = .init()
+  ///     class Image {
+  ///       let _histogram = AtomicLazyReference<Histogram>()
   ///
-  ///   // This is safe to call concurrently from multiple threads.
-  ///   var atomicLazyHistogram: Histogram {
-  ///     if let histogram = _histogram.load() { return histogram }
-  ///     // Note that code here may run concurrently on
-  ///     // multiple threads, but only one of them will get to
-  ///     // succeed setting the reference.
-  ///     let histogram = ...
-  ///     return _histogram.storeIfNil(histogram)
-  /// }
-  /// ```
+  ///       // This is safe to call concurrently from multiple threads.
+  ///       var atomicLazyHistogram: Histogram {
+  ///         if let histogram = _histogram.load() { return histogram }
+  ///         // Note that code here may run concurrently on
+  ///         // multiple threads, but only one of them will get to
+  ///         // succeed setting the reference.
+  ///         let histogram = ...
+  ///         return _histogram.storeIfNil(histogram)
+  ///       }
+  ///     }
   ///
-  /// This operation uses acquiring-and-releasing memory ordering.
-  @available(SwiftStdlib 5.10, *)
+  /// - Note: This operation uses acquiring-and-releasing memory ordering.
+  ///
+  /// - Parameter desired: A value of `Instance` that we will attempt to store
+  ///   if the lazy reference is currently nil.
+  /// - Returns: The value of `Instance` that was successfully stored within the
+  ///   lazy reference. This may or may not be the same value of `Instance` that
+  ///   was passed to this function.
+  @available(SwiftStdlib 5.11, *)
   public func storeIfNil(_ desired: consuming Instance) -> Instance {
     let desiredUnmanaged = Unmanaged.passRetained(desired)
     let (exchanged, current) = storage.compareExchange(
@@ -81,14 +86,17 @@ extension AtomicLazyReference {
 
   /// Atomically loads and returns the current value of this reference.
   ///
-  /// The load operation is performed with the memory ordering
-  /// `AtomicLoadOrdering.acquiring`.
-  @available(SwiftStdlib 5.10, *)
+  /// - Note: The load operation is performed with the memory ordering
+  ///   `AtomicLoadOrdering.acquiring`.
+  ///
+  /// - Returns: A value of `Instance` if the lazy reference was written to, or
+  ///   `nil` if it has not been written to yet.
+  @available(SwiftStdlib 5.11, *)
   public func load() -> Instance? {
     let value = storage.load(ordering: .acquiring)
     return value?.takeUnretainedValue()
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicLazyReference: @unchecked Sendable where Instance: Sendable {}

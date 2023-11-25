@@ -12,30 +12,30 @@
 
 atomicTypes = [
   # Swift               Size   Alignment  Builtin
-  ("_AtomicStorage8",   "8",   "1",       "Builtin.Int8"),
-  ("_AtomicStorage16",  "16",  "2",       "Builtin.Int16"),
-  ("_AtomicStorage32",  "32",  "4",       "Builtin.Int32"),
-  ("_AtomicStorage64",  "64",  "8",       "Builtin.Int64"),
-  ("_AtomicStorage128", "128", "16",      "Builtin.Int128"),
+  ("UInt8",   "8",   "1",       "Builtin.Int8"),
+  ("UInt16",  "16",  "2",       "Builtin.Int16"),
+  ("UInt32",  "32",  "4",       "Builtin.Int32"),
+  ("UInt64",  "64",  "8",       "Builtin.Int64"),
+  ("WordPair", "128", "16",      "Builtin.Int128"),
 ]
 
 intTypes = [
-  # Swift   Storage Type         Builtin
-  ("Int8",  "_AtomicStorage8",   "Int8"),
-  ("Int16", "_AtomicStorage16",  "Int16"),
-  ("Int32", "_AtomicStorage32",  "Int32"),
-  ("Int64", "_AtomicStorage64",  "Int64"),
+  # Swift   Storage Type   Builtin
+  ("Int8",  "UInt8",       "Int8"),
+  ("Int16", "UInt16",      "Int16"),
+  ("Int32", "UInt32",      "Int32"),
+  ("Int64", "UInt64",      "Int64"),
 
   # We handle the word type's storage in source.
-  ("Int",    "",                  "Word"),
+  ("Int",    "",           "Word"),
+  ("UInt",   "",           "Word"),
 
-  ("UInt8",  "_AtomicStorage8",  "Int8"),
-  ("UInt16", "_AtomicStorage16", "Int16"),
-  ("UInt32", "_AtomicStorage32", "Int32"),
-  ("UInt64", "_AtomicStorage64", "Int64"),
-
-  # We handle the word type's storage in source.
-  ("UInt",   "",                 "Word"),
+  # We handle the unsigned integer's storage as the canonical storage types in
+  # AtomicStorage.swift.gyb.
+  ("UInt8",  "",           "Int8"),
+  ("UInt16", "",           "Int16"),
+  ("UInt32", "",           "Int32"),
+  ("UInt64", "",           "Int64"),
 ]
 
 loadOrderings = [
@@ -62,23 +62,23 @@ updateOrderings = [
 ]
 
 integerOperations = [
-  # Swift name,         llvm name,  operator, label,  doc name
-  ("WrappingAdd",       "add",      "&+",     "by",   "wrapping add"),
-  ("WrappingSubtract",  "sub",      "&-",     "by",   "wrapping subtract"),
-  ("BitwiseAnd",        "and",      "&",      "with", "bitwise AND"),
-  ("BitwiseOr",         "or",       "|",      "with", "bitwise OR"),
-  ("BitwiseXor",        "xor",      "^",      "with", "bitwise XOR"),
+  # Swift name,         llvm name,  operator, doc name
+  ("WrappingAdd",       "add",      "&+",     "wrapping add"),
+  ("WrappingSubtract",  "sub",      "&-",     "wrapping subtract"),
+  ("BitwiseAnd",        "and",      "&",      "bitwise AND"),
+  ("BitwiseOr",         "or",       "|",      "bitwise OR"),
+  ("BitwiseXor",        "xor",      "^",      "bitwise XOR"),
 
   # These two are handled specially in source.
-  ("Min",               "min",      "",       "with", "minimum"),
-  ("Max",               "max",      "",       "with", "maximum")
+  ("Min",               "min",      "",       "minimum"),
+  ("Max",               "max",      "",       "maximum")
 ]
 
 boolOperations = [
-  # Swift name,  llvm name, operator, label,  doc
-  ("LogicalAnd", "and",     "&&",     "with", "logical AND"),
-  ("LogicalOr",  "or",      "||",     "with", "logical OR"),
-  ("LogicalXor", "xor",     "!=",     "with", "logical XOR")
+  # Swift name,  llvm name, operator,  doc
+  ("LogicalAnd", "and",     "&&",     "logical AND"),
+  ("LogicalOr",  "or",      "||",     "logical OR"),
+  ("LogicalXor", "xor",     "!=",     "logical XOR")
 ]
 
 # LLVM doesn't support arbitrary ordering combinations yet, so for the
@@ -121,3 +121,6 @@ def atomicOperationName(intType, operation):
 
 def lowerFirst(str):
   return str[:1].lower() + str[1:] if str else ""
+
+def argLabel(label):
+  return label + ": " if label != "_" else ""

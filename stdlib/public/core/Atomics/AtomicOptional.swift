@@ -10,48 +10,135 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.10, *)
+/// An atomic value that also supports atomic operations when wrapped
+/// in an `Optional`. Atomic optional wrappable types come with a
+/// standalone atomic representation for their optional-wrapped
+/// variants.
+@available(SwiftStdlib 5.11, *)
 public protocol AtomicOptionalWrappable: AtomicValue {
+  /// The storage representation type that encodes to and decodes from
+  /// `Optional<Self>` which is a suitable type when used in atomic operations
+  /// on `Optional`.
   associatedtype AtomicOptionalRepresentation
 
+  /// Destroys a value of `Self` and prepares an `AtomicOptionalRepresentation`
+  /// storage type to be used for atomic operations on `Optional`.
+  ///
+  /// - Note: This is not an atomic operation. This simply encodes the logical
+  ///   type `Self` into its storage representation suitable for atomic
+  ///   operations, `AtomicOptionalRepresentation`.
+  ///
+  /// - Parameter value: An optional instance of `Self` that's about to be
+  ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
+  /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   static func encodeAtomicOptionalRepresentation(
     _ value: consuming Self?
   ) -> AtomicOptionalRepresentation
 
+  /// Recovers the logical atomic type `Self?` by destroying some
+  /// `AtomicOptionalRepresentation` storage instance returned from an atomic
+  /// operation on `Optional`.
+  ///
+  /// - Note: This is not an atomic operation. This simply decodes the storage
+  ///   representation used in atomic operations on `Optional` back into the
+  ///   logical type for normal use, `Self?`.
+  ///
+  /// - Parameter storage: The optional storage representation for `Self?`
+  ///   that's used within atomic operations on `Optional`.
+  /// - Returns: The newly decoded logical type `Self?`.
   static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
   ) -> Self?
 }
 
-@available(SwiftStdlib 5.10, *)
-extension AtomicOptionalWrappable
+//===----------------------------------------------------------------------===//
+// RawRepresentable AtomicOptionalWrappable conformance
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.11, *)
+extension RawRepresentable
 where
-  AtomicRepresentation == AtomicOptionalRepresentation
+  Self: AtomicOptionalWrappable,
+  RawValue: AtomicOptionalWrappable
 {
-  @available(SwiftStdlib 5.10, *)
+  /// The storage representation type that encodes to and decodes from
+  /// `Optional<Self>` which is a suitable type when used in atomic operations
+  /// on `Optional`.
+  @available(SwiftStdlib 5.11, *)
+  public typealias AtomicOptionalRepresentation = RawValue.AtomicOptionalRepresentation
+
+  /// Destroys a value of `Self` and prepares an `AtomicOptionalRepresentation`
+  /// storage type to be used for atomic operations on `Optional`.
+  ///
+  /// - Note: This is not an atomic operation. This simply encodes the logical
+  ///   type `Self` into its storage representation suitable for atomic
+  ///   operations, `AtomicOptionalRepresentation`.
+  ///
+  /// - Parameter value: An optional instance of `Self` that's about to be
+  ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
+  /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public static func encodeAtomicRepresentation(
-    _ value: consuming Self
-  ) -> AtomicRepresentation {
-    Self.encodeAtomicOptionalRepresentation(value)
+  public static func encodeAtomicOptionalRepresentation(
+    _ value: consuming Self?
+  ) -> RawValue.AtomicOptionalRepresentation {
+    // FIXME: There is currently a compiler crash with the following:
+    //
+    // RawValue.encodeAtomicOptionalRepresentation(value?.rawValue)
+
+    if let value = value {
+      return RawValue.encodeAtomicOptionalRepresentation(value.rawValue)
+    }
+
+    return RawValue.encodeAtomicOptionalRepresentation(nil)
   }
 
-  @available(SwiftStdlib 5.10, *)
+  /// Recovers the logical atomic type `Self?` by destroying some
+  /// `AtomicOptionalRepresentation` storage instance returned from an atomic
+  /// operation on `Optional`.
+  ///
+  /// - Note: This is not an atomic operation. This simply decodes the storage
+  ///   representation used in atomic operations on `Optional` back into the
+  ///   logical type for normal use, `Self?`.
+  ///
+  /// - Parameter storage: The optional storage representation for `Self?`
+  ///   that's used within atomic operations on `Optional`.
+  /// - Returns: The newly decoded logical type `Self?`.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public static func decodeAtomicRepresentation(
-    _ representation: consuming AtomicRepresentation
-  ) -> Self {
-    Self.decodeAtomicOptionalRepresentation(representation)!
+  public static func decodeAtomicOptionalRepresentation(
+    _ representation: consuming RawValue.AtomicOptionalRepresentation
+  ) -> Self? {
+    RawValue.decodeAtomicOptionalRepresentation(representation).flatMap {
+      Self(rawValue: $0)
+    }
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+//===----------------------------------------------------------------------===//
+// Optional AtomicValue conformance
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.11, *)
 extension Optional: AtomicValue where Wrapped: AtomicOptionalWrappable {
+  /// The storage representation type that `Self` encodes to and decodes from
+  /// which is a suitable type when used in atomic operations.
+  @available(SwiftStdlib 5.11, *)
   public typealias AtomicRepresentation = Wrapped.AtomicOptionalRepresentation
 
-  @available(SwiftStdlib 5.10, *)
+  /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
+  /// type to be used for atomic operations.
+  ///
+  /// - Note: This is not an atomic operation. This simply encodes the logical
+  ///   type `Self` into its storage representation suitable for atomic
+  ///   operations, `AtomicRepresentation`.
+  ///
+  /// - Parameter value: A valid instance of `Self` that's about to be destroyed
+  ///   to encode an instance of its `AtomicRepresentation`.
+  /// - Returns: The newly encoded `AtomicRepresentation` storage.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -60,7 +147,17 @@ extension Optional: AtomicValue where Wrapped: AtomicOptionalWrappable {
     Wrapped.encodeAtomicOptionalRepresentation(value)
   }
 
-  @available(SwiftStdlib 5.10, *)
+  /// Recovers the logical atomic type `Self` by destroying some
+  /// `AtomicRepresentation` storage instance returned from an atomic operation.
+  ///
+  /// - Note: This is not an atomic operation. This simply decodes the storage
+  ///   representation used in atomic operations back into the logical type for
+  ///   normal use, `Self`.
+  ///
+  /// - Parameter storage: The storage representation for `Self` that's used
+  ///   within atomic operations.
+  /// - Returns: The newly decoded logical type `Self`.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(

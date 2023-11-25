@@ -10,72 +10,110 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.10, *)
+/// A pair of two word sized `UInt`s.
+///
+/// This type's primary purpose is to be used in double wide atomic operations.
+/// On platforms that support it, atomic operations on `WordPair` are done in a
+/// single operation for two words. Users can use this type as itself when used
+/// on `Atomic`, or it could be used as an intermediate step for custom
+/// `AtomicValue` types that are also double wide.
+///
+///     let atomicPair = Atomic<WordPair>(WordPair(first: 0, second: 0))
+///     atomicPair.store(WordPair(first: someVersion, second: .max), ordering: .relaxed)
+///
+/// When used as an intermediate step for custom `AtomicValue` types, it is
+/// critical that their `AtomicRepresentation` be equal to
+/// `WordPair.AtomicRepresentation`.
+///
+///     struct GridPoint {
+///       var x: Int
+///       var y: Int
+///     }
+///
+///     extension GridPoint: AtomicValue {
+///       typealias AtomicRepresentation = WordPair.AtomicRepresentation
+///
+///       ...
+///     }
+///
+/// - Note: This type only conforms to `AtomicValue` on platforms that support
+///   double wide atomics.
+@available(SwiftStdlib 5.11, *)
 @frozen
 public struct WordPair {
-#if _pointerBitWidth(_64)
-  @usableFromInline
-  typealias BuiltinInt = Builtin.Int128
-#elseif _pointerBitWidth(_32)
-  @usableFromInline
-  typealias BuiltinInt = Builtin.Int64
-#else
-#error("Unsupported platform")
-#endif
+  /// The first element in this word pair.
+  public var first: UInt
 
-  public var lowWord: UInt
-  public var highWord: UInt
+  /// The second element in this word pair.
+  public var second: UInt
 
-  /// Initialize a new `WordPair` value given its high- and low-order words.
-  @available(SwiftStdlib 5.10, *)
+  /// Initialize a new `WordPair` value given both individual words.
+  ///
+  /// - Parameter first: The first word to use in the pair.
+  /// - Parameter second: The second word to use in the pair.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public init(highWord: UInt, lowWord: UInt) {
-    self.highWord = highWord
-    self.lowWord = lowWord
+  public init(first: UInt, second: UInt) {
+    self.first = first
+    self.second = second
   }
 }
 
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension WordPair: AtomicValue {
-#if _pointerBitWidth(_64)
-  public typealias AtomicRepresentation = _AtomicStorage128
-#elseif _pointerBitWidth(_32)
-  public typealias AtomicRepresentation = _AtomicStorage64
-#else
-#error("Unsupported platform")
-#endif
+  // WordPair's AtomicRepresentation is defined in AtomicStorage.swift.gyb.
 
-  @available(SwiftStdlib 5.10, *)
+  /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
+  /// type to be used for atomic operations.
+  ///
+  /// - Note: This is not an atomic operation. This simply encodes the logical
+  ///   type `Self` into its storage representation suitable for atomic
+  ///   operations, `AtomicRepresentation`.
+  ///
+  /// - Parameter value: A valid instance of `Self` that's about to be destroyed
+  ///   to encode an instance of its `AtomicRepresentation`.
+  /// - Returns: The newly encoded `AtomicRepresentation` storage.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming WordPair
   ) -> AtomicRepresentation {
 #if _pointerBitWidth(_64)
-    var i128 = Builtin.zext_Int64_Int128(value.lowWord._value)
-    var high128 = Builtin.zext_Int64_Int128(value.highWord._value)
+    var i128 = Builtin.zext_Int64_Int128(value.first._value)
+    var high128 = Builtin.zext_Int64_Int128(value.second._value)
     let highShift = Builtin.zext_Int64_Int128(UInt(64)._value)
     high128 = Builtin.shl_Int128(high128, highShift)
     i128 = Builtin.or_Int128(i128, high128)
 
-    return _AtomicStorage128(i128)
+    return AtomicRepresentation(i128)
 #elseif _pointerBitWidth(_32)
-    var i64 = Builtin.zext_Int32_Int64(value.lowWord._value)
-    var high64 = Builtin.zext_Int32_Int64(value.highWord._value)
+    var i64 = Builtin.zext_Int32_Int64(value.first._value)
+    var high64 = Builtin.zext_Int32_Int64(value.second._value)
     let highShift = Builtin.zext_Int32_Int64(UInt(32)._value)
     high64 = Builtin.shl_Int64(high64, highShift)
     i64 = Builtin.or_Int64(i64, high64)
 
-    return _AtomicStorage64(i64)
+    return AtomicRepresentation(i64)
 #else
 #error("Unsupported platform")
 #endif
   }
 
-  @available(SwiftStdlib 5.10, *)
+  /// Recovers the logical atomic type `Self` by destroying some
+  /// `AtomicRepresentation` storage instance returned from an atomic operation.
+  ///
+  /// - Note: This is not an atomic operation. This simply decodes the storage
+  ///   representation used in atomic operations back into the logical type for
+  ///   normal use, `Self`.
+  ///
+  /// - Parameter storage: The storage representation for `Self` that's used
+  ///   within atomic operations.
+  /// - Returns: The newly decoded logical type `Self`.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(
@@ -83,62 +121,74 @@ extension WordPair: AtomicValue {
   ) -> WordPair {
 #if _pointerBitWidth(_64)
     let highShift = Builtin.zext_Int64_Int128(UInt(64)._value)
-    let high128 = Builtin.lshr_Int128(representation.storage, highShift)
+    let high128 = Builtin.lshr_Int128(representation._storage, highShift)
     let high = Builtin.trunc_Int128_Int64(high128)
-    let low = Builtin.trunc_Int128_Int64(representation.storage)
+    let low = Builtin.trunc_Int128_Int64(representation._storage)
 #elseif _pointerBitWidth(_32)
     let highShift = Builtin.zext_Int32_Int64(UInt(32)._value)
-    let high64 = Builtin.lshr_Int64(representation.storage, highShift)
+    let high64 = Builtin.lshr_Int64(representation._storage, highShift)
     let high = Builtin.trunc_Int64_Int32(high64)
-    let low = Builtin.trunc_Int64_Int32(representation.storage)
+    let low = Builtin.trunc_Int64_Int32(representation._storage)
 #else
 #error("Unsupported platform")
 #endif
 
-    return WordPair(highWord: UInt(high), lowWord: UInt(low))
+    return WordPair(first: UInt(low), second: UInt(high))
   }
 }
 
 #endif
 
-//===----------------------------------------------------------------------===//
-// Duration AtomicValue conformance
-//===----------------------------------------------------------------------===//
-
-#if _pointerBitWidth(_64) && _hasAtomicBitWidth(_128)
-
-@available(SwiftStdlib 5.10, *)
-extension Duration: AtomicValue {
-  @available(SwiftStdlib 5.10, *)
-  public typealias AtomicRepresentation = WordPair.AtomicRepresentation
-
-  @available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
+extension WordPair: Equatable {
+  /// Compares two values of this type to determine if they are equivalent to
+  /// each other.
+  ///
+  /// - Parameter lhs: The first value to compare.
+  /// - Parameter rhs: The second value to compare.
+  /// - Returns: True if both values were equal, or false if they were unequal.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public static func encodeAtomicRepresentation(
-    _ value: consuming Duration
-  ) -> AtomicRepresentation {
-    WordPair.encodeAtomicRepresentation(
-      WordPair(
-        highWord: UInt(truncatingIfNeeded: value._high),
-        lowWord: UInt(truncatingIfNeeded: value._low)
-      )
-    )
-  }
-
-  @available(SwiftStdlib 5.10, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public static func decodeAtomicRepresentation(
-    _ representation: consuming AtomicRepresentation
-  ) -> Duration {
-    let wp = WordPair.decodeAtomicRepresentation(representation)
-
-    return Duration(
-      _high: Int64(truncatingIfNeeded: wp.highWord),
-      low: UInt64(truncatingIfNeeded: wp.lowWord)
-    )
+  public static func ==(lhs: WordPair, rhs: WordPair) -> Bool {
+    lhs.first == rhs.first && lhs.second == rhs.second
   }
 }
 
-#endif
+@available(SwiftStdlib 5.11, *)
+extension WordPair: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @available(SwiftStdlib 5.11, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(first)
+    hasher.combine(second)
+  }
+}
+
+@available(SwiftStdlib 5.11, *)
+extension WordPair: CustomStringConvertible {
+  /// A string that represents the contents of the word pair.
+  @available(SwiftStdlib 5.11, *)
+  public var description: String {
+    "WordPair(first: \(first), second: \(second))"
+  }
+}
+
+@available(SwiftStdlib 5.11, *)
+extension WordPair: CustomDebugStringConvertible {
+  /// A string that represents the contents of the word pair, suitable for
+  /// debugging.
+  @available(SwiftStdlib 5.11, *)
+  public var debugDescription: String {
+    "WordPair(first: \(first), second: \(second))"
+  }
+}
+
+@available(SwiftStdlib 5.11, *)
+extension WordPair: Sendable {}

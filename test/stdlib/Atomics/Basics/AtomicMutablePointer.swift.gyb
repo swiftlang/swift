@@ -1,0 +1,12 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+%{
+  from gyb import expand
+
+  types = [
+    # Label              Type                           a         b
+    ("MutablePointer",   "UnsafeMutablePointer<Foo>",   "_mfoo1", "_mfoo2"),
+  ]
+}%
+${expand("Tests.gyb-template", line_directive='', types=types)}

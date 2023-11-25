@@ -10,25 +10,27 @@
 //
 //===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
+// Load Orderings
+//===----------------------------------------------------------------------===//
+
 /// Specifies the memory ordering semantics of an atomic load operation.
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 @frozen
 public struct AtomicLoadOrdering {
-  // This struct works like a non-frozen enum whose cases aren't reorderable.
-
   @usableFromInline
   internal var _rawValue: Int
 
-  @available(SwiftStdlib 5.10, *)
-  @_semantics("constant_evaluable")
+  @available(SwiftStdlib 5.11, *)
   @inlinable
+  @_semantics("constant_evaluable")
   @_transparent
   internal init(_rawValue: Int) {
     self._rawValue = _rawValue
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicLoadOrdering {
   // FIXME: Explain these ordering levels in more detail.
 
@@ -36,7 +38,7 @@ extension AtomicLoadOrdering {
   /// but imposes no ordering constraints on any other variable accesses.
   ///
   /// This value corresponds to `std::memory_order_relaxed` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -50,7 +52,7 @@ extension AtomicLoadOrdering {
   /// acquiring thread happen after the atomic operation itself.
   ///
   /// This value corresponds to `std::memory_order_acquire` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -64,7 +66,7 @@ extension AtomicLoadOrdering {
   /// in a single, total sequential ordering.
   ///
   /// This value corresponds to `std::memory_order_seq_cst` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -73,27 +75,27 @@ extension AtomicLoadOrdering {
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicLoadOrdering: Equatable {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_transparent
   public static func ==(left: Self, right: Self) -> Bool {
-    return left._rawValue == right._rawValue
+    left._rawValue == right._rawValue
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicLoadOrdering: Hashable {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_rawValue)
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicLoadOrdering: CustomStringConvertible {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   public var description: String {
     switch self {
     case .relaxed: return "relaxed"
@@ -104,27 +106,27 @@ extension AtomicLoadOrdering: CustomStringConvertible {
   }
 }
 
-//------------------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
+// Store Orderings
+//===----------------------------------------------------------------------===//
 
 /// Specifies the memory ordering semantics of an atomic store operation.
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 @frozen
 public struct AtomicStoreOrdering {
-  // This struct works like a non-frozen enum whose cases aren't reorderable.
-
   @usableFromInline
   internal var _rawValue: Int
 
-  @available(SwiftStdlib 5.10, *)
-  @_semantics("constant_evaluable")
+  @available(SwiftStdlib 5.11, *)
   @inlinable
+  @_semantics("constant_evaluable")
   @_transparent
   internal init(_rawValue: Int) {
     self._rawValue = _rawValue
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicStoreOrdering {
   // FIXME: Explain these ordering levels in more detail.
 
@@ -132,7 +134,7 @@ extension AtomicStoreOrdering {
   /// but imposes no ordering constraints on any other variable accesses.
   ///
   /// This value corresponds to `std::memory_order_relaxed` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -146,7 +148,7 @@ extension AtomicStoreOrdering {
   /// the releasing thread happen before the atomic operation itself.
   ///
   /// This value corresponds to `std::memory_order_release` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -160,7 +162,7 @@ extension AtomicStoreOrdering {
   /// in a single, total sequential ordering.
   ///
   /// This value corresponds to `std::memory_order_seq_cst` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -169,26 +171,26 @@ extension AtomicStoreOrdering {
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicStoreOrdering: Equatable {
   @_transparent
   public static func ==(left: Self, right: Self) -> Bool {
-    return left._rawValue == right._rawValue
+    left._rawValue == right._rawValue
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicStoreOrdering: Hashable {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_rawValue)
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicStoreOrdering: CustomStringConvertible {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   public var description: String {
     switch self {
     case .relaxed: return "relaxed"
@@ -199,28 +201,28 @@ extension AtomicStoreOrdering: CustomStringConvertible {
   }
 }
 
-//------------------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
+// Update Orderings
+//===----------------------------------------------------------------------===//
 
 /// Specifies the memory ordering semantics of an atomic read-modify-write
 /// operation.
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 @frozen
 public struct AtomicUpdateOrdering {
-  // This struct works like a non-frozen enum whose cases aren't reorderable.
-
   @usableFromInline
   internal var _rawValue: Int
 
-  @available(SwiftStdlib 5.10, *)
-  @_semantics("constant_evaluable")
+  @available(SwiftStdlib 5.11, *)
   @inlinable
+  @_semantics("constant_evaluable")
   @_transparent
   internal init(_rawValue: Int) {
     self._rawValue = _rawValue
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicUpdateOrdering {
   // FIXME: Explain these ordering levels in more detail.
 
@@ -228,7 +230,7 @@ extension AtomicUpdateOrdering {
   /// but imposes no ordering constraints on any other variable accesses.
   ///
   /// This value corresponds to `std::memory_order_relaxed` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -242,7 +244,7 @@ extension AtomicUpdateOrdering {
   /// the acquring thread happen after the atomic operation itself.
   ///
   /// This value corresponds to `std::memory_order_acquire` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -256,7 +258,7 @@ extension AtomicUpdateOrdering {
   /// the releasing thread happen before the atomic operation itself.
   ///
   /// This value corresponds to `std::memory_order_release` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -268,7 +270,7 @@ extension AtomicUpdateOrdering {
   /// `.acquiring` and `.releasing` operation on the same variable.
   ///
   /// This value corresponds to `std::memory_order_acq_rel` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -283,7 +285,7 @@ extension AtomicUpdateOrdering {
   /// ordering.
   ///
   /// This value corresponds to `std::memory_order_seq_cst` in C++.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_alwaysEmitIntoClient
   @_transparent
@@ -292,27 +294,27 @@ extension AtomicUpdateOrdering {
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicUpdateOrdering: Equatable {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_transparent
   public static func ==(left: Self, right: Self) -> Bool {
-    return left._rawValue == right._rawValue
+    left._rawValue == right._rawValue
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicUpdateOrdering: Hashable {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_rawValue)
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicUpdateOrdering: CustomStringConvertible {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   public var description: String {
     switch self {
     case .relaxed: return "relaxed"
@@ -325,9 +327,9 @@ extension AtomicUpdateOrdering: CustomStringConvertible {
   }
 }
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension AtomicLoadOrdering {
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @_semantics("constant_evaluable")
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
@@ -345,6 +347,10 @@ extension AtomicLoadOrdering {
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Atomic Memory Fence
+//===----------------------------------------------------------------------===//
 
 /// Establishes a memory ordering without associating it with a
 /// particular atomic operation.
@@ -367,7 +373,7 @@ extension AtomicLoadOrdering {
 ///
 /// Be aware that Thread Sanitizer does not support fences and may report
 /// false-positive races for data protected by a fence.
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 @_semantics("atomics.requires_constant_orderings")
 @_alwaysEmitIntoClient
 @_transparent

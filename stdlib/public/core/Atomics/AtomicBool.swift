@@ -14,12 +14,24 @@
 // Bool AtomicValue conformance
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension Bool: AtomicValue {
-  @available(SwiftStdlib 5.10, *)
+  /// The storage representation type that `Self` encodes to and decodes from
+  /// which is a suitable type when used in atomic operations.
+  @available(SwiftStdlib 5.11, *)
   public typealias AtomicRepresentation = UInt8.AtomicRepresentation
 
-  @available(SwiftStdlib 5.10, *)
+  /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
+  /// type to be used for atomic operations.
+  ///
+  /// - Note: This is not an atomic operation. This simply encodes the logical
+  ///   type `Self` into its storage representation suitable for atomic
+  ///   operations, `AtomicRepresentation`.
+  ///
+  /// - Parameter value: A valid instance of `Self` that's about to be destroyed
+  ///   to encode an instance of its `AtomicRepresentation`.
+  /// - Returns: The newly encoded `AtomicRepresentation` storage.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -30,7 +42,17 @@ extension Bool: AtomicValue {
     )
   }
 
-  @available(SwiftStdlib 5.10, *)
+  /// Recovers the logical atomic type `Self` by destroying some
+  /// `AtomicRepresentation` storage instance returned from an atomic operation.
+  ///
+  /// - Note: This is not an atomic operation. This simply decodes the storage
+  ///   representation used in atomic operations back into the logical type for
+  ///   normal use, `Self`.
+  ///
+  /// - Parameter storage: The storage representation for `Self` that's used
+  ///   within atomic operations.
+  /// - Returns: The newly decoded logical type `Self`.
+  @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func decodeAtomicRepresentation(
@@ -43,10 +65,10 @@ extension Bool: AtomicValue {
 }
 
 //===----------------------------------------------------------------------===//
-// Bool load then atomic operations
+// Bool atomic operations
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 5.10, *)
+@available(SwiftStdlib 5.11, *)
 extension Atomic where Value == Bool {
   /// Perform an atomic logical AND operation and return the old and new value,
   /// applying the specified memory ordering.
@@ -55,54 +77,53 @@ extension Atomic where Value == Bool {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple with the old value before the operation a the new value
   ///   after the operation.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
   public func logicalAnd(
-    with operand: Bool,
+    _ operand: Bool,
     ordering: AtomicUpdateOrdering
   ) -> (oldValue: Bool, newValue: Bool) {
-    // If we could reinterpret self as `Atomic<UInt8>` then we could just call
-    // bitwiseAnd...
+    let builtinOperand = Bool.encodeAtomicRepresentation(operand)._storage
 
     let original = switch ordering {
     case .relaxed:
       Builtin.atomicrmw_and_monotonic_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .acquiring:
       Builtin.atomicrmw_and_acquire_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .releasing:
       Builtin.atomicrmw_and_release_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .acquiringAndReleasing:
       Builtin.atomicrmw_and_acqrel_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .sequentiallyConsistent:
       Builtin.atomicrmw_and_seqcst_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     default:
       Builtin.unreachable()
     }
 
-    let old = Bool.decodeAtomicRepresentation(_AtomicStorage8(original))
+    let old = Bool.decodeAtomicRepresentation(UInt8.AtomicRepresentation(original))
 
     return (oldValue: old, newValue: old && operand)
   }
@@ -114,51 +135,53 @@ extension Atomic where Value == Bool {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple with the old value before the operation a the new value
   ///   after the operation.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
   public func logicalOr(
-    with operand: Bool,
+    _ operand: Bool,
     ordering: AtomicUpdateOrdering
   ) -> (oldValue: Bool, newValue: Bool) {
+    let builtinOperand = Bool.encodeAtomicRepresentation(operand)._storage
+
     let original = switch ordering {
     case .relaxed:
       Builtin.atomicrmw_or_monotonic_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .acquiring:
       Builtin.atomicrmw_or_acquire_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .releasing:
       Builtin.atomicrmw_or_release_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .acquiringAndReleasing:
       Builtin.atomicrmw_or_acqrel_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .sequentiallyConsistent:
       Builtin.atomicrmw_or_seqcst_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     default:
       Builtin.unreachable()
     }
 
-    let old = Bool.decodeAtomicRepresentation(_AtomicStorage8(original))
+    let old = Bool.decodeAtomicRepresentation(UInt8.AtomicRepresentation(original))
 
     return (oldValue: old, newValue: old || operand)
   }
@@ -170,51 +193,53 @@ extension Atomic where Value == Bool {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple with the old value before the operation a the new value
   ///   after the operation.
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @_alwaysEmitIntoClient
   @_transparent
   public func logicalXor(
-    with operand: Bool,
+    _ operand: Bool,
     ordering: AtomicUpdateOrdering
   ) -> (oldValue: Bool, newValue: Bool) {
+    let builtinOperand = Bool.encodeAtomicRepresentation(operand)._storage
+
     let original = switch ordering {
     case .relaxed:
       Builtin.atomicrmw_xor_monotonic_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .acquiring:
       Builtin.atomicrmw_xor_acquire_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .releasing:
       Builtin.atomicrmw_xor_release_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .acquiringAndReleasing:
       Builtin.atomicrmw_xor_acqrel_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     case .sequentiallyConsistent:
       Builtin.atomicrmw_xor_seqcst_Int8(
         rawAddress,
-        Bool.encodeAtomicRepresentation(operand).storage
+        builtinOperand
       )
 
     default:
       Builtin.unreachable()
     }
 
-    let old = Bool.decodeAtomicRepresentation(_AtomicStorage8(original))
+    let old = Bool.decodeAtomicRepresentation(UInt8.AtomicRepresentation(original))
 
     return (oldValue: old, newValue: old != operand)
   }
