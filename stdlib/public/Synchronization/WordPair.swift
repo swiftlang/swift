@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// A pair of two word sized `UInt`s.
 ///
 /// This type's primary purpose is to be used in double wide atomic operations.

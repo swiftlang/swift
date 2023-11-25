@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 % from SwiftAtomics import *
 
 % for (type, size, alignment, builtin) in atomicTypes:

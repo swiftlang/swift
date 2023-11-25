@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
+
 /// An atomic value.
 @available(SwiftStdlib 5.11, *)
 @_rawLayout(like: Value.AtomicRepresentation)

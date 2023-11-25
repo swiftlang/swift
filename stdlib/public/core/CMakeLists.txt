@@ -42,17 +42,6 @@ split_embedded_sources(
     NORMAL ASCII.swift
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
-
-    NORMAL Atomics/Atomic.swift
-    NORMAL Atomics/AtomicBool.swift
-    NORMAL Atomics/AtomicFloats.swift
-    NORMAL Atomics/AtomicLazyReference.swift
-    NORMAL Atomics/AtomicMemoryOrderings.swift
-    NORMAL Atomics/AtomicOptional.swift
-    NORMAL Atomics/AtomicPointers.swift
-    NORMAL Atomics/AtomicValue.swift
-    NORMAL Atomics/WordPair.swift
-
   EMBEDDED BidirectionalCollection.swift
     NORMAL Bitset.swift
   EMBEDDED Bool.swift
@@ -249,9 +238,6 @@ split_embedded_sources(
 split_embedded_sources(
   OUT_LIST_EMBEDDED SWIFTLIB_EMBEDDED_GYB_SOURCES
   OUT_LIST_NORMAL SWIFTLIB_GYB_SOURCES
-
-    NORMAL Atomics/AtomicIntegers.swift.gyb
-    NORMAL Atomics/AtomicStorage.swift.gyb
 
     NORMAL AtomicInt.swift.gyb
     NORMAL FloatingPointParsing.swift.gyb
