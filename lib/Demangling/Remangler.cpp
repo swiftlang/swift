@@ -2930,59 +2930,17 @@ ManglingError Remangler::mangleFreestandingMacroExpansion(
   return mangleChildNode(node, 2, depth + 1);
 }
 
-ManglingError Remangler::mangleAccessorAttachedMacroExpansion(
-    Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer << "fMa";
-  return mangleChildNode(node, 3, depth + 1);
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)    \
+ManglingError Remangler::mangle##Name##AttachedMacroExpansion( \
+    Node *node, unsigned depth) {                              \
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));        \
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));        \
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));        \
+  Buffer << "fM" MangledChar;                                  \
+  return mangleChildNode(node, 3, depth + 1);                  \
 }
-
-ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
-    Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer << "fMr";
-  return mangleChildNode(node, 3, depth + 1);
-}
-
-ManglingError Remangler::mangleMemberAttachedMacroExpansion(
-    Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer << "fMm";
-  return mangleChildNode(node, 3, depth + 1);
-}
-
-ManglingError Remangler::manglePeerAttachedMacroExpansion(
-    Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer << "fMp";
-  return mangleChildNode(node, 3, depth + 1);
-}
-
-ManglingError Remangler::mangleConformanceAttachedMacroExpansion(
-    Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer << "fMc";
-  return mangleChildNode(node, 3, depth + 1);
-}
-
-ManglingError Remangler::mangleExtensionAttachedMacroExpansion(
-    Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  Buffer << "fMe";
-  return mangleChildNode(node, 3, depth + 1);
-}
+#include "swift/Basic/MacroRoles.def"
 
 ManglingError Remangler::mangleMacroExpansionUniqueName(
     Node *node, unsigned depth) {
