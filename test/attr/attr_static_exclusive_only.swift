@@ -1,10 +1,14 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature StaticExclusiveOnly
 
-@_staticExclusiveOnly // expected-error{{@_staticExclusiveOnly can only be applied to noncopyable types}}
+@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly can only be applied to noncopyable types}}
 struct A {}
 
 @_staticExclusiveOnly // OK
-struct B: ~Copyable {
+struct B: ~Copyable { // expected-note {{'B' is a non-mutable type}}
+                      // expected-note@-1 {{'B' is a non-mutable type}}
+                      // expected-note@-2 {{'B' is a non-mutable type}}
+                      // expected-note@-3 {{'B' is a non-mutable type}}
+                      // expected-note@-4 {{'B' is a non-mutable type}}
   mutating func change() { // expected-error {{@_staticExclusiveOnly type 'B' cannot have mutating function 'change()'}}
     print("123")
   }
@@ -40,3 +44,27 @@ func i() {
     return $0 + $1
   }
 }
+
+@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+enum J {}
+
+@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+class K {}
+
+@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+func l() {}
+
+@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+let m = 123
+
+@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+protocol N {}
+
+func o(_: consuming B) {} // OK
+
+func p(_: (consuming B) -> ()) {} // OK
+
+@_staticExclusiveOnly
+struct Q<T>: ~Copyable {} // expected-note {{'Q<T>' is a non-mutable type}}
+
+var r0 = Q<Int>() // expected-error {{variable of type 'Q<Int>' must be declared with a 'let'}}

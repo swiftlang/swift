@@ -7259,12 +7259,14 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
     StaticExclusiveOnlyAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::StaticExclusiveOnly)) {
     diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_disabled);
+    return;
   }
 
   // Can only be applied to structs.
   auto structDecl = cast<StructDecl>(D);
 
-  if (!structDecl->isNoncopyable()) {
+  if (!structDecl->getDeclaredInterfaceType()
+                 ->isNoncopyable(D->getDeclContext())) {
     diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_noncopyable);
   }
 }

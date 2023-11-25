@@ -1924,6 +1924,8 @@ ERROR(attr_static_exclusive_only_noncopyable,none,
       "@_staticExclusiveOnly can only be applied to noncopyable types", ())
 ERROR(attr_static_exclusive_only_let_only,none,
       "variable of type %0 must be declared with a 'let'", (Type))
+NOTE(attr_static_exclusive_only_type_nonmutating,none,
+     "%0 is a non-mutable type", (Type))
 ERROR(attr_static_exclusive_only_let_only_param,none,
       "parameter of type %0 must be declared as either 'borrowing' or 'consuming'", (Type))
 ERROR(attr_static_exclusive_only_mutating,none,
