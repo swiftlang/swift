@@ -242,6 +242,40 @@ static bool isProjectedFromAggregate(SILValue value) {
 }
 
 //===----------------------------------------------------------------------===//
+//                             MARK: Diagnostics
+//===----------------------------------------------------------------------===//
+
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &context, SourceLoc loc,
+                                   Diag<T...> diag, U &&...args) {
+  return context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(const PartitionOp &op, Diag<T...> diag,
+                                   U &&...args) {
+  return ::diagnose(op.getSourceInst()->getFunction()->getASTContext(),
+                    op.getSourceLoc().getSourceLoc(), diag,
+                    std::forward<U>(args)...);
+}
+
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(const Operand *op, Diag<T...> diag,
+                                   U &&...args) {
+  return ::diagnose(op->getUser()->getFunction()->getASTContext(),
+                    op->getUser()->getLoc().getSourceLoc(), diag,
+                    std::forward<U>(args)...);
+}
+
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(const SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+  return ::diagnose(inst->getFunction()->getASTContext(),
+                    inst->getLoc().getSourceLoc(), diag,
+                    std::forward<U>(args)...);
+}
+
+//===----------------------------------------------------------------------===//
 //                 MARK: Expr/Type Inference for Diagnostics
 //===----------------------------------------------------------------------===//
 
@@ -1893,7 +1927,7 @@ class PartitionAnalysis {
   /// Once we have reached a fixpoint, this routine runs over all blocks again
   /// reporting any failures by applying our ops to the converged dataflow
   /// state.
-  void diagnose() {
+  void emitDiagnostics() {
     assert(solved && "diagnose should not be called before solve");
 
     LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
@@ -1933,9 +1967,7 @@ class PartitionAnalysis {
                        << "        Rep: "
                        << *translator.getValueForId(transferredVal)
                                ->getRepresentative());
-            function->getASTContext().Diags.diagnose(
-                partitionOp.getSourceLoc().getSourceLoc(),
-                diag::arg_region_transferred);
+            diagnose(partitionOp, diag::arg_region_transferred);
           };
       eval.nonTransferrableElements = translator.getNeverTransferredValues();
       eval.isActorDerivedCallback = [&](Element element) -> bool {
@@ -1970,14 +2002,10 @@ class PartitionAnalysis {
       liveness.process(requireInsts);
 
       InferredCallerArgumentTypeInfo argTypeInfo(transferOp);
-      auto loc = transferOp->getUser()->getLoc();
-
-      function->getASTContext()
-          .Diags
-          .diagnose(loc.getSourceLoc(), diag::call_site_transfer_yields_race,
-                    argTypeInfo.inferredType,
-                    argTypeInfo.isolationCrossing.getCallerIsolation(),
-                    argTypeInfo.isolationCrossing.getCalleeIsolation())
+      diagnose(transferOp, diag::call_site_transfer_yields_race,
+               argTypeInfo.inferredType,
+               argTypeInfo.isolationCrossing.getCallerIsolation(),
+               argTypeInfo.isolationCrossing.getCalleeIsolation())
           .highlight(transferOp->get().getLoc().getSourceRange());
 
       // Ok, we now have our requires... emit the errors.
@@ -1996,10 +2024,8 @@ class PartitionAnalysis {
         if (!liveness.finalRequires.contains(require))
           continue;
 
-        auto loc = require->getLoc();
-        function->getASTContext()
-            .Diags.diagnose(loc.getSourceLoc(), diag::possible_racy_access_site)
-            .highlight(loc.getSourceRange());
+        diagnose(require, diag::possible_racy_access_site)
+            .highlight(require->getLoc().getSourceRange());
         didEmitRequire = true;
       }
 
@@ -2022,7 +2048,7 @@ public:
     auto analysis = PartitionAnalysis(function);
     analysis.solve();
     LLVM_DEBUG(llvm::dbgs() << "SOLVED: "; analysis.print(llvm::dbgs()););
-    analysis.diagnose();
+    analysis.emitDiagnostics();
   }
 };
 
