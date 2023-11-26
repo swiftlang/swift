@@ -412,11 +412,13 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
   }
 
   if (auto accessorDecl = propertyDecl->getAccessor(AccessorKind::Get)) {
-    auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
-    if (auto *stmt = node.dyn_cast<Stmt *>()) {
-      if (stmt->getKind() == StmtKind::Return) {
-        return {propertyDecl,
-                extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
+    if (auto body = accessorDecl->getTypecheckedBody()) {
+      auto node = body->getFirstElement();
+      if (auto *stmt = node.dyn_cast<Stmt *>()) {
+        if (stmt->getKind() == StmtKind::Return) {
+          return {propertyDecl,
+                  extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
+        }
       }
     }
   }

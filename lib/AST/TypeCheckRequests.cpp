@@ -1540,7 +1540,6 @@ TypeCheckFunctionBodyRequest::getCachedResult() const {
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
-  case BodyKind::None:
     // These cases don't have any body available.
     return nullptr;
 
@@ -1550,6 +1549,7 @@ TypeCheckFunctionBodyRequest::getCachedResult() const {
   case BodyKind::Synthesize:
   case BodyKind::Parsed:
   case BodyKind::Unparsed:
+  case BodyKind::None:
     return llvm::None;
   }
   llvm_unreachable("Unhandled BodyKind in switch");

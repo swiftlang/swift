@@ -308,7 +308,7 @@ public:
     if (D->isImplicit())
       return D;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (BraceStmt *B = FD->getBody()) {
+      if (BraceStmt *B = FD->getTypecheckedBody()) {
         const ParameterList *PL = FD->getParameters();
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
         BraceStmt *NB = transformBraceStmt(B, PL);

@@ -336,7 +336,7 @@ public:
     if (D->isImplicit())
       return D;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (BraceStmt *B = FD->getBody()) {
+      if (BraceStmt *B = FD->getTypecheckedBody()) {
         const ParameterList *PL = FD->getParameters();
         BraceStmt *NB = transformBraceStmt(B, PL);
         // Since it would look strange going straight to the first line in a
