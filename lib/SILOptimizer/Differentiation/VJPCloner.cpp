@@ -564,6 +564,12 @@ public:
         // We do not have a good way to differentiate direct yields
         if (yield.isAutoDiffSemanticResult())
           remappedResultType = yield.getSILStorageInterfaceType();
+        else {
+          context.emitNondifferentiabilityError(
+              origCallee, invoker,
+              diag::autodiff_cannot_differentiate_through_direct_yield);
+          return true;
+        }
       } else if (resultIndex >= firstSemanticParamResultIdx) {
         auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
         auto semanticResultArg =

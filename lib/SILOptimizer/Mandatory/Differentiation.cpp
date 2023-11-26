@@ -157,18 +157,18 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
         isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
 
-    // We can differentiate only indirect yields
+    // We can differentiate only indirect yields.
     if (auto *yi = dyn_cast<YieldInst>(term)) {
-      for (const auto &val : yi->getAllOperands())
-        if (!yi->getYieldInfoForOperand(val).isAutoDiffSemanticResult()) {
-          context.emitNondifferentiabilityError(
-            term, invoker, diag::autodiff_control_flow_not_supported);
-          return true;
-        }
-
+#ifndef NDEBUG
+      for (const auto &val : yi->getAllOperands()) {
+        // This should be diagnosed earlier in VJPCloner.
+        assert(yi->getYieldInfoForOperand(val).isAutoDiffSemanticResult() &&
+               "unsupported result");
+      }
+#endif
       continue;
     }
-    
+
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
       context.emitNondifferentiabilityError(
@@ -562,9 +562,10 @@ emitDerivativeFunctionReference(
         if (resultIndex >= firstYieldResultIndex) {
           auto yieldResultIndex = resultIndex - firstYieldResultIndex;
           auto yield = originalFnTy->getYields()[yieldResultIndex];
-          // We can only differentiate indirect yields
-          if (yield.isAutoDiffSemanticResult())
-            resultType = yield.getSILStorageInterfaceType();
+          // We can only differentiate indirect yields. This should be diagnosed
+          // earlier in VJPCloner.
+          assert(yield.isAutoDiffSemanticResult() && "unsupported result");
+          resultType = yield.getSILStorageInterfaceType();
         } else if (resultIndex >= firstSemanticParamResultIdx) {
           auto semanticResultParamIdx = resultIndex - firstSemanticParamResultIdx;
           auto semanticResultParam =

@@ -826,7 +826,7 @@ struct HasModifyAccessors: Differentiable {
 // expected-note @+2 {{when differentiating this function definition}}
 @differentiable(reverse)
 func testReadAccessorCoroutines(_ x: HasReadAccessors) -> Float {
-  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
+  // expected-note @+1 {{cannot differentiate through a direct yield result}}
   return x.computed
 }
 
