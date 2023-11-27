@@ -164,6 +164,7 @@ extension UnsafeCurrentTask {
   /// The lifetime of an executor is not guaranteed by an ``UnownedTaskExecutor``,
   /// so accessing it must be handled with great case -- and the program must use other
   /// means to guarantee the executor remains alive while it is in use.
+  @available(SwiftStdlib 9999, *)
   public var unownedTaskExecutor: UnownedTaskExecutor? {
     let ref = _getPreferredTaskExecutor()
     return UnownedTaskExecutor(ref)
