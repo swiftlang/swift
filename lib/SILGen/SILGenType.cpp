@@ -1242,7 +1242,7 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    SGM.visitEmittedAccessors(asd, [&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
   }
@@ -1422,7 +1422,7 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    SGM.visitEmittedAccessors(asd, [&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
   }
