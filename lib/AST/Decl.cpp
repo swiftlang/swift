@@ -11065,7 +11065,7 @@ MacroRoles swift::getAttachedMacroRoles() {
 
 bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
   switch (role) {
-#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName) \
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, MangledChar, FeatureName) \
   case MacroRole::Name: \
     return ctx.LangOpts.hasFeature(Feature::FeatureName);
 
@@ -11076,7 +11076,7 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
 
 #include "swift/Basic/MacroRoles.def"
 
-#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName)
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, MangledChar, FeatureName)
 #define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, FeatureName)
 #define MACRO_ROLE(Name, Description) case MacroRole::Name:
 #include "swift/Basic/MacroRoles.def"

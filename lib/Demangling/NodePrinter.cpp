@@ -1448,46 +1448,19 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        Node->getNumChildren() == 3? TypePrinting::WithColon
                                                   : TypePrinting::FunctionStyle,
                        /*hasName*/ true);
-  case Node::Kind::AccessorAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("accessor macro @" +
-                        nodeToString(Node->getChild(2)) + " expansion #"),
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)                \
+  case Node::Kind::Name##AttachedMacroExpansion:                           \
+    return printEntity(Node, depth, asPrefixContext,                       \
+                       TypePrinting::NoType, /*hasName*/true,              \
+                       (Description " macro @" +                           \
+                        nodeToString(Node->getChild(2)) + " expansion #"), \
                        (int)Node->getChild(3)->getIndex() + 1);
+#include "swift/Basic/MacroRoles.def"
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
-  case Node::Kind::MemberAttributeAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("member attribute macro @" +
-                        nodeToString(Node->getChild(2)) + " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::MemberAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("member macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::PeerAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("peer macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::ConformanceAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("conformance macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::ExtensionAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("extension macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "unique name #",
