@@ -2072,11 +2072,15 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
     if (auto task = dyn_cast<AsyncTask>(job)) {
       auto taskExecutor = task->getPreferredTaskExecutor();
       if (taskExecutor.isDefined()) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+        swift_unreachable("task executors not supported in embedded Swift");
+#else
         auto wtable = taskExecutor.getTaskExecutorWitnessTable();
         auto taskExecutorObject = taskExecutor.getIdentity();
         auto taskExecutorType = swift_getObjectType(taskExecutorObject);
         return _swift_task_enqueueOnTaskExecutor(job, taskExecutorObject,
                                                  taskExecutorType, wtable);
+#endif // SWIFT_CONCURRENCY_EMBEDDED
       } // else, fall-through to the default global enqueue
     }
     return swift_task_enqueueGlobal(job);
@@ -2088,6 +2092,9 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
       taskExecutor = task->getPreferredTaskExecutor();
     }
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+    swift_unreachable("task executors not supported in embedded Swift");
+#else
     if (taskExecutor.isDefined()) {
       auto wtable = taskExecutor.getTaskExecutorWitnessTable();
       auto executorObject = taskExecutor.getIdentity();
@@ -2097,6 +2104,7 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
     } else {
       return swift_defaultActor_enqueue(job, executor.getDefaultActor());
     }
+#endif // SWIFT_CONCURRENCY_EMBEDDED
   }
 
 #if SWIFT_CONCURRENCY_EMBEDDED
@@ -2107,7 +2115,7 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
   auto executorObject = executor.getIdentity();
   auto executorType = swift_getObjectType(executorObject);
   _swift_task_enqueueOnExecutor(job, executorObject, executorType, wtable);
-#endif
+#endif // SWIFT_CONCURRENCY_EMBEDDED
 }
 
 static void

@@ -35,6 +35,7 @@ import Swift
 /// - Returns: the value returned from the `operation` closure
 /// - Throws: if the operation closure throws
 /// - SeeAlso: `TaskExecutor`
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
 public func withTaskExecutor<T: Sendable>(

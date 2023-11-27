@@ -108,6 +108,7 @@ public protocol SerialExecutor: Executor {
 ///
 /// By setting a task executor preference, either with a ``withTaskExecutor(_:operation:)``, creating
 /// a task with a preference (`Task(on:)`), or
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 public protocol TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
@@ -139,6 +140,7 @@ public protocol TaskExecutor: Executor {
   func asUnownedTaskExecutor() -> UnownedTaskExecutor
 }
 
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 extension TaskExecutor {
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
@@ -237,7 +239,7 @@ public struct UnownedSerialExecutor: Sendable {
   /// actually use the same underlying serialization context and can be therefore
   /// safely treated as the same serial exclusive execution context (e.g. multiple
   /// dispatch queues targeting the same serial queue).
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.9, *)
   @inlinable
   public init<E: SerialExecutor>(complexEquality executor: __shared E) {
     #if compiler(>=5.9) && $BuiltinBuildComplexEqualityExecutor
@@ -256,10 +258,11 @@ public struct UnownedSerialExecutor: Sendable {
 }
 
 
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @frozen
 public struct UnownedTaskExecutor: Sendable {
-  // #if compiler(>=5.9) && $BuiltinExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
+  #if $BuiltinExecutor
   @usableFromInline
   internal var executor: Builtin.Executor
 
@@ -269,11 +272,11 @@ public struct UnownedTaskExecutor: Sendable {
   public var _executor: Builtin.Executor {
     self.executor
   }
-  // #endif
+  #endif
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    #if $BuiltinExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
+    #if $BuiltinExecutor
     self.executor = executor
     #endif
   }
@@ -288,6 +291,7 @@ public struct UnownedTaskExecutor: Sendable {
   }
 }
 
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 extension UnownedTaskExecutor: Equatable {
   @inlinable
@@ -357,6 +361,7 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_silgen_name("_task_executor_getTaskExecutorRef")
 internal func _task_executor_getTaskExecutorRef<E>(_ executor: E) -> Builtin.Executor
@@ -381,6 +386,7 @@ where E: SerialExecutor {
 }
 
 // Used by the concurrency runtime
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
 internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: TaskExecutor {
