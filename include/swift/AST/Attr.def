@@ -531,7 +531,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_resultDependsOnSelf, ResultDependsOnSelf,
   OnFunc | DeclModifier | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   150)
 SIMPLE_DECL_ATTR(_staticExclusiveOnly, StaticExclusiveOnly,
-  OnStruct | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   151)
 
 #undef TYPE_ATTR
