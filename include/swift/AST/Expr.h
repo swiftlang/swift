@@ -6116,6 +6116,11 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
+  BoundGenericType *getKeyPathType() const;
+
+  Type getRootType() const;
+  Type getValueType() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPath;
   }
