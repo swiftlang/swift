@@ -810,6 +810,7 @@ struct PartitionOpEvaluator {
         REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
                                          p.print(llvm::dbgs()));
       }
+      assert(p.is_canonical_correct());
     };
 
     switch (op.getKind()) {
@@ -829,13 +830,13 @@ struct PartitionOpEvaluator {
       // assignment could have invalidated canonicality of either the old region
       // of op.getOpArgs()[0] or the region of op.getOpArgs()[1], or both
       p.canonical = false;
-      break;
+      return;
     case PartitionOpKind::AssignFresh:
       assert(op.getOpArgs().size() == 1 &&
              "AssignFresh PartitionOp should be passed 1 argument");
 
       p.addElement(op.getOpArgs()[0]);
-      break;
+      return;
     case PartitionOpKind::Transfer: {
       assert(op.getOpArgs().size() == 1 &&
              "Transfer PartitionOp should be passed 1 argument");
@@ -853,8 +854,7 @@ struct PartitionOpEvaluator {
         if (!p.isTransferred(nonTransferrable) &&
             p.elementToRegionMap.at(nonTransferrable) ==
                 p.elementToRegionMap.at(op.getOpArgs()[0])) {
-          handleTransferNonTransferrable(op, nonTransferrable);
-          break;
+          return handleTransferNonTransferrable(op, nonTransferrable);
         }
       }
 
@@ -874,7 +874,7 @@ struct PartitionOpEvaluator {
 
       // Mark op.getOpArgs()[0] as transferred.
       p.markTransferred(op.getOpArgs()[0], op.getSourceOp());
-      break;
+      return;
     }
     case PartitionOpKind::UndoTransfer: {
       assert(op.getOpArgs().size() == 1 &&
@@ -884,7 +884,7 @@ struct PartitionOpEvaluator {
 
       // Mark op.getOpArgs()[0] as not transferred.
       p.undoTransfer(op.getOpArgs()[0]);
-      break;
+      return;
     }
     case PartitionOpKind::Merge:
       assert(op.getOpArgs().size() == 2 &&
@@ -900,7 +900,7 @@ struct PartitionOpEvaluator {
         handleFailure(op, op.getOpArgs()[1], transferringInst);
 
       p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
-      break;
+      return;
     case PartitionOpKind::Require:
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
@@ -908,9 +908,10 @@ struct PartitionOpEvaluator {
              "Require PartitionOp's argument should already be tracked");
       if (auto *transferringInst = p.getTransferred(op.getOpArgs()[0]))
         handleFailure(op, op.getOpArgs()[0], transferringInst);
+      return;
     }
 
-    assert(p.is_canonical_correct());
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   void apply(std::initializer_list<PartitionOp> ops) {
