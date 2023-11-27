@@ -2550,17 +2550,20 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto context = TAI->getFunction()->getTypeExpansionContext();
     SmallVector<SILValue, 8> Args;
     unsigned numArgs = TAI->getNumArguments();
+    unsigned calleeArgIdx = 0;
     for (unsigned i = 0; i < numArgs; ++i) {
       auto Arg = TAI->getArgument(i);
+      if (origConv.isArgumentIndexOfIndirectErrorResult(i) &&
+          !targetConv.isArgumentIndexOfIndirectErrorResult(i)) {
+        continue;
+      }
       // Cast argument if required.
       std::tie(Arg, std::ignore) = castValueToABICompatibleType(
           &Builder, TAI->getLoc(), Arg, origConv.getSILArgumentType(i, context),
-          targetConv.getSILArgumentType(i, context), {TAI});
+          targetConv.getSILArgumentType(calleeArgIdx, context), {TAI});
       Args.push_back(Arg);
+      calleeArgIdx += 1;
     }
-
-    assert(calleeConv.getNumSILArguments() == Args.size()
-           && "The number of arguments should match");
 
     LLVM_DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
 

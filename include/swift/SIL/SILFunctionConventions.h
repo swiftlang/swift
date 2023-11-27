@@ -242,6 +242,12 @@ public:
     return 0;
   }
 
+  bool isArgumentIndexOfIndirectErrorResult(unsigned idx) {
+    unsigned indirectResults = getNumIndirectSILResults();
+    return idx >= indirectResults &&
+           idx < indirectResults + getNumIndirectSILErrorResults();
+  }
+
   /// Are any SIL results passed as address-typed arguments?
   bool hasIndirectSILResults() const { return getNumIndirectSILResults() != 0; }
   bool hasIndirectSILErrorResults() const { return getNumIndirectSILErrorResults() != 0; }

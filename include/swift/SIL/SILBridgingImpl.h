@@ -413,6 +413,10 @@ SwiftInt BridgedFunction::getNumIndirectFormalResults() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumIndirectFormalResults();
 }
 
+bool BridgedFunction::hasIndirectErrorResult() const {
+  return (SwiftInt)getFunction()->getLoweredFunctionType()->hasIndirectErrorResult();
+}
+
 SwiftInt BridgedFunction::getNumParameters() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumParameters();
 }

@@ -4785,6 +4785,9 @@ public:
   unsigned getNumPackResults() const {
     return isCoroutine() ? 0 : NumPackResults;
   }
+  bool hasIndirectErrorResult() const {
+    return hasErrorResult() && getErrorResult().isFormalIndirect();
+  }
 
   struct IndirectFormalResultFilter {
     bool operator()(SILResultInfo result) const {
