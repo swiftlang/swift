@@ -880,13 +880,6 @@ extension BeginAccessInst : ScopedInstruction {
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
   public var borrowedValue: Value { operand.value }
 
-  public typealias EndBorrowSequence = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndBorrowInst?>>,
-                                                       EndBorrowInst>
-
-  public var endBorrows: EndBorrowSequence {
-    uses.lazy.compactMap({ $0.instruction as? EndBorrowInst })
-  }
-
   public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
   public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }
 }
