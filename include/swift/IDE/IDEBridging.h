@@ -67,7 +67,8 @@ struct ResolvedLoc {
 
   SWIFT_NAME(
       "init(range:labelRanges:firstTrailingLabel:labelType:isActive:context:)")
-  ResolvedLoc(BridgedCharSourceRange range, CharSourceRangeVector labelRanges,
+  ResolvedLoc(BridgedCharSourceRange range,
+              BridgedCharSourceRangeVector labelRanges,
               unsigned firstTrailingLabel, LabelRangeType labelType,
               bool isActive, ResolvedLocContext context);
 

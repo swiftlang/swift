@@ -22,16 +22,15 @@
 //
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/Compiler.h"
-#include "swift/Basic/SourceLoc.h"
-// Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
-// when including VirtualFileSystem.h
-#include "llvm/CAS/CASReference.h"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <vector>
 #ifdef USED_IN_CPP_SOURCE
+// Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
+// when including VirtualFileSystem.h
 #include <cassert>
+#include "llvm/CAS/CASReference.h"
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
@@ -306,7 +305,7 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// MARK: CharSourceRange
+// MARK: BridgedCharSourceRange
 //===----------------------------------------------------------------------===//
 
 class BridgedCharSourceRange {
@@ -344,24 +343,29 @@ BridgedCharSourceRange_byteLength(BridgedCharSourceRange range) {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: std::vector<CharSourceRange>
+// MARK: std::vector<BridgedCharSourceRange>
 //===----------------------------------------------------------------------===//
 
-typedef std::vector<swift::CharSourceRange> CharSourceRangeVector;
+typedef std::vector<BridgedCharSourceRange> BridgedCharSourceRangeVector;
 
 /// Create an empty `std::vector<ResolvedLoc>`.
 ///
 /// - Note: This can't be imported as an initializer on
 /// `BridgedResolvedLocVector`
 ///   because initializers without any arguments aren't imported to Swift
-SWIFT_NAME("CharSourceRangeVector.empty()")
-CharSourceRangeVector CharSourceRangeVector_createEmpty();
+SWIFT_NAME("BridgedCharSourceRangeVector.empty()")
+BridgedCharSourceRangeVector BridgedCharSourceRangeVector_createEmpty();
 
-/// Convert the `BridgedCharSourceRange` to a `CharSourceRange` and append it
-/// to `vector`.
-SWIFT_NAME("CharSourceRangeVector.push_back(self:_:)")
-void CharSourceRangeVector_push_back_BridgedCharSourceRange(
-    CharSourceRangeVector &vector, BridgedCharSourceRange range);
+/// Append the given `BridgedCharSourceRange` to `vector`.
+SWIFT_NAME("BridgedCharSourceRangeVector.push_back(self:_:)")
+void BridgedCharSourceRangeVector_push_back_BridgedCharSourceRange(
+    BridgedCharSourceRangeVector &vector, BridgedCharSourceRange range);
+
+#ifdef USED_IN_CPP_SOURCE
+/// Convert the `BridgedCharSourceRange` to a `CharSourceRange`.
+std::vector<swift::CharSourceRange> BridgedCharSourceRangeVector_unbridged(
+    const BridgedCharSourceRangeVector &vector);
+#endif
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins

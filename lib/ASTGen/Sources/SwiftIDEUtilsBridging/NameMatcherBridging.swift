@@ -26,7 +26,7 @@ fileprivate extension BridgedCharSourceRange {
   }
 }
 
-fileprivate extension CharSourceRangeVector {
+fileprivate extension BridgedCharSourceRangeVector {
   init(from ranges: some Sequence<Range<AbsolutePosition>>, in sourceFile: ExportedSourceFile) {
     self = .empty()
     for range in ranges {
@@ -74,7 +74,7 @@ extension IDEBridging.ResolvedLoc {
     }
     self.init(
       range: BridgedCharSourceRange(from: resolvedLoc.baseNameRange, in: sourceFile), 
-      labelRanges: CharSourceRangeVector(from: arguments.map { $0.range }, in: sourceFile), 
+      labelRanges: BridgedCharSourceRangeVector(from: arguments.map { $0.range }, in: sourceFile), 
       firstTrailingLabel: firstTrailingClosureIndex,
       labelType: LabelRangeType(resolvedLoc.arguments), 
       isActive: resolvedLoc.isActive, 

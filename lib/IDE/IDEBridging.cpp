@@ -15,10 +15,11 @@
 #include <climits>
 
 ResolvedLoc::ResolvedLoc(BridgedCharSourceRange range,
-                         CharSourceRangeVector labelRanges,
+                         BridgedCharSourceRangeVector labelRanges,
                          unsigned firstTrailingLabel, LabelRangeType labelType,
                          bool isActive, ResolvedLocContext context)
-    : range(range.unbridged()), labelRanges(labelRanges),
+    : range(range.unbridged()),
+      labelRanges(BridgedCharSourceRangeVector_unbridged(labelRanges)),
       firstTrailingLabel(firstTrailingLabel == UINT_MAX
                              ? llvm::None
                              : llvm::Optional<unsigned>(firstTrailingLabel)),
