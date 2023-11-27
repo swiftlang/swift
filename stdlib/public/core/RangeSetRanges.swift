@@ -16,22 +16,18 @@ extension RangeSet {
   public struct Ranges {
   	internal var _storage: [Range<Bound>]
 
-	  @usableFromInline
 	  internal init() {
 	    _storage = []
 	  }
 	  
-	  @usableFromInline
 	  internal init(_range: Range<Bound>) {
 	    _storage = [_range]
 	  }
 	  
-	  @usableFromInline
 	  internal init(_ranges: [Range<Bound>]) {
 	    _storage = _ranges
 	  }
 
-	  @usableFromInline
 	  internal func _contains(_ bound: Bound) -> Bool {
 	  	let i = _storage._partitioningIndex { $0.upperBound > bound }
 		  return i == _storage.endIndex ? false : _storage[i].lowerBound <= bound
@@ -95,7 +91,6 @@ extension RangeSet {
 	  }
 
 	  // Insert a non-empty range into the storage
-	  @usableFromInline
 	  internal mutating func _insert(contentsOf range: Range<Bound>) {
 	  	let indices = _indicesOfRange(range, in: _storage)
 	  	if indices.isEmpty {
@@ -111,7 +106,6 @@ extension RangeSet {
 	  }
 
 	  // Remove a non-empty range from the storage
-	  @usableFromInline
 	  internal mutating func _remove(contentsOf range: Range<Bound>) {
 	  	let indices = _indicesOfRange(range, in: _storage, includeAdjacent: false)
 	  	guard !indices.isEmpty else {
@@ -144,7 +138,6 @@ extension RangeSet {
 
 	  /// Returns a that represents the ranges of values within the
 	  /// given bounds that aren't represented by this range set.
-	  @usableFromInline
 	  internal func _gaps(boundedBy bounds: Range<Bound>) -> Self {
 			let indices = _indicesOfRange(bounds, in: _storage)
 	  	guard !indices.isEmpty else {
@@ -168,7 +161,6 @@ extension RangeSet {
 	    return resultVal
 	  }
 
-	  @usableFromInline
 	  internal func _intersection(_ other: Ranges) -> Ranges {
 	  	let left = self._storage
 	  	let right = other._storage
@@ -242,7 +234,6 @@ extension RangeSet.Ranges : Collection {
   public typealias Indices = Range<Index>
   public typealias SubSequence = Slice<Self>
   
-  @inlinable
   public var startIndex: Index {
     0
   }
@@ -251,7 +242,6 @@ extension RangeSet.Ranges : Collection {
     _storage.count
   }
   
-  @inlinable
   public var count: Int {
     self.endIndex
   }

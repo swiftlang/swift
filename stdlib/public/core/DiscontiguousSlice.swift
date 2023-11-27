@@ -13,21 +13,17 @@
 /// A collection wrapper that provides access to the elements of a collection,
 /// indexed by a set of indices.
 @available(SwiftStdlib 5.11, *)
-@frozen
 public struct DiscontiguousSlice<Base: Collection> {
-  @usableFromInline
   internal var _base: Base
   
   /// The set of subranges that are available through this discontiguous slice.
   public let subranges: RangeSet<Base.Index>
 
   /// The collection that the indexed collection wraps.
-  @inlinable
   public var base: Base {
     return _base
   }
 
-  @inlinable
   internal init(_base: Base, subranges: RangeSet<Base.Index>) {
     self._base = _base
     self.subranges = subranges
@@ -40,7 +36,6 @@ where Base: Sendable, Base.Index: Sendable {}
 
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice: Equatable where Base.Element: Equatable {
-  @inlinable
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.elementsEqual(rhs)
   }
@@ -48,7 +43,6 @@ extension DiscontiguousSlice: Equatable where Base.Element: Equatable {
 
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
-  @inlinable
   public func hash(into hasher: inout Hasher) {
     var count = 0
     for element in self {
@@ -69,16 +63,13 @@ extension DiscontiguousSlice: CustomStringConvertible {
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice {
   /// A position in a `DiscontiguousSlice`.
-  @frozen
   public struct Index {
     /// The index of the range that contains `base`.
-    @usableFromInline
     internal let _rangeOffset: Int
     
     /// The position of this index in the base collection.
     public let base: Base.Index
 
-    @inlinable
     internal init(_rangeOffset: Int, base: Base.Index) {
       self._rangeOffset = _rangeOffset
       self.base = base
@@ -88,7 +79,6 @@ extension DiscontiguousSlice {
 
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice.Index: Equatable {
-  @inlinable
   public static func == (left: Self, right: Self) -> Bool {
     left.base == right.base
   }
@@ -96,7 +86,6 @@ extension DiscontiguousSlice.Index: Equatable {
 
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice.Index: Hashable where Base.Index: Hashable {
-  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(base)
   }
@@ -104,7 +93,6 @@ extension DiscontiguousSlice.Index: Hashable where Base.Index: Hashable {
 
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice.Index: Comparable {
-  @inlinable
   public static func < (left: Self, right: Self) -> Bool {
     left.base < right.base
   }
@@ -128,12 +116,10 @@ extension DiscontiguousSlice: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = IndexingIterator<Self>
 
-  @inlinable
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     _customIndexOfEquatableElement(element).map { $0 != nil }
   }
 
-  @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     var result: ContiguousArray<Element> = []
     for range in subranges.ranges {
@@ -148,19 +134,16 @@ extension DiscontiguousSlice: Collection {
   public typealias SubSequence = Self
   public typealias Indices = DefaultIndices<Self>
   
-  @inlinable
   public var startIndex: Index {
     subranges.isEmpty
       ? endIndex
       : Index(_rangeOffset: 0, base: subranges.ranges[0].lowerBound)
   }
   
-  @inlinable
   public var endIndex: Index {
     Index(_rangeOffset: subranges.ranges.endIndex, base: _base.endIndex)
   }
   
-  @inlinable
   public var count: Int {
     var c = 0
     for range in subranges.ranges {
@@ -169,12 +152,10 @@ extension DiscontiguousSlice: Collection {
     return c
   }
 
-  @inlinable
   public var isEmpty: Bool {
     subranges.isEmpty
   }
 
-  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     let ranges = subranges.ranges[start._rangeOffset ... end._rangeOffset]
     guard ranges.count > 1 else {
@@ -192,7 +173,6 @@ extension DiscontiguousSlice: Collection {
     return head + middle + tail
   }
   
-  @inlinable
   public func index(after i: Index) -> Index {
     // Note: index validation performed by the underlying collections only
     let currentRange = subranges.ranges[i._rangeOffset]
@@ -210,13 +190,11 @@ extension DiscontiguousSlice: Collection {
       _rangeOffset: nextOffset, base: subranges.ranges[nextOffset].lowerBound)
   }
 
-  @inlinable
   public subscript(i: Index) -> Base.Element {
     // Note: index validation performed by the base collection only
     _base[subranges.ranges[i._rangeOffset]][i.base]
   }
   
-  @inlinable
   public subscript(bounds: Range<Index>) -> DiscontiguousSlice<Base> {
     let baseBounds = bounds.lowerBound.base ..< bounds.upperBound.base
     let baseSlice = base[baseBounds]
@@ -225,7 +203,6 @@ extension DiscontiguousSlice: Collection {
     return DiscontiguousSlice<Base>(_base: base, subranges: subset)
   }
 
-  @usableFromInline
   internal func _index(of baseIndex: Base.Index) -> Index? {
     let rangeOffset = subranges.ranges
       ._partitioningIndex { $0.upperBound >= baseIndex }
@@ -236,7 +213,6 @@ extension DiscontiguousSlice: Collection {
     return Index(_rangeOffset: rangeOffset, base: baseIndex)
   }
 
-  @inlinable
   public func _customIndexOfEquatableElement(_ element: Element) -> Index?? {
     var definite = true
     for (i, range) in subranges.ranges.enumerated() {
@@ -257,7 +233,6 @@ extension DiscontiguousSlice: Collection {
     }
   }
 
-  @inlinable
   public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
     var definite = true
     for (i, range) in subranges.ranges.enumerated().reversed() {
@@ -278,7 +253,6 @@ extension DiscontiguousSlice: Collection {
     }
   }
 
-  @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     let baseBounds = bounds.lowerBound.base ..< bounds.upperBound.base
     let offsetBounds = bounds.lowerBound._rangeOffset ..<
@@ -292,7 +266,6 @@ extension DiscontiguousSlice: Collection {
     }
   }
 
-  @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
     let baseBounds = bounds.lowerBound.base ... bounds.upperBound.base
     let offsetBounds = bounds.lowerBound._rangeOffset ...
@@ -306,7 +279,6 @@ extension DiscontiguousSlice: Collection {
     }
   }
 
-  @inlinable
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     let baseBounds = bounds.lowerBound.base ..< bounds.upperBound.base
     let baseRange = range.lowerBound.base ..< range.upperBound.base
@@ -339,7 +311,6 @@ extension DiscontiguousSlice: Collection {
 extension DiscontiguousSlice: BidirectionalCollection
   where Base: BidirectionalCollection
 {
-  @inlinable
   public func index(before i: Index) -> Index {
     _precondition(i > startIndex, "Can't move index before startIndex")
 
@@ -381,7 +352,6 @@ extension DiscontiguousSlice where Base: MutableCollection {
   ///   `endIndex` property.
   ///
   /// - Complexity: O(1)
-  @inlinable
   public subscript(i: Index) -> Base.Element {
     get {
       _base[subranges.ranges[i._rangeOffset]][i.base]
@@ -404,7 +374,6 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 5.11, *)
-  @inlinable
   public subscript(subranges: RangeSet<Index>) -> DiscontiguousSlice<Self> {
     DiscontiguousSlice(_base: self, subranges: subranges)
   }
