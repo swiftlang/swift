@@ -2608,6 +2608,8 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
 
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
+  if (Ctx.getDiags().hadAnyError())
+    return 1;
   Collector.serialize(FS);
   return 0;
 }
