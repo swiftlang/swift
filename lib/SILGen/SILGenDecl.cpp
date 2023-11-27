@@ -1628,7 +1628,7 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   });
 
   // Emit the variable's accessors.
-  D->visitEmittedAccessors([&](AccessorDecl *accessor) {
+  SGM.visitEmittedAccessors(D, [&](AccessorDecl *accessor) {
     SGM.emitFunction(accessor);
   });
 }
