@@ -36,7 +36,7 @@ public:
   RegionType addSyntacticRenameRanges(const ResolvedLoc &Resolved,
                                       const RenameLoc &Config);
 
-  std::vector<RenameRangeDetail> getResult() const { return Ranges; }
+  std::vector<RenameRangeDetail> &&takeResult() { return std::move(Ranges); }
 
 private:
   void addRenameRange(CharSourceRange Label, RefactoringRangeKind RangeKind,
@@ -458,5 +458,5 @@ SyntacticRenameRangeDetails swift::ide::getSyntacticRenameRangeDetails(
     const RenameLoc &Config) {
   RenameRangeDetailCollector RangeCollector(SM, OldName);
   RegionType Type = RangeCollector.addSyntacticRenameRanges(Resolved, Config);
-  return {Type, RangeCollector.getResult()};
+  return {Type, RangeCollector.takeResult()};
 }

@@ -2,7 +2,7 @@
 func foo(x: Int) {
 #if true
   print(x)
-#else {
+#else
   print(x)
 #endif
 }

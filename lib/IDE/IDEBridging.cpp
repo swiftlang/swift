@@ -56,6 +56,6 @@ const std::vector<ResolvedLoc> &BridgedResolvedLocVector::unbridged() {
 
 void BridgedResolvedLocVector::destroy() { delete vector; }
 
-void *BridgedResolvedLocVector_getOpaqueValue(const BridgedResolvedLocVector &vector) {
-  return static_cast<void *>(vector.vector);
+void *BridgedResolvedLocVector::getOpaqueValue() const {
+  return static_cast<void *>(this->vector);
 }

@@ -92,13 +92,13 @@ public:
   RenameLocs() {}
 };
 
-/// Return the location to rename when renaming the identifier at \p startLoc
+/// Return the locations to rename when renaming the \p valueDecl
 /// in \p sourceFile.
 ///
 /// - Parameters:
 ///   - sourceFile: The source file in which to perform local rename
-///   - renameInfo: Information about the symbol to rename. See `getRenameInfo`
-RenameLocs localRenameLocs(SourceFile *sourceFile, RenameInfo renameInfo);
+///   - valueDecl: The declaration that should be renamed
+RenameLocs localRenameLocs(SourceFile *sourceFile, const ValueDecl *valueDecl);
 
 /// Given a list of `RenameLoc`s, get the corresponding `ResolveLoc`s.
 ///

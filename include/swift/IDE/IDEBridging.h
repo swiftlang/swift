@@ -112,19 +112,14 @@ public:
   /// Delete the heap-allocated memory owned by this object. Accessing
   /// `unbridged` is illegal after calling `destroy`.
   void destroy();
+
+  SWIFT_IMPORT_UNSAFE
+  void *getOpaqueValue() const;
 };
 
 
 SWIFT_NAME("BridgedResolvedLocVector.empty()")
 BridgedResolvedLocVector BridgedResolvedLocVector_createEmpty();
-
-/// Get an opaque pointer value that describes this
-/// `BridgedResolvedLocVector`. This opaque value can be returned by a
-/// `@_cdecl` function in Swift.
-/// 
-/// - Note: Cannot be defined as a member on BridgedResolvecLocVector because 
-///   Swift 5.8 does not import methods that return pointers. 
-void *BridgedResolvedLocVector_getOpaqueValue(const BridgedResolvedLocVector &vector);
 
 typedef std::vector<BridgedSourceLoc> SourceLocVector;
 

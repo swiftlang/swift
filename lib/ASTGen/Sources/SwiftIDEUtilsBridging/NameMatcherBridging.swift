@@ -107,5 +107,5 @@ public func runNameMatcher(
   let positions: [AbsolutePosition] =  locations.compactMap { sourceFile.position(of: $0) }
   let resolvedLocs = NameMatcher.resolve(baseNamePositions: positions, in: sourceFile.syntax)
   let bridged = BridgedResolvedLocVector(from: resolvedLocs, in: sourceFile)
-  return BridgedResolvedLocVector_getOpaqueValue(bridged)
+  return bridged.getOpaqueValue()
 }

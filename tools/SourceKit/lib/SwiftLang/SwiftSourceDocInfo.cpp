@@ -2569,7 +2569,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
           return;
         }
 
-        RenameLocs Locs = localRenameLocs(SrcFile, *Info);
+        RenameLocs Locs = localRenameLocs(SrcFile, Info->VD);
 
         // Ignore any errors produced by `resolveRenameLocations` since, if some
         // symbol failed to resolve, we still want to return all the other

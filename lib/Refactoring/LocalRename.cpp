@@ -193,7 +193,7 @@ public:
 
   /// Take the resuls from the collector.
   /// This invalidates the collector and must only be called once.
-  RenameLocs takeResults() {
+  RenameLocs takeResults() && {
     return RenameLocs(locations, std::move(stringStorage));
   }
 
@@ -278,7 +278,7 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
 ///
 /// This \c DeclContext contains all possible references to \c VD within the
 /// file.
-DeclContext *getRenameScope(ValueDecl *VD) {
+DeclContext *getRenameScope(const ValueDecl *VD) {
   auto *Scope = VD->getDeclContext();
   // There may be sibling decls that the renamed symbol is visible from.
   switch (Scope->getContextKind()) {
@@ -303,15 +303,15 @@ DeclContext *getRenameScope(ValueDecl *VD) {
   return Scope;
 }
 
-/// Get the `RenameInfo` at `startLoc` and validate that we can perform local
+/// Get the declaration at `startLoc` and validate that we can perform local
 /// rename on it (e.g. checking that the original definition isn't a system
 /// symbol).
 ///
-/// If the validation succeeds, return the `RenameInfo`, otherwise add an error
-/// to `diags` and return `None`.
-static llvm::Optional<RenameInfo>
-getRenameInfoForLocalRename(SourceFile *sourceFile, SourceLoc startLoc,
-                            DiagnosticEngine &diags) {
+/// If the validation succeeds, return the `ValueDecl`, otherwise add an error
+/// to `diags` and return `nullptr`.
+static ValueDecl *getDeclForLocalRename(SourceFile *sourceFile,
+                                        SourceLoc startLoc,
+                                        DiagnosticEngine &diags) {
   auto cursorInfo = evaluateOrDefault(
       sourceFile->getASTContext().evaluator,
       CursorInfoRequest{CursorInfoOwner(sourceFile, startLoc)},
@@ -320,7 +320,7 @@ getRenameInfoForLocalRename(SourceFile *sourceFile, SourceLoc startLoc,
   llvm::Optional<RenameInfo> info = getRenameInfo(cursorInfo);
   if (!info) {
     diags.diagnose(startLoc, diag::unresolved_location);
-    return llvm::None;
+    return nullptr;
   }
 
   switch (info->Availability.AvailableKind) {
@@ -328,30 +328,31 @@ getRenameInfoForLocalRename(SourceFile *sourceFile, SourceLoc startLoc,
     break;
   case RefactorAvailableKind::Unavailable_system_symbol:
     diags.diagnose(startLoc, diag::decl_is_system_symbol, info->VD->getName());
-    return llvm::None;
+    return nullptr;
   case RefactorAvailableKind::Unavailable_has_no_location:
     diags.diagnose(startLoc, diag::value_decl_no_loc, info->VD->getName());
-    return llvm::None;
+    return nullptr;
   case RefactorAvailableKind::Unavailable_has_no_name:
     diags.diagnose(startLoc, diag::decl_has_no_name);
-    return llvm::None;
+    return nullptr;
   case RefactorAvailableKind::Unavailable_has_no_accessibility:
     diags.diagnose(startLoc, diag::decl_no_accessibility);
-    return llvm::None;
+    return nullptr;
   case RefactorAvailableKind::Unavailable_decl_from_clang:
     diags.diagnose(startLoc, diag::decl_from_clang);
-    return llvm::None;
+    return nullptr;
   case RefactorAvailableKind::Unavailable_decl_in_macro:
     diags.diagnose(startLoc, diag::decl_in_macro);
-    return llvm::None;
+    return nullptr;
   }
 
-  return info;
+  return info->VD;
 }
 
-RenameLocs swift::ide::localRenameLocs(SourceFile *SF, RenameInfo renameInfo) {
+RenameLocs swift::ide::localRenameLocs(SourceFile *SF,
+                                       const ValueDecl *valueDecl) {
   DeclContext *RenameScope = SF;
-  if (!RenameScope) {
+  if (RenameScope) {
     // If the value is declared in a DeclContext that's a child of the file in
     // which we are performing the rename, we can limit our analysis to this
     // decl context.
@@ -359,16 +360,16 @@ RenameLocs swift::ide::localRenameLocs(SourceFile *SF, RenameInfo renameInfo) {
     // Cases where the rename scope is not a child of the source file include
     // if we are getting related identifiers of a type A that is defined in
     // another file. In this case, we need to analyze the entire file.
-    auto DeclarationScope = getRenameScope(renameInfo.VD);
+    auto DeclarationScope = getRenameScope(valueDecl);
     if (DeclarationScope->isChildContextOf(SF)) {
       RenameScope = DeclarationScope;
     }
   }
 
-  RenameRangeCollector rangeCollector(renameInfo.VD);
+  RenameRangeCollector rangeCollector(valueDecl);
   indexDeclContext(RenameScope, rangeCollector);
 
-  return rangeCollector.takeResults();
+  return std::move(rangeCollector).takeResults();
 }
 
 CancellableResult<std::vector<SyntacticRenameRangeDetails>>
@@ -385,13 +386,12 @@ swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range) {
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
-  llvm::Optional<RenameInfo> info =
-      getRenameInfoForLocalRename(SF, StartLoc, Diags);
-  if (!info || DiagConsumer.didErrorOccur()) {
+  ValueDecl *declToRename = getDeclForLocalRename(SF, StartLoc, Diags);
+  if (!declToRename || DiagConsumer.didErrorOccur()) {
     return ResultType::failure(ErrBuffer);
   }
 
-  RenameLocs RenameRanges = localRenameLocs(SF, *info);
+  RenameLocs RenameRanges = localRenameLocs(SF, declToRename);
 
   return findSyntacticRenameRanges(SF, RenameRanges.getLocations(),
                                    /*NewName=*/StringRef());
