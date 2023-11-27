@@ -208,6 +208,12 @@ class TaskExecutorRef {
 
 public:
 
+  // Only public for CompatibilityOverrideConcurrency stubs.
+  // Prefer `TaskExecutorRef::undefined` instead.
+  explicit TaskExecutorRef() : Identity(nullptr), Implementation(0) {
+    assert(isUndefined());
+  }
+
   constexpr static TaskExecutorRef undefined() {
     return TaskExecutorRef(nullptr, 0);
   }

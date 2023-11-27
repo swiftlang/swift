@@ -621,7 +621,9 @@ TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
   return preference;
 }
 
-TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
+SWIFT_CC(swift)
+static TaskExecutorRef
+swift_task_getPreferredTaskExecutorImpl() {
   if (auto task = swift_task_getCurrent()) {
     return task->getPreferredTaskExecutor();
   }
@@ -630,10 +632,14 @@ TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
 }
 
 SWIFT_CC(swift)
-TaskExecutorPreferenceStatusRecord *
-swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
+static TaskExecutorPreferenceStatusRecord *
+swift_task_pushTaskExecutorPreferenceImpl(TaskExecutorRef taskExecutor) {
   auto task = swift_task_getCurrent();
-  assert(task && "Executor preference can only be called from async contexts.");
+  if (!task) {
+    // we cannot push a preference if we're not in a task (including in
+    // compatibility tests), so we return eagerly.
+    return nullptr;
+  }
 
   void *allocation = _swift_task_alloc_specific(
       task, sizeof(class TaskExecutorPreferenceStatusRecord));
@@ -659,7 +665,7 @@ swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
 }
 
 SWIFT_CC(swift)
-void swift::swift_task_popTaskExecutorPreference(
+static void swift_task_popTaskExecutorPreferenceImpl(
     TaskExecutorPreferenceStatusRecord *record) {
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task executor "
                        "preference record %p from task:%p",
@@ -669,6 +675,9 @@ void swift::swift_task_popTaskExecutorPreference(
   int preferenceRecordsCount = 0;
 
   auto task = swift_task_getCurrent();
+  if (!task)
+    return;
+
   removeStatusRecordWhere(
       task,
       /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
