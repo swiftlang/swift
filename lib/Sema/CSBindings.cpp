@@ -641,6 +641,7 @@ void BindingSet::finalize(
           updatedBindings.insert(
               {keyPathTy, AllowedBindingKind::Exact, keyPathLoc});
         } else if (CS.shouldAttemptFixes()) {
+          auto fixedRootTy = CS.getFixedType(rootTy);
           // If key path is structurally correct and has a resolved root
           // type, let's promote the fallback type into a binding because
           // root would have been inferred from explicit type already and
@@ -648,7 +649,7 @@ void BindingSet::finalize(
           // type to key path literal to propagate root/value to the context.
           if (!keyPath->hasSingleInvalidComponent() &&
               (keyPath->getParsedRoot() ||
-               !CS.getFixedType(rootTy)->isTypeVariableOrMember())) {
+               (fixedRootTy && !fixedRootTy->isTypeVariableOrMember()))) {
             auto fallback = llvm::find_if(Defaults, [](const auto &entry) {
               return entry.second->getKind() == ConstraintKind::FallbackType;
             });
