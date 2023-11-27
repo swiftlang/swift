@@ -32,17 +32,17 @@ import Swift
 ///   }
 ///   return sum
 /// } onCancel: {
-///   // this onCancel closure may execute concurrently with the operation!
+///   // This onCancel closure might execute concurrently with the operation.
 ///   condition.cancel()
 /// }
 /// ```
 ///
 /// ### Execution order and semantics
 /// The `operation` closure is always invoked, even when the
-/// `withTaskCancellationHandler` method is called from an already cancelled
-/// task.
+/// `withTaskCancellationHandler(operation:onCancel:)` method is called from a task
+/// that was already cancelled.
 ///
-/// When `withTaskCancellationHandler` is used in a task that has already been
+/// When `withTaskCancellationHandler(operation:onCancel:)` is used in a task that has already been
 /// cancelled, the cancellation handler will be executed
 /// immediately before the `operation` closure gets to execute.
 ///
@@ -50,14 +50,14 @@ import Swift
 /// that the operation may be *atomically* checking for in order to avoid
 /// performing any actual work once the operation gets to run.
 ///
-/// The `operation` executes on the calling execution context and does not
+/// The `operation` closure executes on the calling execution context, and doesn't
 /// suspend or change execution context unless code contained within the closure
 /// does so. In other words, the potential suspension point of the
-/// `withTaskCancellationHandler` does not ever suspend by itself before
-/// executing the `operation`.
+/// `withTaskCancellationHandler(operation:onCancel:)` never suspends by itself before
+/// executing the operation.
 ///
 /// If cancellation occurs while the operation is running, the cancellation
-/// `handler` will execute *concurrently* with the `operation`.
+/// handler executes *concurrently* with the operation.
 ///
 /// ### Cancellation handlers and locks
 ///
