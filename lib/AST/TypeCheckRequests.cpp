@@ -2178,3 +2178,35 @@ void UniqueUnderlyingTypeSubstitutionsRequest::cacheResult(
   const_cast<OpaqueTypeDecl *>(decl)
       ->LazySemanticInfo.UniqueUnderlyingTypeComputed = true;
 }
+
+void ExpandPreambleMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity,
+                 "preamble",
+                 decl->getName());
+}
+
+void ExpandPreambleMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity_through,
+                 "preamble",
+                 decl->getName());
+}
+
+void ExpandBodyMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity,
+                 "body",
+                 decl->getName());
+}
+
+void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity_through,
+                 "body",
+                 decl->getName());
+}

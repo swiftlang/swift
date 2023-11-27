@@ -493,6 +493,12 @@ SWIFT_REQUEST(TypeChecker, ExpandSynthesizedMemberMacroRequest,
 SWIFT_REQUEST(TypeChecker, ExpandPeerMacroRequest,
               ArrayRef<unsigned>(Decl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExpandPreambleMacroRequest,
+              ArrayRef<unsigned>(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExpandBodyMacroRequest,
+              llvm::Optional<unsigned>(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),
               Cached, NoLocationInfo)

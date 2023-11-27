@@ -2778,7 +2778,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   if (AFD->isBodySkipped())
     return nullptr;
 
-  BraceStmt *body = AFD->getBody();
+  BraceStmt *body = AFD->getMacroExpandedBody();
 
   // If there is no function body, there is nothing to type-check.
   if (!body) {
