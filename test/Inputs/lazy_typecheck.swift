@@ -16,6 +16,10 @@ public func publicFunc() -> Int {
   return NoTypecheck.int
 }
 
+public func publicFuncReturnsTypealias() -> PublicIntAlias {
+  return NoTypecheck.int
+}
+
 public func publicFuncWithDefaultArg(_ x: Int = 1) -> Int {
   return NoTypecheck.int
 }
@@ -88,11 +92,15 @@ struct InternalWrapper {
 // MARK: - Global vars
 
 public var publicGlobalVar: Int = NoTypecheck.int
+public var publicGlobalVarTypealias: PublicIntAlias = 1
 public var publicGlobalVarInferredType = ""
+public var publicGlobalVarInferredInferredGeneric: [_] = [1]
+public var publicGlobalVarTypealiasGeneric: PublicIntAlias? = 1
 public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) = (0, 1)
 
 var internalGlobalVar: NoTypecheck = NoTypecheck()
 var internalGlobalVarInferredType = NoTypecheck()
+var internalGlobalTypealiasVar: PublicIntAlias = NoTypecheck.int
 
 // MARK: - Nominal types
 
@@ -132,6 +140,7 @@ protocol InternalProtoConformingToPublicProto: PublicProto {
 
 public struct PublicStruct {
   public var publicProperty: Int = NoTypecheck.int
+  public var publicTypealiasProperty: PublicIntAlias = 1
   public var publicPropertyInferredType = ""
   public var publicLazyProperty: Int = NoTypecheck.int
   public var publicLazyPropertyInferred = 1
@@ -334,6 +343,7 @@ extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForCons
 
 // MARK: - Type aliases
 
+public typealias PublicIntAlias = Int
 public typealias PublicStructAlias = PublicStruct
 typealias InternalTypeAlias = NoTypecheck
 
