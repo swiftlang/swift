@@ -9,7 +9,7 @@ struct B: ~Copyable { // expected-note {{'B' is a non-mutable type}}
                       // expected-note@-2 {{'B' is a non-mutable type}}
                       // expected-note@-3 {{'B' is a non-mutable type}}
                       // expected-note@-4 {{'B' is a non-mutable type}}
-  mutating func change() { // expected-error {{@_staticExclusiveOnly type 'B' cannot have mutating function 'change()'}}
+  mutating func change() { // expected-error {{type 'B' cannot have mutating function 'change()'}}
     print("123")
   }
 }

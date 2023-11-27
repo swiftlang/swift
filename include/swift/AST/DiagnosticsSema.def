@@ -1929,7 +1929,7 @@ NOTE(attr_static_exclusive_only_type_nonmutating,none,
 ERROR(attr_static_exclusive_only_let_only_param,none,
       "parameter of type %0 must be declared as either 'borrowing' or 'consuming'", (Type))
 ERROR(attr_static_exclusive_only_mutating,none,
-      "@_staticExclusiveOnly type %0 cannot have mutating function %1", (Type, ValueDecl *))
+      "type %0 cannot have mutating function %1", (Type, ValueDecl *))
 
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
