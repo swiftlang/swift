@@ -29,4 +29,43 @@ MoveOnlyCxxOperators.test("NonCopyableHolderConstDeref pointee borrow") {
   expectEqual(k, 11)
 }
 
+MoveOnlyCxxOperators.test("testNonCopyableHolderPairedDeref pointee borrow") {
+  var holder = NonCopyableHolderPairedDeref(11)
+  var k = borrowNC(holder.pointee)
+  expectEqual(k, 33)
+  k = holder.pointee.method(2)
+  expectEqual(k, 22)
+  k = holder.pointee.x
+  expectEqual(k, 11)
+  k = inoutNC(&holder.pointee, -1)
+  expectEqual(k, -1)
+  expectEqual(holder.pointee.x, -1)
+  holder.pointee.mutMethod(3)
+  expectEqual(holder.pointee.x, 3)
+  holder.pointee.x = 34
+  expectEqual(holder.pointee.x, 34)
+  consumingNC(holder.pointee)
+  expectEqual(holder.pointee.x, 0)
+}
+
+MoveOnlyCxxOperators.test("testNonCopyableHolderMutDeref pointee borrow") {
+  var holder = NonCopyableHolderMutDeref(11)
+  var k = borrowNC(holder.pointee)
+  expectEqual(k, 33)
+  k = holder.pointee.method(2)
+  expectEqual(k, 22)
+  k = holder.pointee.x
+  expectEqual(k, 11)
+  k = inoutNC(&holder.pointee, -1)
+  expectEqual(k, -1)
+  expectEqual(holder.pointee.x, -1)
+  holder.pointee.mutMethod(3)
+  expectEqual(holder.pointee.x, 3)
+  holder.pointee.x = 34
+  expectEqual(holder.pointee.x, 34)
+  consumingNC(holder.pointee)
+  expectEqual(holder.pointee.x, 0)
+}
+
+
 runAllTests()

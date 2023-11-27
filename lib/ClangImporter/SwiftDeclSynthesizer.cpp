@@ -1542,6 +1542,29 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
     pointeePropertyRefExpr->setType(elementTy);
     propertyExpr = pointeePropertyRefExpr;
   }
+  // Cast an 'address' result from a mutable pointer if needed.
+  if (isAddress &&
+      getterImpl->getResultInterfaceType()->isUnsafeMutablePointer()) {
+    auto reinterpretCast = cast<FuncDecl>(
+        getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
+    auto rawTy = getterImpl->getResultInterfaceType();
+    auto enumTy = elementTy;
+    SubstitutionMap subMap = SubstitutionMap::get(
+        reinterpretCast->getGenericSignature(), {rawTy, enumTy}, {});
+    ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
+    auto reinterpretCastRef = new (ctx)
+        DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+    FunctionType::ExtInfo info;
+    reinterpretCastRef->setType(
+        FunctionType::get({FunctionType::Param(rawTy)}, enumTy, info));
+
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {propertyExpr});
+    auto reinterpreted =
+        CallExpr::createImplicit(ctx, reinterpretCastRef, argList);
+    reinterpreted->setType(enumTy);
+    reinterpreted->setThrows(nullptr);
+    propertyExpr = reinterpreted;
+  }
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), propertyExpr,
                                          /*implicit*/ true);
@@ -1608,6 +1631,26 @@ synthesizeUnwrappingSetterBody(AbstractFunctionDecl *afd, void *context) {
                                     assignExpr,
                                 },
                                 SourceLoc());
+  return {body, /*isTypeChecked*/ true};
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeUnwrappingAddressSetterBody(AbstractFunctionDecl *afd,
+                                      void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  auto setterImpl = static_cast<FuncDecl *>(context);
+
+  ASTContext &ctx = setterDecl->getASTContext();
+
+  auto selfArg = createSelfArg(setterDecl);
+  auto *setterImplCallExpr =
+      createAccessorImplCallExpr(setterImpl, selfArg, nullptr);
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), setterImplCallExpr,
+                                         /*implicit*/ true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit*/ true);
   return {body, /*isTypeChecked*/ true};
 }
 
@@ -1755,8 +1798,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
     paramVarDecl->setSpecifier(ParamSpecifier::Default);
     paramVarDecl->setInterfaceType(elementTy);
 
-    auto setterParamList =
-        ParameterList::create(ctx, {paramVarDecl});
+    auto setterParamList = useAddress
+                               ? ParameterList::create(ctx, {})
+                               : ParameterList::create(ctx, {paramVarDecl});
 
     setterDecl = AccessorDecl::create(
         ctx, setterImpl->getLoc(), setterImpl->getLoc(),
@@ -1773,7 +1817,10 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
       setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
-    setterDecl->setBodySynthesizer(synthesizeUnwrappingSetterBody, setterImpl);
+    setterDecl->setBodySynthesizer(useAddress
+                                       ? synthesizeUnwrappingAddressSetterBody
+                                       : synthesizeUnwrappingSetterBody,
+                                   setterImpl);
 
     if (setterImpl->isMutating()) {
       setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);

@@ -35,4 +35,17 @@ class NonCopyableHolderConstDeref {
     inline const NonCopyable & operator *() const { return x; }
 };
 
+class NonCopyableHolderPairedDeref {
+    NONCOPYABLE_HOLDER_WRAPPER(NonCopyableHolderPairedDeref)
+
+    inline const NonCopyable & operator *() const { return x; }
+    inline NonCopyable & operator *() { return x; }
+};
+
+class NonCopyableHolderMutDeref {
+    NONCOPYABLE_HOLDER_WRAPPER(NonCopyableHolderMutDeref)
+
+    inline NonCopyable & operator *() { return x; }
+};
+
 #endif // TEST_INTEROP_CXX_OPERATORS_MOVE_ONLY_OPS_H
