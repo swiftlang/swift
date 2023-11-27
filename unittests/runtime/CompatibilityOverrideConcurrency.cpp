@@ -288,7 +288,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, task_hasTaskGroupStatusRecord) {
   swift_task_hasTaskGroupStatusRecord();
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, task_getTaskExecutorPreference) {
+TEST_F(CompatibilityOverrideConcurrencyTest, task_getPreferredTaskExecutor) {
   swift_task_getPreferredTaskExecutor();
 }
 
