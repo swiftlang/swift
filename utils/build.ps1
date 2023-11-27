@@ -1594,7 +1594,7 @@ function Build-Installer($Arch) {
     $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
   }
 
-  Build-WiXProject bundle\installer.wixproj -Arch $Arch -Properties $Properties
+  Build-WiXProject bundle\installer.wixproj -Arch $Arch -Bundle -Properties $Properties
 }
 
 function Stage-BuildArtifacts($Arch) {
