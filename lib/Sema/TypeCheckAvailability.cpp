@@ -2420,12 +2420,12 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
             }
           }
         }
-        // Function names are the same(including context if applicable), so
+        // Function names are the same (including context if applicable), so
         // renaming fix-it doesn't need do be produced.
+        auto calledValue = CE->getCalledValue(/*skipFunctionConversions=*/true);
         if ((parsed.ContextName.empty() ||
              parsed.ContextName == callContextName) &&
-            CE->getCalledValue(/*skipFunctionConversions=*/true)
-                    ->getBaseName() == parsed.BaseName) {
+            calledValue && calledValue->getBaseName() == parsed.BaseName) {
           shouldEmitRenameFixit = false;
         }
       }
