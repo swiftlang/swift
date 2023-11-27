@@ -444,6 +444,42 @@ bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
   return ::mayBeDeinitBarrierNotConsideringSideEffects(unbridged());
 }
 
-void writeCharToStderr(int c) {
-  putc(c, stderr);
+//===----------------------------------------------------------------------===//
+//                               BridgedBuilder
+//===----------------------------------------------------------------------===//
+
+static llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16>
+convertCases(SILType enumTy, const void * _Nullable enumCases, SwiftInt numEnumCases) {
+  using BridgedCase = const std::pair<SwiftInt, BridgedBasicBlock>;
+  llvm::ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
+                                    (unsigned)numEnumCases);
+  llvm::SmallDenseMap<SwiftInt, swift::EnumElementDecl *> mappedElements;
+  swift::EnumDecl *enumDecl = enumTy.getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    mappedElements[elemWithIndex.index()] = elemWithIndex.value();
+  }
+  llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16> convertedCases;
+  for (auto c : cases) {
+    assert(mappedElements.count(c.first) && "wrong enum element index");
+    convertedCases.push_back({mappedElements[c.first], c.second.unbridged()});
+  }
+  return convertedCases;
+}
+
+BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
+                                        const void * _Nullable enumCases, SwiftInt numEnumCases) const {
+  return {unbridged().createSwitchEnum(regularLoc(),
+                                       enumVal.getSILValue(),
+                                       defaultBlock.unbridged(),
+                                       convertCases(enumVal.getSILValue()->getType(), enumCases, numEnumCases))};
+}
+
+BridgedInstruction BridgedBuilder::createSwitchEnumAddrInst(BridgedValue enumAddr,
+                                                            OptionalBridgedBasicBlock defaultBlock,
+                                                            const void * _Nullable enumCases,
+                                                            SwiftInt numEnumCases) const {
+  return {unbridged().createSwitchEnumAddr(regularLoc(),
+                                           enumAddr.getSILValue(),
+                                           defaultBlock.unbridged(),
+                                           convertCases(enumAddr.getSILValue()->getType(), enumCases, numEnumCases))};
 }

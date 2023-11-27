@@ -27,7 +27,7 @@ public protocol Executor: AnyObject, Sendable {
   // since it lacks move-only type support.
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.9, *)
-  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
   func enqueue(_ job: consuming Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -47,7 +47,7 @@ public protocol SerialExecutor: Executor {
   @_nonoverride
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.1, *)
-  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func enqueue(_ job: UnownedJob)
 
@@ -58,7 +58,7 @@ public protocol SerialExecutor: Executor {
   // work-scheduling operation.
   @_nonoverride
   @available(SwiftStdlib 5.9, *)
-  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
   func enqueue(_ job: consuming Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 

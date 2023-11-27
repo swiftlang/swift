@@ -64,6 +64,7 @@ public func registerSILClasses() {
   register(ReleaseValueInst.self)
   register(DestroyValueInst.self)
   register(DestroyAddrInst.self)
+  register(EndLifetimeInst.self)
   register(StrongCopyUnownedValueInst.self)
   register(StrongCopyUnmanagedValueInst.self)
   register(InjectEnumAddrInst.self)

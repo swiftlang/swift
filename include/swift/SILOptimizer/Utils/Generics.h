@@ -88,6 +88,8 @@ class ReabstractionInfo {
   /// See `droppedMetatypeArgs`.
   bool dropMetatypeArgs = false;
   
+  bool hasIndirectErrorResult = false;
+
   /// The first NumResults bits in Conversions refer to formal indirect
   /// out-parameters.
   unsigned NumFormalIndirectResults = 0;
@@ -190,6 +192,8 @@ private:
   void finishPartialSpecializationPreparation(
       FunctionSignaturePartialSpecializer &FSPS);
 
+  TypeCategory handleReturnAndError(SILResultInfo RI, unsigned argIdx);
+
 public:
   ReabstractionInfo(SILModule &M) : M(&M) {}
 
@@ -227,7 +231,12 @@ public:
   }
 
   unsigned param2ArgIndex(unsigned ParamIdx) const  {
-    return ParamIdx + NumFormalIndirectResults;
+    return ParamIdx + NumFormalIndirectResults + (hasIndirectErrorResult ? 1: 0);
+  }
+
+  unsigned indirectErrorIndex() const {
+    assert(hasIndirectErrorResult);
+    return NumFormalIndirectResults;
   }
 
   /// Returns true if the specialized function needs an alternative mangling.
@@ -253,6 +262,10 @@ public:
   bool isFormalResultConverted(unsigned ResultIdx) const {
     assert(ResultIdx < NumFormalIndirectResults);
     return ConvertIndirectToDirect && Conversions.test(ResultIdx);
+  }
+
+  bool isErrorResultConverted() const {
+    return ConvertIndirectToDirect && Conversions.test(indirectErrorIndex());
   }
 
   /// Gets the total number of original function arguments.

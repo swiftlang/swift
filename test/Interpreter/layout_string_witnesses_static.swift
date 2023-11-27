@@ -1012,6 +1012,50 @@ func testEnumWithExistential() {
 
 testEnumWithExistential()
 
+// Regression test for rdar://118606044
+func testNotBitwiseTakableBridge() {
+    let ptr = UnsafeMutablePointer<NotBitwiseTakableBridge<SimpleClass>>.allocate(capacity: 1)
+
+    // initWithTake
+    do {
+        let x = NotBitwiseTakableBridge([SimpleClass(x: 23)])
+        testInitTake(ptr, to: consume x)
+    }
+
+    // assignWithTake
+    do {
+        let y = NotBitwiseTakableBridge([SimpleClass(x: 33)])
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssign(ptr, from: y)
+    }
+
+    // assignWithCopy
+    do {
+        var z = NotBitwiseTakableBridge([SimpleClass(x: 43)])
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // destroy
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNotBitwiseTakableBridge()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)

@@ -61,7 +61,7 @@ private func handle(instruction: Instruction, _ context: FunctionPassContext) {
       case "delete_branches":
         deleteAllInstructions(ofType: BranchInst.self, in: instruction.parentBlock, context)
       case "split_block":
-        _ = context.splitBlock(at: instruction)
+        _ = context.splitBlock(before: instruction)
       default:
         break
     }

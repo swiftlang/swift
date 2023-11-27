@@ -185,9 +185,9 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   // empty value.
   // Create the needed blocks of the `switch_enum` CFG diamond.
   let origBlock = bridgeToSwiftCall.parentBlock
-  let someBlock = context.splitBlock(at: bridgeToSwiftCall)
-  let noneBlock = context.splitBlock(at: bridgeToSwiftCall)
-  let continueBlock = context.splitBlock(at: bridgeToSwiftCall)
+  let someBlock = context.splitBlock(before: bridgeToSwiftCall)
+  let noneBlock = context.splitBlock(before: bridgeToSwiftCall)
+  let continueBlock = context.splitBlock(before: bridgeToSwiftCall)
 
 
   let builder = Builder(atEndOf: origBlock, location: bridgeToSwiftCall.location, context)

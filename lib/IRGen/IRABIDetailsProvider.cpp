@@ -391,8 +391,10 @@ void LoweredFunctionSignature::visitParameterList(
       if (!schema.requiresIndirect()) {
         // Skip ABI parameters with empty native representation, as they're not
         // emitted in the LLVM IR signature.
-        if (schema.empty())
+        if (schema.empty()) {
+          ++currentSilParam;
           continue;
+        }
         isIndirect = false;
       }
     }

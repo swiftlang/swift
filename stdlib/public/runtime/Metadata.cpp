@@ -2933,6 +2933,7 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
     previousFieldOffset = offset + fieldType->vw_size();
     fullOffset += fieldType->vw_size();
   } else if (auto *tuple = dyn_cast<TupleTypeMetadata>(fieldType)) {
+    previousFieldOffset = offset;
     for (InProcess::StoredSize i = 0; i < tuple->NumElements; i++) {
       _swift_addRefCountStringForMetatype(writer, flags,
                                           tuple->getElement(i).Type, fullOffset,

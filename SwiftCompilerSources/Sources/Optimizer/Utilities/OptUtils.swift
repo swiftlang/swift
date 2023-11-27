@@ -239,7 +239,10 @@ extension StoreInst {
           builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
         }
       } else {
-        for idx in 0..<type.getNominalFields(in: parentFunction).count {
+        guard let fields = type.getNominalFields(in: parentFunction) else {
+          return
+        }
+        for idx in 0..<fields.count {
           let srcField = builder.createStructExtract(struct: source, fieldIndex: idx)
           let fieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
           builder.createStore(source: srcField, destination: fieldAddr, ownership: splitOwnership(for: srcField))
@@ -283,7 +286,10 @@ extension LoadInst {
       if type.nominal.isStructWithUnreferenceableStorage {
         return
       }
-      for idx in 0..<type.getNominalFields(in: parentFunction).count {
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return
+      }
+      for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
         let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
         elements.append(splitLoad)

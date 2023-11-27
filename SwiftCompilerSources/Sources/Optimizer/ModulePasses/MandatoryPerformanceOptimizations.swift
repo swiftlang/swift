@@ -90,6 +90,16 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
           _ = context.specializeClassMethodInst(classMethod)
         }
 
+      // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
+      case let destroyValue as DestroyValueInst:
+        if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
+          context.diagnosticEngine.diagnose(destroyValue.location.sourceLoc, .deinit_not_visible)
+        }
+      case let destroyAddr as DestroyAddrInst:
+        if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
+          context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
+        }
+
       default:
         break
       }

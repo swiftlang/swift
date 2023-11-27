@@ -543,6 +543,10 @@ SWIFT_NAME("BridgedNominalTypeDecl.isGlobalActor(self:)")
 BRIDGED_INLINE
 bool BridgedNominalTypeDecl_isGlobalActor(BridgedNominalTypeDecl decl);
 
+SWIFT_NAME("BridgedNominalTypeDecl.hasValueDeinit(self:)")
+BRIDGED_INLINE
+bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl);
+
 SWIFT_NAME("BridgedNominalTypeDecl.setParsedMembers(self:_:)")
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
                                              BridgedArrayRef members);
