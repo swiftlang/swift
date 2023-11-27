@@ -2392,16 +2392,6 @@ FUNCTION(TaskGetMainExecutor,
          EFFECT(Concurrency),
          MEMEFFECTS(ArgMemOnly))
 
-// TaskExecutorRef swift_task_getPreferredTaskExecutor();
-FUNCTION(TaskGetPreferredTaskExecutor,
-         swift_task_getPreferredTaskExecutor, SwiftCC,
-         TaskExecutorAvailability,
-         RETURNS(SwiftExecutorTy),
-         ARGS(),
-         ATTRS(NoUnwind, WillReturn),
-         EFFECT(Concurrency),
-         MEMEFFECTS(ArgMemOnly))
-
 // void swift_defaultActor_initialize(DefaultActor *actor);
 FUNCTION(DefaultActorInitialize,
          swift_defaultActor_initialize, SwiftCC,

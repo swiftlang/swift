@@ -508,11 +508,6 @@ FuncDecl *SILGenModule::getGetMainExecutor() {
                                     "_getMainExecutor");
 }
 
-FuncDecl *SILGenModule::getPreferredTaskExecutor() {
-  return lookupConcurrencyIntrinsic(getASTContext(), GetPreferredTaskExecutor,
-                                    "_getPreferredTaskExecutor");
-}
-
 FuncDecl *SILGenModule::getSwiftJobRun() {
   return lookupConcurrencyIntrinsic(getASTContext(), SwiftJobRun,
                                     "_swiftJobRun");

@@ -2,7 +2,6 @@
 
 // REQUIRES: concurrency
 
-import Swift
 import _Concurrency
 
 @MainActor
