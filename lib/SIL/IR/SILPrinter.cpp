@@ -1701,6 +1701,9 @@ public:
     if (BBI->hasPointerEscape()) {
       *this << "[pointer_escape] ";
     }
+    if (BBI->isFromVarDecl()) {
+      *this << "[var_decl] ";
+    }
     *this << getIDAndType(BBI->getOperand());
   }
 
@@ -2074,6 +2077,8 @@ public:
       *this << "[lexical] ";
     if (I->hasPointerEscape())
       *this << "[pointer_escape] ";
+    if (I->isFromVarDecl())
+      *this << "[var_decl] ";
     *this << getIDAndType(I->getOperand());
   }
 

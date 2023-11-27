@@ -3801,6 +3801,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool allowsDiagnostics = false;
     bool isLexical = false;
     bool hasPointerEscape = false;
+    bool fromVarDecl = false;
 
     StringRef AttrName;
     SourceLoc AttrLoc;
@@ -3811,6 +3812,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         isLexical = true;
       else if (AttrName == "pointer_escape")
         hasPointerEscape = true;
+      else if (AttrName == "var_decl")
+        fromVarDecl = true;
       else {
         P.diagnose(InstLoc.getSourceLoc(),
                    diag::sil_invalid_attribute_for_instruction, AttrName,
@@ -3823,7 +3826,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    auto *MVI = B.createMoveValue(InstLoc, Val, isLexical, hasPointerEscape);
+    auto *MVI = B.createMoveValue(InstLoc, Val, isLexical, hasPointerEscape,
+                                  fromVarDecl);
     MVI->setAllowsDiagnostics(allowsDiagnostics);
     ResultVal = MVI;
     break;
@@ -4032,6 +4036,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     bool isLexical = false;
     bool hasPointerEscape = false;
+    bool fromVarDecl = false;
 
     StringRef AttrName;
     SourceLoc AttrLoc;
@@ -4040,6 +4045,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         isLexical = true;
       else if (AttrName == "pointer_escape")
         hasPointerEscape = true;
+      else if (AttrName == "var_decl")
+        fromVarDecl = true;
       else {
         P.diagnose(InstLoc.getSourceLoc(),
                    diag::sil_invalid_attribute_for_instruction, AttrName,
@@ -4052,7 +4059,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createBeginBorrow(InstLoc, Val, isLexical, hasPointerEscape);
+    ResultVal = B.createBeginBorrow(InstLoc, Val, isLexical, hasPointerEscape,
+                                    fromVarDecl);
     break;
   }
 
