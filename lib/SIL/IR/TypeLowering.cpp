@@ -2369,6 +2369,9 @@ namespace {
         properties.setLexical(IsLexical);
         return handleMoveOnlyAddressOnly(structType, properties);
       }
+      if (D->getValueTypeDestructor()) {
+        properties.setHasValueDeinit();
+      }
 
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
@@ -2450,6 +2453,9 @@ namespace {
             applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
         return new (TC) LoadableEnumTypeLowering(enumType, properties,
                                                  Expansion);
+      }
+      if (D->getValueTypeDestructor()) {
+        properties.setHasValueDeinit();
       }
 
       auto subMap = enumType->getContextSubstitutionMap(&TC.M, D);

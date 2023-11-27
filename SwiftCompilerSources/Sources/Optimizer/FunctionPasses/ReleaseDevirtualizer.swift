@@ -167,7 +167,7 @@ private extension Type {
       return true
     }
     if isStruct {
-      return getNominalFields(in: function).containsSingleReference(in: function)
+      return getNominalFields(in: function)?.containsSingleReference(in: function) ?? false
     } else if isTuple {
       return tupleElements.containsSingleReference(in: function)
     } else {

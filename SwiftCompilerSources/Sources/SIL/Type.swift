@@ -43,6 +43,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return bridged.isReferenceCounted(function.bridged)
   }
 
+  public func selfOrAnyFieldHasValueDeinit(in function: Function) -> Bool {
+    return bridged.selfOrAnyFieldHasValueDeinit(function.bridged)
+  }
+
   public var isUnownedStorageType: Bool {
     return bridged.isUnownedStorageType()
   }
@@ -86,8 +90,24 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
-  public func getNominalFields(in function: Function) -> NominalFieldsArray {
-    NominalFieldsArray(type: self, function: function)
+  /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
+  /// Returns nil if the nominal is a resilient type because in this case the complete list
+  /// of fields is not known.
+  public func getNominalFields(in function: Function) -> NominalFieldsArray? {
+    if nominal.isResilient(in: function) {
+      return nil
+    }
+    return NominalFieldsArray(type: self, function: function)
+  }
+
+  /// Can only be used if the type is in fact an enum type.
+  /// Returns nil if the enum is a resilient type because in this case the complete list
+  /// of cases is not known.
+  public func getEnumCases(in function: Function) -> EnumCases? {
+    if nominal.isResilient(in: function) {
+      return nil
+    }
+    return EnumCases(enumType: self, function: function)
   }
 
   public typealias MetatypeRepresentation = BridgedType.MetatypeRepresentation
@@ -189,6 +209,36 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
+public struct EnumCase {
+  public let payload: Type?
+  public let index: Int
+}
+
+public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
+  fileprivate let enumType: Type
+  fileprivate let function: Function
+  private var caseIterator: BridgedType.EnumElementIterator
+  private var caseIndex = 0
+
+  fileprivate init(enumType: Type, function: Function) {
+    self.enumType = enumType
+    self.function = function
+    self.caseIterator = enumType.bridged.getFirstEnumCaseIterator()
+  }
+
+  public mutating func next() -> EnumCase? {
+    if !enumType.bridged.isEndCaseIterator(caseIterator) {
+      defer {
+        caseIterator = caseIterator.getNext()
+        caseIndex += 1
+      }
+      return EnumCase(payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
+                      index: caseIndex)
+    }
+    return nil
+  }
+}
+
 public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
 
@@ -207,7 +257,7 @@ extension BridgedType {
 
 // TODO: use an AST type for this once we have it
 public struct NominalTypeDecl : Equatable, Hashable {
-  private let bridged: BridgedNominalTypeDecl
+  public let bridged: BridgedNominalTypeDecl
 
   public init(_bridged: BridgedNominalTypeDecl) {
     self.bridged = _bridged
@@ -223,11 +273,19 @@ public struct NominalTypeDecl : Equatable, Hashable {
     hasher.combine(bridged.raw)
   }
 
+  public func isResilient(in function: Function) -> Bool {
+    function.bridged.isResilientNominalDecl(bridged)
+  }
+
   public var isStructWithUnreferenceableStorage: Bool {
     bridged.isStructWithUnreferenceableStorage()
   }
 
   public var isGlobalActor: Bool {
     return bridged.isGlobalActor()
+  }
+
+  public var hasValueDeinit: Bool {
+    return bridged.hasValueDeinit()
   }
 }

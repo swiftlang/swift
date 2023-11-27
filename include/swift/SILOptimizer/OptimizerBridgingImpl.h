@@ -183,9 +183,19 @@ BridgedDiagnosticEngine BridgedPassContext::getDiagnosticEngine() const {
 
 // SIL modifications
 
-BridgedBasicBlock BridgedPassContext::splitBlock(BridgedInstruction bridgedInst) const {
+BridgedBasicBlock BridgedPassContext::splitBlockBefore(BridgedInstruction bridgedInst) const {
   auto *block = bridgedInst.unbridged()->getParent();
   return {block->split(bridgedInst.unbridged()->getIterator())};
+}
+
+BridgedBasicBlock BridgedPassContext::splitBlockAfter(BridgedInstruction bridgedInst) const {
+  auto *block = bridgedInst.unbridged()->getParent();
+  return {block->split(std::next(bridgedInst.unbridged()->getIterator()))};
+}
+
+BridgedBasicBlock BridgedPassContext::createBlockAfter(BridgedBasicBlock bridgedBlock) const {
+  swift::SILBasicBlock *block = bridgedBlock.unbridged();
+  return {block->getParent()->createBasicBlockAfter(block)};
 }
 
 void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
