@@ -8,6 +8,8 @@
 // CHECK:   func testMutable() -> Int32
 // CHECK:   class func create() -> Empty
 // CHECK: }
+// CHECK: func takesConstRefEmpty(_ e: Empty)
+// CHECK: func takesConstRefEmptyDefaulted(_ e: Empty)
 // CHECK: func mutateIt(_: Empty)
 // CHECK-NOT: func passThroughByValue(_ x: Empty) -> Empty
 

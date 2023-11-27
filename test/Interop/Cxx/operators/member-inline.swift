@@ -413,4 +413,10 @@ OperatorsTestSuite.test("DerivedFromLoadableIntWrapperWithUsingDecl") {
   expectEqual(666, d.getValue())
 }
 
+OperatorsTestSuite.test("HasOperatorCallWithDefaultArg.call") {
+  let h = HasOperatorCallWithDefaultArg(value: 321)
+  let res = h(123)
+  expectEqual(444, res)
+}
+
 runAllTests()

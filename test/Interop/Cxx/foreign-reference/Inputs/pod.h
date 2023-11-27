@@ -21,6 +21,8 @@ __attribute__((swift_attr("release:immortal"))) Empty {
   static Empty *create() { return new (malloc(sizeof(Empty))) Empty(); }
 };
 
+void takesConstRefEmpty(const Empty &e) {}
+void takesConstRefEmptyDefaulted(const Empty &e = {}) {}
 void mutateIt(Empty &) {}
 Empty passThroughByValue(Empty x) { return x; }
 

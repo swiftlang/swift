@@ -4199,14 +4199,20 @@ void ClangModuleUnit::getImportedModulesForLookup(
 void ClangImporter::getMangledName(raw_ostream &os,
                                    const clang::NamedDecl *clangDecl) const {
   if (!Impl.Mangler)
-    Impl.Mangler.reset(Impl.getClangASTContext().createMangleContext());
+    Impl.Mangler.reset(getClangASTContext().createMangleContext());
 
+  return Impl.getMangledName(Impl.Mangler.get(), clangDecl, os);
+}
+
+void ClangImporter::Implementation::getMangledName(
+    clang::MangleContext *mangler, const clang::NamedDecl *clangDecl,
+    raw_ostream &os) {
   if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
     auto ctorGlobalDecl =
         clang::GlobalDecl(ctor, clang::CXXCtorType::Ctor_Complete);
-    Impl.Mangler->mangleCXXName(ctorGlobalDecl, os);
+    mangler->mangleCXXName(ctorGlobalDecl, os);
   } else {
-    Impl.Mangler->mangleName(clangDecl, os);
+    mangler->mangleName(clangDecl, os);
   }
 }
 
@@ -7044,6 +7050,14 @@ bool ClangImporter::isAnnotatedWith(const clang::CXXMethodDecl *method,
          });
 }
 
+FuncDecl *
+ClangImporter::getDefaultArgGenerator(const clang::ParmVarDecl *param) {
+  auto it = Impl.defaultArgGenerators.find(param);
+  if (it != Impl.defaultArgGenerators.end())
+    return it->second;
+  return nullptr;
+}
+
 SwiftLookupTable *
 ClangImporter::findLookupTable(const clang::Module *clangModule) {
   return Impl.findLookupTable(clangModule);
@@ -7190,7 +7204,7 @@ static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
          });
 }
 
-static bool hasUnsafeAPIAttr(const clang::Decl *decl) {
+bool importer::hasUnsafeAPIAttr(const clang::Decl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
              return swiftAttr->getAttribute() == "import_unsafe";
@@ -7254,6 +7268,10 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
   }
 
   return false;
+}
+
+bool importer::isViewType(const clang::CXXRecordDecl *decl) {
+  return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
 static bool copyConstructorIsDefaulted(const clang::CXXRecordDecl *decl) {
@@ -7581,8 +7599,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         // A projection of a view type (such as a string_view) from a self
         // contained parent is a proejction (unsafe).
         if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
-            !hasOwnedValueAttr(cxxRecordReturnType) &&
-            hasPointerInSubobjects(cxxRecordReturnType)) {
+            isViewType(cxxRecordReturnType)) {
           return !parentIsSelfContained;
         }
       }

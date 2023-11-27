@@ -719,6 +719,13 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   }
   case SILDeclRef::Kind::EnumElement:
     return true;
+  case SILDeclRef::Kind::DefaultArgGenerator: {
+    // Default arguments of C++ functions are only emitted if used.
+    if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+      return true;
+
+    break;
+  }
   default:
     break;
   }

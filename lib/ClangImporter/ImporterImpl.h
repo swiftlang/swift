@@ -589,6 +589,10 @@ public:
     return Instance.get();
   }
 
+  /// Writes the mangled name of \p clangDecl to \p os.
+  void getMangledName(clang::MangleContext *mangler,
+                      const clang::NamedDecl *clangDecl, raw_ostream &os);
+
   /// Whether the C++ interoperability compatibility version is at least
   /// 'major'.
   ///
@@ -664,6 +668,10 @@ private:
       clonedBaseMembers;
 
 public:
+  llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
+
+  bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
+
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
@@ -1984,6 +1992,10 @@ inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
 #include "clang/Basic/OperatorKinds.def"
   return "None";
 }
+
+bool hasUnsafeAPIAttr(const clang::Decl *decl);
+
+bool isViewType(const clang::CXXRecordDecl *decl);
 
 }
 }

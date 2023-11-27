@@ -981,6 +981,10 @@ bool SILDeclRef::isForeignToNativeThunk() const {
   // have a foreign-to-native thunk.
   if (!hasDecl())
     return false;
+  // A default argument generator for a C++ function is a Swift function, so no
+  // thunk needed.
+  if (isDefaultArgGenerator())
+    return false;
   if (requiresForeignToNativeThunk(getDecl()))
     return true;
   // ObjC initializing constructors and factories are foreign.
@@ -1103,7 +1107,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   // As a special case, Clang functions and globals don't get mangled at all
   // - except \c objc_direct decls.
-  if (hasDecl()) {
+  if (hasDecl() && !isDefaultArgGenerator()) {
     if (getDecl()->getClangDecl()) {
       if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
         auto clangMangling = mangleClangDecl(getDecl(), isForeign);

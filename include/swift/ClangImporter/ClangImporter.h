@@ -587,6 +587,8 @@ public:
 
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
+  FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
+
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
 
   /// Find the lookup table that corresponds to the given Clang module.
