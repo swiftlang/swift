@@ -2212,9 +2212,7 @@ public:
   }
 
   /// Returns the typechecked binding entry at the given index.
-  const PatternBindingEntry *
-  getCheckedPatternBindingEntry(unsigned i,
-                                bool leaveClosureBodiesUnchecked = false) const;
+  const PatternBindingEntry *getCheckedPatternBindingEntry(unsigned i) const;
 
   /// Clean up walking the initializers for the pattern
   class InitIterator {

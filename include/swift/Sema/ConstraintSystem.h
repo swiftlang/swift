@@ -1806,14 +1806,10 @@ enum class ConstraintSystemFlags {
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x08,
 
-  /// Don't try to type check closure bodies, and leave them unchecked. This is
-  /// used for source tooling functionalities.
-  LeaveClosureBodyUnchecked = 0x10,
-
   /// If set, we are solving specifically to determine the type of a
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
-  ForCodeCompletion = 0x20,
+  ForCodeCompletion = 0x10,
 
   /// Include Clang function types when checking equality for function types.
   ///
@@ -1824,13 +1820,13 @@ enum class ConstraintSystemFlags {
   /// should be treated as semantically different, as they may have different
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
-  UseClangFunctionTypes = 0x40,
+  UseClangFunctionTypes = 0x20,
 
   /// When set, ignore async/sync mismatches
-  IgnoreAsyncSyncMismatch = 0x80,
+  IgnoreAsyncSyncMismatch = 0x40,
 
   /// Disable macro expansions.
-  DisableMacroExpansions = 0x100,
+  DisableMacroExpansions = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -5210,8 +5206,7 @@ public:
   /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
   /// to replace any discovered invalid member references with `ErrorExpr`.
   static bool preCheckTarget(SyntacticElementTarget &target,
-                             bool replaceInvalidRefsWithErrors,
-                             bool leaveClosureBodiesUnchecked);
+                             bool replaceInvalidRefsWithErrors);
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
@@ -5219,8 +5214,7 @@ public:
   /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
   /// to replace any discovered invalid member references with `ErrorExpr`.
   static bool preCheckExpression(Expr *&expr, DeclContext *dc,
-                                 bool replaceInvalidRefsWithErrors,
-                                 bool leaveClosureBodiesUnchecked);
+                                 bool replaceInvalidRefsWithErrors);
 
   /// Solve the system of constraints generated from provided target.
   ///

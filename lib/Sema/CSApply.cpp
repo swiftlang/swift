@@ -8749,11 +8749,8 @@ namespace {
         return true;
 
       case SolutionApplicationToFunctionResult::Delay: {
-        if (!Rewriter.cs.Options
-                .contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked)) {
-          auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
-          ClosuresToTypeCheck.push_back(closure);
-        }
+        auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
+        ClosuresToTypeCheck.push_back(closure);
         return false;
       }
       }
