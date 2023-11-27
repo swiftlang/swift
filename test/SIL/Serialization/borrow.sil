@@ -11,6 +11,7 @@ import Builtin
 // CHECK-LABEL: sil [serialized] [ossa] @begin_borrow_test
 // CHECK: begin_borrow [lexical] {{%[^,]+}}
 // CHECK: begin_borrow {{%[^,]+}}
+// CHECK: begin_borrow [var_decl] {{%[^,]+}}
 // CHECK: } // end sil function 'begin_borrow_test'
 sil [serialized] [ossa] @begin_borrow_test : $@convention(thin) () -> () {
   %instance = alloc_ref $C
@@ -18,6 +19,8 @@ sil [serialized] [ossa] @begin_borrow_test : $@convention(thin) () -> () {
   end_borrow %guaranteed_c : $C
   %guaranteed_c2 = begin_borrow %instance : $C
   end_borrow %guaranteed_c2 : $C
+  %guaranteed_c3 = begin_borrow [var_decl] %instance : $C
+  end_borrow %guaranteed_c3 : $C
   destroy_value %instance : $C
   %res = tuple ()
   return %res : $()
