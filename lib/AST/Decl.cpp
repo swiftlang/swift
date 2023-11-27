@@ -9102,6 +9102,24 @@ bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
 }
 
+bool AbstractFunctionDecl::hasBody() const {
+  switch (getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::Parsed:
+  case BodyKind::SILSynthesize:
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    return true;
+
+  case BodyKind::None:
+    return false;
+
+  case BodyKind::TypeChecked:
+    return BodyAndFP.getBody() != nullptr;
+  }
+}
+
+
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&
@@ -10857,13 +10875,13 @@ void ParseAbstractFunctionBodyRequest::cacheResult(
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
-  case BodyKind::None:
     // The body is always empty, so don't cache anything.
     assert(!value.getFingerprint().has_value() && value.getBody() == nullptr);
     return;
 
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
+  case BodyKind::None:
     afd->BodyAndFP = value;
     return;
 
