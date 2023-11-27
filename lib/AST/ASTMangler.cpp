@@ -3892,7 +3892,7 @@ void ASTMangler::appendMacroExpansionContext(
   // Freestanding macros
 #define FREESTANDING_MACRO_ROLE(Name, Description) \
   case GeneratedSourceInfo::Name##MacroExpansion:
-#define ATTACHED_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
 #include "swift/Basic/MacroRoles.def"
   {
     auto parent = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode);
@@ -3914,7 +3914,7 @@ void ASTMangler::appendMacroExpansionContext(
 
   // Attached macros
 #define FREESTANDING_MACRO_ROLE(Name, Description)
-#define ATTACHED_MACRO_ROLE(Name, Description)      \
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)      \
     case GeneratedSourceInfo::Name##MacroExpansion:
 #include "swift/Basic/MacroRoles.def"
   {
@@ -3956,34 +3956,17 @@ void ASTMangler::appendMacroExpansionOperator(
 
   switch (role) {
 #define FREESTANDING_MACRO_ROLE(Name, Description) case MacroRole::Name:
-#define ATTACHED_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
 #include "swift/Basic/MacroRoles.def"
     appendOperator("fMf", Index(discriminator));
     break;
 
-  case MacroRole::Accessor:
-    appendOperator("fMa", Index(discriminator));
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar) \
+  case MacroRole::Name:                                     \
+    appendOperator("fM" MangledChar, Index(discriminator)); \
     break;
-
-  case MacroRole::MemberAttribute:
-    appendOperator("fMr", Index(discriminator));
-    break;
-
-  case MacroRole::Member:
-    appendOperator("fMm", Index(discriminator));
-    break;
-
-  case MacroRole::Peer:
-    appendOperator("fMp", Index(discriminator));
-    break;
-
-  case MacroRole::Conformance:
-    appendOperator("fMc", Index(discriminator));
-    break;
-
-  case MacroRole::Extension:
-    appendOperator("fMe", Index(discriminator));
-    break;
+#include "swift/Basic/MacroRoles.def"
   }
 }
 
