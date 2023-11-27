@@ -4503,6 +4503,9 @@ The optional ``lexical`` attribute specifies that the operand corresponds to a
 local variable in the Swift source, so special care must be taken when moving
 the end_borrow.
 
+The optional ``pointer_escape`` attribute specifies that a pointer to the
+operand escapes within the borrow scope introduced by this begin_borrow.
+
 This instruction is only valid in functions in Ownership SSA form.
 
 end_borrow
@@ -6257,6 +6260,9 @@ a type `T` into the move only value space.
 
 The ``lexical`` attribute specifies that the value corresponds to a local
 variable in the Swift source.
+
+The optional ``pointer_escape`` attribute specifies that a pointer to the
+operand escapes within the scope introduced by this move_value.
 
 
 drop_deinit
