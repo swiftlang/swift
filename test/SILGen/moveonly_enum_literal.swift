@@ -16,7 +16,7 @@ var value: Bool { false }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21moveonly_enum_literal4testyyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // CHECK: [[VALUE:%.*]] = enum $MoveOnlyIntPair, #MoveOnlyIntPair.lhs!enumelt,
 // CHECK: store [[VALUE]] to [init] [[PROJECT]]

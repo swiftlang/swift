@@ -177,7 +177,8 @@ func stringToPointer(_ s: String) {
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box ${ var Int }
-  // CHECK: [[PB:%.*]] = project_box [[INT]]
+  // CHECK: [[L:%.*]] = begin_borrow [var_decl] [[INT]]
+  // CHECK: [[PB:%.*]] = project_box [[L]]
   takesMutablePointer(&int)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [stack_protection] [[WRITE]]
@@ -229,7 +230,7 @@ func takesPlusZeroOptionalPointer(_ x: AutoreleasingUnsafeMutablePointer<C?>) {}
 func classInoutToPointer() {
   var c = C()
   // CHECK: [[VAR:%.*]] = alloc_box ${ var C }
-  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VAR]]
+  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VAR]]
   // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
   takesPlusOnePointer(&c)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
@@ -288,7 +289,8 @@ func functionInoutToPointer() {
 // CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion20inoutPointerOrderingyyF
 func inoutPointerOrdering() {
   // CHECK: [[ARRAY_BOX:%.*]] = alloc_box ${ var Array<Int> }
-  // CHECK: [[ARRAY:%.*]] = project_box [[ARRAY_BOX]] :
+  // CHECK: [[L:%.*]] = begin_borrow [var_decl] [[ARRAY_BOX]] :
+  // CHECK: [[ARRAY:%.*]] = project_box [[L]] :
   // CHECK: store {{.*}} to [init] [[ARRAY]]
   var array = [Int]()
 
