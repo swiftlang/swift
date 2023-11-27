@@ -66,7 +66,27 @@ func testNonCopyableHolderMutDerefPointeeLet() {
 #endif
 }
 
+func testNonCopyableHolderValueConstDerefPointeeLet() {
+    let holder = NonCopyableHolderValueConstDeref(11)
+    let val = holder.pointee // expected-note {{}}
+    _ = borrowNC(val) // ok
+#if NO_CONSUME
+    val.mutMethod(3) // expected-error {{cannot use mutating member on immutable value: 'val' is a 'let' constant}}
+#endif
+}
+
+func testNonCopyableHolderValueMutDerefPointeeLet() {
+    var holder = NonCopyableHolderValueMutDeref(11)
+    let val = holder.pointee // expected-note {{}}
+    _ = borrowNC(val) // ok
+#if NO_CONSUME
+    val.mutMethod(3) // expected-error {{cannot use mutating member on immutable value: 'val' is a 'let' constant}}
+#endif
+}
+
 testNonCopyableHolderConstDerefPointee()
 testNonCopyableHolderPairedDerefPointee()
 testNonCopyableHolderMutDerefPointee()
 testNonCopyableHolderMutDerefPointeeLet()
+testNonCopyableHolderValueConstDerefPointeeLet()
+testNonCopyableHolderValueMutDerefPointeeLet()

@@ -48,4 +48,16 @@ class NonCopyableHolderMutDeref {
     inline NonCopyable & operator *() { return x; }
 };
 
+class NonCopyableHolderValueConstDeref {
+    NONCOPYABLE_HOLDER_WRAPPER(NonCopyableHolderValueConstDeref)
+
+    inline NonCopyable operator *() const { return NonCopyable(x.x); }
+};
+
+class NonCopyableHolderValueMutDeref {
+    NONCOPYABLE_HOLDER_WRAPPER(NonCopyableHolderValueMutDeref)
+
+    inline NonCopyable operator *() { return NonCopyable(x.x); }
+};
+
 #endif // TEST_INTEROP_CXX_OPERATORS_MOVE_ONLY_OPS_H

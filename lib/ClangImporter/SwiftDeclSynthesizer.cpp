@@ -1755,8 +1755,10 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
   // Use 'address' or 'mutableAddress' accessors for non-copyable
-  // types.
-  bool useAddress = elementTy->isNoncopyable(dc);
+  // types that are returned indirectly.
+  bool isImplicit = !elementTy->isNoncopyable(dc);
+  bool useAddress =
+      rawElementTy->getAnyPointerElementType() && elementTy->isNoncopyable(dc);
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -1773,7 +1775,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
       ParameterList::createEmpty(ctx),
       useAddress ? elementTy->wrapInPointer(PTK_UnsafePointer) : elementTy, dc);
   getterDecl->setAccess(AccessLevel::Public);
-  if (!useAddress)
+  if (isImplicit)
     getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
@@ -1813,7 +1815,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                    : TupleType::getEmpty(ctx),
         dc);
     setterDecl->setAccess(AccessLevel::Public);
-    if (!useAddress)
+    if (isImplicit)
       setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
