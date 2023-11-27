@@ -53,7 +53,8 @@ struct StructOfInt {
 // CHECK: bb0(%0 : $@thin StructOfInt.Type):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var StructOfInt }, var, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]] : ${ var StructOfInt }
-// CHECK:   [[PROJ:%.*]] = project_box [[UNINIT]] : ${ var StructOfInt }, 0
+// CHECK:   [[LIFETIME:%.*]] = begin_borrow [var_decl] [[UNINIT]]
+// CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]] : ${ var StructOfInt }, 0
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]] : $*StructOfInt
 // CHECK:   [[ADR:%.*]] = struct_element_addr [[ACCESS]] : $*StructOfInt, #StructOfInt.i
 // CHECK:   assign %{{.*}} to [[ADR]] : $*Int
@@ -105,7 +106,7 @@ class SubHasInt : SuperHasInt {
 // CHECK: bb0(%0 : @owned $SubHasInt):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SubHasInt }, let, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [derivedself] [[BOX]] : ${ var SubHasInt }
-// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT]]
+// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[UNINIT]]
 // CHECK:   [[PROJ:%.*]] = project_box [[UNINIT_LIFETIME]] : ${ var SubHasInt }, 0
 // CHECK-NOT: begin_access
 // CHECK:   store %0 to [init] [[PROJ]] : $*SubHasInt
@@ -134,7 +135,7 @@ class SubHasInt : SuperHasInt {
 // CHECK: bb0(%0 : $Int, %1 : @owned $SubHasInt):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SubHasInt }, let, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [derivedself] [[BOX]] : ${ var SubHasInt }
-// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT]]
+// CHECK:   [[UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[UNINIT]]
 // CHECK:   [[PROJ:%.*]] = project_box [[UNINIT_LIFETIME]] : ${ var SubHasInt }, 0
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [init] [[PROJ]] : $*SubHasInt
@@ -220,11 +221,12 @@ func testCaptureLocal() -> ()->() {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify16testCaptureLocalyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var Int }, var, name "x"
-// CHECK:   [[PROJ:%.*]] = project_box [[BOX]]
+// CHECK:   [[LIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+// CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
 // CHECK:   store %{{.*}} to [trivial] [[ACCESS]]
 // CHECK:   end_access
-// CHECK:   [[CAPTURE:%.*]] = copy_value [[BOX]] : ${ var Int }
+// CHECK:   [[CAPTURE:%.*]] = copy_value [[LIFETIME]] : ${ var Int }
 // CHECK:   partial_apply [callee_guaranteed] %{{.*}}([[CAPTURE]]) : $@convention(thin) (@guaranteed { var Int }) -> ()
 // CHECK:   begin_access [read] [unknown] [[PROJ]]
 // CHECK:   [[VAL:%.*]] = load [trivial]
