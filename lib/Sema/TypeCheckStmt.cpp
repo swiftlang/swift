@@ -2717,11 +2717,66 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   return body;
 }
 
+/// Determine whether the given declaration requires a definition.
+///
+/// Only valid for declarations that can have definitions, i.e.,
+/// functions, initializers, etc.
+static bool requiresDefinition(Decl *decl) {
+  // Invalid, implicit, and Clang-imported declarations never
+  // require a definition.
+  if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
+    return false;
+
+  // Protocol requirements do not require definitions.
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return false;
+
+  // Functions can have _silgen_name, semantics, and NSManaged attributes.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
+        func->getAttrs().hasAttribute<ExternAttr>() ||
+        func->getAttrs().hasAttribute<SemanticsAttr>() ||
+        func->getAttrs().hasAttribute<NSManagedAttr>())
+      return false;
+  }
+
+  // Declarations in SIL and module interface files don't require
+  // definitions.
+  auto dc = decl->getDeclContext();
+  if (auto sourceFile = dc->getParentSourceFile()) {
+    switch (sourceFile->Kind) {
+    case SourceFileKind::SIL:
+    case SourceFileKind::Interface:
+      return false;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::MacroExpansion:
+      break;
+    }
+  }
+
+  // Declarations deserialized from a module file don't require definitions.
+  if (auto fileUnit = dyn_cast<FileUnit>(dc->getModuleScopeContext()))
+    if (fileUnit->getKind() == FileUnitKind::SerializedAST)
+      return false;
+
+  // Everything else requires a definition.
+  return true;
+}
+
+/// Determine whether the given declaration should not have a definition.
+static bool requiresNoDefinition(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    // Function with @_extern should not have a body.
+    return func->getAttrs().hasAttribute<ExternAttr>();
+  }
+  // Everything else can have a definition.
+  return false;
+}
+
 BraceStmt *
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
-  assert(!AFD->isBodySkipped());
-
   ASTContext &ctx = AFD->getASTContext();
 
   llvm::Optional<FunctionBodyTimer> timer;
@@ -2729,7 +2784,31 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
 
+  /// If the function body has been skipped, there's nothing to do here.
+  if (AFD->isBodySkipped())
+    return nullptr;
+
   BraceStmt *body = AFD->getBody();
+
+  // If there is no function body, there is nothing to type-check.
+  if (!body) {
+    // If a definition is required here, complain.
+    if (requiresDefinition(AFD)) {
+      if (isa<ConstructorDecl>(AFD))
+        AFD->diagnose(diag::missing_initializer_def);
+      else
+        AFD->diagnose(diag::func_decl_without_brace);
+    }
+
+    return nullptr;
+  }
+
+  // If the function body must not have a definition, complain and drop it.
+  if (requiresNoDefinition(AFD)) {
+    AFD->diagnose(diag::func_decl_no_body_expected);
+    return nullptr;
+  }
+
   assert(body && "Expected body to type-check");
 
   // It's possible we synthesized an already type-checked body, in which case

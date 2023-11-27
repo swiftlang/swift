@@ -44,6 +44,11 @@ import SIL
 let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals") {
   (function: Function, context: FunctionPassContext) in
 
+  if context.hadError {
+    // In case of a preceding error, there is no guarantee that the SIL is valid.
+    return
+  }
+
   if !function.isGlobalInitOnceFunction {
     return
   }
@@ -176,7 +181,13 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> ([StoreInst], 
     return nil
   }
   let structAddr = elementAddr.struct
-  let numElements = structAddr.type.getNominalFields(in: firstStore.parentFunction).count
+  if structAddr.type.isMoveOnly {
+    return nil
+  }
+  guard let fields = structAddr.type.getNominalFields(in: firstStore.parentFunction) else {
+    return nil
+  }
+  let numElements = fields.count
   var elementStores = Array<StoreInst?>(repeating: nil, count: numElements)
   var numStoresFound = 0
 

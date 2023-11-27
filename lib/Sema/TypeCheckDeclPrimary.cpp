@@ -3434,57 +3434,6 @@ public:
     // PatternBindingDecl.
   }
 
-  /// Determine whether the given declaration should not have a definition.
-  static bool requiresNoDefinition(Decl *decl) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      // Function with @_extern should not have a body.
-      return func->getAttrs().hasAttribute<ExternAttr>();
-    }
-    // Everything else can have a definition.
-    return false;
-  }
-
-  /// Determine whether the given declaration requires a definition.
-  ///
-  /// Only valid for declarations that can have definitions, i.e.,
-  /// functions, initializers, etc.
-  static bool requiresDefinition(Decl *decl) {
-    // Invalid, implicit, and Clang-imported declarations never
-    // require a definition.
-    if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
-      return false;
-
-    // Protocol requirements do not require definitions.
-    if (isa<ProtocolDecl>(decl->getDeclContext()))
-      return false;
-
-    // Functions can have _silgen_name, semantics, and NSManaged attributes.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
-          func->getAttrs().hasAttribute<ExternAttr>() ||
-          func->getAttrs().hasAttribute<SemanticsAttr>() ||
-          func->getAttrs().hasAttribute<NSManagedAttr>())
-        return false;
-    }
-
-    // Declarations in SIL and module interface files don't require
-    // definitions.
-    if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
-      switch (sourceFile->Kind) {
-      case SourceFileKind::SIL:
-      case SourceFileKind::Interface:
-        return false;
-      case SourceFileKind::Library:
-      case SourceFileKind::Main:
-      case SourceFileKind::MacroExpansion:
-        break;
-      }
-    }
-
-    // Everything else requires a definition.
-    return true;
-  }
-
   /// FIXME: This is an egregious hack to turn off availability checking
   /// for specific functions that were missing availability in older versions
   /// of existing libraries that we must nonetheless still support.
@@ -3541,13 +3490,7 @@ public:
         !hasHistoricallyWrongAvailability(FD))
       TypeChecker::checkConcurrencyAvailability(FD->getAsyncLoc(), FD);
     
-    if (requiresDefinition(FD) && !FD->hasBody()) {
-      // Complain if we should have a body.
-      FD->diagnose(diag::func_decl_without_brace);
-    } else if (requiresNoDefinition(FD) && FD->hasBody()) {
-      // Complain if we have a body but shouldn't.
-      FD->diagnose(diag::func_decl_no_body_expected);
-    } else if (FD->getDeclContext()->isLocalContext()) {
+    if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       (void)FD->getTypecheckedBody();
       TypeChecker::computeCaptures(FD);
@@ -4043,10 +3986,7 @@ public:
 
     checkExplicitAvailability(CD);
 
-    if (requiresDefinition(CD) && !CD->hasBody()) {
-      // Complain if we should have a body.
-      CD->diagnose(diag::missing_initializer_def);
-    } else if (CD->getDeclContext()->isLocalContext()) {
+    if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       (void)CD->getTypecheckedBody();
     } else if (!CD->isBodySkipped()) {

@@ -2343,20 +2343,11 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
 
 static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   switch (context) {
-#define CASE(NAME) \
-  case swift::MacroRole::NAME: \
-    return static_cast<uint8_t>(serialization::MacroRole::NAME);
-  CASE(Expression)
-  CASE(Declaration)
-  CASE(Accessor)
-  CASE(MemberAttribute)
-  CASE(Member)
-  CASE(Peer)
-  CASE(Conformance)
-  CASE(CodeItem)
-  CASE(Extension)
+#define MACRO_ROLE(Name, Description) \
+  case swift::MacroRole::Name: \
+    return static_cast<uint8_t>(serialization::MacroRole::Name);
+#include "swift/Basic/MacroRoles.def"
   }
-#undef CASE
   llvm_unreachable("bad result declaration macro kind");
 }
 

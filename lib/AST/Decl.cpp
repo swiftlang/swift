@@ -9102,6 +9102,24 @@ bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
 }
 
+bool AbstractFunctionDecl::hasBody() const {
+  switch (getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::Parsed:
+  case BodyKind::SILSynthesize:
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    return true;
+
+  case BodyKind::None:
+    return false;
+
+  case BodyKind::TypeChecked:
+    return BodyAndFP.getBody() != nullptr;
+  }
+}
+
+
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&
@@ -10857,13 +10875,13 @@ void ParseAbstractFunctionBodyRequest::cacheResult(
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
-  case BodyKind::None:
     // The body is always empty, so don't cache anything.
     assert(!value.getFingerprint().has_value() && value.getBody() == nullptr);
     return;
 
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
+  case BodyKind::None:
     afd->BodyAndFP = value;
     return;
 
@@ -11019,12 +11037,12 @@ StringRef swift::getMacroIntroducedDeclNameString(
 static MacroRoles freestandingMacroRoles =
   (MacroRoles()
 #define FREESTANDING_MACRO_ROLE(Name, Description) | MacroRole::Name
-#define ATTACHED_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
 #include "swift/Basic/MacroRoles.def"
    );
 static MacroRoles attachedMacroRoles = 
   (MacroRoles()
-#define ATTACHED_MACRO_ROLE(Name, Description) | MacroRole::Name
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar) | MacroRole::Name
 #define FREESTANDING_MACRO_ROLE(Name, Description)
 #include "swift/Basic/MacroRoles.def"
    );
@@ -11047,9 +11065,9 @@ MacroRoles swift::getAttachedMacroRoles() {
 
 bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
   switch (role) {
-#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName) \
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, MangledChar, FeatureName) \
   case MacroRole::Name: \
-    return ctx.LangOpts.hasFeature(FeatureName::CodeItemMacros);
+    return ctx.LangOpts.hasFeature(Feature::FeatureName);
 
 #define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, FeatureName) \
   case MacroRole::Name: return ctx.LangOpts.hasFeature(Feature::FeatureName);
@@ -11058,7 +11076,7 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
 
 #include "swift/Basic/MacroRoles.def"
 
-#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName)
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, MangledChar, FeatureName)
 #define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, FeatureName)
 #define MACRO_ROLE(Name, Description) case MacroRole::Name:
 #include "swift/Basic/MacroRoles.def"
@@ -11506,7 +11524,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   // Attached macros
 #define FREESTANDING_MACRO_ROLE(Name, Description)  \
   case GeneratedSourceInfo::Name##MacroExpansion:
-#define ATTACHED_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
 #include "swift/Basic/MacroRoles.def"
   {
     auto node = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode);
@@ -11525,7 +11543,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
 
   // Attached macros
 #define FREESTANDING_MACRO_ROLE(Name, Description)
-#define ATTACHED_MACRO_ROLE(Name, Description)      \
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)      \
   case GeneratedSourceInfo::Name##MacroExpansion:
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:

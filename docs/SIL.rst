@@ -4550,10 +4550,19 @@ end_lifetime
 
    sil-instruction ::= 'end_lifetime' sil-operand
 
+   // Consumes %0 without destroying it
+   end_lifetime %0 : $T
+
+   // Consumes the memory location %1 without destroying it
+   end_lifetime %1 : $*T
+
 This instruction signifies the end of it's operand's lifetime to the ownership
 verifier. It is inserted by the compiler in instances where it could be illegal
 to insert a destroy operation. Ex: if the sil-operand had an undef value.
 
+The instruction accepts an object or address type.
+
+`@owned T`. If its argument is an address type, it's an identity projection.
 This instruction is valid only in OSSA and is lowered to a no-op when lowering
 to non-OSSA.
 

@@ -190,7 +190,9 @@ struct BridgedPassContext {
     bool cfgChanged;
   };
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlock(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockBefore(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitBlockAfter(BridgedInstruction bridgedInst) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
@@ -266,6 +268,7 @@ struct BridgedPassContext {
                                                                           bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
 
   // Passmanager housekeeping

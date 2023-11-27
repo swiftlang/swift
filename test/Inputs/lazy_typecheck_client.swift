@@ -12,23 +12,27 @@ struct ConformsToMainActorProto: MainActorProtocol {
 }
 
 func testGlobalFunctions() {
-  _ = publicFunc()
-  _ = publicFuncWithDefaultArg()
+  let _: Int = publicFunc()
+  let _: Int = publicFuncReturnsTypealias()
+  let _: Int = publicFuncWithDefaultArg()
   #if TEST_PACKAGE
-  _ = packageFunc()
+  let _: Int = packageFunc()
   #endif
   constrainedGenericPublicFunction(ConformsToPublicProto())
-  _ = publicSpecializedFunc(4)
-  _ = publicSpecializedFunc(ConformsToPublicProto())
+  let _: Int = publicSpecializedFunc(4)
+  let _: ConformsToPublicProto = publicSpecializedFunc(ConformsToPublicProto())
   if #available(SwiftStdlib 5.1, *) {
-    _ = publicFuncWithOpaqueReturnType()
-    _ = publicAEICFuncWithOpaqueReturnType()
+    let _: any PublicProto = publicFuncWithOpaqueReturnType()
+    let _: Any = publicAEICFuncWithOpaqueReturnType()
   }
 }
 
 func testGobalVars() {
   let _: Int = publicGlobalVar
+  let _: Int = publicGlobalVarTypealias
   let _: String = publicGlobalVarInferredType
+  let _: [Int] = publicGlobalVarInferredInferredGeneric
+  let _: Int? = publicGlobalVarTypealiasGeneric
   let _: (Int, Int) = (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY)
 }
 
@@ -36,6 +40,7 @@ func testPublicStructs() {
   let s = PublicStruct(x: 1)
   let _: Int = s.publicMethod()
   let _: Int = s.publicProperty
+  let _: Int = s.publicTypealiasProperty
   let _: String = s.publicPropertyInferredType
   let _: Int = s.publicLazyProperty
   let _: Int = s.publicLazyPropertyInferred

@@ -44,6 +44,10 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 //                                BridgedType
 //===----------------------------------------------------------------------===//
 
+BridgedType::EnumElementIterator BridgedType::EnumElementIterator::getNext() const {
+  return EnumElementIterator(std::next(unbridged()));
+}
+
 BridgedOwnedString BridgedType::getDebugDescription() const {
   return BridgedOwnedString(unbridged().getDebugDescription());
 }
@@ -82,6 +86,12 @@ bool BridgedType::isLoadable(BridgedFunction f) const {
 
 bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
+}
+
+bool BridgedType::selfOrAnyFieldHasValueDeinit(BridgedFunction f) const {
+  swift::SILType contextType = unbridged().hasTypeParameter() ? f.getFunction()->mapTypeIntoContext(unbridged())
+                                                              : unbridged();
+  return f.getFunction()->getTypeLowering(contextType).selfOrAnyFieldHasValueDeinit();
 }
 
 bool BridgedType::isUnownedStorageType() const {
@@ -208,6 +218,23 @@ SwiftInt BridgedType::getFieldIdxOfNominalType(BridgedStringRef name) const {
 
 BridgedStringRef BridgedType::getFieldName(SwiftInt idx) const {
   return unbridged().getFieldName(idx);
+}
+
+BridgedType::EnumElementIterator BridgedType::getFirstEnumCaseIterator() const {
+  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  return EnumElementIterator(enumDecl->getAllElements().begin());
+}
+
+bool BridgedType::isEndCaseIterator(EnumElementIterator i) const {
+  swift::EnumDecl *enumDecl = unbridged().getEnumOrBoundGenericEnum();
+  return i.unbridged() == enumDecl->getAllElements().end();
+}
+
+BridgedType BridgedType::getEnumCasePayload(EnumElementIterator i, BridgedFunction f) const {
+  swift::EnumElementDecl *elt = *i.unbridged();
+  if (elt->hasAssociatedValues())
+    return unbridged().getEnumElementType(elt, f.getFunction());
+  return swift::SILType();
 }
 
 SwiftInt BridgedType::getNumTupleElements() const {
@@ -413,6 +440,10 @@ SwiftInt BridgedFunction::getNumIndirectFormalResults() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumIndirectFormalResults();
 }
 
+bool BridgedFunction::hasIndirectErrorResult() const {
+  return (SwiftInt)getFunction()->getLoweredFunctionType()->hasIndirectErrorResult();
+}
+
 SwiftInt BridgedFunction::getNumParameters() const {
   return (SwiftInt)getFunction()->getLoweredFunctionType()->getNumParameters();
 }
@@ -521,6 +552,11 @@ bool BridgedFunction::needsStackProtection() const {
 
 void BridgedFunction::setNeedStackProtection(bool needSP) const {
   getFunction()->setNeedStackProtection(needSP);
+}
+
+bool BridgedFunction::isResilientNominalDecl(BridgedNominalTypeDecl decl) const {
+  return decl.unbridged()->isResilient(getFunction()->getModule().getSwiftModule(),
+                                       getFunction()->getResilienceExpansion());
 }
 
 
@@ -1310,6 +1346,10 @@ BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
   return {unbridged().createDestroyAddr(regularLoc(), op.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createEndLifetime(BridgedValue op) const {
+  return {unbridged().createEndLifetime(regularLoc(), op.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createDebugStep() const {
   return {unbridged().createDebugStep(regularLoc())};
 }
@@ -1327,33 +1367,17 @@ BridgedInstruction BridgedBuilder::createApply(BridgedValue function, BridgedSub
       arguments.getValues(argValues), applyOpts, specInfo.data)};
 }
 
-BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
-                                        const void * _Nullable enumCases, SwiftInt numEnumCases) const {
-  using BridgedCase = const std::pair<SwiftInt, BridgedBasicBlock>;
-  llvm::ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
-                                    (unsigned)numEnumCases);
-  llvm::SmallDenseMap<SwiftInt, swift::EnumElementDecl *> mappedElements;
-  swift::SILValue en = enumVal.getSILValue();
-  swift::EnumDecl *enumDecl = en->getType().getEnumOrBoundGenericEnum();
-  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
-    mappedElements[elemWithIndex.index()] = elemWithIndex.value();
-  }
-  llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16> convertedCases;
-  for (auto c : cases) {
-    assert(mappedElements.count(c.first) && "wrong enum element index");
-    convertedCases.push_back({mappedElements[c.first], c.second.unbridged()});
-  }
-  return {unbridged().createSwitchEnum(regularLoc(), enumVal.getSILValue(),
-                                       defaultBlock.unbridged(),
-                                       convertedCases)};
-}
-
 BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal, SwiftInt caseIdx,
                                            BridgedType resultType) const {
   swift::SILValue en = enumVal.getSILValue();
   return {unbridged().createUncheckedEnumData(
       regularLoc(), enumVal.getSILValue(),
       en->getType().getEnumElement(caseIdx), resultType.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createUncheckedTakeEnumDataAddr(BridgedValue enumAddr, SwiftInt caseIdx) const {
+  swift::SILValue en = enumAddr.getSILValue();
+  return {unbridged().createUncheckedTakeEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx))};
 }
 
 BridgedInstruction BridgedBuilder::createEnum(SwiftInt caseIdx, OptionalBridgedValue payload,

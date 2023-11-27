@@ -4109,46 +4109,19 @@ NodePointer Demangler::demangleMacroExpansion() {
   bool isAttached;
   bool isFreestanding;
   switch (nextChar()) {
-  case 'a':
-    kind = Node::Kind::AccessorAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)    \
+  case MangledChar[0]:                                         \
+    kind = Node::Kind::Name##AttachedMacroExpansion;           \
+    isAttached = true;                                         \
+    isFreestanding = false;                                    \
     break;
-
-  case 'r':
-    kind = Node::Kind::MemberAttributeAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
+#include "swift/Basic/MacroRoles.def"
 
   case 'f':
     kind = Node::Kind::FreestandingMacroExpansion;
     isAttached = false;
     isFreestanding = true;
-    break;
-
-  case 'm':
-    kind = Node::Kind::MemberAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
-
-  case 'p':
-    kind = Node::Kind::PeerAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
-
-  case 'c':
-    kind = Node::Kind::ConformanceAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
-
-  case 'e':
-    kind = Node::Kind::ExtensionAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
     break;
 
   case 'u':

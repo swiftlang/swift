@@ -473,7 +473,7 @@ public:
   SingleValueInstruction *
   getRootLocalArchetypeDefInst(CanLocalArchetypeType archetype,
                                SILFunction *inFunction) {
-    return cast<SingleValueInstruction>(
+    return dyn_cast<SingleValueInstruction>(
         getRootLocalArchetypeDef(archetype, inFunction));
   }
 

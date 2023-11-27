@@ -41,6 +41,10 @@ bool BridgedNominalTypeDecl_isGlobalActor(BridgedNominalTypeDecl decl) {
   return decl.unbridged()->isGlobalActor();
 }
 
+bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl) {
+  return decl.unbridged()->getValueTypeDestructor() != nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedVarDecl
 //===----------------------------------------------------------------------===//

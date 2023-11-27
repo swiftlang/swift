@@ -570,7 +570,7 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
                                    Decl *attachedTo) {
   switch (role) {
 #define FREESTANDING_MACRO_ROLE(Name, Description) case MacroRole::Name:
-#define ATTACHED_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
 #include "swift/Basic/MacroRoles.def"
     llvm_unreachable("Invalid macro role for attached macro");
 

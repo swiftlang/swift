@@ -71,6 +71,11 @@ llvm::cl::opt<bool>
     EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(false),
                           llvm::cl::desc("Enable the DestroyHoisting pass."));
 
+llvm::cl::opt<bool>
+    EnableDeinitDevirtualizer("enable-deinit-devirtualizer", llvm::cl::init(false),
+                          llvm::cl::desc("Enable the DestroyHoisting pass."));
+
+
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -162,6 +167,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
+
+  if (EnableDeinitDevirtualizer)
+    P.addDeinitDevirtualizer();
+
   // Lower move only wrapped trivial types.
   P.addTrivialMoveOnlyTypeEliminator();
   // Check no uses after consume operator of a value in an address.

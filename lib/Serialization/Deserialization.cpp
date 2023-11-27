@@ -2981,19 +2981,10 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
 
 static llvm::Optional<swift::MacroRole> getActualMacroRole(uint8_t context) {
   switch (context) {
-#define CASE(THE_DK) \
-  case (uint8_t)serialization::MacroRole::THE_DK: \
-    return swift::MacroRole::THE_DK;
-  CASE(Expression)
-  CASE(Declaration)
-  CASE(Accessor)
-  CASE(MemberAttribute)
-  CASE(Member)
-  CASE(Peer)
-  CASE(Conformance)
-  CASE(CodeItem)
-  CASE(Extension)
-#undef CASE
+#define MACRO_ROLE(Name, Description)           \
+  case (uint8_t)serialization::MacroRole::Name: \
+    return swift::MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
   }
   return llvm::None;
 }

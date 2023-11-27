@@ -241,9 +241,9 @@ func test8(_ b: Bool) -> Int { // CHECK-NEXT: [[@LINE]]:30 {{.*}} : 0
     if b {                     // CHECK-NEXT: [[@LINE]]:10 {{.*}} : 2
       return 1
     }                          // CHECK-NEXT: [[@LINE]]:6 {{.*}} : (1 - 2)
-  }                            // CHECK: [[@LINE]]:4 {{.*}} : (1 - 2)
+  }                            // CHECK-NEXT: [[@LINE]]:4 {{.*}} : (1 - 2)
   return 0
-}
+}                              // CHECK-NEXT: }
 
 // Test coverage with nested do-catches
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors5test9SiyF"
@@ -362,6 +362,8 @@ func test19() throws -> Int {            // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+
   return x                               // CHECK-NEXT: [[@LINE-1]]:41 -> [[@LINE]]:11 : ((0 - 1) - 2)
 }                                        // CHECK-NEXT: }
 
+// TODO: We probably ought to include the function call in the non-throwing
+// regions here (rdar://118524386).
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test20yyKF"
 func test20() throws { // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+5]]:2 : 0
   takesInts(

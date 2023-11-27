@@ -1703,6 +1703,8 @@ public:
         // the current function.
         auto *openingInst = F.getModule().getRootLocalArchetypeDefInst(
             root, AI->getFunction());
+        require(openingInst,
+                "Root opened archetype should be registered in SILModule");
         require(openingInst == AI || properlyDominates(openingInst, AI),
                 "Use of a local archetype should be dominated by a "
                 "definition of this root opened archetype");

@@ -7245,7 +7245,7 @@ public:
   ///
   /// Note that a true return value does not imply that the body was actually
   /// parsed.
-  bool hasBody() const { return getBodyKind() != BodyKind::None; }
+  bool hasBody() const;
 
   /// Returns true if the text of this function's body can be retrieved either
   /// by extracting the text from the source buffer or reading the inlinable
