@@ -93,7 +93,7 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
       }
     }
 
-    group.addTaskUnlessCancelled(on: secondExecutor) {
+    _ = group.addTaskUnlessCancelled(on: secondExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
       return await withTaskGroup(of: Int.self) { inner in
@@ -116,7 +116,7 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
         }
-        inner.addTaskUnlessCancelled(on: nil) {
+        _ = inner.addTaskUnlessCancelled(on: nil) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -134,7 +134,7 @@ func testTaskGroup(_ firstExecutor: MyTaskExecutor,
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
         }
-        inner.addTaskUnlessCancelled(on: nil) {
+        _ = inner.addTaskUnlessCancelled(on: nil) {
           // disabled the preference
           dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
           dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -155,6 +155,7 @@ func testAsyncLet(_ firstExecutor: MyTaskExecutor,
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
       return 12
     }()
+    _ = await first
   }
   await withTaskExecutor(firstExecutor) {
     await withTaskExecutor(secondExecutor) {
@@ -163,6 +164,7 @@ func testAsyncLet(_ firstExecutor: MyTaskExecutor,
         dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
         return 12
       }()
+      _ = await first
     }
   }
 
@@ -176,6 +178,7 @@ func testAsyncLet(_ firstExecutor: MyTaskExecutor,
         }()
         return await firstInside
       }()
+      _ = await first
     }
   }
 }
@@ -187,10 +190,12 @@ func testGroupAsyncLet(_ firstExecutor: MyTaskExecutor,
       dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
 
-      async let first = expect(firstExecutor)
+      async let first: () = expect(firstExecutor)
+      _ = await first
 
       await withTaskExecutor(secondExecutor) {
-        async let second = expect(secondExecutor)
+        async let second: () = expect(secondExecutor)
+        _ = await second
       }
     }
   }
