@@ -7445,6 +7445,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
 std::pair<bool, llvm::Optional<KeyPathCapability>>
 ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   bool didOptionalChain = false;
+  bool isSendable = true;
 
   auto fail = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
     return std::make_pair(false, llvm::None);
@@ -7454,9 +7455,9 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     return std::make_pair(true, llvm::None);
   };
 
-  auto success = [](KeyPathMutability mutability)
+  auto success = [](KeyPathMutability mutability, bool isSendable)
       -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
-    KeyPathCapability capability(mutability, /*isSendable=*/true);
+    KeyPathCapability capability(mutability, isSendable);
     return std::make_pair(true, capability);
   };
 
@@ -7475,10 +7476,33 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     case KeyPathExpr::Component::Kind::CodeCompletion: {
       return fail();
     }
+
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+    case KeyPathExpr::Component::Kind::Subscript: {
+      if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+        // Key path is sendable only when all of its captures are sendable.
+        if (auto *args = component.getSubscriptArgs()) {
+          auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
+
+          for (const auto &arg : *args) {
+            auto argTy = simplifyType(getType(arg.getExpr()));
+
+            // Sendability cannot be determined until the argument
+            // is fully resolved.
+            if (argTy->hasTypeVariable())
+              return delay();
+
+            auto conformance = lookupConformance(argTy, sendable);
+            isSendable &=
+                bool(conformance) &&
+                !conformance.hasMissingConformance(DC->getParentModule());
+          }
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
     case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::Subscript:
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
-    case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+    case KeyPathExpr::Component::Kind::UnresolvedProperty: {
       auto *componentLoc =
           getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
       auto *calleeLoc = getCalleeLocator(componentLoc);
@@ -7555,7 +7579,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   if (didOptionalChain)
     mutability = KeyPathMutability::ReadOnly;
 
-  return success(mutability);
+  return success(mutability, isSendable);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
