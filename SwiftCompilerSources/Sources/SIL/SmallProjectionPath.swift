@@ -543,7 +543,9 @@ extension StringParser {
         if !ty.isClass && !ty.isStruct {
           try throwError("unknown kind of nominal type")
         }
-        let nominalFields = ty.getNominalFields(in: function)
+        guard let nominalFields = ty.getNominalFields(in: function) else {
+          try throwError("resilient types are not supported")
+        }
         guard let fieldIdx = nominalFields.getIndexOfField(withName: name) else {
           try throwError("field not found")
         }

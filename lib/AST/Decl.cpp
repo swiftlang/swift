@@ -2220,12 +2220,11 @@ bool PatternBindingDecl::hasStorage() const {
   return false;
 }
 
-const PatternBindingEntry *PatternBindingDecl::getCheckedPatternBindingEntry(
-    unsigned i, bool leaveClosureBodiesUnchecked) const {
+const PatternBindingEntry *
+PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
   return evaluateOrDefault(
       getASTContext().evaluator,
-      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
-                                 leaveClosureBodiesUnchecked},
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i},
       nullptr);
 }
 
@@ -2428,8 +2427,7 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
     const VarDecl *vd) const {
   unsigned i = getPatternEntryIndexForVarDecl(vd);
   return getASTContext().evaluator.hasActiveRequest(
-      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
-                                 /*LeaveClosureBodyUnchecked=*/false});
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
 }
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
@@ -10637,6 +10635,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     DeclContext *dc,
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
+  auto &ctx = dc->getASTContext();
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
   if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
@@ -10657,6 +10656,13 @@ ActorIsolation swift::getActorIsolationOfContext(
   //     actor isolation as the field itself. That default expression may only
   //     be used from inits that meet the required isolation.
   if (auto *var = dcToUse->getNonLocalVarDecl()) {
+    // If IsolatedDefaultValues are enabled, treat this context as having
+    // unspecified isolation. We'll compute the required isolation for
+    // the initializer and validate that it matches the isolation of the
+    // var itself in the DefaultInitializerIsolation request.
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues))
+      return ActorIsolation::forUnspecified();
+
     return getActorIsolation(var);
   }
 
@@ -11065,7 +11071,7 @@ MacroRoles swift::getAttachedMacroRoles() {
 
 bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
   switch (role) {
-#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName) \
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, MangledChar, FeatureName) \
   case MacroRole::Name: \
     return ctx.LangOpts.hasFeature(Feature::FeatureName);
 
@@ -11076,7 +11082,7 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
 
 #include "swift/Basic/MacroRoles.def"
 
-#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName)
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, MangledChar, FeatureName)
 #define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, FeatureName)
 #define MACRO_ROLE(Name, Description) case MacroRole::Name:
 #include "swift/Basic/MacroRoles.def"

@@ -416,6 +416,16 @@ public struct SinglePayloadEnumExtraTagBytesWrapper {
     }
 }
 
+public struct NotBitwiseTakableBridge<T> {
+    let x: Int = 0
+    let y: [T]
+    weak var z: AnyObject? = nil
+
+    public init(_ y: [T]) {
+        self.y = y
+    }
+}
+
 public enum SinglePayloadEnumExtraTagBytes {
     case empty0
     case empty1
@@ -555,6 +565,17 @@ public enum SinglePayloadEnumExistential {
     case c
 }
 
+public struct TupleLargeAlignment<T> {
+    let x: AnyObject? = nil
+    let x1: AnyObject? = nil
+    let x2: AnyObject? = nil
+    let x3: (T, SIMD4<Int>)
+
+    public init(_ t: T) {
+        self.x3 = (t, .init(Int(Int32.max) + 32, Int(Int32.max) + 32, Int(Int32.max) + 32, Int(Int32.max) + 32))
+    }
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -590,6 +611,11 @@ public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
 @inline(never)
 public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
     ptr.initialize(to: x)
+}
+
+@inline(never)
+public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
+    ptr.initialize(to: consume x)
 }
 
 @inline(never)

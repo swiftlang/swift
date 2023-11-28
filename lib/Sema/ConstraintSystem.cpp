@@ -7407,9 +7407,6 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   if (getAppliedResultBuilderTransform(closure))
     return true;
 
-  if (Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked))
-    return false;
-
   if (closure->hasEmptyBody())
     return false;
 
@@ -7470,8 +7467,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       break;
 
     case KeyPathExpr::Component::Kind::CodeCompletion: {
-      capability = KeyPathCapability::ReadOnly;
-      break;
+      return fail();
     }
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:

@@ -774,13 +774,15 @@ public:
         return nullptr;
       }
 
-      // We don't check if the second argument to the builtin is loop invariant
-      // here, because only induction variables with a +1 incremenent are
-      // considered for bounds check optimization.
       AsArg = dyn_cast<SILArgument>(Builtin->getArguments()[0]);
       if (!AsArg) {
         return nullptr;
       }
+
+      auto *incrVal = dyn_cast<IntegerLiteralInst>(Builtin->getArguments()[1]);
+      if (!incrVal || incrVal->getValue() != 1)
+        return nullptr;
+
       preIncrement = true;
     }
 

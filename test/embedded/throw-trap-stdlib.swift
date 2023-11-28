@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded -throws-as-traps | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 public func test() {
   withUnsafeTemporaryAllocation(byteCount: MemoryLayout<Int>.size, alignment: MemoryLayout<Int>.alignment) { p in

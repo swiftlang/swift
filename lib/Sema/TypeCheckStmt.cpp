@@ -1090,12 +1090,6 @@ public:
     Expr *E = RS->getResult();
     TypeCheckExprOptions options = {};
     
-    if (LeaveBraceStmtBodyUnchecked) {
-      assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
-             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
@@ -2047,9 +2041,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
         (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
     if (isDiscarded)
       options |= TypeCheckExprFlags::IsDiscarded;
-    if (LeaveBraceStmtBodyUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
 
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
@@ -2087,7 +2078,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(D, LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(D);
     return;
   }
 
@@ -2396,8 +2387,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/false);
+            typeCheckPatternBinding(PBD, i);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
             // This is important to get the correct USR of variables defined
             // in closures initializing lazy variables.

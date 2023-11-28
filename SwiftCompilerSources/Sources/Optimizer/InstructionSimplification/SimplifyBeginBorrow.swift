@@ -192,7 +192,7 @@ private extension ForwardingInstruction {
         return false
       }
       let structFields = si.struct.type.getNominalFields(in: parentFunction)
-      return structFields.hasSingleNonTrivialElement(at: si.fieldIndex, in: parentFunction)
+      return structFields?.hasSingleNonTrivialElement(at: si.fieldIndex, in: parentFunction) ?? false
     case let ti as TupleExtractInst:
       return ti.tuple.type.tupleElements.hasSingleNonTrivialElement(at: ti.fieldIndex, in: parentFunction)
     default:

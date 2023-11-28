@@ -397,8 +397,7 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
 
 /// Validate the \c entryNumber'th entry in \c binding.
 const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
-    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber,
-    bool LeaveClosureBodiesUnchecked) const {
+    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber) const {
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
@@ -513,12 +512,8 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   if (patternType->hasUnresolvedType() ||
       patternType->hasPlaceholder() ||
       patternType->hasUnboundGenericType()) {
-    TypeCheckExprOptions options;
-    if (LeaveClosureBodiesUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber, patternType,
-                                             options)) {
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
+                                             patternType)) {
       binding->setInvalid();
       return &pbe;
     }

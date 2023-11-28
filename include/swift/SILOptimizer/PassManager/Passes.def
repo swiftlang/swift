@@ -341,6 +341,8 @@ PASS(RedundantPhiElimination, "redundant-phi-elimination",
      "Redundant Phi Block Argument Elimination")
 PASS(PhiExpansion, "phi-expansion",
      "Replace Phi arguments by their only used field")
+SWIFT_FUNCTION_PASS(DeinitDevirtualizer, "deinit-devirtualizer",
+     "Devirtualizes destroys of non-copyable values")
 SWIFT_FUNCTION_PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
@@ -474,8 +476,6 @@ PASS(PartialApplySimplification, "partial-apply-simplification",
      "Transform partial_apply instructions into explicit closure box constructions")
 PASS(MovedAsyncVarDebugInfoPropagator, "sil-moved-async-var-dbginfo-propagator",
      "Propagate debug info from moved async vars after coroutine funclet boundaries")
-PASS(MoveOnlyDeinitDevirtualization, "sil-move-only-deinit-devirtualization",
-     "After running move only checking, convert last destroy_values to deinit calls")
 PASS(MoveOnlyBorrowToDestructureTransform,
      "sil-move-only-borrow-to-destructure",
      "Pass that is phased ordered before move only object checking that is "

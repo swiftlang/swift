@@ -5352,8 +5352,14 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "non-isolated context",
       (const ValueDecl *))
+ERROR(conflicting_stored_property_isolation,none,
+      "%select{default|memberwise}0 initializer for %1 cannot be both %2 and %3",
+      (bool, Type, ActorIsolation, ActorIsolation))
+NOTE(property_requires_actor,none,
+      "initializer for %0 %1 is %2",
+      (DescriptiveDeclKind, Identifier, ActorIsolation))
 ERROR(isolated_default_argument_context,none,
-      "%0 default argument in a %1 context", 
+      "%0 default value in a %1 context", 
       (ActorIsolation, ActorIsolation))
 ERROR(conflicting_default_argument_isolation,none,
       "default argument cannot be both %0 and %1",
