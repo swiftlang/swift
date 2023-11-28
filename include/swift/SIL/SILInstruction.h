@@ -3908,6 +3908,8 @@ class KeyPathInst final
   }
   
 public:
+  BoundGenericType *getKeyPathType() const;
+
   KeyPathPattern *getPattern() const;
   bool hasPattern() const { return (bool)Pattern; }
 

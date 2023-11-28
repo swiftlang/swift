@@ -7123,7 +7123,8 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
     emitDeallocateDynamicAlloca(*dynamicArgsBuf);
   }
 
-  auto resultStorageTy = IGM.getTypeInfo(I->getType()).getStorageType();
+  auto loweredKeyPathTy = IGM.getLoweredType(I->getKeyPathType());
+  auto resultStorageTy = IGM.getTypeInfo(loweredKeyPathTy).getStorageType();
 
   Explosion e;
   e.add(Builder.CreateBitCast(call, resultStorageTy));
