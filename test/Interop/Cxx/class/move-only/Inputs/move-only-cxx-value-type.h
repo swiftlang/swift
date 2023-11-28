@@ -17,8 +17,16 @@ struct NonCopyable {
       x = y;
       return y;
     }
-private:
+
     int x;
+};
+
+struct NonCopyableDerived: public NonCopyable {
+    NonCopyableDerived(int x) : NonCopyable(x) {}
+};
+
+struct NonCopyableDerivedDerived: public NonCopyableDerived {
+    NonCopyableDerivedDerived(int x) : NonCopyableDerived(x) {}
 };
 
 struct NonCopyableHolder {
