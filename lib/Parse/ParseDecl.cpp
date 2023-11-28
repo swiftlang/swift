@@ -8923,8 +8923,6 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   }
 
   (void)parseAbstractFunctionBodyImpl(AFD);
-  assert(BodyRange.Start == AFD->getBodySourceRange().Start &&
-         "The start of the body should be the 'l_brace' token above");
   BodyRange = AFD->getBodySourceRange();
   setIDEInspectionDelayedDeclStateIfNeeded();
 }

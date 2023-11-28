@@ -851,7 +851,6 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (loc.isInvalid())
     return nullptr;
 
-
   // Check whether this location is in a "replaced" range, in which case
   // we want to use the original source file.
   auto &sourceMgr = getASTContext().SourceMgr;
@@ -1210,11 +1209,12 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
-  auto macroExpansion = getMacroExpansion();
-  if (!macroExpansion)
+  if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto sourceLoc = macroExpansion.getStartLoc();
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 

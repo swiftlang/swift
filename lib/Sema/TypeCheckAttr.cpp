@@ -7157,6 +7157,8 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
       // TODO: Check property observer names?
       break;
     case MacroRole::MemberAttribute:
+    case MacroRole::Preamble:
+    case MacroRole::Body:
       if (!attr->getNames().empty())
         diagnoseAndRemoveAttr(attr, diag::macro_cannot_introduce_names,
                               getMacroRoleString(attr->getMacroRole()));

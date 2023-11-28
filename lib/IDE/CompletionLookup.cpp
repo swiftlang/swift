@@ -1856,6 +1856,12 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
     case MacroRole::Peer:
       roleStrs.push_back("Peer Macro");
       break;
+    case MacroRole::Preamble:
+      roleStrs.push_back("Preamble Macro");
+      break;
+    case MacroRole::Body:
+      roleStrs.push_back("Body Macro");
+      break;
     }
   }
 

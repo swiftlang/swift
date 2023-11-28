@@ -357,6 +357,7 @@ private:
     case Node::Kind::AutoClosureType:
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
+    case Node::Kind::BodyAttachedMacroExpansion:
     case Node::Kind::ClangType:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
@@ -486,6 +487,7 @@ private:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::PeerAttachedMacroExpansion:
     case Node::Kind::PostfixOperator:
+    case Node::Kind::PreambleAttachedMacroExpansion:
     case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:

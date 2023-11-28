@@ -4397,6 +4397,44 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+class ExpandPreambleMacroRequest
+    : public SimpleRequest<ExpandPreambleMacroRequest,
+                           ArrayRef<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+class ExpandBodyMacroRequest
+    : public SimpleRequest<ExpandBodyMacroRequest,
+                           llvm::Optional<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Optional<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,

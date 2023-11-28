@@ -2940,6 +2940,10 @@ static bool usesFeatureExtensionMacros(Decl *decl) {
   return macro->getMacroRoles().contains(MacroRole::Extension);
 }
 
+static bool usesFeatureBodyMacros(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureExtensionMacroAttr(Decl *decl) {
   return usesFeatureExtensionMacros(decl);
 }

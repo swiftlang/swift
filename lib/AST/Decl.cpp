@@ -1029,7 +1029,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
 
 void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getLastElement();
+  auto body = getBody(/*canSynthesize=*/false)->getLastElement();
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       returnStmt->setResult(NewBody);
@@ -9118,6 +9118,63 @@ bool AbstractFunctionDecl::hasBody() const {
 }
 
 
+static BraceStmt *expandBodyMacro(AbstractFunctionDecl *fn) {
+  ASTContext &ctx = fn->getASTContext();
+
+  auto bufferID = evaluateOrDefault(
+      ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None);
+  if (!bufferID) {
+    return nullptr;
+  }
+
+  CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
+  auto bufferStart = bufferRange.getStart();
+  auto module = fn->getParentModule();
+  auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
+
+  return BraceStmt::create(
+      ctx, bufferRange.getStart(), macroSourceFile->getTopLevelItems(),
+      bufferRange.getEnd());
+}
+
+BraceStmt *AbstractFunctionDecl::getMacroExpandedBody() const {
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  switch (getBodyKind()) {
+  case BodyKind::None:
+  case BodyKind::Unparsed:
+  case BodyKind::Parsed:
+    switch (getBodyExpandedStatus()) {
+    case BodyExpandedStatus::NotExpanded:
+      if (auto expandedBody = expandBodyMacro(mutableThis)) {
+        // Save the original body's source range.
+        mutableThis->keepOriginalBodySourceRange();
+
+        // Cache the expanded macro body as the parsed body of the function.
+        mutableThis->setBodyExpandedStatus(BodyExpandedStatus::Expanded);
+        mutableThis->setBodyParsed(expandedBody);
+
+        return expandedBody;
+      }
+
+      mutableThis->setBodyExpandedStatus(BodyExpandedStatus::NoMacros);
+      break;
+
+    case BodyExpandedStatus::NoMacros:
+    case BodyExpandedStatus::Expanded:
+      break;
+    }
+
+    // Fall through to get the body.
+    LLVM_FALLTHROUGH;
+
+  case BodyKind::Synthesize:
+  case BodyKind::TypeChecked:
+  case BodyKind::SILSynthesize:
+  case BodyKind::Deserialized:
+    return getBody(/*canSynthesize=*/true);
+  }
+}
+
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&
@@ -11325,6 +11382,8 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Accessor:
   case MacroRole::Conformance:
   case MacroRole::MemberAttribute:
+  case MacroRole::Preamble:
+  case MacroRole::Body:
     break;
   }
 }
