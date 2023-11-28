@@ -237,6 +237,71 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
 }
 
+// ==== Unsafe APIs ------------------------------------------------------------
+
+@available(SwiftStdlib 9999, *)
+extension TaskLocal {
+
+  /// Unsafe API for binding a task-local value that must be paired with an
+  /// ``unsafePopValue(file:line:)`` call to remove the task local when exiting
+  /// the scope in which it was set.
+  ///
+  /// Generally, the safe ``withValue(_:operation:file:line:)`` method should be
+  /// used instead of this pair of unsafe calls.
+  ///
+  /// Using this unsafe pair of methods can lead to runtime crashes, or
+  /// unexpected behavior (including memory leaks), when not used correctly.
+  ///
+  /// Every value *push* **must** be paired with exactly one *pop* of a value.
+  /// The safe `withValue` version of this API handles this automatically by
+  /// pushing the value before the operation closure executes, and popping it
+  /// after the closure completes. Using these the
+  /// ``unsafePushValue(_:file:line:)`` and ``unsafePopValue(file:line:)`` pair
+  /// of methods **must** uphold the same semantic - when exiting a scope (e.g.
+  /// method, or code block), the value must be popped properly.
+  ///
+  /// Omitting a pop operation may lead to leaking and over-hanging a task-local
+  /// value binding beyond it's expected scope. Issuing an additional pop
+  /// operation will pop a different value binding and risk incorrect behavior.
+  /// Attempting to pop a value when the task-local value bindings stack is
+  /// empty will result in a runtime crash.
+  ///
+  /// - Parameters:
+  ///   - valueDuringOperation: the value to be pushed onto the task-local
+  ///                           binding stack
+  ///
+  /// - SeeAlso: ``withValue(_:file:line:)``
+  /// - SeeAlso: ``unsafePopValue(_:file:line:)``
+  @inlinable
+  // TODO(ktoso): back deploy, cannot do so with 9999 yet
+  public func unsafePushValue(_ valueDuringOperation: __owned Value,
+                              file: String = #fileID, line: UInt = #line) {
+    // check if we're not trying to bind a value from an illegal context; this may crash
+    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
+
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+  }
+
+  /// Unsafe API for removing a task-local binding from the bindings stack.
+  ///
+  /// Generally, the safe ``withValue(_:operation:file:line:)`` method should be
+  /// used instead of this pair of unsafe calls.
+  ///
+  /// Must only be used in conjunction with the
+  /// ``unsafePushValue(_:file:line:)`` method, to remove any value binding the
+  /// prior has established.
+  ///
+  /// - SeeAlso: ``withValue(_:file:line:)``
+  /// - SeeAlso: ``unsafePushValue(_:file:line:)``
+  @inlinable
+  // TODO(ktoso): back deploy, cannot do so with 9999 yet
+  public func unsafePopValue(file: String = #fileID, line: UInt = #line) {
+    _taskLocalValuePop()
+  }
+
+}
+
+
 // ==== ------------------------------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)

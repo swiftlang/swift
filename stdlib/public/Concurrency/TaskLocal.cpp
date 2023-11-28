@@ -123,7 +123,11 @@ static void swift_task_localValuePopImpl() {
     return;
   }
 
-  assert(false && "Attempted to pop value but no task or thread-local storage available!");
+  swift_reportError(0, "Attempted to pop task-local binding from empty "
+                       "task-local bindings stack! This indicates an "
+                       "un-balanced number of 'unsafePushValue' and "
+                       "'unsafePopValue' calls.");
+  abort();
 }
 
 SWIFT_CC(swift)
@@ -355,7 +359,13 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
 }
 
 bool TaskLocal::Storage::popValue(AsyncTask *task) {
-  assert(head && "attempted to pop value off empty task-local stack");
+  if (!head) {
+    swift_reportError(0, "Attempted to pop task-local value binding from empty "
+                         "task-local bindings stack. This indicates an "
+                         "un-balanced number of 'unsafePushValue' and "
+                         "'unsafePopValue' calls.");
+    abort();
+  }
   auto old = head;
   head = head->getNext();
   old->destroy(task);

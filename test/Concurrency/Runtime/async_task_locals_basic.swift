@@ -2,7 +2,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: libdispatch
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime
