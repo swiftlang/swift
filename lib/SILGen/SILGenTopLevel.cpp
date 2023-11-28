@@ -257,7 +257,7 @@ void SILGenTopLevel::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 }
 
 void SILGenTopLevel::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
-  ASD->visitEmittedAccessors(
+  SGF.SGM.visitEmittedAccessors(ASD,
       [this](AccessorDecl *Accessor) { visitAbstractFunctionDecl(Accessor); });
 }
 
@@ -338,7 +338,7 @@ void SILGenTopLevel::TypeVisitor::visitAbstractFunctionDecl(
 
 void SILGenTopLevel::TypeVisitor::visitAbstractStorageDecl(
     AbstractStorageDecl *ASD) {
-  ASD->visitEmittedAccessors(
+  SGF.SGM.visitEmittedAccessors(ASD,
       [this](AccessorDecl *Accessor) { visitAbstractFunctionDecl(Accessor); });
 }
 

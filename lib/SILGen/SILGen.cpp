@@ -1802,7 +1802,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  vd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+  visitEmittedAccessors(vd, [&](AccessorDecl *accessor) {
     emitFunction(accessor);
   });
 
@@ -1823,6 +1823,16 @@ void SILGenModule::visitMacroDecl(MacroDecl *d) {
 
 void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
   // Expansion already visited as auxiliary decls.
+}
+
+void SILGenModule::visitEmittedAccessors(
+    AbstractStorageDecl *D, llvm::function_ref<void(AccessorDecl *)> callback) {
+  D->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    if (shouldSkipDecl(accessor))
+      return;
+
+    callback(accessor);
+  });
 }
 
 bool
