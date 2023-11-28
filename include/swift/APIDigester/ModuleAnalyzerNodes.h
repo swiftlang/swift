@@ -234,10 +234,7 @@ public:
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   llvm::Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
 
-  CompilerInstance &newCompilerInstance() {
-    CIs.emplace_back(new CompilerInstance());
-    return *CIs.back();
-  }
+  CompilerInstance &newCompilerInstance();
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {

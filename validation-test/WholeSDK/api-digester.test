@@ -224,7 +224,7 @@ Social
 SoundAnalysis
 Speech
 SpriteKit
-// StoreKit - crash processing StoreKit.Transaction.environmentStringRepresentation in Swift CI
+StoreKit
 SwiftUI
 // SyncServices - error: module 'SyncServices' is incompatible with feature 'swift'
 SystemConfiguration

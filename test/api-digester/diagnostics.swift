@@ -1,5 +1,6 @@
 // REQUIRES: OS=macosx
 // RUN: not %api-digester -deserialize-sdk -input-paths %S/diagnostics.json -o - 2>&1 | %FileCheck %s
+// RUN: not %api-digester -diagnose-sdk -input-paths %S/diagnostics.json -input-paths %S/diagnostics.json -compiler-style-diags -o - 2>&1 | %FileCheck %s
 
 // CHECK: diagnostics.json:5:3: error: unrecognized key 'badKey' in SDK node
 // CHECK: diagnostics.json:8:15: error: unrecognized SDK node kind 'Zyzyx'

@@ -89,6 +89,17 @@ void SDKContext::addDiagConsumer(DiagnosticConsumer &Consumer) {
   }
 }
 
+CompilerInstance &SDKContext::newCompilerInstance() {
+  CIs.emplace_back(new CompilerInstance());
+
+  // Add our existing diagnostic consumers to this new compiler instance.
+  // (Note that we do the opposite in addDiagConsumer().)
+  for (auto &consumer : Diags.getConsumers())
+    CIs.back()->addDiagnosticConsumer(consumer);
+
+  return *CIs.back();
+}
+
 void SDKNodeRoot::registerDescendant(SDKNode *D) {
   // Operator doesn't have usr
   if (isa<SDKNodeDeclOperator>(D))

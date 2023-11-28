@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/APIDigester/ModuleDiagsConsumer.h"
 
@@ -145,6 +146,13 @@ bool swift::ide::api::FilteringDiagnosticConsumer::finishProcessing() {
 }
 
 bool swift::ide::api::FilteringDiagnosticConsumer::shouldProceed(const DiagnosticInfo &Info) {
+  // Suppress spurious warnings from imported headers. These were traditionally
+  // ignored because they were emitted before the diagnostic consumer was ready.
+  if (Info.ID == diag::warning_from_clang.ID ||
+      Info.ID == diag::remark_from_clang.ID ||
+      Info.ID == diag::note_from_clang.ID)
+    return false;
+
   if (allowedBreakages->empty()) {
     return true;
   }
