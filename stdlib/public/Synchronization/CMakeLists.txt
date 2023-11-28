@@ -30,6 +30,7 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     "-enable-builtin-module"
     "-enable-experimental-feature" "RawLayout"
+    "-enable-experimental-feature" "StaticExclusiveOnly"
 
   INSTALL_IN_COMPONENT
     stdlib
