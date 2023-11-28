@@ -353,6 +353,8 @@ public:
 
   void visitNonEscapableAttr(NonEscapableAttr *attr);
   void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
+
+  void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
 };
 
 } // end anonymous namespace
@@ -499,6 +501,15 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
                               attrModifier, FD->getDescriptiveKind(),
                               DC->getSelfProtocolDecl() != nullptr);
         break;
+      }
+    }
+
+    // Types who are marked @_staticExclusiveOnly cannot have mutating functions.
+    if (auto SD = contextTy->getStructOrBoundGenericStruct()) {
+      if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
+          attrModifier == SelfAccessKind::Mutating) {
+        diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_mutating,
+                              contextTy, FD);
       }
     }
   } else {
@@ -7241,6 +7252,22 @@ void AttributeChecker::visitUnsafeNonEscapableResultAttr(
   UnsafeNonEscapableResultAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::NonEscapableTypes)) {
     diagnoseAndRemoveAttr(attr, diag::nonescapable_types_attr_disabled);
+  }
+}
+
+void AttributeChecker::visitStaticExclusiveOnlyAttr(
+    StaticExclusiveOnlyAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::StaticExclusiveOnly)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_disabled);
+    return;
+  }
+
+  // Can only be applied to structs.
+  auto structDecl = cast<StructDecl>(D);
+
+  if (!structDecl->getDeclaredInterfaceType()
+                 ->isNoncopyable(D->getDeclContext())) {
+    diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_noncopyable);
   }
 }
 

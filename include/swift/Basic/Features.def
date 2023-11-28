@@ -259,6 +259,9 @@ EXPERIMENTAL_FEATURE(Extern, true)
 // global functions and key paths.
 EXPERIMENTAL_FEATURE(InferSendableFromCaptures, false)
 
+/// Enable the `@_staticExclusiveOnly` attribute.
+EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

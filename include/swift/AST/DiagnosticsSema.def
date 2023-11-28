@@ -1917,6 +1917,20 @@ WARNING(extern_c_maybe_invalid_name, none,
         "C name '%0' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning",
         (StringRef))
 
+// @_staticExclusiveOnly
+ERROR(attr_static_exclusive_only_disabled,none,
+      "attribute requires '-enable-experimental feature StaticExclusiveOnly'", ())
+ERROR(attr_static_exclusive_only_noncopyable,none,
+      "@_staticExclusiveOnly can only be applied to noncopyable types", ())
+ERROR(attr_static_exclusive_only_let_only,none,
+      "variable of type %0 must be declared with a 'let'", (Type))
+NOTE(attr_static_exclusive_only_type_nonmutating,none,
+     "%0 is a non-mutable type", (Type))
+ERROR(attr_static_exclusive_only_let_only_param,none,
+      "parameter of type %0 must be declared as either 'borrowing' or 'consuming'", (Type))
+ERROR(attr_static_exclusive_only_mutating,none,
+      "type %0 cannot have mutating function %1", (Type, ValueDecl *))
+
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
