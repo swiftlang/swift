@@ -6408,6 +6408,11 @@ bool InvalidPackExpansion::diagnoseAsError() {
   return true;
 }
 
+bool InvalidWhereClauseInPackIteration::diagnoseAsError() {
+  emitDiagnostic(diag::pack_iteration_where_clause_not_supported);
+  return true;
+}
+
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto *locator = getLocator();
