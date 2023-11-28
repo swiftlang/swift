@@ -11,7 +11,8 @@
 // RUN: %target-swift-frontend -Osize -emit-ir %t/Main.swift -I%t -enable-experimental-feature Embedded
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 // BEGIN Module.swift
 

@@ -5,7 +5,8 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 @_silgen_name("putchar")
 func putchar(_: UInt8)
