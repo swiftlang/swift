@@ -2627,3 +2627,16 @@ IgnoreGenericSpecializationArityMismatch::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreGenericSpecializationArityMismatch(
       cs, decl, numParams, numArgs, hasParameterPack, locator);
 }
+
+bool IgnoreKeyPathSubscriptIndexMismatch::diagnose(const Solution &solution,
+                                                   bool asNote) const {
+  InvalidTypeAsKeyPathSubscriptIndex failure(solution, ArgType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreKeyPathSubscriptIndexMismatch *
+IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
+                                            ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
+}

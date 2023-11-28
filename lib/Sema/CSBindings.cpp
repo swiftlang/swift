@@ -1427,6 +1427,27 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       return llvm::None;
   }
 
+  if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
+    // Key path subscript index can only be a r-value non-optional
+    // type that is a subtype of a known KeyPath type.
+    type = type->getRValueType()->lookThroughAllOptionalTypes();
+
+    // If argument to a key path subscript is an existential,
+    // we can erase it to superclass (if any) here and solver
+    // will perform the opening if supertype turns out to be
+    // a valid key path type of its subtype.
+    if (kind == AllowedBindingKind::Supertypes) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass) {
+          type = superclass;
+        } else if (!CS.shouldAttemptFixes()) {
+          return llvm::None;
+        }
+      }
+    }
+  }
+
   if (auto *locator = TypeVar->getImpl().getLocator()) {
     // Don't allow a protocol type to get propagated from the base to the result
     // type of a chain, Result should always be a concrete type which conforms

@@ -9302,3 +9302,8 @@ bool InvalidTypeSpecializationArity::diagnoseAsError() {
                                   /*generic=*/nullptr);
   return true;
 }
+
+bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
+  emitDiagnostic(diag::cannot_convert_type_to_keypath_subscript_index, ArgType);
+  return true;
+}

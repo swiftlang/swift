@@ -3693,16 +3693,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // Key path application looks like a subscript(keyPath: KeyPath<Base, T>).
     // The element type is T or @lvalue T based on the key path subtype and
     // the mutability of the base.
-    auto keyPathIndexTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToInOut);
+    auto *keyPathIndexLoc =
+        getConstraintLocator(locator, ConstraintLocator::KeyPathSubscriptIndex);
+    auto keyPathIndexTy = createTypeVariable(keyPathIndexLoc,
+                                             /*options=*/0);
     auto elementTy = createTypeVariable(
-            getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-            TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-    auto elementObjTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
-    addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
+        getConstraintLocator(keyPathIndexLoc, ConstraintLocator::KeyPathValue),
+        TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
     // The element result is an lvalue or rvalue based on the key path class.
     addKeyPathApplicationConstraint(
@@ -6104,6 +6101,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::OptionalPayload:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
+    case ConstraintLocator::KeyPathSubscriptIndex:
       break;
     }
 

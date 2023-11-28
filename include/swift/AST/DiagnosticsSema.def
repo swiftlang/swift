@@ -704,6 +704,10 @@ ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
+ERROR(cannot_convert_type_to_keypath_subscript_index,none,
+      "cannot use value of type %0 as a key path subscript index; argument must be"
+      " a key path",
+      (Type))
 WARNING(expr_deprecated_writable_keypath,Deprecation,
         "forming a writable keypath to property %0 that is read-only in this context "
         "is deprecated and will be removed in a future release",

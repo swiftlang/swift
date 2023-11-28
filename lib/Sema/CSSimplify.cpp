@@ -12414,9 +12414,18 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     // Otherwise, we don't have a key path type at all.
     return SolutionKind::Error;
   }
-  if (!keyPathTy->isTypeVariableOrMember())
+
+  if (!keyPathTy->isTypeVariableOrMember()) {
+    if (shouldAttemptFixes()) {
+      auto *fix = IgnoreKeyPathSubscriptIndexMismatch::create(
+          *this, keyPathTy, getConstraintLocator(locator));
+      recordAnyTypeVarAsPotentialHole(valueTy);
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
     return SolutionKind::Error;
-  
+  }
+
   return unsolved();
 }
 
@@ -14886,7 +14895,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowConcreteTypeSpecialization:
-  case FixKind::IgnoreGenericSpecializationArityMismatch: {
+  case FixKind::IgnoreGenericSpecializationArityMismatch:
+  case FixKind::IgnoreKeyPathSubscriptIndexMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreThrownErrorMismatch: {

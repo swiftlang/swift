@@ -499,6 +499,10 @@ public:
   /// expression.
   bool isKeyPathValue() const;
 
+  /// Determine whether this type variable represents an index parameter of
+  /// a special `subscript(keyPath:)` subscript.
+  bool isKeyPathSubscriptIndex() const;
+
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
