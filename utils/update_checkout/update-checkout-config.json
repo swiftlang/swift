@@ -175,7 +175,6 @@
                 "swift-integration-tests": "release/5.10",
                 "swift-xcode-playground-support": "release/5.10",
                 "ninja": "release",
-                "icu": "maint/maint-69",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "release/5.10",
@@ -189,7 +188,11 @@
                 "swift-markdown": "release/5.10",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "swift/release/5.10"
+                "swift-experimental-string-processing": "swift/release/5.10",
+                "curl": "curl-8_4_0",
+                "icu": "maint/maint-69",
+                "libxml2": "v2.11.5",
+                "zlib": "v1.3"
             }
         },
         "rebranch": {
