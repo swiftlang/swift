@@ -395,6 +395,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.UseCASBackend = Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile = Args.hasArg(OPT_cas_emit_casid_file);
 
+  Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
+
   return false;
 }
 

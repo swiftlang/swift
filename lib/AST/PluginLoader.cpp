@@ -199,7 +199,8 @@ PluginLoader::loadExecutablePlugin(StringRef path) {
     DepTracker->addDependency(resolvedPath, /*IsSystem=*/false);
 
   // Load the plugin.
-  auto plugin = getRegistry()->loadExecutablePlugin(resolvedPath);
+  auto plugin =
+      getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox);
   if (!plugin) {
     resolvedPath.push_back(0);
     return llvm::handleErrors(
