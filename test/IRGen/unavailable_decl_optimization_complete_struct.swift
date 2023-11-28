@@ -21,6 +21,15 @@ public struct AvailableStruct<T> {
     _modify { fatalError() }
   }
 
+  // CHECK-NO-STRIP: s4Test15AvailableStructV45availablePropertyWithSomeUnavailableAccessorsxvg
+  // CHECK-NO-STRIP: s4Test15AvailableStructV45availablePropertyWithSomeUnavailableAccessorsxvs
+  // CHECK-STRIP-NOT: s4Test15AvailableStructV45availablePropertyWithSomeUnavailableAccessorsxvs
+  public var availablePropertyWithSomeUnavailableAccessors: T {
+    get { fatalError() }
+    @available(*, unavailable)
+    set { fatalError() }
+  }
+
   // CHECK-NO-STRIP: s4Test15AvailableStructVyACyxGxcfC
   // CHECK-STRIP-NOT: s4Test15AvailableStructVyACyxGxcfC
   @available(*, unavailable)

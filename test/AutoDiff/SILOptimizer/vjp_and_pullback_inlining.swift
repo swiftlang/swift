@@ -12,10 +12,10 @@ import Glibc
 import Foundation
 #endif
 
-// ======================== VJPs ======================== //
+// ======================== Simple case without control-flow ======================== //
 @differentiable(reverse)
-@_silgen_name("simple_vjp")
-func simple_vjp(x: Float) -> Float {
+@_silgen_name("simple")
+func simple(x: Float) -> Float {
     let a = x * x;
     let b = x + x;
     let c = x * a;
@@ -26,19 +26,21 @@ func simple_vjp(x: Float) -> Float {
 }
 
 @inline(never)
-@_silgen_name("caller_of_simple_vjp")
-func caller_of_simple_vjp() -> Float {
-  gradient(at: Float(4), of: simple_vjp)
+@_silgen_name("caller_of_simple")
+func caller_of_simple(x: Float) -> Float {
+  gradient(at: Float(4), of: simple)
 }
 
-// CHECK: decision {{{.*}}, b=30, {{.*}}} simple_vjpTJrSpSr
-// CHECK-NEXT: "simple_vjpTJrSpSr" inlined into "caller_of_simple_vjp"
+// CHECK: decision {{{.*}}, b=30, {{.*}}} simpleTJrSpSr
+// CHECK-NEXT: "simpleTJrSpSr" inlined into "caller_of_simple"
+// PB inlining check
+// CHECK: decision {{{.*}}, b=70, {{.*}}} simpleTJpSpSr
+// CHECK-NEXT: "simpleTJpSpSr" inlined into "caller_of_simple"
 
-// ======================== Pullback w/ control-flow ======================== //
-
+// ======================== Simple case with control-flow ======================== //
 @differentiable(reverse)
-@_silgen_name("pb_with_control_flow")
-func pb_with_control_flow(_ x: Float) -> Float {
+@_silgen_name("with_control_flow")
+func with_control_flow(_ x: Float) -> Float {
   if (x > 0) {
     return sin(x) * cos(x)
   } else {
@@ -47,25 +49,19 @@ func pb_with_control_flow(_ x: Float) -> Float {
 }
 
 @inline(never)
-@_silgen_name("caller_of_pb_with_control_flow")
-func caller_of_pb_with_control_flow() -> Float {
-    gradient(at: Float(1), of: pb_with_control_flow)
+@_silgen_name("caller_of_with_control_flow")
+func caller_of_with_control_flow(x: Float) -> Float {
+    gradient(at: x, of: with_control_flow)
 }
 
-// CHECK: decision {{{.*}}, b=70, {{.*}}} pb_with_control_flowTJpSpSr
-// CHECK-NEXT: "pb_with_control_flowTJpSpSr" inlined into "caller_of_pb_with_control_flow"
+// VJP inlining check
+// CHECK: decision {{{.*}}, b=30, {{.*}}} with_control_flowTJrSpSr
+// CHECK-NEXT: "with_control_flowTJrSpSr" inlined into "caller_of_with_control_flow"
+// PB inlining check
+// CHECK: decision {{{.*}}, b=70, {{.*}}} with_control_flowTJpSpSr
+// CHECK-NEXT: "with_control_flowTJpSpSr" inlined into "caller_of_with_control_flow"
 
-
-@differentiable(reverse)
-func double(x: Float) -> Float {
-    return x + x
-}
-
-@differentiable(reverse)
-func square(x: Float) -> Float {
-    return x * x
-}
-
+// ======================== Complex case with control-flow ======================== //
 @differentiable(reverse)
 @_silgen_name("more_complex_pb_with_control_flow")
 func more_complex_pb_with_control_flow(x: Float) -> Float {
@@ -90,9 +86,27 @@ func more_complex_pb_with_control_flow(x: Float) -> Float {
     return x*3
 }
 
+
+@differentiable(reverse)
+func double(x: Float) -> Float {
+    return x + x
+}
+
+@differentiable(reverse)
+func square(x: Float) -> Float {
+    return x * x
+}
+
 @inline(never)
 @_silgen_name("caller_of_more_complex_pb_with_control_flow")
 func caller_of_more_complex_pb_with_control_flow() -> Float {
+    // Need to pass a constant argument to `gradient` so that the call
+    // to VJP also receives a constant argument, and it is in turn inlined
+    // as a "pure" call. 
+    //
+    // Only after the VJP is inlined can the pullback be inlined, as the 
+    // full signature of the pullback (with the branch-trace enum) is never
+    // visible at the call site otherwise.
     gradient(at: Float(1), of: more_complex_pb_with_control_flow)
 }
 

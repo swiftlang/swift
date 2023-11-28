@@ -3640,6 +3640,10 @@ static bool usesFeatureExtern(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExternAttr>();
 }
 
+static bool usesFeatureStaticExclusiveOnly(Decl *decl) {
+  return decl->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
