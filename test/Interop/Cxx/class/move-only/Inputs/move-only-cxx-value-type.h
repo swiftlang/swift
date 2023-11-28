@@ -37,7 +37,7 @@ struct NonCopyableHolder {
     inline NonCopyable &returnMutNonCopyableRef() { return x; }
 
     inline const NonCopyable &returnNonCopyableRef() const { return x; }
-private:
+
     NonCopyable x;
 };
 

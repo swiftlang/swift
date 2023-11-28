@@ -33,4 +33,21 @@ MoveOnlyCxxValueType.test("Test derived move only type member access") {
   expectEqual(k, -13)
 }
 
+func borrowNC(_ x: borrowing NonCopyable) -> CInt {
+  return x.method(3)
+}
+
+func inoutNC(_ x: inout NonCopyable, _ y: CInt) -> CInt {
+  return x.mutMethod(y)
+}
+
+MoveOnlyCxxValueType.test("Test move only field access in holder") {
+  var c = NonCopyableHolder(11)
+  var k = borrowNC(c.x)
+  expectEqual(k, 33)
+  k = inoutNC(&c.x, 7)
+  expectEqual(k, 7)
+  expectEqual(c.x.x, 7)
+}
+
 runAllTests()
