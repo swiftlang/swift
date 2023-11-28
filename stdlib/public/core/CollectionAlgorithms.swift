@@ -236,27 +236,16 @@ extension Collection {
   public func indices(where predicate: (Element) throws -> Bool) rethrows
     -> RangeSet<Index>
   {
-    if isEmpty { return RangeSet() }
-
     var result: [Range<Index>] = []
-    var i = startIndex
-    var start: Index? = nil
-    while i < endIndex {
-      if try predicate(self[i]) {
-        if start == nil {
-          start = i
-        }
-      } else {
-        if let oldStart = start {
-          result.append(oldStart ..< i)
-          start = nil
-        }
-      }
-      formIndex(after: &i)
-    }
+    var end = startIndex
+    while let begin = try self[end...].firstIndex(where: predicate) {
+      end = try self[begin...].prefix(while: predicate).endIndex
+      result.append(begin ..< end)
 
-    if let start {
-      result.append(start ..< endIndex)
+      guard end < self.endIndex else {
+        break
+      }
+      self.formIndex(after: &end)
     }
 
     return RangeSet(_orderedRanges: result)
