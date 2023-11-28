@@ -336,6 +336,14 @@ protected:
   explicit DeclRefTypeRepr(TypeReprKind K) : TypeRepr(K) {}
 
 public:
+  static DeclRefTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                 DeclNameLoc NameLoc, DeclNameRef Name);
+
+  static DeclRefTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                 DeclNameLoc NameLoc, DeclNameRef Name,
+                                 ArrayRef<TypeRepr *> GenericArgs,
+                                 SourceRange AngleBrackets);
+
   /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
   /// qualifier of a `IdentTypeRepr` is itself.
   TypeRepr *getRoot();

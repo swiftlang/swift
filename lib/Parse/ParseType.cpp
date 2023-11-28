@@ -203,11 +203,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
           status, PackTypeRepr::create(Context, keywordLoc,
                                        SourceRange(lbLoc, rbLoc), elements));
     } else {
-      ty = parseTypeIdentifier();
-      if (auto *ITR = cast_or_null<IdentTypeRepr>(ty.getPtrOrNull())) {
+      ty = parseTypeIdentifier(/*Base=*/nullptr);
+      if (auto *repr = ty.getPtrOrNull()) {
         if (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) {
           if (CodeCompletionCallbacks) {
-            CodeCompletionCallbacks->completeTypeSimpleWithoutDot(ITR);
+            CodeCompletionCallbacks->completeTypeSimpleWithoutDot(repr);
           }
 
           ty.setHasCodeCompletionAndIsError();
@@ -771,14 +771,14 @@ ParserResult<TypeRepr> Parser::parseQualifiedDeclNameBaseType() {
   }
 
   ParserStatus Status;
-  SmallVector<IdentTypeRepr *, 4> ComponentsR;
+  DeclRefTypeRepr *Result = nullptr;
   SourceLoc EndLoc;
   while (true) {
-    auto IdentResult = parseTypeIdentifier();
-    if (IdentResult.isParseErrorOrHasCompletion())
-      return IdentResult;
+    auto PartialResult = parseTypeIdentifier(/*Base=*/Result);
+    if (PartialResult.isParseErrorOrHasCompletion())
+      return PartialResult;
 
-    ComponentsR.push_back(cast<IdentTypeRepr>(IdentResult.get()));
+    Result = PartialResult.get();
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'Type'.
@@ -811,31 +811,26 @@ ParserResult<TypeRepr> Parser::parseQualifiedDeclNameBaseType() {
     break;
   }
 
-  DeclRefTypeRepr *DeclRefTR = nullptr;
-  if (!ComponentsR.empty()) {
-    DeclRefTR = MemberTypeRepr::create(Context, ComponentsR);
-  }
-
   if (Status.hasCodeCompletion()) {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       consumeToken();
       if (CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completeTypeSimpleWithDot(DeclRefTR);
+        CodeCompletionCallbacks->completeTypeSimpleWithDot(Result);
       }
     } else {
       if (CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completeTypeSimpleWithoutDot(DeclRefTR);
+        CodeCompletionCallbacks->completeTypeSimpleWithoutDot(Result);
       }
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
   }
 
-  return makeParserResult(Status, DeclRefTR);
+  return makeParserResult(Status, Result);
 }
 
-ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
+ParserResult<DeclRefTypeRepr> Parser::parseTypeIdentifier(TypeRepr *Base) {
   // FIXME: We should parse e.g. 'X.var'. Almost any keyword is a valid member
   // component.
   DeclNameLoc Loc;
@@ -846,7 +841,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     return makeParserError();
 
   ParserStatus Status;
-  IdentTypeRepr *IdTR;
+  DeclRefTypeRepr *Result;
 
   if (startsWithLess(Tok)) {
     SourceLoc LAngle, RAngle;
@@ -855,20 +850,20 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     if (ArgsStatus.isErrorOrHasCompletion())
       return ArgsStatus;
 
-    IdTR = GenericIdentTypeRepr::create(Context, Loc, Name, GenericArgs,
-                                        SourceRange(LAngle, RAngle));
+    Result = DeclRefTypeRepr::create(Context, Base, Loc, Name, GenericArgs,
+                                     SourceRange(LAngle, RAngle));
   } else {
-    IdTR = new (Context) SimpleIdentTypeRepr(Loc, Name);
+    Result = DeclRefTypeRepr::create(Context, Base, Loc, Name);
   }
 
-  return makeParserResult(IdTR);
+  return makeParserResult(Result);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeDotted(ParserResult<TypeRepr> Base) {
   assert(Base.isNonNull());
   assert(Tok.isAny(tok::period, tok::period_prefix));
 
-  SmallVector<IdentTypeRepr *, 4> MemberComponents;
+  TypeRepr *Result = Base.get();
 
   while (Tok.isAny(tok::period, tok::period_prefix)) {
     if (peekToken().is(tok::code_complete)) {
@@ -881,32 +876,25 @@ ParserResult<TypeRepr> Parser::parseTypeDotted(ParserResult<TypeRepr> Base) {
 
     if (Tok.isContextualKeyword("Type") ||
         Tok.isContextualKeyword("Protocol")) {
-      TypeRepr *MetaBase =
-          MemberTypeRepr::create(Context, Base.get(), MemberComponents);
       if (Tok.getRawText() == "Type") {
-        Base = makeParserResult(Base,
-                                new (Context) MetatypeTypeRepr(
-                                    MetaBase, consumeToken(tok::identifier)));
+        Result = new (Context)
+            MetatypeTypeRepr(Result, consumeToken(tok::identifier));
       } else {
-        Base = makeParserResult(Base,
-                                new (Context) ProtocolTypeRepr(
-                                    MetaBase, consumeToken(tok::identifier)));
+        Result = new (Context)
+            ProtocolTypeRepr(Result, consumeToken(tok::identifier));
       }
 
-      // Start anew with a metatype base.
-      MemberComponents.clear();
       continue;
     }
 
-    auto IdentResult = parseTypeIdentifier();
-    if (IdentResult.isParseErrorOrHasCompletion())
-      return IdentResult | ParserStatus(Base);
+    auto PartialResult = parseTypeIdentifier(/*Base=*/Result);
+    if (PartialResult.isParseErrorOrHasCompletion())
+      return PartialResult | ParserStatus(Base);
 
-    MemberComponents.push_back(cast<IdentTypeRepr>(IdentResult.get()));
+    Result = PartialResult.get();
   }
 
-  return makeParserResult(
-      Base, MemberTypeRepr::create(Context, Base.get(), MemberComponents));
+  return makeParserResult(Base, Result);
 }
 
 /// parseTypeSimpleOrComposition

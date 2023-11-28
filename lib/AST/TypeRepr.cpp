@@ -154,6 +154,43 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   return SourceLoc();
 }
 
+DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                         DeclNameLoc NameLoc,
+                                         DeclNameRef Name) {
+  return create(C, Base, NameLoc, Name, {}, SourceRange());
+}
+
+DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                         DeclNameLoc NameLoc, DeclNameRef Name,
+                                         ArrayRef<TypeRepr *> GenericArgs,
+                                         SourceRange AngleBrackets) {
+  IdentTypeRepr *identTR = nullptr;
+  if (AngleBrackets.isInvalid() && GenericArgs.empty()) {
+    identTR = new (C) SimpleIdentTypeRepr(NameLoc, Name);
+  } else {
+    identTR = GenericIdentTypeRepr::create(C, NameLoc, Name, GenericArgs,
+                                           AngleBrackets);
+  }
+
+  if (Base) {
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(Base)) {
+      llvm::SmallVector<IdentTypeRepr *> newComponents;
+      {
+        auto components = memberTR->getMemberComponents();
+        newComponents.append(components.begin(), components.end());
+      }
+      newComponents.push_back(identTR);
+
+      return cast<DeclRefTypeRepr>(
+          MemberTypeRepr::create(C, memberTR->getRoot(), newComponents));
+    } else {
+      return cast<DeclRefTypeRepr>(MemberTypeRepr::create(C, Base, {identTR}));
+    }
+  } else {
+    return identTR;
+  }
+}
+
 TypeRepr *DeclRefTypeRepr::getRoot() {
   return const_cast<TypeRepr *>(
       const_cast<const DeclRefTypeRepr *>(this)->getRoot());
