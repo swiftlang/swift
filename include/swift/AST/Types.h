@@ -757,11 +757,6 @@ public:
   /// Retrieve the set of type parameter packs that occur within this type.
   void walkPackReferences(llvm::function_ref<bool (Type)> fn);
 
-  /// Replace opened archetypes with the given root with their most
-  /// specific non-dependent upper bounds throughout this type.
-  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root,
-                                         const DeclContext *useDC) const;
-
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
   /// Otherwise, returns the type itself.

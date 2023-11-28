@@ -7364,16 +7364,6 @@ WARNING(backdeployed_opaque_result_not_supported,none,
 // MARK: Implicit opening of existential types
 //------------------------------------------------------------------------------
 
-ERROR(result_requires_explicit_coercion,none,
-      "inferred result type %0 requires explicit coercion due to "
-      "loss of generic requirements",
-      (Type))
-
-NOTE(candidate_result_requires_explicit_coercion,none,
-     "inferred result type %0 requires explicit coercion due to "
-     "loss of generic requirements",
-     (Type))
-
 ERROR(concurrency_task_to_thread_model_custom_executor,none,
       "custom executors are not permitted within %0", (StringRef))
 ERROR(concurrency_task_to_thread_model_async_main,none,
