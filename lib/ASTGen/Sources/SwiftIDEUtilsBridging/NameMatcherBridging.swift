@@ -37,9 +37,9 @@ fileprivate extension BridgedCharSourceRangeVector {
 
 fileprivate extension BridgedResolvedLocVector {
   init(from resolvedLocs: some Sequence<DeclNameLocation>, in sourceFile: ExportedSourceFile) {
-    self = .empty()
+    self = .init()
     for resolvedLoc in resolvedLocs {
-      self.push_back(IDEBridging.ResolvedLoc(from: resolvedLoc, in: sourceFile))
+      self.append(BridgedResolvedLoc(from: resolvedLoc, in: sourceFile))
     }
   }
 }
@@ -56,7 +56,7 @@ fileprivate extension IDEBridging.LabelRangeType {
   }
 }
 
-extension IDEBridging.ResolvedLoc {
+extension BridgedResolvedLoc {
   init(from resolvedLoc: DeclNameLocation, in sourceFile: ExportedSourceFile) {
     let firstTrailingClosureIndex: UInt32
     if case .call(_, .some(let index)) = resolvedLoc.arguments {

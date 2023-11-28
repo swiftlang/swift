@@ -14,16 +14,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <climits>
 
-ResolvedLoc::ResolvedLoc(BridgedCharSourceRange range,
-                         BridgedCharSourceRangeVector labelRanges,
-                         unsigned firstTrailingLabel, LabelRangeType labelType,
-                         bool isActive, ResolvedLocContext context)
-    : range(range.unbridged()), labelRanges(labelRanges.takeUnbridged()),
-      firstTrailingLabel(firstTrailingLabel == UINT_MAX
-                             ? llvm::None
-                             : llvm::Optional<unsigned>(firstTrailingLabel)),
-      labelType(labelType), isActive(isActive), context(context) {}
-
 ResolvedLoc::ResolvedLoc(swift::CharSourceRange range,
                          std::vector<swift::CharSourceRange> labelRanges,
                          llvm::Optional<unsigned> firstTrailingLabel,
@@ -35,27 +25,27 @@ ResolvedLoc::ResolvedLoc(swift::CharSourceRange range,
 
 ResolvedLoc::ResolvedLoc() {}
 
-BridgedResolvedLocVector BridgedResolvedLocVector_createEmpty() {
-  return BridgedResolvedLocVector(new std::vector<ResolvedLoc>());
-}
+BridgedResolvedLoc::BridgedResolvedLoc(BridgedCharSourceRange range,
+                                       BridgedCharSourceRangeVector labelRanges,
+                                       unsigned firstTrailingLabel,
+                                       LabelRangeType labelType, bool isActive,
+                                       ResolvedLocContext context)
+    : resolvedLoc(
+          new ResolvedLoc(range.unbridged(), labelRanges.takeUnbridged(),
+                          firstTrailingLabel == UINT_MAX
+                              ? llvm::None
+                              : llvm::Optional<unsigned>(firstTrailingLabel),
+                          labelType, isActive, context)) {}
 
-void BridgedResolvedLocVector::push_back(const ResolvedLoc &Loc) {
-  this->vector->push_back(Loc);
-}
+BridgedResolvedLocVector::BridgedResolvedLocVector()
+    : vector(new std::vector<BridgedResolvedLoc>()) {}
 
-BridgedResolvedLocVector::BridgedResolvedLocVector(
-    const std::vector<ResolvedLoc> &vector)
-    : vector(new std::vector<ResolvedLoc>(vector)) {}
+void BridgedResolvedLocVector::push_back(BridgedResolvedLoc Loc) {
+  static_cast<std::vector<ResolvedLoc> *>(vector)->push_back(
+      Loc.takeUnbridged());
+}
 
 BridgedResolvedLocVector::BridgedResolvedLocVector(void *opaqueValue)
-    : vector(static_cast<std::vector<ResolvedLoc> *>(opaqueValue)) {}
+    : vector(opaqueValue) {}
 
-const std::vector<ResolvedLoc> &BridgedResolvedLocVector::unbridged() {
-  return *vector;
-}
-
-void BridgedResolvedLocVector::destroy() { delete vector; }
-
-void *BridgedResolvedLocVector::getOpaqueValue() const {
-  return static_cast<void *>(this->vector);
-}
+void *BridgedResolvedLocVector::getOpaqueValue() const { return vector; }
