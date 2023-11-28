@@ -5,7 +5,6 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that

@@ -7,8 +7,7 @@
 // RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 // Dependencies look like this:
 //
@@ -44,4 +43,4 @@ public func main() {
   MyModuleC.foo()
 }
 
-// CHECK: @"$s9MyModuleA6globalSivp" = global %TSi zeroinitializer
+// CHECK: @"$s9MyModuleA6globalSivp" = {{.*}}global %TSi zeroinitializer
