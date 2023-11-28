@@ -18,8 +18,7 @@ ResolvedLoc::ResolvedLoc(BridgedCharSourceRange range,
                          BridgedCharSourceRangeVector labelRanges,
                          unsigned firstTrailingLabel, LabelRangeType labelType,
                          bool isActive, ResolvedLocContext context)
-    : range(range.unbridged()),
-      labelRanges(BridgedCharSourceRangeVector_unbridged(labelRanges)),
+    : range(range.unbridged()), labelRanges(labelRanges.takeUnbridged()),
       firstTrailingLabel(firstTrailingLabel == UINT_MAX
                              ? llvm::None
                              : llvm::Optional<unsigned>(firstTrailingLabel)),

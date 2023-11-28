@@ -58,29 +58,16 @@ void BridgedData_free(BridgedData data) {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: std::vector<CharSourceRange>
+// MARK: BridgedCharSourceRangeVector
 //===----------------------------------------------------------------------===//
 
-BridgedCharSourceRangeVector BridgedCharSourceRangeVector_createEmpty() {
-  return BridgedCharSourceRangeVector();
-}
+BridgedCharSourceRangeVector::BridgedCharSourceRangeVector()
+    : vector(new std::vector<CharSourceRange>()) {}
 
-void BridgedCharSourceRangeVector_push_back_BridgedCharSourceRange(
-    BridgedCharSourceRangeVector &vector, BridgedCharSourceRange range) {
-  vector.push_back(range);
+void BridgedCharSourceRangeVector::push_back(BridgedCharSourceRange range) {
+  static_cast<std::vector<CharSourceRange> *>(vector)->push_back(
+      range.unbridged());
 }
-
-#ifdef USED_IN_CPP_SOURCE
-std::vector<swift::CharSourceRange> BridgedCharSourceRangeVector_unbridged(
-    const BridgedCharSourceRangeVector &vector) {
-  std::vector<swift::CharSourceRange> unbridged;
-  unbridged.reserve(vector.size());
-  for (auto bridgedCharSourceRange : vector) {
-    unbridged.push_back(bridgedCharSourceRange.unbridged());
-  }
-  return unbridged;
-}
-#endif
 
 //===----------------------------------------------------------------------===//
 // MARK: JSON

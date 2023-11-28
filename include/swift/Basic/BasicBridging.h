@@ -25,7 +25,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <vector>
 #ifdef USED_IN_CPP_SOURCE
 // Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
 // when including VirtualFileSystem.h
@@ -35,6 +34,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
+#include <vector>
 #endif
 
 // FIXME: We ought to be importing '<swift/bridging>' instead.
@@ -346,26 +346,36 @@ BridgedCharSourceRange_byteLength(BridgedCharSourceRange range) {
 // MARK: std::vector<BridgedCharSourceRange>
 //===----------------------------------------------------------------------===//
 
-typedef std::vector<BridgedCharSourceRange> BridgedCharSourceRangeVector;
-
-/// Create an empty `std::vector<ResolvedLoc>`.
+/// An opaque, heap-allocated `std::vector<CharSourceRange>`.
 ///
-/// - Note: This can't be imported as an initializer on
-/// `BridgedResolvedLocVector`
-///   because initializers without any arguments aren't imported to Swift
-SWIFT_NAME("BridgedCharSourceRangeVector.empty()")
-BridgedCharSourceRangeVector BridgedCharSourceRangeVector_createEmpty();
+/// This type is manually memory managed. The creator of the object needs to
+/// ensure that `takeUnbridged` is called to free the memory.
+class BridgedCharSourceRangeVector {
+  /// Opaque pointer to `std::vector<CharSourceRange>`.
+  void *_Nonnull vector;
 
-/// Append the given `BridgedCharSourceRange` to `vector`.
-SWIFT_NAME("BridgedCharSourceRangeVector.push_back(self:_:)")
-void BridgedCharSourceRangeVector_push_back_BridgedCharSourceRange(
-    BridgedCharSourceRangeVector &vector, BridgedCharSourceRange range);
+public:
+  BridgedCharSourceRangeVector();
+
+  SWIFT_NAME("append(_:)")
+  void push_back(BridgedCharSourceRange range);
 
 #ifdef USED_IN_CPP_SOURCE
-/// Convert the `BridgedCharSourceRange` to a `CharSourceRange`.
-std::vector<swift::CharSourceRange> BridgedCharSourceRangeVector_unbridged(
-    const BridgedCharSourceRangeVector &vector);
+  /// Returns the `std::vector<swift::CharSourceRange>` that this
+  /// `BridgedCharSourceRangeVector` represents and frees the memory owned by
+  /// this `BridgedCharSourceRangeVector`.
+  ///
+  /// No operations should be called on `BridgedCharSourceRangeVector` after
+  /// `takeUnbridged` is called.
+  std::vector<swift::CharSourceRange> takeUnbridged() {
+    auto *vectorPtr =
+        static_cast<std::vector<swift::CharSourceRange> *>(vector);
+    std::vector<swift::CharSourceRange> unbridged = *vectorPtr;
+    delete vectorPtr;
+    return unbridged;
+  }
 #endif
+};
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins
