@@ -191,6 +191,14 @@ DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
   }
 }
 
+TypeRepr *DeclRefTypeRepr::getBase() const {
+  if (isa<IdentTypeRepr>(this)) {
+    return nullptr;
+  }
+
+  return cast<MemberTypeRepr>(this)->getBase();
+}
+
 TypeRepr *DeclRefTypeRepr::getRoot() {
   return const_cast<TypeRepr *>(
       const_cast<const DeclRefTypeRepr *>(this)->getRoot());

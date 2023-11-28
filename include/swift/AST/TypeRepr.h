@@ -344,6 +344,10 @@ public:
                                  ArrayRef<TypeRepr *> GenericArgs,
                                  SourceRange AngleBrackets);
 
+  /// Returns the qualifier or base type representation. For example, `A.B`
+  /// for `A.B.C`. The base of a `IdentTypeRepr` is null.
+  TypeRepr *getBase() const;
+
   /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
   /// qualifier of a `IdentTypeRepr` is itself.
   TypeRepr *getRoot();
