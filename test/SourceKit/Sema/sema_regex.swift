@@ -2,7 +2,8 @@ public func retRegex() -> Regex<Substring> {
   /foo/
 }
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
+
 // RUN: %sourcekitd-test -req=sema %s -- %s -Xfrontend -enable-bare-slash-regex -Xfrontend -disable-availability-checking | %FileCheck %s
 
 // CHECK: [
