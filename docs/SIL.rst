@@ -4514,8 +4514,15 @@ live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
 
 The optional ``lexical`` attribute specifies that the operand corresponds to a
-local variable in the Swift source, so special care must be taken when moving
-the end_borrow.
+local variable with a lexical lifetime in the Swift source, so special care
+must be taken when moving the end_borrow.  Compare to the ``var_decl``
+attribute.
+
+The optional ``pointer_escape`` attribute specifies that a pointer to the
+operand escapes within the borrow scope introduced by this begin_borrow.
+
+The optional ``var_decl`` attribute specifies that the operand corresponds to a
+local variable in the Swift source.
 
 This instruction is only valid in functions in Ownership SSA form.
 
@@ -6373,7 +6380,14 @@ values'. A move_value instruction is an instruction that introduces (or injects)
 a type `T` into the move only value space.
 
 The ``lexical`` attribute specifies that the value corresponds to a local
-variable in the Swift source.
+variable with a lexical lifetime in the Swift source.  Compare to the
+``var_decl`` attribute.
+
+The optional ``pointer_escape`` attribute specifies that a pointer to the
+operand escapes within the scope introduced by this move_value.
+
+The optional ``var_decl`` attribute specifies that the operand corresponds to a
+local variable in the Swift source.
 
 
 drop_deinit

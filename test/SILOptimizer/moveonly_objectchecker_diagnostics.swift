@@ -26,6 +26,7 @@ public func borrowVal(_ x: borrowing KlassPair) {}
 public func borrowVal(_ x: borrowing AggGenericStruct<String>) {}
 public func borrowVal<T>(_ x: borrowing AggGenericStruct<T>) {}
 public func borrowVal(_ x: borrowing EnumTy) {}
+public func borrowVal(_ x: borrowing String) {}
 
 public func consumeVal(_ x: __owned Klass) {}
 public func consumeVal(_ x: __owned FinalKlass) {}
@@ -4261,4 +4262,23 @@ func testMyEnum() {
       _ = y
     }
   }
+}
+
+
+func rdar_118059326_example1() {
+  @_noEagerMove let thinger = "hello" // expected-error {{'thinger' used after consume}}
+  _ = consume thinger // expected-note {{consumed}}
+  borrowVal(thinger) // expected-note {{used}}
+}
+
+func withSadness<T>(_ execute: () throws -> T) rethrows -> T {
+  try execute()
+}
+
+func rdar_118059326_example2(_ path: String) {
+  let decoded = withSadness { // expected-error {{'decoded' used after consume}}
+      return path
+  }
+  _ = consume decoded // expected-note {{consumed}}
+  borrowVal(decoded) // expected-note {{used}}
 }

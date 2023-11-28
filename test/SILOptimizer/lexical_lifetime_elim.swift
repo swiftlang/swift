@@ -14,7 +14,7 @@ func getOwned() -> AnyObject
 
 // CHECK-LABEL: // testLexical()
 // CHECK: [[A:%.*]] = apply %{{.*}}()
-// CHECK: [[B:%.*]] = begin_borrow [lexical] [[A]]
+// CHECK: [[B:%.*]] = begin_borrow [lexical] [var_decl] [[A]]
 // CHECK: apply %{{.*}}([[B]])
 // CHECK: apply
 // CHECK: end_borrow [[B]]
@@ -28,7 +28,7 @@ func getOwned() -> AnyObject
 // CHECK-LABEL: *** SIL function after {{.*}} (sil-lexical-lifetime-eliminator)
 // CHECK-LABEL: // testLexical()
 // CHECK: [[A:%.*]] = apply %{{.*}}()
-// CHECK: [[B:%.*]] = begin_borrow [[A]]
+// CHECK: [[B:%.*]] = begin_borrow [var_decl] [[A]]
 // CHECK: apply %{{.*}}([[B]])
 // CHECK: apply
 // CHECK: end_borrow [[B]]
