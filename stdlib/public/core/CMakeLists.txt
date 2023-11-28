@@ -49,7 +49,7 @@ split_embedded_sources(
     NORMAL BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
-    NORMAL BuiltinMath.swift
+  EMBEDDED BuiltinMath.swift
     NORMAL Character.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift
