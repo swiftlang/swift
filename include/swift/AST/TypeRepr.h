@@ -362,6 +362,8 @@ public:
   /// The identifier that describes the last component.
   DeclNameRef getNameRef() const;
 
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent ||

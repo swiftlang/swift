@@ -209,6 +209,15 @@ TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
       ->getBoundDecl();
 }
 
+ArrayRef<TypeRepr *> DeclRefTypeRepr::getGenericArgs() const {
+  auto *lastComp = const_cast<DeclRefTypeRepr *>(this)->getLastComponent();
+  if (auto *genericTR = dyn_cast<GenericIdentTypeRepr>(lastComp)) {
+    return genericTR->getGenericArgs();
+  }
+
+  return {};
+}
+
 DeclNameRef DeclRefTypeRepr::getNameRef() const {
   return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->getNameRef();
 }
