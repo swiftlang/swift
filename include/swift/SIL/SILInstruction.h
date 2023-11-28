@@ -8402,6 +8402,9 @@ public:
   }
 };
 
+/// Drop the user-defined deinitializer from a struct or enum. Takes either an
+/// object or address operand and produces an object or address. See SIL.rst
+/// for details. See SILVerifier.cpp for constraints on valid uses.
 class DropDeinitInst
     : public UnaryInstructionBase<SILInstructionKind::DropDeinitInst,
                                   SingleValueInstruction> {
