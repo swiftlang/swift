@@ -3800,6 +3800,23 @@ namespace {
           auto *args = component.getSubscriptArgs();
           base = addSubscriptConstraints(E, base, /*decl*/ nullptr, args,
                                          memberLocator, &componentTypeVars);
+
+          auto &ctx = CS.getASTContext();
+          // All of the type variables that appear in subscript arguments
+          // need to be connected to a key path, otherwise it won't be
+          // possible to determine sendability of the key path type if
+          // the arguments are disconnected from it before being fully
+          // resolved.
+          if (args &&
+              ctx.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+            SmallPtrSet<TypeVariableType *, 2> referencedVars;
+            for (const auto &arg : *args) {
+              CS.getType(arg.getExpr())->getTypeVariables(referencedVars);
+            }
+
+            componentTypeVars.append(referencedVars.begin(),
+                                     referencedVars.end());
+          }
           break;
         }
 
