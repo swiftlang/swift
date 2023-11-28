@@ -1209,11 +1209,12 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
-  auto macroExpansion = getMacroExpansion();
-  if (!macroExpansion)
+  if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto sourceLoc = macroExpansion.getStartLoc();
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 

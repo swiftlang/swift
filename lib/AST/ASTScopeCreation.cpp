@@ -275,9 +275,14 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::MemberAttribute:
     case MacroRole::Conformance:
     case MacroRole::Extension:
-    case MacroRole::Preamble:
       parentLoc = expansion.getStartLoc();
       break;
+    case MacroRole::Preamble: {
+      // Preamble macro roles start at the beginning of the macro body.
+      auto func = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+      parentLoc = func->getMacroExpandedBody()->getStartLoc();
+      break;
+    }
     case MacroRole::Body:
       parentLoc = expansion.getEndLoc();
       bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());

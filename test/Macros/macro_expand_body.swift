@@ -13,6 +13,12 @@
 @attached(body)
 macro Remote() = #externalMacro(module: "MacroDefinition", type: "RemoteBodyMacro")
 
+@attached(preamble)
+macro Traced() = #externalMacro(module: "MacroDefinition", type: "TracedPreambleMacro")
+
+@attached(preamble)
+macro Log2() = #externalMacro(module: "MacroDefinition", type: "Log2PreambleMacro")
+
 protocol ConjureRemoteValue {
   static func conjureValue() -> Self
 }
@@ -30,13 +36,27 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
   return Result.conjureValue()
 }
 
+func log(_ value: String) {
+  print(value)
+}
+
+func log2(_ value: String) {
+  print("log2(\(value))")
+}
+
+@Traced
+func doubleTheValue(value: Int) -> Int {
+  return value * 2
+}
+
 @available(SwiftStdlib 5.1, *)
 @Remote
 func f(a: Int, b: String) async throws -> String
 
-
 @available(SwiftStdlib 5.1, *)
 @Remote
+@Traced
+@Log2
 func g(a: Int, b: String) async throws -> String {
   doesNotTypeCheck()
 }
@@ -51,10 +71,18 @@ func h(a: Int, b: String) async throws -> String {
 }
 #endif
 
+// CHECK: Entering doubleTheValue(value: 7)
+// CHECK-NEXT: Exiting doubleTheValue(value:)
+_ = doubleTheValue(value: 7)
+
 if #available(SwiftStdlib 5.1, *) {
   // CHECK: Remote call f(a: 5, b: Hello)
   print(try await f(a: 5, b: "Hello"))
 
+  // CHECK: Entering g(a: 5, b: World)
+  // CHECK: log2(Entering g(a: 5, b: World))
   // CHECK: Remote call g(a: 5, b: World)
+  // CHECK: log2(Exiting g(a:b:))
+  // CHECK: Exiting g(a:b:)
   print(try await g(a: 5, b: "World"))
 }

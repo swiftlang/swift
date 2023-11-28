@@ -909,7 +909,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   case MacroRole::Preamble: {
     SourceLoc inBodyLoc;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(target.get<Decl *>())) {
-      inBodyLoc = fn->getBodySourceRange().Start;
+      inBodyLoc = fn->getMacroExpandedBody()->getStartLoc();
     }
 
     if (inBodyLoc.isInvalid())
@@ -1581,6 +1581,7 @@ ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
           bufferIDs.push_back(*bufferID);
       });
 
+  std::reverse(bufferIDs.begin(), bufferIDs.end());
   return fn->getASTContext().AllocateCopy(bufferIDs);
 }
 
