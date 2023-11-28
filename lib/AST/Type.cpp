@@ -569,6 +569,15 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
         }
       }
 
+      if (auto lvalue = dyn_cast<LValueType>(type)) {
+        auto objTy = lvalue->getObjectType();
+        auto erased = transformFn(objTy);
+        if (erased.getPointer() == objTy.getPointer())
+          return Type(lvalue);
+
+        return erased;
+      }
+
       auto *const archetype = dyn_cast<OpenedArchetypeType>(ty);
       if (!archetype) {
         // Recurse.
