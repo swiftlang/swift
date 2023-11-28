@@ -41,8 +41,3 @@ module OptimizerBridging {
   header "swift/SILOptimizer/OptimizerBridging.h"
   export *
 }
-
-module _RegexParserBridging {
-  header "swift/Parse/RegexParserBridging.h"
-  export *
-}

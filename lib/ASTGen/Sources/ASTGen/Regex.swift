@@ -10,28 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _RegexParserBridging
-import AST
-import Basic
+import CASTBridging
+import CBasicBridging
 
 #if canImport(_CompilerRegexParser)
 @_spi(CompilerInterface) import _CompilerRegexParser
-
-func registerRegexParser() {
-  Parser_registerRegexLiteralParsingFn(_RegexLiteralParsingFn)
-  Parser_registerRegexLiteralLexingFn(_RegexLiteralLexingFn)
-}
 
 /// Bridging between C++ lexer and swiftCompilerLexRegexLiteral.
 ///
 /// Attempt to lex a regex literal string.
 ///
 /// - Parameters:
-///   - CurPtrPtr: A pointer to the current pointer of lexer, which should be
+///   - curPtrPtr: A pointer to the current pointer of lexer, which should be
 ///                the start of the literal. This will be advanced to the point
 ///                at which the lexer should resume, or will remain the same if
 ///                this is not a regex literal.
-///   - BufferEndPtr: A pointer to the end of the buffer, which should not be
+///   - bufferEndPtr: A pointer to the end of the buffer, which should not be
 ///                   lexed past.
 ///   - mustBeRegex: A bool value whether an error during lexing should be
 ///                  considered a regex literal, or some thing else. If true
@@ -42,12 +36,13 @@ func registerRegexParser() {
 /// - Returns: A bool indicating whether lexing was completely erroneous, and
 ///            cannot be recovered from, or false if there either was no error,
 ///            or there was a recoverable error.
-private func _RegexLiteralLexingFn(
+@_cdecl("swift_ASTGen_lexRegexLiteral")
+public func _RegexLiteralLexingFn(
   _ curPtrPtr: UnsafeMutablePointer<UnsafePointer<CChar>>,
   _ bufferEndPtr: UnsafePointer<CChar>,
-  _ mustBeRegex: CBool,
-  _ bridgedDiagnosticEngine: BridgedOptionalDiagnosticEngine
-) -> /*CompletelyErroneous*/ CBool {
+  _ mustBeRegex: Bool,
+  _ bridgedDiagnosticEnginePtr: UnsafeMutableRawPointer?
+) -> /*CompletelyErroneous*/ Bool {
   let inputPtr = curPtrPtr.pointee
 
   guard let (resumePtr, error) = swiftCompilerLexRegexLiteral(
@@ -62,10 +57,18 @@ private func _RegexLiteralLexingFn(
 
   if let error = error {
     // Emit diagnostic if diagnostics are enabled.
-    if let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine) {
-      let startLoc = SourceLoc(
-        locationInFile: error.location.assumingMemoryBound(to: UInt8.self))!
-      diagEngine.diagnose(startLoc, .foreign_diagnostic, error.message)
+
+    if let diagEnginePtr = bridgedDiagnosticEnginePtr {
+      var message = error.message
+      message.withBridgedString { message in
+        let diag = Diagnostic_create(
+          BridgedDiagnosticEngine(raw: diagEnginePtr),
+          .error,
+          BridgedSourceLoc(raw: error.location),
+          message
+        )
+        Diagnostic_finish(diag)
+      }
     }
     return error.completelyErroneous
   }
@@ -75,27 +78,26 @@ private func _RegexLiteralLexingFn(
 /// Bridging between C++ parser and swiftCompilerParseRegexLiteral.
 ///
 /// - Parameters:
-///   - inputPtr: A null-terminated C string.
-///   - errOut: A buffer accepting an error string upon error.
-///   - versionOut: A buffer accepting a regex literal format
-///     version.
+///   - input: Regex literal text.
+///   - versionOut: A buffer accepting a regex literal format version.
 ///   - captureStructureOut: A buffer accepting a byte sequence representing the
 ///     capture structure.
 ///   - captureStructureSize: The size of the capture structure buffer. Must be
-///     greater than or equal to `strlen(inputPtr)`.
+///     greater than or equal to `input.size()`.
 ///   - bridgedDiagnosticBaseLoc: Source location of the start of the literal
 ///   - bridgedDiagnosticEngine: Diagnostic engine to emit diagnostics.
 ///
 /// - Returns: `true` if there was a parse error, `false` otherwise.
+@_cdecl("swift_ASTGen_parseRegexLiteral")
 public func _RegexLiteralParsingFn(
-  _ inputPtr: UnsafePointer<CChar>,
-  _ versionOut: UnsafeMutablePointer<CUnsignedInt>,
+  _ input: BridgedString,
+  _ versionOut: UnsafeMutablePointer<UInt>,
   _ captureStructureOut: UnsafeMutableRawPointer,
-  _ captureStructureSize: CUnsignedInt,
-  _ bridgedDiagnosticBaseLoc: swift.SourceLoc,
+  _ captureStructureSize: UInt,
+  _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
   _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
 ) -> Bool {
-  let str = String(cString: inputPtr)
+  let str = String(bridged: input)
   let captureBuffer = UnsafeMutableRawBufferPointer(
     start: captureStructureOut, count: Int(captureStructureSize))
   do {
@@ -103,25 +105,42 @@ public func _RegexLiteralParsingFn(
     // For now, it is the same as the input.
     let (_, version) = try swiftCompilerParseRegexLiteral(
       str, captureBufferOut: captureBuffer)
-    versionOut.pointee = CUnsignedInt(version)
+    versionOut.pointee = UInt(version)
     return false
   } catch let error as CompilerParseError {
-    var diagLoc = SourceLoc(bridged: bridgedDiagnosticBaseLoc)
-    let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine)
-    if let _diagLoc = diagLoc, let errorLoc = error.location {
+    var diagLoc = bridgedDiagnosticBaseLoc
+
+    if let diagLocPtr = diagLoc.raw, let errorLoc = error.location {
       let offset = str.utf8.distance(from: str.startIndex, to: errorLoc)
-      diagLoc = _diagLoc.advanced(by: offset)
+      diagLoc = BridgedSourceLoc(raw: diagLocPtr.advanced(by: offset))
     }
-    diagEngine.diagnose(diagLoc, .foreign_diagnostic, error.message)
+    var message = error.message
+    message.withBridgedString { message in
+      let diag = Diagnostic_create(
+        bridgedDiagnosticEngine,
+        .error,
+        diagLoc,
+        message
+      )
+      Diagnostic_finish(diag)
+    }
     return true
   } catch {
     fatalError("Expected CompilerParseError")
   }
 }
 
+extension String {
+  init(bridged: BridgedString) {
+    self.init(
+      decoding: UnsafeBufferPointer(start: bridged.data, count: Int(bridged.length)),
+      as: UTF8.self
+    )
+  }
+}
+
 #else // canImport(_CompilerRegexParser)
 
 #warning("Regex parsing is disabled")
-func registerRegexParser() {}
 
 #endif // canImport(_CompilerRegexParser)
