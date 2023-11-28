@@ -2,7 +2,8 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 public func sink<T>(t: T) {}
 

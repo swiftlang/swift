@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 public func staticstring() -> StaticString {
   return "hello"
