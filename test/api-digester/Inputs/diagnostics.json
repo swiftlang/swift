@@ -9,6 +9,14 @@
       "typeAttributes": ["autoclosure", "fnord", "inout", "Available"],
       "declAttributes": ["Available", "Fnord", "ObjC", "inout"],
       "declKind": "Subroutine"
+    },
+    {
+      "kind": "Function",
+      "declAttributes": ["Available", "Fnord", "ObjC", "inout"],
+      "declKind": "Func",
+      "name": "foo",
+      "children": [],
+      "usr": "s:11diagnostics3fooP"
     }
   ]
 }

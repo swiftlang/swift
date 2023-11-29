@@ -2897,6 +2897,10 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
 
   // Diagnose removing attributes.
   for (auto Kind: getDeclAttributes()) {
+    if (Kind == swift::DAK_Count)
+      // Unknown attribute, diagnosed elsewhere.
+      continue;
+
     if (!RD->hasDeclAttribute(Kind)) {
       if ((Ctx.checkingABI() ? DeclAttribute::isRemovingBreakingABI(Kind) :
                                DeclAttribute::isRemovingBreakingAPI(Kind)) &&
@@ -2909,6 +2913,10 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
 
   // Diagnose adding attributes.
   for (auto Kind: RD->getDeclAttributes()) {
+    if (Kind == swift::DAK_Count)
+      // Unknown attribute, diagnosed elsewhere.
+      continue;
+
     if (!hasDeclAttribute(Kind)) {
       if ((Ctx.checkingABI() ? DeclAttribute::isAddingBreakingABI(Kind) :
                                DeclAttribute::isAddingBreakingAPI(Kind)) &&
