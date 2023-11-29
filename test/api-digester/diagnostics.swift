@@ -13,8 +13,8 @@
 // CHECK: diagnostics.json:8:15: error: unrecognized SDK node kind 'Zyzyx'
 // CHECK: diagnostics.json:9:41: error: unrecognized type attribute 'fnord' in SDK node
 // CHECK: diagnostics.json:9:59: error: unrecognized type attribute 'Available' in SDK node
-// CHECK: diagnostics.json:10:39: error: unrecognized declaration attribute 'Fnord' in SDK node
-// CHECK: diagnostics.json:10:56: error: unrecognized declaration attribute 'inout' in SDK node
+// CHECK: diagnostics.json:10:39: warning: unrecognized declaration attribute 'Fnord' in SDK node
+// CHECK: diagnostics.json:10:56: warning: unrecognized declaration attribute 'inout' in SDK node
 // CHECK: diagnostics.json:11:19: error: unrecognized declaration kind 'Subroutine' in SDK node
 
 // Make sure we don't try to output a result:
@@ -22,8 +22,8 @@
 
 // Older versions of the compiler used 'BackDeploy' for @_backDeploy. We now use
 // 'BackDeployed', but we should still support the old name.
-// NEGATIVE-NOT: error: unrecognized declaration attribute 'BackDeploy' in SDK node
+// NEGATIVE-NOT: {{warning|error}}: unrecognized declaration attribute 'BackDeploy' in SDK node
 // NEGATIVE-NOT: is now without @backDeployed
 
 // Should not have any errors in the diagnostics-compare file.
-// NEGATIVE-NOT: diagnostics-compare.json:{{.*}}: error:
+// NEGATIVE-NOT: diagnostics-compare.json:{{.*}}: {{warning|error}}:
