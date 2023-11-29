@@ -4978,7 +4978,7 @@ FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl, ASTContext &ctx,
       cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), cxxMethod);
   if (!newClangMethod)
     return nullptr;
-  return cast<FuncDecl>(
+  return cast_or_null<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(newClangMethod));
 }
 
