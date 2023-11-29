@@ -48,6 +48,24 @@ MoveOnlyCxxValueType.test("Test move only field access in holder") {
   k = inoutNC(&c.x, 7)
   expectEqual(k, 7)
   expectEqual(c.x.x, 7)
+  c.x.x = 78
+  expectEqual(c.x.x, 78)
+  c.x.mutMethod(5)
+  expectEqual(c.x.x, 5)
+}
+
+MoveOnlyCxxValueType.test("Test move only field access in derived holder") {
+  var c = NonCopyableHolderDerivedDerived(-11)
+  var k = borrowNC(c.x)
+  expectEqual(k, -33)
+  expectEqual(c.getActualX(), -11)
+  k = inoutNC(&c.x, 7)
+  expectEqual(k, 7)
+  expectEqual(c.x.x, 7)
+  c.x.x = 78
+  expectEqual(c.x.x, 78)
+  c.x.mutMethod(5)
+  expectEqual(c.x.x, 5)
 }
 
 runAllTests()

@@ -41,4 +41,16 @@ struct NonCopyableHolder {
     NonCopyable x;
 };
 
+struct NonCopyableHolderDerived: NonCopyableHolder {
+    inline NonCopyableHolderDerived(int x) : NonCopyableHolder(x) {}
+};
+
+struct NonCopyableHolderDerivedDerived: NonCopyableHolderDerived {
+    inline NonCopyableHolderDerivedDerived(int x) : NonCopyableHolderDerived(x) {}
+
+    inline int getActualX() const {
+        return x.x;
+    }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_MOVE_ONLY_VT_H

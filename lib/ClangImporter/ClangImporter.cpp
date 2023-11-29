@@ -5053,13 +5053,22 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
+// How should the synthesized C++ method that returns the field of interest
+// from the base class should return the value - by value, or by reference.
+enum ReferenceReturnTypeBehaviorForBaseAccessorSynthesis {
+  ReturnByValue,
+  ReturnByReference,
+  ReturnByMutableReference
+};
+
 // Synthesize a C++ method that returns the field of interest from the base
 // class. This lets Clang take care of the cast from the derived class
 // to the base class while the field is accessed.
 static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
     ClangImporter &impl, const clang::CXXRecordDecl *derivedClass,
     const clang::CXXRecordDecl *baseClass, const clang::FieldDecl *field,
-    ValueDecl *retainOperationFn) {
+    ValueDecl *retainOperationFn,
+    ReferenceReturnTypeBehaviorForBaseAccessorSynthesis behavior) {
   auto &clangCtx = impl.getClangASTContext();
   auto &clangSema = impl.getClangSema();
 
@@ -5068,7 +5077,10 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
   if (name.isIdentifier()) {
     std::string newName;
     llvm::raw_string_ostream os(newName);
-    os << "__synthesizedBaseGetterAccessor_"
+    os << (behavior == ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::
+                           ReturnByMutableReference
+               ? "__synthesizedBaseSetterAccessor_"
+               : "__synthesizedBaseGetterAccessor_")
        << name.getAsIdentifierInfo()->getName();
     name = clang::DeclarationName(
         &impl.getClangPreprocessor().getIdentifierTable().get(os.str()));
@@ -5076,8 +5088,19 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
   auto returnType = field->getType();
   if (returnType->isReferenceType())
     returnType = returnType->getPointeeType();
+  auto valueReturnType = returnType;
+  if (behavior !=
+      ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::ReturnByValue) {
+    returnType = clangCtx.getRValueReferenceType(
+        behavior == ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::
+                        ReturnByReference
+            ? returnType.withConst()
+            : returnType);
+  }
   clang::FunctionProtoType::ExtProtoInfo info;
-  info.TypeQuals.addConst();
+  if (behavior != ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::
+                      ReturnByMutableReference)
+    info.TypeQuals.addConst();
   info.ExceptionSpec.Type = clang::EST_NoThrow;
   auto ftype = clangCtx.getFunctionType(returnType, {}, info);
   auto newMethod = clang::CXXMethodDecl::Create(
@@ -5128,9 +5151,10 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
         /*HadMultipleCandidates=*/false,
         clang::DeclarationNameInfo(field->getDeclName(),
                                    clang::SourceLocation()),
-        returnType, clang::VK_LValue, clang::OK_Ordinary);
-    auto returnCast = clangSema.ImpCastExprToType(
-        memberExpr, returnType, clang::CK_LValueToRValue, clang::VK_PRValue);
+        valueReturnType, clang::VK_LValue, clang::OK_Ordinary);
+    auto returnCast = clangSema.ImpCastExprToType(memberExpr, valueReturnType,
+                                                  clang::CK_LValueToRValue,
+                                                  clang::VK_PRValue);
     if (!returnCast.isUsable())
       return nullptr;
     return returnCast.get();
@@ -5187,7 +5211,11 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
 // The method's body takes the following form:
 //   return self.__synthesizedBaseCall_fn(args...)
 static std::pair<BraceStmt *, bool>
-synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
+synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
+                                                  void *context,
+                                                  AccessorKind kind) {
+  assert(kind == AccessorKind::Get || kind == AccessorKind::Address ||
+         kind == AccessorKind::MutableAddress);
   ASTContext &ctx = afd->getASTContext();
 
   AccessorDecl *getterDecl = cast<AccessorDecl>(afd);
@@ -5201,8 +5229,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   if (baseClassVar->getClangDecl())
     baseClangDecl = baseClassVar->getClangDecl();
   else
-    baseClangDecl =
-        getCalledBaseCxxMethod(baseClassVar->getAccessor(AccessorKind::Get));
+    baseClangDecl = getCalledBaseCxxMethod(baseClassVar->getAccessor(kind));
 
   clang::CXXMethodDecl *baseGetterCxxMethod = nullptr;
   if (auto *md = dyn_cast_or_null<clang::CXXMethodDecl>(baseClangDecl)) {
@@ -5215,9 +5242,12 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
         getterDecl->getResultInterfaceType()->isForeignReferenceType()
             ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
                   RemoveReferenceIfPointer
-            : ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                  RemoveReference,
-        /*forceConstQualifier=*/true);
+            : (kind != AccessorKind::Get
+                   ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                         KeepReference
+                   : ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                         RemoveReference),
+        /*forceConstQualifier=*/kind != AccessorKind::MutableAddress);
   } else if (auto *fd = dyn_cast_or_null<clang::FieldDecl>(baseClangDecl)) {
     ValueDecl *retainOperationFn = nullptr;
     // Check if this field getter is returning a retainable FRT.
@@ -5240,7 +5270,14 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
         *static_cast<ClangImporter *>(ctx.getClangModuleLoader()),
         cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
         cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), fd,
-        retainOperationFn);
+        retainOperationFn,
+        kind == AccessorKind::Get
+            ? ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::ReturnByValue
+            : (kind == AccessorKind::Address
+                   ? ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::
+                         ReturnByReference
+                   : ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::
+                         ReturnByMutableReference));
   }
 
   if (!baseGetterCxxMethod) {
@@ -5253,12 +5290,17 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto *baseGetterMethod = cast<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(baseGetterCxxMethod));
 
-  auto selfDecl = getterDecl->getImplicitSelfDecl();
-  auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                        /*implicit*/ true);
-  selfExpr->setType(selfDecl->getTypeInContext());
-
-  Argument selfArg = Argument::unlabeled(selfExpr);
+  Argument selfArg = [&]() {
+    auto selfDecl = getterDecl->getImplicitSelfDecl();
+    auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                          /*implicit*/ true);
+    if (kind == AccessorKind::MutableAddress) {
+      selfExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
+      return Argument::implicitInOut(ctx, selfExpr);
+    }
+    selfExpr->setType(selfDecl->getTypeInContext());
+    return Argument::unlabeled(selfExpr);
+  }();
 
   auto *baseMemberExpr =
       new (ctx) DeclRefExpr(ConcreteDeclRef(baseGetterMethod), DeclNameLoc(),
@@ -5292,6 +5334,19 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
   return {body, /*isTypeChecked=*/true};
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
+  return synthesizeBaseClassFieldGetterOrAddressGetterBody(afd, context,
+                                                           AccessorKind::Get);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeBaseClassFieldAddressGetterBody(AbstractFunctionDecl *afd,
+                                          void *context) {
+  return synthesizeBaseClassFieldGetterOrAddressGetterBody(
+      afd, context, AccessorKind::Address);
 }
 
 // For setters we have to pass self as a pointer and then emit an assign:
@@ -5355,12 +5410,23 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
+static std::pair<BraceStmt *, bool>
+synthesizeBaseClassFieldAddressSetterBody(AbstractFunctionDecl *afd,
+                                          void *context) {
+  return synthesizeBaseClassFieldGetterOrAddressGetterBody(
+      afd, context, AccessorKind::MutableAddress);
+}
+
 static SmallVector<AccessorDecl *, 2>
 makeBaseClassMemberAccessors(DeclContext *declContext,
                              AbstractStorageDecl *computedVar,
                              AbstractStorageDecl *baseClassVar) {
   auto &ctx = declContext->getASTContext();
   auto computedType = computedVar->getInterfaceType();
+
+  // Use 'address' or 'mutableAddress' accessors for non-copyable
+  // types.
+  bool useAddress = computedType->isNoncopyable(declContext);
 
   ParameterList *bodyParams = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -5375,18 +5441,22 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
   auto getterDecl = AccessorDecl::create(
       ctx,
       /*FuncLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedVar,
+      /*AccessorKeywordLoc=*/SourceLoc(),
+      useAddress ? AccessorKind::Address : AccessorKind::Get, computedVar,
       /*StaticLoc=*/SourceLoc(),
       StaticSpellingKind::None, // TODO: we should handle static vars.
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      bodyParams, computedType, declContext);
+      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), bodyParams,
+      useAddress ? computedType->wrapInPointer(PTK_UnsafePointer)
+                 : computedType,
+      declContext);
   getterDecl->setIsTransparent(true);
   getterDecl->setAccess(AccessLevel::Public);
-  getterDecl->setBodySynthesizer(synthesizeBaseClassFieldGetterBody,
+  getterDecl->setBodySynthesizer(useAddress
+                                     ? synthesizeBaseClassFieldAddressGetterBody
+                                     : synthesizeBaseClassFieldGetterBody,
                                  baseClassVar);
-
   if (baseClassVar->getWriteImpl() == WriteImplKind::Immutable)
     return {getterDecl};
 
@@ -5396,28 +5466,33 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
   newValueParam->setSpecifier(ParamSpecifier::Default);
   newValueParam->setInterfaceType(computedType);
 
-  ParameterList *setterBodyParams = nullptr;
-  if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
-    auto idxParam = subscript->getIndices()->get(0);
-    bodyParams = ParameterList::create(ctx, { idxParam });
-    setterBodyParams = ParameterList::create(ctx, { newValueParam, idxParam });
-  } else {
-    setterBodyParams = ParameterList::create(ctx, { newValueParam });
-  }
+  SmallVector<ParamDecl *, 2> setterParamDecls;
+  if (!useAddress)
+    setterParamDecls.push_back(newValueParam);
+  if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar))
+    setterParamDecls.push_back(subscript->getIndices()->get(0));
+  ParameterList *setterBodyParams =
+      ParameterList::create(ctx, setterParamDecls);
 
   auto setterDecl = AccessorDecl::create(
       ctx,
       /*FuncLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Set, computedVar,
+      /*AccessorKeywordLoc=*/SourceLoc(),
+      useAddress ? AccessorKind::MutableAddress : AccessorKind::Set,
+      computedVar,
       /*StaticLoc=*/SourceLoc(),
       StaticSpellingKind::None, // TODO: we should handle static vars.
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      setterBodyParams, TupleType::getEmpty(ctx),declContext);
+      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), setterBodyParams,
+      useAddress ? computedType->wrapInPointer(PTK_UnsafeMutablePointer)
+                 : TupleType::getEmpty(ctx),
+      declContext);
   setterDecl->setIsTransparent(true);
   setterDecl->setAccess(AccessLevel::Public);
-  setterDecl->setBodySynthesizer(synthesizeBaseClassFieldSetterBody,
+  setterDecl->setBodySynthesizer(useAddress
+                                     ? synthesizeBaseClassFieldAddressSetterBody
+                                     : synthesizeBaseClassFieldSetterBody,
                                  baseClassVar);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
 
@@ -5504,6 +5579,10 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   }
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    // Subscripts that return non-copyable types are not yet supported.
+    // See: https://github.com/apple/swift/issues/70047.
+    if (subscript->getElementInterfaceType()->isNoncopyable(newContext))
+      return nullptr;
     auto out = SubscriptDecl::create(
         subscript->getASTContext(), subscript->getName(), subscript->getStaticLoc(),
         subscript->getStaticSpelling(), subscript->getSubscriptLoc(),
@@ -5528,12 +5607,17 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     out->setIsDynamic(var->isDynamic());
     out->copyFormalAccessFrom(var);
     out->getASTContext().evaluator.cacheOutput(HasStorageRequest{out}, false);
-    out->setAccessors(SourceLoc(),
-                      makeBaseClassMemberAccessors(newContext, out, var),
-                      SourceLoc());
+    auto accessors = makeBaseClassMemberAccessors(newContext, out, var);
+    out->setAccessors(SourceLoc(), accessors, SourceLoc());
     auto isMutable = var->getWriteImpl() == WriteImplKind::Immutable
                          ? StorageIsNotMutable : StorageIsMutable;
-    out->setImplInfo(StorageImplInfo::getComputed(isMutable));
+    out->setImplInfo(
+        accessors[0]->getAccessorKind() == AccessorKind::Address
+            ? (accessors[1] ? StorageImplInfo(ReadImplKind::Address,
+                                              WriteImplKind::MutableAddress,
+                                              ReadWriteImplKind::MutableAddress)
+                            : StorageImplInfo(ReadImplKind::Address))
+            : StorageImplInfo::getComputed(isMutable));
     out->setIsSetterMutating(true);
     return out;
   }
