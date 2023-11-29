@@ -32,12 +32,12 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddrOnlyCallResult{{.*}} :
 // CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>>):
 // CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>> } <T>, var, name "f"
-// CHECK: [[F_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[F]]
+// CHECK: [[F_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[F]]
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F_LIFETIME]]
 // CHECK: [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK: store [[T0_COPY]] to [init] [[PBF]]
 // CHECK-NEXT: [[X:%.*]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>, var, name "x"
-// CHECK-NEXT: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK-NEXT: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X]]
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[PBX]]
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBF]]

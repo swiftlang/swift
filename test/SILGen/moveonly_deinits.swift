@@ -83,7 +83,7 @@ var value: Bool { false }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits24testIntPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
@@ -133,7 +133,7 @@ public func testIntPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits21testIntPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
@@ -181,7 +181,7 @@ public func testIntPairWithDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits26testKlassPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[BORROWED_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[BORROWED_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // SILGEN: [[PROJECT:%.*]] = project_box [[BORROWED_BOX]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
@@ -345,7 +345,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
@@ -394,7 +394,7 @@ public func testIntEnumPairWithoutDeinit() {
 
 // SILGEN-LABEL: sil [ossa] @$s16moveonly_deinits25testIntEnumPairWithDeinityyF : $@convention(thin) () -> () {
 // SILGEN: [[BOX:%.*]] = alloc_box
-// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[BOX]]
+// SILGEN: [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // SILGEN: [[PROJECT:%.*]] = project_box [[BOX_LIFETIME]]
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //

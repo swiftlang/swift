@@ -13,7 +13,7 @@ public struct TopLevelStruct<T> {
   // CHECK: bb0([[SELF_OUT:%.*]] : $*TopLevelStruct<T>, [[T_ARG:%.*]] : $*T, [[METATYPE_ARG:%.*]] : $@thin TopLevelStruct<T>.Type):
   // CHECK:   [[SELF:%.*]] = alloc_box $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>, var, name "self"
   // CHECK:   [[MARKED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>
-  // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [lexical] [[MARKED_SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>
+  // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>
   // CHECK:   [[BOX:%.*]] = project_box [[BORROWED_SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>, 0
   // CHECK:   [[T_STACK:%.*]] = alloc_stack $T
   // CHECK:   copy_addr [[T_ARG]] to [init] [[T_STACK]] : $*T
