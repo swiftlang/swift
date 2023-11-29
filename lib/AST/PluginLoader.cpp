@@ -196,7 +196,8 @@ LoadedExecutablePlugin *PluginLoader::loadExecutablePlugin(StringRef path) {
     DepTracker->addDependency(resolvedPath, /*IsSystem=*/false);
 
   // Load the plugin.
-  auto plugin = getRegistry()->loadExecutablePlugin(resolvedPath);
+  auto plugin =
+      getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox);
   if (!plugin) {
     Ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                        llvm::toString(plugin.takeError()));
