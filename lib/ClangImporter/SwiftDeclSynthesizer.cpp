@@ -1496,6 +1496,29 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
 
 // MARK: C++ subscripts
 
+Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
+                                                            Type givenType,
+                                                            Type exprType,
+                                                            Expr *baseExpr) {
+  auto reinterpretCast = cast<FuncDecl>(
+      getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
+  SubstitutionMap subMap = SubstitutionMap::get(
+      reinterpretCast->getGenericSignature(), {givenType, exprType}, {});
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
+  auto reinterpretCastRef =
+      new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  FunctionType::ExtInfo info;
+  reinterpretCastRef->setType(
+      FunctionType::get({FunctionType::Param(givenType)}, exprType, info));
+
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseExpr});
+  auto reinterpreted =
+      CallExpr::createImplicit(ctx, reinterpretCastRef, argList);
+  reinterpreted->setType(exprType);
+  reinterpreted->setThrows(nullptr);
+  return reinterpreted;
+}
+
 /// Synthesizer callback for a subscript getter or a getter for a
 /// dereference property (`var pointee`). If the getter's implementation returns
 /// an UnsafePointer or UnsafeMutablePointer, it unwraps the pointer and returns
@@ -1544,27 +1567,9 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   }
   // Cast an 'address' result from a mutable pointer if needed.
   if (isAddress &&
-      getterImpl->getResultInterfaceType()->isUnsafeMutablePointer()) {
-    auto reinterpretCast = cast<FuncDecl>(
-        getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
-    auto rawTy = getterImpl->getResultInterfaceType();
-    auto enumTy = elementTy;
-    SubstitutionMap subMap = SubstitutionMap::get(
-        reinterpretCast->getGenericSignature(), {rawTy, enumTy}, {});
-    ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
-    auto reinterpretCastRef = new (ctx)
-        DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-    FunctionType::ExtInfo info;
-    reinterpretCastRef->setType(
-        FunctionType::get({FunctionType::Param(rawTy)}, enumTy, info));
-
-    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {propertyExpr});
-    auto reinterpreted =
-        CallExpr::createImplicit(ctx, reinterpretCastRef, argList);
-    reinterpreted->setType(enumTy);
-    reinterpreted->setThrows(nullptr);
-    propertyExpr = reinterpreted;
-  }
+      getterImpl->getResultInterfaceType()->isUnsafeMutablePointer())
+    propertyExpr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+        ctx, getterImpl->getResultInterfaceType(), elementTy, propertyExpr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), propertyExpr,
                                          /*implicit*/ true);

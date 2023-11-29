@@ -19,6 +19,7 @@
 #include "ClangDiagnosticConsumer.h"
 #include "ClangIncludePaths.h"
 #include "ImporterImpl.h"
+#include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -4948,6 +4949,18 @@ const clang::CXXMethodDecl *getCalledBaseCxxMethod(FuncDecl *baseMember) {
   if (!returnStmt)
     return nullptr;
   Expr *returnExpr = returnStmt->getResult();
+  // Look through a potential 'reinterpresetCast' that can be used
+  // to cast UnsafeMutablePointer to UnsafePointer in the synthesized
+  // Swift body for `.pointee`.
+  if (auto *ce = dyn_cast<CallExpr>(returnExpr)) {
+    if (auto *v = ce->getCalledValue()) {
+      if (v->getModuleContext() ==
+              baseMember->getASTContext().TheBuiltinModule &&
+          v->getBaseName().getIdentifier().str() == "reinterpretCast") {
+        returnExpr = ce->getArgs()->get(0).getExpr();
+      }
+    }
+  }
   // A member ref expr for `.pointee` access can be wrapping a call
   // when looking through the synthesized Swift body for `.pointee`
   // accessor.
@@ -5325,10 +5338,22 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
 
   auto *baseMemberCallExpr =
       CallExpr::createImplicit(ctx, baseMemberDotCallExpr, argumentList);
-  baseMemberCallExpr->setType(baseGetterMethod->getResultInterfaceType());
+  Type resultType = baseGetterMethod->getResultInterfaceType();
+  if (kind == AccessorKind::Address && resultType->isUnsafeMutablePointer()) {
+    resultType = getterDecl->getResultInterfaceType();
+  }
+  baseMemberCallExpr->setType(resultType);
   baseMemberCallExpr->setThrows(nullptr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
+  Expr *returnExpr = baseMemberCallExpr;
+  // Cast an 'address' result from a mutable pointer if needed.
+  if (kind == AccessorKind::Address &&
+      baseGetterMethod->getResultInterfaceType()->isUnsafeMutablePointer())
+    returnExpr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+        ctx, baseGetterMethod->getResultInterfaceType(), resultType,
+        returnExpr);
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), returnExpr,
                                          /*implicit=*/true);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
@@ -5613,10 +5638,11 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
                          ? StorageIsNotMutable : StorageIsMutable;
     out->setImplInfo(
         accessors[0]->getAccessorKind() == AccessorKind::Address
-            ? (accessors[1] ? StorageImplInfo(ReadImplKind::Address,
-                                              WriteImplKind::MutableAddress,
-                                              ReadWriteImplKind::MutableAddress)
-                            : StorageImplInfo(ReadImplKind::Address))
+            ? (accessors.size() > 1
+                   ? StorageImplInfo(ReadImplKind::Address,
+                                     WriteImplKind::MutableAddress,
+                                     ReadWriteImplKind::MutableAddress)
+                   : StorageImplInfo(ReadImplKind::Address))
             : StorageImplInfo::getComputed(isMutable));
     out->setIsSetterMutating(true);
     return out;

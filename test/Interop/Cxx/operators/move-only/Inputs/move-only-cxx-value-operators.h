@@ -60,4 +60,18 @@ class NonCopyableHolderValueMutDeref {
     inline NonCopyable operator *() { return NonCopyable(x.x); }
 };
 
+template<class T>
+class OneDerived: public T {
+public:
+    OneDerived(int x) : T(x) {}
+};
+
+using NonCopyableHolderConstDerefDerivedDerived = OneDerived<OneDerived<NonCopyableHolderConstDeref>>;
+
+using NonCopyableHolderPairedDerefDerivedDerived = OneDerived<OneDerived<NonCopyableHolderPairedDeref>>;
+
+using NonCopyableHolderMutDerefDerivedDerived = OneDerived<OneDerived<NonCopyableHolderMutDeref>>;
+
+using NonCopyableHolderValueConstDerefDerivedDerived = OneDerived<OneDerived<NonCopyableHolderValueConstDeref>>;
+
 #endif // TEST_INTEROP_CXX_OPERATORS_MOVE_ONLY_OPS_H
