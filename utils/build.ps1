@@ -812,10 +812,14 @@ function Build-BuildTools($Arch) {
       LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
       SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
       SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
+      SWIFT_BUILD_LIBEXEC = "NO";
       SWIFT_BUILD_REMOTE_MIRROR = "NO";
+      SWIFT_BUILD_SOURCEKIT = "NO";
       SWIFT_BUILD_STATIC_SDK_OVERLAY = "NO";
       SWIFT_BUILD_STATIC_STDLIB = "NO";
+      SWIFT_INCLUDE_APINOTES = "NO";
       SWIFT_INCLUDE_DOCS = "NO";
+      SWIFT_INCLUDE_TESTS = "NO";
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
       SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
     }
