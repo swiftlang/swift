@@ -877,16 +877,19 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 
 // Warnings arising from the flow-sensitive checking of Sendability of
 // non-Sendable values
-WARNING(arg_region_transferred, none,
+WARNING(regionbasedisolation_selforargtransferred, none,
         "call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller", ())
-WARNING(transfer_yields_race, none,
-        "non-sendable value sent across isolation domains that could be concurrently accessed later in this function (%0 access site%select{|s}1 displayed%select{|, %3 more hidden}2)",
-        (unsigned, bool, bool, unsigned))
-WARNING(call_site_transfer_yields_race, none,
+WARNING(regionbasedisolation_transfer_yields_race_no_isolation, none,
+        "transferred value of non-Sendable type %0 that could race with later accesses",
+        (Type))
+WARNING(regionbasedisolation_transfer_yields_race_with_isolation, none,
         "passing argument of non-sendable type %0 from %1 context to %2 context at this call site could yield a race with accesses later in this function",
         (Type, ActorIsolation, ActorIsolation))
-NOTE(possible_racy_access_site, none,
+NOTE(regionbasedisolation_maybe_race, none,
      "access here could race", ())
+ERROR(regionbasedisolation_unknown_pattern, none,
+      "pattern that the region based isolation checker does not understand how to check. Please file a bug",
+      ())
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
