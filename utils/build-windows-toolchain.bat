@@ -12,7 +12,7 @@ setlocal enableextensions enabledelayedexpansion
 path %PATH%;%PYTHON_HOME%
 
 :: Versioning
-set ProductVersion=5.9.0
+set ProductVersion=5.9.1
 set ProductTag=
 
 :: Identify the SourceRoot
@@ -160,29 +160,82 @@ cmake ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
-  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\curl-7.77.0\usr ^
+  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\curl-8.4.0\usr ^
 
-  -D BUILD_CURL_EXE=NO ^
-  -D CMAKE_USE_OPENSSL=NO ^
-  -D CURL_CA_PATH=none ^
-  -D CMAKE_USE_SCHANNEL=YES ^
-  -D CMAKE_USE_LIBSSH2=NO ^
-  -D HAVE_POLL_FINE=NO ^
+  -D CURL_CA_BUNDLE="none" ^
+  -D CURL_CA_FALLBACK=NO ^
+  -D CURL_CA_PATH="none" ^
+  -D CURL_BROTLI=NO ^
+  -D CURL_DISABLE_ALTSVC=NO ^
+  -D CURL_DISABLE_AWS=YES ^
+  -D CURL_DISABLE_BASIC_AUTH=NO ^
+  -D CURL_DISABLE_BEARER_AUTH=NO ^
+  -D CURL_DISABLE_COOKIES=NO ^
+  -D CURL_DISABLE_DICT=YES ^
+  -D CURL_DISABLE_DIGEST_AUTH=NO ^
+  -D CURL_DISABLE_DOH=NO ^
+  -D CURL_DISABLE_FILE=YES ^
+  -D CURL_DISABLE_FORM_API=NO ^
+  -D CURL_DISABLE_FTP=YES ^
+  -D CURL_DISABLE_GETOPTIONS=NO ^
+  -D CURL_DISABLE_GOPHER=YES ^
+  -D CURL_DISABLE_HSTS=NO ^
+  -D CURL_DISABLE_HTTP=NO ^
+  -D CURL_DISABLE_HTTP_AUTH=NO ^
+  -D CURL_DISABLE_IMAP=YES ^
+  -D CURL_DISABLE_KERBEROS_AUTH=NO ^
   -D CURL_DISABLE_LDAP=YES ^
   -D CURL_DISABLE_LDAPS=YES ^
-  -D CURL_DISABLE_TELNET=YES ^
-  -D CURL_DISABLE_DICT=YES ^
-  -D CURL_DISABLE_FILE=YES ^
-  -D CURL_DISABLE_TFTP=YES ^
-  -D CURL_DISABLE_RTSP=YES ^
-  -D CURL_DISABLE_PROXY=YES ^
+  -D CURL_DISABLE_MIME=NO ^
+  -D CURL_DISABLE_MQTT=YES ^
+  -D CURL_DISABLE_NEGOTIATE_AUTH=NO ^
+  -D CURL_DISABLE_NETRC=NO ^
+  -D CURL_DISABLE_NTLM=NO ^
+  -D CURL_DISABLE_PARSEDATE=NO ^
   -D CURL_DISABLE_POP3=YES ^
-  -D CURL_DISABLE_IMAP=YES ^
+  -D CURL_DISABLE_PROGRESS_METER=YES ^
+  -D CURL_DISABLE_PROXY=NO ^
+  -D CURL_DISABLE_RTSP=YES ^
+  -D CURL_DISABLE_SHUFFLE_DNS=YES ^
+  -D CURL_DISABLE_SMB=YES ^
   -D CURL_DISABLE_SMTP=YES ^
-  -D CURL_DISABLE_GOPHER=YES ^
+  -D CURL_DISABLE_SOCKETPAIR=YES ^
+  -D CURL_DISABLE_SRP=NO ^
+  -D CURL_DISABLE_TELNET=YES ^
+  -D CURL_DISABLE_TFTP=YES ^
+  -D CURL_DISABLE_VERBOSE_STRINGS=NO ^
+  -D CURL_LTO=NO ^
+  -D CURL_USE_BEARSSL=NO ^
+  -D CURL_USE_GNUTLS=NO ^
+  -D CURL_USE_GSSAPI=NO ^
+  -D CURL_USE_LIBPSL=NO ^
+  -D CURL_USE_LIBSSH=NO ^
+  -D CURL_USE_LIBSSH2=NO ^
+  -D CURL_USE_MBEDTLS=NO ^
+  -D CURL_USE_OPENSSL=NO ^
+  -D CURL_USE_SCHANNEL=YES ^
+  -D CURL_USE_WOLFSSL=NO ^
+  -D CURL_WINDOWS_SSPI=YES ^
   -D CURL_ZLIB=YES ^
-  -D ENABLE_UNIX_SOCKETS=NO ^
+  -D CURL_ZSTD=NO ^
+  -D ENABLE_ARES=NO ^
+  -D ENABLE_CURLDEBUG=NO ^
+  -D ENABLE_DEBUG=NO ^
+  -D ENABLE_IPV6=YES ^
+  -D ENABLE_MANUAL=NO ^
   -D ENABLE_THREADED_RESOLVER=NO ^
+  -D ENABLE_UNICODE=YES ^
+  -D ENABLE_UNIX_SOCKETS=NO ^
+  -D ENABLE_WEBSOCKETS=NO ^
+  -D HAVE_POLL_FINE=NO ^
+  -D USE_IDN2=NO ^
+  -D USE_MSH3=NO ^
+  -D USE_NGHTTP2=NO ^
+  -D USE_NGTCP2=NO ^
+  -D USE_QUICHE=NO ^
+  -D USE_WIN32_IDN=YES ^
+  -D USE_WIN32_LARGE_FILES=YES ^
+  -D USE_WIN32_LDAP=NO ^
 
   -D ZLIB_ROOT=%BuildRoot%\Library\zlib-1.2.11\usr ^
   -D ZLIB_LIBRARY=%BuildRoot%\Library\zlib-1.2.11\usr\lib\zlibstatic.lib ^
@@ -350,7 +403,7 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D CURL_DIR=%BuildRoot%\Library\curl-8.4.0\usr\lib\cmake\CURL ^
   -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
   -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
   -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
@@ -849,7 +902,7 @@ git clone --quiet --no-tags --depth 1 --branch v1.2.11 https://github.com/madler
 git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/libxml2
 git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
 git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
-git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
+git clone --quiet --no-tags --depth 1 --branch curl-8_4_0 https://github.com/curl/curl
 
 goto :eof
 endlocal
@@ -922,7 +975,7 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D CURL_DIR=%BuildRoot%\Library\curl-8.4.0\usr\lib\cmake\CURL ^
   -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
   -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
   -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
@@ -1064,6 +1117,8 @@ move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
 move %PackageRoot%\toolchain.msi %BuildRoot%\artifacts || (exit /b)
 :: SDK
 move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
+:: Developer Tools
+move %PackageRoot%\devtools.msi %BuildRoot%\artifacts || (exit /b)
 :: Installer
 move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
 
