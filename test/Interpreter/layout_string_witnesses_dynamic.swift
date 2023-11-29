@@ -1059,6 +1059,35 @@ func testSinglePayloadSimpleResolve() {
 
 testSinglePayloadSimpleResolve()
 
+// This is a regression test for rdar://118366415
+func testTupleAlignment() {
+    let ptr = allocateInternalGenericPtr(of: TupleLargeAlignment<TestClass>.self)
+
+    do {
+        let x = TupleLargeAlignment(TestClass())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = TupleLargeAlignment(TestClass())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: TupleLargeAlignment<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testTupleAlignment()
+
 #if os(macOS)
 
 import Foundation

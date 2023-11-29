@@ -540,6 +540,17 @@ public enum SinglePayloadEnumExistential {
     case c
 }
 
+public struct TupleLargeAlignment<T> {
+    let x: AnyObject? = nil
+    let x1: AnyObject? = nil
+    let x2: AnyObject? = nil
+    let x3: (T, SIMD4<Int>)
+
+    public init(_ t: T) {
+        self.x3 = (t, .init(Int(Int32.max) + 32, Int(Int32.max) + 32, Int(Int32.max) + 32, Int(Int32.max) + 32))
+    }
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
