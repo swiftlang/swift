@@ -12,10 +12,21 @@
 
 import SwiftRemoteMirror
 
-extension swift_metadata_allocation_t {
+extension swift_metadata_allocation_t: Encodable {
   internal var tag: swift_metadata_allocation_tag_t { return self.Tag }
   internal var ptr: swift_reflection_ptr_t { return self.Ptr }
   internal var size: Int { return Int(self.Size) }
+  enum CodingKeys: String, CodingKey {
+      case tag
+      case ptr = "address"
+      case size
+  }
+  public func encode(to encoder: Encoder) throws {
+      var container = encoder.container(keyedBy: CodingKeys.self)
+      try container.encode(tag, forKey: .tag)
+      try container.encode(ptr, forKey: .ptr)
+      try container.encode(size, forKey: .size)
+  }
 }
 
 extension swift_metadata_allocation_t: Comparable {
