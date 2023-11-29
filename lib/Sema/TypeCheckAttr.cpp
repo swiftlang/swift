@@ -330,6 +330,8 @@ public:
   
   void visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr);
 
+  void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
+
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
@@ -428,6 +430,13 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
 
 void AttributeChecker::visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr) {
   return;
+}
+
+void AttributeChecker::visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::ExtractConstantsFromMembers)) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_extractConstantsFromMembers_experimental);
+  }
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {

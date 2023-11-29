@@ -3648,6 +3648,10 @@ static bool usesFeatureStaticExclusiveOnly(Decl *decl) {
   return decl->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>();
 }
 
+static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {

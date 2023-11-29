@@ -56,7 +56,8 @@ public:
     if (auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D))
       if (!isa<ProtocolDecl>(NTD))
         for (auto &Protocol : NTD->getAllProtocols())
-          if (Protocols.count(Protocol->getName().str().str()) != 0)
+          if (Protocol->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>() ||
+              Protocols.count(Protocol->getName().str().str()) != 0)
             ConformanceTypeDecls.push_back(NTD);
     return Action::Continue();
   }
