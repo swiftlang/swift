@@ -6316,7 +6316,10 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   SmallVector<ManagedValue, 2> resultElts;
   std::move(result).getAll(resultElts);
 
-  return {resultElts[0], resultElts[1].getUnmanagedValue()};
+  // Add a mark_dependence between the interior pointer and the array value
+  auto dependentValue = B.createMarkDependence(Loc, resultElts[1].getValue(),
+                                               resultElts[0].getValue());
+  return {resultElts[0], dependentValue};
 }
 
 /// Deallocate an uninitialized array.
