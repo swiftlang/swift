@@ -260,7 +260,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       SDK "embedded"
       ARCHITECTURE "${mod}"
       DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT "never_install"
+      INSTALL_IN_COMPONENT stdlib
       )
     set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 

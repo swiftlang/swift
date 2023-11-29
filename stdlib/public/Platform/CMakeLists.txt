@@ -120,11 +120,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT "never_install"
+      INSTALL_IN_COMPONENT stdlib
       )
-    set_property(TARGET embedded-darwin-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-
     add_dependencies(embedded-darwin embedded-darwin-${mod})
   endforeach()
 endif()
