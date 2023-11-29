@@ -1569,11 +1569,11 @@ BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cTildeLoc,
                                     BridgedTypeRepr cConstraint);
 
-SWIFT_NAME("BridgedMemberTypeRepr.createParsed(_:base:members:)")
-BridgedTypeRepr
-BridgedMemberTypeRepr_createParsed(BridgedASTContext cContext,
-                                   BridgedTypeRepr baseComponent,
-                                   BridgedArrayRef bridgedMemberComponents);
+SWIFT_NAME("BridgedDeclRefTypeRepr.createParsed(_:base:name:nameLoc:genericArguments:angleRange:)")
+BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr cBase, BridgedIdentifier cName,
+    BridgedSourceLoc cLoc, BridgedArrayRef cGenericArguments,
+    BridgedSourceRange cAngleRange);
 
 SWIFT_NAME("BridgedMetatypeTypeRepr.createParsed(_:base:typeKeywordLoc:)")
 BridgedMetatypeTypeRepr

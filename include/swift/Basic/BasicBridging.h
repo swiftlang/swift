@@ -292,6 +292,8 @@ public:
   SWIFT_NAME("end")
   BridgedSourceLoc End;
 
+  BridgedSourceRange() : Start(), End() {}
+
   SWIFT_NAME("init(start:end:)")
   BridgedSourceRange(BridgedSourceLoc start, BridgedSourceLoc end)
       : Start(start), End(end) {}
