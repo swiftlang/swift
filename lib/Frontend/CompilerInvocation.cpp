@@ -1503,6 +1503,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
+  Opts.EnableLazyTypecheck |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
 
   return HadError;
 }

@@ -322,6 +322,10 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.SkipNonExportableDecls |=
       Args.hasArg(OPT_experimental_skip_non_exportable_decls);
+  Opts.SkipNonExportableDecls |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
