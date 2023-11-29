@@ -116,7 +116,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
 
-    self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
+    self.init(_uncheckedStart: start, count: count)
   }
 
   @_alwaysEmitIntoClient
@@ -131,7 +131,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
     )
 
     _position = start
-    _end = start.map { $0 + count }
+    _end = start.map { $0 + _assumeNonNegative(count) }
   }
 }
 
@@ -416,8 +416,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
   // The public version of this doesn't use this method because this unsafely
-  // unwraps the base address. The public store bytes uses
-  // _unsafelyUnwrappedUnchecked, should the public ones too..?
+  // unwraps the base address. Load uses the bang operator to unwrap its base
+  // address, but storeBytes actually uses '._unsafelyUnwrappedUnchecked'.
+  // Should load do the same...?
   internal func _uncheckedLoad<T>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -428,7 +429,10 @@ extension Unsafe${Mutable}RawBufferPointer {
       "${Self}.load out of bounds"
     )
 
-    return baseAddress._unsafelyUnwrappedUnchecked.load(fromByteOffset: offset, as: T.self)
+    return baseAddress._unsafelyUnwrappedUnchecked._uncheckedLoad(
+      fromByteOffset: offset,
+      as: T.self
+    )
   }
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -598,7 +602,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   internal func _uncheckedCopyMemory(from source: UnsafeRawBufferPointer) {
     _internalInvariant(
       source.count <= self.count,
-      "${Self}.copyMemory source has too many element"
+      "${Self}.copyMemory source has too many elements"
     )
 
     if let baseAddress = baseAddress, let sourceAddress = source.baseAddress {
@@ -1155,6 +1159,28 @@ extension Unsafe${Mutable}RawBufferPointer {
     return try body(.init(start: .init(s._rawValue), count: n))
   }
 
+  @_alwaysEmitIntoClient
+  internal func _uncheckedWithMemoryRebound<T, Result>(
+    to type: T.Type,
+    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws -> Result
+  ) rethrows -> Result {
+    let s = _position._unsafelyUnwrappedUnchecked
+
+    _internalInvariant(
+      Int(bitPattern: s) & (MemoryLayout<T>.alignment &- 1) == 0,
+      "baseAddress must be a properly aligned pointer for type T"
+    )
+
+    _internalInvariant(_end != nil)
+
+    let c = s.distance(to: _end._unsafelyUnwrappedUnchecked)
+    let stride = MemoryLayout<T>.stride
+    let n = Int(Builtin.sdiv_Word(c._builtinWordValue, stride._builtinWordValue))
+    let binding = Builtin.bindMemory(s._rawValue, n._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(s._rawValue, binding) }
+    return try body(.init(_uncheckedStart: .init(s._rawValue), count: n))
+  }
+
   /// Returns a typed buffer to the memory referenced by this buffer,
   /// assuming that the memory is already bound to the specified type.
   ///
@@ -1325,7 +1351,10 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
 ) rethrows -> Result
 {
   return try _withUnprotectedUnsafePointer(to: &value) {
-    try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
+    try body(UnsafeRawBufferPointer(
+      _uncheckedStart: $0,
+      count: MemoryLayout<T>.size)
+    )
   }
 }
 
@@ -1373,7 +1402,10 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
 #else
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
 #endif
-  let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
+  let buffer = UnsafeRawBufferPointer(
+    _uncheckedStart: addr,
+    count: MemoryLayout<T>.size
+  )
   return try body(buffer)
 }
 
