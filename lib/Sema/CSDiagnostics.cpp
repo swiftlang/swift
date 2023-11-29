@@ -9345,7 +9345,7 @@ bool InvalidTypeSpecializationArity::diagnoseAsError() {
   diagnoseInvalidGenericArguments(getLoc(), D,
                                   NumArgs, NumParams,
                                   HasParameterPack,
-                                  /*generic=*/nullptr);
+                                  /*angleBrackets=*/SourceRange());
   return true;
 }
 

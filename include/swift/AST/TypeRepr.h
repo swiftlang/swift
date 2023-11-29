@@ -363,6 +363,10 @@ public:
   DeclNameLoc getNameLoc() const;
   DeclNameRef getNameRef() const;
 
+  /// Replace the identifier with a new identifier, e.g., due to typo
+  /// correction.
+  void overwriteNameRef(DeclNameRef newId);
+
   /// Returns whether this instance has been bound to a type declaration. This
   /// happens during type resolution.
   bool isBound() const;

@@ -215,6 +215,11 @@ DeclNameLoc DeclRefTypeRepr::getNameLoc() const {
   return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->getNameLoc();
 }
 
+void DeclRefTypeRepr::overwriteNameRef(DeclNameRef newId) {
+  assert(newId.isSimpleName() && !newId.isSpecial() && !newId.isOperator());
+  getLastComponent()->overwriteNameRef(newId);
+}
+
 bool DeclRefTypeRepr::isBound() const {
   return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->isBound();
 }

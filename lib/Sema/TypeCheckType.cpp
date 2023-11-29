@@ -178,7 +178,7 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
 
 Type TypeResolution::resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                                 SourceRange baseRange,
-                                                IdentTypeRepr *repr) const {
+                                                MemberTypeRepr *repr) const {
   // FIXME(ModQual): Reject qualified names immediately; they cannot be
   // dependent member types.
   Identifier refIdentifier = repr->getNameRef().getBaseIdentifier();
@@ -675,7 +675,7 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
                                             unsigned argCount,
                                             unsigned paramCount,
                                             bool hasParameterPack,
-                                            GenericIdentTypeRepr *generic) {
+                                            SourceRange angleBrackets) {
   auto &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
 
@@ -687,27 +687,27 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
       auto diag = diags
           .diagnose(loc, diag::too_few_generic_arguments, decl->getBaseIdentifier(),
                     argCount, paramCount);
-      if (generic)
-        diag.highlight(generic->getAngleBrackets());
+      if (angleBrackets.isValid())
+        diag.highlight(angleBrackets);
     } else {
       auto diag = diags
           .diagnose(loc, diag::too_many_generic_arguments, decl->getBaseIdentifier(),
                     argCount, paramCount);
-      if (generic)
-        diag.highlight(generic->getAngleBrackets());
+      if (angleBrackets.isValid())
+        diag.highlight(angleBrackets);
     }
   } else {
     if (argCount < paramCount - 1) {
       auto diag = diags
           .diagnose(loc, diag::too_few_generic_arguments_pack, decl->getBaseIdentifier(),
                     argCount, paramCount - 1);
-      if (generic)
-        diag.highlight(generic->getAngleBrackets());
+      if (angleBrackets.isValid())
+        diag.highlight(angleBrackets);
     } else {
       auto diag = diags
           .diagnose(loc, diag::generic_argument_pack_mismatch, decl->getBaseIdentifier());
-      if (generic)
-        diag.highlight(generic->getAngleBrackets());
+      if (angleBrackets.isValid())
+        diag.highlight(angleBrackets);
     }
   }
 
@@ -727,22 +727,20 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
 /// \param type The generic type to which to apply arguments.
 /// \param resolution The type resolution to perform.
 /// \param silContext Used to look up generic parameters in SIL mode.
-/// \param repr The arguments to apply with the angle bracket range for
-/// diagnostics.
-///
+/// \param repr The syntactic representation of \p type, with a possible
+/// generic argument list to apply.
 /// \returns A BoundGenericType bound to the given arguments, or null on
 /// error.
 ///
 /// \see TypeResolution::applyUnboundGenericArguments
 static Type applyGenericArguments(Type type, TypeResolution resolution,
                                   SILTypeResolutionContext *silContext,
-                                  IdentTypeRepr *repr) {
+                                  DeclRefTypeRepr *repr) {
   auto options = resolution.getOptions();
   auto dc = resolution.getDeclContext();
   auto loc = repr->getNameLoc().getBaseNameLoc();
 
-  auto *generic = dyn_cast<GenericIdentTypeRepr>(repr);
-  if (!generic) {
+  if (!repr->hasGenericArgList()) {
     if (auto *const unboundTy = type->getAs<UnboundGenericType>()) {
       if (!options.is(TypeResolverContext::TypeAliasDecl) &&
           !options.is(TypeResolverContext::ExtensionBinding)) {
@@ -786,14 +784,14 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   }
 
   if (type->hasError()) {
-    generic->setInvalid();
+    repr->setInvalid();
     return type;
   }
 
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
-  auto genericArgs = generic->getGenericArgs();
+  const auto genericArgs = repr->getGenericArgs();
 
   // Parameterized protocol types have their own code path.
   if (auto *protoType = type->getAs<ProtocolType>()) {
@@ -803,7 +801,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     if (assocTypes.empty()) {
       diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
                      protoType)
-           .fixItRemove(generic->getAngleBrackets());
+           .fixItRemove(repr->getAngleBrackets());
       if (!protoDecl->isImplicit()) {
         diags.diagnose(protoDecl, diag::decl_declared_here, protoDecl);
       }
@@ -862,12 +860,12 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (!type->is<ModuleType>()) {
         // When turning a SourceRange into CharSourceRange the closing angle
         // brackets on nested generics are lexed as one token.
-        SourceRange angles = generic->getAngleBrackets();
+        SourceRange angles = repr->getAngleBrackets();
         diag.fixItRemoveChars(angles.Start,
                               angles.End.getAdvancedLocOrInvalid(1));
       }
 
-      generic->setInvalid();
+      repr->setInvalid();
     }
     return ErrorType::get(ctx);
   }
@@ -920,7 +918,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
         diagnoseInvalidGenericArguments(
             loc, decl, genericArgs.size(), genericParams->size(),
-            /*hasParameterPack=*/false, generic);
+            /*hasParameterPack=*/false, repr->getAngleBrackets());
       }
       return ErrorType::get(ctx);
     }
@@ -942,7 +940,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
         diagnoseInvalidGenericArguments(
             loc, decl, genericArgs.size(), genericParams->size(),
-            /*hasParameterPack=*/true, generic);
+            /*hasParameterPack=*/true, repr->getAngleBrackets());
       }
       return ErrorType::get(ctx);
     }
@@ -987,17 +985,17 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {
     if (isMutablePointer)
       diags.diagnose(loc, diag::use_of_void_pointer, "Mutable").
-        fixItReplace(generic->getSourceRange(), "UnsafeMutableRawPointer");
+        fixItReplace(repr->getSourceRange(), "UnsafeMutableRawPointer");
     else
       diags.diagnose(loc, diag::use_of_void_pointer, "").
-        fixItReplace(generic->getSourceRange(), "UnsafeRawPointer");
+        fixItReplace(repr->getSourceRange(), "UnsafeRawPointer");
   }
 
   if (auto clangDecl = decl->getClangDecl()) {
     if (auto classTemplateDecl =
             dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
       SmallVector<Type, 2> typesOfGenericArgs;
-      for (auto typeRepr : generic->getGenericArgs()) {
+      for (auto typeRepr : genericArgs) {
         typesOfGenericArgs.push_back(resolution.resolveType(typeRepr));
       }
 
@@ -1284,7 +1282,7 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type = resolution.resolveTypeInContext(typeDecl, foundDC,
-                                              isa<GenericIdentTypeRepr>(repr));
+                                              repr->hasGenericArgList());
 
   if (type->hasError() && foundDC &&
       (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
@@ -1338,8 +1336,10 @@ static std::string getDeclNameFromContext(DeclContext *dc,
 static Type diagnoseUnknownType(TypeResolution resolution,
                                 Type parentType,
                                 SourceRange parentRange,
-                                IdentTypeRepr *repr,
+                                DeclRefTypeRepr *repr,
                                 NameLookupOptions lookupOptions) {
+  assert(parentType || isa<IdentTypeRepr>(repr));
+
   auto dc = resolution.getDeclContext();
   ASTContext &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
@@ -1742,7 +1742,7 @@ static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
 
       // We don't allow generic arguments on 'Self'.
       if (selfTypeKind != SelfTypeKind::InvalidSelf &&
-          isa<GenericIdentTypeRepr>(repr)) {
+          repr->hasGenericArgList()) {
         diagnoseGenericArgumentsOnSelf(resolution, repr, typeDC);
       }
 
@@ -1790,13 +1790,12 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
 /// \param silContext Used to look up generic parameters in SIL mode.
 static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
                                           SILTypeResolutionContext *silContext,
-                                          Type parentTy,
-                                          SourceRange parentRange,
-                                          IdentTypeRepr *repr) {
+                                          Type parentTy, MemberTypeRepr *repr) {
   const auto options = resolution.getOptions();
   auto DC = resolution.getDeclContext();
   auto &ctx = DC->getASTContext();
   auto &diags = ctx.Diags;
+  const auto parentRange = repr->getBase()->getSourceRange();
   auto isExtensionBinding = options.is(TypeResolverContext::ExtensionBinding);
 
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
@@ -2157,6 +2156,8 @@ namespace {
                                 SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
                                 llvm::Optional<SILResultInfo> &errorResult);
+    NeverNullType resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
+                                            TypeResolutionOptions options);
     NeverNullType resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                          TypeResolutionOptions options);
     NeverNullType resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
@@ -4636,15 +4637,16 @@ bool TypeResolver::resolveSILResults(
 }
 
 NeverNullType
-TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
-                                     TypeResolutionOptions options) {
+TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
+                                        TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+
   Type result;
 
-  auto *rootComp = repr->getRoot();
-  if (auto *identBase = dyn_cast<IdentTypeRepr>(rootComp)) {
+  if (auto *identTR = dyn_cast<IdentTypeRepr>(repr)) {
     // The base component uses unqualified lookup.
     result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
-                                             silContext, identBase);
+                                             silContext, identTR);
 
     if (result && result->isParameterPack() &&
         // Workaround to allow 'shape' type checking of SIL.
@@ -4667,31 +4669,34 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       }
     }
   } else {
-    result = resolveType(rootComp, options);
-  }
+    auto *qualIdentTR = cast<MemberTypeRepr>(repr);
+    auto *baseTR = qualIdentTR->getBase();
 
-  if (result->hasError())
-    return ErrorType::get(result->getASTContext());
-
-  // Remaining components are resolved via iterated qualified lookups.
-  if (auto *memberTR = dyn_cast<MemberTypeRepr>(repr)) {
-    SourceRange parentRange = rootComp->getSourceRange();
-    for (auto *nestedComp : memberTR->getMemberComponents()) {
-      result = resolveQualifiedIdentTypeRepr(resolution.withOptions(options),
-                                             silContext, result, parentRange,
-                                             nestedComp);
-      if (result->hasError())
-        return ErrorType::get(result->getASTContext());
-
-      parentRange.End = nestedComp->getEndLoc();
+    Type baseTy;
+    if (auto *declRefBaseTR = dyn_cast<DeclRefTypeRepr>(baseTR)) {
+      baseTy = resolveDeclRefTypeReprRec(declRefBaseTR, options);
+    } else {
+      baseTy = resolveType(baseTR, options);
     }
+
+    if (baseTy->hasError()) {
+      return ErrorType::get(ctx);
+    }
+
+    result = resolveQualifiedIdentTypeRepr(resolution.withOptions(options),
+                                           silContext, baseTy, qualIdentTR);
   }
 
-  auto lastComp = repr->getLastComponent();
+  return result->hasError() ? ErrorType::get(ctx) : result;
+}
 
-  // Diagnose an error if the last component's generic arguments are missing.
-  if (result->is<UnboundGenericType>() &&
-      !isa<GenericIdentTypeRepr>(lastComp) &&
+NeverNullType
+TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  Type result = resolveDeclRefTypeReprRec(repr, options);
+
+  // Diagnose an error if generic arguments are missing.
+  if (result->is<UnboundGenericType>() && !repr->hasGenericArgList() &&
       !resolution.getUnboundTypeOpener() &&
       !options.is(TypeResolverContext::TypeAliasDecl) &&
       !options.is(TypeResolverContext::ExtensionBinding)) {
@@ -4700,14 +4705,13 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       // Tailored diagnostic for custom attributes.
       if (options.is(TypeResolverContext::CustomAttr)) {
         auto &ctx = resolution.getASTContext();
-        ctx.Diags.diagnose(lastComp->getNameLoc(), diag::unknown_attribute,
-                           lastComp->getNameRef().getBaseIdentifier().str());
+        ctx.Diags.diagnose(repr->getNameLoc(), diag::unknown_attribute,
+                           repr->getNameRef().getBaseIdentifier().str());
 
         return ErrorType::get(ctx);
       }
 
-      diagnoseUnboundGenericType(result,
-                                 lastComp->getNameLoc().getBaseNameLoc());
+      diagnoseUnboundGenericType(result, repr->getNameLoc().getBaseNameLoc());
     }
 
     return ErrorType::get(result->getASTContext());
@@ -4720,11 +4724,11 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     // Otherwise, emit an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
-      diagnose(lastComp->getNameLoc(), diag::cannot_find_type_in_scope,
+      diagnose(repr->getNameLoc(), diag::cannot_find_type_in_scope,
                DeclNameRef(moduleName));
-      diagnose(lastComp->getNameLoc(), diag::note_module_as_type, moduleName);
+      diagnose(repr->getNameLoc(), diag::note_module_as_type, moduleName);
     }
-    lastComp->setInvalid();
+    repr->setInvalid();
     return ErrorType::get(getASTContext());
   }
 
