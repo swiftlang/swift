@@ -739,6 +739,10 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
             auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
   #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
   #include "swift/AST/Attr.def"
+            // BackDeployAttr was renamed to BackDeployedAttr, but not before a
+            // compiler shipped which used the old name in digests. Make the old
+            // name equivalent to the new one.
+            .Case("BackDeploy", DeclAttrKind::DAK_BackDeployed)
             .Default(DeclAttrKind::DAK_Count);
             if (Result == DAK_Count)
               Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,

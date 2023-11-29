@@ -5,7 +5,7 @@
   "children": [
     {
       "kind": "Function",
-      "declAttributes": ["Available", "ObjC"],
+      "declAttributes": ["Available", "ObjC", "BackDeployed"],
       "declKind": "Func",
       "name": "foo",
       "children": [],

@@ -20,5 +20,10 @@
 // Make sure we don't try to output a result:
 // NEGATIVE-NOT: "kind": "Root",
 
+// Older versions of the compiler used 'BackDeploy' for @_backDeploy. We now use
+// 'BackDeployed', but we should still support the old name.
+// NEGATIVE-NOT: error: unrecognized declaration attribute 'BackDeploy' in SDK node
+// NEGATIVE-NOT: is now without @backDeployed
+
 // Should not have any errors in the diagnostics-compare file.
 // NEGATIVE-NOT: diagnostics-compare.json:{{.*}}: error:

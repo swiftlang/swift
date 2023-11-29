@@ -6,13 +6,13 @@
   "children": [
     {
       "kind": "Zyzyx",
-      "typeAttributes": ["autoclosure", "fnord", "inout", "Available"],
+      "typeAttributes": ["autoclosure", "fnord", "inout", "Available", "BackDeploy"],
       "declAttributes": ["Available", "Fnord", "ObjC", "inout"],
       "declKind": "Subroutine"
     },
     {
       "kind": "Function",
-      "declAttributes": ["Available", "Fnord", "ObjC", "inout"],
+      "declAttributes": ["Available", "Fnord", "ObjC", "inout", "BackDeploy"],
       "declKind": "Func",
       "name": "foo",
       "children": [],

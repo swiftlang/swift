@@ -43,6 +43,7 @@ cake: Func C1.foo1() is now not static
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static
+cake: Func Zoo.getCurrentAnimalBackDeployed() is now without @backDeployed
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
 cake: EnumElement FrozenKind.AddedCase has been added as a new enum case
