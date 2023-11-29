@@ -3455,8 +3455,6 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   case SelfAccessKind::NonMutating:
     // The default flagless state.
     break;
-  case SelfAccessKind::ResultDependsOnSelf:
-    break;
   }
 
   return AnyFunctionType::Param(selfTy, Identifier(), flags);

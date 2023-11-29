@@ -429,7 +429,6 @@ enum class SelfAccessKind : uint8_t {
   LegacyConsuming,
   Consuming,
   Borrowing,
-  ResultDependsOnSelf,
 };
 using SelfAccessKindField = BCFixed<3>;
   

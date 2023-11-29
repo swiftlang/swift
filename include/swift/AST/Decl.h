@@ -241,8 +241,7 @@ enum class SelfAccessKind : uint8_t {
   LegacyConsuming,
   Consuming,
   Borrowing,
-  ResultDependsOnSelf,
-  LastSelfAccessKind = ResultDependsOnSelf,
+  LastSelfAccessKind = Borrowing,
 };
 enum : unsigned {
   NumSelfAccessKindBits =

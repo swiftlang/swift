@@ -2837,8 +2837,6 @@ getActualSelfAccessKind(uint8_t raw) {
     return swift::SelfAccessKind::Consuming;
   case serialization::SelfAccessKind::Borrowing:
     return swift::SelfAccessKind::Borrowing;
-  case serialization::SelfAccessKind::ResultDependsOnSelf:
-    return swift::SelfAccessKind::ResultDependsOnSelf;
   }
   return llvm::None;
 }
