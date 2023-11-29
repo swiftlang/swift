@@ -14,30 +14,20 @@ extension MyType {
 // CHECK-NEXT:    "ProtocolConformances.MyProto"
 // CHECK-NEXT:  ],
 // CHECK:       "properties": [
-
-// CHECK:         "label": "value",
-// CHECK:         "type": "Swift.String",
-// CHECK:         "valueKind": "Runtime"
-
-// CHECK:         "label": "defaultValue",
-// CHECK:         "type": "ProtocolConformances.MyType",
-// CHECK:         "valueKind": "Runtime"
-
-// CHECK:         "label": "anotherValue",
-// CHECK:         "type": "ProtocolConformances.MyType",
-// CHECK:         "valueKind": "Runtime"
-
-// CHECK:         "label": "myValue",
-// CHECK:         "type": "ProtocolConformances.MyType",
-// CHECK:         "valueKind": "InitCall",
-// CHECK-NEXT:    "value": {
-// CHECK-NEXT:      "type": "ProtocolConformances.MyType",
-// CHECK-NEXT:      "arguments": [
-// CHECK-NEXT:        {
-// CHECK-NEXT:          "label": "",
-// CHECK-NEXT:          "type": "Swift.String",
-// CHECK-NEXT:          "valueKind": "RawLiteral",
-// CHECK-NEXT:          "value": "it is doable"
-// CHECK-NEXT:        }
-// CHECK-NEXT:      ]
+// CHECK-NEXT:    {
+// CHECK-NEXT:      "label": "myValue",
+// CHECK:           "type": "ProtocolConformances.MyType",
+// CHECK:           "valueKind": "InitCall",
+// CHECK-NEXT:      "value": {
+// CHECK-NEXT:        "type": "ProtocolConformances.MyType",
+// CHECK-NEXT:        "arguments": [
+// CHECK-NEXT:          {
+// CHECK-NEXT:            "label": "",
+// CHECK-NEXT:            "type": "Swift.String",
+// CHECK-NEXT:            "valueKind": "RawLiteral",
+// CHECK-NEXT:            "value": "it is doable"
+// CHECK-NEXT:          }
+// CHECK-NEXT:        ]
+// CHECK-NEXT:      }
 // CHECK-NEXT:    }
+// CHECK-NEXT:  ]

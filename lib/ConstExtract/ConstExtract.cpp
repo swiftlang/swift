@@ -469,37 +469,52 @@ extractEnumCases(NominalTypeDecl *Decl) {
   return llvm::None;
 }
 
-ConstValueTypeInfo
-ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
-                                   NominalTypeDecl *Decl) const {
-  // Use 'getStoredProperties' to get lowered lazy and wrapped properties
-  auto StoredProperties = Decl->getStoredProperties();
-  std::unordered_set<VarDecl *> StoredPropertiesSet(StoredProperties.begin(),
-                                                    StoredProperties.end());
+ConstValueTypeInfo ConstantValueInfoRequest::evaluate(
+    Evaluator &Evaluator, NominalTypeDecl *Decl,
+    llvm::PointerUnion<const SourceFile *, ModuleDecl *> extractionScope)
+    const {
+
+  auto shouldExtract = [&](DeclContext *decl) {
+    if (auto SF = extractionScope.dyn_cast<const SourceFile *>())
+      return decl->getOutermostParentSourceFile() == SF;
+    return decl->getParentModule() == extractionScope.get<ModuleDecl *>();
+  };
 
   std::vector<ConstValueTypePropertyInfo> Properties;
-  for (auto Property : StoredProperties) {
-    Properties.push_back(extractTypePropertyInfo(Property));
-  }
+  llvm::Optional<std::vector<EnumElementDeclValue>> EnumCases;
 
-  for (auto Member : Decl->getMembers()) {
-    auto *VD = dyn_cast<VarDecl>(Member);
-    // Ignore plain stored properties collected above,
-    // instead gather up remaining static and computed properties.
-    if (!VD || StoredPropertiesSet.count(VD))
-      continue;
-    Properties.push_back(extractTypePropertyInfo(VD));
+  if (shouldExtract(Decl)) {
+    // Use 'getStoredProperties' to get lowered lazy and wrapped properties
+    auto StoredProperties = Decl->getStoredProperties();
+    std::unordered_set<VarDecl *> StoredPropertiesSet(StoredProperties.begin(),
+                                                      StoredProperties.end());
+    for (auto Property : StoredProperties) {
+      Properties.push_back(extractTypePropertyInfo(Property));
+    }
+
+    for (auto Member : Decl->getMembers()) {
+      auto *VD = dyn_cast<VarDecl>(Member);
+      // Ignore plain stored properties collected above,
+      // instead gather up remaining static and computed properties.
+      if (!VD || StoredPropertiesSet.count(VD))
+        continue;
+      Properties.push_back(extractTypePropertyInfo(VD));
+    }
+
+    EnumCases = extractEnumCases(Decl);
   }
 
   for (auto Extension: Decl->getExtensions()) {
-    for (auto Member : Extension->getMembers()) {
-      if (auto *VD = dyn_cast<VarDecl>(Member)) {
-        Properties.push_back(extractTypePropertyInfo(VD));
+    if (shouldExtract(Extension)) {
+      for (auto Member : Extension->getMembers()) {
+        if (auto *VD = dyn_cast<VarDecl>(Member)) {
+          Properties.push_back(extractTypePropertyInfo(VD));
+        }
       }
     }
   }
 
-  return ConstValueTypeInfo{Decl, Properties, extractEnumCases(Decl)};
+  return ConstValueTypeInfo{Decl, Properties, EnumCases};
 }
 
 std::vector<ConstValueTypeInfo>
@@ -513,7 +528,8 @@ gatherConstValuesForModule(const std::unordered_set<std::string> &Protocols,
   Module->walk(ConformanceCollector);
   for (auto *CD : ConformanceDecls)
     Result.emplace_back(evaluateOrDefault(CD->getASTContext().evaluator,
-                                          ConstantValueInfoRequest{CD}, {}));
+                                          ConstantValueInfoRequest{CD, Module},
+                                          {}));
   return Result;
 }
 
@@ -529,8 +545,8 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
     D->walk(ConformanceCollector);
 
   for (auto *CD : ConformanceDecls)
-    Result.emplace_back(evaluateOrDefault(CD->getASTContext().evaluator,
-                                          ConstantValueInfoRequest{CD}, {}));
+    Result.emplace_back(evaluateOrDefault(
+        CD->getASTContext().evaluator, ConstantValueInfoRequest{CD, SF}, {}));
   return Result;
 }
 
