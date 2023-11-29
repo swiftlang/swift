@@ -610,6 +610,18 @@ SWIFTSCAN_PUBLIC void
 SWIFTSCAN_PUBLIC void swiftscan_cache_cancellation_token_dispose(
     swiftscan_cache_cancellation_token_t);
 
+/// Async load CASObject using CASID. This is only to perform the download to
+/// local CAS where result is returned via callback. \c ctx is an opaque value
+/// that passed to the callback and \c swiftscan_cache_cancellation_token_t will
+/// return an token that can be used to cancel the async operation. The token
+/// needs to be freed by caller using
+/// `swiftscan_cache_cancellation_token_dispose`. If no token is needed, nullptr
+/// can be passed and no token will be returned.
+SWIFTSCAN_PUBLIC void swiftscan_cache_download_cas_object_async(
+    swiftscan_cas_t, const char *id, void *ctx,
+    void (*callback)(void *ctx, bool success, swiftscan_string_ref_t error),
+    swiftscan_cache_cancellation_token_t *);
+
 /// Create a swift cached compilation replay instance with its command-line
 /// invocation. Return nullptr when errors occurs and the error message is
 /// returned via \c error parameter and its caller needs to free the message
