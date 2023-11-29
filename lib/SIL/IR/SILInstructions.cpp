@@ -2971,8 +2971,7 @@ BoundGenericType *KeyPathInst::getKeyPathType() const {
   auto kpTy = getType();
 
   if (auto existential = kpTy.getAs<ExistentialType>()) {
-    auto containedTy = existential->getConstraintType();
-    return containedTy->getExistentialLayout()
+    return existential->getExistentialLayout()
         .explicitSuperclass->castTo<BoundGenericType>();
   }
 

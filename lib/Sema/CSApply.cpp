@@ -5010,8 +5010,7 @@ namespace {
         leafTy = fnTy->getResult();
         isFunctionType = true;
       } else if (auto *existential = exprType->getAs<ExistentialType>()) {
-        auto constrainedTy = existential->getConstraintType();
-        auto layout = constrainedTy->getExistentialLayout();
+        auto layout = existential->getExistentialLayout();
         auto keyPathTy = layout.explicitSuperclass->castTo<BoundGenericType>();
         baseTy = keyPathTy->getGenericArgs()[0];
         leafTy = keyPathTy->getGenericArgs()[1];
