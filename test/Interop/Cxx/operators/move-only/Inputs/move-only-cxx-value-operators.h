@@ -74,4 +74,6 @@ using NonCopyableHolderMutDerefDerivedDerived = OneDerived<OneDerived<NonCopyabl
 
 using NonCopyableHolderValueConstDerefDerivedDerived = OneDerived<OneDerived<NonCopyableHolderValueConstDeref>>;
 
+using NonCopyableHolderValueMutDerefDerivedDerived = OneDerived<OneDerived<NonCopyableHolderValueMutDeref>>;
+
 #endif // TEST_INTEROP_CXX_OPERATORS_MOVE_ONLY_OPS_H

@@ -5450,8 +5450,10 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
   auto computedType = computedVar->getInterfaceType();
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
-  // types.
-  bool useAddress = computedType->isNoncopyable(declContext);
+  // types, unless the base accessor returns it by value.
+  bool useAddress = computedType->isNoncopyable(declContext) &&
+                    (baseClassVar->getReadImpl() == ReadImplKind::Stored ||
+                     baseClassVar->getAccessor(AccessorKind::Address));
 
   ParameterList *bodyParams = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {

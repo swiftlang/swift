@@ -129,4 +129,20 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderMutDerefDerivedDerived pointee b
   expectEqual(holder.pointee.x, 0)
 }
 
+MoveOnlyCxxOperators.test("testNonCopyableHolderValueConstDerefDerivedDerived pointee value") {
+  let holder = NonCopyableHolderValueConstDerefDerivedDerived(11)
+  var k = holder.pointee
+  expectEqual(k.x, 11)
+  var k2 = holder.pointee
+  expectEqual(k.x, k2.x)
+}
+
+MoveOnlyCxxOperators.test("testNonCopyableHolderValueMutDerefDerivedDerived pointee value") {
+  let holder = NonCopyableHolderValueMutDerefDerivedDerived(23)
+  var k = holder.pointee
+  expectEqual(k.x, 23)
+  var k2 = holder.pointee
+  expectEqual(k.x, k2.x)
+}
+
 runAllTests()
