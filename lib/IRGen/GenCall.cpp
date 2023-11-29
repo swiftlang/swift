@@ -4751,6 +4751,13 @@ Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync,
   auto errorAlignment  = isTypedError ? IGM.getPointerAlignment() :
     cast<FixedTypeInfo>(getTypeInfo(errorType)).getFixedAlignment();
 
+  // Pass an address for zero sized types.
+  if (!isTypedError && !setSwiftErrorFlag &&
+      cast<FixedTypeInfo>(getTypeInfo(errorType)).getFixedSize() == Size(0)) {
+    errorStorageType = IGM.Int8PtrTy;
+    errorAlignment = IGM.getPointerAlignment();
+  }
+
   // Create the alloca.  We don't use allocateStack because we're
   // not allocating this in stack order.
   auto addr = createAlloca(errorStorageType,
