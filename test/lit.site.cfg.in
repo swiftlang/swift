@@ -73,8 +73,6 @@ config.testing_against_host_compiler = \
 
 # Please remember to handle empty strings and/or unset variables correctly.
 
-config.available_features.add("STDLIB_VARIANT={}".format(config.variant_suffix[1:]))
-
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
 else:
