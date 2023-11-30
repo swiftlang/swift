@@ -22,6 +22,7 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -3484,8 +3485,12 @@ void ConstraintSystem::bindOverloadType(
            "subscript always has one argument");
     // Parameter type is KeyPath<T, U> where `T` is a root type
     // and U is a leaf type (aka member type).
-    auto keyPathTy =
-        fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
+    auto paramTy = fnType->getParams()[0].getPlainType();
+
+    if (auto *existential = paramTy->getAs<ExistentialType>())
+      paramTy = existential->getExistentialLayout().explicitSuperclass;
+
+    auto keyPathTy = paramTy->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
     assert(isKnownKeyPathType(keyPathTy) &&
@@ -3576,7 +3581,7 @@ void ConstraintSystem::bindOverloadType(
       addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,
                     keyPathLoc);
 
-      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
+      addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy,
                                            originalCallerTy->getResult());
 
       // Bind the overload type to the opened type as usual to match the fact
@@ -3592,8 +3597,7 @@ void ConstraintSystem::bindOverloadType(
       // Form constraints for a x[dynamicMember:] subscript with a key path
       // argument, where the overload type is bound to the result to model the
       // fact that this a property access in the source.
-      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
-                                           boundType);
+      addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy, boundType);
     }
     return;
   }
