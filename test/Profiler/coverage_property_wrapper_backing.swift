@@ -98,3 +98,16 @@ struct U {
   // CHECK-NEXT:  }
 }
 
+struct V {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_property_wrapper_backing.V.x
+  // CHECK-NEXT:  [[@LINE+2]]:4  -> [[@LINE+2]]:14 : 0
+  // CHECK-NEXT:  }
+  @Wrapper(0)
+  var x = switch Bool.random() { case true: 0 case false: 0 }
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_property_wrapper_backing.V.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:62 : 0
+  // CHECK-NEXT:  [[@LINE-3]]:18 -> [[@LINE-3]]:31 : 0
+  // CHECK-NEXT:  [[@LINE-4]]:34 -> [[@LINE-4]]:46 : 1
+  // CHECK-NEXT:  [[@LINE-5]]:47 -> [[@LINE-5]]:60 : 2
+  // CHECK-NEXT:  }
+}
