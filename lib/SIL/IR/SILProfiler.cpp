@@ -907,6 +907,9 @@ private:
 
   /// Subtract \c Expr from \c Node's counter.
   void subtractFromCounter(ASTNode Node, CounterExpr Expr) {
+    if (Expr.isZero())
+      return;
+
     auto Counter = getCounter(Node);
     assert(!Counter.isZero() && "Cannot create a negative counter");
     assignCounter(Node,
