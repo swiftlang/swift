@@ -20,11 +20,11 @@ func requiresMainActor() -> Int { 0 }
 @SomeGlobalActor
 func requiresSomeGlobalActor() -> Int { 0 }
 
-// expected-error@+1 {{main actor-isolated default argument in a nonisolated context}}
+// expected-error@+1 {{main actor-isolated default value in a nonisolated context}}
 func mainActorDefaultArgInvalid(value: Int = requiresMainActor()) {}
 
 func mainActorClosureInvalid(
-  closure: () -> Int = { // expected-error {{main actor-isolated default argument in a nonisolated context}}
+  closure: () -> Int = { // expected-error {{main actor-isolated default value in a nonisolated context}}
     requiresMainActor()
   }
 ) {}
@@ -41,7 +41,7 @@ func mainActorDefaultArg(value: Int = requiresMainActor()) {}
 ) {}
 
 func mainActorClosureCall(
-  closure: Int = { // expected-error {{main actor-isolated default argument in a nonisolated context}}
+  closure: Int = { // expected-error {{main actor-isolated default value in a nonisolated context}}
     requiresMainActor()
   }()
 ) {}
@@ -155,6 +155,11 @@ struct S3 {
   var (x, y, z) = (requiresMainActor(), requiresSomeGlobalActor(), 10)
 }
 
+struct S4 {
+  // expected-error@+1 {{main actor-isolated default value in a nonisolated context}}
+  var x: Int = requiresMainActor()
+}
+
 @MainActor
 func initializeFromMainActor() {
   _ = S1(required: 10)
@@ -189,4 +194,38 @@ extension A {
     // expected-error@+1 {{call to global actor 'SomeGlobalActor'-isolated initializer 'init(required:x:y:)' in a synchronous actor-isolated context}}
     _ = S2(required: 10)
   }
+}
+
+// expected-error@+1 {{default initializer for 'C1' cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+class C1 {
+  // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
+  @MainActor var x = requiresMainActor()
+  // expected-note@+1 {{initializer for property 'y' is global actor 'SomeGlobalActor'-isolated}}
+  @SomeGlobalActor var y = requiresSomeGlobalActor()
+}
+
+class NonSendable {}
+
+// expected-error@+1 {{default initializer for 'C2' cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+class C2 {
+  // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
+  @MainActor var x = NonSendable()
+  // expected-note@+1 {{initializer for property 'y' is global actor 'SomeGlobalActor'-isolated}}
+  @SomeGlobalActor var y = NonSendable()
+}
+
+class C3 {
+  @MainActor var x = 1
+  @SomeGlobalActor var y = 2
+}
+
+@MainActor struct NonIsolatedInit {
+  var x = 0
+  var y = 0
+}
+
+func callDefaultInit() async {
+  _ = C2()
+  _ = NonIsolatedInit()
+  _ = NonIsolatedInit(x: 10)
 }

@@ -509,4 +509,6 @@ UID_KINDS = [
     KIND('MacroRolePeer', 'source.lang.swift.macro_role.peer'),
     KIND('MacroRoleConformance', 'source.lang.swift.macro_role.conformance'),
     KIND('MacroRoleExtension', 'source.lang.swift.macro_role.extension'),
+    KIND('MacroRolePreamble', 'source.lang.swift.macro_role.preamble'),
+    KIND('MacroRoleBody', 'source.lang.swift.macro_role.body'),
 ]

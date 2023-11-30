@@ -4336,6 +4336,14 @@ namespace {
 
       printFlag(T->hasExplicitAnyObject(), "any_object");
 
+      for (auto ip : T->getInverses()) {
+        switch (ip) {
+        case InvertibleProtocolKind::Copyable:
+          printFlag("inverse_copyable");
+          break;
+        }
+      }
+
       for (auto proto : T->getMembers()) {
         printRec(proto);
       }

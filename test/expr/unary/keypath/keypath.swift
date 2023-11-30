@@ -1233,3 +1233,7 @@ func test_keypath_coercion_to_function() {
   let fn = \User.email as (User) -> String // Ok
   _ = users.map(fn) // Ok
 }
+
+func test_keypath_application_with_composition(v: String, kp: any KeyPath<String, Int> & PP) {
+  _ = v[keyPath: kp] // Ok
+}

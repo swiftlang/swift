@@ -539,8 +539,7 @@ public:
   void visitExprPattern(ExprPattern *EP) {
     auto target = SyntacticElementTarget::forExprPattern(EP);
 
-    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true,
-                          /*leaveClosureBodyUnchecked=*/false)) {
+    if (cs.preCheckTarget(target, /*replaceInvalidRefWithErrors=*/true)) {
       hadError = true;
       return;
     }
@@ -757,8 +756,7 @@ private:
           /*bindPatternVarsOneWay=*/false);
 
       if (ConstraintSystem::preCheckTarget(
-              target, /*replaceInvalidRefsWithErrors=*/true,
-              /*LeaveCLosureBodyUnchecked=*/false))
+              target, /*replaceInvalidRefsWithErrors=*/true))
         return llvm::None;
 
       return target;

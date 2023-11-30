@@ -49,6 +49,12 @@ Operand *transferSingletons[5] = {
     (Operand *)0xFEDA0000, (Operand *)0xFBDA0000,
 };
 
+SILInstruction *instSingletons[5] = {
+    (SILInstruction *)0xBEAD0000, (SILInstruction *)0xBEAD0000,
+    (SILInstruction *)0xBEDF0000, (SILInstruction *)0xBEDA0000,
+    (SILInstruction *)0xBBDA0000,
+};
+
 // This test tests that if a series of merges is split between two partitions
 // p1 and p2, but also applied in its entirety to p3, then joining p1 and p2
 // yields p3.
@@ -631,4 +637,18 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
     };
     eval.apply(PartitionOp::Require(Element(0)));
   }
+}
+
+TEST(PartitionUtilsTest, TestUndoTransfer) {
+  Partition p;
+  PartitionOpEvaluator eval(p);
+  eval.failureCallback = [&](const PartitionOp &, unsigned, Operand *) {
+    EXPECT_TRUE(false);
+  };
+
+  // Shouldn't error on this.
+  eval.apply({PartitionOp::AssignFresh(Element(0)),
+              PartitionOp::Transfer(Element(0), transferSingletons[0]),
+              PartitionOp::UndoTransfer(Element(0), instSingletons[0]),
+              PartitionOp::Require(Element(0), instSingletons[0])});
 }

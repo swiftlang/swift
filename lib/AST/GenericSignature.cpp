@@ -635,26 +635,23 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
-Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
-  return getUpperBound(type);
-}
-
-Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
-  return getUpperBound(type, /*wantDependentBound=*/true);
-}
-
-Type GenericSignatureImpl::getUpperBound(Type type,
-                                         bool wantDependentBound) const {
+Type GenericSignatureImpl::getUpperBound(Type type) const {
   assert(type->isTypeParameter());
 
-  bool hasExplicitAnyObject = requiresClass(type);
-
   llvm::SmallVector<Type, 2> types;
+  unsigned rootDepth = type->getRootGenericParam()->getDepth();
+
+  bool hasExplicitAnyObject = requiresClass(type);
 
   if (Type superclass = getSuperclassBound(type)) {
     do {
       superclass = getReducedType(superclass);
-      if (wantDependentBound || !superclass->hasTypeParameter()) {
+
+      if (!superclass.findIf([&](Type t) {
+            if (auto *paramTy = t->getAs<GenericTypeParamType>())
+              return (paramTy->getDepth() == rootDepth);
+            return false;
+          })) {
         break;
       }
     } while ((superclass = superclass->getSuperclass()));
@@ -684,31 +681,13 @@ Type GenericSignatureImpl::getUpperBound(Type type,
 
         // If the reduced type is at a lower depth than the root generic
         // parameter of T, then it's constrained.
-        bool hasOuterGenericParam = false;
-        bool hasInnerGenericParam = false;
-        reducedType.visit([&](Type t) {
-          if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-            unsigned rootDepth = type->getRootGenericParam()->getDepth();
-            if (paramTy->getDepth() == rootDepth)
-              hasInnerGenericParam = true;
-            else {
-              assert(paramTy->getDepth() < rootDepth);
-              hasOuterGenericParam = true;
-            }
-          }
-        });
-
-        if (hasInnerGenericParam && hasOuterGenericParam) {
-          llvm::errs() << "Weird same-type requirements?\n";
-          llvm::errs() << "Interface type: " << type << "\n";
-          llvm::errs() << "Member type: " << memberType << "\n";
-          llvm::errs() << "Reduced member type: " << reducedType << "\n";
-          llvm::errs() << GenericSignature(this) << "\n";
-          abort();
-        }
-
-        if (!hasInnerGenericParam && (wantDependentBound || !hasOuterGenericParam))
+        if (!reducedType.findIf([&](Type t) {
+            if (auto *paramTy = t->getAs<GenericTypeParamType>())
+              return (paramTy->getDepth() == rootDepth);
+            return false;
+          })) {
           argTypes.push_back(reducedType);
+        }
       }
 
       // If we have constrained all primary associated types, create a
@@ -721,7 +700,8 @@ Type GenericSignatureImpl::getUpperBound(Type type,
       //
       // In that case just add the base type in the default branch below.
       if (argTypes.size() == primaryAssocTypes.size()) {
-        types.push_back(ParameterizedProtocolType::get(getASTContext(), baseType, argTypes));
+        types.push_back(ParameterizedProtocolType::get(
+            getASTContext(), baseType, argTypes));
         continue;
       }
     }

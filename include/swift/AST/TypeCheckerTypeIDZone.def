@@ -256,7 +256,7 @@ SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
               llvm::TinyPtrVector<ValueDecl *>(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
-              const PatternBindingEntry *(PatternBindingDecl *, unsigned, bool),
+              const PatternBindingEntry *(PatternBindingDecl *, unsigned),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PatternBindingCheckedAndContextualizedInitRequest,
               Expr *(PatternBindingDecl *, unsigned),
@@ -492,6 +492,12 @@ SWIFT_REQUEST(TypeChecker, ExpandSynthesizedMemberMacroRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandPeerMacroRequest,
               ArrayRef<unsigned>(Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExpandPreambleMacroRequest,
+              ArrayRef<unsigned>(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExpandBodyMacroRequest,
+              llvm::Optional<unsigned>(AbstractFunctionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),

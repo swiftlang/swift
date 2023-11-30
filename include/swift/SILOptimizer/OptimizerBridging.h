@@ -17,6 +17,9 @@
 // Function implementations should be placed into OptimizerBridgingImpl.h or PassManager.cpp
 // (under OptimizerBridging) andrequired header files should be added there.
 //
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+//
 #include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
 
@@ -26,6 +29,8 @@
 
 #else // USED_IN_CPP_SOURCE
 
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 #ifdef SWIFT_SIL_SILVALUE_H
 #error "should not include swift headers into bridging header"
 #endif

@@ -16,6 +16,9 @@
 // Do not add other C++/llvm/swift header files here!
 // Function implementations should be placed into ASTBridging.cpp and required header files should be added there.
 //
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+//
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE

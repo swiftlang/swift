@@ -190,9 +190,9 @@ case BuiltinValueKind::id:
       IntConst lhs = getIntConst(Args[0], depth);
       IntConst rhs = getIntConst(Args[1], depth);
       if (lhs.isValid && rhs.isValid) {
-        return IntConst(constantFoldComparison(lhs.value, rhs.value,
-                                               Builtin.ID),
-                        lhs.isFromCaller || rhs.isFromCaller);
+        return IntConst(
+            constantFoldComparisonInt(lhs.value, rhs.value, Builtin.ID),
+            lhs.isFromCaller || rhs.isFromCaller);
       }
       break;
     }

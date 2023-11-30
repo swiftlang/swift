@@ -66,3 +66,15 @@ func reabstractAsConcreteThrowing() throws -> Int {
 // CHECK-LABEL: define {{.*}} swiftcc void @"$sSi12typed_throws10MyBigErrorOIgdzo_SiACIegrzr_TR"(ptr noalias nocapture sret(%TSi) %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias nocapture swifterror dereferenceable(8) %4, ptr %5)
 // CHECK: call swiftcc {{i32|i64}} %1
 // CHECK: br i1 %8, label %typed.error.load, label %10
+
+
+struct S : Error { }
+
+func callee() throws (S) {
+  throw S()
+}
+
+// This used to crash at compile time.
+func testit() throws (S) {
+  try callee()
+}

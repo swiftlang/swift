@@ -198,9 +198,18 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     list(GET list 1 mod)
     list(GET list 2 triple)
 
-    # TODO: Only build embedded Swift Concurrency for macOS, for now.
-    if(NOT "${mod}" MATCHES "-macos$")
-      continue()
+    if (SWIFT_HOST_VARIANT STREQUAL "linux")
+      if(NOT "${mod}" MATCHES "-linux-gnu$")
+        continue()
+      endif()
+      set(extra_c_compile_flags)
+      set(extra_swift_compile_flags)
+    elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
+      if(NOT "${mod}" MATCHES "-macos$")
+        continue()
+      endif()
+      set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding)
+      set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
     endif()
     
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
@@ -242,12 +251,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       TaskCancellation.swift
 
       SWIFT_COMPILE_FLAGS
-        -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
+        ${extra_swift_compile_flags} -enable-experimental-feature Embedded
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
-        -D__MACH__ -D__APPLE__ -ffreestanding
-        ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1
+        ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${mod}"

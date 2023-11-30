@@ -1090,12 +1090,6 @@ public:
     Expr *E = RS->getResult();
     TypeCheckExprOptions options = {};
     
-    if (LeaveBraceStmtBodyUnchecked) {
-      assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
-             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
@@ -2047,9 +2041,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
         (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
     if (isDiscarded)
       options |= TypeCheckExprFlags::IsDiscarded;
-    if (LeaveBraceStmtBodyUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
 
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
@@ -2087,7 +2078,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(D, LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(D);
     return;
   }
 
@@ -2396,8 +2387,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/false);
+            typeCheckPatternBinding(PBD, i);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
             // This is important to get the correct USR of variables defined
             // in closures initializing lazy variables.
@@ -2774,6 +2764,24 @@ static bool requiresNoDefinition(Decl *decl) {
   return false;
 }
 
+/// Expand all preamble macros attached to the given function declaration.
+static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
+  std::vector<ASTNode> preamble;
+
+  ASTContext &ctx = func->getASTContext();
+  ExpandPreambleMacroRequest request{func};
+  auto module = func->getParentModule();
+  for (auto bufferID : evaluateOrDefault(ctx.evaluator, request, { })) {
+    auto bufferStart = ctx.SourceMgr.getLocForBufferStart(bufferID);
+    auto preambleSF = module->getSourceFileContainingLocation(bufferStart);
+    preamble.insert(preamble.end(),
+                    preambleSF->getTopLevelItems().begin(),
+                    preambleSF->getTopLevelItems().end());
+  }
+
+  return preamble;
+}
+
 BraceStmt *
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
@@ -2788,7 +2796,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   if (AFD->isBodySkipped())
     return nullptr;
 
-  BraceStmt *body = AFD->getBody();
+  BraceStmt *body = AFD->getMacroExpandedBody();
 
   // If there is no function body, there is nothing to type-check.
   if (!body) {
@@ -2849,6 +2857,17 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
     }
   }
 
+  // Expand any preamble macros and introduce them into the body.
+  auto preamble = expandPreamble(AFD);
+  if (!preamble.empty()) {
+    auto newBody = std::move(preamble);
+    newBody.insert(
+        newBody.end(), body->getElements().begin(), body->getElements().end());
+
+    body = BraceStmt::create(
+        ctx, body->getLBraceLoc(), newBody, body->getRBraceLoc());
+  }
+
   // Typechecking, in particular ApplySolution is going to replace closures
   // with OpaqueValueExprs and then try to do lookups into the closures.
   // So, build out the body now.
@@ -2868,6 +2887,8 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
     StmtChecker SC(AFD);
     hadError = SC.typeCheckBody(body);
   }
+
+
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means

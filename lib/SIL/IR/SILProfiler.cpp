@@ -433,6 +433,23 @@ public:
 
 /// A region of source code that can be mapped to a counter.
 class SourceMappingRegion {
+public:
+  enum class Kind {
+    /// A region that is associated with an ASTNode, and defines a scope under
+    /// which the region is active.
+    Node,
+
+    /// A node region that is only present for scoping of child regions, and
+    /// doesn't need to be included in the resulting set of regions.
+    ScopingOnly,
+
+    /// A region that refines the counter of a node region. This doesn't have
+    /// an ASTNode of its own.
+    Refined,
+  };
+
+private:
+  Kind RegionKind;
   ASTNode Node;
 
   /// The counter for an incomplete region. Note we do not store counters
@@ -445,20 +462,53 @@ class SourceMappingRegion {
   /// The region's ending location.
   llvm::Optional<SourceLoc> EndLoc;
 
-public:
-  SourceMappingRegion(ASTNode Node, llvm::Optional<CounterExpr> Counter,
-                      llvm::Optional<SourceLoc> StartLoc,
-                      llvm::Optional<SourceLoc> EndLoc)
-      : Node(Node), Counter(std::move(Counter)), StartLoc(StartLoc),
-        EndLoc(EndLoc) {
+  SourceMappingRegion(Kind RegionKind, llvm::Optional<CounterExpr> Counter,
+                      llvm::Optional<SourceLoc> StartLoc)
+      : RegionKind(RegionKind), Counter(Counter), StartLoc(StartLoc) {
     assert((!StartLoc || StartLoc->isValid()) &&
            "Expected start location to be valid");
-    assert((!EndLoc || EndLoc->isValid()) &&
-           "Expected end location to be valid");
+  }
+
+  SourceMappingRegion(Kind RegionKind, ASTNode Node, SourceRange Range,
+                      const SourceManager &SM)
+      : RegionKind(RegionKind), Node(Node) {
+    assert(Range.isValid());
+    StartLoc = Range.Start;
+    EndLoc = Lexer::getLocForEndOfToken(SM, Range.End);
+  }
+
+public:
+  /// Create a regular source region for an ASTNode.
+  static SourceMappingRegion forNode(ASTNode Node, const SourceManager &SM,
+                                     SourceRange Range = SourceRange()) {
+    if (Range.isInvalid())
+      Range = Node.getSourceRange();
+
+    // Note we don't store counters for nodes, as we need to be able to fix them
+    // up later.
+    return SourceMappingRegion(Kind::Node, Node, Range, SM);
+  }
+
+  /// Create a source region for an ASTNode that is only present for scoping of
+  /// child regions, and doesn't need to be included in the resulting set of
+  /// regions.
+  static SourceMappingRegion scopingOnly(ASTNode Node,
+                                         const SourceManager &SM) {
+    return SourceMappingRegion(Kind::ScopingOnly, Node, Node.getSourceRange(),
+                               SM);
+  }
+
+  /// Create a refined region for a given counter.
+  static SourceMappingRegion refined(CounterExpr Counter,
+                                     llvm::Optional<SourceLoc> StartLoc) {
+    return SourceMappingRegion(Kind::Refined, Counter, StartLoc);
   }
 
   SourceMappingRegion(SourceMappingRegion &&Region) = default;
   SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
+
+  /// Whether this region is for scoping only.
+  bool isForScopingOnly() const { return RegionKind == Kind::ScopingOnly; }
 
   ASTNode getNode() const { return Node; }
 
@@ -867,6 +917,13 @@ private:
   /// Returns the delta of the count on entering \c Node and exiting, or null if
   /// there was no change.
   llvm::Optional<CounterExpr> setExitCount(ASTNode Node) {
+    // A `try?` absorbs child error branches, so we can assume the exit count is
+    // the same as the entry count in that case.
+    // NOTE: This assumes there is no other kind of control flow that can happen
+    // in a nested expression, which is true today, but may not always be.
+    if (Node.isExpr(ExprKind::OptionalTry))
+      return llvm::None;
+
     ExitCounter = getCurrentCounter();
     if (hasCounter(Node) && getRegion().getNode() != Node)
       return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterBuilder);
@@ -876,22 +933,28 @@ private:
   /// Adjust the count for control flow when exiting a scope.
   void adjustForNonLocalExits(ASTNode Scope,
                               llvm::Optional<CounterExpr> ControlFlowAdjust) {
-    if (Parent.getAsDecl())
+    // If there are no regions left, there's nothing to adjust.
+    if (RegionStack.empty())
       return;
 
+    // If the region is for a brace, check to see if we have a parent labeled
+    // statement, in which case the exit count needs to account for any direct
+    // jumps to it though e.g break statements.
     llvm::Optional<CounterExpr> JumpsToLabel;
-    if (auto *ParentStmt = Parent.getAsStmt()) {
-      if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
-        // We need to handle the brace of a DoCatchStmt here specially,
-        // applying the same logic we apply to the catch clauses (handled by
-        // the CaseStmt logic), we add on the exit count of the branch to the
-        // statement's exit count.
-        addToCounter(DCS, getExitCounter());
-        return;
-      }
+    if (Scope.isStmt(StmtKind::Brace)) {
+      if (auto *ParentStmt = Parent.getAsStmt()) {
+        if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
+          // We need to handle the brace of a DoCatchStmt here specially,
+          // applying the same logic we apply to the catch clauses (handled by
+          // the CaseStmt logic), we add on the exit count of the branch to the
+          // statement's exit count.
+          addToCounter(DCS, getExitCounter());
+          return;
+        }
 
-      if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
-        JumpsToLabel = getCounter(LS);
+        if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
+          JumpsToLabel = getCounter(LS);
+      }
     }
 
     if (!ControlFlowAdjust && !JumpsToLabel)
@@ -908,20 +971,14 @@ private:
     replaceCount(Count, getEndLoc(Scope));
   }
 
-  /// Push a region covering \c Node onto the stack.
-  void pushRegion(ASTNode Node, SourceRange Range = SourceRange()) {
-    if (Range.isInvalid())
-      Range = Node.getSourceRange();
-
-    // Note we don't store counters for nodes, as we need to be able to fix
-    // them up later.
-    RegionStack.emplace_back(Node, /*Counter*/ llvm::None, Range.Start,
-                             Lexer::getLocForEndOfToken(SM, Range.End));
+  /// Push a region onto the stack.
+  void pushRegion(SourceMappingRegion Region) {
     LLVM_DEBUG({
       llvm::dbgs() << "Pushed region: ";
-      RegionStack.back().print(llvm::dbgs(), SM);
+      Region.print(llvm::dbgs(), SM);
       llvm::dbgs() << "\n";
     });
+    RegionStack.push_back(std::move(Region));
   }
 
   /// Replace the current region at \p Start with a new counter. If \p Start is
@@ -934,7 +991,7 @@ private:
     if (Start && Counter.isZero())
       Start = llvm::None;
 
-    RegionStack.emplace_back(ASTNode(), Counter, Start, llvm::None);
+    pushRegion(SourceMappingRegion::refined(Counter, Start));
   }
 
   /// Get the location for the end of the last token in \c Node.
@@ -942,46 +999,59 @@ private:
     return Lexer::getLocForEndOfToken(SM, Node.getEndLoc());
   }
 
+  /// Record a popped region in the resulting list of regions.
+  void takePoppedRegion(SourceMappingRegion &&Region, SourceLoc ParentEndLoc) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "Popped region: ";
+      Region.print(llvm::dbgs(), SM);
+      llvm::dbgs() << "\n";
+    });
+
+    // Don't bother recording regions that are only present for scoping.
+    if (Region.isForScopingOnly())
+      return;
+
+    // Don't record incomplete regions.
+    if (!Region.hasStartLoc())
+      return;
+
+    // Set the region end location to the end location of the parent.
+    if (!Region.hasEndLoc())
+      Region.setEndLoc(ParentEndLoc);
+
+    // If the range ended up being empty, ignore it (this can happen when we
+    // replace the counter, and don't extend the region any further).
+    if (!Region.hasNonEmptyRange())
+      return;
+
+    SourceRegions.push_back(std::move(Region));
+  }
+
   /// Pop regions from the stack into the function's list of regions.
   ///
   /// Adds all regions from \c ParentNode to the top of the stack to the
   /// function's \c SourceRegions.
   void popRegions(ASTNode ParentNode) {
-    auto I = RegionStack.begin(), E = RegionStack.end();
-    while (I != E &&
-           I->getNode().getOpaqueValue() != ParentNode.getOpaqueValue())
-      ++I;
-    assert(I != E && "parent not in stack");
-    auto ParentIt = I;
-    SourceLoc EndLoc = ParentIt->getEndLoc();
-    assert(ParentIt->hasNonEmptyRange() && "Pushed node with empty range?");
-
-    unsigned FirstPoppedIndex = SourceRegions.size();
-    (void)FirstPoppedIndex;
-    SourceRegions.push_back(std::move(*I++));
-    for (; I != E; ++I) {
-      if (!I->hasStartLoc())
-        continue;
-      if (!I->hasEndLoc())
-        I->setEndLoc(EndLoc);
-
-      // If the range ended up being empty, ignore it (this can happen when we
-      // replace the counter, and don't extend the region any further).
-      if (!I->hasNonEmptyRange())
-        continue;
-
-      SourceRegions.push_back(std::move(*I));
-    }
-
-    LLVM_DEBUG({
-      for (unsigned Idx = FirstPoppedIndex; Idx < SourceRegions.size(); ++Idx) {
-        llvm::dbgs() << "Popped region: ";
-        SourceRegions[Idx].print(llvm::dbgs(), SM);
-        llvm::dbgs() << "\n";
-      }
+    auto I = llvm::find_if(RegionStack, [&](const SourceMappingRegion &Region) {
+      return Region.getNode().getOpaqueValue() == ParentNode.getOpaqueValue();
     });
+    auto E = RegionStack.end();
+    assert(I != E && "parent not in stack");
+    assert(I->hasNonEmptyRange() && "Pushed node with empty range?");
 
-    RegionStack.erase(ParentIt, E);
+    auto EndLoc = I->getEndLoc();
+    for (auto &Region : llvm::make_range(I, E))
+      takePoppedRegion(std::move(Region), EndLoc);
+
+    RegionStack.erase(I, E);
+  }
+
+  /// Exit the given region, popping it and its children from the region stack,
+  /// and adjusting the following counter if needed.
+  void exitRegion(ASTNode Node) {
+    auto Adjust = setExitCount(Node);
+    popRegions(Node);
+    adjustForNonLocalExits(Node, Adjust);
   }
 
   /// Return the currently active region.
@@ -1102,6 +1172,20 @@ public:
     return Action::Continue();
   }
 
+  class SetParentRAII final {
+    ASTWalker &Walker;
+    decltype(ASTWalker::Parent) PriorParent;
+
+  public:
+    template <typename T>
+    SetParentRAII(ASTWalker &walker, T *newParent)
+        : Walker(walker), PriorParent(walker.Parent) {
+      walker.Parent = newParent;
+    }
+
+    ~SetParentRAII() { Walker.Parent = PriorParent; }
+  };
+
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (S->isImplicit() && S != ImplicitTopLevelBody)
       return Action::Continue(S);
@@ -1113,24 +1197,45 @@ public:
 
     if (auto *BS = dyn_cast<BraceStmt>(S)) {
       if (hasCounter(BS))
-        pushRegion(BS);
+        pushRegion(SourceMappingRegion::forNode(BS, SM));
 
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
-      if (auto *Cond = getConditionNode(IS->getCond()))
-        assignCounter(Cond, getCurrentCounter());
-
       // The counter for the if statement itself tracks the number of jumps to
       // it by break statements.
       assignCounter(IS, CounterExpr::Zero());
 
-      // We emit a counter for the then block, and define the else block in
-      // terms of it.
-      auto ThenCounter = assignKnownCounter(IS->getThenStmt());
-      if (IS->getElseStmt()) {
-        auto ElseCounter =
-            CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterBuilder);
-        assignCounter(IS->getElseStmt(), ElseCounter);
+      // FIXME: This is a redundant region.
+      if (auto *Cond = getConditionNode(IS->getCond()))
+        assignCounter(Cond, getCurrentCounter());
+
+      // Visit the children.
+      // FIXME: This is a hack.
+      {
+        SetParentRAII R(*this, S);
+        for (auto Cond : IS->getCond())
+          Cond.walk(*this);
+
+        // The parent counter is taken after the condition in case e.g
+        // it threw an error.
+        auto ParentCounter = getCurrentCounter();
+
+        // We emit a counter for the then block, and define the else block in
+        // terms of it.
+        auto ThenCounter = assignKnownCounter(IS->getThenStmt());
+        IS->getThenStmt()->walk(*this);
+
+        if (auto *Else = IS->getElseStmt()) {
+          auto ElseCounter = CounterExpr::Sub(ParentCounter, ThenCounter,
+                                              CounterBuilder);
+          assignCounter(Else, ElseCounter);
+          Else->walk(*this);
+        }
       }
+      // Already visited the children.
+      // FIXME: The ASTWalker should do a post-walk for SkipChildren.
+      walkToStmtPost(S);
+      return Action::SkipChildren(S);
+
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       assignCounter(GS, CounterExpr::Zero());
       assignKnownCounter(GS->getBody());
@@ -1165,6 +1270,7 @@ public:
       // cases.
       assignCounter(SS, CounterExpr::Zero());
 
+      // FIXME: This is a redundant region.
       assignCounter(SS->getSubjectExpr(), getCurrentCounter());
 
       // Assign counters for cases so they're available for fallthrough.
@@ -1207,7 +1313,7 @@ public:
         Range = CS->getSourceRange();
         break;
       }
-      pushRegion(CS, Range);
+      pushRegion(SourceMappingRegion::forNode(CS, SM, Range));
     }
     return Action::Continue(S);
   }
@@ -1217,11 +1323,8 @@ public:
       return Action::Continue(S);
 
     if (isa<BraceStmt>(S)) {
-      if (hasCounter(S)) {
-        auto Adjust = setExitCount(S);
-        popRegions(S);
-        adjustForNonLocalExits(S, Adjust);
-      }
+      if (hasCounter(S))
+        exitRegion(S);
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       // Update the condition with the backedge count.
@@ -1314,16 +1417,47 @@ public:
     if (isa<LazyInitializerExpr>(E))
       assignKnownCounter(E);
 
-    if (hasCounter(E))
-      pushRegion(E);
+    if (hasCounter(E)) {
+      pushRegion(SourceMappingRegion::forNode(E, SM));
+    } else if (isa<OptionalTryExpr>(E)) {
+      // If we have a `try?`, that doesn't already have a counter, record it
+      // as a scoping-only region. We need it to scope child error branches,
+      // but don't need it in the resulting set of regions.
+      assignCounter(E, getCurrentCounter());
+      pushRegion(SourceMappingRegion::scopingOnly(E, SM));
+    }
 
     assert(!RegionStack.empty() && "Must be within a region");
 
-    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
-      auto ThenCounter = assignKnownCounter(IE->getThenExpr());
-      auto ElseCounter =
-          CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterBuilder);
-      assignCounter(IE->getElseExpr(), ElseCounter);
+    if (auto *TE = dyn_cast<TernaryExpr>(E)) {
+      assert(shouldWalkIntoExpr(TE, Parent, Constant).Action.Action ==
+                 PreWalkAction::Continue &&
+             "Currently this only returns false for closures");
+
+      // Visit the children.
+      // FIXME: This is a hack.
+      {
+        SetParentRAII R(*this, TE);
+        TE->getCondExpr()->walk(*this);
+
+        // The parent counter is taken after the condition in case e.g
+        // it threw an error.
+        auto ParentCounter = getCurrentCounter();
+
+        auto *Then = TE->getThenExpr();
+        auto ThenCounter = assignKnownCounter(Then);
+        Then->walk(*this);
+
+        auto *Else = TE->getElseExpr();
+        auto ElseCounter =
+            CounterExpr::Sub(ParentCounter, ThenCounter, CounterBuilder);
+        assignCounter(Else, ElseCounter);
+        Else->walk(*this);
+      }
+      // Already visited the children.
+      // FIXME: The ASTWalker should do a post-walk for SkipChildren.
+      walkToExprPost(TE);
+      return Action::SkipChildren(TE);
     }
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
     if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
@@ -1339,17 +1473,17 @@ public:
     if (shouldSkipExpr(E))
       return Action::Continue(E);
 
-    if (hasCounter(E))
-      popRegions(E);
-
-    // The region following the expression gets current counter minus the
-    // error branch counter, i.e the number of times we didn't throw an error.
-    if (!RegionStack.empty() && mayExpressionThrow(E)) {
+    // The region following the expression gets current counter minus the error
+    // branch counter, i.e the number of times we didn't throw an error.
+    if (mayExpressionThrow(E)) {
       auto ThrowCount = assignKnownCounter(ProfileCounterRef::errorBranchOf(E));
       replaceCount(
           CounterExpr::Sub(getCurrentCounter(), ThrowCount, CounterBuilder),
           Lexer::getLocForEndOfToken(SM, E->getEndLoc()));
     }
+
+    if (hasCounter(E))
+      exitRegion(E);
 
     return Action::Continue(E);
   }

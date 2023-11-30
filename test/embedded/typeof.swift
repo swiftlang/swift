@@ -2,8 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 public func unsafeWriteArray<T, R>(_ elementType: R.Type, array: inout T, index n: Int, value: R) {
   precondition(_isPOD(elementType))

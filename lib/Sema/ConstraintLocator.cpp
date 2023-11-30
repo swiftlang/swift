@@ -111,6 +111,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PackExpansionType:
   case ConstraintLocator::ThrownErrorType:
   case ConstraintLocator::FallbackType:
+  case ConstraintLocator::KeyPathSubscriptIndex:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -527,6 +528,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
   case ConstraintLocator::FallbackType: {
     out << "fallback type";
+    break;
+
+  case ConstraintLocator::KeyPathSubscriptIndex:
+    out << "key path subscript index parameter";
     break;
   }
   }

@@ -2,7 +2,7 @@ import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
 /// Replace the label of the first element in the tuple with the given
 /// new label.
@@ -2080,5 +2080,145 @@ public struct NotMacroStruct {
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
     fatalError()
+  }
+}
+
+extension FunctionParameterSyntax {
+  var parameterName: TokenSyntax? {
+    // If there were two names, the second is the parameter name.
+    if let secondName {
+      if secondName.text == "_" {
+        return nil
+      }
+
+      return secondName
+    }
+
+    if firstName.text == "_" {
+      return nil
+    }
+
+    return firstName
+  }
+}
+
+@_spi(ExperimentalLanguageFeature)
+public struct RemoteBodyMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    // FIXME: Should be able to support (de-)initializers and accessors as
+    // well, but this is a lazy implementation.
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      return []
+    }
+
+    let funcBaseName = funcDecl.name.text
+    let paramNames = funcDecl.signature.parameterClause.parameters.map { param in
+      param.parameterName ?? TokenSyntax(.wildcard, presence: .present)
+    }
+
+    let passedArgs = DictionaryExprSyntax(
+      content: .elements(
+        DictionaryElementListSyntax {
+          for paramName in paramNames {
+            DictionaryElementSyntax(
+              key: ExprSyntax("\(literal: paramName.text)"),
+              value: DeclReferenceExprSyntax(baseName: paramName)
+            )
+          }
+        }
+      )
+    )
+
+    return [
+      """
+      return try await remoteCall(function: \(literal: funcBaseName), arguments: \(passedArgs))
+      """
+    ]
+  }
+}
+
+@_spi(ExperimentalLanguageFeature)
+public struct TracedPreambleMacro: PreambleMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPreambleFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    // FIXME: Should be able to support (de-)initializers and accessors as
+    // well, but this is a lazy implementation.
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      return []
+    }
+
+    let funcBaseName = funcDecl.name
+    let paramNames = funcDecl.signature.parameterClause.parameters.map { param in
+      param.parameterName?.text ?? "_"
+    }
+
+    let passedArgs = paramNames.map { "\($0): \\(\($0))" }.joined(separator: ", ")
+
+    let entry: CodeBlockItemSyntax = """
+      log("Entering \(funcBaseName)(\(raw: passedArgs))")
+      """
+
+    let argLabels = paramNames.map { "\($0):" }.joined()
+
+    let exit: CodeBlockItemSyntax = """
+      log("Exiting \(funcBaseName)(\(raw: argLabels))")
+      """
+
+    return [
+      entry,
+      """
+      defer {
+        \(exit)
+      }
+      """,
+    ]
+  }
+}
+
+@_spi(ExperimentalLanguageFeature)
+public struct Log2PreambleMacro: PreambleMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPreambleFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    // FIXME: Should be able to support (de-)initializers and accessors as
+    // well, but this is a lazy implementation.
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      return []
+    }
+
+    let funcBaseName = funcDecl.name
+    let paramNames = funcDecl.signature.parameterClause.parameters.map { param in
+      param.parameterName?.text ?? "_"
+    }
+
+    let passedArgs = paramNames.map { "\($0): \\(\($0))" }.joined(separator: ", ")
+
+    let entry: CodeBlockItemSyntax = """
+      log2("Entering \(funcBaseName)(\(raw: passedArgs))")
+      """
+
+    let argLabels = paramNames.map { "\($0):" }.joined()
+
+    let exit: CodeBlockItemSyntax = """
+      log2("Exiting \(funcBaseName)(\(raw: argLabels))")
+      """
+
+    return [
+      entry,
+      """
+      defer {
+        \(exit)
+      }
+      """,
+    ]
   }
 }

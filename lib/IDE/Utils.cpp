@@ -654,6 +654,8 @@ adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
   case GeneratedSourceInfo::DeclarationMacroExpansion:
   case GeneratedSourceInfo::CodeItemMacroExpansion:
   case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::PreambleMacroExpansion:
+  case GeneratedSourceInfo::BodyMacroExpansion:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
     return expandedCode;

@@ -4398,11 +4398,12 @@ class BeginBorrowInst
   USE_SHARED_UINT8;
 
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool isLexical,
-                  bool hasPointerEscape)
+                  bool hasPointerEscape, bool fromVarDecl)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {
     sharedUInt8().BeginBorrowInst.lexical = isLexical;
     sharedUInt8().BeginBorrowInst.pointerEscape = hasPointerEscape;
+    sharedUInt8().BeginBorrowInst.fromVarDecl = fromVarDecl;
   }
 
 public:
@@ -4426,6 +4427,10 @@ public:
   }
   void setHasPointerEscape(bool pointerEscape) {
     sharedUInt8().BeginBorrowInst.pointerEscape = pointerEscape;
+  }
+
+  bool isFromVarDecl() const {
+    return sharedUInt8().BeginBorrowInst.fromVarDecl;
   }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
@@ -8374,10 +8379,11 @@ class MoveValueInst
   USE_SHARED_UINT8;
 
   MoveValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isLexical,
-                bool hasPointerEscape)
+                bool hasPointerEscape, bool fromVarDecl)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
     sharedUInt8().MoveValueInst.lexical = isLexical;
     sharedUInt8().MoveValueInst.pointerEscape = hasPointerEscape;
+    sharedUInt8().MoveValueInst.fromVarDecl = fromVarDecl;
   }
 
 public:
@@ -8400,8 +8406,13 @@ public:
   void setHasPointerEscape(bool pointerEscape) {
     sharedUInt8().MoveValueInst.pointerEscape = pointerEscape;
   }
+
+  bool isFromVarDecl() const { return sharedUInt8().MoveValueInst.fromVarDecl; }
 };
 
+/// Drop the user-defined deinitializer from a struct or enum. Takes either an
+/// object or address operand and produces an object or address. See SIL.rst
+/// for details. See SILVerifier.cpp for constraints on valid uses.
 class DropDeinitInst
     : public UnaryInstructionBase<SILInstructionKind::DropDeinitInst,
                                   SingleValueInstruction> {

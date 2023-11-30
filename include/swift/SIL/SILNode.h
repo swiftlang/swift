@@ -241,7 +241,8 @@ protected:
 
     SHARED_FIELD(BeginBorrowInst, uint8_t
                  lexical : 1,
-                 pointerEscape : 1);
+                 pointerEscape : 1,
+                 fromVarDecl : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
@@ -272,7 +273,8 @@ protected:
     SHARED_FIELD(MoveValueInst, uint8_t
                  allowDiagnostics : 1,
                  lexical : 1,
-                 pointerEscape : 1);
+                 pointerEscape : 1,
+                 fromVarDecl : 1);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
