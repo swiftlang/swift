@@ -2704,6 +2704,8 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    auto *DC = SD->getDeclContext();
+
     // Force requests that can emit diagnostics.
     (void) SD->getInterfaceType();
     (void) SD->getGenericSignature();
@@ -2754,7 +2756,7 @@ public:
     checkDefaultArguments(SD->getIndices());
     checkVariadicParameters(SD->getIndices(), SD);
 
-    if (SD->getDeclContext()->getSelfClassDecl()) {
+    if (DC->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
 
       if (SD->getValueInterfaceType()->hasDynamicSelfType() &&
@@ -2765,15 +2767,15 @@ public:
 
     // Reject "class" methods on actors.
     if (SD->getStaticSpelling() == StaticSpellingKind::KeywordClass &&
-        SD->getDeclContext()->getSelfClassDecl() &&
-        SD->getDeclContext()->getSelfClassDecl()->isActor()) {
+        DC->getSelfClassDecl() &&
+        DC->getSelfClassDecl()->isActor()) {
       SD->diagnose(diag::class_subscript_not_in_class, false)
           .fixItReplace(SD->getStaticLoc(), "static");
     }
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (SD->getElementInterfaceType()->isNoncopyable()) {
+    if (SD->getElementInterfaceType()->isNoncopyable(DC)) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {

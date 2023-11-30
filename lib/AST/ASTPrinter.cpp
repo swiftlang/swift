@@ -29,6 +29,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -3360,31 +3361,64 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureMoveOnly(Decl *decl) {
+/// \param isRelevantInverse the function used to inspect a mark corresponding
+/// to an inverse to determine whether it "has" an inverse that we care about.
+static bool hasInverseCopyable(
+    Decl *decl,
+    std::function<bool(InverseMarking const&)> isRelevantInverse) {
+
+  auto getTypeDecl = [](Type type) -> TypeDecl* {
+    if (auto genericTy = type->getAnyGeneric())
+      return genericTy;
+    if (auto gtpt = dyn_cast<GenericTypeParamType>(type))
+      return gtpt->getDecl();
+    return nullptr;
+  };
+
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
-      if (nominal->canBeNoncopyable())
+      if (isRelevantInverse(nominal->getNoncopyableMarking()))
         return true;
   }
 
   if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-    if (typeDecl->canBeNoncopyable())
+    if (isRelevantInverse(typeDecl->getNoncopyableMarking()))
       return true;
+
+    // Check the protocol's associated types too.
+    if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+      auto hasNoncopyable = llvm::any_of(proto->getAssociatedTypeMembers(),
+                                         [&](AssociatedTypeDecl *assocTyDecl) {
+                                           return isRelevantInverse(assocTyDecl->getNoncopyableMarking());
+                                         });
+      if (hasNoncopyable)
+        return true;
+    }
   }
 
   if (auto value = dyn_cast<ValueDecl>(decl)) {
-    // Check for move-only types in the types of this declaration.
+    // Check for noncopyable types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
-      bool hasMoveOnly = type.findIf([](Type type) {
-        return type->isNoncopyable();
+      bool hasNoncopyable = type.findIf([&](Type type) {
+        if (auto *typeDecl = getTypeDecl(type))
+          if (isRelevantInverse(typeDecl->getNoncopyableMarking()))
+            return true;
+
+        return false;
       });
 
-      if (hasMoveOnly)
+      if (hasNoncopyable)
         return true;
     }
   }
 
   return false;
+}
+
+static bool usesFeatureMoveOnly(Decl *decl) {
+  return hasInverseCopyable(decl, [](auto &marking) -> bool {
+    return marking.getInverse().is(InverseMarking::Kind::LegacyExplicit);
+  });
 }
 
 static bool usesFeatureLazyImmediate(Decl *D) { return false; }
@@ -3424,9 +3458,17 @@ static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
 }
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
-  // FIXME: need to look for suppressed entries on generic parameters or
-  // inheritance clauses!
-  return false;
+  return hasInverseCopyable(decl, [](auto &marking) -> bool {
+    switch (marking.getInverse().getKind()) {
+    case InverseMarking::Kind::None:
+    case InverseMarking::Kind::LegacyExplicit: // covered by MoveOnly
+      return false;
+
+    case InverseMarking::Kind::Explicit:
+    case InverseMarking::Kind::Inferred:
+      return true;
+    }
+  });
 }
 
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
@@ -7207,17 +7249,29 @@ public:
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *T) {
-    if (T->getMembers().empty()) {
-      if (T->hasExplicitAnyObject())
-        Printer << "AnyObject";
-      else
-        Printer.printKeyword("Any", Options);
-    } else {
-      interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
-                 [&] { Printer << " & "; });
-      if (T->hasExplicitAnyObject())
-        Printer << " & AnyObject";
-    }
+    interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
+        [&] { Printer << " & "; });
+
+    bool printed = !T->getMembers().empty();
+    auto printSpecial = [&](llvm::StringRef str, bool tilde=false) {
+      if (printed)
+        Printer << " & ";
+
+      if (tilde)
+        Printer << "~";
+
+      Printer << str;
+      printed = true;
+    };
+
+    if (T->hasExplicitAnyObject())
+      printSpecial("AnyObject");
+
+    for (auto ip : T->getInverses())
+      printSpecial(getProtocolName(getKnownProtocolKind(ip)), true);
+
+    if (!printed)
+      Printer.printKeyword("Any", Options);
   }
 
   void visitParameterizedProtocolType(ParameterizedProtocolType *T) {

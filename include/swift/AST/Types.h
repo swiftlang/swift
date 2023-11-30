@@ -5783,8 +5783,6 @@ class ProtocolCompositionType final : public TypeBase,
     private llvm::TrailingObjects<ProtocolCompositionType, Type> {
   friend TrailingObjects;
 
-  // TODO(kavon): this could probably be folded into the existing Bits field
-  // or we could just store the InverseType's in the Members array.
   InvertibleProtocolSet Inverses;
   
 public:
@@ -7420,10 +7418,6 @@ inline Type TypeBase::getNominalParent() {
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
-
-//inline TypeDecl *TypeBase::getAnyTypeDecl() {
-//  return getCanonicalType().getAnyTypeDecl();
-//}
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))

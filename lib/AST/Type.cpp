@@ -181,20 +181,6 @@ static bool alwaysNoncopyable(Type ty) {
 /// context to substitute unbound types.
 bool TypeBase::isNoncopyable(const DeclContext *dc) {
   assert(dc);
-  auto &ctx = dc->getASTContext();
-
-  // Fast-path for type parameters; ask the generic signature directly.
-  if (isTypeParameter() &&
-      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    auto canType = getCanonicalType();
-
-    auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    if (!copyable)
-      llvm_unreachable("missing Copyable protocol!");
-
-    auto sig = dc->getGenericSignatureOfContext();
-    return !sig->requiresProtocol(canType, copyable);
-  }
 
   if (!hasArchetype() || hasOpenedExistential())
     if (auto env = dc->getGenericEnvironmentOfContext())
@@ -205,7 +191,8 @@ bool TypeBase::isNoncopyable(const DeclContext *dc) {
 
 /// \returns true iff this type lacks conformance to Copyable.
 bool TypeBase::isNoncopyable() {
-  auto canType = getCanonicalType();
+  // Strip @lvalue and canonicalize.
+  auto canType = getRValueType()->getCanonicalType();
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
@@ -337,43 +324,64 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
+/// Adds the inferred default protocols for an ExistentialLayout with respect
+/// to that existential's inverses. For example, if an inverse ~P exists, then
+/// P will not be added to the protocols list.
+///
+/// \param inverses the inverses '& ~P' that are in the existential's type.
+/// \param protocols the output vector of protocols for an ExistentialLayout
+///                  to be modified.
+static void expandDefaultProtocols(
+    ASTContext &ctx,
+    InvertibleProtocolSet inverses,
+    SmallVectorImpl<ProtocolDecl*> &protocols) {
+
+  // Skip unless noncopyable generics is enabled
+  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
+    return;
+
+  // Try to add all invertible protocols, unless an inverse was provided.
+  for (auto ip : InvertibleProtocolSet::full()) {
+    if (inverses.contains(ip))
+      continue;
+
+    auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+    assert(proto);
+
+    protocols.push_back(proto);
+  }
+}
+
 ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
 
   hasExplicitAnyObject = false;
-  hasInverseCopyable = false;
   containsNonObjCProtocol = !isObjCProtocol(protoDecl);
   containsParameterized = false;
+  representsAnyObject = false;
 
   protocols.push_back(protoDecl);
+
+  // NOTE: all the invertible protocols are usable from ObjC.
+  expandDefaultProtocols(type->getASTContext(), {}, protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanInverseType type) {
   hasExplicitAnyObject = false;
-  hasInverseCopyable = false;
   containsNonObjCProtocol = false;
   containsParameterized = false;
+  representsAnyObject = false;
 
-  // Handle inverse.
-  switch (type->getInverseKind()) {
-  case InvertibleProtocolKind::Copyable:
-    hasInverseCopyable = true;
-  }
+  // NOTE: all the invertible protocols are usable from ObjC.
+  expandDefaultProtocols(type->getASTContext(),
+                         {type->getInverseKind()},
+                         protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
-  hasInverseCopyable = false;
   containsNonObjCProtocol = false;
   containsParameterized = false;
-
-  // Handle inverses.
-  for (auto ip : type->getInverses()) {
-    switch (ip) {
-    case InvertibleProtocolKind::Copyable:
-      hasInverseCopyable = true;
-    }
-  }
 
   auto members = type.getMembers();
   if (!members.empty() &&
@@ -395,6 +403,12 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     containsNonObjCProtocol |= !isObjCProtocol(protoDecl);
     protocols.push_back(protoDecl);
   }
+
+  representsAnyObject =
+      hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
+
+  // NOTE: all the invertible protocols are usable from ObjC.
+  expandDefaultProtocols(type->getASTContext(), type->getInverses(), protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
@@ -466,10 +480,6 @@ Type ExistentialLayout::getSuperclass() const {
   }
 
   return Type();
-}
-
-bool ExistentialLayout::isAnyObject() const {
-  return (hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty());
 }
 
 bool TypeBase::isObjCExistentialType() {

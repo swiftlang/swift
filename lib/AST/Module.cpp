@@ -1568,11 +1568,12 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   if (!protocol->existentialConformsToSelf())
     return ProtocolConformanceRef::forInvalid();
 
-  // All existentials are Copyable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
+      && !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Prior to noncopyable generics, all existentials conform to Copyable.
+        return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
   }
 
   auto layout = type->getExistentialLayout();

@@ -31,9 +31,9 @@ struct ExistentialLayout {
 
   ExistentialLayout() {
     hasExplicitAnyObject = false;
-    hasInverseCopyable = false;
     containsNonObjCProtocol = false;
     containsParameterized = false;
+    representsAnyObject = false;
   }
 
   ExistentialLayout(CanProtocolType type);
@@ -47,14 +47,14 @@ struct ExistentialLayout {
   /// Whether the existential contains an explicit '& AnyObject' constraint.
   bool hasExplicitAnyObject : 1;
 
-  /// Whether the existential contains an explicit '& ~Copyable' constraint.
-  bool hasInverseCopyable : 1;
-
   /// Whether any protocol members are non-@objc.
   bool containsNonObjCProtocol : 1;
 
   /// Whether any protocol members are parameterized.s
   bool containsParameterized : 1;
+
+  /// Whether this layout is the canonical layout for plain-old 'AnyObject'.
+  bool representsAnyObject : 1;
 
   /// Return the kind of this existential (class/error/opaque).
   Kind getKind() {
@@ -69,7 +69,7 @@ struct ExistentialLayout {
     return Kind::Opaque;
   }
 
-  bool isAnyObject() const;
+  bool isAnyObject() const { return representsAnyObject; }
 
   bool isObjC() const {
     // FIXME: Does the superclass have to be @objc?

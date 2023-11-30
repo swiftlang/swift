@@ -80,6 +80,7 @@ static void emitAdviceToApplyInverseAfter(InFlightDiagnostic &&diag,
     addConformanceFixIt(nominal, diag, kp, /*inverse=*/true);
   }
     break;
+  case InverseMarking::Kind::LegacyExplicit:
   case InverseMarking::Kind::Explicit:
     // FIXME: we can probably do better here. Look for the extension where the
     // inverse came from.
@@ -141,6 +142,7 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
                            diag::note_inverse_preventing_conformance_implicit,
                            nominal, getProtocolName(kp));
         break;
+      case InverseMarking::Kind::LegacyExplicit:
       case InverseMarking::Kind::Explicit:
         assert(loc);
         ctx.Diags.diagnose(loc,
@@ -408,6 +410,7 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     // Check what kind of inverse we have to determine whether to generate a
     // conformance for Copyable.
     switch (marking.getInverse().getKind()) {
+    case InverseMarking::Kind::LegacyExplicit:
     case InverseMarking::Kind::Explicit:
       return nullptr; // No Copyable conformance will be inferred.
 
