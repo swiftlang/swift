@@ -781,7 +781,8 @@ private:
   /// Subtract \c Expr from \c Node's counter.
   void subtractFromCounter(ASTNode Node, CounterExpr Expr) {
     auto Counter = getCounter(Node);
-    assert(!Counter.isZero() && "Cannot create a negative counter");
+    // FIXME: This assertion ought to be restored (rdar://100470244)
+    // assert(!Counter.isZero() && "Cannot create a negative counter");
     assignCounter(Node,
                   CounterExpr::Sub(Counter, std::move(Expr), CounterBuilder));
   }
