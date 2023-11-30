@@ -121,3 +121,16 @@ print(\Controller[[42], [42]])
 print(\Controller[array: [42]])
 // CHECK: \Controller.
 print(\Controller[array: [42], array2: [42]])
+
+do {
+  struct S {
+    var i: Int
+  }
+
+  func test<T, U>(v: T, _ kp: any KeyPath<T, U> & Sendable) {
+    print(v[keyPath: kp])
+  }
+
+  // CHECK: 42
+  test(v: S(i: 42), \.i)
+}

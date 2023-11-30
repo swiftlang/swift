@@ -12195,6 +12195,12 @@ ConstraintSystem::simplifyKeyPathConstraint(
     if (contextualTy->isPlaceholder())
       return true;
 
+    // Situations like `any KeyPath<...> & Sendable`.
+    if (contextualTy->isExistentialType()) {
+      contextualTy = contextualTy->getExistentialLayout().explicitSuperclass;
+      assert(contextualTy);
+    }
+
     // If there are no other options the solver might end up picking
     // `AnyKeyPath` or `PartialKeyPath` based on a contextual conversion.
     // This is an error during normal type-checking but okay in
