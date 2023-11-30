@@ -75,6 +75,7 @@ public:
   bool isFileScope() const;
   bool isInternal() const;
   bool isPackage() const;
+  bool isPublicOrPackage() const { return isPublic() || isPackage(); }
 
   /// Checks if the DeclContext of this (use site) access scope is more
   /// restrictive than that of the argument (decl site) based on the DeclContext
