@@ -2812,6 +2812,12 @@ namespace {
       if (getActorIsolation(value).isActorIsolated())
         return false;
 
+      if (auto attr = value->getAttrs().getAttribute<NonisolatedAttr>();
+          ctx.LangOpts.hasFeature(Feature::GlobalConcurrency) && attr &&
+          attr->isUnsafe()) {
+        return false;
+      }
+
       ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       return true;
@@ -3273,6 +3279,12 @@ namespace {
               ctx.Diags.diagnose(loc, diag::concurrent_access_of_inout_param, param->getName());
               return true;
           }
+        }
+
+        if (auto attr = var->getAttrs().getAttribute<NonisolatedAttr>();
+            ctx.LangOpts.hasFeature(Feature::GlobalConcurrency) && attr &&
+            attr->isUnsafe()) {
+          return false;
         }
 
         // Otherwise, we have concurrent access. Complain.
