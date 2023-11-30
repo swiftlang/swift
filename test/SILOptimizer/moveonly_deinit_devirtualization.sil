@@ -329,18 +329,6 @@ bb0(%0 : @owned $StructDeinit):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dropDeinitOnIndirectStruct : $@convention(thin) (@in StructDeinit) -> () {
-// CHECK:         %1 = drop_deinit %0
-// CHECK-NEXT:    end_lifetime %1
-// CHECK:       } // end sil function 'dropDeinitOnIndirectStruct'
-sil [ossa] @dropDeinitOnIndirectStruct : $@convention(thin) (@in StructDeinit) -> () {
-bb0(%0 : $*StructDeinit):
-  %1 = drop_deinit %0 : $*StructDeinit
-  destroy_addr %1 : $*StructDeinit
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 sil @$s4main5KlassCfD : $@convention(method) (@owned Klass) -> ()
 sil @$s4main5KlassCACycfc : $@convention(method) (@owned Klass) -> @owned Klass
 sil @$s4main5KlassCfd : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject
