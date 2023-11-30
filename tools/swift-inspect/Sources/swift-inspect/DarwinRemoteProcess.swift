@@ -174,8 +174,8 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
   deinit {
     task_stop_peeking(self.task)
+    CSRelease(self.symbolicator)
     mach_port_deallocate(mach_task_self_, self.task)
-    mach_port_mod_refs(mach_task_self_, self.task, MACH_PORT_RIGHT_SEND, -1);
   }
 
   func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
