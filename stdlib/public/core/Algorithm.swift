@@ -160,6 +160,4 @@ extension EnumeratedSequence: Sequence {
 }
 
 @available(SwiftStdlib 5.11, *)
-public func hello() {
-  print("hello!")
-}
+public func hello() {}

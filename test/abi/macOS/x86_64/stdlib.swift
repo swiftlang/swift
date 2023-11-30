@@ -7,11 +7,7 @@
 // RUN: diff -u %S/../../Inputs/macOS/x86_64/stdlib/baseline %t/symbols
 
 // REQUIRES: swift_stdlib_no_asserts
-// REQUIRES: OS=macosx
-
-// FIXME: This isn't technically required. We really want a STDLIB_ARCH=x86_64
-// feature that tells us we've built an x86_64 version of the standard library.
-// REQUIRES: CPU=x86_64
+// REQUIRES: STDLIB_VARIANT=macosx-x86_64
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
