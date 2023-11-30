@@ -11,7 +11,7 @@ enum Either {
 // CHECK-SAME:             size: {{328|168}},
 
 // DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "Either",
-// DWARF-SAME:             size: 328, num_extra_inhabitants: 253,
+// DWARF-SAME:             size: {{328|168}}, num_extra_inhabitants: 253,
 // DWARF-SAME:             identifier: "$s4enum6EitherOD")
 
 // DWARF: !DICompositeType(tag: DW_TAG_variant_part
