@@ -233,9 +233,9 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @available(SwiftStdlib 5.11, *)
-  public func indices(where predicate: (Element) throws -> Bool) rethrows
-    -> RangeSet<Index>
-  {
+  public func indices(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> RangeSet<Index> {
     var result: [Range<Index>] = []
     var end = startIndex
     while let begin = try self[end...].firstIndex(where: predicate) {

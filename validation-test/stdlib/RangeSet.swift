@@ -278,6 +278,39 @@ if #available(SwiftStdlib 5.11, *) {
     }
   }
 
+  RangeSetTests.test("isSubset") {
+    func isSubsetViaSet(_ s1: RangeSet<Int>, _ s2: RangeSet<Int>) -> Bool {
+      let set1 = Set(parent.indices[s1])
+      let set2 = Set(parent.indices[s2])
+      return set1.isSubset(of: set2)
+    }
+
+    do {
+      // Simple test
+      let set1: RangeSet = [0..<5, 9..<14]
+      let set2: RangeSet = [1..<3, 4..<6, 8..<12]
+      let set3: RangeSet = [6..<9, 14..<20]
+      let set4: RangeSet = [1..<2, 10..<12]
+      expectFalse(set1.isSubset(of: set2))
+      expectFalse(set2.isSubset(of: set1))
+      expectFalse(set1.isSubset(of: set3))
+      expectFalse(set3.isSubset(of: set1))
+      expectFalse(set1.isSubset(of: set4))
+      expectFalse(set2.isSubset(of: set4))
+      expectTrue(set4.isSubset(of: set1))
+      expectTrue(set4.isSubset(of: set2))
+    }
+    
+    for _ in 0..<100 {
+      let set1 = buildRandomRangeSet()
+      let set2 = buildRandomRangeSet()
+      
+      let rangeSetSubset = set1.isSubset(of: set2)
+      let stdlibSetSubset = isSubsetViaSet(set1, set2)
+      expectEqual(rangeSetSubset, stdlibSetSubset)
+    }
+  }
+
   RangeSetTests.test("indices(of:/where:)") {
     let a = [1, 2, 3, 4, 3, 3, 4, 5, 3, 4, 3, 3, 3]
     let indices = a.indices(of: 3)

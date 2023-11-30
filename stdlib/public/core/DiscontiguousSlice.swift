@@ -44,12 +44,10 @@ extension DiscontiguousSlice: Equatable where Base.Element: Equatable {
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
   public func hash(into hasher: inout Hasher) {
-    var count = 0
+    hasher.combine(count) // delimeter; do not remove
     for element in self {
       hasher.combine(element)
-      count += 1
     }
-    hasher.combine(count) // discriminator
   }
 }
 
@@ -101,10 +99,7 @@ extension DiscontiguousSlice.Index: Comparable {
 @available(SwiftStdlib 5.11, *)
 extension DiscontiguousSlice.Index: CustomStringConvertible {
   public var description: String {
-    var d = ""
-    debugPrint(base, terminator: "", to: &d)
-    d += " (rangeOffset: \(_rangeOffset))"
-    return d
+    "<base: \(String(reflecting: base)), rangeOffset: \(_rangeOffset)>"
   }
 }
 
@@ -233,7 +228,9 @@ extension DiscontiguousSlice: Collection {
     }
   }
 
-  public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
+  public func _customLastIndexOfEquatableElement(
+    _ element: Element
+  ) -> Index?? {
     var definite = true
     for (i, range) in subranges.ranges.enumerated().reversed() {
       guard let baseResult = _base[range]
@@ -253,7 +250,9 @@ extension DiscontiguousSlice: Collection {
     }
   }
 
-  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
+  public func _failEarlyRangeCheck(
+    _ index: Index, bounds: Range<Index>
+  ) {
     let baseBounds = bounds.lowerBound.base ..< bounds.upperBound.base
     let offsetBounds = bounds.lowerBound._rangeOffset ..<
       bounds.upperBound._rangeOffset

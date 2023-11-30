@@ -62,7 +62,7 @@ public struct RangeSet<Bound: Comparable> {
   /// passed to this initializer.
   ///
   /// - Parameter ranges: The ranges to use for the new range set.
-  public init<S: Sequence>(_ ranges: S) where S.Element == Range<Bound> {
+  public init(_ ranges: some Sequence<Range<Bound>>) {
     self.init()
     for range in ranges {
       insert(contentsOf: range)
@@ -169,9 +169,9 @@ extension RangeSet {
   ///   - index: The index to include in the range set. `index` must be a
   ///     valid index of `collection` that isn't the collection's `endIndex`.
   ///   - collection: The collection that contains `index`.
-  public init<S, C>(_ indices: S, within collection: C)
-    where S: Sequence, C: Collection, S.Element == C.Index, C.Index == Bound
-  {
+  public init<S: Sequence, C: Collection>(
+    _ indices: S, within collection: C
+  ) where S.Element == C.Index, C.Index == Bound {
     self.init()
     for i in indices {
       self.insert(i, within: collection)
@@ -188,9 +188,9 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
-  public mutating func insert<C>(_ index: Bound, within collection: C)
-    where C: Collection, C.Index == Bound
-  {
+  public mutating func insert<C: Collection>(
+    _ index: Bound, within collection: C
+  ) where C.Index == Bound {
     insert(contentsOf: index ..< collection.index(after: index))
   }
   
@@ -204,9 +204,9 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
-  public mutating func remove<C>(_ index: Bound, within collection: C)
-    where C: Collection, C.Index == Bound
-  {
+  public mutating func remove<C: Collection>(
+    _ index: Bound, within collection: C
+  ) where C.Index == Bound {
     remove(contentsOf: index ..< collection.index(after: index))
   }
 
@@ -220,9 +220,9 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
-  internal func _inverted<C>(within collection: C) -> RangeSet
-    where C: Collection, C.Index == Bound
-  {
+  internal func _inverted<C: Collection>(
+    within collection: C
+  ) -> RangeSet where C: Collection, C.Index == Bound {
     return RangeSet(_ranges: _ranges._gaps(
       boundedBy: collection.startIndex ..< collection.endIndex))
   }
@@ -311,7 +311,9 @@ extension RangeSet {
   ///
   /// - Parameter other: The range set to subtract.
   /// - Returns: A new range set.
-  public func subtracting(_ other: RangeSet<Bound>) -> RangeSet<Bound> {
+  public __consuming func subtracting(
+    _ other: RangeSet<Bound>
+  ) -> RangeSet<Bound> {
     var result = self
     result.subtract(other)
     return result
@@ -324,7 +326,21 @@ extension RangeSet {
   /// - Returns: `true` if this range set is a subset of `other`;
   ///   otherwise, `false`.
   public func isSubset(of other: RangeSet<Bound>) -> Bool {
-    self.intersection(other) == self
+    var remaining = other.ranges[...]
+    for range in ranges {
+      guard let containingIdx = remaining.firstIndex(where: {
+        $0.contains(range.lowerBound)
+      }) else {
+        return false
+      }
+
+      if remaining[containingIdx].upperBound < range.upperBound {
+        return false
+      }
+
+      remaining = other.ranges[containingIdx...]
+    }
+    return true
   }
   
   /// Returns a Boolean value that indicates whether this range set is a
