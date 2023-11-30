@@ -152,6 +152,11 @@ bool TypeVariableType::Implementation::isKeyPathValue() const {
   return locator && locator->isKeyPathValue();
 }
 
+bool TypeVariableType::Implementation::isKeyPathSubscriptIndex() const {
+  return locator &&
+         locator->isLastElement<LocatorPathElt::KeyPathSubscriptIndex>();
+}
+
 bool TypeVariableType::Implementation::isSubscriptResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;

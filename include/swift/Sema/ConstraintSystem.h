@@ -499,6 +499,10 @@ public:
   /// expression.
   bool isKeyPathValue() const;
 
+  /// Determine whether this type variable represents an index parameter of
+  /// a special `subscript(keyPath:)` subscript.
+  bool isKeyPathSubscriptIndex() const;
+
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
@@ -5770,11 +5774,18 @@ llvm::Optional<MatchCallArgumentResult> matchCallArguments(
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
 /// Given a type that includes an existential type that has been opened to
-/// the given type variable, type-erase occurrences of that opened type
-/// variable and anything that depends on it to their non-dependent bounds.
+/// the given type variable, replace the opened type variable and its member
+/// types with their upper bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
                                          TypePosition outermostPosition);
+
+
+/// Given a type that includes opened existential archetypes derived from
+/// the given generic environment, replace the archetypes with their upper
+/// bounds.
+Type typeEraseOpenedArchetypesWithRoot(Type type,
+                                       const OpenedArchetypeType *root);
 
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.

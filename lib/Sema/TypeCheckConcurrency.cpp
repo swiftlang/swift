@@ -2329,9 +2329,14 @@ namespace {
         if (closure && closure->isImplicit()) {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
-            diagnoseNonSendableTypes(
-                type, getDeclContext(), capture.getLoc(),
-                diag::implicit_async_let_non_sendable_capture, decl->getName());
+            // Defer diagnosing checking of non-Sendable types that are passed
+            // into async let to SIL level region based isolation.
+            if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
+              diagnoseNonSendableTypes(
+                  type, getDeclContext(), capture.getLoc(),
+                  diag::implicit_async_let_non_sendable_capture,
+                  decl->getName());
+            }
           } else {
             // Fallback to a generic implicit capture missing sendable
             // conformance diagnostic.
@@ -3207,8 +3212,8 @@ namespace {
             unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
-      // check if language features ask us to defer sendable diagnostics
-      // if so, don't check for sendability of arguments here
+      // Check if language features ask us to defer sendable diagnostics if so,
+      // don't check for sendability of arguments here.
       if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
         diagnoseApplyArgSendability(apply, getDeclContext());
       }

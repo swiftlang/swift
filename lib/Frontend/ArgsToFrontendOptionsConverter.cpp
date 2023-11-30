@@ -322,6 +322,16 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.SkipNonExportableDecls |=
       Args.hasArg(OPT_experimental_skip_non_exportable_decls);
+  Opts.SkipNonExportableDecls |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  // HACK: The driver currently erroneously passes all flags to module interface
+  // verification jobs. -experimental-skip-non-exportable-decls is not
+  // appropriate for verification tasks and should be ignored, though.
+  if (Opts.RequestedAction ==
+      FrontendOptions::ActionType::TypecheckModuleFromInterface)
+    Opts.SkipNonExportableDecls = false;
+
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
@@ -394,6 +404,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.UseCASBackend = Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile = Args.hasArg(OPT_cas_emit_casid_file);
+
+  Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
 
   return false;
 }

@@ -704,6 +704,10 @@ ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
+ERROR(cannot_convert_type_to_keypath_subscript_index,none,
+      "cannot use value of type %0 as a key path subscript index; argument must be"
+      " a key path",
+      (Type))
 WARNING(expr_deprecated_writable_keypath,Deprecation,
         "forming a writable keypath to property %0 that is read-only in this context "
         "is deprecated and will be removed in a future release",
@@ -1916,6 +1920,24 @@ ERROR(extern_only_non_other_attr,none,
 WARNING(extern_c_maybe_invalid_name, none,
         "C name '%0' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning",
         (StringRef))
+
+// @_staticExclusiveOnly
+ERROR(attr_static_exclusive_only_disabled,none,
+      "attribute requires '-enable-experimental feature StaticExclusiveOnly'", ())
+ERROR(attr_static_exclusive_only_noncopyable,none,
+      "@_staticExclusiveOnly can only be applied to noncopyable types", ())
+ERROR(attr_static_exclusive_only_let_only,none,
+      "variable of type %0 must be declared with a 'let'", (Type))
+NOTE(attr_static_exclusive_only_type_nonmutating,none,
+     "%0 is a non-mutable type", (Type))
+ERROR(attr_static_exclusive_only_let_only_param,none,
+      "parameter of type %0 must be declared as either 'borrowing' or 'consuming'", (Type))
+ERROR(attr_static_exclusive_only_mutating,none,
+      "type %0 cannot have mutating function %1", (Type, ValueDecl *))
+
+// @extractConstantsFromMembers
+ERROR(attr_extractConstantsFromMembers_experimental,none,
+      "@extractConstantsFromMembers requires '-enable-experimental-feature ExtractConstantsFromMembers'", ())
 
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
@@ -5330,9 +5352,6 @@ ERROR(broken_distributed_actor_requirement,none,
 ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,
       "%kind0 is missing witness for protocol requirement %1",
       (const ValueDecl *, DeclName))
-NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
-      "protocol %0 requires function %1 with signature:\n%2",
-     (DeclName, DeclName, StringRef))
 
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
@@ -7349,16 +7368,6 @@ WARNING(backdeployed_opaque_result_not_supported,none,
 //------------------------------------------------------------------------------
 // MARK: Implicit opening of existential types
 //------------------------------------------------------------------------------
-
-ERROR(result_requires_explicit_coercion,none,
-      "inferred result type %0 requires explicit coercion due to "
-      "loss of generic requirements",
-      (Type))
-
-NOTE(candidate_result_requires_explicit_coercion,none,
-     "inferred result type %0 requires explicit coercion due to "
-     "loss of generic requirements",
-     (Type))
 
 ERROR(concurrency_task_to_thread_model_custom_executor,none,
       "custom executors are not permitted within %0", (StringRef))

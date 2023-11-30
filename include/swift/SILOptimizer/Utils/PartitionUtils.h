@@ -105,6 +105,10 @@ enum class PartitionOpKind : uint8_t {
   /// Transfer the region of a value if not already transferred, takes one arg.
   Transfer,
 
+  /// Due to an async let or something like that a value that was transferred is
+  /// no longer transferred.
+  UndoTransfer,
+
   /// Require the region of a value to be non-transferred, takes one arg.
   Require,
 };
@@ -128,20 +132,26 @@ private:
   PartitionOp(PartitionOpKind opKind, Element arg1,
               SILInstruction *sourceInst = nullptr)
       : opKind(opKind), opArgs({arg1}), source(sourceInst) {
-    assert((opKind != PartitionOpKind::Transfer || sourceInst) &&
+    assert(((opKind != PartitionOpKind::Transfer &&
+             opKind != PartitionOpKind::UndoTransfer) ||
+            sourceInst) &&
            "Transfer needs a sourceInst");
   }
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand)
       : opKind(opKind), opArgs({arg1}), source(sourceOperand) {
-    assert((opKind != PartitionOpKind::Transfer || sourceOperand) &&
+    assert(((opKind != PartitionOpKind::Transfer &&
+             opKind != PartitionOpKind::UndoTransfer) ||
+            sourceOperand) &&
            "Transfer needs a sourceInst");
   }
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
               SILInstruction *sourceInst = nullptr)
       : opKind(opKind), opArgs({arg1, arg2}), source(sourceInst) {
-    assert((opKind != PartitionOpKind::Transfer || sourceInst) &&
+    assert(((opKind != PartitionOpKind::Transfer &&
+             opKind != PartitionOpKind::UndoTransfer) ||
+            sourceInst) &&
            "Transfer needs a sourceInst");
   }
 
@@ -160,6 +170,11 @@ public:
 
   static PartitionOp Transfer(Element tgt, Operand *transferringOp) {
     return PartitionOp(PartitionOpKind::Transfer, tgt, transferringOp);
+  }
+
+  static PartitionOp UndoTransfer(Element tgt,
+                                  SILInstruction *untransferringInst) {
+    return PartitionOp(PartitionOpKind::UndoTransfer, tgt, untransferringInst);
   }
 
   static PartitionOp Merge(Element tgt1, Element tgt2,
@@ -217,6 +232,14 @@ public:
     case PartitionOpKind::Transfer: {
       constexpr static char extraSpaceLiteral[10] = "    ";
       os << "transfer ";
+      if (extraSpace)
+        os << extraSpaceLiteral;
+      os << "%%" << opArgs[0];
+      break;
+    }
+    case PartitionOpKind::UndoTransfer: {
+      constexpr static char extraSpaceLiteral[10] = "    ";
+      os << "undo_transfer ";
       if (extraSpace)
         os << extraSpaceLiteral;
       os << "%%" << opArgs[0];
@@ -352,6 +375,33 @@ public:
     auto iter2 =
         regionToTransferredOpMap.try_emplace(iter1->second, transferOperand);
     return iter2.second;
+  }
+
+  /// If val was marked as transferred, unmark it as transfer. Returns true if
+  /// we found that \p val was transferred. We return false otherwise.
+  bool undoTransfer(Element val) {
+    // First see if our val is tracked. If it is not tracked, insert it.
+    if (!isTracked(val)) {
+      elementToRegionMap.insert_or_assign(val, fresh_label);
+      fresh_label = Region(fresh_label + 1);
+      canonical = false;
+      return true;
+    }
+
+    // Otherwise, we already have this value in the map. Remove it from the
+    // transferred map.
+    auto iter1 = elementToRegionMap.find(val);
+    assert(iter1 != elementToRegionMap.end());
+    return regionToTransferredOpMap.erase(iter1->second);
+  }
+
+  void addElement(Element newElt) {
+    // Map index newElt to a fresh label.
+    elementToRegionMap.insert_or_assign(newElt, fresh_label);
+
+    // Increment the fresh label so it remains fresh.
+    fresh_label = Region(fresh_label + 1);
+    canonical = false;
   }
 
   /// Construct the partition corresponding to the union of the two passed
@@ -760,6 +810,7 @@ struct PartitionOpEvaluator {
         REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
                                          p.print(llvm::dbgs()));
       }
+      assert(p.is_canonical_correct());
     };
 
     switch (op.getKind()) {
@@ -779,18 +830,13 @@ struct PartitionOpEvaluator {
       // assignment could have invalidated canonicality of either the old region
       // of op.getOpArgs()[0] or the region of op.getOpArgs()[1], or both
       p.canonical = false;
-      break;
+      return;
     case PartitionOpKind::AssignFresh:
       assert(op.getOpArgs().size() == 1 &&
              "AssignFresh PartitionOp should be passed 1 argument");
 
-      // map index op.getOpArgs()[0] to a fresh label
-      p.elementToRegionMap.insert_or_assign(op.getOpArgs()[0], p.fresh_label);
-
-      // increment the fresh label so it remains fresh
-      p.fresh_label = Region(p.fresh_label + 1);
-      p.canonical = false;
-      break;
+      p.addElement(op.getOpArgs()[0]);
+      return;
     case PartitionOpKind::Transfer: {
       assert(op.getOpArgs().size() == 1 &&
              "Transfer PartitionOp should be passed 1 argument");
@@ -808,8 +854,7 @@ struct PartitionOpEvaluator {
         if (!p.isTransferred(nonTransferrable) &&
             p.elementToRegionMap.at(nonTransferrable) ==
                 p.elementToRegionMap.at(op.getOpArgs()[0])) {
-          handleTransferNonTransferrable(op, nonTransferrable);
-          break;
+          return handleTransferNonTransferrable(op, nonTransferrable);
         }
       }
 
@@ -817,6 +862,7 @@ struct PartitionOpEvaluator {
       // actor derived, we need to treat as nontransferrable.
       if (isActorDerived(op.getOpArgs()[0]))
         return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+
       Region elementRegion = p.elementToRegionMap.at(op.getOpArgs()[0]);
       if (llvm::any_of(p.elementToRegionMap,
                        [&](const std::pair<Element, Region> &pair) -> bool {
@@ -828,7 +874,17 @@ struct PartitionOpEvaluator {
 
       // Mark op.getOpArgs()[0] as transferred.
       p.markTransferred(op.getOpArgs()[0], op.getSourceOp());
-      break;
+      return;
+    }
+    case PartitionOpKind::UndoTransfer: {
+      assert(op.getOpArgs().size() == 1 &&
+             "UndoTransfer PartitionOp should be passed 1 argument");
+      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+             "UndoTransfer PartitionOp's argument should already be tracked");
+
+      // Mark op.getOpArgs()[0] as not transferred.
+      p.undoTransfer(op.getOpArgs()[0]);
+      return;
     }
     case PartitionOpKind::Merge:
       assert(op.getOpArgs().size() == 2 &&
@@ -844,7 +900,7 @@ struct PartitionOpEvaluator {
         handleFailure(op, op.getOpArgs()[1], transferringInst);
 
       p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
-      break;
+      return;
     case PartitionOpKind::Require:
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
@@ -852,9 +908,10 @@ struct PartitionOpEvaluator {
              "Require PartitionOp's argument should already be tracked");
       if (auto *transferringInst = p.getTransferred(op.getOpArgs()[0]))
         handleFailure(op, op.getOpArgs()[0], transferringInst);
+      return;
     }
 
-    assert(p.is_canonical_correct());
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   void apply(std::initializer_list<PartitionOp> ops) {

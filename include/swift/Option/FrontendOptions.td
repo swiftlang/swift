@@ -1130,6 +1130,11 @@ def experimental_skip_all_function_bodies:
   Flag<["-"], "experimental-skip-all-function-bodies">,
   HelpText<"Skip type-checking function bodies and all SIL generation">;
 
+def experimental_skip_non_inlinable_function_bodies_is_lazy
+  : Flag<["-"], "experimental-skip-non-inlinable-function-bodies-is-lazy">,
+  HelpText<"Infer lazy typechecking for "
+           "-experimental-skip-non-inlinable-function-bodies">;
+
 def experimental_allow_module_with_compiler_errors:
   Flag<["-"], "experimental-allow-module-with-compiler-errors">,
   Flags<[HelpHidden]>,
@@ -1159,9 +1164,11 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
            "disabled. NOTE: Can not be used if enable-ast-verifier is used "
            "as well">;
 
-def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
-  HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
-           "when optimizing ownership will be lowered before serializing SIL">;
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
+    HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
+            "when optimizing ownership will be lowered before serializing SIL">;
+}
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;

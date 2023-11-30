@@ -804,11 +804,13 @@ public:
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
                                      bool isLexical = false,
-                                     bool hasPointerEscape = false) {
+                                     bool hasPointerEscape = false,
+                                     bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
     assert(!LV->getType().isAddress());
-    return insert(new (getModule()) BeginBorrowInst(getSILDebugLocation(Loc),
-                                                    LV, isLexical, hasPointerEscape));
+    return insert(new (getModule())
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical,
+                                      hasPointerEscape, fromVarDecl));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and
@@ -1402,13 +1404,15 @@ public:
 
   MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
                                  bool isLexical = false,
-                                 bool hasPointerEscape = false) {
+                                 bool hasPointerEscape = false,
+                                 bool fromVarDecl = false) {
     assert(getFunction().hasOwnership());
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitMoveValueOperation");
-    return insert(new (getModule()) MoveValueInst(
-        getSILDebugLocation(loc), operand, isLexical, hasPointerEscape));
+    return insert(new (getModule())
+                      MoveValueInst(getSILDebugLocation(loc), operand,
+                                    isLexical, hasPointerEscape, fromVarDecl));
   }
 
   DropDeinitInst *createDropDeinit(SILLocation loc, SILValue operand) {

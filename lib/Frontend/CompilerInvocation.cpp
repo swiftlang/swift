@@ -1503,6 +1503,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
+  Opts.EnableLazyTypecheck |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  // HACK: The driver currently erroneously passes all flags to module interface
+  // verification jobs. -experimental-skip-non-exportable-decls is not
+  // appropriate for verification tasks and should be ignored, though.
+  if (FrontendOpts.RequestedAction ==
+      FrontendOptions::ActionType::TypecheckModuleFromInterface)
+    Opts.EnableLazyTypecheck = false;
 
   return HadError;
 }

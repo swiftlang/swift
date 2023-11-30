@@ -2154,11 +2154,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     bool isLexical = Attr & 0x1;
     bool hasPointerEscape = (Attr >> 1) & 0x1;
+    bool fromVarDecl = (Attr >> 2) & 0x1;
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
-        isLexical, hasPointerEscape);
+        isLexical, hasPointerEscape, fromVarDecl);
     break;
   }
 
@@ -2245,10 +2246,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool AllowsDiagnostics = Attr & 0x1;
     bool IsLexical = (Attr >> 1) & 0x1;
     bool IsEscaping = (Attr >> 2) & 0x1;
+    bool IsFromVarDecl = (Attr >> 3) & 0x1;
     auto *MVI = Builder.createMoveValue(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        IsLexical, IsEscaping);
+        IsLexical, IsEscaping, IsFromVarDecl);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
     break;

@@ -757,11 +757,6 @@ public:
   /// Retrieve the set of type parameter packs that occur within this type.
   void walkPackReferences(llvm::function_ref<bool (Type)> fn);
 
-  /// Replace opened archetypes with the given root with their most
-  /// specific non-dependent upper bounds throughout this type.
-  Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root,
-                                         const DeclContext *useDC) const;
-
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
   /// Otherwise, returns the type itself.
@@ -5788,8 +5783,6 @@ class ProtocolCompositionType final : public TypeBase,
     private llvm::TrailingObjects<ProtocolCompositionType, Type> {
   friend TrailingObjects;
 
-  // TODO(kavon): this could probably be folded into the existing Bits field
-  // or we could just store the InverseType's in the Members array.
   InvertibleProtocolSet Inverses;
   
 public:
@@ -7425,10 +7418,6 @@ inline Type TypeBase::getNominalParent() {
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
-
-//inline TypeDecl *TypeBase::getAnyTypeDecl() {
-//  return getCanonicalType().getAnyTypeDecl();
-//}
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))

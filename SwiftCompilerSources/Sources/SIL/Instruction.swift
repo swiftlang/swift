@@ -234,7 +234,7 @@ extension UnaryInstruction {
 final public class UnimplementedInstruction : Instruction {
 }
 
-public protocol StoringInstruction : AnyObject {
+public protocol StoringInstruction : Instruction {
   var operands: OperandArray { get }
 }
 
@@ -269,6 +269,8 @@ final public class StoreInst : Instruction, StoringInstruction {
 
 final public class StoreWeakInst : Instruction, StoringInstruction { }
 final public class StoreUnownedInst : Instruction, StoringInstruction { }
+
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction { }
 
 final public class AssignInst : Instruction, StoringInstruction {
   // must match with enum class swift::AssignOwnershipQualifier
@@ -495,6 +497,9 @@ extension LoadInstruction {
   public var address: Value { operand.value }
 }
 
+/// Instructions, beginning a borrow-scope which must be ended by `end_borrow`.
+public protocol BorrowIntroducingInstruction : SingleValueInstruction {}
+
 final public class LoadInst : SingleValueInstruction, LoadInstruction {
   // must match with enum class LoadOwnershipQualifier
   public enum LoadOwnership: Int {
@@ -507,7 +512,7 @@ final public class LoadInst : SingleValueInstruction, LoadInstruction {
 
 final public class LoadWeakInst : SingleValueInstruction, LoadInstruction {}
 final public class LoadUnownedInst : SingleValueInstruction, LoadInstruction {}
-final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction {}
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
   public typealias ID = BridgedInstruction.BuiltinValueKind
@@ -872,15 +877,8 @@ extension BeginAccessInst : ScopedInstruction {
   }
 }
 
-final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {
+final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
   public var borrowedValue: Value { operand.value }
-
-  public typealias EndBorrowSequence = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndBorrowInst?>>,
-                                                       EndBorrowInst>
-
-  public var endBorrows: EndBorrowSequence {
-    uses.lazy.compactMap({ $0.instruction as? EndBorrowInst })
-  }
 
   public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
   public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }

@@ -3556,9 +3556,22 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     // Validate the presence of ownership for a noncopyable parameter.
-    if (inStage(TypeResolutionStage::Interface))
+    if (inStage(TypeResolutionStage::Interface)) {
       diagnoseMissingOwnership(getASTContext(), dc, ownership,
                                eltTypeRepr, ty, options);
+
+      // @_staticExclusiveOnly types cannot be passed as 'inout' in function
+      // types.
+      if (auto SD = ty->getStructOrBoundGenericStruct()) {
+        if (getASTContext().LangOpts.hasFeature(Feature::StaticExclusiveOnly) &&
+            SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
+            ownership == ParamSpecifier::InOut) {
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::attr_static_exclusive_only_let_only_param,
+                   ty);
+        }
+      }
+    }
 
     Identifier argumentLabel;
     Identifier parameterName;

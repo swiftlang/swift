@@ -6133,6 +6133,7 @@ void AbstractFunctionDecl::keepOriginalBodySourceRange() {
   auto result =
       impl.OriginalBodySourceRanges.insert({this, getBodySourceRange()});
   assert((!result.second ||
+          result.first->getSecond().isInvalid() ||
           isSourceLocInOrignalBuffer(this, result.first->getSecond().Start)) &&
          "This function must be called before setting new body range");
   (void)result;

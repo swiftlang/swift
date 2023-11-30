@@ -1525,12 +1525,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
       Attr = ECMI->doKeepUnique();
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
-      Attr =
-          unsigned(BBI->isLexical()) | unsigned(BBI->hasPointerEscape() << 1);
+      Attr = unsigned(BBI->isLexical()) |
+             (unsigned(BBI->hasPointerEscape() << 1)) |
+             (unsigned(BBI->isFromVarDecl() << 2));
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
       Attr = unsigned(MVI->getAllowDiagnostics()) |
              (unsigned(MVI->isLexical() << 1)) |
-             (unsigned(MVI->hasPointerEscape() << 2));
+             (unsigned(MVI->hasPointerEscape() << 2)) |
+             (unsigned(MVI->isFromVarDecl() << 3));
     } else if (auto *I = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
     } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {

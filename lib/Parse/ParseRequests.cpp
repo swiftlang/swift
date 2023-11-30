@@ -181,6 +181,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       break;
 
     case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::PreambleMacroExpansion:
+    case GeneratedSourceInfo::BodyMacroExpansion:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::PrettyPrinted: {
       parser.parseTopLevelItems(items);

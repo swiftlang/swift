@@ -258,6 +258,13 @@ class Verifier : public ASTWalker {
     abort();
   }
 
+  ModuleDecl *getModuleContext() const {
+    if (auto sourceFile = M.dyn_cast<SourceFile *>())
+      return sourceFile->getParentModule();
+
+    return M.get<ModuleDecl *>();
+  }
+
 public:
   Verifier(ModuleDecl *M, DeclContext *DC)
       : Verifier(PointerUnion<ModuleDecl *, SourceFile *>(M), DC) {}
@@ -3813,7 +3820,17 @@ public:
       } else {
         llvm_unreachable("impossible parent node");
       }
-      
+
+      if (AltEnclosing.isInvalid()) {
+        // A preamble macro introduces child nodes directly into the tree.
+        auto *sourceFile =
+            getModuleContext()->getSourceFileContainingLocation(Current.Start);
+        if (sourceFile &&
+            sourceFile->getFulfilledMacroRole() == MacroRole::Preamble) {
+          AltEnclosing = Current;
+        }
+      }
+
       if (!Ctx.SourceMgr.rangeContains(Enclosing, Current) &&
           !(AltEnclosing.isValid() &&
             Ctx.SourceMgr.rangeContains(AltEnclosing, Current))) {

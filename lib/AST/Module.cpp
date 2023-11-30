@@ -851,7 +851,6 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (loc.isInvalid())
     return nullptr;
 
-
   // Check whether this location is in a "replaced" range, in which case
   // we want to use the original source file.
   auto &sourceMgr = getASTContext().SourceMgr;
@@ -1210,11 +1209,12 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
-  auto macroExpansion = getMacroExpansion();
-  if (!macroExpansion)
+  if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto sourceLoc = macroExpansion.getStartLoc();
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
@@ -1568,11 +1568,12 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   if (!protocol->existentialConformsToSelf())
     return ProtocolConformanceRef::forInvalid();
 
-  // All existentials are Copyable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
+      && !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Prior to noncopyable generics, all existentials conform to Copyable.
+        return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
   }
 
   auto layout = type->getExistentialLayout();

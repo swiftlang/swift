@@ -23,6 +23,8 @@ internal final class WindowsRemoteProcess: RemoteProcess {
 
   public private(set) var process: ProcessHandle
   public private(set) var context: SwiftReflectionContextRef!
+  public private(set) var processIdentifier: ProcessIdentifier
+  public private(set) var processName: String = "<unknown process>"
 
   private var hSwiftCore: HMODULE = HMODULE(bitPattern: -1)!
 
@@ -136,6 +138,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
   }
 
   init?(processId: ProcessIdentifier) {
+    self.processIdentifier = processId
     // Get process handle.
     self.process =
       OpenProcess(

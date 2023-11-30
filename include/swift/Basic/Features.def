@@ -126,6 +126,7 @@ EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
+EXPERIMENTAL_FEATURE(BodyMacros, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)", true)
@@ -258,6 +259,12 @@ EXPERIMENTAL_FEATURE(Extern, true)
 // Infer Sendability of unapplied and partial applied methods,
 // global functions and key paths.
 EXPERIMENTAL_FEATURE(InferSendableFromCaptures, false)
+
+/// Enable the `@_staticExclusiveOnly` attribute.
+EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
+
+/// Enable the @extractConstantsFromMembers attribute.
+EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

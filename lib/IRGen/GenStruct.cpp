@@ -1636,6 +1636,9 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 
 void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (opaque->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   if (!opaque->isAvailableDuringLowering())
     return;
 

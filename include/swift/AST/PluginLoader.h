@@ -44,6 +44,7 @@ private:
 
   ASTContext &Ctx;
   DependencyTracker *DepTracker;
+  const bool disableSandbox;
 
   /// Map a module name to an plugin entry that provides the module.
   llvm::Optional<llvm::DenseMap<swift::Identifier, PluginEntry>> PluginMap;
@@ -52,8 +53,9 @@ private:
   llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();
 
 public:
-  PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker)
-      : Ctx(Ctx), DepTracker(DepTracker) {}
+  PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker,
+               bool disableSandbox = false)
+      : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {}
 
   void setRegistry(PluginRegistry *newValue);
   PluginRegistry *getRegistry();

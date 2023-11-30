@@ -931,7 +931,8 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
         if (!decl->getASTContext().supportsMoveOnlyTypes())
           decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
 
-        return InverseMarking::forInverse(Kind::Explicit, attr->getLocation());
+        return InverseMarking::forInverse(Kind::LegacyExplicit,
+                                          attr->getLocation());
       }
     }
     return InverseMarking::forInverse(Kind::None);
@@ -947,7 +948,8 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
     assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl)
                || (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)
                    && isa<ClassDecl>(decl)));
-    return InverseMarking::forInverse(Kind::Explicit, attr->getLocation());
+    return InverseMarking::forInverse(Kind::LegacyExplicit,
+                                      attr->getLocation());
   }
 
   /// The invertible protocol being targeted by this annotation request.
@@ -987,10 +989,10 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
         loc = repr->getLoc();
 
       if (isTarget(type))
-        result.getPositive().setIfUnset(Kind::Explicit, loc);
+        result.positive.setIfUnset(Kind::Explicit, loc);
 
       if (isInverseTarget(type))
-          result.getInverse().setIfUnset(Kind::Explicit, loc);
+          result.inverse.setIfUnset(Kind::Explicit, loc);
     }
 
     return result;
@@ -998,7 +1000,7 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
 
   // Function to check the generic parameters for an explicit ~TARGET marking
   // which would result in an Inferred ~TARGET marking for this context.
-  auto hasInverseTarget = [&](GenericContext *genCtx) -> Mark {
+  auto hasInferredInverseTarget = [&](GenericContext *genCtx) -> Mark {
     if (!genCtx->isGeneric())
       return InverseMarking::Mark();
 
@@ -1008,7 +1010,7 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
     // Scan the inheritance clauses of generic parameters only for an inverse.
     for (GenericTypeParamDecl *param : gpList->getParams()) {
       auto clause = searchInheritanceClause(param->getInherited());
-      if (auto inverse = clause.getInverse())
+      if (auto &inverse = clause.getInverse())
         return inverse.with(Kind::Inferred);
 
       params.insert(param);
@@ -1051,47 +1053,74 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
     return result;
   };
 
+  // Checks a where clause for constraints of the form:
+  //   - selfTy : TARGET
+  //   - selfTy : ~TARGET
+  // and records them in the `InverseMarking` result.
+  auto genWhereClauseVisitor = [&](CanType selfTy, InverseMarking &result) {
+    return [&](Requirement req, RequirementRepr *repr) -> bool/*=stop search*/ {
+      if (req.getKind() != RequirementKind::Conformance)
+        return false;
+
+      if (req.getFirstType()->getCanonicalType() != selfTy)
+        return false;
+
+      // Check constraint type
+      auto loc = repr->getSecondTypeRepr()->getLoc();
+      auto constraint = req.getSecondType();
+
+      if (isTarget(constraint))
+        result.positive.setIfUnset(Kind::Explicit, loc);
+
+      if (isInverseTarget(constraint))
+        result.inverse.setIfUnset(Kind::Explicit, loc);
+
+      return false;
+    };
+  };
+
 
   /// MARK: procedure for determining if a nominal is marked with ~TARGET.
 
-  auto nominal = cast<NominalTypeDecl>(decl);
-  assert(!isa<BuiltinTupleDecl>(nominal));
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    assert(!isa<BuiltinTupleDecl>(nominal));
 
-  /// Protocols are handled specially since they do not infer an inverse based
-  /// on their associated types.
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    // Check inheritance clause.
-    auto result = searchInheritanceClause(proto);
-
-    // Next, check the where clause for Self: TARGET or Self: ~TARGET
-    auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();
-    WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
-      [&](Requirement req, RequirementRepr *repr) -> bool /* = stop search */ {
-        if (req.getKind() != RequirementKind::Conformance)
-          return false;
-
-        if (req.getFirstType()->getCanonicalType() != selfTy)
-          return false;
-
-        // Check constraint type
-        auto loc = repr->getSecondTypeRepr()->getLoc();
-        auto constraint = req.getSecondType();
-
-        if (isTarget(constraint))
-          result.getPositive().setIfUnset(Kind::Explicit, loc);
-
-        if (isInverseTarget(constraint))
-          result.getInverse().setIfUnset(Kind::Explicit, loc);
-
-        return false;
-      });
-
-    return result;
+    if (!isa<ProtocolDecl>(nominal)) {
+      // Handle non-protocol nominals specially because they infer a ~TARGET
+      // based on their generic parameters.
+      auto result = searchInheritanceClause(nominal->getInherited());
+      result.inverse.setIfUnset(hasInferredInverseTarget(nominal));
+      return result;
+    }
   }
 
-  // Handle non-protocol nominals.
-  auto result = searchInheritanceClause(nominal->getInherited());
-  result.getInverse().setIfUnset(hasInverseTarget(nominal));
+
+  /// MARK: procedure for handling other TypeDecls
+
+  // Check inheritance clause.
+  auto result = searchInheritanceClause(decl->getInherited());
+
+  // Check the where clause for markings that refer to this decl, if this
+  // TypeDecl has a where-clause at all.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();
+    WhereClauseOwner(proto)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           genWhereClauseVisitor(selfTy, result));
+
+  } else if (auto assocTy = dyn_cast<AssociatedTypeDecl>(decl)) {
+    auto selfTy = assocTy->getInterfaceType()->getCanonicalType();
+    WhereClauseOwner(assocTy)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           genWhereClauseVisitor(selfTy, result));
+
+  } else if (auto genericTyDecl = dyn_cast<GenericTypeDecl>(decl)) {
+    auto selfTy = genericTyDecl->getInterfaceType()->getCanonicalType();
+    WhereClauseOwner(genericTyDecl)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           genWhereClauseVisitor(selfTy, result));
+  }
+
   return result;
 }
 
