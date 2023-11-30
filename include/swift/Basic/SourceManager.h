@@ -255,6 +255,20 @@ public:
   /// part of the same source file, for example due to macro expansion.
   bool containsTokenLoc(SourceRange range, SourceLoc loc) const;
 
+  /// Returns true if \c range contains the location \c loc.
+  ///
+  /// This function accounts for the possibility that the source locations
+  /// provided might come from different source buffers that are conceptually
+  /// part of the same source file, for example due to macro expansion.
+  bool containsLoc(SourceRange range, SourceLoc loc) const;
+
+  /// Returns true if \c enclosing contains the whole range \c inner.
+  ///
+  /// This function accounts for the possibility that the source locations
+  /// provided might come from different source buffers that are conceptually
+  /// part of the same source file, for example due to macro expansion.
+  bool encloses(SourceRange enclosing, SourceRange inner) const;
+
   /// Returns true if range \c R contains the location \c Loc, where all
   /// locations are known to be in the same source buffer.
   ///

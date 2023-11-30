@@ -817,3 +817,12 @@ bool SourceManager::isAtOrBefore(SourceLoc first, SourceLoc second) const {
 bool SourceManager::containsTokenLoc(SourceRange range, SourceLoc loc) const {
   return isAtOrBefore(range.Start, loc) && isAtOrBefore(loc, range.End);
 }
+
+bool SourceManager::containsLoc(SourceRange range, SourceLoc loc) const {
+  return isAtOrBefore(range.Start, loc) && isBefore(loc, range.End);
+}
+
+bool SourceManager::encloses(SourceRange enclosing, SourceRange inner) const {
+  return containsLoc(enclosing, inner.Start) &&
+      isAtOrBefore(inner.End, enclosing.End);
+}

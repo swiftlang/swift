@@ -120,20 +120,16 @@ ASTScopeImpl::findChildContaining(ModuleDecl *parentModule,
   auto *const *child = llvm::lower_bound(
       getChildren(), loc,
       [&](const ASTScopeImpl *scope, SourceLoc loc) {
-        auto rangeOfScope = scope->getSourceRangeOfThisASTNode();
-        auto endOfScope =
-            Lexer::getLocForEndOfToken(sourceMgr, rangeOfScope.End);
-
+        auto rangeOfScope = scope->getCharSourceRangeOfScope(sourceMgr);
         loc = translateLocForReplacedRange(sourceMgr, rangeOfScope.Start, loc);
-        return sourceMgr.isAtOrBefore(endOfScope, loc);
+        return sourceMgr.isAtOrBefore(rangeOfScope.End, loc);
       });
 
   if (child != getChildren().end()) {
-    auto rangeOfScope = (*child)->getSourceRangeOfThisASTNode();
-    auto endOfScope = Lexer::getLocForEndOfToken(sourceMgr, rangeOfScope.End);
+    auto rangeOfScope = (*child)->getCharSourceRangeOfScope(sourceMgr);
     loc = translateLocForReplacedRange(sourceMgr, rangeOfScope.Start, loc);
     if (sourceMgr.isAtOrBefore(rangeOfScope.Start, loc) &&
-        sourceMgr.isBefore(loc, endOfScope))
+        sourceMgr.isBefore(loc, rangeOfScope.End))
       return *child;
   }
 
