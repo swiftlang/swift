@@ -84,6 +84,15 @@ class SWIFT_UNCHECKED_SENDABLE UnsafeSendable {
 public:
 };
 
+class SWIFT_NONCOPYABLE NonCopyableCopyable {
+public:
+    NonCopyableCopyable(const NonCopyableCopyable &other) = default;
+    NonCopyableCopyable(NonCopyableCopyable &&other);
+    ~NonCopyableCopyable();
+private:
+    int x;
+};
+
 
 // CHECK: struct SelfContained {
 
@@ -106,3 +115,5 @@ public:
 // CHECK: struct ConformsTo : Proto {
 
 // CHECK: struct UnsafeSendable : @unchecked Sendable {
+
+// CHECK: struct NonCopyableCopyable
