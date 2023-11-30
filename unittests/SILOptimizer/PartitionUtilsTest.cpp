@@ -548,14 +548,13 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (Element(11)))
 
-  auto never_called = [](const PartitionOp &, unsigned, Operand *) {
+  auto never_called = [](const PartitionOp &, unsigned, TransferringOperand) {
     EXPECT_TRUE(false);
   };
 
   int times_called = 0;
-  auto increment_times_called = [&](const PartitionOp &, unsigned, Operand *) {
-    times_called++;
-  };
+  auto increment_times_called = [&](const PartitionOp &, unsigned,
+                                    TransferringOperand) { times_called++; };
 
   {
     PartitionOpEvaluator eval(p);
@@ -623,18 +622,16 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
   {
     bool failure = false;
     PartitionOpEvaluator eval(p1);
-    eval.failureCallback = [&](const PartitionOp &, unsigned, Operand *) {
-      failure = true;
-    };
+    eval.failureCallback = [&](const PartitionOp &, unsigned,
+                               TransferringOperand) { failure = true; };
     eval.apply(PartitionOp::Require(Element(0)));
     EXPECT_TRUE(failure);
   }
 
   {
     PartitionOpEvaluator eval(p2);
-    eval.failureCallback = [](const PartitionOp &, unsigned, Operand *) {
-      EXPECT_TRUE(false);
-    };
+    eval.failureCallback = [](const PartitionOp &, unsigned,
+                              TransferringOperand) { EXPECT_TRUE(false); };
     eval.apply(PartitionOp::Require(Element(0)));
   }
 }
@@ -642,9 +639,8 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
 TEST(PartitionUtilsTest, TestUndoTransfer) {
   Partition p;
   PartitionOpEvaluator eval(p);
-  eval.failureCallback = [&](const PartitionOp &, unsigned, Operand *) {
-    EXPECT_TRUE(false);
-  };
+  eval.failureCallback = [&](const PartitionOp &, unsigned,
+                             TransferringOperand) { EXPECT_TRUE(false); };
 
   // Shouldn't error on this.
   eval.apply({PartitionOp::AssignFresh(Element(0)),

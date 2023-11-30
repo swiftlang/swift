@@ -88,6 +88,70 @@ struct DenseMapInfo<swift::PartitionPrimitives::Region> {
 
 namespace swift {
 
+struct TransferringOperand {
+  using ValueType = llvm::PointerIntPair<Operand *, 1>;
+  ValueType value;
+
+  TransferringOperand() : value() {}
+  TransferringOperand(Operand *op, bool isClosureCaptured)
+      : value(op, isClosureCaptured) {}
+  explicit TransferringOperand(Operand *op) : value(op, false) {}
+  TransferringOperand(ValueType newValue) : value(newValue) {}
+
+  operator bool() const { return bool(value.getPointer()); }
+
+  Operand *getOperand() const { return value.getPointer(); }
+
+  bool isClosureCaptured() const { return value.getInt(); }
+
+  SILInstruction *getUser() const { return getOperand()->getUser(); }
+};
+
+} // namespace swift
+
+namespace llvm {
+
+template <>
+struct PointerLikeTypeTraits<swift::TransferringOperand> {
+  using TransferringOperand = swift::TransferringOperand;
+
+  static inline void *getAsVoidPointer(TransferringOperand ptr) {
+    return PointerLikeTypeTraits<
+        TransferringOperand::ValueType>::getAsVoidPointer(ptr.value);
+  }
+  static inline TransferringOperand getFromVoidPointer(void *ptr) {
+    return {PointerLikeTypeTraits<
+        TransferringOperand::ValueType>::getFromVoidPointer(ptr)};
+  }
+
+  static constexpr int NumLowBitsAvailable = PointerLikeTypeTraits<
+      TransferringOperand::ValueType>::NumLowBitsAvailable;
+};
+
+template <>
+struct DenseMapInfo<swift::TransferringOperand> {
+  using TransferringOperand = swift::TransferringOperand;
+  using ParentInfo = DenseMapInfo<TransferringOperand::ValueType>;
+
+  static TransferringOperand getEmptyKey() {
+    return TransferringOperand(ParentInfo::getEmptyKey());
+  }
+  static TransferringOperand getTombstoneKey() {
+    return TransferringOperand(ParentInfo::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(TransferringOperand operand) {
+    return ParentInfo::getHashValue(operand.value);
+  }
+  static bool isEqual(TransferringOperand LHS, TransferringOperand RHS) {
+    return ParentInfo::isEqual(LHS.value, RHS.value);
+  }
+};
+
+} // namespace llvm
+
+namespace swift {
+
 /// PartitionOpKind represents the different kinds of PartitionOps that
 /// SILInstructions can be translated to
 enum class PartitionOpKind : uint8_t {
@@ -142,7 +206,7 @@ private:
       : opKind(opKind), opArgs({arg1}), source(sourceOperand) {
     assert(((opKind != PartitionOpKind::Transfer &&
              opKind != PartitionOpKind::UndoTransfer) ||
-            sourceOperand) &&
+            bool(sourceOperand)) &&
            "Transfer needs a sourceInst");
   }
 
@@ -304,7 +368,7 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  llvm::SmallDenseMap<Region, Operand *, 2> regionToTransferredOpMap;
+  llvm::SmallDenseMap<Region, TransferringOperand, 2> regionToTransferredOpMap;
 
 public:
   Partition() : elementToRegionMap({}), canonical(true) {}
@@ -358,12 +422,12 @@ public:
 
   /// Mark val as transferred. Returns true if we inserted \p
   /// transferOperand. We return false otherwise.
-  bool markTransferred(Element val, Operand *transferOperand) {
+  bool markTransferred(Element val, TransferringOperand transferredOperand) {
     // First see if our val is tracked. If it is not tracked, insert it and mark
     // its new region as transferred.
     if (!isTracked(val)) {
       elementToRegionMap.insert_or_assign(val, fresh_label);
-      regionToTransferredOpMap.insert({fresh_label, transferOperand});
+      regionToTransferredOpMap.insert({fresh_label, transferredOperand});
       fresh_label = Region(fresh_label + 1);
       canonical = false;
       return true;
@@ -373,7 +437,7 @@ public:
     auto iter1 = elementToRegionMap.find(val);
     assert(iter1 != elementToRegionMap.end());
     auto iter2 =
-        regionToTransferredOpMap.try_emplace(iter1->second, transferOperand);
+        regionToTransferredOpMap.try_emplace(iter1->second, transferredOperand);
     return iter2.second;
   }
 
@@ -532,13 +596,30 @@ public:
 
     os << "[";
     for (auto [regionNo, elementNumbers] : multimap.getRange()) {
-      bool isTransferred = regionToTransferredOpMap.count(regionNo);
-      os << (isTransferred ? "{" : "(");
+      auto iter = regionToTransferredOpMap.find(regionNo);
+      bool isTransferred = iter != regionToTransferredOpMap.end();
+      bool isClosureCaptured =
+          isTransferred ? iter->getSecond().isClosureCaptured() : false;
+
+      if (isTransferred) {
+        os << '{';
+        if (isClosureCaptured)
+          os << '*';
+      } else {
+        os << '(';
+      }
+
       int j = 0;
       for (Element i : elementNumbers) {
         os << (j++ ? " " : "") << i;
       }
-      os << (isTransferred ? "}" : ")");
+      if (isTransferred) {
+        if (isClosureCaptured)
+          os << '*';
+        os << '}';
+      } else {
+        os << ')';
+      }
     }
     os << "]\n";
   }
@@ -552,13 +633,13 @@ public:
 
   /// Return the instruction that transferred \p val's region or nullptr
   /// otherwise.
-  Operand *getTransferred(Element val) const {
+  std::optional<TransferringOperand> getTransferred(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
-      return nullptr;
+      return std::nullopt;
     auto iter2 = regionToTransferredOpMap.find(iter->second);
     if (iter2 == regionToTransferredOpMap.end())
-      return nullptr;
+      return std::nullopt;
     return iter2->second;
   }
 
@@ -642,7 +723,7 @@ private:
     //
     // TODO: If we just used an array for this, we could just rewrite and
     // re-sort and not have to deal with potential allocations.
-    llvm::SmallDenseMap<Region, Operand *, 2> oldMap =
+    llvm::SmallDenseMap<Region, TransferringOperand, 2> oldMap =
         std::move(regionToTransferredOpMap);
     for (auto &[oldReg, op] : oldMap) {
       auto iter = oldRegionToRelabeledMap.find(oldReg);
@@ -676,8 +757,9 @@ private:
       horizontalUpdate(elementToRegionMap, snd, fstRegion);
       auto iter = regionToTransferredOpMap.find(sndRegion);
       if (iter != regionToTransferredOpMap.end()) {
-        regionToTransferredOpMap.try_emplace(fstRegion, iter->second);
+        auto operand = iter->second;
         regionToTransferredOpMap.erase(iter);
+        regionToTransferredOpMap.try_emplace(fstRegion, operand);
       }
     } else {
       result = sndRegion;
@@ -685,8 +767,9 @@ private:
       horizontalUpdate(elementToRegionMap, fst, sndRegion);
       auto iter = regionToTransferredOpMap.find(fstRegion);
       if (iter != regionToTransferredOpMap.end()) {
-        regionToTransferredOpMap.try_emplace(sndRegion, iter->second);
+        auto operand = iter->second;
         regionToTransferredOpMap.erase(iter);
+        regionToTransferredOpMap.try_emplace(sndRegion, operand);
       }
     }
 
@@ -751,8 +834,8 @@ struct PartitionOpEvaluator {
   /// 3. The operand of the instruction that originally transferred the
   /// region. Can be used to get the immediate value transferred or the
   /// transferring instruction.
-  std::function<void(const PartitionOp &, Element, Operand *)> failureCallback =
-      nullptr;
+  std::function<void(const PartitionOp &, Element, TransferringOperand)>
+      failureCallback = nullptr;
 
   /// A list of elements that cannot be transferred. Whenever we transfer, we
   /// check this list to see if we are transferring the element and then call
@@ -771,11 +854,21 @@ struct PartitionOpEvaluator {
   /// transferred.
   std::function<bool(Element)> isActorDerivedCallback = nullptr;
 
+  /// Check if the representative value of \p elt is closure captured at \p
+  /// op.
+  ///
+  /// NOTE: We actually just use the user of \p op in our callbacks. The reason
+  /// why we do not just pass in that SILInstruction is that then we would need
+  /// to access the instruction in the evaluator which creates a problem when
+  /// since the operand we pass in is a dummy operand.
+  std::function<bool(Element elt, Operand *op)> isClosureCapturedCallback =
+      nullptr;
+
   PartitionOpEvaluator(Partition &p) : p(p) {}
 
   /// A wrapper around the failure callback that checks if it is nullptr.
   void handleFailure(const PartitionOp &op, Element elt,
-                     Operand *transferringOp) const {
+                     TransferringOperand transferringOp) const {
     if (!failureCallback)
       return;
     failureCallback(op, elt, transferringOp);
@@ -795,6 +888,14 @@ struct PartitionOpEvaluator {
   /// isActorDerivedCallback().
   bool isActorDerived(Element elt) const {
     return bool(isActorDerivedCallback) && isActorDerivedCallback(elt);
+  }
+
+  /// A wraper around isClosureCapturedCallback that returns false if
+  /// isClosureCapturedCallback is nullptr and otherwise returns
+  /// isClosureCapturedCallback.
+  bool isClosureCaptured(Element elt, Operand *op) const {
+    return bool(isClosureCapturedCallback) &&
+           isClosureCapturedCallback(elt, op);
   }
 
   /// Apply \p op to the partition op.
@@ -821,8 +922,8 @@ struct PartitionOpEvaluator {
              "Assign PartitionOp's source argument should be already tracked");
       // If we are using a region that was transferred as our assignment source
       // value... emit an error.
-      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[1]))
-        handleFailure(op, op.getOpArgs()[1], transferringInst);
+      if (auto transferredOperand = p.getTransferred(op.getOpArgs()[1]))
+        handleFailure(op, op.getOpArgs()[1], *transferredOperand);
 
       p.elementToRegionMap.insert_or_assign(
           op.getOpArgs()[0], p.elementToRegionMap.at(op.getOpArgs()[1]));
@@ -863,17 +964,22 @@ struct PartitionOpEvaluator {
       if (isActorDerived(op.getOpArgs()[0]))
         return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
 
+      // While we are checking for actor derived, also check if our value or any
+      // value in our region is closure captured and propagate that bit in our
+      // transferred inst.
+      bool isClosureCapturedElt =
+          isClosureCaptured(op.getOpArgs()[0], op.getSourceOp());
+
       Region elementRegion = p.elementToRegionMap.at(op.getOpArgs()[0]);
-      if (llvm::any_of(p.elementToRegionMap,
-                       [&](const std::pair<Element, Region> &pair) -> bool {
-                         if (pair.second != elementRegion)
-                           return false;
-                         return isActorDerived(pair.first);
-                       }))
-        return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+      for (const auto &pair : p.elementToRegionMap) {
+        if (pair.second == elementRegion && isActorDerived(pair.first))
+          return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+        isClosureCapturedElt |= isClosureCaptured(pair.first, op.getSourceOp());
+      }
 
       // Mark op.getOpArgs()[0] as transferred.
-      p.markTransferred(op.getOpArgs()[0], op.getSourceOp());
+      p.markTransferred(op.getOpArgs()[0],
+                        {op.getSourceOp(), isClosureCapturedElt});
       return;
     }
     case PartitionOpKind::UndoTransfer: {
@@ -894,10 +1000,10 @@ struct PartitionOpEvaluator {
              "Merge PartitionOp's arguments should already be tracked");
 
       // if attempting to merge a transferred region, handle the failure
-      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[0]))
-        handleFailure(op, op.getOpArgs()[0], transferringInst);
-      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[1]))
-        handleFailure(op, op.getOpArgs()[1], transferringInst);
+      if (auto transferringOp = p.getTransferred(op.getOpArgs()[0]))
+        handleFailure(op, op.getOpArgs()[0], *transferringOp);
+      if (auto transferringOp = p.getTransferred(op.getOpArgs()[1]))
+        handleFailure(op, op.getOpArgs()[1], *transferringOp);
 
       p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
@@ -906,8 +1012,8 @@ struct PartitionOpEvaluator {
              "Require PartitionOp should be passed 1 argument");
       assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
              "Require PartitionOp's argument should already be tracked");
-      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[0]))
-        handleFailure(op, op.getOpArgs()[0], transferringInst);
+      if (auto transferringOp = p.getTransferred(op.getOpArgs()[0]))
+        handleFailure(op, op.getOpArgs()[0], *transferringOp);
       return;
     }
 
