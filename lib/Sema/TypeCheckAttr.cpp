@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -1826,6 +1827,15 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     return false;
 
   auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
+
+  // Allow to compose key path type with a protocol as a way to express
+  // additional requirements on the parameter.
+  if (auto *existential = paramTy->getAs<ExistentialType>()) {
+    paramTy = existential->getExistentialLayout().explicitSuperclass;
+    if (!paramTy)
+      return false;
+  }
+
   return paramTy->isKeyPath() ||
          paramTy->isWritableKeyPath() ||
          paramTy->isReferenceWritableKeyPath();

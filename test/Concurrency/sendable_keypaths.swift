@@ -124,3 +124,17 @@ do {
   // TODO: This should be diagnosed by the isolation checker because implicitly synthesized closures captures a non-Sendable value.
   testSendableFn(v: v, \.[42, CondSendable(nonSendable)])
 }
+
+// @dynamicMemberLookup with Sendable requirement
+do {
+  @dynamicMemberLookup
+  struct Test<T> {
+    var obj: T
+
+    subscript<U>(dynamicMember member: KeyPath<T, U> & Sendable) -> U {
+      get { obj[keyPath: member] }
+    }
+  }
+
+  _ = Test(obj: "Hello").utf8.count // Ok
+}
