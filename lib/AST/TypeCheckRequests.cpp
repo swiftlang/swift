@@ -1699,6 +1699,7 @@ bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
   case Nonisolated:
+  case NonisolatedUnsafe:
   case Unspecified:
     return false;
 
@@ -1713,6 +1714,7 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
   case Nonisolated:
+  case NonisolatedUnsafe:
   case Unspecified:
     return *this;
 
