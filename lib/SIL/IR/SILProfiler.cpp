@@ -270,6 +270,12 @@ struct MapRegionCounters : public ASTWalker {
     return LazyInitializerWalking::InAccessor;
   }
 
+  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+    // mapped as part of the wrapped value initialization.
+    return false;
+  }
+
   void mapRegion(ASTNode N) {
     mapRegion(ProfileCounterRef::node(N));
   }
@@ -582,6 +588,12 @@ struct PGOMapping : public ASTWalker {
     // We want to walk lazy initializers present in the synthesized getter for
     // a lazy variable.
     return LazyInitializerWalking::InAccessor;
+  }
+
+  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+    // mapped as part of the wrapped value initialization.
+    return false;
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -944,6 +956,12 @@ public:
     // We want to walk lazy initializers present in the synthesized getter for
     // a lazy variable.
     return LazyInitializerWalking::InAccessor;
+  }
+
+  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+    // mapped as part of the wrapped value initialization.
+    return false;
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
