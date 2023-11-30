@@ -203,3 +203,24 @@ precedencegroup Precedence2 {
   associativity: left
   assignment: true
 }
+
+struct TestStruct {
+  func method(arg: Int, _ c: Int) {}
+
+  func test() {
+    _ = method(arg:_:)
+    _ = self.method(arg:_:)
+  }
+
+// FIXME: Compute 'static' location
+//  static var shared = TestStruct()
+//  func testUnresolvedMember1() -> Self {
+//    return .shared
+//  }
+//
+// FIXME: Compute 'static' location
+//  static func instance(arg: Int) -> TestStruct { return TestStruct() }
+//  func testUnresolvedMember2() -> Self {
+//    return .instance(arg:)(12)
+//  }
+}

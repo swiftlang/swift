@@ -34,6 +34,8 @@ class DiagnosticArgument;
 class DiagnosticEngine;
 }
 
+class BridgedASTContext;
+
 //===----------------------------------------------------------------------===//
 // MARK: Identifier
 //===----------------------------------------------------------------------===//
@@ -70,6 +72,82 @@ struct BridgedIdentifierAndSourceLoc {
   SWIFT_NAME("nameLoc")
   BridgedSourceLoc NameLoc;
 };
+
+class BridgedDeclBaseName {
+  BridgedIdentifier Ident;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDeclBaseName(swift::DeclBaseName baseName) : Ident(baseName.Ident) {}
+
+  swift::DeclBaseName unbridged() const {
+    return swift::DeclBaseName(Ident.unbridged());
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedDeclBaseName.createConstructor()")
+BridgedDeclBaseName BridgedDeclBaseName_createConstructor();
+
+SWIFT_NAME("BridgedDeclBaseName.createDestructor()")
+BridgedDeclBaseName BridgedDeclBaseName_createDestructor();
+
+SWIFT_NAME("BridgedDeclBaseName.createSubscript()")
+BridgedDeclBaseName BridgedDeclBaseName_createSubscript();
+
+SWIFT_NAME("BridgedDeclBaseName.createIdentifier(_:)")
+BridgedDeclBaseName
+BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier);
+
+class BridgedDeclNameRef {
+  void *_Nonnull opaque;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDeclNameRef(swift::DeclNameRef name) : opaque(name.getOpaqueValue()) {}
+
+  swift::DeclNameRef unbridged() const {
+    return swift::DeclNameRef::getFromOpaqueValue(opaque);
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:baseName:argumentLabels:)")
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                BridgedDeclBaseName cBaseName,
+                                BridgedArrayRef cLabels);
+
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:)")
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedDeclBaseName cBaseName);
+
+class BridgedDeclNameLoc {
+  const void *_Nonnull LocationInfo;
+  size_t NumArgumentLabels;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDeclNameLoc(swift::DeclNameLoc loc)
+      : LocationInfo(loc.LocationInfo),
+        NumArgumentLabels(loc.NumArgumentLabels) {}
+
+  swift::DeclNameLoc unbridged() const {
+    return swift::DeclNameLoc(LocationInfo, NumArgumentLabels);
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:baseNameLoc:lParenLoc:"
+           "argumentLabelLocs:rParenLoc:)")
+BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cBaseNameLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cLabelLocs,
+    BridgedSourceLoc cRParenLoc);
+
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:)")
+BridgedDeclNameLoc
+BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
@@ -577,9 +655,11 @@ BridgedClosureExpr_createParsed(BridgedASTContext cContext,
                                 BridgedDeclContext cDeclContext,
                                 BridgedBraceStmt body);
 
-SWIFT_NAME("BridgedUnresolvedDeclRefExpr.createParsed(_:base:loc:)")
-BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
-    BridgedASTContext cContext, BridgedIdentifier base, BridgedSourceLoc cLoc);
+SWIFT_NAME("BridgedUnresolvedDeclRefExpr.createParsed(_:name:loc:)")
+BridgedUnresolvedDeclRefExpr
+BridgedUnresolvedDeclRefExpr_createParsed(BridgedASTContext cContext,
+                                          BridgedDeclNameRef cName,
+                                          BridgedDeclNameLoc cLoc);
 
 SWIFT_NAME("BridgedSingleValueStmtExpr.createWithWrappedBranches(_:stmt:"
            "declContext:mustBeExpr:)")
@@ -630,7 +710,12 @@ BridgedArrayExpr BridgedArrayExpr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedUnresolvedDotExpr.createParsed(_:base:dotLoc:name:nameLoc:)")
 BridgedUnresolvedDotExpr BridgedUnresolvedDotExpr_createParsed(
     BridgedASTContext cContext, BridgedExpr base, BridgedSourceLoc cDotLoc,
-    BridgedIdentifier name, BridgedSourceLoc cNameLoc);
+    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc);
+
+SWIFT_NAME("BridgedUnresolvedMemberExpr.createParsed(_:dotLoc:name:nameLoc:)")
+BridgedUnresolvedMemberExpr BridgedUnresolvedMemberExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cDotLoc,
+    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc);
 
 SWIFT_NAME("BridgedExpr.dump(self:)")
 void BridgedExpr_dump(BridgedExpr expr);
