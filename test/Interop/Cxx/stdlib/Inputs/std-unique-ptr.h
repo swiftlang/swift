@@ -17,9 +17,16 @@ std::unique_ptr<int[]> makeArray() {
 
 static bool dtorCalled = false;
 struct HasDtor {
+  HasDtor() = default;
+#if __is_target_os(windows)
+  // On windows, force this type to be address-only.
+  HasDtor(const StructWithDestructor &other);
+#endif
   ~HasDtor() {
     dtorCalled = true;
   }
+private:
+  int x;
 };
 
 std::unique_ptr<HasDtor> makeDtor() {
