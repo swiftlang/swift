@@ -109,63 +109,6 @@ static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
   return loc;
 }
 
-/// Populate the ancestors list for this buffer, with the root source buffer
-/// at the beginning and the given source buffer at the end.
-static void populateAncestors(
-    SourceManager &sourceMgr, unsigned bufferID,
-    SmallVectorImpl<unsigned> &ancestors) {
-  if (auto info = sourceMgr.getGeneratedSourceInfo(bufferID)) {
-    auto ancestorLoc = info->originalSourceRange.getStart();
-    if (ancestorLoc.isValid()) {
-      auto ancestorBufferID = sourceMgr.findBufferContainingLoc(ancestorLoc);
-      populateAncestors(sourceMgr, ancestorBufferID, ancestors);
-    }
-  }
-
-  ancestors.push_back(bufferID);
-}
-
-/// Determine whether the first source location precedes the second, accounting
-/// for macro expansions.
-static bool isBeforeInSource(
-    SourceManager &sourceMgr, SourceLoc firstLoc, SourceLoc secondLoc,
-    bool allowEqual) {
-  // If the two locations are in the same source buffer, compare their pointers.
-  unsigned firstBufferID = sourceMgr.findBufferContainingLoc(firstLoc);
-  unsigned secondBufferID = sourceMgr.findBufferContainingLoc(secondLoc);
-  if (firstBufferID == secondBufferID) {
-    return sourceMgr.isBeforeInBuffer(firstLoc, secondLoc) ||
-        (allowEqual && firstLoc == secondLoc);
-  }
-
-  // If the two locations are in different source buffers, we need to compute
-  // the least common ancestor.
-  SmallVector<unsigned, 4> firstAncestors;
-  populateAncestors(sourceMgr, firstBufferID, firstAncestors);
-  SmallVector<unsigned, 4> secondAncestors;
-  populateAncestors(sourceMgr, secondBufferID, secondAncestors);
-
-  // Find the first mismatch between the two ancestor lists; this is the
-  // point of divergence.
-  auto [firstMismatch, secondMismatch] = std::mismatch(
-      firstAncestors.begin(), firstAncestors.end(),
-      secondAncestors.begin(), secondAncestors.end());
-  assert(firstMismatch != firstAncestors.begin() &&
-         secondMismatch != secondAncestors.begin() &&
-         "Ancestors don't have the same root source file");
-
-  SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
-      ? firstLoc
-      : sourceMgr.getGeneratedSourceInfo(*firstMismatch)
-          ->originalSourceRange.getStart();
-  SourceLoc secondLocInLCA = secondMismatch == secondAncestors.end()
-      ? secondLoc
-      : sourceMgr.getGeneratedSourceInfo(*secondMismatch)
-          ->originalSourceRange.getStart();
-  return sourceMgr.isBeforeInBuffer(firstLocInLCA, secondLocInLCA) ||
-    (allowEqual && firstLocInLCA == secondLocInLCA);
-}
-
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(ModuleDecl *parentModule,
                                   SourceLoc loc,
@@ -182,17 +125,15 @@ ASTScopeImpl::findChildContaining(ModuleDecl *parentModule,
             Lexer::getLocForEndOfToken(sourceMgr, rangeOfScope.End);
 
         loc = translateLocForReplacedRange(sourceMgr, rangeOfScope.Start, loc);
-        return isBeforeInSource(
-            sourceMgr, endOfScope, loc, /*allowEqual=*/true);
+        return sourceMgr.isAtOrBefore(endOfScope, loc);
       });
 
   if (child != getChildren().end()) {
     auto rangeOfScope = (*child)->getSourceRangeOfThisASTNode();
     auto endOfScope = Lexer::getLocForEndOfToken(sourceMgr, rangeOfScope.End);
     loc = translateLocForReplacedRange(sourceMgr, rangeOfScope.Start, loc);
-    if (isBeforeInSource(sourceMgr, rangeOfScope.Start, loc,
-                         /*allowEqual=*/true) &&
-        isBeforeInSource(sourceMgr, loc, endOfScope, /*allowEqual=*/false))
+    if (sourceMgr.isAtOrBefore(rangeOfScope.Start, loc) &&
+        sourceMgr.isBefore(loc, endOfScope))
       return *child;
   }
 
