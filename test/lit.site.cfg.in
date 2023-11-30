@@ -44,6 +44,9 @@ config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 config.swift_ide_test_test_options = "@SWIFT_IDE_TEST_TEST_OPTIONS@"
 
+config.c_flags = r'''@CMAKE_C_FLAGS@'''
+config.exe_linker_flags = r'''@CMAKE_EXE_LINKER_FLAGS@'''
+
 # --- Darwin ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
