@@ -26,6 +26,9 @@
 
 // CHECK: struct StructNonCopyableTriviallyMovable
 
+// CHECK: struct StructWithPointerNonCopyableTriviallyMovable
+// CHECK: struct StructWithPointerNonCopyableTriviallyMovableField
+
 // CHECK: struct Iterator {
 // CHECK: }
 

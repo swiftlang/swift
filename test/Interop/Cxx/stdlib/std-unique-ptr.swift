@@ -4,12 +4,7 @@
 
 import StdlibUnittest
 import StdUniquePtr
-#if os(Linux)
 import CxxStdlib
-// FIXME: import CxxStdlib.string once libstdc++ is split into submodules.
-#else
-import CxxStdlib.memory
-#endif
 
 var StdUniquePtrTestSuite = TestSuite("StdUniquePtr")
 
