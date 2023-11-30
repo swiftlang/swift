@@ -1688,10 +1688,10 @@ function Build-Installer($Arch) {
 
   Isolate-EnvVars {
     Invoke-VsDevShell $Arch
-    $VCRedistInstallerPath = "${env:VCToolsRedistDir}\vc_redist.$($Arch.ShortName).exe"
-    if (Test-Path $VCRedistInstallerPath) {
-      $Properties["VCRedistInstaller"] = $VCRedistInstallerPath
-      $Properties["VSVersion"] = $env:VSCMD_VER
+    # Avoid hard-coding the VC tools version number
+    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+    if ($VCRedistDir) {
+      $Properties["VCRedistDir"] = "$VCRedistDir\"
     }
   }
 
