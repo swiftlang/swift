@@ -26,7 +26,7 @@ extension /*class-Animal:def*/Animal {
 
 enum /*enum-Barcode:def*/Barcode {
 	case upc(Int, Int, Int, Int)
-	case /*case-qrCode:def*/<base>qrCode</base>(<callarg index=0>code</callarg><callcolon index=0>: </callcolon>String)
+	case /*case-qrCode:def*/<base>qrCode</base>(<arglabel index=0>code</arglabel><param index=0></param>: String)
 	case /*case-other:def*/other(Int)
 	case /*case-another:def*/another
 }

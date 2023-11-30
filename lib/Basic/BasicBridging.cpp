@@ -58,6 +58,18 @@ void BridgedData_free(BridgedData data) {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedCharSourceRangeVector
+//===----------------------------------------------------------------------===//
+
+BridgedCharSourceRangeVector::BridgedCharSourceRangeVector()
+    : vector(new std::vector<CharSourceRange>()) {}
+
+void BridgedCharSourceRangeVector::push_back(BridgedCharSourceRange range) {
+  static_cast<std::vector<CharSourceRange> *>(vector)->push_back(
+      range.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: JSON
 //===----------------------------------------------------------------------===//
 

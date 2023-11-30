@@ -79,7 +79,7 @@ extension BridgedParameterList: HasNullable {
   }
 }
 
-extension BridgedSourceLoc {
+public extension BridgedSourceLoc {
   /// Form a source location at the given absolute position in `buffer`.
   init(
     at position: AbsolutePosition,

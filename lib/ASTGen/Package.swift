@@ -70,6 +70,16 @@ let package = Package(
       swiftSettings: swiftSetttings
     ),
     .target(
+      name: "swiftIDEUtilsBridging",
+      dependencies: [
+        "swiftASTGen",
+        .product(name: "SwiftIDEUtils", package: "swift-syntax"),
+        .product(name: "SwiftSyntax", package: "swift-syntax"),
+      ],
+      path: "Sources/SwiftIDEUtilsBridging",
+      swiftSettings: swiftSetttings
+    ),
+    .target(
       name: "swiftLLVMJSON",
       dependencies: [],
       path: "Sources/LLVMJSON",

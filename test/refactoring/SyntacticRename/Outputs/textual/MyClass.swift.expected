@@ -31,8 +31,8 @@ class /*MyClass:unknown*/<base>MyClass</base> {}
 _ = /*MyClass:unknown*/Mismatch()
 _ = /*MyClass:unknown*/<base>MyClass</base>()
 #else
-class /*MyClass:unknown*/MyClass {}
+class /*MyClass:unknown*/<base>MyClass</base> {}
 _ = /*MyClass:unknown*/Mismatch()
-_ = /*MyClass:unknown*/MyClass()
+_ = /*MyClass:unknown*/<base>MyClass</base>()
 #endif
 

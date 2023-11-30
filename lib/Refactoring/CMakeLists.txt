@@ -1,3 +1,8 @@
+if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
+  # swiftRefactoring requires SwiftIDEUtilsBriding, which isn't built if SWIFT_BUILD_SWIFT_SYNTAX is `NO`.
+  return()
+endif()
+
 add_swift_host_library(swiftRefactoring STATIC
   AddEquatableConformance.cpp
   AddExplicitCodableImplementation.cpp
@@ -27,17 +32,16 @@ add_swift_host_library(swiftRefactoring STATIC
   ExtractFunction.cpp
   ExtractRepeatedExpr.cpp
   FillProtocolStubs.cpp
-  FindRenameRangesAnnotatingConsumer.cpp
   LocalizeString.cpp
   LocalRename.cpp
   MemberwiseInitLocalRefactoring.cpp
   MoveMembersToExtension.cpp
   Refactoring.cpp
   RefactoringAction.cpp
-  Renamer.cpp
   ReplaceBodiesWithFatalError.cpp
   SimplifyNumberLiteral.cpp
   SyntacticRename.cpp
+  SyntacticRenameRangeDetails.cpp
   TrailingClosure.cpp
   Utils.cpp
 )
@@ -46,6 +50,7 @@ target_link_libraries(swiftRefactoring PRIVATE
   swiftAST
   swiftClangImporter
   swiftIDE
+  swiftIDEUtilsBridging
   swiftIndex
   swiftParse
   swiftSema)

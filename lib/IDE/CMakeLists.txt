@@ -22,6 +22,7 @@ add_swift_host_library(swiftIDE STATIC
   ExprContextAnalysis.cpp
   Formatting.cpp
   FuzzyStringMatcher.cpp
+  IDEBridging.cpp
   IDERequests.cpp
   IDETypeChecking.cpp
   ImportDepth.cpp
