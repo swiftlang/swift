@@ -18,10 +18,9 @@ import ParseBridging
 extension ASTGenVisitor {
 
   func generateWithLegacy(_ node: ExprSyntax) -> BridgedExpr {
-    // NOTE: Postfix expressions and sequence expressions share the same start
-    // location with the inner expression. This function must only be called on
-    // the outermost expression that shares the same position.
-    // See also `isExprMigrated(_:)`
+    // NOTE: Postfix expressions share the same start location with the inner
+    // expression. This function must only be called on the outermost expression
+    // that shares the same position. See also `isExprMigrated(_:)`
 
     // FIXME: Calculate isExprBasic.
     let isExprBasic = false

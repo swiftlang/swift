@@ -224,3 +224,12 @@ struct TestStruct {
 //    return .instance(arg:)(12)
 //  }
 }
+
+func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
+  _ = arg1 + arg2()
+  _ = arg3 as? Int ?? 31 as Int
+  _ = false ? arg2() : Int(1)
+  _ = [() -> Int]()
+  _ = [@Sendable () -> Int]().count +  [any Collection]().count
+  _ = arg3 is Double || !(arg3 is Int, 0).0
+}
