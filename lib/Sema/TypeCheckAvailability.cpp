@@ -525,13 +525,8 @@ private:
     // get expanded from macros attached to the parent declaration. We must
     // not eagerly expand the attached property wrappers to avoid request
     // cycles.
-    if (auto *pattern = dyn_cast<PatternBindingDecl>(D)) {
-      if (auto firstVar = pattern->getAnchoringVarDecl(0)) {
-        // FIXME: We could narrow this further by detecting whether there are
-        // any macro expansions required to visit the CustomAttrs of the var.
-        if (firstVar->hasInitialValue() && !firstVar->isInitExposedToClients())
-          return true;
-      }
+    if (isa<PatternBindingDecl>(D)) {
+      return true;
     }
 
     return false;
