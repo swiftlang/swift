@@ -569,7 +569,7 @@ public:
     return ContextAndBits.getInt() & HasComputedAssociatedConformancesFlag;
   }
 
-  /// Mark this conformance as having computed the assocaited conformance array.
+  /// Mark this conformance as having computed the associated conformance array.
   void setHasComputedAssociatedConformances() {
     ContextAndBits.setInt(ContextAndBits.getInt() | HasComputedAssociatedConformancesFlag);
   }
