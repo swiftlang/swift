@@ -661,6 +661,12 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
                                              BridgedTupleExpr args);
 
+SWIFT_NAME("BridgedDotSelfExpr.createParsed(_:subExpr:dotLoc:selfLoc:)")
+BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
+                                                   BridgedExpr cSubExpr,
+                                                   BridgedSourceLoc cDotLoc,
+                                                   BridgedSourceLoc cSelfLoc);
+
 SWIFT_NAME("BridgedClosureExpr.createParsed(_:declContext:body:)")
 BridgedClosureExpr
 BridgedClosureExpr_createParsed(BridgedASTContext cContext,

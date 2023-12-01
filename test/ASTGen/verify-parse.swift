@@ -207,9 +207,15 @@ precedencegroup Precedence2 {
 struct TestStruct {
   func method(arg: Int, _ c: Int) {}
 
+  enum Ty {
+    case `self`
+    case `Self`
+  }
+
   func test() {
     _ = method(arg:_:)
-    _ = self.method(arg:_:)
+    _ = self.method(arg:_:).self
+    _ = Ty.`Self` ==  Ty.`self`
   }
 
 // FIXME: Compute 'static' location

@@ -925,6 +925,15 @@ BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
                                        cType.unbridged());
 }
 
+BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
+                                                   BridgedExpr cSubExpr,
+                                                   BridgedSourceLoc cDotLoc,
+                                                   BridgedSourceLoc cSelfLoc) {
+
+  return new (cContext.unbridged()) DotSelfExpr(
+      cSubExpr.unbridged(), cDotLoc.unbridged(), cSelfLoc.unbridged());
+}
+
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIsLoc,
                                          BridgedTypeRepr cType) {

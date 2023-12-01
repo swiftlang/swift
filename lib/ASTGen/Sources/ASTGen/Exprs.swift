@@ -348,20 +348,33 @@ extension ASTGenVisitor {
   }
 
   func generate(memberAccessExpr node: MemberAccessExprSyntax) -> BridgedExpr {
+    let dotLoc = self.generateSourceLoc(node.period)
     let nameAndLoc = createDeclNameRef(declReferenceExpr: node.declName)
 
     if let base = node.base {
-      return BridgedUnresolvedDotExpr.createParsed(
-        self.ctx,
-        base: self.generate(expr: base),
-        dotLoc: self.generateSourceLoc(node.period),
-        name: nameAndLoc.name,
-        nameLoc: nameAndLoc.loc
-      ).asExpr
+      if node.declName.baseName.keywordKind == .`self` {
+        // TODO: Diagnose if there's arguments
+        assert(node.declName.argumentNames == nil)
+
+        return BridgedDotSelfExpr.createParsed(
+          self.ctx,
+          subExpr: self.generate(expr: base),
+          dotLoc: dotLoc,
+          selfLoc: self.generateSourceLoc(node.declName)
+        ).asExpr
+      } else {
+        return BridgedUnresolvedDotExpr.createParsed(
+          self.ctx,
+          base: self.generate(expr: base),
+          dotLoc: dotLoc,
+          name: nameAndLoc.name,
+          nameLoc: nameAndLoc.loc
+        ).asExpr
+      }
     } else {
       return BridgedUnresolvedMemberExpr.createParsed(
         self.ctx,
-        dotLoc: self.generateSourceLoc(node.period),
+        dotLoc: dotLoc,
         name: nameAndLoc.name,
         nameLoc: nameAndLoc.loc
       ).asExpr
