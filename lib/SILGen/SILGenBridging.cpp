@@ -759,7 +759,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
       [&](SubstitutableType *t) -> Type {
         return nativeType;
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule(SGF.SGM.SwiftModule));
 
     // The intrinsic takes a T; reabstract to the generic abstraction
     // pattern.
