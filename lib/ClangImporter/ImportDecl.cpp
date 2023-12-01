@@ -2193,6 +2193,10 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
+        if (decl->isInStdNamespace() && decl->getName() == "promise") {
+          // Do not import std::promise.
+          return nullptr;
+        }
         result->getAttrs().add(new (Impl.SwiftContext)
                                    MoveOnlyAttr(/*Implicit=*/true));
       }
