@@ -718,6 +718,8 @@ static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
 class Classification {
   bool IsInvalid = false;  // The AST is malformed.  Don't diagnose.
 
+  bool downgradeToWarning = false;
+
   // Throwing
   ConditionalEffectKind ThrowKind = ConditionalEffectKind::None;
   llvm::Optional<PotentialEffectReason> ThrowReason;
@@ -968,6 +970,13 @@ public:
   bool isInvalid() const { return IsInvalid; }
   void makeInvalid() { IsInvalid = true; }
 
+  bool shouldDowngradeToWarning() const {
+    return downgradeToWarning;
+  }
+  void setDowngradeToWarning(bool downgrade) {
+    downgradeToWarning = downgrade;
+  }
+
   ConditionalEffectKind getConditionalKind(EffectKind kind) const {
     switch (kind) {
     case EffectKind::Throws: return ThrowKind;
@@ -1044,6 +1053,23 @@ public:
     return Classification();
   }
 
+  /// Whether a missing 'await' error on accessing an async var should be
+  /// downgraded to a warning. This is only the case for synchronous access
+  /// to isolated global or static 'let' variables.
+  bool downgradeAsyncAccessToWarning(Decl *decl) {
+    if (auto *var = dyn_cast<VarDecl>(decl)) {
+      ActorReferenceResult::Options options = llvm::None;
+      // The newly-diagnosed cases are invalid regardless of the module context
+      // of the caller, i.e. isolated static and global 'let' variables.
+      auto *module = var->getDeclContext()->getParentModule();
+      if (!isLetAccessibleAnywhere(module, var, options)) {
+        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+      }
+    }
+
+    return false;
+  }
+
   Classification classifyLookup(LookupExpr *E) {
     auto member = E->getMember();
     if (!member)
@@ -1059,6 +1085,9 @@ public:
     } else if (isa<SubscriptExpr>(E) || isa<DynamicSubscriptExpr>(E)) {
       reason = PotentialEffectReason::forSubscriptAccess();
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(member.getDecl()));
 
     classification.mergeImplicitEffects(
         member.getDecl()->getASTContext(),
@@ -1085,6 +1114,9 @@ public:
       classification = Classification::forDeclRef(
           declRef, ConditionalEffectKind::Always, reason);
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(E->getDecl()));
 
     classification.mergeImplicitEffects(
         E->getDeclRef().getDecl()->getASTContext(),
@@ -2548,15 +2580,20 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
-                   PotentialEffectReason reason) :
+                   PotentialEffectReason reason,
+                   bool downgradeToWarning) :
       reason(reason),
-      expr(failingExpr) {}
+      expr(failingExpr),
+      downgradeToWarning(downgradeToWarning) {}
 
     /// Reason for throwing
     PotentialEffectReason reason;
 
     /// Failing expression
     Expr &expr;
+
+    /// Whether the error should be downgraded to a warning.
+    bool downgradeToWarning;
   };
 
   SmallVector<Expr *, 4> errorOrder;
@@ -3113,8 +3150,9 @@ private:
                                     CurContext.isWithinInterpolatedString());
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
-        uncoveredAsync[anchor].emplace_back(*expr,
-                                            classification.getAsyncReason());
+        uncoveredAsync[anchor].emplace_back(
+            *expr, classification.getAsyncReason(),
+            classification.shouldDowngradeToWarning());
       }
     }
 
@@ -3335,7 +3373,13 @@ private:
         awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
     }
 
+    bool downgradeToWarning = llvm::all_of(errors,
+        [&](DiagnosticInfo diag) -> bool {
+          return diag.downgradeToWarning;
+        });
+
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
+      .warnUntilSwiftVersionIf(downgradeToWarning, 6)
       .fixItInsert(awaitInsertLoc, "await ")
       .highlight(anchor->getSourceRange());
 
