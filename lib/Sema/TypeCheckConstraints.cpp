@@ -191,6 +191,10 @@ bool TypeVariableType::Implementation::isOpaqueType() const {
   return false;
 }
 
+bool TypeVariableType::Implementation::isArrayLiteralType() const {
+  return locator && locator->directlyAt<ArrayExpr>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
