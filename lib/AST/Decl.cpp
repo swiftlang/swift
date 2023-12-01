@@ -9127,24 +9127,74 @@ bool AbstractFunctionDecl::hasBody() const {
   }
 }
 
+/// Expand all preamble macros attached to the given function declaration.
+static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
+  std::vector<ASTNode> preamble;
 
+  ASTContext &ctx = func->getASTContext();
+  ExpandPreambleMacroRequest request{func};
+  auto module = func->getParentModule();
+  for (auto bufferID : evaluateOrDefault(ctx.evaluator, request, { })) {
+    auto bufferStart = ctx.SourceMgr.getLocForBufferStart(bufferID);
+    auto preambleSF = module->getSourceFileContainingLocation(bufferStart);
+    preamble.insert(preamble.end(),
+                    preambleSF->getTopLevelItems().begin(),
+                    preambleSF->getTopLevelItems().end());
+  }
+
+  return preamble;
+}
+
+/// Expand body macros and produce the resulting body.
 static BraceStmt *expandBodyMacro(AbstractFunctionDecl *fn) {
   ASTContext &ctx = fn->getASTContext();
 
-  auto bufferID = evaluateOrDefault(
-      ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None);
-  if (!bufferID) {
+  // Expand the preamble.
+  auto preamble = expandPreamble(fn);
+
+  // Expand a body macro, if there is one.
+  if (auto bufferID = evaluateOrDefault(
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+    CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
+    auto bufferStart = bufferRange.getStart();
+    auto module = fn->getParentModule();
+    auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
+
+    // When there is no preamble, adopt the body itself.
+    if (preamble.empty()) {
+      return BraceStmt::create(
+          ctx, bufferRange.getStart(), macroSourceFile->getTopLevelItems(),
+          bufferRange.getEnd());
+    }
+
+    // Merge the preamble into the macro-produced body.
+    auto contents = std::move(preamble);
+    contents.insert(
+        contents.end(),
+        macroSourceFile->getTopLevelItems().begin(),
+        macroSourceFile->getTopLevelItems().end());
+    return BraceStmt::create(
+        ctx, bufferRange.getStart(), contents, bufferRange.getEnd());
+  }
+
+  // There is no body macro. If there's no preamble, either, then there is
+  // nothing to do.
+  if (preamble.empty())
+    return nullptr;
+
+  // If there is no body, the preamble has nowhere to go.
+  auto body = fn->getBody(/*canSynthesize=*/true);
+  if (!body) {
+    // FIXME: diagnose this
     return nullptr;
   }
 
-  CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
-  auto bufferStart = bufferRange.getStart();
-  auto module = fn->getParentModule();
-  auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
-
+  // Merge the preamble into the existing body.
+  auto contents = std::move(preamble);
+  contents.insert(
+      contents.end(), body->getElements().begin(), body->getElements().end());
   return BraceStmt::create(
-      ctx, bufferRange.getStart(), macroSourceFile->getTopLevelItems(),
-      bufferRange.getEnd());
+      ctx, body->getLBraceLoc(), contents, body->getRBraceLoc());
 }
 
 BraceStmt *AbstractFunctionDecl::getMacroExpandedBody() const {

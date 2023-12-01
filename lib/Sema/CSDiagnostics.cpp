@@ -1426,7 +1426,7 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
     auto anchor = getAnchor();
     auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
     if (componentPathElt->getIndex() == 0) {
-      if (auto rootType = keyPathExpr->getRootType()) {
+      if (auto rootType = keyPathExpr->getExplicitRootType()) {
         return rootType->getSourceRange();
       } else {
         return keyPathExpr->getComponents().front().getLoc();
@@ -1483,7 +1483,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // For members where the base type is an optional key path root
     // let's emit a tailored note suggesting to use its unwrapped type.
     auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
-    if (auto rootType = keyPathExpr->getRootType()) {
+    if (auto rootType = keyPathExpr->getExplicitRootType()) {
       emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
                      unwrappedBaseType);
 
@@ -6134,7 +6134,7 @@ SourceLoc AnyObjectKeyPathRootFailure::getLoc() const {
   auto anchor = getAnchor();
 
   if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
-    if (auto rootTyRepr = KPE->getRootType())
+    if (auto rootTyRepr = KPE->getExplicitRootType())
       return rootTyRepr->getLoc();
   }
 
@@ -6145,7 +6145,7 @@ SourceRange AnyObjectKeyPathRootFailure::getSourceRange() const {
   auto anchor = getAnchor();
 
   if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
-    if (auto rootTyRepr = KPE->getRootType())
+    if (auto rootTyRepr = KPE->getExplicitRootType())
       return rootTyRepr->getSourceRange();
   }
 

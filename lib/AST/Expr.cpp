@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
@@ -2441,6 +2442,35 @@ llvm::Optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
     }
   }
   return llvm::None;
+}
+
+BoundGenericType *KeyPathExpr::getKeyPathType() const {
+  auto type = getType();
+  if (!type)
+    return nullptr;
+
+  if (auto *existentialTy = type->getAs<ExistentialType>()) {
+    auto *sendableTy =
+        existentialTy->getConstraintType()->castTo<ProtocolCompositionType>();
+    assert(sendableTy->getMembers().size() == 2);
+    type = sendableTy->getExistentialLayout().explicitSuperclass;
+    assert(type->isKeyPath() || type->isWritableKeyPath() ||
+           type->isReferenceWritableKeyPath());
+  }
+
+  return type->castTo<BoundGenericType>();
+}
+
+Type KeyPathExpr::getRootType() const {
+  auto keyPathTy = getKeyPathType();
+  assert(keyPathTy && "key path type has not been set yet");
+  return keyPathTy->getGenericArgs()[0];
+}
+
+Type KeyPathExpr::getValueType() const {
+  auto keyPathTy = getKeyPathType();
+  assert(keyPathTy && "key path type has not been set yet");
+  return keyPathTy->getGenericArgs()[1];
 }
 
 KeyPathExpr::Component KeyPathExpr::Component::forSubscript(

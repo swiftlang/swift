@@ -235,18 +235,6 @@ bb0(%0 : $*E2):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_drop_deinit_addr :
-// CHECK:         %1 = drop_deinit %0
-// CHECK:         end_lifetime %1
-// CHECK:       } // end sil function 'test_drop_deinit_addr'
-sil [ossa] @test_drop_deinit_addr : $@convention(thin) (@in S1) -> () {
-bb0(%0 : $*S1):
-  %1 = drop_deinit %0 : $*S1
-  destroy_addr %1 : $*S1
-  %r = tuple()
-  return %r : $()
-}
-
 // CHECK-LABEL: sil [ossa] @test_two_field_drop_deinit_addr :
 // CHECK:         %1 = drop_deinit %0
 // CHECK:         [[A1:%.*]] = struct_element_addr %1 : $*S4, #S4.a
@@ -261,7 +249,10 @@ bb0(%0 : $*S1):
 sil [ossa] @test_two_field_drop_deinit_addr : $@convention(thin) (@in S4) -> () {
 bb0(%0 : $*S4):
   %1 = drop_deinit %0 : $*S4
-  destroy_addr %1 : $*S4
+  %2 = struct_element_addr %1 : $*S4, #S4.a
+  destroy_addr %2 : $*S1
+  %4 = struct_element_addr %1 : $*S4, #S4.b
+  destroy_addr %4 : $*S2
   %r = tuple()
   return %r : $()
 }

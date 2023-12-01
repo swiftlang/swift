@@ -1026,16 +1026,7 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
     assert(nextStart.isValid() &&
            "Only implicit decls can have invalid source location");
 
-    if (getASTContext().SourceMgr.isBeforeInBuffer(prevEnd, nextStart))
-      return;
-
-    // Synthesized member macros can add new members in a macro expansion buffer.
-    SourceFile *memberSourceFile = member->getLoc()
-        ? member->getModuleContext()
-                ->getSourceFileContainingLocation(member->getLoc())
-        : member->getInnermostDeclContext()->getParentSourceFile();
-    if (memberSourceFile->getFulfilledMacroRole() == MacroRole::Member ||
-        memberSourceFile->getFulfilledMacroRole() == MacroRole::Peer)
+    if (getASTContext().SourceMgr.isAtOrBefore(prevEnd, nextStart))
       return;
 
     llvm::errs() << "Source ranges out of order in addMember():\n";

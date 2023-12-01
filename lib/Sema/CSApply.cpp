@@ -5009,6 +5009,11 @@ namespace {
         baseTy = fnTy->getParams()[0].getParameterType();
         leafTy = fnTy->getResult();
         isFunctionType = true;
+      } else if (auto *existential = exprType->getAs<ExistentialType>()) {
+        auto layout = existential->getExistentialLayout();
+        auto keyPathTy = layout.explicitSuperclass->castTo<BoundGenericType>();
+        baseTy = keyPathTy->getGenericArgs()[0];
+        leafTy = keyPathTy->getGenericArgs()[1];
       } else {
         auto keyPathTy = exprType->castTo<BoundGenericType>();
         baseTy = keyPathTy->getGenericArgs()[0];

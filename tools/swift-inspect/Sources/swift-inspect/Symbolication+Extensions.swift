@@ -33,6 +33,8 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
 enum Sym {
   static let pidFromHint: @convention(c) (AnyObject) -> pid_t =
     symbol(symbolicationHandle, "pidFromHint")
+  static let CSRelease: @convention(c) (CSTypeRef) -> Void =
+    symbol(coreSymbolicationHandle, "CSRelease")
   static let CSSymbolicatorCreateWithTask: @convention(c) (task_t) -> CSTypeRef =
     symbol(coreSymbolicationHandle, "CSSymbolicatorCreateWithTask")
   static let CSSymbolicatorGetSymbolOwnerWithNameAtTime:
@@ -98,6 +100,10 @@ typealias CSSymbolOwnerRef = CSTypeRef
 func pidFromHint(_ hint: String) -> pid_t? {
   let result = Sym.pidFromHint(hint as NSString)
   return result == 0 ? nil : result
+}
+
+func CSRelease(_ sym: CSTypeRef) -> Void {
+  Sym.CSRelease(sym)
 }
 
 func CSSymbolicatorCreateWithTask(_ task: task_t) -> CSTypeRef {

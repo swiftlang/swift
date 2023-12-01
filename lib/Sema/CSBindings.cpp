@@ -531,22 +531,41 @@ void BindingSet::inferTransitiveBindings(
   }
 }
 
-static BoundGenericType *getKeyPathType(ASTContext &ctx,
-                                        KeyPathCapability capability,
-                                        Type rootType, Type valueType) {
-  switch (capability) {
-  case KeyPathCapability::ReadOnly:
-    return BoundGenericType::get(ctx.getKeyPathDecl(), /*parent=*/Type(),
-                                 {rootType, valueType});
+static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
+                           Type rootType, Type valueType) {
+  KeyPathMutability mutability;
+  bool isSendable;
 
-  case KeyPathCapability::Writable:
-    return BoundGenericType::get(ctx.getWritableKeyPathDecl(),
-                                 /*parent=*/Type(), {rootType, valueType});
+  std::tie(mutability, isSendable) = capability;
 
-  case KeyPathCapability::ReferenceWritable:
-    return BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
-                                 /*parent=*/Type(), {rootType, valueType});
+  Type keyPathTy;
+  switch (mutability) {
+  case KeyPathMutability::ReadOnly:
+    keyPathTy = BoundGenericType::get(ctx.getKeyPathDecl(), /*parent=*/Type(),
+                                      {rootType, valueType});
+    break;
+
+  case KeyPathMutability::Writable:
+    keyPathTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
+                                      /*parent=*/Type(), {rootType, valueType});
+    break;
+
+  case KeyPathMutability::ReferenceWritable:
+    keyPathTy = BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
+                                      /*parent=*/Type(), {rootType, valueType});
+    break;
   }
+
+  if (isSendable &&
+      ctx.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    auto *sendable = ctx.getProtocol(KnownProtocolKind::Sendable);
+    keyPathTy = ProtocolCompositionType::get(
+        ctx, {keyPathTy, sendable->getDeclaredInterfaceType()},
+        /*hasExplicitAnyObject=*/false);
+    return ExistentialType::get(keyPathTy);
+  }
+
+  return keyPathTy;
 }
 
 void BindingSet::finalize(

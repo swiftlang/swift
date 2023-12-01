@@ -17,6 +17,7 @@
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/AST/Type.h"
+#include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/CodeCompletionResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -35,6 +36,7 @@ namespace llvm {
 
 namespace SourceKit {
 class GlobalConfig;
+using swift::ide::CancellableResult;
 
 struct EntityInfo {
   UIdent Kind;
@@ -906,9 +908,7 @@ struct RenameLocation {
 
 struct RenameLocations {
   StringRef OldName;
-  StringRef NewName;
   const bool IsFunctionLike;
-  const bool IsNonProtocolType;
   std::vector<RenameLocation> LineColumnLocs;
 };
 
@@ -921,7 +921,8 @@ struct IndexStoreInfo{};
 
 typedef std::function<void(RequestResult<ArrayRef<CategorizedEdits>> Result)>
     CategorizedEditsReceiver;
-typedef std::function<void(RequestResult<ArrayRef<CategorizedRenameRanges>> Result)>
+typedef std::function<void(
+    CancellableResult<std::vector<CategorizedRenameRanges>> Result)>
     CategorizedRenameRangesReceiver;
 typedef std::function<void(RequestResult<IndexStoreInfo> Result)> IndexToStoreReceiver;
 
@@ -1189,10 +1190,10 @@ public:
                                 ArrayRef<const char *> Args,
                                 std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) = 0;
 
-  virtual void findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                                ArrayRef<RenameLocations> RenameLocations,
-                                ArrayRef<const char *> Args,
-                                CategorizedRenameRangesReceiver Receiver) = 0;
+  virtual CancellableResult<std::vector<CategorizedRenameRanges>>
+  findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                   ArrayRef<RenameLocations> RenameLocations,
+                   ArrayRef<const char *> Args) = 0;
   virtual void
   findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                         unsigned Length, ArrayRef<const char *> Args,

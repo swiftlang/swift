@@ -5423,8 +5423,9 @@ public:
     auto kpTy = KPI->getType();
     
     require(kpTy.isObject(), "keypath result must be an object type");
-    
-    auto kpBGT = kpTy.getAs<BoundGenericType>();
+
+    auto *kpBGT = KPI->getKeyPathType();
+
     require(kpBGT, "keypath result must be a generic type");
     require(kpBGT->isKeyPath() ||
             kpBGT->isWritableKeyPath() ||

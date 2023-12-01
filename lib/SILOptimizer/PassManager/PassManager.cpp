@@ -178,9 +178,21 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::location(DebugOnlyPassNumberOptLoc),
               llvm::cl::ValueRequired);
 
+static bool isInPrintFunctionList(SILFunction *F) {
+  for (const std::string &printFnName : SILPrintFunction) {
+    if (printFnName == F->getName())
+      return true;
+    if (!printFnName.empty() && printFnName[0] != '$' &&
+        !F->getName().empty() && F->getName()[0] == '$' &&
+        printFnName == F->getName().drop_front()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool isFunctionSelectedForPrinting(SILFunction *F) {
-  if (!SILPrintFunction.empty() && SILPrintFunction.end() ==
-      std::find(SILPrintFunction.begin(), SILPrintFunction.end(), F->getName()))
+  if (!SILPrintFunction.empty() && !isInPrintFunctionList(F))
     return false;
 
   if (!F->getName().contains(SILPrintFunctions))

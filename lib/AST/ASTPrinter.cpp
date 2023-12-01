@@ -3286,6 +3286,10 @@ static bool usesFeatureStrictConcurrency(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDeprecateApplicationMain(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
   ClangNode clangNode = decl->getClangNode();
   if (!clangNode)
@@ -3309,6 +3313,10 @@ static bool usesFeatureImplicitSome(Decl *decl) {
 }
 
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureCompleteConcurrency(Decl *decl) {
   return false;
 }
 

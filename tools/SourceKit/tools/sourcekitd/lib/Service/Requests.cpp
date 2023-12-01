@@ -310,7 +310,7 @@ static sourcekitd_response_t
 editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args);
 
 static bool
-buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
+buildRenameLocationsFromDict(const RequestDict &Req,
                              std::vector<RenameLocations> &RenameLocations,
                              llvm::SmallString<64> &Error);
 
@@ -318,9 +318,8 @@ static sourcekitd_response_t
 createCategorizedEditsResponse(
     const RequestResult<ArrayRef<CategorizedEdits>> &Result);
 
-static sourcekitd_response_t
-createCategorizedRenameRangesResponse(
-    const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result);
+static sourcekitd_response_t createCategorizedRenameRangesResponse(
+    const CancellableResult<std::vector<CategorizedRenameRanges>> &Result);
 
 static sourcekitd_response_t
 findRenameRanges(llvm::MemoryBuffer *InputBuf,
@@ -1071,7 +1070,7 @@ handleRequestFindRenameRanges(const RequestDict &Req,
 
     SmallString<64> ErrBuf;
     std::vector<RenameLocations> RenameLocations;
-    if (buildRenameLocationsFromDict(Req, false, RenameLocations, ErrBuf))
+    if (buildRenameLocationsFromDict(Req, RenameLocations, ErrBuf))
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     return Rec(findRenameRanges(InputBuf.get(), RenameLocations, Args));
   }
@@ -1695,7 +1694,8 @@ handleRequestFindLocalRenameRanges(const RequestDict &Req,
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
         *PrimaryFilePath, Line, Column, Length, Args, CancellationToken,
-        [Rec](const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
+        [Rec](const CancellableResult<std::vector<CategorizedRenameRanges>>
+                  &Result) {
           Rec(createCategorizedRenameRangesResponse(Result));
         });
   });
@@ -3994,7 +3994,7 @@ editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args) {
 }
 
 static bool
-buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
+buildRenameLocationsFromDict(const RequestDict &Req,
                              std::vector<RenameLocations> &RenameLocations,
                              llvm::SmallString<64> &Error) {
   bool Failed = Req.dictionaryArrayApply(KeyRenameLocations,
@@ -4005,32 +4005,14 @@ buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
       return true;
     }
 
-    int64_t IsNonProtocolType = false;
-    if (RenameLocation.getInt64(KeyIsNonProtocolType, IsNonProtocolType, false)) {
-      Error = "missing key.is_non_protocol_type";
-      return true;
-    }
-
     Optional<StringRef> OldName = RenameLocation.getString(KeyName);
     if (!OldName.has_value()) {
       Error = "missing key.name";
       return true;
     }
 
-    Optional<StringRef> NewName;
-    if (UseNewName) {
-      NewName = RenameLocation.getString(KeyNewName);
-      if (!NewName.has_value()) {
-        Error = "missing key.newname";
-        return true;
-      }
-    }
-
-    RenameLocations.push_back({*OldName,
-                               UseNewName ? *NewName : "",
-                               static_cast<bool>(IsFunctionLike),
-                               static_cast<bool>(IsNonProtocolType),
-                               {}});
+    RenameLocations.push_back(
+        {*OldName, static_cast<bool>(IsFunctionLike), {}});
     auto &LineCols = RenameLocations.back().LineColumnLocs;
     bool Failed = RenameLocation.dictionaryArrayApply(KeyLocations,
                                                       [&](RequestDict LineAndCol) {
@@ -4124,14 +4106,19 @@ createCategorizedEditsResponse(const RequestResult<ArrayRef<CategorizedEdits>> &
   return RespBuilder.createResponse();
 }
 
-static sourcekitd_response_t
-createCategorizedRenameRangesResponse(const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
-  if (Result.isCancelled())
+static sourcekitd_response_t createCategorizedRenameRangesResponse(
+    const CancellableResult<std::vector<CategorizedRenameRanges>> &Result) {
+  using swift::ide::CancellableResultKind;
+  switch (Result.getKind()) {
+  case CancellableResultKind::Cancelled:
     return createErrorRequestCancelled();
-  if (Result.isError())
+  case CancellableResultKind::Failure:
     return createErrorRequestFailed(Result.getError());
+  case CancellableResultKind::Success:
+    break; // Handle below
+  }
 
-  const ArrayRef<CategorizedRenameRanges> &Ranges = Result.value();
+  const std::vector<CategorizedRenameRanges> &Ranges = Result.getResult();
 
   ResponseBuilder RespBuilder;
   auto Dict = RespBuilder.getDictionary();
@@ -4160,13 +4147,9 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
                  ArrayRef<RenameLocations> RenameLocations,
                  ArrayRef<const char *> Args) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  sourcekitd_response_t Result;
-  Lang.findRenameRanges(
-      InputBuf, RenameLocations, Args,
-      [&](const RequestResult<ArrayRef<CategorizedRenameRanges>> &ReqResult) {
-        Result = createCategorizedRenameRangesResponse(ReqResult);
-      });
-  return Result;
+  CancellableResult<std::vector<CategorizedRenameRanges>> ReqResult =
+      Lang.findRenameRanges(InputBuf, RenameLocations, Args);
+  return createCategorizedRenameRangesResponse(ReqResult);
 }
 
 static bool isSemanticEditorDisabled() {

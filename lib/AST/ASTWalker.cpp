@@ -1280,7 +1280,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (!E->isObjC()) {
-      auto rootType = E->getRootType();
+      auto rootType = E->getExplicitRootType();
       if (rootType && doIt(rootType))
         return nullptr;
     }
