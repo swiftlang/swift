@@ -9179,8 +9179,8 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   }
 
   if (optTy->isPlaceholder()) {
-    // object type should be simplified because it could be already bound.
-    recordAnyTypeVarAsPotentialHole(simplifyType(second));
+    if (auto *typeVar = second->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
     return SolutionKind::Solved;
   }
 
