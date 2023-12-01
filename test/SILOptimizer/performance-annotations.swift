@@ -429,3 +429,45 @@ func testPrecondition(_ count: Int) {
   precondition(count == 2, "abc")
 }
 
+@_noRuntime
+func dynamicCastNoRuntime(_ a: AnyObject) -> Cl? {
+  return a as? Cl // expected-error {{dynamic casting can lock or allocate}}
+}
+
+func useExistential<T: P>(_: T) {}
+
+@_noRuntime
+func openExistentialNoRuntime(_ existential: P) {
+  _openExistential(existential, do: useExistential) // expected-error {{generic function calls can cause metadata allocation or locks}}
+}
+
+@_noExistentials
+func dynamicCastNoExistential(_ a: AnyObject) -> Cl? {
+  return a as? Cl
+}
+
+@_noExistentials
+func useOfExistential() -> P {
+  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in @_noExistential function}}
+}
+
+@_noExistentials
+func genericNoExistential() -> some P {
+  Str(x: 1)
+}
+
+@_noRuntime
+func genericNoRuntime() -> some P {
+  Str(x: 1)
+}
+
+@_noObjCBridging
+func useOfExistentialNoObjc() -> P {
+  Str(x: 1)
+}
+
+@_noRuntime
+func useOfExistentialNoRuntime() -> P {
+  Str(x: 1) // expected-error {{Using type 'any P' can cause metadata allocation or locks}}
+}
+

@@ -302,7 +302,10 @@ struct BridgedFunction {
   enum class PerformanceConstraints {
     None = 0,
     NoAllocation = 1,
-    NoLocks = 2
+    NoLocks = 2,
+    NoRuntime = 3,
+    NoExistentials = 4,
+    NoObjCBridging = 5
   };
 
   enum class InlineStrategy {

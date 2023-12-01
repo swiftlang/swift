@@ -356,6 +356,10 @@ ERROR(embedded_swift_existential_type,none,
       "cannot use a value of protocol type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_existential,none,
       "cannot use a value of protocol type in embedded Swift", ())
+ERROR(perf_diag_existential_type,none,
+      "cannot use a value of protocol type %0 in @_noExistential function", (Type))
+ERROR(perf_diag_existential,none,
+      "cannot use a value of protocol type in @_noExistential function", ())
 ERROR(embedded_swift_metatype_type,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_metatype,none,

@@ -1149,6 +1149,12 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *perfConstraints = PerformanceConstraints::NoLocks;
     else if (perfConstraints && SP.P.Tok.getText() == "no_allocation")
       *perfConstraints = PerformanceConstraints::NoAllocation;
+    else if (perfConstraints && SP.P.Tok.getText() == "no_runtime")
+      *perfConstraints = PerformanceConstraints::NoRuntime;
+    else if (perfConstraints && SP.P.Tok.getText() == "no_existentials")
+      *perfConstraints = PerformanceConstraints::NoExistentials;
+    else if (perfConstraints && SP.P.Tok.getText() == "no_objc_bridging")
+      *perfConstraints = PerformanceConstraints::NoObjCBridging;
     else if (markedAsUsed && SP.P.Tok.getText() == "used")
       *markedAsUsed = true;
     else if (section && SP.P.Tok.getText() == "section") {
