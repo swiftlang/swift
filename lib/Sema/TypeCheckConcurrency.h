@@ -560,6 +560,13 @@ bool isAccessibleAcrossActors(
     const DeclContext *fromDC,
     llvm::Optional<ReferencedActor> actorInstance = llvm::None);
 
+/// Determines if the 'let' can be read from anywhere within the given module,
+/// regardless of the isolation or async-ness of the context in which
+/// the var is read.
+bool isLetAccessibleAnywhere(const ModuleDecl *fromModule,
+                             VarDecl *let,
+                             ActorReferenceResult::Options &options);
+
 /// Check whether given variable references to a potentially
 /// isolated actor.
 bool isPotentiallyIsolatedActor(
