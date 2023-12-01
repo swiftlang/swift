@@ -240,8 +240,8 @@ public:
     // Copy in the pointers into the tail allocated memory. We do not need to do
     // any sorting/uniquing ourselves since we assume that our users perform
     // this task for us.
-    llvm::MutableArrayRef<void *> DataMem(reinterpret_cast<void **>(&Mem[1]),
-                                          NumElts);
+    llvm::MutableArrayRef<T> DataMem(reinterpret_cast<T *>(&Mem[1]),
+                                     NumElts);
     std::copy(Array.begin(), Array.end(), DataMem.begin());
 
     // Allocate the new node and insert it into the Set.
