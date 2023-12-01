@@ -1323,7 +1323,7 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
 #pragma mark - expandBody
 
 void FunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
-  scopeCreator.addToScopeTree(decl->getMacroExpandedBody(), this);
+  scopeCreator.addToScopeTree(decl->getBody(), this);
 }
 
 void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}

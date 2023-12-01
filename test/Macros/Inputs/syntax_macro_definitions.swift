@@ -2183,7 +2183,7 @@ public struct TracedPreambleMacro: PreambleMacro {
 }
 
 @_spi(ExperimentalLanguageFeature)
-public struct LoggerMacro: PreambleMacro {
+public struct Log2PreambleMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingPreambleFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
@@ -2203,19 +2203,16 @@ public struct LoggerMacro: PreambleMacro {
     let passedArgs = paramNames.map { "\($0): \\(\($0))" }.joined(separator: ", ")
 
     let entry: CodeBlockItemSyntax = """
-      logger.log(entering: "\(funcBaseName)(\(raw: passedArgs))")
+      log2("Entering \(funcBaseName)(\(raw: passedArgs))")
       """
 
     let argLabels = paramNames.map { "\($0):" }.joined()
 
     let exit: CodeBlockItemSyntax = """
-      logger.log(exiting: "\(funcBaseName)(\(raw: argLabels))")
+      log2("Exiting \(funcBaseName)(\(raw: argLabels))")
       """
 
     return [
-      """
-      let logger = Logger()
-      """,
       entry,
       """
       defer {
