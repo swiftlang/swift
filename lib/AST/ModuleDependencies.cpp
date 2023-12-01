@@ -567,8 +567,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       ClangScanningFormat,
       Instance.getInvocation().getFrontendOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS,
-      /* ReuseFileManager */ false, /* OptimizeArgs */ false);
+      UseClangIncludeTree ? nullptr : CacheFS);
 
   return false;
 }
