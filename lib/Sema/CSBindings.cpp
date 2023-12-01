@@ -1257,6 +1257,11 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   if (Bindings.empty())
     return false;
 
+  // Always prefer key path type if it has bindings and is not delayed
+  // because that means that it was possible to infer its capability.
+  if (TypeVar->getImpl().isKeyPathType())
+    return true;
+
   return !involvesTypeVariables();
 }
 
