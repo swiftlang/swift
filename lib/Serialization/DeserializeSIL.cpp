@@ -407,6 +407,16 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
     }
   }
 
+  // A deserialized function might reference a non-fragile function (e.g. in
+  // embedded Swift if we deserialize a specialized function, which references
+  // something that has already been specialized in the current module). Make
+  // the referenced function serialized in that case.
+  if (SILMod.getOptions().EmbeddedSwift &&
+      !fn->hasValidLinkageForFragileRef()) {
+    fn->setSerialized(IsSerialized_t(IsSerialized));
+    assert(fn->hasValidLinkageForFragileRef() && "invalid non-fragile ref");
+  }
+
   // FIXME: check for matching types.
 
   // At this point, if fn is set, we know that we have a good function to use.
