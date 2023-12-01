@@ -888,6 +888,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(*feature);
   }
 
+  // CompleteConcurrency enables all data-race safety upcoming features.
+  if (Opts.hasFeature(Feature::CompleteConcurrency)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+    Opts.Features.insert(Feature::DisableOutwardActorInference);
+  }
+
   // Map historical flags over to experimental features. We do this for all
   // compilers because that's how existing experimental feature flags work.
   if (Args.hasArg(OPT_enable_experimental_static_assert))
@@ -1002,7 +1008,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-  } else if (Opts.hasFeature(Feature::StrictConcurrency)) {
+  } else if (Opts.hasFeature(Feature::CompleteConcurrency) ||
+             Opts.hasFeature(Feature::StrictConcurrency)) {
     // Already set above.
   } else {
     // Default to minimal checking in Swift 5.x.
