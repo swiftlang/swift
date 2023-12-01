@@ -360,6 +360,12 @@ OVERRIDE_TASK_LOCAL(task_localValuePop, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, ,)
 
+OVERRIDE_TASK_LOCAL(task_localValuePopExpectedKey, bool,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::,
+                    (const HeapObject *expectedKey),
+                    (expectedKey))
+
 OVERRIDE_TASK_LOCAL(task_localsCopyTo, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,

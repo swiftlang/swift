@@ -273,13 +273,14 @@ extension TaskLocal {
   /// - SeeAlso: ``withValue(_:file:line:)``
   /// - SeeAlso: ``unsafePopValue(_:file:line:)``
   @inlinable
+  @available(SwiftStdlib 9999, *)
   // TODO(ktoso): back deploy, cannot do so with 9999 yet
   public func unsafePushValue(_ valueDuringOperation: __owned Value,
                               file: String = #fileID, line: UInt = #line) {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
-    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    _taskLocalValuePush(key: self.key, value: consume valueDuringOperation)
   }
 
   /// Unsafe API for removing a task-local binding from the bindings stack.
@@ -294,9 +295,14 @@ extension TaskLocal {
   /// - SeeAlso: ``withValue(_:file:line:)``
   /// - SeeAlso: ``unsafePushValue(_:file:line:)``
   @inlinable
+  @available(SwiftStdlib 9999, *)
   // TODO(ktoso): back deploy, cannot do so with 9999 yet
-  public func unsafePopValue(file: String = #fileID, line: UInt = #line) {
-    _taskLocalValuePop()
+  public func unsafePopValue(file: StaticString = #fileID, line: UInt = #line) {
+    guard _taskLocalValuePopExpectedKey(self.key) else {
+      fatalError("unsafePopValue key did not match actually removed binding. " +
+        "This a indicates not well-balanced push/pop pair of calls. " +
+        "Expected key \(Self.self)", file: file, line: line)
+    }
   }
 
 }
@@ -316,6 +322,13 @@ func _taskLocalValuePush<Value>(
 @usableFromInline
 @_silgen_name("swift_task_localValuePop")
 func _taskLocalValuePop()
+
+@available(SwiftStdlib 9999, *)
+@usableFromInline
+@_silgen_name("swift_task_localValuePopExpectedKey")
+func _taskLocalValuePopExpectedKey(
+  _ expectedKey: Builtin.RawPointer/*Key*/
+) -> Bool
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localValueGet")

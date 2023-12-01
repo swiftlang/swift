@@ -637,6 +637,17 @@ void swift_task_localValuePush(const HeapObject *key,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localValuePop();
 
+/// Similar to `swift_task_localValuePop` however validates the popped
+/// task local item's key against the expected key.
+///
+/// Its Swift signature is
+///
+/// \code
+///  public func _taskLocalValuePopExpectedKey(Any.Type)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_localValuePopExpectedKey(const HeapObject *expectedKey);
+
 /// Copy all task locals from the current context to the target task.
 ///
 /// Its Swift signature is

@@ -18,6 +18,9 @@ enum TL {
 
   @TaskLocal
   static var number: Int = 0
+
+  @TaskLocal
+  static var other: String = ""
 }
 
 @main struct Main {
@@ -41,6 +44,15 @@ enum TL {
         TL.$number.unsafePopValue()
         TL.$number.unsafePopValue() // BAD ALREADY! tries to pop in parent!
       }.value
+    }
+
+    tests.test("pop unexpected key") {
+      expectCrashLater(withMessage:
+        "unsafePopValue key did not match actually removed binding. This a indicates not well-balanced push/pop pair of calls. Expected key TaskLocal<Int>")
+      TL.$number.unsafePushValue(1)
+      TL.$other.unsafePushValue("hi")
+      // expected order of popping should be reverse of pushing
+      TL.$number.unsafePopValue()
     }
 
     await runAllTestsAsync()

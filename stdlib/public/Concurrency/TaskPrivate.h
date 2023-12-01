@@ -1130,6 +1130,11 @@ inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
 }
 
+inline ExpectedTaskLocalKeyPopResult
+AsyncTask::localValuePopExpectedKey(const HeapObject *expectedKey) {
+  return _private().Local.popValueExpectingKey(this, expectedKey);
+}
+
 } // end namespace swift
 
 #endif

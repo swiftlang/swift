@@ -27,6 +27,7 @@ struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
 class TaskGroup;
+struct ExpectedTaskLocalKeyPopResult;
 
 // ==== Task Locals Values ---------------------------------------------------
 
@@ -199,6 +200,13 @@ public:
     /// and `false` if the just popped value was the last one and the storage
     /// can be safely disposed of.
     bool popValue(AsyncTask *task);
+
+    /// Pop a value form the task-local bindings chain and compare the popped
+    /// item's key with the expected key.
+    ///
+    /// \param expectedKey the expected key to pop.
+    /// \return `true` if the popped item has matching `key`, `false` otherwise
+    ExpectedTaskLocalKeyPopResult popValueExpectingKey(AsyncTask *task, const HeapObject *expectedKey);
 
     /// Copy all task-local bindings to the target task.
     ///

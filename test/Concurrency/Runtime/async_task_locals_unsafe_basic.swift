@@ -86,11 +86,11 @@ func nested() async {
       printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (2)
       printTaskLocal(TL.$string, "hello") // CHECK: TaskLocal<String>(defaultValue: <undefined>) (hello)
     }
-    TL.$clazz.unsafePopValue() // pop "2"
+    TL.$number.unsafePopValue() // pop "2"
     printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
     printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (hello)
   }
-  TL.$clazz.unsafePopValue() // pop "hello"
+  TL.$string.unsafePopValue() // pop "hello"
   printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }

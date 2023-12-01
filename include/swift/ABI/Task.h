@@ -246,6 +246,18 @@ struct ResultTypeInfo {
 #endif
 };
 
+/// Result of `localValuePopExpectedKey`.
+struct ExpectedTaskLocalKeyPopResult {
+public:
+  bool hasRemainingBindings;
+  bool keyMatched;
+
+  explicit ExpectedTaskLocalKeyPopResult(
+      bool hasRemainingBindings, bool keyMatched)
+      : hasRemainingBindings(hasRemainingBindings),
+        keyMatched(keyMatched) {}
+};
+
 /// An asynchronous task.  Tasks are the analogue of threads for
 /// asynchronous functions: that is, they are a persistent identity
 /// for the overall async computation.
@@ -420,6 +432,8 @@ public:
 
   /// Returns true if storage has still more bindings.
   bool localValuePop();
+
+  ExpectedTaskLocalKeyPopResult localValuePopExpectedKey(const HeapObject *key);
 
   // ==== Child Fragment -------------------------------------------------------
 

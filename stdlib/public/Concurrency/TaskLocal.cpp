@@ -131,6 +131,32 @@ static void swift_task_localValuePopImpl() {
 }
 
 SWIFT_CC(swift)
+static bool swift_task_localValuePopExpectedKeyImpl(
+    const HeapObject *expectedKey) {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    auto result = task->localValuePopExpectedKey(expectedKey);
+    return result.keyMatched;
+  }
+
+  if (TaskLocal::Storage *Local = FallbackTaskLocalStorage::get()) {
+    auto result = Local->popValueExpectingKey(nullptr, expectedKey);
+    if (!result.hasRemainingBindings) {
+      // We clean up eagerly, it may be that this non-swift-concurrency thread
+      // never again will use task-locals, and as such we better remove the storage.
+      FallbackTaskLocalStorage::set(nullptr);
+      free(Local);
+    }
+    return result.keyMatched;
+  }
+
+  swift_reportError(0, "Attempted to pop task-local binding from empty "
+                       "task-local bindings stack! This indicates an "
+                       "un-balanced number of 'unsafePushValue' and "
+                       "'unsafePopValue' calls.");
+  abort();
+}
+
+SWIFT_CC(swift)
 static void swift_task_localsCopyToImpl(AsyncTask *task) {
   TaskLocal::Storage *Local = nullptr;
 
@@ -372,6 +398,27 @@ bool TaskLocal::Storage::popValue(AsyncTask *task) {
 
   /// if pointing at not-null next item, there are remaining bindings.
   return head != nullptr;
+}
+
+ExpectedTaskLocalKeyPopResult TaskLocal::Storage::popValueExpectingKey(
+    AsyncTask *task,
+    const HeapObject *expectedKey) {
+  if (!head) {
+    swift_reportError(0, "Attempted to pop task-local value binding from empty "
+                         "task-local bindings stack. This indicates an "
+                         "un-balanced number of 'unsafePushValue' and "
+                         "'unsafePopValue' calls.");
+    abort();
+  }
+  auto old = head;
+  head = head->getNext();
+
+  bool hasRemainingBindings = head != nullptr;
+  bool keyMatched = old->key == expectedKey;
+
+  old->destroy(task);
+
+  return ExpectedTaskLocalKeyPopResult(hasRemainingBindings, keyMatched);
 }
 
 OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,

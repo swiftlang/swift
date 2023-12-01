@@ -269,6 +269,11 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValuePop) {
   swift_task_localValuePop();
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_task_localValuePopExpectedKey) {
+  swift_task_localValuePopExpectedKey(nullptr);
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localsCopyTo) {
   swift_task_localsCopyTo(nullptr);
 }
