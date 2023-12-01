@@ -2,6 +2,8 @@
 //
 // REQUIRES: VENDOR=apple
 
+// REQUIRES: swift_stdlib_no_asserts
+
 // Tests for the OSLogOptimization pass that performs compile-time analysis
 // and optimization of the new os log APIs. The tests here check whether specific
 // compile-time constants such as the format string, the size of the byte buffer etc. are
