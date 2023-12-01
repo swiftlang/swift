@@ -1025,16 +1025,14 @@ public:
       SourceLoc loc = S->getThrowLoc();
       if (loc.isValid()) {
         auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
-
-        if (!catchNode) {
-          Out << "No catch context for throw statement\n";
-          abort();
-        }
-
-        if (auto thrown = catchNode.getThrownErrorTypeInContext(Ctx)) {
-          thrownError = *thrown;
+	if (catchNode) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(Ctx)) {
+            thrownError = *thrown;
+          } else {
+            thrownError = Ctx.getNeverType();
+          }
         } else {
-          thrownError = Ctx.getNeverType();
+          thrownError = checkExceptionTypeExists("throw expression");
         }
       } else {
         return;
