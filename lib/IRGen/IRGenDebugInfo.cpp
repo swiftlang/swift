@@ -268,10 +268,36 @@ public:
   /// Decode (and cache) a SourceLoc.
   FileAndLocation decodeSourceLoc(SourceLoc SL) {
     auto &Cached = FileAndLocationCache[SL.getOpaquePointerValue()];
-    if (!Cached.File) {
-      Cached = getFileAndLocation(
-          SILLocation::decode(SL, SM, /*ForceGeneratedSourceToDisk=*/true));
+    if (Cached.File)
+      return Cached;
+
+    if (!SL.isValid()) {
+      Cached.File = CompilerGeneratedFile;
+      return Cached;
     }
+
+    // If the source buffer is a macro, extract its full text.
+    llvm::Optional<StringRef> Source;
+    bool ForceGeneratedSourceToDisk = Opts.DWARFVersion < 5;
+    if (!ForceGeneratedSourceToDisk) {
+      auto BufferID = SM.findBufferContainingLoc(SL);
+      if (auto generatedInfo = SM.getGeneratedSourceInfo(BufferID)) {
+        // We only care about macros, so skip everything else.
+        if (generatedInfo->kind != GeneratedSourceInfo::ReplacedFunctionBody &&
+            generatedInfo->kind != GeneratedSourceInfo::PrettyPrinted)
+          if (auto *MemBuf = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID))
+            Source = MemBuf->getBuffer();
+      }
+    }
+    Cached.File = getOrCreateFile(
+        SM.getDisplayNameForLoc(SL, !ForceGeneratedSourceToDisk), Source);
+    std::tie(Cached.Line, Cached.Column) =
+        SM.getPresumedLineAndColumnForLoc(SL);
+    // When WinDbg finds two locations with the same line but different
+    // columns, the user must select an address when they break on that
+    // line. Also, clang does not emit column locations in CodeView for C++.
+    if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+      Cached.Column = 0;
     return Cached;
   }
 
@@ -295,7 +321,7 @@ private:
     const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
     StringRef Filename = getFilenameFromDC(DC);
     if (!Filename.empty())
-      L.File = getOrCreateFile(Filename);
+      L.File = getOrCreateFile(Filename, {});
     return L;
   }
 
@@ -306,7 +332,7 @@ private:
     // line. Also, clang does not emit column locations in CodeView for C++.
     bool CodeView = Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView;
     return {FL.line, CodeView ? (uint16_t)0 : FL.column,
-            getOrCreateFile(FL.filename)};
+            getOrCreateFile(FL.filename, {})};
   }
 
   /// Use the Swift SM to figure out the actual line/column of a SourceLoc.
@@ -345,7 +371,7 @@ private:
         return L;
       L.Line = PresumedLoc.getLine();
       L.Column = PresumedLoc.getColumn();
-      L.File = getOrCreateFile(PresumedLoc.getFilename());
+      L.File = getOrCreateFile(PresumedLoc.getFilename(), {});
       return L;
     }
     return getSwiftFileAndLocation(D, End);
@@ -457,7 +483,8 @@ private:
 
 #endif
 
-  llvm::DIFile *getOrCreateFile(StringRef Filename) {
+  llvm::DIFile *getOrCreateFile(StringRef Filename,
+                                llvm::Optional<StringRef> Source) {
     if (Filename.empty())
       Filename = SILLocation::getCompilerGeneratedLoc()->filename;
 
@@ -486,7 +513,7 @@ private:
       }
     }
 
-    return createFile(Filename, llvm::None, llvm::None);
+    return createFile(Filename, llvm::None, Source);
   }
 
   /// This is effectively \p clang::CGDebugInfo::createFile().
@@ -2077,7 +2104,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   MainFile = (RelFile && RelDir)
                  ? createFile(SourcePath, {}, {})
                  : DBuilder.createFile(RemappedFile, RemappedDir);
-  CompilerGeneratedFile = getOrCreateFile("");
+  CompilerGeneratedFile = getOrCreateFile("", {});
 
   StringRef Sysroot = IGM.Context.SearchPathOpts.getSDKPath();
   StringRef SDK;
@@ -2287,7 +2314,7 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   else {
     std::string FuncName = "Swift runtime failure: ";
     FuncName += failureMsg;
-    llvm::DIFile *File = getOrCreateFile({});
+    llvm::DIFile *File = getOrCreateFile({}, {});
     TrapSP = DBuilder.createFunction(
         File, FuncName, StringRef(), File, 0,
         DIFnTy, 0, llvm::DINode::FlagArtificial,
