@@ -2764,24 +2764,6 @@ static bool requiresNoDefinition(Decl *decl) {
   return false;
 }
 
-/// Expand all preamble macros attached to the given function declaration.
-static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
-  std::vector<ASTNode> preamble;
-
-  ASTContext &ctx = func->getASTContext();
-  ExpandPreambleMacroRequest request{func};
-  auto module = func->getParentModule();
-  for (auto bufferID : evaluateOrDefault(ctx.evaluator, request, { })) {
-    auto bufferStart = ctx.SourceMgr.getLocForBufferStart(bufferID);
-    auto preambleSF = module->getSourceFileContainingLocation(bufferStart);
-    preamble.insert(preamble.end(),
-                    preambleSF->getTopLevelItems().begin(),
-                    preambleSF->getTopLevelItems().end());
-  }
-
-  return preamble;
-}
-
 BraceStmt *
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
@@ -2855,17 +2837,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
         body->walk(ContextualizeClosuresAndMacros(AFD));
       }
     }
-  }
-
-  // Expand any preamble macros and introduce them into the body.
-  auto preamble = expandPreamble(AFD);
-  if (!preamble.empty()) {
-    auto newBody = std::move(preamble);
-    newBody.insert(
-        newBody.end(), body->getElements().begin(), body->getElements().end());
-
-    body = BraceStmt::create(
-        ctx, body->getLBraceLoc(), newBody, body->getRBraceLoc());
   }
 
   // Typechecking, in particular ApplySolution is going to replace closures

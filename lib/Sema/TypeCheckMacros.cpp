@@ -834,6 +834,29 @@ getExplicitInitializerRange(AbstractStorageDecl *storage) {
   return SourceRange(equalLoc, initRange.End);
 }
 
+/// Compute the original source range for expanding a preamble macro.
+static CharSourceRange getPreambleMacroOriginalRange(AbstractFunctionDecl *fn) {
+  ASTContext &ctx = fn->getASTContext();
+
+  SourceLoc insertionLoc;
+
+  // If there is a body macro, start at the beginning of it.
+  if (auto bodyBufferID = evaluateOrDefault(
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+    insertionLoc = ctx.SourceMgr.getRangeForBuffer(*bodyBufferID).getStart();
+  } else {
+    // If there is a parsed body, start at the beginning of it.
+    SourceRange range = fn->getBodySourceRange();
+    if (range.isValid()) {
+      insertionLoc = range.Start;
+    } else {
+      insertionLoc = fn->getEndLoc();
+    }
+  }
+
+  return CharSourceRange(insertionLoc, 0);
+}
+
 static CharSourceRange getExpansionInsertionRange(MacroRole role,
                                                   ASTNode target,
                                                   SourceManager &sourceMgr) {
@@ -907,15 +930,11 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
 
   case MacroRole::Preamble: {
-    SourceLoc inBodyLoc;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(target.get<Decl *>())) {
-      inBodyLoc = fn->getMacroExpandedBody()->getStartLoc();
+      return getPreambleMacroOriginalRange(fn);
     }
 
-    if (inBodyLoc.isInvalid())
-      inBodyLoc = target.getEndLoc();
-
-    return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, inBodyLoc), 0);
+    return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc()), 0);
   }
 
   case MacroRole::Body: {
