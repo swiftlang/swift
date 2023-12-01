@@ -1828,10 +1828,17 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 
   auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
 
-  // Allow to compose key path type with a protocol as a way to express
-  // additional requirements on the parameter.
+  // Allow to compose key path type with a `Sendable` protocol as
+  // a way to express sendability requirement.
   if (auto *existential = paramTy->getAs<ExistentialType>()) {
-    paramTy = existential->getExistentialLayout().explicitSuperclass;
+    auto layout = existential->getExistentialLayout();
+
+    auto protocols = layout.getProtocols();
+    if (!(protocols.size() == 1 &&
+          protocols[0] == ctx.getProtocol(KnownProtocolKind::Sendable)))
+      return false;
+
+    paramTy = layout.getSuperclass();
     if (!paramTy)
       return false;
   }

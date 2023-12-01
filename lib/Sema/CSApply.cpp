@@ -2372,8 +2372,10 @@ namespace {
       };
 
       Type keyPathTy = argType;
-      if (auto *existential = keyPathTy->getAs<ExistentialType>())
-        keyPathTy = existential->getExistentialLayout().explicitSuperclass;
+      if (auto *existential = keyPathTy->getAs<ExistentialType>()) {
+        keyPathTy = existential->getSuperclass();
+        assert(isKnownKeyPathType(keyPathTy));
+      }
 
       SmallVector<Component, 2> components;
       auto *componentLoc = cs.getConstraintLocator(

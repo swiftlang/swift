@@ -3487,8 +3487,10 @@ void ConstraintSystem::bindOverloadType(
     // and U is a leaf type (aka member type).
     auto paramTy = fnType->getParams()[0].getPlainType();
 
-    if (auto *existential = paramTy->getAs<ExistentialType>())
-      paramTy = existential->getExistentialLayout().explicitSuperclass;
+    if (auto *existential = paramTy->getAs<ExistentialType>()) {
+      paramTy = existential->getSuperclass();
+      assert(isKnownKeyPathType(paramTy));
+    }
 
     auto keyPathTy = paramTy->castTo<BoundGenericType>();
 
