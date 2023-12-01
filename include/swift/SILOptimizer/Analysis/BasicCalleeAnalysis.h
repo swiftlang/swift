@@ -97,6 +97,8 @@ public:
   }
 
   MemoryBehavior getMemoryBehavior(ApplySite as, bool observeRetains);
+
+  CalleeCache *getCalleeCache() { return Cache.get(); }
 };
 
 bool isDeinitBarrier(SILInstruction *const instruction,
