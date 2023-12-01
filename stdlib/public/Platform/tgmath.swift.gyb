@@ -329,6 +329,7 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 @available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message:
            "use ${T}(nan: ${T}.RawSignificand).")
 @_transparent
+@_unavailableInEmbedded
 public func nan(_ tag: String) -> ${T} {
   return ${T}(nan${f}(tag))
 }
