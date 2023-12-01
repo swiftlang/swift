@@ -119,6 +119,8 @@ public:
   using iterator = typename llvm::ArrayRef<T>::iterator;
   iterator begin() const { return Data.begin(); }
   iterator end() const { return Data.end(); }
+  llvm::iterator_range<iterator> range() const { return {begin(), end()}; }
+  llvm::ArrayRef<T> data() const { return Data; }
 
   unsigned size() const { return Data.size(); }
   bool empty() const { return Data.empty(); }

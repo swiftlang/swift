@@ -15,6 +15,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
+#include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -37,6 +38,10 @@
 
 using namespace swift;
 using namespace swift::PartitionPrimitives;
+
+namespace {
+using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
+} // namespace
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -2095,9 +2100,12 @@ class BlockPartitionState {
   /// block.
   std::vector<PartitionOp> blockPartitionOps = {};
 
+  TransferringOperandSetFactory &ptrSetFactory;
+
   BlockPartitionState(SILBasicBlock *basicBlock,
-                      PartitionOpTranslator &translator)
-      : basicBlock(basicBlock) {
+                      PartitionOpTranslator &translator,
+                      TransferringOperandSetFactory &ptrSetFactory)
+      : basicBlock(basicBlock), ptrSetFactory(ptrSetFactory) {
     translator.translateSILBasicBlock(basicBlock, blockPartitionOps);
   }
 
@@ -2108,7 +2116,7 @@ class BlockPartitionState {
   /// to discover if an error occured.
   bool recomputeExitFromEntry(PartitionOpTranslator &translator) {
     Partition workingPartition = entryPartition;
-    PartitionOpEvaluator eval(workingPartition);
+    PartitionOpEvaluator eval(workingPartition, ptrSetFactory);
     eval.isClosureCapturedCallback = [&](Element element, Operand *op) -> bool {
       auto iter = translator.getValueForId(element);
       if (!iter)
@@ -2376,6 +2384,9 @@ class PartitionAnalysis {
 
   BasicBlockData<BlockPartitionState> blockStates;
 
+  llvm::BumpPtrAllocator allocator;
+  TransferringOperandSetFactory ptrSetFactory;
+
   SILFunction *function;
 
   PostOrderFunctionInfo *pofi;
@@ -2389,9 +2400,11 @@ class PartitionAnalysis {
       : translator(fn, pofi),
         blockStates(fn,
                     [this](SILBasicBlock *block) {
-                      return BlockPartitionState(block, translator);
+                      return BlockPartitionState(block, translator,
+                                                 ptrSetFactory);
                     }),
-        function(fn), pofi(pofi), solved(false) {
+        allocator(), ptrSetFactory(allocator), function(fn), pofi(pofi),
+        solved(false) {
     // Initialize the entry block as needing an update, and having a partition
     // that places all its non-sendable args in a single region
     blockStates[fn->getEntryBlock()].needsUpdate = true;
@@ -2453,8 +2466,6 @@ class PartitionAnalysis {
                      predState.exitPartition.print(llvm::dbgs()));
           newEntryPartition =
               Partition::join(newEntryPartition, predState.exitPartition);
-          LLVM_DEBUG(llvm::dbgs() << "        Join: ";
-                     newEntryPartition.print(llvm::dbgs()));
         }
 
         // If we found predecessor blocks, then attempt to use them to update
@@ -2510,7 +2521,7 @@ class PartitionAnalysis {
       // Grab its entry partition and setup an evaluator for the partition that
       // has callbacks that emit diagnsotics...
       Partition workingPartition = blockState.getEntryPartition();
-      PartitionOpEvaluator eval(workingPartition);
+      PartitionOpEvaluator eval(workingPartition, ptrSetFactory);
       eval.failureCallback = /*handleFailure=*/
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal,
               TransferringOperand transferringOp) {

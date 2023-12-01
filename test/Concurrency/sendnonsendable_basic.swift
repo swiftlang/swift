@@ -15,7 +15,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 22{{}}
+class NonSendableKlass { // expected-complete-note 25{{}}
   var field: NonSendableKlass? = nil
 
   func asyncCall() async {}
@@ -137,10 +137,10 @@ func closureInOut2(_ a: Actor) async {
 
   closure = { useInOut(&contents) } // expected-tns-note {{access here could race}}
 
-  await a.useKlass(ns1)
+  await a.useKlass(ns1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
-  closure()
+  closure() // expected-tns-note {{access here could race}}
 }
 
 func closureNonInOut(_ a: Actor) async {
@@ -1118,28 +1118,27 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
   useValue(test)  // expected-tns-note {{access here could race}}
 }
 
-// In this case since we are tracking the transfer from the if statement, we
-// do not track the closure.
-//
-// TODO: Change to track all sets.
 func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
   var test = StructFieldTests()
   test = StructFieldTests()
   var cls = {}
 
+  // In this test case, the first transfer errors on the
+  // test.varSendableNonTrivial b/c of the cls. Since we don't have cls on the
+  // else path, it emits on useValue(test).
   if await booleanFlag {
     cls = {
       useInOut(&test.varSendableNonTrivial)
     }
     _ = cls
-    await transferToMain(test)
+    await transferToMain(test) // expected-tns-warning {{passing argument of non-sendable type 'StructFieldTests' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   } else {
     await transferToMain(test) // expected-tns-warning {{passing argument of non-sendable type 'StructFieldTests' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   }
 
-  test.varSendableNonTrivial = SendableKlass()
+  test.varSendableNonTrivial = SendableKlass() // expected-tns-note {{access here could race}}
   useValue(test)  // expected-tns-note {{access here could race}}
 }
 
@@ -1151,7 +1150,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive7() async {
   var cls = {}
 
   if await booleanFlag {
-    await transferToMain(test)
+    await transferToMain(test) // expected-tns-warning {{passing argument of non-sendable type 'StructFieldTests' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
   } else {
     cls = {
@@ -1163,7 +1162,7 @@ func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive7() async {
   }
 
   test.varSendableNonTrivial = SendableKlass() // expected-tns-note {{access here could race}}
-  useValue(test)
+  useValue(test) // expected-tns-note {{access here could race}}
 }
 
 ////////////////////////////
@@ -1228,3 +1227,42 @@ func varNonSendableNonTrivialVarTupleFieldTest() async {
   useValue(test)
 }
 
+//////////////////////////////
+// MARK: Control Flow Tests //
+//////////////////////////////
+
+func controlFlowTest1() async {
+  let x = NonSendableKlass()
+
+  if await booleanFlag {
+    await transferToMain(x) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  } else {
+    await transferToMain(x) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  useValue(x) // expected-tns-note 2{{access here could race}}
+}
+
+// This test seems like something that we should not error upon. What is
+// happening here is that when we get to the bottom of the for loop, we realize
+// that x's old value and x/x's new value are in different regions. But when we
+// merge back into the loop header, we note that the loop entry block has x/x's
+// old value in the same region so when we merge, we get that x/x's old
+// value/x's new value are all in the same region. We emit the error on useValue
+// as well afterwards since if we exit from the loop header, we have that large
+// merge region leave the for loop.
+func controlFlowTest2() async {
+  var x = NonSendableKlass()
+
+  for _ in 0..<1024 {
+    await transferToMain(x) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-tns-note @-1 {{access here could race}}
+    // expected-complete-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+    x = NonSendableKlass()
+  }
+
+  useValue(x) // expected-tns-note {{access here could race}}
+}
