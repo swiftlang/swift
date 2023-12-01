@@ -1,9 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftCore.dylib > %t/symbols
-// RUN: { grep -Ev "^/|^$" %s || true; } > %t/changes
-// RUN: cat %t/changes | while read line; do if [[ $line =~ ^Added:\ (.*)$ ]]; then sed -i "" "/${BASH_REMATCH[1]}/d" %t/symbols; fi done
-// RUN: cat %t/changes | while read line; do if [[ $line =~ ^Removed:\ (.*)$ ]]; then echo "${BASH_REMATCH[1]}" >> %t/symbols; fi done
-// RUN: sort %t/symbols -o %t/symbols
+// RUN: %abi-symbol-checker %s %t/symbols
 // RUN: diff -u %S/../../Inputs/macOS/arm64/stdlib/baseline %t/symbols
 
 // REQUIRES: swift_stdlib_no_asserts

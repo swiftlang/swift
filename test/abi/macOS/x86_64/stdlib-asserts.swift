@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: nm -g --defined-only -f just-symbols %stdlib_dir/x86_64/libswiftCore.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols
-// RUN: diff -u %S/../../Inputs/macOS/x86_64/stdlib/baseline %t/symbols
+// RUN: diff -u %S/../../Inputs/macOS/x86_64/stdlib/baseline-asserts %t/symbols
 
-// REQUIRES: swift_stdlib_no_asserts
+// REQUIRES: swift_stdlib_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-x86_64
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
