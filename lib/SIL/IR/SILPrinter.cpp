@@ -3318,9 +3318,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   PerformanceConstraints perf = getPerfConstraints();
   switch (perf) {
-    case PerformanceConstraints::None:         break;
-    case PerformanceConstraints::NoLocks:      OS << "[no_locks] "; break;
-    case PerformanceConstraints::NoAllocation: OS << "[no_allocation] "; break;
+    case PerformanceConstraints::None:           break;
+    case PerformanceConstraints::NoLocks:        OS << "[no_locks] "; break;
+    case PerformanceConstraints::NoAllocation:   OS << "[no_allocation] "; break;
+    case PerformanceConstraints::NoRuntime:      OS << "[no_runtime] "; break;
+    case PerformanceConstraints::NoExistentials: OS << "[no_existentials] "; break;
+    case PerformanceConstraints::NoObjCBridging: OS << "[no_objc_bridging] "; break;
   }
 
   if (getEffectsKind() == EffectsKind::ReadOnly)

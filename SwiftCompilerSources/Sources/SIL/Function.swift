@@ -203,6 +203,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case none
     case noAllocations
     case noLocks
+    case noRuntime
+    case noExistentials
+    case noObjCRuntime
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -210,6 +213,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .None: return .none
       case .NoAllocation: return .noAllocations
       case .NoLocks: return .noLocks
+      case .NoRuntime: return .noRuntime
+      case .NoExistentials: return .noExistentials
+      case .NoObjCBridging: return .noObjCRuntime
       default: fatalError("unknown performance constraint")
     }
   }
