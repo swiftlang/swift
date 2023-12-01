@@ -225,6 +225,17 @@ namespace serialized_diagnostics {
 } // namespace serialized_diagnostics
 } // namespace swift
 
+/// Sanitize a filename for the purposes of the serialized diagnostics reader.
+static StringRef sanitizeFilename(
+    StringRef filename, SmallString<32> &scratch) {
+  if (!filename.endswith("/") && !filename.endswith("\\"))
+    return filename;
+
+  scratch = filename;
+  scratch += "_operator";
+  return scratch;
+}
+
 unsigned SerializedDiagnosticConsumer::getEmitFile(
     SourceManager &SM, StringRef Filename, unsigned bufferID
 ) {
@@ -248,9 +259,14 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   Record.push_back(entry);
   Record.push_back(0); // For legacy.
   Record.push_back(0); // For legacy.
-  Record.push_back(Filename.size());
+  
+  // Sanitize the filename enough that the serialized diagnostics reader won't
+  // reject it.
+  SmallString<32> filenameScratch;
+  auto sanitizedFilename = sanitizeFilename(Filename, filenameScratch);
+  Record.push_back(sanitizedFilename.size());
   State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_FILENAME),
-                                   Record, Filename.data());
+                                   Record, sanitizedFilename.data());
 
   // If the buffer contains code that was synthesized by the compiler,
   // emit the contents of the buffer.
