@@ -537,10 +537,16 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 }
 
 bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
-                                    VarDecl *let) {
+                                    VarDecl *let,
+                                    ActorReferenceResult::Options &options) {
   auto isolation = getActorIsolation(let);
-  ActorReferenceResult::Options options = llvm::None;
   return varIsSafeAcrossActors(fromModule, let, isolation, options);
+}
+
+bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
+                                    VarDecl *let) {
+  ActorReferenceResult::Options options = llvm::None;
+  return isLetAccessibleAnywhere(fromModule, let, options);
 }
 
 namespace {
