@@ -2470,7 +2470,10 @@ bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
 
   auto baseTy =
       simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
-  return getApplicationLevel(*this, baseTy, UDE) < 2;
+  auto level = getApplicationLevel(*this, baseTy, UDE);
+  // Static members have base applied implicitly which means that their
+  // application level is lower.
+  return level < (baseTy->is<MetatypeType>() ? 1 : 2);
 }
 
 DeclReferenceType
