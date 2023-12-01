@@ -439,29 +439,38 @@ GlobalActorAttributeRequest::evaluate(
             .warnUntilSwiftVersion(6)
             .fixItRemove(globalActorAttr->getRangeWithAt());
 
+        auto &ctx = decl->getASTContext();
         auto *storage = accessor->getStorage();
         // Let's suggest to move the attribute to the storage if
         // this is an accessor/addressor of a property of subscript.
         if (storage->getDeclContext()->isTypeContext()) {
-          // If enclosing declaration has a global actor,
-          // skip the suggestion.
-          if (storage->getGlobalActorAttr())
-            return llvm::None;
+          auto canMoveAttr = [&]() {
+            // If enclosing declaration has a global actor,
+            // skip the suggestion.
+            if (storage->getGlobalActorAttr())
+              return false;
 
-          // Global actor attribute cannot be applied to
-          // an instance stored property of a struct.
-          if (auto *var = dyn_cast<VarDecl>(storage)) {
-            if (isStoredInstancePropertyOfStruct(var))
-              return llvm::None;
+            // Global actor attribute cannot be applied to
+            // an instance stored property of a struct.
+            if (auto *var = dyn_cast<VarDecl>(storage)) {
+              return !isStoredInstancePropertyOfStruct(var);
+            }
+
+            return true;
+          };
+
+          if (canMoveAttr()) {
+            decl->diagnose(diag::move_global_actor_attr_to_storage_decl,
+                           storage)
+                .fixItInsert(
+                    storage->getAttributeInsertionLoc(/*forModifier=*/false),
+                    llvm::Twine("@", result->second->getNameStr()).str());
           }
-
-          decl->diagnose(diag::move_global_actor_attr_to_storage_decl, storage)
-              .fixItInsert(
-                  storage->getAttributeInsertionLoc(/*forModifier=*/false),
-                  llvm::Twine("@", result->second->getNameStr()).str());
         }
 
-        return llvm::None;
+        // In Swift 6, once the diag above is an error, it is disallowed.
+        if (ctx.isSwiftVersionAtLeast(6))
+          return llvm::None;
       }
     }
     // Functions are okay.
