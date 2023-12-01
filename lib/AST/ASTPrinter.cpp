@@ -3702,6 +3702,8 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>();
 }
 
+static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {

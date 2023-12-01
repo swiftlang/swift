@@ -269,6 +269,9 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
+/// Enable bitwise-copyable feature.
+EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
