@@ -15,6 +15,12 @@ import BasicBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
+extension EffectSpecifiersSyntax {
+  var thrownError: TypeSyntax? {
+    throwsClause?.type
+  }
+}
+
 /// Check if an `TypeSyntax` can be generated using ASTGen.
 ///
 /// If all the type nodes that shares the first token are migrated,
@@ -278,7 +284,7 @@ extension ASTGenVisitor {
       ),
       asyncLoc: (node.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsLoc: (node.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(type: node.effectSpecifiers?.thrownError?.type),
+      thrownType: self.generate(type: node.effectSpecifiers?.thrownError),
       arrowLoc: node.returnClause.arrow.bridgedSourceLoc(in: self),
       resultType: generate(type: node.returnClause.type)
     )
