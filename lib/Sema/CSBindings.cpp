@@ -1253,6 +1253,12 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
     return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
+  // If this is an array literal type, it's preferrable to bind it
+  // early (unless it's delayed) to connect all of its elements even
+  // if it doesn't have any bindings.
+  if (TypeVar->getImpl().isArrayLiteralType())
+    return !involvesTypeVariables();
+
   // Don't prioritize type variables that don't have any direct bindings.
   if (Bindings.empty())
     return false;
