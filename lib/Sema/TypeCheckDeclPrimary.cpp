@@ -41,6 +41,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -206,8 +207,10 @@ static void checkInheritanceClause(
       auto layout = inheritedTy->getExistentialLayout();
 
       // An inverse on an extension is an error.
-      if (isa<ExtensionDecl>(decl) && inheritedTy->is<InverseType>())
-        decl->diagnose(diag::inverse_extension, inheritedTy);
+      if (isa<ExtensionDecl>(decl))
+        if (auto pct = inheritedTy->getAs<ProtocolCompositionType>())
+          if (!pct->getInverses().empty())
+            decl->diagnose(diag::inverse_extension, inheritedTy);
 
       // Subclass existentials are not allowed except on classes and
       // non-@objc protocols.
@@ -2011,15 +2014,21 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (otherProto == proto)
       continue;
 
-    if (EnabledNoncopyableGenerics) {
+    if (EnabledNoncopyableGenerics
+        && otherProto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       // For any protocol 'P', there is an implied requirement 'Self: Copyable',
       // unless it was suppressed via `Self: ~Copyable`. So if this suppression
       // annotation exists yet Copyable was implied anyway, emit a diagnostic.
-      if (otherProto->isSpecificProtocol(KnownProtocolKind::Copyable))
-        if (!proto->canBeNoncopyable())
-          continue; // no ~Copyable annotation
+      auto inverse = proto->getNoncopyableMarking().getInverse();
+      if (!inverse.isPresent())
+        continue; // no ~Copyable annotation
 
-      // TODO(kavon): emit tailored error diagnostic to remove the ~Copyable
+      auto &Diags = proto->getASTContext().Diags;
+      Diags.diagnose(inverse.getLoc(),
+                     diag::noncopyable_generic_but_copyable,
+                     proto->getSelfInterfaceType(),
+                     getProtocolName(KnownProtocolKind::Copyable));
+      continue;
     }
 
     // SIMDScalar in the standard library currently emits this warning for:

@@ -20,6 +20,7 @@ protocol P {
 protocol U {}
 
 extension U where Self: ~Copyable {} // expected-error {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
+// expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
 extension P {
   func g() where Self: ~Copyable {} // expected-error {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
@@ -35,6 +36,7 @@ struct S<T> {
   // expected-error@+1 {{parameter of noncopyable type 'U' must specify ownership}}
   func fn<U>(_ u: U)
     where T: ~Copyable, // expected-error {{cannot add inverse constraint 'T: ~Copyable' on generic parameter 'T' defined in outer scope}}
+                        // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
           U: ~Copyable
           {}
 
@@ -42,3 +44,8 @@ struct S<T> {
 }
 
 extension S where T: NoCopyReq & ~Copyable {} // expected-error {{cannot add inverse constraint 'T: ~Copyable' on generic parameter 'T' defined in outer scope}}
+// expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+
+struct ExtraInverse<T: ~Copyable> {
+  func check() where T: ~Copyable {} // expected-error {{cannot add inverse constraint 'T: ~Copyable' on generic parameter 'T' defined in outer scope}}
+}

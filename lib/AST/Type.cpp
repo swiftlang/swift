@@ -286,7 +286,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::Module:
   case TypeKind::LValue:
   case TypeKind::InOut:
-  case TypeKind::Inverse:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BoundGenericEnum:
@@ -366,18 +365,6 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   expandDefaultProtocols(type->getASTContext(), {}, protocols);
 }
 
-ExistentialLayout::ExistentialLayout(CanInverseType type) {
-  hasExplicitAnyObject = false;
-  containsNonObjCProtocol = false;
-  containsParameterized = false;
-  representsAnyObject = false;
-
-  // NOTE: all the invertible protocols are usable from ObjC.
-  expandDefaultProtocols(type->getASTContext(),
-                         {type->getInverseKind()},
-                         protocols);
-}
-
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
   containsNonObjCProtocol = false;
@@ -443,9 +430,6 @@ ExistentialLayout CanType::getExistentialLayout() {
 
   if (auto param = dyn_cast<ParameterizedProtocolType>(ty))
     return ExistentialLayout(param);
-
-  if (auto inverse = dyn_cast<InverseType>(ty))
-    return ExistentialLayout(inverse);
 
   auto comp = cast<ProtocolCompositionType>(ty);
   return ExistentialLayout(comp);
@@ -1820,12 +1804,6 @@ CanType TypeBase::computeCanonicalType() {
       CanArgs.push_back(t->getCanonicalType());
     auto &C = Base->getASTContext();
     Result = ParameterizedProtocolType::get(C, Base, CanArgs);
-    break;
-  }
-  case TypeKind::Inverse: {
-    auto *inverse = cast<InverseType>(this);
-    auto protocol = inverse->getInvertedProtocol()->getCanonicalType();
-    Result = InverseType::get(protocol).getPointer();
     break;
   }
   case TypeKind::Existential: {
@@ -3905,6 +3883,12 @@ Type ProtocolCompositionType::theAnyObjectType(const ASTContext &C) {
   return ProtocolCompositionType::get(C, {}, /*HasExplicitAnyObject=*/true);
 }
 
+Type ProtocolCompositionType::getInverseOf(const ASTContext &C,
+                                           InvertibleProtocolKind IP) {
+  return ProtocolCompositionType::get(C, {}, {IP},
+                                      /*HasExplicitAnyObject=*/false);
+}
+
 Type ProtocolCompositionType::get(const ASTContext &C, ArrayRef<Type> Members,
                                   bool HasExplicitAnyObject) {
   return ProtocolCompositionType::get(C, Members,
@@ -3920,8 +3904,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   if (Members.empty()) {
     return build(C, Members, Inverses, HasExplicitAnyObject);
   }
-
-  assert(llvm::none_of(Members, [](Type t){return t->is<InverseType>();}));
 
   // Whether this composition has an `AnyObject` or protocol-inverse member
   // that is not reflected in the Members array.
@@ -5135,20 +5117,6 @@ case TypeKind::Id:
     return ExistentialType::get(constraint);
   }
 
-  case TypeKind::Inverse: {
-    auto *inverse = cast<InverseType>(base);
-    auto protocol =
-        inverse->getInvertedProtocol().transformWithPosition(pos, fn);
-    if (!protocol || protocol->hasError())
-      return protocol;
-
-    if (protocol.getPointer() ==
-        inverse->getInvertedProtocol().getPointer())
-      return *this;
-
-    return InverseType::get(protocol);
-  }
-
   case TypeKind::ProtocolComposition: {
     auto pc = cast<ProtocolCompositionType>(base);
     SmallVector<Type, 4> substMembers;
@@ -5409,7 +5377,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Module:
   case TypeKind::LValue:
   case TypeKind::InOut:
-  case TypeKind::Inverse:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BoundGenericEnum:

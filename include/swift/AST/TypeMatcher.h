@@ -495,14 +495,6 @@ private:
                       sugaredFirstType);
     }
 
-    bool visitInverseType(CanInverseType firstInverse,
-                          Type secondType,
-                          Type sugaredFirstType) {
-      // NOTE: If this visitor is reached, determine whether it should've been
-      // before implementing this.
-      llvm_unreachable("Yahaha! You found me!");
-    }
-
     bool visitLValueType(CanLValueType firstLValue, Type secondType,
                          Type sugaredFirstType) {
       if (auto secondLValue = secondType->getAs<LValueType>()) {

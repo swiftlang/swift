@@ -27,6 +27,8 @@
 
 namespace swift {
 
+enum class InvertibleProtocolKind : uint8_t;
+
 /// Return type of Requirement::checkRequirement().
 enum class CheckRequirementResult : uint8_t {
   /// The requirement was fully satisfied.
@@ -222,6 +224,31 @@ struct StructuralRequirement {
   /// diagnosed as redundant, since we want to give users the option of
   /// spelling out these requirements explicitly.
   bool inferred = false;
+
+  /// A flag indicating whether this requirement was produced via the expansion
+  /// of default conformances to invertible protocols.
+  bool fromDefault = false;
+};
+
+struct InverseRequirement {
+  Type subject;
+  ProtocolDecl *protocol;
+  SourceLoc loc;
+
+  InverseRequirement(Type subject, ProtocolDecl *protocol, SourceLoc loc);
+
+  InvertibleProtocolKind getKind() const;
+
+  static void enumerateDefaultedParams(TypeDecl *decl,
+                                       SmallVectorImpl<Type> &result);
+
+  static void expandDefault(Type gp,
+                            SourceLoc loc,
+                            SmallVectorImpl<StructuralRequirement> &result);
+
+  static void expandDefaults(ASTContext &ctx,
+                             ArrayRef<Type> gps,
+                             SmallVectorImpl<StructuralRequirement> &result);
 };
 
 } // end namespace swift

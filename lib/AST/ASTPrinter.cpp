@@ -6310,11 +6310,6 @@ public:
       Printer << "_";
   }
 
-  void visitInverseType(InverseType *T) {
-    Printer << "~";
-    visit(T->getInvertedProtocol());
-  }
-
   void visitPlaceholderType(PlaceholderType *T) {
     if (Options.PrintTypesForDebugging) {
       Printer << "<<placeholder for ";
@@ -7663,7 +7658,7 @@ void LayoutConstraint::print(raw_ostream &OS,
 
 void LayoutConstraintInfo::print(ASTPrinter &Printer,
                                  const PrintOptions &PO) const {
-  Printer << getName(PO.PrintClassLayoutName);
+  Printer << getName(PO.PrintInternalLayoutName);
   switch (getKind()) {
   case LayoutConstraintKind::UnknownLayout:
   case LayoutConstraintKind::RefCountedObject:
@@ -7671,7 +7666,7 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   case LayoutConstraintKind::Class:
   case LayoutConstraintKind::NativeClass:
   case LayoutConstraintKind::Trivial:
-    return;
+    return; // non-parameterized cases
   case LayoutConstraintKind::TrivialOfAtMostSize:
   case LayoutConstraintKind::TrivialOfExactSize:
     Printer << "(";

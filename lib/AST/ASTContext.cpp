@@ -460,7 +460,6 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<ClassDecl*, Type>, ClassType*> ClassTypes;
     llvm::DenseMap<std::pair<ProtocolDecl*, Type>, ProtocolType*> ProtocolTypes;
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
-    llvm::DenseMap<Type, InverseType *> InverseTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
@@ -3840,28 +3839,6 @@ ExistentialMetatypeType::ExistentialMetatypeType(
 
 Type ExistentialMetatypeType::getExistentialInstanceType() {
   return ExistentialType::get(getInstanceType());
-}
-
-InvertibleProtocolKind InverseType::getInverseKind() const {
-  return *getInvertibleProtocolKind(*protocol->getKnownProtocol());
-}
-
-Type InverseType::get(Type invertedProto) {
-  auto &C = invertedProto->getASTContext();
-
-  auto properties = invertedProto->getRecursiveProperties();
-  auto arena = getArena(properties);
-
-  auto &entry = C.getImpl().getArena(arena).InverseTypes[invertedProto];
-  if (entry)
-    return entry;
-
-  const ASTContext *canonicalContext =
-      invertedProto->isCanonical() ? &C : nullptr;
-
-  return entry = new (C, arena) InverseType(invertedProto,
-                                            canonicalContext,
-                                            properties);
 }
 
 ModuleType *ModuleType::get(ModuleDecl *M) {

@@ -1401,9 +1401,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::LValue:
       llvm_unreachable("@lvalue types should not occur in function interfaces");
 
-    case TypeKind::Inverse:
-      llvm_unreachable("inverse types should not appear in interfaces");
-
     case TypeKind::InOut:
       appendType(cast<InOutType>(tybase)->getObjectType(), sig, forDecl);
       return appendOperator("z");

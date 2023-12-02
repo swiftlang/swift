@@ -171,10 +171,10 @@ class LayoutConstraintInfo
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
   /// Return the name of this layout constraint.
-  StringRef getName(bool useClassLayoutName = false) const;
+  StringRef getName(bool internalName = false) const;
 
   /// Return the name of a layout constraint with a given kind.
-  static StringRef getName(LayoutConstraintKind Kind, bool useClassLayoutName = false);
+  static StringRef getName(LayoutConstraintKind Kind, bool internalName = false);
 
   static bool isKnownLayout(LayoutConstraintKind Kind);
 

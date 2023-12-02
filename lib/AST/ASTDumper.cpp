@@ -4368,12 +4368,6 @@ namespace {
       printFoot();
     }
 
-    void visitInverseType(InverseType *T, StringRef label) {
-      printCommon("inverse_type", label);
-      printRec(T->getInvertedProtocol());
-      printFoot();
-    }
-
     void visitLValueType(LValueType *T, StringRef label) {
       printCommon("lvalue_type", label);
       printRec(T->getObjectType());

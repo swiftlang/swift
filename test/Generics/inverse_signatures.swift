@@ -19,28 +19,16 @@ func where1<T>(_ t: borrowing T) where T: ~Copyable {}
 func where2<T>(_ t: borrowing T) where T: NoCopyP, T: ~Copyable {}
 
 // CHECK-LABEL: .where3@
-// CHECK: Generic signature: <T where T : CopyP>
-func where3<T>(_ t: T) where T: CopyP, T: ~Copyable {}
-
-// CHECK-LABEL: .where4@
 // CHECK: Generic signature: <T where T : Equatable>
-func where4<T>(_ t: borrowing T) where T: Equatable, T: ~Copyable {}
+func where3<T>(_ t: borrowing T) where T: Equatable, T: ~Copyable {}
 
 // CHECK-LABEL: .compose1@
 // CHECK: Generic signature: <T where T : NoCopyP>
 func compose1<T: NoCopyP & ~Copyable>(_ t: borrowing T) {}
 
-// CHECK-LABEL: .compose2@
-// CHECK: Generic signature: <T where T : CopyP>
-func compose2<T: CopyP & ~Copyable>(_ t: T) {}
-
 // CHECK-LABEL: .compose3@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : CopyP>
-func compose3(_ t: some CopyP & ~Copyable) {}
-
-// CHECK-LABEL: .compose4@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : NoCopyP>
-func compose4(_ t: inout some NoCopyP & ~Copyable) {}
+func compose3(_ t: inout some NoCopyP & ~Copyable) {}
 
 // CHECK-LABEL: .f1@
 // CHECK: Generic signature: <T where T : Copyable, T : NoCopyP>
@@ -100,11 +88,7 @@ protocol CopyP {}
 
 // CHECK-LABEL: .CopyP2@
 // CHECK: Requirement signature: <Self where Self : CopyP>
-protocol CopyP2: CopyP, ~Copyable {}  // expected-warning {{protocol 'CopyP2' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
-
-// CHECK-LABEL: .CopyP2_Fixed@
-// CHECK: Requirement signature: <Self where Self : CopyP>
-protocol CopyP2_Fixed: CopyP {}
+protocol CopyP2: CopyP {}
 
 // CHECK-LABEL: .CopyInheritsNC@
 // CHECK: Requirement signature: <Self where Self : Copyable, Self : NoCopyP>

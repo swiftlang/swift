@@ -23,12 +23,15 @@ func test<C, NC: ~Copyable>(
   checkCopyable(b2) // expected-error {{global function 'checkCopyable' requires that 'NC' conform to 'Copyable'}}
 }
 
-// FIXME: we should expect a warning/error that NC actually did require Copyable
-// despite the annotation due to the implied requirement!
 func checkAliases<C, NC: ~Copyable>(_ a: AlwaysCopyable<C>, _ b: AlwaysCopyable<NC>) {
+// expected-error@-1 {{'NC' required to be 'Copyable' but is marked with '~Copyable'}}
   checkCopyable(a)
   checkCopyable(b)
 }
+
+struct TryInferCopyable: ~Copyable, NeedsCopyable {}
+// expected-error@-1 {{type 'TryInferCopyable' does not conform to protocol 'NeedsCopyable'}}
+// expected-error@-2 {{type 'TryInferCopyable' does not conform to protocol 'Copyable'}}
 
 protocol Removed: ~Copyable {
   func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
@@ -165,9 +168,6 @@ struct OopsConformance1: ~Copyable, NeedsCopyable {}
 // expected-error@-1 {{type 'OopsConformance1' does not conform to protocol 'NeedsCopyable'}}
 // expected-error@-2 {{type 'OopsConformance1' does not conform to protocol 'Copyable'}}
 
-protocol Nothing: ~Copyable, NeedsCopyable {}
-// expected-warning@-1 {{protocol 'Nothing' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
-
 
 struct Extendo: ~Copyable {}
 extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
@@ -177,6 +177,7 @@ extension EnumExtendo: ~Copyable {} // expected-error {{cannot apply inverse '~C
 
 extension NeedsCopyable where Self: ~Copyable {}
 // expected-error@-1 {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
+// expected-error@-2 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
 protocol NoCopyP: ~Copyable {}
 
@@ -204,3 +205,64 @@ func project<CurValue>(_ base: CurValue) { }
 func testSpecial(_ a: Any) {
   _openExistential(a, do: project)
 }
+
+
+func conflict1<T>(_ t: T) where T: NeedsCopyable, T: ~Copyable {}
+// expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+
+func conflict2<T: ~Copyable>(_ t: AlwaysCopyable<T>) {}
+// expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+
+func conflict3<T: NeedsCopyable & ~Copyable>(_ t: T) {}
+// expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+
+func conflict4(_ t: some NeedsCopyable & ~Copyable) {}
+// expected-error@-1 {{'some NeedsCopyable & ~Copyable' required to be 'Copyable' but is marked with '~Copyable'}}
+
+protocol Conflict5: ~Copyable {
+  func whatever() -> AlwaysCopyable<Self> // expected-error {{type 'Self' does not conform to protocol 'Copyable'}}
+}
+
+// expected-warning@+1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
+func conflict6<T: ~Copyable, U>(_ t: T, _ u: U) // expected-error {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+ where U : NeedsCopyable, T == U {}
+
+protocol Conflict7 {
+  associatedtype Element
+}
+
+func conflict7<T, U>(_ t: T, _ u: U)
+  where
+    U: ~Copyable,  // expected-error {{'U' required to be 'Copyable' but is marked with '~Copyable'}}
+    T: Conflict7,
+    U == T.Element
+  {}
+
+protocol Conflict8: ~Copyable, NeedsCopyable {}
+// expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
+
+struct Conflict9<T: NeedsCopyable> {}
+func conflict9<U: ~Copyable>(_ u: Conflict9<U>) {}
+// expected-error@-1 {{'U' required to be 'Copyable' but is marked with '~Copyable'}}
+
+func conflict10<T>(_ t: T, _ u: some ~Copyable & Copyable)
+// expected-error@-1 {{'some ~Copyable & Copyable' required to be 'Copyable' but is marked with '~Copyable'}}
+  where T: Copyable,
+        T: ~Copyable {}
+// expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+
+// FIXME: this is bogus (rdar://119345796)
+protocol Conflict11: ~Copyable, Copyable {}
+
+struct Conflict12: ~Copyable, Copyable {}
+// expected-error@-1 {{struct 'Conflict12' required to be 'Copyable' but is marked with '~Copyable'}}
+
+// FIXME: this is bogus (rdar://119346022)
+protocol Conflict13 {
+  associatedtype A
+  associatedtype B: ~Copyable
+}
+func conflict13<T>(_ t: T)
+  where T: Conflict13,
+        T.A == T.B
+        {}
