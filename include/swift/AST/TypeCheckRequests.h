@@ -46,6 +46,7 @@ class ContextualPattern;
 class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
+class DoCatchStmt;
 struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
@@ -2299,6 +2300,27 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
+  llvm::Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+/// Determines the explicitly-written thrown error type in a do..catch block.
+class DoCatchExplicitThrownTypeRequest
+    : public SimpleRequest<DoCatchExplicitThrownTypeRequest,
+                           Type(DeclContext *, DoCatchStmt *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, DeclContext *dc, DoCatchStmt *stmt) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
   llvm::Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };

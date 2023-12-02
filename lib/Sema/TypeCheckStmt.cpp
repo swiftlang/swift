@@ -1195,8 +1195,7 @@ public:
         DC->getParentModule(), TS->getThrowLoc());
     Type errorType;
     if (catchNode) {
-      errorType = catchNode.getThrownErrorTypeInContext(getASTContext())
-          .value_or(Type());
+      errorType = catchNode.getThrownErrorTypeInContext(DC).value_or(Type());
     }
 
     // If there was no error type, use 'any Error'. We'll check it later.
@@ -1679,7 +1678,7 @@ public:
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
 
-    Type caughtErrorType = TypeChecker::catchErrorType(Ctx, S);
+    Type caughtErrorType = TypeChecker::catchErrorType(DC, S);
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,

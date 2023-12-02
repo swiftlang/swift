@@ -450,12 +450,15 @@ Expr *ForEachStmt::getTypeCheckedSequence() const {
 }
 
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                                 SourceLoc doLoc, Stmt *body,
+                                 SourceLoc doLoc,
+                                 SourceLoc throwsLoc, TypeLoc thrownType,
+                                 Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
                                  llvm::Optional<bool> implicit) {
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
-  return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
+  return ::new (mem) DoCatchStmt(labelInfo, doLoc, throwsLoc, thrownType, body,
+                                 catches, implicit);
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
@@ -472,7 +475,17 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
   return false;
 }
 
-Type DoCatchStmt::getCaughtErrorType() const {
+Type DoCatchStmt::getExplicitlyThrownType(DeclContext *dc) const {
+  ASTContext &ctx = dc->getASTContext();
+  DoCatchExplicitThrownTypeRequest request{dc, const_cast<DoCatchStmt *>(this)};
+  return evaluateOrDefault(ctx.evaluator, request, Type());
+}
+
+Type DoCatchStmt::getCaughtErrorType(DeclContext *dc) const {
+  // Check for an explicitly-specified error type.
+  if (Type explicitError = getExplicitlyThrownType(dc))
+    return explicitError;
+
   auto firstPattern = getCatches()
     .front()
     ->getCaseLabelItems()
