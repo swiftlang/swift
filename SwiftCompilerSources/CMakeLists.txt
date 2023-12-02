@@ -263,6 +263,15 @@ else()
   add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
   target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
 
+  # When building unified, we need to make sure all the Clang headers are
+  # generated before we try to use them.
+  # When building Swift against an already compiled LLVM/Clang, like
+  # build-script does, this target does not exist, but the headers
+  # are already completely generated at that point.
+  if(TARGET clang-tablegen-targets)
+    add_dependencies(importedHeaderDependencies clang-tablegen-targets)
+  endif()
+
   if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
     if (NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
