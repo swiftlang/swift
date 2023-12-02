@@ -333,7 +333,7 @@ extension ASTGenVisitor {
       parameterList: self.generate(functionParameterClause: node.signature.parameterClause),
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError?.type),
+      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
       returnType: self.generate(type: node.signature.returnClause?.type),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
@@ -358,7 +358,7 @@ extension ASTGenVisitor {
       parameterList: self.generate(functionParameterClause: node.signature.parameterClause),
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError?.type),
+      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
 
