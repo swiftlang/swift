@@ -37,7 +37,7 @@
 // RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-executable
-// RUN: %swift-build-cxx-plugin -o %t/libexec/MacroDefinitionPlugin %t/src/MacroDefinition.c
+// RUN: %swift-build-c-plugin -o %t/libexec/MacroDefinitionPlugin %t/src/MacroDefinition.c
 
 //#-- Expect -load-plugin-library
 // RUN: %target-build-swift %t/src/test.swift \
