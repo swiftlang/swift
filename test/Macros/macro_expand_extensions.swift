@@ -244,3 +244,15 @@ func testStringFoo(s: String) {
   "Test".printFoo()
   s.printFoo()
 }
+
+@attached(extension, conformances: Sendable)
+macro AddSendable() = #externalMacro(module: "MacroDefinition", type: "SendableMacro")
+
+@AddSendable
+final class SendableClass {
+}
+
+// expected-warning@+2 {{non-final class 'InvalidSendableClass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+@AddSendable
+class InvalidSendableClass {
+}
