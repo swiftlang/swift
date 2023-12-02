@@ -1117,7 +1117,7 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 }
 
 void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
-  Type formalExnType = S->getCaughtErrorType();
+  Type formalExnType = S->getCaughtErrorType(SGF.FunctionDC);
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
   SILValue exnArg;

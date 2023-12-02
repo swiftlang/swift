@@ -1020,13 +1020,23 @@ public:
       return shouldVerifyChecked(S->getSubExpr());
     }
 
+    DeclContext *getInnermostDC() const {
+      for (auto scope : llvm::reverse(Scopes)) {
+        if (auto dc = scope.dyn_cast<DeclContext *>())
+          return dc;
+      }
+
+      return nullptr;
+    }
+
     void verifyChecked(ThrowStmt *S) {
       Type thrownError;
       SourceLoc loc = S->getThrowLoc();
       if (loc.isValid()) {
         auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
-	if (catchNode) {
-          if (auto thrown = catchNode.getThrownErrorTypeInContext(Ctx)) {
+        DeclContext *dc = getInnermostDC();
+        if (catchNode && dc) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(dc)) {
             thrownError = *thrown;
           } else {
             thrownError = Ctx.getNeverType();

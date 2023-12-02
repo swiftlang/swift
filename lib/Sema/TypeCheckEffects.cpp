@@ -2788,9 +2788,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// Retrieve the type of the error that can be caught when an error is
   /// thrown from the given location.
   Type getCaughtErrorTypeAt(SourceLoc loc) {
-    auto module = CurContext.getDeclContext()->getParentModule();
+    auto dc = CurContext.getDeclContext();
+    auto module = dc->getParentModule();
     if (CatchNode catchNode = ASTScope::lookupCatchNode(module, loc)) {
-      if (auto caughtType = catchNode.getThrownErrorTypeInContext(Ctx))
+      if (auto caughtType = catchNode.getThrownErrorTypeInContext(dc))
         return *caughtType;
     }
 
@@ -2917,7 +2918,8 @@ private:
     // specialized diagnostic about non-exhaustive catches.
     if (!CurContext.handlesThrows(ConditionalEffectKind::Conditional)) {
       CurContext.setNonExhaustiveCatch(true);
-    } else if (Type rethrownErrorType = S->getCaughtErrorType()) {
+    } else if (Type rethrownErrorType =
+                   S->getCaughtErrorType(CurContext.getDeclContext())) {
       // We're implicitly rethrowing the error out of this do..catch, so make
       // sure that we can throw an error of this type out of this context.
       auto catches = S->getCatches();
@@ -3554,7 +3556,9 @@ llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   return classification.getThrownError();
 }
 
-Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
+Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
+  ASTContext &ctx = dc->getASTContext();
+
   // When typed throws is disabled, this is always "any Error".
   // FIXME: When we distinguish "precise" typed throws from normal typed
   // throws, we'll be able to compute a more narrow catch error type in some
@@ -3562,7 +3566,13 @@ Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
   if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
     return ctx.getErrorExistentialType();
 
-  // Classify the throwing behavior of the "do" body.
+  // If the do..catch statement explicitly specifies that it throws, use
+  // that type.
+  if (Type explicitError = stmt->getExplicitlyThrownType(dc)) {
+    return explicitError;
+  }
+
+  // Otherwise, infer the thrown error type from the "do" body.
   ApplyClassifier classifier(ctx);
   Classification classification = classifier.classifyStmt(
       stmt->getBody(), EffectKind::Throws);
