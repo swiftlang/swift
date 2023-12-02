@@ -2253,10 +2253,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
              trace.emplace(*buffer);
            });
 
-  // Setting DWARF Version based on frontend options.
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  IRGenOpts.DWARFVersion = IRGenOpts.DWARFVersion;
-
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {
     observer->parsedArgs(Invocation);
