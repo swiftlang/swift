@@ -4935,6 +4935,14 @@ bool swift::contextRequiresStrictConcurrencyChecking(
       if (hasExplicitIsolationAttribute(decl))
         return true;
 
+      // Extensions of explicitly isolated types are using concurrency
+      // features.
+      if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+        auto *nominal = extension->getExtendedNominal();
+        if (nominal && hasExplicitIsolationAttribute(nominal))
+          return true;
+      }
+
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         // Async and concurrent functions use concurrency features.
         if (func->hasAsync() || func->isSendable())

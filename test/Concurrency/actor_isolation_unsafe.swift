@@ -20,8 +20,7 @@ actor SomeGlobalActor {
 // Witnessing and unsafe global actor
 // ----------------------------------------------------------------------
 protocol P1 {
-  @MainActor(unsafe) func onMainActor() // expected-note{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
-  // expected-complete-tns-note @-1 {{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
+  @MainActor(unsafe) func onMainActor() // expected-note 2{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
 }
 
 struct S1_P1: P1 {
@@ -36,9 +35,9 @@ struct S3_P1: P1 {
   nonisolated func onMainActor() { }
 }
 
-struct S4_P1_quietly: P1 {
+struct S4_P1_not_quietly: P1 {
   @SomeGlobalActor func onMainActor() { }
-  // expected-complete-tns-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
+  // expected-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
 }
 
 @SomeGlobalActor

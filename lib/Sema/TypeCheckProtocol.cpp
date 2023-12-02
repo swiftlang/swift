@@ -3225,9 +3225,10 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       refResult.isolation.isGlobalActor() ||
       requirementIsolation.isGlobalActor()) {
     // If the witness or requirement has global actor isolation, downgrade
-    // based on context.
+    // based on context. Use the witness itself as the context, because
+    // an explicitly isolated witness should not suppress diagnostics.
     behavior = SendableCheckContext(
-        Conformance->getDeclContext()).defaultDiagnosticBehavior();
+        witness->getInnermostDeclContext()).defaultDiagnosticBehavior();
   }
 
   // Complain that this witness cannot conform to the requirement due to
