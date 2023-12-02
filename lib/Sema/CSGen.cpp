@@ -4647,11 +4647,11 @@ static llvm::Optional<SyntacticElementTarget>
 generateForEachStmtConstraints(ConstraintSystem &cs,
                                SyntacticElementTarget target) {
   ForEachStmt *stmt = target.getAsForEachStmt();
-  auto *sequenceExpr = stmt->getParsedSequence();
+  auto *forEachExpr = stmt->getParsedSequence();
   auto *dc = target.getDeclContext();
 
   auto elementLocator = cs.getConstraintLocator(
-      sequenceExpr, ConstraintLocator::SequenceElementType);
+      forEachExpr, ConstraintLocator::SequenceElementType);
 
   Pattern *pattern = TypeChecker::resolvePattern(stmt->getPattern(), dc,
                                                  /*isStmtCondition*/ false);
@@ -4665,8 +4665,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
     return llvm::None;
   }
 
-  if (isa<PackExpansionExpr>(sequenceExpr)) {
-    auto *expansion = cast<PackExpansionExpr>(sequenceExpr);
+  if (isa<PackExpansionExpr>(forEachExpr)) {
+    auto *expansion = cast<PackExpansionExpr>(forEachExpr);
 
     // Generate constraints for the pattern
     Type patternType = cs.generateConstraints(
