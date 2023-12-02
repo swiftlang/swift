@@ -5135,8 +5135,9 @@ bool swift::checkSendableConformance(
   auto conformanceDecl = conformanceDC->getAsDecl();
   auto behavior = SendableCheckContext(conformanceDC, check)
       .defaultDiagnosticBehavior();
-  if (conformanceDC->getParentSourceFile() &&
-      conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
+  if (conformanceDC->getOutermostParentSourceFile() &&
+      conformanceDC->getOutermostParentSourceFile() !=
+      nominal->getOutermostParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
                               nominal)
       .limitBehavior(behavior);
