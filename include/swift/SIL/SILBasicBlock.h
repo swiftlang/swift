@@ -231,6 +231,52 @@ public:
   const_reverse_iterator rbegin() const { return InstList.rbegin(); }
   const_reverse_iterator rend() const { return InstList.rend(); }
 
+  llvm::iterator_range<iterator> getRangeStartingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {inst->getIterator(), end()};
+  }
+
+  llvm::iterator_range<iterator> getRangeEndingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {begin(), inst->getIterator()};
+  }
+
+  llvm::iterator_range<reverse_iterator>
+  getReverseRangeStartingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {inst->getReverseIterator(), rend()};
+  }
+
+  llvm::iterator_range<reverse_iterator>
+  getReverseRangeEndingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {rbegin(), inst->getReverseIterator()};
+  }
+
+  llvm::iterator_range<const_iterator>
+  getRangeStartingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {inst->getIterator(), end()};
+  }
+
+  llvm::iterator_range<const_iterator>
+  getRangeEndingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {begin(), inst->getIterator()};
+  }
+
+  llvm::iterator_range<const_reverse_iterator>
+  getReverseRangeStartingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {inst->getReverseIterator(), rend()};
+  }
+
+  llvm::iterator_range<const_reverse_iterator>
+  getReverseRangeEndingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {rbegin(), inst->getReverseIterator()};
+  }
+
   /// Allows deleting instructions while iterating over all instructions of the
   /// block.
   ///
