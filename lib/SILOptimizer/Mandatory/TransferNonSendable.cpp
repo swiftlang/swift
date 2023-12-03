@@ -24,6 +24,7 @@
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -38,6 +39,7 @@
 
 using namespace swift;
 using namespace swift::PartitionPrimitives;
+using namespace swift::PatternMatch;
 
 namespace {
 using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
@@ -296,6 +298,26 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
     return false;
 
   return *kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer;
+}
+
+static bool isGlobalActorInit(SILFunction *fn) {
+  auto block = fn->begin();
+
+  // Make sure our function has a single block. We should always have a single
+  // block today. Return nullptr otherwise.
+  if (block == fn->end() || std::next(block) != fn->end())
+    return false;
+
+  GlobalAddrInst *gai = nullptr;
+  if (!match(cast<SILInstruction>(block->getTerminator()),
+             m_ReturnInst(m_AddressToPointerInst(m_GlobalAddrInst(gai)))))
+    return false;
+
+  auto *globalDecl = gai->getReferencedGlobal()->getDecl();
+  if (!globalDecl)
+    return false;
+
+  return globalDecl->getGlobalActorAttr() != std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1047,6 +1069,17 @@ class PartitionOpTranslator {
       }
     }
 
+    // Check if we have an unsafeMutableAddressor from a global actor, mark the
+    // returned value as being actor derived.
+    if (auto applySite = FullApplySite::isa(iter.first->first)) {
+      if (auto *calleeFunction = applySite.getCalleeFunction()) {
+        if (calleeFunction->isGlobalInit() &&
+            isGlobalActorInit(calleeFunction)) {
+          iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+        }
+      }
+    }
+
     // If our access storage is from a class, then see if we have an actor. In
     // such a case, we need to add this id to the neverTransferred set.
 
@@ -1550,6 +1583,14 @@ public:
            "srcID and dstID are different?!");
   }
 
+  void translateSILLookThrough(SingleValueInstruction *svi) {
+    assert(svi->getNumOperands() == 1);
+    auto srcID = tryToTrackValue(svi->getOperand(0));
+    auto destID = tryToTrackValue(svi);
+    assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
+           "srcID and dstID are different?!");
+  }
+
   template <typename Collection>
   void translateSILAssign(SILValue dest, Collection collection) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(dest), collection);
@@ -1783,6 +1824,21 @@ public:
         return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
       return translateSILAssign(inst);
 
+    case SILInstructionKind::PointerToAddressInst: {
+      auto *atpi = cast<PointerToAddressInst>(inst);
+
+      // A raw pointer is considered to be a non-Sendable type. If we cast it to
+      // a Sendable type, treat it as a require. We can assume that if the user
+      // casted it to a Sendable type, if the type were not actually sendable,
+      // it would be undefined behavior.
+      if (!isNonSendableType(atpi->getType())) {
+        return translateSILRequire(atpi->getOperand());
+      }
+
+      // Otherwise, if we have a non-Sendable type, look through it.
+      return translateSILAssign(atpi);
+    }
+
     // Just make the result part of the operand's region without requiring.
     //
     // This is appropriate for things like object casts and object
@@ -1799,8 +1855,6 @@ public:
     case SILInstructionKind::InitExistentialRefInst:
     case SILInstructionKind::OpenExistentialBoxInst:
     case SILInstructionKind::OpenExistentialRefInst:
-    case SILInstructionKind::PointerToAddressInst:
-    case SILInstructionKind::ProjectBlockStorageInst:
     case SILInstructionKind::RefToUnmanagedInst:
     case SILInstructionKind::TailAddrInst:
     case SILInstructionKind::ThickToObjCMetatypeInst:
