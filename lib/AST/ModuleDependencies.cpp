@@ -480,17 +480,6 @@ SwiftDependencyTracker::createTreeFromDependencies() {
       });
 }
 
-void SwiftDependencyScanningService::overlaySharedFilesystemCacheForCompilation(
-    CompilerInstance &Instance) {
-  auto existingFS = Instance.getSourceMgr().getFileSystem();
-  llvm::IntrusiveRefCntPtr<
-      clang::tooling::dependencies::DependencyScanningWorkerFilesystem>
-      depFS =
-          new clang::tooling::dependencies::DependencyScanningWorkerFilesystem(
-              getSharedFilesystemCache(), existingFS);
-  Instance.getSourceMgr().setFileSystem(depFS);
-}
-
 bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
   if (!Instance.getInvocation().getFrontendOptions().EnableCaching)
