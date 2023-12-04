@@ -734,7 +734,8 @@ SWIFT_NAME("BridgedIfStmt.createParsed(_:ifKeywordLoc:condition:thenStmt:"
            "elseLoc:elseStmt:)")
 BridgedIfStmt BridgedIfStmt_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIfLoc,
-                                         BridgedExpr cond, BridgedStmt then,
+                                         BridgedExpr cond,
+                                         BridgedBraceStmt then,
                                          BridgedSourceLoc cElseLoc,
                                          BridgedNullableStmt elseStmt);
 
