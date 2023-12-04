@@ -519,9 +519,9 @@ public:
   /// Determine whether this type variable represents an opened opaque type.
   bool isOpaqueType() const;
 
-  /// Determine whether this type variable represents a type of an array literal
-  /// (represented by `ArrayExpr` in AST).
-  bool isArrayLiteralType() const;
+  /// Determine whether this type variable represents a type of a collection
+  /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
+  bool isCollectionLiteralType() const;
 
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
