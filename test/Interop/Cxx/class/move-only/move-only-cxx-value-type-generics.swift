@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature NoncopyableGenerics)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature NoncopyableGenerics -O)
 //
 // REQUIRES: executable_test
 
@@ -27,9 +28,11 @@ MoveOnlyCxxValueType.test("Test move only type ref return pointee borrow") {
   expectEqual(k, 2)
   k = borrowNC(holder.__returnMutNonCopyableRefUnsafe().pointee)
   expectEqual(k, 6)
+#if ALLOW_CONSUME
   consumingNC(holder.__returnMutNonCopyableRefUnsafe().pointee)
   k = borrowNC(holder.__returnNonCopyableRefUnsafe().pointee)
   expectEqual(k, -123 * 3)
+#endif
 }
 
 runAllTests()

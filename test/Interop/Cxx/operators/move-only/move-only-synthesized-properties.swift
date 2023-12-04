@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -O)
 //
 // REQUIRES: executable_test
 
@@ -44,8 +45,10 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderPairedDeref pointee borrow") {
   expectEqual(holder.pointee.x, 3)
   holder.pointee.x = 34
   expectEqual(holder.pointee.x, 34)
+#if SUPPORT_CONSUME
   consumingNC(holder.pointee)
   expectEqual(holder.pointee.x, 0)
+#endif
 }
 
 MoveOnlyCxxOperators.test("testNonCopyableHolderMutDeref pointee borrow") {
@@ -63,8 +66,10 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderMutDeref pointee borrow") {
   expectEqual(holder.pointee.x, 3)
   holder.pointee.x = 34
   expectEqual(holder.pointee.x, 34)
+#if SUPPORT_CONSUME
   consumingNC(holder.pointee)
   expectEqual(holder.pointee.x, 0)
+#endif
 }
 
 MoveOnlyCxxOperators.test("testNonCopyableHolderValueConstDeref pointee value") {
@@ -106,8 +111,10 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderPairedDerefDerivedDerived pointe
   expectEqual(holder.pointee.x, 3)
   holder.pointee.x = 34
   expectEqual(holder.pointee.x, 34)
+#if SUPPORT_CONSUME
   consumingNC(holder.pointee)
   expectEqual(holder.pointee.x, 0)
+#endif
 }
 
 MoveOnlyCxxOperators.test("testNonCopyableHolderMutDerefDerivedDerived pointee borrow") {
@@ -125,8 +132,10 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderMutDerefDerivedDerived pointee b
   expectEqual(holder.pointee.x, 3)
   holder.pointee.x = 34
   expectEqual(holder.pointee.x, 34)
+#if SUPPORT_CONSUME
   consumingNC(holder.pointee)
   expectEqual(holder.pointee.x, 0)
+#endif
 }
 
 MoveOnlyCxxOperators.test("testNonCopyableHolderValueConstDerefDerivedDerived pointee value") {
