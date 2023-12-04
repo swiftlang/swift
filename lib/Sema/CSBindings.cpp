@@ -1331,6 +1331,14 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
     }
   }
 
+  // If key path capability is not yet determined it cannot be favored
+  // over a conjunction because:
+  // 1. There could be no other bindings and that would mean that
+  //    key path would be selected even though it's not yet ready.
+  // 2. A conjunction could be the source of type context for the key path.
+  if (TypeVar->getImpl().isKeyPathType() && isDelayed())
+    return false;
+
   return true;
 }
 
