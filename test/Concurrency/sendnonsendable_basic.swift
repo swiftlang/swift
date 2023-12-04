@@ -15,7 +15,8 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 25{{}}
+class NonSendableKlass { // expected-complete-note 35{{}}
+  // expected-typechecker-only-note @-1 2{{}}
   var field: NonSendableKlass? = nil
 
   func asyncCall() async {}
@@ -50,9 +51,15 @@ struct SingleFieldKlassBox { // expected-complete-note 2{{consider making struct
   var k = NonSendableKlass()
 }
 
-struct TwoFieldKlassBox {
+struct TwoFieldKlassBox { // expected-typechecker-only-note 2{{}}
   var k1 = NonSendableKlass()
   var k2 = NonSendableKlass()
+}
+
+class TwoFieldKlassClassBox {
+  var k1 = NonSendableKlass()
+  var k2 = NonSendableKlass()
+  var recursive: TwoFieldKlassClassBox? = nil
 }
 
 ////////////////////////////
@@ -1265,4 +1272,106 @@ func controlFlowTest2() async {
   }
 
   useValue(x) // expected-tns-note {{access here could race}}
+}
+
+////////////////////////
+// MARK: Actor Setter //
+////////////////////////
+
+actor ActorWithSetter {
+  var field = NonSendableKlass()
+  var twoFieldBox = TwoFieldKlassBox()
+  var twoFieldBoxInTuple = (NonSendableKlass(), TwoFieldKlassBox())
+  var recursive: ActorWithSetter? = nil
+  var classBox = TwoFieldKlassClassBox()
+
+  func test1() async {
+    let x = NonSendableKlass()
+    self.field = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func test2() async {
+    let x = NonSendableKlass()
+    self.twoFieldBox.k1 = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func test3() async {
+    let x = NonSendableKlass()
+    self.twoFieldBoxInTuple.1.k1 = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
+  }
+
+  // This triggers a crash in SILGen with tns enabled.
+  #if TYPECHECKER_ONLY
+  func recursive() async {
+    let x = NonSendableKlass()
+    await self.recursive!.twoFieldBoxInTuple.1.k2 = x
+    // expected-typechecker-only-warning @-1 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
+    // expected-typechecker-only-warning @-2 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
+
+    await transferToMain(x) // xpected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+  #endif
+
+  func classBox() async {
+    let x = NonSendableKlass()
+    self.classBox.k1 = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+}
+
+final actor FinalActorWithSetter {
+  var field = NonSendableKlass()
+  var twoFieldBox = TwoFieldKlassBox()
+  var twoFieldBoxInTuple = (NonSendableKlass(), TwoFieldKlassBox())
+  var recursive: ActorWithSetter? = nil
+  var classBox = TwoFieldKlassClassBox()
+
+  func test1() async {
+    let x = NonSendableKlass()
+    self.field = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func test2() async {
+    let x = NonSendableKlass()
+    self.twoFieldBox.k1 = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+
+  func test3() async {
+    let x = NonSendableKlass()
+    self.twoFieldBoxInTuple.1.k1 = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}    
+  }
+
+  // This triggers a crash in SILGen with tns enabled.
+  #if TYPECHECKER_ONLY
+  func recursive() async {
+    let x = NonSendableKlass()
+    await self.recursive!.twoFieldBoxInTuple.1.k2 = x
+    // expected-typechecker-only-warning @-1 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
+    // expected-typechecker-only-warning @-2 {{non-sendable type '(NonSendableKlass, TwoFieldKlassBox)' in implicitly asynchronous access to actor-isolated property 'twoFieldBoxInTuple' cannot cross actor boundary}}
+
+    await transferToMain(x) // xpected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
+  #endif
+
+  func classBox() async {
+    let x = NonSendableKlass()
+    self.classBox.k1 = x
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  }
 }
