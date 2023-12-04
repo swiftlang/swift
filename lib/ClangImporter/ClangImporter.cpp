@@ -4785,26 +4785,37 @@ static clang::CXXMethodDecl *synthesizeCxxBaseMethod(
     ReferenceReturnTypeBehaviorForBaseMethodSynthesis
         referenceReturnTypeBehavior =
             ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
-    bool forceConstQualifier = false) {
+    bool forceConstQualifier = false,
+    bool isVirtualCall = false) {
   auto &clangCtx = impl.getClangASTContext();
   auto &clangSema = impl.getClangSema();
+  // When emitting symbolic decls, the method might not have a concrete
+  // record type as this type.
+  if (impl.isSymbolicImportEnabled()
+      && !method->getThisType()->getPointeeCXXRecordDecl()) {
+    return nullptr;
+  }
 
   // Create a new method in the derived class that calls the base method.
   clang::DeclarationName name = method->getNameInfo().getName();
   if (name.isIdentifier()) {
     std::string newName;
     llvm::raw_string_ostream os(newName);
-    os << "__synthesizedBaseCall_" << name.getAsIdentifierInfo()->getName();
+    os << (isVirtualCall ? "__synthesizedVirtualCall_" :
+                           "__synthesizedBaseCall_")
+       << name.getAsIdentifierInfo()->getName();
     name = clang::DeclarationName(
         &impl.getClangPreprocessor().getIdentifierTable().get(os.str()));
   } else if (name.getCXXOverloadedOperator() == clang::OO_Subscript) {
     name = clang::DeclarationName(
         &impl.getClangPreprocessor().getIdentifierTable().get(
-            "__synthesizedBaseCall_operatorSubscript"));
+            (isVirtualCall ? "__synthesizedVirtualCall_operatorSubscript" :
+                             "__synthesizedBaseCall_operatorSubscript")));
   } else if (name.getCXXOverloadedOperator() == clang::OO_Star) {
     name = clang::DeclarationName(
         &impl.getClangPreprocessor().getIdentifierTable().get(
-            "__synthesizedBaseCall_operatorStar"));
+            (isVirtualCall ? "__synthesizedVirtualCall_operatorStar" :
+                             "__synthesizedBaseCall_operatorStar")));
   }
   auto methodType = method->getType();
   // Check if we need to drop the reference from the return type
@@ -4928,6 +4939,16 @@ static clang::CXXMethodDecl *synthesizeCxxBaseMethod(
 
   newMethod->setBody(returnStmt);
   return newMethod;
+}
+
+// Synthesize a C++ virtual method
+clang::CXXMethodDecl *synthesizeCxxVirtualMethod(
+    swift::ClangImporter &Impl, const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method) {
+  return synthesizeCxxBaseMethod(
+      Impl, derivedClass, baseClass, method,
+      ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
+      false /* forceConstQualifier */, true /* isVirtualCall */);
 }
 
 // Find the base C++ method called by the base function we want to synthesize
@@ -6555,7 +6576,7 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
 // are not used in the function signature. We supply the type params as explicit
 // metatype arguments to aid in typechecking, but they shouldn't be forwarded to
 // the corresponding C++ function.
-static std::pair<BraceStmt *, bool>
+std::pair<BraceStmt *, bool>
 synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = afd->getASTContext();
 
@@ -7437,6 +7458,10 @@ void ClangImporter::withSymbolicFeatureEnabled(
   Impl.ImportedDecls = std::move(importedDeclsCopy);
   Impl.nameImporter->enableSymbolicImportFeature(
       oldImportSymbolicCXXDecls.get());
+}
+
+bool ClangImporter::isSymbolicImportEnabled() const {
+  return Impl.importSymbolicCXXDecls;
 }
 
 const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
