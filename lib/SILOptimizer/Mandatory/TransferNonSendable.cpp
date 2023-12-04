@@ -1326,7 +1326,7 @@ public:
 
     functionArgPartition = Partition::singleRegion(nonSendableJoinedIndices);
     for (Element elt : nonSendableSeparateIndices) {
-      functionArgPartition->addElement(elt);
+      functionArgPartition->trackNewElement(elt);
     }
   }
 

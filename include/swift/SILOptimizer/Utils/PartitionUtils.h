@@ -359,8 +359,6 @@ public:
   }
 };
 
-struct PartitionOpEvaluator;
-
 /// A map from Element -> Region that represents the current partition set.
 ///
 ///
@@ -369,7 +367,6 @@ public:
   /// A class defined in PartitionUtils unittest used to grab state from
   /// Partition without exposing it to other users.
   struct PartitionTester;
-  friend PartitionOpEvaluator;
 
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
@@ -451,14 +448,16 @@ public:
     return fst.elementToRegionMap == snd.elementToRegionMap;
   }
 
-  bool isTracked(Element val) const { return elementToRegionMap.count(val); }
+  bool isTrackingElement(Element val) const {
+    return elementToRegionMap.count(val);
+  }
 
   /// Mark val as transferred.
   void markTransferred(Element val,
                        TransferringOperandSet *transferredOperandSet) {
     // First see if our val is tracked. If it is not tracked, insert it and mark
     // its new region as transferred.
-    if (!isTracked(val)) {
+    if (!isTrackingElement(val)) {
       elementToRegionMap.insert_or_assign(val, fresh_label);
       regionToTransferredOpMap.insert({fresh_label, transferredOperandSet});
       fresh_label = Region(fresh_label + 1);
@@ -485,7 +484,7 @@ public:
   /// we found that \p val was transferred. We return false otherwise.
   bool undoTransfer(Element val) {
     // First see if our val is tracked. If it is not tracked, insert it.
-    if (!isTracked(val)) {
+    if (!isTrackingElement(val)) {
       elementToRegionMap.insert_or_assign(val, fresh_label);
       fresh_label = Region(fresh_label + 1);
       canonical = false;
@@ -499,7 +498,7 @@ public:
     return regionToTransferredOpMap.erase(iter1->second);
   }
 
-  void addElement(Element newElt) {
+  void trackNewElement(Element newElt) {
     // Map index newElt to a fresh label.
     elementToRegionMap.insert_or_assign(newElt, fresh_label);
 
@@ -507,6 +506,22 @@ public:
     fresh_label = Region(fresh_label + 1);
     canonical = false;
   }
+
+  void assignElement(Element oldElt, Element newElt) {
+    elementToRegionMap.insert_or_assign(oldElt, elementToRegionMap.at(newElt));
+    canonical = false;
+  }
+
+  bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
+    return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
+  }
+
+  Region getRegion(Element elt) const { return elementToRegionMap.at(elt); }
+
+  using iterator = std::map<Element, Region>::iterator;
+  iterator begin() { return elementToRegionMap.begin(); }
+  iterator end() { return elementToRegionMap.end(); }
+  llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
   /// Construct the partition corresponding to the union of the two passed
   /// partitions.
@@ -754,10 +769,12 @@ public:
     return set;
   }
 
-private:
   /// Used only in assertions, check that Partitions promised to be canonical
   /// are actually canonical
   bool is_canonical_correct() {
+#ifdef NDEBUG
+    return true;
+#else
     if (!canonical)
       return true; // vacuously correct
 
@@ -796,53 +813,7 @@ private:
     }
 
     return true;
-  }
-
-  /// For each region label that occurs, find the first index at which it occurs
-  /// and relabel all instances of it to that index.  This excludes the -1 label
-  /// for transferred regions.
-  ///
-  /// This runs in linear time.
-  void canonicalize() {
-    if (canonical)
-      return;
-    canonical = true;
-
-    std::map<Region, Region> oldRegionToRelabeledMap;
-
-    // We rely on in-order traversal of labels to ensure that we always take the
-    // lowest eltNumber.
-    for (auto &[eltNo, regionNo] : elementToRegionMap) {
-      if (!oldRegionToRelabeledMap.count(regionNo)) {
-        // if this is the first time encountering this region label,
-        // then this region label should be relabelled to this index,
-        // so enter that into the map
-        oldRegionToRelabeledMap.insert_or_assign(regionNo, Region(eltNo));
-      }
-
-      // Update this label with either its own index, or a prior index that
-      // shared a region with it.
-      regionNo = oldRegionToRelabeledMap.at(regionNo);
-
-      // The maximum index iterated over will be used here to appropriately
-      // set fresh_label.
-      fresh_label = Region(eltNo + 1);
-    }
-
-    // Then relabel our regionToTransferredInst map if we need to by swapping
-    // out the old map and updating.
-    //
-    // TODO: If we just used an array for this, we could just rewrite and
-    // re-sort and not have to deal with potential allocations.
-    decltype(regionToTransferredOpMap) oldMap =
-        std::move(regionToTransferredOpMap);
-    for (auto &[oldReg, op] : oldMap) {
-      auto iter = oldRegionToRelabeledMap.find(oldReg);
-      assert(iter != oldRegionToRelabeledMap.end());
-      regionToTransferredOpMap[iter->second] = op;
-    }
-
-    assert(is_canonical_correct());
+#endif
   }
 
   /// Merge the regions of two indices while maintaining canonicality. Returns
@@ -890,6 +861,53 @@ private:
   }
 
 private:
+  /// For each region label that occurs, find the first index at which it occurs
+  /// and relabel all instances of it to that index.  This excludes the -1 label
+  /// for transferred regions.
+  ///
+  /// This runs in linear time.
+  void canonicalize() {
+    if (canonical)
+      return;
+    canonical = true;
+
+    std::map<Region, Region> oldRegionToRelabeledMap;
+
+    // We rely on in-order traversal of labels to ensure that we always take the
+    // lowest eltNumber.
+    for (auto &[eltNo, regionNo] : elementToRegionMap) {
+      if (!oldRegionToRelabeledMap.count(regionNo)) {
+        // if this is the first time encountering this region label,
+        // then this region label should be relabelled to this index,
+        // so enter that into the map
+        oldRegionToRelabeledMap.insert_or_assign(regionNo, Region(eltNo));
+      }
+
+      // Update this label with either its own index, or a prior index that
+      // shared a region with it.
+      regionNo = oldRegionToRelabeledMap.at(regionNo);
+
+      // The maximum index iterated over will be used here to appropriately
+      // set fresh_label.
+      fresh_label = Region(eltNo + 1);
+    }
+
+    // Then relabel our regionToTransferredInst map if we need to by swapping
+    // out the old map and updating.
+    //
+    // TODO: If we just used an array for this, we could just rewrite and
+    // re-sort and not have to deal with potential allocations.
+    decltype(regionToTransferredOpMap) oldMap =
+        std::move(regionToTransferredOpMap);
+    for (auto &[oldReg, op] : oldMap) {
+      auto iter = oldRegionToRelabeledMap.find(oldReg);
+      assert(iter != oldRegionToRelabeledMap.end());
+      regionToTransferredOpMap[iter->second] = op;
+    }
+
+    assert(is_canonical_correct());
+  }
+
   /// For the passed `map`, ensure that `key` maps to `val`. If `key` already
   /// mapped to a different value, ensure that all other keys mapped to that
   /// value also now map to `val`. This is a relatively expensive (linear time)
@@ -1035,7 +1053,7 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Assign:
       assert(op.getOpArgs().size() == 2 &&
              "Assign PartitionOp should be passed 2 arguments");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[1]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[1]) &&
              "Assign PartitionOp's source argument should be already tracked");
       // If we are using a region that was transferred as our assignment source
       // value... emit an error.
@@ -1044,37 +1062,30 @@ struct PartitionOpEvaluator {
           handleFailure(op, op.getOpArgs()[1], transferredOperand);
         }
       }
-
-      p.elementToRegionMap.insert_or_assign(
-          op.getOpArgs()[0], p.elementToRegionMap.at(op.getOpArgs()[1]));
-
-      // assignment could have invalidated canonicality of either the old region
-      // of op.getOpArgs()[0] or the region of op.getOpArgs()[1], or both
-      p.canonical = false;
+      p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
     case PartitionOpKind::AssignFresh:
       assert(op.getOpArgs().size() == 1 &&
              "AssignFresh PartitionOp should be passed 1 argument");
 
-      p.addElement(op.getOpArgs()[0]);
+      p.trackNewElement(op.getOpArgs()[0]);
       return;
     case PartitionOpKind::Transfer: {
       assert(op.getOpArgs().size() == 1 &&
              "Transfer PartitionOp should be passed 1 argument");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Transfer PartitionOp's argument should already be tracked");
 
       // check if any nontransferrables are transferred here, and handle the
       // failure if so
       for (Element nonTransferrable : nonTransferrableElements) {
         assert(
-            p.elementToRegionMap.count(nonTransferrable) &&
+            p.isTrackingElement(nonTransferrable) &&
             "nontransferrables should be function args and self, and therefore"
             "always present in the label map because of initialization at "
             "entry");
         if (!p.isTransferred(nonTransferrable) &&
-            p.elementToRegionMap.at(nonTransferrable) ==
-                p.elementToRegionMap.at(op.getOpArgs()[0])) {
+            p.areElementsInSameRegion(nonTransferrable, op.getOpArgs()[0])) {
           return handleTransferNonTransferrable(op, nonTransferrable);
         }
       }
@@ -1090,8 +1101,8 @@ struct PartitionOpEvaluator {
       bool isClosureCapturedElt =
           isClosureCaptured(op.getOpArgs()[0], op.getSourceOp());
 
-      Region elementRegion = p.elementToRegionMap.at(op.getOpArgs()[0]);
-      for (const auto &pair : p.elementToRegionMap) {
+      Region elementRegion = p.getRegion(op.getOpArgs()[0]);
+      for (const auto &pair : p.range()) {
         if (pair.second == elementRegion && isActorDerived(pair.first))
           return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
         isClosureCapturedElt |= isClosureCaptured(pair.first, op.getSourceOp());
@@ -1106,7 +1117,7 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::UndoTransfer: {
       assert(op.getOpArgs().size() == 1 &&
              "UndoTransfer PartitionOp should be passed 1 argument");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "UndoTransfer PartitionOp's argument should already be tracked");
 
       // Mark op.getOpArgs()[0] as not transferred.
@@ -1116,8 +1127,8 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Merge:
       assert(op.getOpArgs().size() == 2 &&
              "Merge PartitionOp should be passed 2 arguments");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
-             p.elementToRegionMap.count(op.getOpArgs()[1]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
+             p.isTrackingElement(op.getOpArgs()[1]) &&
              "Merge PartitionOp's arguments should already be tracked");
 
       // if attempting to merge a transferred region, handle the failure
@@ -1137,7 +1148,7 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Require:
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Require PartitionOp's argument should already be tracked");
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
