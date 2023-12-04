@@ -3723,7 +3723,8 @@ namespace {
               decl->getParent(), decl->getParent(), decl);
 
           // call the __synthesizedVirtualCall_ C++ thunk from a Swift thunk
-          if (Decl *swiftThunk = VisitCXXMethodDecl(cxxThunk);
+          if (Decl *swiftThunk =
+                  cxxThunk ? VisitCXXMethodDecl(cxxThunk) : nullptr;
               isa_and_nonnull<FuncDecl>(swiftThunk)) {
             // synthesize the body of the Swift method to call the swiftThunk
             synthesizeForwardingThunkBody(cast<FuncDecl>(method),

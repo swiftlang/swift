@@ -4789,6 +4789,12 @@ static clang::CXXMethodDecl *synthesizeCxxBaseMethod(
     bool isVirtualCall = false) {
   auto &clangCtx = impl.getClangASTContext();
   auto &clangSema = impl.getClangSema();
+  // When emitting symbolic decls, the method might not have a concrete
+  // record type as this type.
+  if (impl.isSymbolicImportEnabled()
+      && !method->getThisType()->getPointeeCXXRecordDecl()) {
+    return nullptr;
+  }
 
   // Create a new method in the derived class that calls the base method.
   clang::DeclarationName name = method->getNameInfo().getName();
@@ -7452,6 +7458,10 @@ void ClangImporter::withSymbolicFeatureEnabled(
   Impl.ImportedDecls = std::move(importedDeclsCopy);
   Impl.nameImporter->enableSymbolicImportFeature(
       oldImportSymbolicCXXDecls.get());
+}
+
+bool ClangImporter::isSymbolicImportEnabled() const {
+  return Impl.importSymbolicCXXDecls;
 }
 
 const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
