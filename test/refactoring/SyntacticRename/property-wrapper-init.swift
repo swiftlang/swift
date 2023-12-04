@@ -35,6 +35,7 @@ func uses() {
 }
 
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="init" -is-function-like -old-name "init(initialValue:)" >> %t.ranges/property-wrapper-init.swift

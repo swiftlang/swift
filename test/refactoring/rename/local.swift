@@ -55,6 +55,7 @@ func testCaptureVariable() {
   }
 }
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=3:9 -new-name="xRenamed" > %t.result/localvar_1.swift
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=7:11 -new-name="xRenamed" > %t.result/localvar_2.swift

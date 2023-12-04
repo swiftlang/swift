@@ -24,6 +24,7 @@ _ = #keyPath(/*Outer*/Outer . /*Inner*/Inner . /*array*/array[0] . hashValue)
 // FIXME: Invalid and not resolved
 _ = #keyPath(/*Outer:unknown*/Outer . /*Inner:unknown*/Inner . /*dict:unknown*/dict . someKey . undefined)
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="Outer" -old-name "Outer" >> %t/outer.swift
 // RUN: diff -u %S/Outputs/objc-keypath/outer.swift.expected %t/outer.swift

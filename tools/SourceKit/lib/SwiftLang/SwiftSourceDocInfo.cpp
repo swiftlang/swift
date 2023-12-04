@@ -2520,6 +2520,10 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 
     // FIXME: Don't silently eat errors here.
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+      Receiver(RequestResult<RelatedIdentsInfo>::fromError("relatedidents is not supported because sourcekitd was built without swift-syntax"));
+      return;
+#else
       auto &CompInst = AstUnit->getCompilerInstance();
 
       auto *SrcFile = retrieveInputFile(InputFile, CompInst);
@@ -2592,6 +2596,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
       RelatedIdentsInfo Info;
       Info.Ranges = Ranges;
       Receiver(RequestResult<RelatedIdentsInfo>::fromResult(Info));
+#endif
     }
 
     void cancelled() override {

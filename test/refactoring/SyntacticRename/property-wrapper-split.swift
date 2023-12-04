@@ -19,6 +19,7 @@ struct User {
 }
 
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="someValue" -old-name "someValue" >> %t.ranges/property-wrapper-split-someValue.swift
 // RUN: diff -u %S/Outputs/property-wrapper-split/someValue.swift.expected %t.ranges/property-wrapper-split-someValue.swift

@@ -7,6 +7,7 @@ func boop() {
   print(LocalEnum.north)
 }
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=3:10 -new-name east > %t.result/north_def.swift
 // RUN: diff -u %S/Outputs/localEnum/north.swift.expected %t.result/north_def.swift

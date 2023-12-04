@@ -117,6 +117,8 @@ struct Foo {
   static var test: Int = 10
 }
 
+// REQUIRES: swift_swift_parser
+
 // RUN: %empty-directory(%t.result)
 
 // Ensure that a syntactic rename request does not require the stdlib

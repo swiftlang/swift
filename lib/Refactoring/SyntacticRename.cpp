@@ -21,6 +21,7 @@
 using namespace swift;
 using namespace swift::ide;
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
 std::vector<ResolvedLoc>
 swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
                                    StringRef NewName, SourceFile &SF,
@@ -105,6 +106,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
   }
   return resolvedLocsInRequestedOrder;
 }
+#endif
 
 CancellableResult<std::vector<SyntacticRenameRangeDetails>>
 swift::ide::findSyntacticRenameRanges(SourceFile *SF,
@@ -112,6 +114,9 @@ swift::ide::findSyntacticRenameRanges(SourceFile *SF,
                                       StringRef NewName) {
   using ResultType =
       CancellableResult<std::vector<SyntacticRenameRangeDetails>>;
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  return ResultType::failure("find-syntactic-rename-ranges is not supported because sourcekitd was built without swift-syntax");
+#else
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
@@ -146,4 +151,5 @@ swift::ide::findSyntacticRenameRanges(SourceFile *SF,
     return ResultType::failure(ErrBuffer);
 
   return ResultType::success(Result);
+#endif
 }

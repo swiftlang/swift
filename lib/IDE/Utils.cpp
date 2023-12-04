@@ -808,6 +808,7 @@ public:
                     getBuffer());
     RewriteBuf.Initialize(Input);
     removeCommentLines(RewriteBuf, Input, "RUN");
+    removeCommentLines(RewriteBuf, Input, "REQUIRES");
     removeCommentLines(RewriteBuf, Input, "CHECK");
   }
 
