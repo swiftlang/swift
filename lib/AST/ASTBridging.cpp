@@ -573,14 +573,11 @@ void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl bridgedDecl,
   setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
 }
 
-static SmallVector<InheritedEntry>
-convertToInheritedEntries(BridgedArrayRef cInheritedTypes) {
-  SmallVector<InheritedEntry> inheritedEntries;
-  for (auto &repr : cInheritedTypes.unbridged<BridgedTypeRepr>()) {
-    inheritedEntries.emplace_back(repr.unbridged());
-  }
-
-  return inheritedEntries;
+static ArrayRef<InheritedEntry>
+convertToInheritedEntries(ASTContext &ctx, BridgedArrayRef cInheritedTypes) {
+  return ctx.AllocateTransform<InheritedEntry>(
+      cInheritedTypes.unbridged<BridgedTypeRepr>(),
+      [](auto &e) { return InheritedEntry(e.unbridged()); });
 }
 
 BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
@@ -594,7 +591,7 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
 
   NominalTypeDecl *decl = new (context) EnumDecl(
       cEnumKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
@@ -646,7 +643,7 @@ BridgedNominalTypeDecl BridgedStructDecl_createParsed(
 
   NominalTypeDecl *decl = new (context) StructDecl(
       cStructKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
@@ -665,7 +662,7 @@ BridgedNominalTypeDecl BridgedClassDecl_createParsed(
 
   NominalTypeDecl *decl = new (context) ClassDecl(
       cClassKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged(), isActor);
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
@@ -680,19 +677,20 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
-  SmallVector<PrimaryAssociatedTypeName, 2> primaryAssociatedTypeNames;
-  for (auto &pair :
-       cPrimaryAssociatedTypeNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
-    primaryAssociatedTypeNames.emplace_back(pair.Name.unbridged(),
-                                            pair.NameLoc.unbridged());
-  }
-
   ASTContext &context = cContext.unbridged();
+
+  auto primaryAssociatedTypeNames =
+      context.AllocateTransform<PrimaryAssociatedTypeName>(
+          cPrimaryAssociatedTypeNames
+              .unbridged<BridgedIdentifierAndSourceLoc>(),
+          [](auto &e) -> PrimaryAssociatedTypeName {
+            return {e.Name.unbridged(), e.NameLoc.unbridged()};
+          });
+
   NominalTypeDecl *decl = new (context) ProtocolDecl(
       cDeclContext.unbridged(), cProtocolKeywordLoc.unbridged(),
-      cNameLoc.unbridged(), cName.unbridged(),
-      context.AllocateCopy(primaryAssociatedTypeNames),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      cNameLoc.unbridged(), cName.unbridged(), primaryAssociatedTypeNames,
+      convertToInheritedEntries(context, cInheritedTypes),
       genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
 
@@ -711,8 +709,7 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
       context, cDeclContext.unbridged(), cAssociatedtypeKeywordLoc.unbridged(),
       cName.unbridged(), cNameLoc.unbridged(), defaultType.unbridged(),
       genericWhereClause.unbridged());
-  decl->setInherited(
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)));
+  decl->setInherited(convertToInheritedEntries(context, cInheritedTypes));
 
   return decl;
 }
@@ -727,7 +724,7 @@ BridgedExtensionDecl BridgedExtensionDecl_createParsed(
 
   auto *decl = ExtensionDecl::create(
       context, cExtensionKeywordLoc.unbridged(), extendedType.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       cDeclContext.unbridged(), genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
   return decl;
@@ -1133,8 +1130,8 @@ BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
   }
 
   ASTContext &context = cContext.unbridged();
-  return BraceStmt::create(context, cLBLoc.unbridged(),
-                           context.AllocateCopy(nodes), cRBLoc.unbridged());
+  return BraceStmt::create(context, cLBLoc.unbridged(), nodes,
+                           cRBLoc.unbridged());
 }
 
 BridgedIfStmt BridgedIfStmt_createParsed(BridgedASTContext cContext,

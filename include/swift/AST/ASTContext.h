@@ -521,6 +521,18 @@ public:
                               setVector.size());
   }
 
+  template <typename Output, typename Range>
+  ArrayRef<Output> AllocateTransform(
+      Range &&input,
+      llvm::function_ref<Output(typename Range::const_reference)> transform,
+      AllocationArena arena = AllocationArena::Permanent) {
+    auto size = std::distance(std::cbegin(input), std::cend(input));
+    auto storage = AllocateUninitialized<Output>(size, arena);
+    for (auto i : indices(input))
+      new (storage.data() + i) Output(transform(input[i]));
+    return storage;
+  }
+
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
