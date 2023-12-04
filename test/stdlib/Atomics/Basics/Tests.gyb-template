@@ -7,6 +7,7 @@
 /// Exercises all operations in a single-threaded context, verifying
 /// they provide the expected results.
 
+import Synchronization
 import StdlibUnittest
 
 % for label, type, a, b in types:

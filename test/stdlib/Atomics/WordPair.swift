@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+import Synchronization
 import StdlibUnittest
 
 let suite = TestSuite("WordPairTests")

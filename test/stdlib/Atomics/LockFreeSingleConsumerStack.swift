@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
 
+import Synchronization
 import StdlibUnittest
 import Dispatch
 
