@@ -2819,6 +2819,7 @@ static bool requiresDefinition(Decl *decl) {
     case SourceFileKind::Library:
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
       break;
     }
   }

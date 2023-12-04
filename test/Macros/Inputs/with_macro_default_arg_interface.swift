@@ -4,18 +4,8 @@ public macro FileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(
 )
 
 @freestanding(expression)
-public macro PrependHello(_ param: String) -> String = #externalMacro(
-    module: "MacroDefinition", type: "PrependHelloMacro"
-)
-
-@freestanding(expression)
-public macro AsIs<T>(_ param: T) -> T = #externalMacro(
-    module: "MacroDefinition", type: "AsIsMacro"
-)
-
-@freestanding(expression)
-public macro IntroduceShadowed<T>(_ param: T) -> T = #externalMacro(
-    module: "MacroDefinition", type: "IntroduceShadowedMacro"
+public macro PrependHelloToShadowed() -> String = #externalMacro(
+    module: "MacroDefinition", type: "PrependHelloToShadowedMacro"
 )
 
 @freestanding(expression)
@@ -43,26 +33,8 @@ public struct ClosureCaller {
 
 public let shadowed = "world"
 
-public func testParameterUseVariableFromOriginalDeclContext(
-    param: String = #PrependHello(shadowed)
-) {
-    print(param)
-}
-
-public func testMacroUseMacro(
-    param: String = #PrependHello(#fileID)
-) {
-    print(param)
-}
-
-public func testUseShadowedFromOuterExpansion(
-    param: String = #IntroduceShadowed(#PrependHello(shadowed))
-) {
-    print(param)
-}
-
-public func testNestedStillInOriginalDeclContext(
-    param: String = #AsIs(#PrependHello(shadowed))
+public func preferVariableFromLocalScope(
+    param: String = #PrependHelloToShadowed
 ) {
     print(param)
 }

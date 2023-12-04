@@ -963,6 +963,7 @@ public:
 #include "swift/Basic/MacroRoles.def"
         IsWalkingMacroExpansionBuffer = true;
         break;
+      case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::ReplacedFunctionBody:
       case GeneratedSourceInfo::PrettyPrinted:
         break;

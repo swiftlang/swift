@@ -774,8 +774,6 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
 #include "swift/AST/MagicIdentifierKinds.def"
 
   case DefaultArgumentKind::ExpressionMacro: {
-    // FIXME: ApolloZhu what is macro has parameters that references
-    // other things in decl context?
     SmallString<128> scratch;
     const StringRef text = param->getDefaultValueStringRepresentation(scratch);
     SourceFile *defaultArgSourceFile =

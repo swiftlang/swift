@@ -99,29 +99,15 @@ let printWithFileLine = buildPrinter { }
         parenthesizedExpansionAtDeclOkay()
         print(result)
         printWithFileLine(context: "macro")
-        
+      
+        // CHECK: hello world
+        preferVariableFromLocalScope()
+      
         do {
-            let shadowed: Int = 1
-            // CHECK: hello world
-            testParameterUseVariableFromOriginalDeclContext()
+            let shadowed = 42
+            // CHECK: hello 42
+            preferVariableFromLocalScope()
         }
-        
-        do {
-            let shadowed: String = "not this"
-            // CHECK: hello world
-            testParameterUseVariableFromOriginalDeclContext()
-        }
-        
-        do {
-            let shadowed: String = "not this either"
-            // CHECK: hello world
-            testNestedStillInOriginalDeclContext()
-        }
-        
-        // CHECK: hello from shadow
-        testUseShadowedFromOuterExpansion()
-        // CHECK: hello MacroUser/macro_default_argument_enabled.swift
-        testMacroUseMacro()
         
         // CHECK: [[# @LINE + 1]]
         asDefaultArgument()

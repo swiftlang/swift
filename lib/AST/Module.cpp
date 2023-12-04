@@ -920,6 +920,8 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
       bufferID = SM.findBufferContainingLoc(loc);
       break;
     }
+    case GeneratedSourceInfo::DefaultArgument:
+      // TODO: ApolloZhu
     case GeneratedSourceInfo::ReplacedFunctionBody:
       // There's not really any "original" location for locations within
       // replaced function bodies. The body is actually different code to the

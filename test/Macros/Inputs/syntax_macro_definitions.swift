@@ -2043,37 +2043,14 @@ public struct ClosureCallerMacro: ExpressionMacro {
     }
 }
 
-public struct PrependHelloMacro: ExpressionMacro {
+public struct PrependHelloToShadowedMacro: ExpressionMacro {
     public static func expansion(
       of node: some FreestandingMacroExpansionSyntax,
       in context: some MacroExpansionContext
     ) -> ExprSyntax {
-        """
-        "hello " + \(node.arguments.first!.expression)
-        """
-    }
-}
-
-public struct AsIsMacro: ExpressionMacro {
-    public static func expansion(
-      of node: some FreestandingMacroExpansionSyntax,
-      in context: some MacroExpansionContext
-    ) -> ExprSyntax {
-        node.arguments.first!.expression
-    }
-}
-
-public struct IntroduceShadowedMacro: ExpressionMacro {
-    public static func expansion(
-      of node: some FreestandingMacroExpansionSyntax,
-      in context: some MacroExpansionContext
-    ) -> ExprSyntax {
-        """
-        {
-            let shadowed = "from shadow"
-            return \(node.arguments.first!.expression)
-        }()
-        """
+        #"""
+        "hello \(shadowed)"
+        """#
     }
 }
 
