@@ -644,6 +644,18 @@ BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME(
+    "BridgedArrowExpr.createParsed(_:asyncLoc:throwsLoc:thrownType:arrowLoc:)")
+BridgedArrowExpr BridgedArrowExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAsyncLoc,
+                                               BridgedSourceLoc cThrowsLoc,
+                                               BridgedNullableExpr cThrownType,
+                                               BridgedSourceLoc cArrowLoc);
+
+SWIFT_NAME("BridgedAssignExpr.createParsed(_:equalsLoc:)")
+BridgedAssignExpr BridgedAssignExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cEqualsLoc);
+
 SWIFT_NAME("BridgedCallExpr.createParsed(_:fn:args:)")
 BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
@@ -655,11 +667,34 @@ BridgedClosureExpr_createParsed(BridgedASTContext cContext,
                                 BridgedDeclContext cDeclContext,
                                 BridgedBraceStmt body);
 
-SWIFT_NAME("BridgedUnresolvedDeclRefExpr.createParsed(_:name:loc:)")
-BridgedUnresolvedDeclRefExpr
-BridgedUnresolvedDeclRefExpr_createParsed(BridgedASTContext cContext,
-                                          BridgedDeclNameRef cName,
-                                          BridgedDeclNameLoc cLoc);
+SWIFT_NAME("BridgedCoerceExpr.createParsed(_:asLoc:type:)")
+BridgedCoerceExpr BridgedCoerceExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cAsLoc,
+                                                 BridgedTypeRepr cType);
+
+SWIFT_NAME(
+    "BridgedConditionalCheckedCastExpr.createParsed(_:asLoc:questionLoc:type:)")
+BridgedConditionalCheckedCastExpr
+BridgedConditionalCheckedCastExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAsLoc,
+                                               BridgedSourceLoc cQuestionLoc,
+                                               BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedDiscardAssignmentExpr.createParsed(_:loc:)")
+BridgedDiscardAssignmentExpr
+BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
+                                          BridgedSourceLoc cLoc);
+
+SWIFT_NAME(
+    "BridgedForcedCheckedCastExpr.createParsed(_:asLoc:exclaimLoc:type:)")
+BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
+    BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedIsExpr.createParsed(_:isLoc:type:)")
+BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
+                                         BridgedSourceLoc cIsLoc,
+                                         BridgedTypeRepr cType);
 
 SWIFT_NAME("BridgedSingleValueStmtExpr.createWithWrappedBranches(_:stmt:"
            "declContext:mustBeExpr:)")
@@ -676,6 +711,11 @@ BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedSequenceExpr.createParsed(_:exprs:)")
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
                                                      BridgedArrayRef exprs);
+
+SWIFT_NAME("BridgedTernaryExpr.createParsed(_:questionLoc:thenExpr:colonLoc:)")
+BridgedTernaryExpr BridgedTernaryExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cQuestionLoc,
+    BridgedExpr cThenExpr, BridgedSourceLoc cColonLoc);
 
 SWIFT_NAME("BridgedTupleExpr.createParsed(_:leftParenLoc:exprs:labels:"
            "labelLocs:rightParenLoc:)")
@@ -706,6 +746,32 @@ BridgedArrayExpr BridgedArrayExpr_createParsed(BridgedASTContext cContext,
                                                BridgedArrayRef elements,
                                                BridgedArrayRef commas,
                                                BridgedSourceLoc cRLoc);
+
+SWIFT_NAME("BridgedPostfixUnaryExpr.createParsed(_:operator:operand:)")
+BridgedPostfixUnaryExpr
+BridgedPostfixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedExpr oper, BridgedExpr operand);
+
+SWIFT_NAME("BridgedPrefixUnaryExpr.createParsed(_:operator:operand:)")
+BridgedPrefixUnaryExpr
+BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedExpr oper, BridgedExpr operand);
+
+SWIFT_NAME("BridgedTypeExpr.createParsed(_:type:)")
+BridgedTypeExpr BridgedTypeExpr_createParsed(BridgedASTContext cContext,
+                                             BridgedTypeRepr cType);
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDeclRefKind : size_t {
+  BridgedDeclRefKindOrdinary,
+  BridgedDeclRefKindBinaryOperator,
+  BridgedDeclRefKindPostfixOperator,
+  BridgedDeclRefKindPrefixOperator,
+};
+
+SWIFT_NAME("BridgedUnresolvedDeclRefExpr.createParsed(_:name:kind:loc:)")
+BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
+    BridgedASTContext cContext, BridgedDeclNameRef cName,
+    BridgedDeclRefKind cKind, BridgedDeclNameLoc cLoc);
 
 SWIFT_NAME("BridgedUnresolvedDotExpr.createParsed(_:base:dotLoc:name:nameLoc:)")
 BridgedUnresolvedDotExpr BridgedUnresolvedDotExpr_createParsed(
