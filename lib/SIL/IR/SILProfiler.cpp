@@ -422,6 +422,13 @@ public:
   /// Returns true if this is a zero counter.
   bool isZero() const { return Counter.isZero(); }
 
+  friend bool operator==(const CounterExpr &LHS, const CounterExpr &RHS) {
+    return LHS.Counter == RHS.Counter;
+  }
+  friend bool operator!=(const CounterExpr &LHS, const CounterExpr &RHS) {
+    return !(LHS == RHS);
+  }
+
   llvm::coverage::Counter getLLVMCounter() const { return Counter; }
 
   void print(raw_ostream &OS,
@@ -476,8 +483,9 @@ private:
   }
 
   SourceMappingRegion(Kind RegionKind, ASTNode Node, SourceRange Range,
+                      llvm::Optional<CounterExpr> Counter,
                       const SourceManager &SM)
-      : RegionKind(RegionKind), Node(Node) {
+      : RegionKind(RegionKind), Node(Node), Counter(Counter) {
     assert(Range.isValid());
     StartLoc = Range.Start;
     EndLoc = Lexer::getLocForEndOfToken(SM, Range.End);
@@ -492,16 +500,18 @@ public:
 
     // Note we don't store counters for nodes, as we need to be able to fix them
     // up later.
-    return SourceMappingRegion(Kind::Node, Node, Range, SM);
+    return SourceMappingRegion(Kind::Node, Node, Range, /*Counter*/ llvm::None,
+                               SM);
   }
 
   /// Create a source region for an ASTNode that is only present for scoping of
   /// child regions, and doesn't need to be included in the resulting set of
   /// regions.
-  static SourceMappingRegion scopingOnly(ASTNode Node,
-                                         const SourceManager &SM) {
+  static SourceMappingRegion
+  scopingOnly(ASTNode Node, const SourceManager &SM,
+              llvm::Optional<CounterExpr> Counter = llvm::None) {
     return SourceMappingRegion(Kind::ScopingOnly, Node, Node.getSourceRange(),
-                               SM);
+                               Counter, SM);
   }
 
   /// Create a refined region for a given counter.
@@ -967,6 +977,14 @@ private:
           return;
         }
 
+        // Don't apply exit adjustments to if statement branches, they should
+        // be handled at the end of the statement. This avoids creating awkward
+        // overlapping exit regions for each branch, and ensures 'break'
+        // statements only have their jump counted once for the entire
+        // statement.
+        if (isa<IfStmt>(ParentStmt))
+          return;
+
         if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
           JumpsToLabel = getCounter(LS);
       }
@@ -1225,7 +1243,7 @@ public:
       // it by break statements.
       assignCounter(IS, CounterExpr::Zero());
 
-      // FIXME: This is a redundant region.
+      // FIXME: This is a redundant region for non else-ifs.
       if (auto *Cond = getConditionNode(IS->getCond()))
         assignCounter(Cond, getCurrentCounter());
 
@@ -1244,13 +1262,68 @@ public:
         // terms of it.
         auto ThenCounter = assignKnownCounter(IS->getThenStmt());
         IS->getThenStmt()->walk(*this);
+        auto ThenDelta =
+            CounterExpr::Sub(ThenCounter, getExitCounter(), CounterBuilder);
 
+        llvm::Optional<CounterExpr> ElseDelta;
         if (auto *Else = IS->getElseStmt()) {
           auto ElseCounter = CounterExpr::Sub(ParentCounter, ThenCounter,
                                               CounterBuilder);
-          assignCounter(Else, ElseCounter);
+          // We handle `else if` and `else` slightly differently here. For
+          // `else` we have a BraceStmt, and can use the existing scoping logic
+          // to handle calculating the exit count. For `else if`, we need to
+          // set up a new scope to contain the child `if` statement, effectively
+          // we treat:
+          //
+          // if .random() {
+          // } else if .random() {
+          // } else {
+          // }
+          //
+          // the same as:
+          //
+          // if .random() {
+          // } else {
+          //   if .random() {
+          //   } else {
+          //   }
+          // }
+          //
+          // This ensures we assign a correct counter to the `else if`
+          // condition, and allows us to compute the exit count correctly. We
+          // don't need the fake `else` scope to be included in the resulting
+          // set of regions, so we mark it scoping-only.
+          if (isa<BraceStmt>(Else)) {
+            assignCounter(Else, ElseCounter);
+          } else {
+            pushRegion(SourceMappingRegion::scopingOnly(Else, SM, ElseCounter));
+          }
           Else->walk(*this);
+
+          // Once we've walked the `else`, compute the delta exit count. For
+          // a normal `else` we can use the computed exit count, for an
+          // `else if` we can take the current region count since we don't have
+          // a proper scope. This is a little hacked together, but we'll be able
+          // to do away with all of this once we re-implement as a SILOptimizer
+          // pass.
+          auto AfterElse = isa<BraceStmt>(Else) ? getExitCounter()
+                                                : getCurrentCounter();
+          if (!isa<BraceStmt>(Else))
+            popRegions(Else);
+
+          ElseDelta = CounterExpr::Sub(ElseCounter, AfterElse, CounterBuilder);
         }
+        // Compute the exit count following the `if`, taking jumps to the
+        // statement by breaks into account, and the delta of the `then` branch
+        // and `else` branch if we have one.
+        auto AfterIf = getCurrentCounter();
+        AfterIf = CounterExpr::Add(AfterIf, getCounter(IS), CounterBuilder);
+        AfterIf = CounterExpr::Sub(AfterIf, ThenDelta, CounterBuilder);
+        if (ElseDelta)
+          AfterIf = CounterExpr::Sub(AfterIf, *ElseDelta, CounterBuilder);
+
+        if (AfterIf != getCurrentCounter())
+          replaceCount(AfterIf, getEndLoc(IS));
       }
       // Already visited the children.
       // FIXME: The ASTWalker should do a post-walk for SkipChildren.
