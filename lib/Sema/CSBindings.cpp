@@ -457,9 +457,28 @@ void BindingSet::inferTransitiveBindings(
               inferredRootTy = fnType->getParams()[0].getParameterType();
           }
 
-          if (inferredRootTy && !inferredRootTy->isTypeVariableOrMember())
-            addBinding(
+          if (inferredRootTy) {
+            // If contextual root is not yet resolved, let's try to see if
+            // there are any bindings in its set. The bindings could be
+            // transitively used because conversions between generic arguments
+            // are not allowed.
+            if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
+              auto rootBindings = inferredBindings.find(contextualRootVar);
+              if (rootBindings != inferredBindings.end()) {
+                auto &bindings = rootBindings->getSecond();
+
+                // Don't infer if root is not yet fully resolved.
+                if (bindings.isDelayed())
+                  continue;
+
+                for (const auto &binding : bindings.Bindings)
+                  addBinding(binding);
+              }
+            } else {
+              addBinding(
                 binding.withSameSource(inferredRootTy, BindingKind::Exact));
+            }
+          }
         }
       }
     }
