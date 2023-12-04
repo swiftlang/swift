@@ -73,7 +73,7 @@ extension ASTGenVisitor {
       self.ctx,
       ifKeywordLoc: node.ifKeyword.bridgedSourceLoc(in: self),
       condition: conditions.first!.castToExpr,
-      thenStmt: self.generate(codeBlock: node.body).asStmt,
+      thenStmt: self.generate(codeBlock: node.body),
       elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
       elseStmt: node.elseBody.map {
         switch $0 {

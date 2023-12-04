@@ -494,7 +494,7 @@ protected:
         availabilityCond && builder.supports(ctx.Id_buildLimitedAvailability);
 
     NullablePtr<Expr> thenVarRef;
-    NullablePtr<Stmt> thenBranch;
+    NullablePtr<BraceStmt> thenBranch;
     {
       SmallVector<ASTNode, 4> thenBody;
 

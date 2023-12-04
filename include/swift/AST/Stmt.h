@@ -757,20 +757,25 @@ public:
 class IfStmt : public LabeledConditionalStmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
-  Stmt *Then;
+  BraceStmt *Then;
   Stmt *Else;
   
 public:
   IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
-         Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
+         BraceStmt *Then, SourceLoc ElseLoc, Stmt *Else,
          llvm::Optional<bool> implicit = llvm::None)
       : LabeledConditionalStmt(StmtKind::If,
                                getDefaultImplicitFlag(implicit, IfLoc),
                                LabelInfo, Cond),
-        IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {}
+        IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {
+    assert(Then && "Must have non-null 'then' statement");
+    assert(!Else || isa<BraceStmt>(Else) ||
+           isa<IfStmt>(Else) &&
+               "Else statement must either be BraceStmt or IfStmt");
+  }
 
-  IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
-         llvm::Optional<bool> implicit, ASTContext &Ctx);
+  IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
+         Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx);
 
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
@@ -782,8 +787,8 @@ public:
     return (Else ? Else->getEndLoc() : Then->getEndLoc());
   }
 
-  Stmt *getThenStmt() const { return Then; }
-  void setThenStmt(Stmt *s) { Then = s; }
+  BraceStmt *getThenStmt() const { return Then; }
+  void setThenStmt(BraceStmt *s) { Then = s; }
 
   Stmt *getElseStmt() const { return Else; }
   void setElseStmt(Stmt *s) { Else = s; }

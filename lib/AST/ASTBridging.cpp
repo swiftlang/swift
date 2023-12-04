@@ -1051,7 +1051,8 @@ BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
 
 BridgedIfStmt BridgedIfStmt_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIfLoc,
-                                         BridgedExpr cond, BridgedStmt then,
+                                         BridgedExpr cond,
+                                         BridgedBraceStmt then,
                                          BridgedSourceLoc cElseLoc,
                                          BridgedNullableStmt elseStmt) {
   ASTContext &context = cContext.unbridged();

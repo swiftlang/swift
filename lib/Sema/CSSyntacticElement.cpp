@@ -1803,7 +1803,7 @@ private:
     else
       hadError = true;
 
-    ifStmt->setThenStmt(visit(ifStmt->getThenStmt()).get<Stmt *>());
+    ifStmt->setThenStmt(castToStmt<BraceStmt>(visit(ifStmt->getThenStmt())));
 
     if (auto elseStmt = ifStmt->getElseStmt()) {
       ifStmt->setElseStmt(visit(elseStmt).get<Stmt *>());

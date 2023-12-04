@@ -661,7 +661,7 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
   return Ctx.AllocateCopy(Arr);
 }
 
-IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
+IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
                Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx)
     : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc,
              Else, implicit) {}
