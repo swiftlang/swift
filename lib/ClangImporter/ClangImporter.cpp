@@ -6956,12 +6956,6 @@ static bool isForeignReferenceType(const clang::QualType type) {
 }
 
 static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
-  // Hard-coded special cases from the standard library (this will go away once
-  // API notes support namespaces).
-  if (decl->getNameAsString() == "basic_string" ||
-      decl->getNameAsString() == "vector")
-    return true;
-
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
              return swiftAttr->getAttribute() == "import_owned";
