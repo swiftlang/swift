@@ -672,8 +672,7 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
 
   auto primaryAssociatedTypeNames =
       context.AllocateTransform<PrimaryAssociatedTypeName>(
-          cPrimaryAssociatedTypeNames
-              .unbridged<BridgedIdentifierAndSourceLoc>(),
+          cPrimaryAssociatedTypeNames.unbridged<BridgedLocatedIdentifier>(),
           [](auto &e) -> PrimaryAssociatedTypeName {
             return {e.Name.unbridged(), e.NameLoc.unbridged()};
           });
@@ -772,15 +771,13 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedSourceLoc cRightBraceLoc) {
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> higherThanNames;
-  for (auto &pair :
-       cHigherThanNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
+  for (auto &pair : cHigherThanNames.unbridged<BridgedLocatedIdentifier>()) {
     higherThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> lowerThanNames;
-  for (auto &pair :
-       cLowerThanNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
+  for (auto &pair : cLowerThanNames.unbridged<BridgedLocatedIdentifier>()) {
     lowerThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
@@ -802,7 +799,7 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements) {
   ImportPath::Builder builder;
   for (auto &element :
-       cImportPathElements.unbridged<BridgedIdentifierAndSourceLoc>()) {
+       cImportPathElements.unbridged<BridgedLocatedIdentifier>()) {
     builder.push_back(element.Name.unbridged(), element.NameLoc.unbridged());
   }
 

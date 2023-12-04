@@ -24,26 +24,26 @@ extension ASTGenVisitor {
 
     // FIXME: Calculate isExprBasic.
     let isExprBasic = false
-    return legacyParse.parseExpr(node.bridgedSourceLoc(in: self), self.declContext, isExprBasic)
+    return legacyParse.parseExpr(self.generateSourceLoc(node), self.declContext, isExprBasic)
   }
 
   func generateWithLegacy(_ node: DeclSyntax) -> BridgedDecl {
-    legacyParse.parseDecl(node.bridgedSourceLoc(in: self), self.declContext)
+    legacyParse.parseDecl(self.generateSourceLoc(node), self.declContext)
   }
 
   func generateWithLegacy(_ node: StmtSyntax) -> BridgedStmt {
-    legacyParse.parseStmt(node.bridgedSourceLoc(in: self), self.declContext)
+    legacyParse.parseStmt(self.generateSourceLoc(node), self.declContext)
   }
 
   func generateWithLegacy(_ node: TypeSyntax) -> BridgedTypeRepr {
-    legacyParse.parseType(node.bridgedSourceLoc(in: self), self.declContext)
+    legacyParse.parseType(self.generateSourceLoc(node), self.declContext)
   }
 
   func generateMatchingPatternWithLegacy(_ node: some PatternSyntaxProtocol) {
-//    legacyParse.parseMatchingPattern(node.bridgedSourceLoc(in: self), self.declContext)
+//    legacyParse.parseMatchingPattern(self.bridgedSourceLoc(syntax: node), self.declContext)
   }
 
   func generateBindingPatternWithLegacy(_ node: some PatternSyntaxProtocol) {
-//    legacyParse.parseBindingPattern(node.bridgedSourceLoc(in: self), self.declContext)
+//    legacyParse.parseBindingPattern(self.bridgedSourceLoc(syntax: node), self.declContext)
   }
 }

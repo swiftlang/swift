@@ -73,22 +73,17 @@ extension ASTGenVisitor {
     // FIXME: This location should be derived from the type repr.
     let specifierLoc: BridgedSourceLoc = nil
 
-    let firstName: BridgedIdentifier
-    if node.optionalFirstName?.tokenKind == .wildcard {
-      // Swift AST represents "_" as a null identifier.
-      firstName = nil
-    } else {
-      firstName = node.optionalFirstName.bridgedIdentifier(in: self)
-    }
-
-    let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
+    let (firstName, firstNameLoc) =
+        self.generateIdentifierAndSourceLoc(node.optionalFirstName)
+    let (secondName, secondNameLoc) =
+        self.generateIdentifierAndSourceLoc(node.secondName)
 
     var type = node.optionalType.map(generate(type:))
     if let ellipsis = node.ellipsis, let base = type {
       type = BridgedVarargTypeRepr.createParsed(
         self.ctx,
         base: base,
-        ellipsisLoc: ellipsis.bridgedSourceLoc(in: self)
+        ellipsisLoc: self.generateSourceLoc(ellipsis)
       )
     }
 
@@ -97,7 +92,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       specifierLoc: specifierLoc,
       firstName: firstName,
-      firstNameLoc: node.optionalFirstName.bridgedSourceLoc(in: self),
+      firstNameLoc: firstNameLoc,
       secondName: secondName,
       secondNameLoc: secondNameLoc,
       type: type.asNullable,
@@ -112,18 +107,18 @@ extension ASTGenVisitor {
   func generate(functionParameterClause node: FunctionParameterClauseSyntax) -> BridgedParameterList {
     BridgedParameterList.createParsed(
       self.ctx,
-      leftParenLoc: node.leftParen.bridgedSourceLoc(in: self),
+      leftParenLoc: self.generateSourceLoc(node.leftParen),
       parameters: self.generate(functionParameterList: node.parameters),
-      rightParenLoc: node.rightParen.bridgedSourceLoc(in: self)
+      rightParenLoc: self.generateSourceLoc(node.rightParen)
     )
   }
 
   func generate(enumCaseParameterClause node: EnumCaseParameterClauseSyntax) -> BridgedParameterList {
     BridgedParameterList.createParsed(
       self.ctx,
-      leftParenLoc: node.leftParen.bridgedSourceLoc(in: self),
+      leftParenLoc: self.generateSourceLoc(node.leftParen),
       parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
-      rightParenLoc: node.rightParen.bridgedSourceLoc(in: self)
+      rightParenLoc: self.generateSourceLoc(node.rightParen)
     )
   }
 }

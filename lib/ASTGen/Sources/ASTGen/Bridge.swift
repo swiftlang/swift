@@ -78,13 +78,6 @@ public extension BridgedSourceLoc {
   }
 }
 
-extension BridgedSourceRange {
-  @inline(__always)
-  init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
-    self.init(start: startToken.bridgedSourceLoc(in: astgen), end: endToken.bridgedSourceLoc(in: astgen))
-  }
-}
-
 extension String {
   init(bridged: BridgedStringRef) {
     self.init(
@@ -134,92 +127,5 @@ public func freeBridgedString(bridged: BridgedStringRef) {
 extension BridgedStringRef {
   var isEmptyInitialized: Bool {
     return self.data == nil && self.count == 0
-  }
-}
-
-extension SyntaxProtocol {
-  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
-  ///
-  /// - Parameter astgen: The visitor providing the source buffer.
-  @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
-    return BridgedSourceLoc(at: self.positionAfterSkippingLeadingTrivia, in: astgen.base)
-  }
-}
-
-extension Optional where Wrapped: SyntaxProtocol {
-  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`.
-  ///
-  /// - Parameter astgen: The visitor providing the source buffer.
-  @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
-    guard let self else {
-      return nil
-    }
-
-    return self.bridgedSourceLoc(in: astgen)
-  }
-}
-
-extension TokenSyntax {
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
-  ///
-  /// - Parameter astgen: The visitor providing the `ASTContext`.
-  @inline(__always)
-  func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
-    var text = self.rawText
-    if rawText == "_" {
-      return nil
-    }
-    if rawText.count > 2 && rawText.hasPrefix("`") && rawText.hasSuffix("`") {
-      text = .init(rebasing: text.dropFirst().dropLast())
-    }
-    return astgen.ctx.getIdentifier(rawText.bridged)
-  }
-
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
-  /// source buffer provided by `astgen`.
-  ///
-  /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
-  @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
-    return (self.bridgedIdentifier(in: astgen), self.bridgedSourceLoc(in: astgen))
-  }
-
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
-  /// source buffer provided by `astgen`.
-  ///
-  /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
-  @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> BridgedIdentifierAndSourceLoc {
-    let (name, nameLoc) = self.bridgedIdentifierAndSourceLoc(in: astgen)
-    return .init(name: name, nameLoc: nameLoc)
-  }
-}
-
-extension Optional<TokenSyntax> {
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
-  ///
-  /// - Parameter astgen: The visitor providing the `ASTContext`.
-  @inline(__always)
-  func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
-    guard let self else {
-      return nil
-    }
-
-    return self.bridgedIdentifier(in: astgen)
-  }
-
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
-  /// source buffer provided by `astgen` excluding leading trivia.
-  ///
-  /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
-  @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
-    guard let self else {
-      return (nil, nil)
-    }
-
-    return self.bridgedIdentifierAndSourceLoc(in: astgen)
   }
 }

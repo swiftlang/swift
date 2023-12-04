@@ -14,7 +14,7 @@ import ASTBridging
 import BasicBridging
 import ParseBridging
 // Needed to use BumpPtrAllocator
-@_spi(BumpPtrAllocator) import SwiftSyntax
+@_spi(BumpPtrAllocator) @_spi(RawSyntax) import SwiftSyntax
 
 import struct SwiftDiagnostics.Diagnostic
 
@@ -106,7 +106,7 @@ struct ASTGenVisitor {
     var out = [BridgedDecl]()
 
     for element in node.statements {
-      let loc = element.bridgedSourceLoc(in: self)
+      let loc = self.generateSourceLoc(element)
       let swiftASTNodes = generate(codeBlockItem: element)
       switch swiftASTNodes {
       case .decl(let d):
@@ -135,6 +135,82 @@ struct ASTGenVisitor {
     }
 
     return out
+  }
+}
+
+extension ASTGenVisitor {
+  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  ///
+  /// If the token text is `_`, return an empty identifier. If the token is an
+  /// escaped identifier, backticks are stripped.
+  @inline(__always)
+  func generateIdentifier(_ token: TokenSyntax) -> BridgedIdentifier {
+    var text = token.rawText
+    // FIXME: Maybe `TokenSyntax.tokenView.rawKind == .wildcard`, or expose it as `.rawTokenKind`.
+    if text == "_" {
+      return nil
+    }
+    if text.count > 2 && text.hasPrefix("`") && text.hasSuffix("`") {
+      text = .init(rebasing: text.dropFirst().dropLast())
+    }
+    return self.ctx.getIdentifier(text.bridged)
+  }
+
+  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  ///
+  /// If the `token` text is `nil`, return an empty identifier.
+  @inline(__always)
+  func generateIdentifier(_ token: TokenSyntax?) -> BridgedIdentifier {
+    token.map(generateIdentifier(_:)) ?? nil
+  }
+
+  /// Obtains the start location of the node excluding leading trivia in the
+  /// source buffer.
+  @inline(__always)
+  func generateSourceLoc(_ node: some SyntaxProtocol) -> BridgedSourceLoc {
+    BridgedSourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
+  }
+
+  /// Obtains the start location of the node excluding leading trivia in the
+  /// source buffer. If the `node` is nil returns an invalid source location.
+  @inline(__always)
+  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> BridgedSourceLoc {
+    node.map(generateSourceLoc(_:)) ?? nil
+  }
+
+  /// Obtains a pair of bridged identifier and the bridged source location.
+  @inline(__always)
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc) {
+    return (
+      self.generateIdentifier(token),
+      self.generateSourceLoc(token)
+    )
+  }
+
+  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
+  /// source location.
+  @inline(__always)
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc) {
+    token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
+  }
+
+  /// Obtains a pair of bridged identifier and the bridged source location.
+  @inline(__always)
+  func generateLocatedIdentifier(_ token: TokenSyntax) -> BridgedLocatedIdentifier {
+    BridgedLocatedIdentifier(
+      name: self.generateIdentifier(token),
+      nameLoc: self.generateSourceLoc(token)
+    )
+  }
+
+  /// Obtains bridged token source range from a pair of token nodes.
+  @inline(__always)
+  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> BridgedSourceRange {
+    BridgedSourceRange(
+      start: self.generateSourceLoc(start),
+      end: self.generateSourceLoc(end)
+    )
   }
 }
 
