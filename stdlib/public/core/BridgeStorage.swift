@@ -31,9 +31,15 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
 
   // rawValue is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
+#if !$Embedded
   @usableFromInline
   internal var rawValue: Builtin.BridgeObject
+#else
+  @usableFromInline
+  internal var rawValue: NativeClass
+#endif
 
+#if !$Embedded
   @inlinable
   @inline(__always)
   internal init(native: Native, isFlagged flag: Bool) {
@@ -46,13 +52,16 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
       native,
       flag ? (1 as UInt) << _objectPointerLowSpareBitShift : 0)
   }
+#endif
 
+#if _runtime(_ObjC)
   @inlinable
   @inline(__always)
   internal init(objC: ObjC) {
     _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }
+#endif
 
   @inlinable
   @inline(__always)
@@ -65,7 +74,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   @inline(__always)
   internal init(taggedPayload: UInt) {
-    rawValue = _bridgeObject(taggingPayload: taggedPayload)
+    rawValue = Builtin.reinterpretCast(taggedPayload)
   }
 #endif
 
@@ -84,9 +93,13 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   internal var isNative: Bool {
     @inline(__always) get {
+      #if !$Embedded
       let result = Builtin.classifyBridgeObject(rawValue)
       return !Bool(Builtin.or_Int1(result.isObjCObject,
                                    result.isObjCTaggedPointer))
+      #else
+      return true
+      #endif
     }
   }
 
@@ -100,9 +113,13 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   internal var isUnflaggedNative: Bool {
     @inline(__always) get {
+      #if !$Embedded
       return (_bitPattern(rawValue) &
         (_bridgeObjectTaggedPointerBits | _objCTaggedPointerBits |
           _objectPointerIsObjCBit | _BridgeStorage.flagMask)) == 0
+      #else
+      return true
+      #endif
     }
   }
 
@@ -117,7 +134,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   internal var nativeInstance: Native {
     @inline(__always) get {
       _internalInvariant(isNative)
-      return Builtin.castReferenceFromBridgeObject(rawValue)
+      return rawValue
     }
   }
 
@@ -125,8 +142,10 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   internal var unflaggedNativeInstance: Native {
     @inline(__always) get {
       _internalInvariant(isNative)
+      #if !$Embedded
       _internalInvariant(_nonPointerBits(rawValue) == 0)
-      return Builtin.reinterpretCast(rawValue)
+      #endif
+      return rawValue
     }
   }
 
@@ -151,6 +170,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     Builtin.endCOWMutation(&rawValue)
   }
 
+#if _runtime(_ObjC)
   @inlinable
   internal var objCInstance: ObjC {
     @inline(__always) get {
@@ -158,4 +178,5 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
+#endif
 }

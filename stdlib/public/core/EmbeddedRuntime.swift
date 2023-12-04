@@ -275,3 +275,10 @@ public func swift_deletedMethodError() -> Never {
 public func swift_willThrow() throws {
 }
 
+@_silgen_name("arc4random_buf")
+public func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
+
+@_silgen_name("swift_stdlib_random")
+public func swift_stdlib_random(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
+  arc4random_buf(buf: buf, nbytes: nbytes)
+}

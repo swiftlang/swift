@@ -43,10 +43,10 @@ split_embedded_sources(
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
   EMBEDDED BidirectionalCollection.swift
-    NORMAL Bitset.swift
+  EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
     NORMAL BridgeObjectiveC.swift
-    NORMAL BridgeStorage.swift
+  EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
@@ -89,7 +89,7 @@ split_embedded_sources(
   # END WORKAROUND
   EMBEDDED Hasher.swift
     NORMAL Hashing.swift
-    NORMAL HashTable.swift
+  EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
     NORMAL InputStream.swift
@@ -111,7 +111,7 @@ split_embedded_sources(
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
     NORMAL NativeDictionary.swift
-    NORMAL NativeSet.swift
+  EMBEDDED NativeSet.swift
     NORMAL NewtypeWrapper.swift
     NORMAL NFC.swift
     NORMAL NFD.swift
@@ -139,15 +139,15 @@ split_embedded_sources(
   EMBEDDED SipHash.swift
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
-    NORMAL Set.swift
+  EMBEDDED Set.swift
   EMBEDDED SetAlgebra.swift
     NORMAL SetAnyHashableExtensions.swift
     NORMAL SetBridging.swift
-    NORMAL SetBuilder.swift
-    NORMAL SetCasting.swift
-    NORMAL SetStorage.swift
-    NORMAL SetVariant.swift
-    NORMAL ShadowProtocols.swift
+  EMBEDDED SetBuilder.swift
+  EMBEDDED SetCasting.swift
+  EMBEDDED SetStorage.swift
+  EMBEDDED SetVariant.swift
+  EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
   EMBEDDED Slice.swift
     NORMAL SmallString.swift

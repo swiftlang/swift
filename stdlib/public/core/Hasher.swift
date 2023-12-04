@@ -251,6 +251,16 @@ extension Hasher {
   }
 }
 
+#if $Embedded
+@usableFromInline
+var _swift_stdlib_Hashing_parameters: _SwiftHashingParameters = {
+  var seed0: UInt64 = 0, seed1: UInt64 = 0
+  swift_stdlib_random(&seed0, MemoryLayout<UInt64>.size)
+  swift_stdlib_random(&seed1, MemoryLayout<UInt64>.size)
+  return .init(seed0: seed0, seed1: seed1, deterministic: false)
+}()
+#endif
+
 /// The universal hash function used by `Set` and `Dictionary`.
 ///
 /// `Hasher` can be used to map an arbitrary sequence of bytes to an integer
