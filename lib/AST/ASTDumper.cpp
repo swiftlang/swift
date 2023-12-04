@@ -3315,7 +3315,7 @@ public:
   void visitMemberTypeRepr(MemberTypeRepr *T, StringRef label) {
     printCommon("type_member", label);
 
-    printRec(T->getBaseComponent());
+    printRec(T->getRoot());
     for (auto *comp : T->getMemberComponents()) {
       printRec(comp);
     }

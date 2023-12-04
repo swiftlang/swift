@@ -1169,7 +1169,7 @@ struct TypeReprCycleCheckWalker : ASTWalker {
 
     if (auto *memberTyR = dyn_cast<MemberTypeRepr>(T)) {
       // If we're looking at a member type`Foo.Bar`, check `Foo` recursively.
-      auto *baseTyR = memberTyR->getBaseComponent();
+      auto *baseTyR = memberTyR->getRoot();
       baseTyR->walk(*this);
 
       // If we're inferring `Foo`, don't look at a witness mentioning `Self.Foo`.

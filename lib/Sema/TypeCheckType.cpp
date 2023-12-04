@@ -4643,8 +4643,8 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
                                      TypeResolutionOptions options) {
   Type result;
 
-  auto *baseComp = repr->getBaseComponent();
-  if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+  auto *rootComp = repr->getRoot();
+  if (auto *identBase = dyn_cast<IdentTypeRepr>(rootComp)) {
     // The base component uses unqualified lookup.
     result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
                                              silContext, identBase);
@@ -4670,7 +4670,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
       }
     }
   } else {
-    result = resolveType(baseComp, options);
+    result = resolveType(rootComp, options);
   }
 
   if (result->hasError())
@@ -4678,7 +4678,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
 
   // Remaining components are resolved via iterated qualified lookups.
   if (auto *memberTR = dyn_cast<MemberTypeRepr>(repr)) {
-    SourceRange parentRange = baseComp->getSourceRange();
+    SourceRange parentRange = rootComp->getSourceRange();
     for (auto *nestedComp : memberTR->getMemberComponents()) {
       result = resolveQualifiedIdentTypeRepr(resolution.withOptions(options),
                                              silContext, result, parentRange,

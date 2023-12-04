@@ -330,9 +330,13 @@ protected:
   explicit DeclRefTypeRepr(TypeReprKind K) : TypeRepr(K) {}
 
 public:
-  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
-  /// is a \c MemberTypeRepr, and the method returns its base component.
-  TypeRepr *getBaseComponent();
+  /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
+  /// qualifier of a `IdentTypeRepr` is itself.
+  TypeRepr *getRoot();
+
+  /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
+  /// qualifier of a `IdentTypeRepr` is itself.
+  const TypeRepr *getRoot() const;
 
   /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
   /// is a \c MemberTypeRepr, and the method returns its last member component.
@@ -498,11 +502,11 @@ class MemberTypeRepr final : public DeclRefTypeRepr,
       private llvm::TrailingObjects<MemberTypeRepr, IdentTypeRepr *> {
   friend TrailingObjects;
 
-  /// The base component, which is not necessarily an identifier type.
-  TypeRepr *Base;
+  /// The root component, which is not necessarily an identifier type.
+  TypeRepr *Root;
 
-  MemberTypeRepr(TypeRepr *Base, ArrayRef<IdentTypeRepr *> MemberComponents)
-      : DeclRefTypeRepr(TypeReprKind::Member), Base(Base) {
+  MemberTypeRepr(TypeRepr *Root, ArrayRef<IdentTypeRepr *> MemberComponents)
+      : DeclRefTypeRepr(TypeReprKind::Member), Root(Root) {
     Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
     assert(MemberComponents.size() > 0 &&
            "MemberTypeRepr requires at least 1 member component");
@@ -511,13 +515,14 @@ class MemberTypeRepr final : public DeclRefTypeRepr,
   }
 
 public:
-  static TypeRepr *create(const ASTContext &Ctx, TypeRepr *Base,
+  static TypeRepr *create(const ASTContext &Ctx, TypeRepr *Root,
                           ArrayRef<IdentTypeRepr *> MemberComponents);
 
   static DeclRefTypeRepr *create(const ASTContext &Ctx,
                                  ArrayRef<IdentTypeRepr *> Components);
 
-  TypeRepr *getBaseComponent() const { return Base; }
+  /// Returns the root qualifier. For example, `A` for `A.B.C`.
+  TypeRepr *getRoot() const { return Root; }
 
   ArrayRef<IdentTypeRepr *> getMemberComponents() const {
     return {getTrailingObjects<IdentTypeRepr *>(),
@@ -534,9 +539,7 @@ public:
   static bool classof(const MemberTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    return getBaseComponent()->getStartLoc();
-  }
+  SourceLoc getStartLocImpl() const { return getRoot()->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return getLastComponent()->getEndLoc(); }
   SourceLoc getLocImpl() const { return getLastComponent()->getLoc(); }
 

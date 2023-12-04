@@ -3932,13 +3932,13 @@ public:
     if (!declRefTR)
       return Action::Continue();
 
-    auto *baseComp = declRefTR->getBaseComponent();
-    if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+    auto *rootComp = declRefTR->getRoot();
+    if (auto *identBase = dyn_cast<IdentTypeRepr>(rootComp)) {
       if (checkIdentTypeRepr(identBase)) {
         foundAnyIssues = true;
         return Action::SkipNode();
       }
-    } else if (diagnoseTypeReprAvailability(baseComp, where, flags)) {
+    } else if (diagnoseTypeReprAvailability(rootComp, where, flags)) {
       foundAnyIssues = true;
       return Action::SkipNode();
     }

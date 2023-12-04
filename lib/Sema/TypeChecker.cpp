@@ -488,11 +488,10 @@ namespace {
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(declRefTR->getBaseComponent())) {
-        auto name = identBase->getNameRef().getBaseIdentifier();
+      if (auto *identRoot = dyn_cast<IdentTypeRepr>(declRefTR->getRoot())) {
+        auto name = identRoot->getNameRef().getBaseIdentifier();
         if (auto *paramDecl = params->lookUpGenericParam(name))
-          identBase->setValue(paramDecl, dc);
+          identRoot->setValue(paramDecl, dc);
       }
     }
 

@@ -2750,11 +2750,10 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         // TypeRepr version: Builtin.AnyObject
         if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
           if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
-            if (auto identBase =
-                    dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
+            if (auto identRoot = dyn_cast<IdentTypeRepr>(memberTR->getRoot())) {
               auto memberComps = memberTR->getMemberComponents();
               if (memberComps.size() == 1 &&
-                  identBase->getNameRef().isSimpleName("Builtin") &&
+                  identRoot->getNameRef().isSimpleName("Builtin") &&
                   memberComps.front()->getNameRef().isSimpleName("AnyObject")) {
                 anyObject = true;
               }
@@ -2929,8 +2928,8 @@ directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                    bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
-  auto *baseComp = repr->getBaseComponent();
-  if (auto *identBase = dyn_cast<IdentTypeRepr>(baseComp)) {
+  auto *rootComp = repr->getRoot();
+  if (auto *identBase = dyn_cast<IdentTypeRepr>(rootComp)) {
     // If we already set a declaration, use it.
     if (auto *typeDecl = identBase->getBoundDecl()) {
       current = {1, typeDecl};
@@ -2941,7 +2940,7 @@ directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
           LookupOuterResults::Excluded, allowUsableFromInline);
     }
   } else {
-    current = directReferencesForTypeRepr(evaluator, ctx, baseComp, dc,
+    current = directReferencesForTypeRepr(evaluator, ctx, rootComp, dc,
                                           allowUsableFromInline);
   }
 

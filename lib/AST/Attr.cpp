@@ -2744,7 +2744,7 @@ std::pair<IdentTypeRepr *, IdentTypeRepr *> CustomAttr::destructureMacroRef() {
   if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
     return {nullptr, identType};
   if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr))
-    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getBaseComponent()))
+    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getRoot()))
       if (memType->getMemberComponents().size() == 1)
         if (auto first =
                 dyn_cast<IdentTypeRepr>(memType->getMemberComponents().front()))

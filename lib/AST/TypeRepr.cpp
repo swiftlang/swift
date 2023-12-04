@@ -134,6 +134,18 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   return SourceLoc();
 }
 
+TypeRepr *DeclRefTypeRepr::getRoot() {
+  return const_cast<TypeRepr *>(
+      const_cast<const DeclRefTypeRepr *>(this)->getRoot());
+}
+
+const TypeRepr *DeclRefTypeRepr::getRoot() const {
+  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
+    return ITR;
+
+  return cast<MemberTypeRepr>(this)->getRoot();
+}
+
 TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
   return const_cast<DeclRefTypeRepr *>(this)
       ->getLastComponent()
@@ -142,13 +154,6 @@ TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
 
 DeclNameRef DeclRefTypeRepr::getNameRef() const {
   return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->getNameRef();
-}
-
-TypeRepr *DeclRefTypeRepr::getBaseComponent() {
-  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
-    return ITR;
-
-  return cast<MemberTypeRepr>(this)->getBaseComponent();
 }
 
 IdentTypeRepr *DeclRefTypeRepr::getLastComponent() {
@@ -289,7 +294,7 @@ void IdentTypeRepr::printImpl(ASTPrinter &Printer,
 
 void MemberTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
-  printTypeRepr(getBaseComponent(), Printer, Opts);
+  printTypeRepr(getRoot(), Printer, Opts);
   for (auto C : getMemberComponents()) {
     Printer << ".";
     printTypeRepr(C, Printer, Opts);
@@ -383,14 +388,14 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
   return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
 }
 
-TypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+TypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Root,
                                  ArrayRef<IdentTypeRepr *> MemberComponents) {
   if (MemberComponents.empty())
-    return Base;
+    return Root;
 
   auto size = totalSizeToAlloc<IdentTypeRepr *>(MemberComponents.size());
   auto mem = C.Allocate(size, alignof(MemberTypeRepr));
-  return new (mem) MemberTypeRepr(Base, MemberComponents);
+  return new (mem) MemberTypeRepr(Root, MemberComponents);
 }
 
 DeclRefTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,

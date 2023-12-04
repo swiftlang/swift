@@ -2268,7 +2268,7 @@ TypeExpr *TypeExpr::createForMemberDecl(TypeRepr *ParentTR, DeclNameLoc NameLoc,
     }
 
     Components.push_back(NewComp);
-    TR = MemberTypeRepr::create(C, DeclRefTR->getBaseComponent(), Components);
+    TR = MemberTypeRepr::create(C, DeclRefTR->getRoot(), Components);
   } else {
     TR = MemberTypeRepr::create(C, ParentTR, NewComp);
   }
@@ -2314,9 +2314,8 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
           return nullptr;
       }
 
-      if (auto *identBase =
-              dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
-        if (isUnboundGenericComponent(identBase))
+      if (auto *identRoot = dyn_cast<IdentTypeRepr>(memberTR->getRoot())) {
+        if (isUnboundGenericComponent(identRoot))
           return nullptr;
       }
     }
@@ -2336,8 +2335,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
     newMemberComps.append(oldMemberComps.begin(), oldMemberComps.end());
     newMemberComps.push_back(genericComp);
 
-    TR =
-        MemberTypeRepr::create(C, memberTR->getBaseComponent(), newMemberComps);
+    TR = MemberTypeRepr::create(C, memberTR->getRoot(), newMemberComps);
   } else {
     TR = genericComp;
   }

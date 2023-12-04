@@ -2143,7 +2143,7 @@ bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
 }
 
 bool Traversal::visitMemberTypeRepr(MemberTypeRepr *T) {
-  if (doIt(T->getBaseComponent()))
+  if (doIt(T->getRoot()))
     return true;
 
   for (auto comp : T->getMemberComponents()) {
