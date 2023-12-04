@@ -31,6 +31,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -833,7 +834,7 @@ struct OwnershipModelEliminator : SILFunctionTransform {
           "Found verification error when verifying before lowering "
           "ownership. Please re-run with -sil-verify-all to identify the "
           "actual pass that introduced the verification error.");
-      f->verify(getPassManager());
+      f->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     }
 
     if (stripOwnership(*f)) {

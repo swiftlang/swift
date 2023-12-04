@@ -6,13 +6,10 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-swift_compiler_sources(Optimizer
-  DiagnosticEngine.swift
-  Devirtualization.swift
-  EscapeUtils.swift
-  OptUtils.swift
-  ForwardingUtils.swift
-  SSAUpdater.swift
-  StaticInitCloner.swift
-  Test.swift
+swift_compiler_sources(SIL
+  AccessUtils.swift
+  SequenceUtilities.swift
+  SmallProjectionPath.swift
+  WalkUtils.swift
 )
+

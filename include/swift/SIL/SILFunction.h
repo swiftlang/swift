@@ -39,7 +39,7 @@ class SILProfiler;
 class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
-class SILPassManager;
+class CalleeCache;
 
 namespace Lowering {
 class TypeLowering;
@@ -1144,6 +1144,9 @@ public:
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
   MemoryBehavior getMemoryBehavior(bool observeRetains);
 
+  // Used by the MemoryLifetimeVerifier
+  bool argumentMayRead(Operand *argOp, SILValue addr);
+
   Purpose getSpecialPurpose() const { return specialPurpose; }
 
   /// Get this function's global_init attribute.
@@ -1500,7 +1503,7 @@ public:
 
   /// verify - Run the SIL verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify(SILPassManager *passManager = nullptr,
+  void verify(CalleeCache *calleeCache = nullptr,
               bool SingleFunction = true,
               bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
@@ -1508,11 +1511,11 @@ public:
   /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
   /// blocks.
   void verifyIncompleteOSSA() const {
-    verify(/*passManager*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+    verify(/*calleeCache*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.
-  void verifyMemoryLifetime(SILPassManager *passManager);
+  void verifyMemoryLifetime(CalleeCache *calleeCache);
 
   /// Run the SIL ownership verifier to check that all values with ownership
   /// have a linear lifetime. Regular OSSA invariants are checked separately in
