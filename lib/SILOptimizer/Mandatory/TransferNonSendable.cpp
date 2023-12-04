@@ -1033,13 +1033,29 @@ class PartitionOpTranslator {
 
     self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 
-    // Otherwise, we need to compute our flags. Begin by seeing if we have a
-    // value that we can prove is not aliased.
+    // Otherwise, we need to compute our flags.
+
+    // First for addresses.
     if (value->getType().isAddress()) {
-      if (auto accessStorage = AccessStorage::compute(value))
-        if (accessStorage.isUniquelyIdentified() &&
-            !isAddressCapturedByPartialApply)
+      auto storage = AccessStorageWithBase::compute(value);
+      if (storage.storage) {
+        // Check if we have a uniquely identified address that was not captured
+        // by a partial apply... in such a case, we treat it as no-alias.
+        if (storage.storage.isUniquelyIdentified() &&
+            !isAddressCapturedByPartialApply) {
           iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
+        }
+
+        // Then see if the memory base is a ref_element_addr from an address. If
+        // so, add the actor derived flag.
+        //
+        // This is important so we properly handle setters.
+        if (isa<RefElementAddrInst>(storage.base)) {
+          if (storage.storage.getRoot()->getType().isActor()) {
+            iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+          }
+        }
+      }
     }
 
     // Then see if we have a sendable value. By default we assume values are not
