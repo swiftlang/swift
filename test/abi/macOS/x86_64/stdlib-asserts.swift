@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: nm -g --defined-only -f just-symbols %stdlib_dir/x86_64/libswiftCore.dylib > %t/symbols
+// RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/x86_64/libswiftCore.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols
 // RUN: diff -u %S/../../Inputs/macOS/x86_64/stdlib/baseline-asserts %t/symbols
 
@@ -36,8 +36,13 @@
 
 // Standard Library Symbols
 
+// Swift._getRetainCount(Swift.AnyObject) -> Swift.UInt
 Added: _$ss15_getRetainCountySuyXlF
+
+// Swift._getWeakRetainCount(Swift.AnyObject) -> Swift.UInt
 Added: _$ss19_getWeakRetainCountySuyXlF
+
+// Swift._getUnownedRetainCount(Swift.AnyObject) -> Swift.UInt
 Added: _$ss22_getUnownedRetainCountySuyXlF
 
 // Runtime Symbols
