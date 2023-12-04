@@ -1,5 +1,3 @@
-// FIXME: Failing in ASAN (rdar://119141141)
-// UNSUPPORTED: asan_runtime
 
 // REQUIRES: swift_swift_parser, executable_test
 
