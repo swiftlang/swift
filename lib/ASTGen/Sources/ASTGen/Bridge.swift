@@ -12,7 +12,7 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftSyntax
+@_spi(RawSyntax) import SwiftSyntax
 
 protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr
@@ -97,6 +97,12 @@ extension String {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
+  }
+}
+
+extension SyntaxText {
+  var bridged: BridgedStringRef {
+    BridgedStringRef(data: self.baseAddress, count: self.count)
   }
 }
 
