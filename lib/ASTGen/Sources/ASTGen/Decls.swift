@@ -72,7 +72,7 @@ extension ASTGenVisitor {
     return self.generateWithLegacy(node)
   }
 
-  public func generate(typeAliasDecl node: TypeAliasDeclSyntax) -> BridgedTypeAliasDecl {
+  func generate(typeAliasDecl node: TypeAliasDeclSyntax) -> BridgedTypeAliasDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     return .createParsed(
@@ -88,7 +88,7 @@ extension ASTGenVisitor {
     )
   }
 
-  public func generate(enumDecl node: EnumDeclSyntax) -> BridgedNominalTypeDecl {
+  func generate(enumDecl node: EnumDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedEnumDecl.createParsed(
@@ -113,7 +113,7 @@ extension ASTGenVisitor {
     return decl
   }
 
-  public func generate(structDecl node: StructDeclSyntax) -> BridgedNominalTypeDecl {
+  func generate(structDecl node: StructDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedStructDecl.createParsed(
@@ -138,7 +138,7 @@ extension ASTGenVisitor {
     return decl
   }
 
-  public func generate(classDecl node: ClassDeclSyntax) -> BridgedNominalTypeDecl {
+  func generate(classDecl node: ClassDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedClassDecl.createParsed(
@@ -164,7 +164,7 @@ extension ASTGenVisitor {
     return decl
   }
 
-  public func generate(actorDecl node: ActorDeclSyntax) -> BridgedNominalTypeDecl {
+  func generate(actorDecl node: ActorDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let decl = BridgedClassDecl.createParsed(
@@ -288,7 +288,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  public func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
+  func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
     let pattern = generate(pattern: node.bindings.first!.pattern)
     let initializer = generate(initializerClause: node.bindings.first!.initializer!)
 
@@ -310,7 +310,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractFunctionDecl
 
 extension ASTGenVisitor {
-  public func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl {
+  func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl {
     // FIXME: Compute this location
     let staticLoc: BridgedSourceLoc = nil
 
