@@ -2539,6 +2539,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      : "-gdwarf_types");
   }
 
+  if (auto A = Args.getLastArg(OPT_emit_split_dwarf_path)) {
+    Opts.SplitDwarfOutput = A->getValue();
+  }
+
   if (auto A = Args.getLastArg(OPT_dwarf_version)) {
     unsigned vers;
     if (!StringRef(A->getValue()).getAsInteger(10, vers) && vers >= 2 &&

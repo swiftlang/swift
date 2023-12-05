@@ -76,6 +76,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -133,6 +134,9 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   // Set option to select the CASBackendMode.
   TargetOpts.MCOptions.CASObjMode = Opts.CASObjMode;
+
+  // Set option to split debug-info into a separate .dwo file.
+  TargetOpts.MCOptions.SplitDwarfFile = Opts.SplitDwarfOutput;
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
@@ -640,16 +644,34 @@ bool swift::compileAndWriteLLVM(
   }
   case IRGenOutputKind::NativeAssembly:
   case IRGenOutputKind::ObjectFile: {
+    CodeGenFileType FileType = CGFT_AssemblyFile;
+    std::unique_ptr<ToolOutputFile> dwoOut = nullptr;
+
+    if (opts.OutputKind == IRGenOutputKind::ObjectFile) {
+      FileType = CGFT_ObjectFile;
+
+      // FIXME: Write to temporary and store in target file only on finalize.
+      if (!opts.SplitDwarfOutput.empty()) {
+        std::error_code EC;
+        dwoOut = std::make_unique<ToolOutputFile>(opts.SplitDwarfOutput, EC,
+                                                  sys::fs::OF_None);
+        if (EC) {
+          diagnoseSync(diags, diagMutex, SourceLoc(),
+                       diag::error_opening_output, opts.SplitDwarfOutput,
+                       std::move(EC.message()));
+          return true;
+        }
+        dwoOut->keep();
+      }
+    }
+
     legacy::PassManager EmitPasses;
-    CodeGenFileType FileType;
-    FileType =
-        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
-                                                            : CGFT_ObjectFile);
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
     bool fail = targetMachine->addPassesToEmitFile(
-        EmitPasses, out, nullptr, FileType, !opts.Verify, nullptr, casid);
+        EmitPasses, out, dwoOut ? &dwoOut->os() : nullptr, FileType,
+        !opts.Verify, nullptr, casid);
     if (fail) {
       diagnoseSync(diags, diagMutex, SourceLoc(),
                    diag::error_codegen_init_fail);
