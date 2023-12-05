@@ -119,6 +119,26 @@ TypeRepr *TypeRepr::getWithoutParens() const {
   return repr;
 }
 
+bool TypeRepr::isSimpleUnqualifiedIdentifier(Identifier identifier) const {
+  if (auto *identTR = dyn_cast<SimpleIdentTypeRepr>(this)) {
+    if (identTR->getNameRef().getBaseIdentifier() == identifier) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool TypeRepr::isSimpleUnqualifiedIdentifier(StringRef str) const {
+  if (auto *identTR = dyn_cast<SimpleIdentTypeRepr>(this)) {
+    if (identTR->getNameRef().getBaseIdentifier().is(str)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {

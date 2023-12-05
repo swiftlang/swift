@@ -1123,9 +1123,7 @@ SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
     // The left-hand side of the type constraint must be 'Self'.
     bool isSelfLHS = false;
     if (auto typeRepr = req.getSubjectRepr()) {
-      if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
-        isSelfLHS = (identTypeRepr->getNameRef().getBaseIdentifier() ==
-                     ctx.Id_Self);
+      isSelfLHS = typeRepr->isSimpleUnqualifiedIdentifier(ctx.Id_Self);
     }
     if (!isSelfLHS)
       continue;
@@ -2750,13 +2748,11 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         // TypeRepr version: Builtin.AnyObject
         if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
           if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
-            if (auto identRoot = dyn_cast<IdentTypeRepr>(memberTR->getRoot())) {
-              auto memberComps = memberTR->getMemberComponents();
-              if (memberComps.size() == 1 &&
-                  identRoot->getNameRef().isSimpleName("Builtin") &&
-                  memberComps.front()->getNameRef().isSimpleName("AnyObject")) {
-                anyObject = true;
-              }
+            auto memberComps = memberTR->getMemberComponents();
+            if (memberComps.size() == 1 &&
+                memberComps.front()->getNameRef().isSimpleName("AnyObject") &&
+                memberTR->getRoot()->isSimpleUnqualifiedIdentifier("Builtin")) {
+              anyObject = true;
             }
           }
         }

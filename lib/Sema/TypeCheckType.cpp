@@ -1354,8 +1354,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       return ErrorType::get(ctx);
     }
 
-    if (repr->getNameRef().isSimpleName(ctx.Id_Self) &&
-        !isa<GenericIdentTypeRepr>(repr)) {
+    if (repr->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
       DeclContext *nominalDC = nullptr;
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
@@ -3847,6 +3846,7 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
 NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     TypeAttrSet *attrs) {
+  auto &ctx = getASTContext();
 
   auto isolatedAttr = claim<IsolatedTypeAttr>(attrs);
 
@@ -3907,7 +3907,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       diagnoseInvalid(
           repr, diffAttr->getAtLoc(),
           diag::differentiable_programming_attr_used_without_required_module,
-          diffAttr->getAttrName(), getASTContext().Id_Differentiation);
+          diffAttr->getAttrName(), ctx.Id_Differentiation);
     }
   }
 
@@ -3921,8 +3921,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
         .warnUntilSwiftVersion(6);
 
-    if (getASTContext().LangOpts.isSwiftVersionAtLeast(6))
-      return ErrorType::get(getASTContext());
+    if (ctx.LangOpts.isSwiftVersionAtLeast(6))
+      return ErrorType::get(ctx);
     else
       repr->setWarned();
   }
@@ -3974,11 +3974,11 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   if (auto patternParams = repr->getPatternGenericParams()) {
     diagnose(patternParams->getLAngleLoc(),
              diag::ast_subst_function_type);
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   } else if (!repr->getInvocationSubstitutions().empty()) {
     diagnose(repr->getInvocationSubstitutions()[0]->getStartLoc(),
              diag::ast_subst_function_type);
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   llvm::Optional<SILInnerGenericContextRAII> innerGenericContext;
@@ -3986,7 +3986,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (!silContext) {
       diagnose(genericParams->getLAngleLoc(), diag::generic_function_type)
         .highlight(genericParams->getSourceRange());
-      return ErrorType::get(getASTContext());
+      return ErrorType::get(ctx);
     }
     innerGenericContext.emplace(silContext, genericParams);
   }
@@ -4000,7 +4000,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   resultOptions.setContext(TypeResolverContext::FunctionResult);
   auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
   if (outputTy->hasError()) {
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   // If this is a function type without parens around the parameter list,
@@ -4011,13 +4011,10 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     // asking if they meant () -> ().
     auto args = repr->getArgsTypeRepr();
     if (args->getNumElements() == 1) {
-      if (const auto Void =
-          dyn_cast<SimpleIdentTypeRepr>(args->getElementType(0))) {
-        if (Void->getNameRef().isSimpleName(getASTContext().Id_Void)) {
-          diagnose(args->getStartLoc(), diag::paren_void_probably_void)
+      if (args->getElementType(0)->isSimpleUnqualifiedIdentifier(ctx.Id_Void)) {
+        diagnose(args->getStartLoc(), diag::paren_void_probably_void)
             .fixItReplace(args->getSourceRange(), "()");
-          repr->setWarned();
-        }
+        repr->setWarned();
       }
     }
   }

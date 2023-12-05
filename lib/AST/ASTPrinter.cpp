@@ -4990,14 +4990,13 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
       }
 
-      if (!ResultTyLoc.getTypeRepr())
-        ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       // FIXME: Hacky way to workaround the fact that 'Self' as return
       // TypeRepr is not getting 'typechecked'. See
       // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
-      if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
-        if (simId->getNameRef().isSimpleName(Ctx.Id_Self))
-          ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
+      if (ResultTyLoc.getTypeRepr() &&
+          ResultTyLoc.getTypeRepr()->isSimpleUnqualifiedIdentifier(
+              Ctx.Id_Self)) {
+        ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       }
       Printer << " -> ";
 

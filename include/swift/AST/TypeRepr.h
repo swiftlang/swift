@@ -195,6 +195,12 @@ public:
   /// \c Type::getCanonicalType() or \c Type::getWithoutParens().
   TypeRepr *getWithoutParens() const;
 
+  /// Whether this is a `SimpleIdentTypeRepr` matching the given identifier.
+  bool isSimpleUnqualifiedIdentifier(Identifier identifier) const;
+
+  /// Whether this is a `SimpleIdentTypeRepr` matching the given string.
+  bool isSimpleUnqualifiedIdentifier(StringRef str) const;
+
   //*** Allocation Routines ************************************************/
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;

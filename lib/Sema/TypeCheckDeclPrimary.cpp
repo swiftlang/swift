@@ -1583,11 +1583,7 @@ static bool isModuleQualified(TypeRepr *repr, ModuleDecl *module) {
 
   // FIXME(ModQual): This needs to be updated once we have an explicit
   //                 module qualification syntax.
-  IdentTypeRepr *rootIdent = dyn_cast<IdentTypeRepr>(memberTy->getRoot());
-  if (!rootIdent) {
-    return false;
-  }
-  return rootIdent->getNameRef().isSimpleName(module->getName());
+  return memberTy->getRoot()->isSimpleUnqualifiedIdentifier(module->getName());
 }
 
 /// If the provided type is an AttributedTypeRepr, unwraps it and provides both

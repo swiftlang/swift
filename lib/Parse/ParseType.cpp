@@ -470,26 +470,16 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     TupleTypeRepr *argsTyR = nullptr;
     if (auto *TTArgs = dyn_cast<TupleTypeRepr>(tyR)) {
       argsTyR = TTArgs;
-    } else {
-      bool isVoid = false;
-      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getNameRef().isSimpleName(Context.Id_Void)) {
-          isVoid = true;
-        }
-      }
-
-      if (isVoid) {
-        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+    } else if (tyR->isSimpleUnqualifiedIdentifier(Context.Id_Void)) {
+      diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
           .fixItReplace(tyR->getStartLoc(), "()");
-        argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
-      } else {
-        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+      argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
+    } else {
+      diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
           .highlight(tyR->getSourceRange())
           .fixItInsert(tyR->getStartLoc(), "(")
           .fixItInsertAfter(tyR->getEndLoc(), ")");
-        argsTyR = TupleTypeRepr::create(Context, {tyR},
-                                        tyR->getSourceRange());
-      }
+      argsTyR = TupleTypeRepr::create(Context, {tyR}, tyR->getSourceRange());
     }
     
     // Parse substitutions for substituted SIL types.
