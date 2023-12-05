@@ -9156,10 +9156,8 @@ static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
 static BraceStmt *expandBodyMacro(AbstractFunctionDecl *fn) {
   ASTContext &ctx = fn->getASTContext();
 
-  // Expand the preamble.
-  auto preamble = expandPreamble(fn);
-
   // Expand a body macro, if there is one.
+  BraceStmt *macroExpandedBody = nullptr;
   if (auto bufferID = evaluateOrDefault(
           ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
     CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
@@ -9167,41 +9165,38 @@ static BraceStmt *expandBodyMacro(AbstractFunctionDecl *fn) {
     auto module = fn->getParentModule();
     auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
 
-    // When there is no preamble, adopt the body itself.
-    if (preamble.empty()) {
-      return BraceStmt::create(
-          ctx, bufferRange.getStart(), macroSourceFile->getTopLevelItems(),
-          bufferRange.getEnd());
+    if (macroSourceFile->getTopLevelItems().size() == 1) {
+      auto stmt = macroSourceFile->getTopLevelItems()[0].dyn_cast<Stmt *>();
+      macroExpandedBody = dyn_cast<BraceStmt>(stmt);
     }
-
-    // Merge the preamble into the macro-produced body.
-    auto contents = std::move(preamble);
-    contents.insert(
-        contents.end(),
-        macroSourceFile->getTopLevelItems().begin(),
-        macroSourceFile->getTopLevelItems().end());
-    return BraceStmt::create(
-        ctx, bufferRange.getStart(), contents, bufferRange.getEnd());
   }
 
-  // There is no body macro. If there's no preamble, either, then there is
-  // nothing to do.
-  if (preamble.empty())
-    return nullptr;
+  // Expand the preamble.
+  auto preamble = expandPreamble(fn);
 
-  // If there is no body, the preamble has nowhere to go.
-  auto body = fn->getBody(/*canSynthesize=*/true);
+  // If there is no preamble, we're done one way or the other: return the
+  // macro-expanded body.
+  if (preamble.empty())
+    return macroExpandedBody;
+
+  // We have a preamble. The body is either the one produced by macro expansion,
+  // or if not that, the one that was written.
+  auto body = macroExpandedBody ? macroExpandedBody : fn->getBody();
+
+  // If there is no body at this point, the preamble has nowhere to go.
   if (!body) {
     // FIXME: diagnose this
     return nullptr;
   }
 
-  // Merge the preamble into the existing body.
+  // Merge the preamble into the body.
   auto contents = std::move(preamble);
   contents.insert(
-      contents.end(), body->getElements().begin(), body->getElements().end());
+      contents.end(),
+      body->getElements().begin(),
+      body->getElements().end());
   return BraceStmt::create(
-      ctx, body->getLBraceLoc(), contents, body->getRBraceLoc());
+      ctx, body->getStartLoc(), contents, body->getEndLoc());
 }
 
 BraceStmt *AbstractFunctionDecl::getMacroExpandedBody() const {
