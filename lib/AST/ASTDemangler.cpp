@@ -1031,7 +1031,10 @@ ASTBuilder::createTypeDecl(NodePointer node,
 ModuleDecl *
 ASTBuilder::findModule(NodePointer node) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
-  const auto &moduleName = node->getText();
+  const auto moduleName = node->getText();
+  if (Ctx.MainModule && Ctx.MainModule->getABIName().is(moduleName))
+    return Ctx.MainModule;
+
   return Ctx.getModuleByName(moduleName);
 }
 
