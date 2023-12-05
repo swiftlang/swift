@@ -13,7 +13,7 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 extension EffectSpecifiersSyntax {
   var thrownError: TypeSyntax? {
@@ -203,14 +203,14 @@ extension ASTGenVisitor {
   public func generate(metatypeType node: MetatypeTypeSyntax) -> BridgedTypeRepr {
     let baseType = generate(type: node.baseType)
     let tyLoc = node.metatypeSpecifier.bridgedSourceLoc(in: self)
-    if node.metatypeSpecifier.text == "Type" {
+    if node.metatypeSpecifier.rawText == "Type" {
       return BridgedMetatypeTypeRepr.createParsed(
         self.ctx,
         base: baseType,
         typeKeywordLoc: tyLoc
       )
     } else {
-      assert(node.metatypeSpecifier.text == "Protocol")
+      assert(node.metatypeSpecifier.rawText == "Protocol")
       return BridgedProtocolTypeRepr.createParsed(
         self.ctx,
         base: baseType,
@@ -298,7 +298,7 @@ extension ASTGenVisitor {
   public func generate(someOrAnyType node: SomeOrAnyTypeSyntax) -> BridgedTypeRepr {
     let someOrAnyLoc = node.someOrAnySpecifier.bridgedSourceLoc(in: self)
     let baseTy = generate(type: node.constraint)
-    if node.someOrAnySpecifier.text == "some" {
+    if node.someOrAnySpecifier.rawText == "some" {
       return BridgedOpaqueReturnTypeRepr.createParsed(
         self.ctx,
         someKeywordLoc: someOrAnyLoc,
@@ -368,10 +368,7 @@ extension ASTGenVisitor {
         }
 
         let nameSyntax = identType.name
-        var name = nameSyntax.text
-        let typeAttrKind = name.withBridgedString { bridgedName in
-          BridgedTypeAttrKind(from: bridgedName)
-        }
+        let typeAttrKind = BridgedTypeAttrKind(from: nameSyntax.rawText.bridged)
         let atLoc = attribute.atSign.bridgedSourceLoc(in: self)
         let attrLoc = nameSyntax.bridgedSourceLoc(in: self)
         switch typeAttrKind {

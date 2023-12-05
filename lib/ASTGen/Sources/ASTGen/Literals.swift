@@ -18,6 +18,7 @@ extension ASTGenVisitor {
     let openDelimiterOrQuoteLoc = (node.openingPounds ?? node.openingQuote).bridgedSourceLoc(in: self)
 
     // FIXME: Handle interpolated strings.
+    // FIXME: Avoid 'String' instantiation
     var segment = node.segments.first!.as(StringSegmentSyntax.self)!.content.text
     return segment.withBridgedString { bridgedSegment in
       return .createParsed(self.ctx, value: bridgedSegment, loc: openDelimiterOrQuoteLoc)
@@ -25,6 +26,8 @@ extension ASTGenVisitor {
   }
 
   public func generate(integerLiteralExpr node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
+    // FIXME: Avoid 'String' instantiation
+    // FIXME: Strip '_'.
     var segment = node.literal.text
     return segment.withBridgedString { bridgedSegment in
       return .createParsed(ctx, value: bridgedSegment, loc: node.literal.bridgedSourceLoc(in: self))
