@@ -384,20 +384,33 @@ set(SWIFT_TOOLS_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH
 
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
     "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+set(SWIFT_STDLIB_RELEASE_RUNTIME_TYPE "MD" CACHE STRING "MSVC Runtime type for the standard library in Release mode [MD, MDd]")
+set(SWIFT_STDLIB_DEBUG_RUNTIME_TYPE "MDd" CACHE STRING "MSVC Runtime type for the standard library in Debug mode [MD, MDd]")
+
 # Allow the user to specify the standard library CMAKE_MSVC_RUNTIME_LIBRARY
 # value.  The following values are valid:
 #   - MultiThreaded (/MT)
 #   - MultiThreadedDebug (/MTd)
 #   - MultiThreadedDLL (/MD)
 #   - MultiThreadedDebugDLL (/MDd)
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default MultiThreadedDebugDLL)
+if(SWIFT_STDLIB_RELEASE_RUNTIME_TYPE STREQUAL "MD")
+  set(SWIFT_STDLIB_RELEASE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 else()
-  set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default MultiThreadedDLL)
+  set(SWIFT_STDLIB_RELEASE_MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL")
 endif()
-set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
-  ${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default}
-  CACHE STRING "MSVC Runtime Library for the standard library")
+
+if(SWIFT_STDLIB_DEBUG_RUNTIME_TYPE STREQUAL "MD")
+  set(SWIFT_STDLIB_DEBUG_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+else()
+  set(SWIFT_STDLIB_DEBUG_MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL")
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY ${SWIFT_STDLIB_DEBUG_MSVC_RUNTIME_LIBRARY})
+else()
+  set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY ${SWIFT_STDLIB_RELEASE_MSVC_RUNTIME_LIBRARY})
+endif()
+set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY ${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY} CACHE STRING "MSVC Runtime Library for the standard library")
 
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
