@@ -33,10 +33,6 @@ using namespace swift;
 
 LangOptions::LangOptions() {
   // Note: Introduce default-on language options here.
-#ifndef NDEBUG
-  Features.insert(Feature::ParserRoundTrip);
-  Features.insert(Feature::ParserValidation);
-#endif
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \
