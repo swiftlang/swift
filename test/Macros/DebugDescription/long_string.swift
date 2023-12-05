@@ -4,9 +4,13 @@
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -typecheck -enable-experimental-feature SymbolLinkageMarkers -plugin-path %swift-plugin-dir -dump-macro-expansions > %t/expansions-dump.txt 2>&1
 // RUN: %FileCheck %s < %t/expansions-dump.txt
 
-@attached(peer, names: suffixed(_lldb_summary))
+@attached(memberAttribute)
 public macro _DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
+
+@attached(peer, names: named(_lldb_summary))
+public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
+  #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
 
 @_DebugDescription
 struct MyStruct: CustomDebugStringConvertible {
@@ -19,7 +23,7 @@ struct MyStruct: CustomDebugStringConvertible {
     """
   }
 }
-// CHECK: let MyStruct_lldb_summary = (
+// CHECK: static let _lldb_summary = (
 // CHECK:     /* version */ 1 as UInt8,
 // CHECK:     /* record size */ 192 as UInt8, 2 as UInt8,
 // CHECK: 8-bit integer. See https://en.wikipedia.org/wiki/LEB128" */ 175 as UInt8, 2 as UInt8, 65 as UInt8,

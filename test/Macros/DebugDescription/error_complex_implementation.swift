@@ -3,15 +3,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -typecheck -verify -plugin-path %swift-plugin-dir
 
-@attached(peer, names: suffixed(_lldb_summary))
+@attached(memberAttribute)
 public macro _DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
+
+@attached(peer, names: named(_lldb_summary))
+public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
+  #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
 
 @_DebugDescription
 struct MyStruct {
   var flag: Bool
 
-  // expected-error @+1 {{debugDescription must consist of a single string literal}}
+  // expected-error @+1 {{body must consist of a single string literal}}
   var debugDescription: String {
     flag ? "yes" : "no"
   }
