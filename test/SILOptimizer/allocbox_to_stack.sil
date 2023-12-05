@@ -841,7 +841,7 @@ bb3:
 // CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[REF:%[0-9]+]] = alloc_ref [stack] $SomeClass
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
-// CHECK:         store %0 to %1 : $*Int
+// CHECK:        store %0 to %1 : $*Int
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack_ref [[REF]]
 // CHECK-NEXT:   tuple
@@ -1065,7 +1065,7 @@ bb3:
 // CHECK-NEXT:   dealloc_stack [[AI]]
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
-// CHECK:        store %0 to %as1 : $*Bool
+// CHECK-NEXT:   store %0 to %as1 : $*Bool
 // CHECK-NEXT:   load
 // CHECK-NEXT:   unreachable
 sil @nesting_and_unreachable7 : $@convention(thin) (Bool) -> Bool {
