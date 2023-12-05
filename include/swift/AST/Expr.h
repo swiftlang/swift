@@ -4639,41 +4639,6 @@ public:
   }
 };
 
-// ApplyIsolationCrossing records the source and target of an isolation crossing
-// within an ApplyExpr. In particular, it stores the isolation of the caller
-// and the callee of the ApplyExpr, to be used for inserting implicit actor
-// hops for implicitly async functions and to be used for diagnosing potential
-// data races that could arise when non-Sendable values are passed to calls
-// that cross isolation domains.
-struct ApplyIsolationCrossing {
-  ActorIsolation CallerIsolation;
-  ActorIsolation CalleeIsolation;
-
-  ApplyIsolationCrossing()
-      : CallerIsolation(ActorIsolation::forUnspecified()),
-        CalleeIsolation(ActorIsolation::forUnspecified()) {}
-
-  ApplyIsolationCrossing(ActorIsolation CallerIsolation,
-                         ActorIsolation CalleeIsolation)
-      : CallerIsolation(CallerIsolation), CalleeIsolation(CalleeIsolation) {}
-
-  // If the callee is not actor isolated, then this crossing exits isolation.
-  // This method returns true iff this crossing exits isolation.
-  bool exitsIsolation() const { return !CalleeIsolation.isActorIsolated(); }
-
-  // Whether to use the isolation of the caller or callee for generating
-  // informative diagnostics depends on whether this crossing is an exit.
-  // In particular, we tend to use the callee isolation for diagnostics,
-  // but if this crossing is an exit from isolation then the callee isolation
-  // is not very informative, so we use the caller isolation instead.
-  ActorIsolation getDiagnoseIsolation() const {
-    return exitsIsolation() ? CallerIsolation : CalleeIsolation;
-  }
-
-  ActorIsolation getCallerIsolation() const { return CallerIsolation; }
-  ActorIsolation getCalleeIsolation() const {return CalleeIsolation; }
-};
-
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
 /// a function to get a result.
 class ApplyExpr : public Expr {

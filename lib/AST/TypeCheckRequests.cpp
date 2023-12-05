@@ -1735,7 +1735,12 @@ void swift::simple_display(
       if (state.isDistributedActor()) {
         out << "distributed ";
       }
-      out << "actor " << state.getActor()->getName();
+      out << "actor ";
+      if (state.isSILParsed()) {
+        out << "SILPARSED";
+      } else {
+        out << state.getActor()->getName();
+      }
       break;
 
     case ActorIsolation::Nonisolated:
@@ -1752,8 +1757,12 @@ void swift::simple_display(
 
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
-      out << "actor-isolated to global actor "
-          << state.getGlobalActor().getString();
+      out << "actor-isolated to global actor ";
+      if (state.isSILParsed()) {
+        out << "SILPARSED";
+      } else {
+        out << state.getGlobalActor().getString();
+      }
 
       if (state == ActorIsolation::GlobalActorUnsafe)
         out << "(unsafe)";

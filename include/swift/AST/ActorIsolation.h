@@ -18,6 +18,9 @@
 
 #include "swift/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace llvm {
 class raw_ostream;
@@ -80,7 +83,11 @@ private:
   };
   unsigned kind : 3;
   unsigned isolatedByPreconcurrency : 1;
-  unsigned parameterIndex : 28;
+
+  /// Set to true if this was parsed from SIL.
+  unsigned silParsed : 1;
+
+  unsigned parameterIndex : 27;
 
   ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
 
@@ -88,13 +95,13 @@ private:
 
   ActorIsolation(Kind kind, Type globalActor)
       : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
-        parameterIndex(0) { }
+        silParsed(false), parameterIndex(0) {}
 
 public:
   // No-argument constructor needed for DenseMap use in PostfixCompletion.cpp
-  explicit ActorIsolation(Kind kind = Unspecified)
+  explicit ActorIsolation(Kind kind = Unspecified, bool isSILParsed = false)
       : pointer(nullptr), kind(kind), isolatedByPreconcurrency(false),
-        parameterIndex(0) { }
+        silParsed(isSILParsed), parameterIndex(0) {}
 
   static ActorIsolation forUnspecified() {
     return ActorIsolation(Unspecified, nullptr);
@@ -122,6 +129,27 @@ public:
         unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
   }
 
+  static std::optional<ActorIsolation> forSILString(StringRef string) {
+    auto kind =
+        llvm::StringSwitch<std::optional<ActorIsolation::Kind>>(string)
+            .Case("unspecified",
+                  std::optional<ActorIsolation>(ActorIsolation::Unspecified))
+            .Case("actor_instance",
+                  std::optional<ActorIsolation>(ActorIsolation::ActorInstance))
+            .Case("nonisolated",
+                  std::optional<ActorIsolation>(ActorIsolation::Nonisolated))
+            .Case("nonisolated_unsafe", std::optional<ActorIsolation>(
+                                            ActorIsolation::NonisolatedUnsafe))
+            .Case("global_actor",
+                  std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
+            .Case("global_actor_unsafe", std::optional<ActorIsolation>(
+                                             ActorIsolation::GlobalActorUnsafe))
+            .Default(std::nullopt);
+    if (kind == std::nullopt)
+      return std::nullopt;
+    return ActorIsolation(*kind, true /*is sil parsed*/);
+  }
+
   Kind getKind() const { return (Kind)kind; }
 
   operator Kind() const { return getKind(); }
@@ -139,6 +167,8 @@ public:
     assert(getKind() == ActorInstance);
     return parameterIndex;
   }
+
+  bool isSILParsed() const { return silParsed; }
 
   bool isActorIsolated() const {
     switch (getKind()) {
@@ -168,6 +198,10 @@ public:
 
   Type getGlobalActor() const {
     assert(isGlobalActor());
+
+    if (silParsed)
+      return Type();
+
     return globalActor;
   }
 
@@ -222,6 +256,32 @@ public:
         state.kind, state.pointer, state.isolatedByPreconcurrency,
         state.parameterIndex);
   }
+
+  void print(llvm::raw_ostream &os) const {
+    switch (getKind()) {
+    case Unspecified:
+      os << "unspecified";
+      return;
+    case ActorInstance:
+      os << "actor_instance";
+      return;
+    case Nonisolated:
+      os << "nonisolated";
+      return;
+    case NonisolatedUnsafe:
+      os << "nonisolated_unsafe";
+      return;
+    case GlobalActor:
+      os << "global_actor";
+      return;
+    case GlobalActorUnsafe:
+      os << "global_actor_unsafe";
+      return;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
 /// Determine how the given value declaration is isolated.
@@ -249,6 +309,51 @@ bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 
+// ApplyIsolationCrossing records the source and target of an isolation crossing
+// within an ApplyExpr. In particular, it stores the isolation of the caller
+// and the callee of the ApplyExpr, to be used for inserting implicit actor
+// hops for implicitly async functions and to be used for diagnosing potential
+// data races that could arise when non-Sendable values are passed to calls
+// that cross isolation domains.
+struct ApplyIsolationCrossing {
+  ActorIsolation CallerIsolation;
+  ActorIsolation CalleeIsolation;
+
+  ApplyIsolationCrossing()
+      : CallerIsolation(ActorIsolation::forUnspecified()),
+        CalleeIsolation(ActorIsolation::forUnspecified()) {}
+
+  ApplyIsolationCrossing(ActorIsolation CallerIsolation,
+                         ActorIsolation CalleeIsolation)
+      : CallerIsolation(CallerIsolation), CalleeIsolation(CalleeIsolation) {}
+
+  // If the callee is not actor isolated, then this crossing exits isolation.
+  // This method returns true iff this crossing exits isolation.
+  bool exitsIsolation() const { return !CalleeIsolation.isActorIsolated(); }
+
+  // Whether to use the isolation of the caller or callee for generating
+  // informative diagnostics depends on whether this crossing is an exit.
+  // In particular, we tend to use the callee isolation for diagnostics,
+  // but if this crossing is an exit from isolation then the callee isolation
+  // is not very informative, so we use the caller isolation instead.
+  ActorIsolation getDiagnoseIsolation() const {
+    return exitsIsolation() ? CallerIsolation : CalleeIsolation;
+  }
+
+  ActorIsolation getCallerIsolation() const { return CallerIsolation; }
+  ActorIsolation getCalleeIsolation() const { return CalleeIsolation; }
+};
+
 } // end namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::ActorIsolation &other) {
+  other.print(os);
+  return os;
+}
+
+} // namespace llvm
 
 #endif /* SWIFT_AST_ACTORISOLATIONSTATE_H */

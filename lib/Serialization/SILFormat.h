@@ -424,6 +424,8 @@ namespace sil_block {
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
+    ActorIsolationField, // Caller Isolation if we have one. Unspecified otherwise.
+    ActorIsolationField, // Callee Isolation if we have one. Unspecified otherwise.
     BCArray<ValueIDField> // a list of arguments
   >;
 

@@ -1796,6 +1796,32 @@ public:
           substConv.getSILArgumentType(i, F.getTypeExpansionContext()),
           "operand of 'apply' doesn't match function input type");
     }
+
+    // If we have any actor isolation, then our callee and caller must be
+    // asynchronous.
+    if (auto isolationCrossing = site.getIsolationCrossing()) {
+      require(bool(isolationCrossing->getCallerIsolation()) ||
+                  bool(isolationCrossing->getCalleeIsolation()),
+              "Should only have a non-std::nullopt isolation crossing if one "
+              "of callee/caller isolation is not Unspecified");
+
+      require(site->getFunction()->isAsync(),
+              "Caller must be asynchronous if we have an isolation corssing");
+      require(substTy->isAsync(),
+              "Callee must be asynchronous if we have an isolation crossing");
+
+      // If we have an AST node make sure that its isolation matches the
+      // isolation crossing on the apply site.
+      if (auto *fn = site.getCalleeFunction()) {
+        if (auto *fnDecl =
+                fn->getLocation().getAsASTNode<AbstractFunctionDecl>()) {
+          require(
+              getActorIsolation(fnDecl) ==
+                  isolationCrossing->getCalleeIsolation(),
+              "Callee's isolation must match isolation of isolation crossing");
+        }
+      }
+    }
   }
 
   void checkApplyInst(ApplyInst *AI) {

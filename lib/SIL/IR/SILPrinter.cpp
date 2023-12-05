@@ -659,6 +659,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(ValueOwnershipKind)
   SIMPLE_PRINTER(UUID)
   SIMPLE_PRINTER(GenericSignature)
+  SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
 
   SILPrinter &operator<<(SILValuePrinterInfo i) {
@@ -1530,6 +1531,14 @@ public:
       *this << "[nothrow] ";
     if (AI->isNonAsync())
       *this << "[noasync] ";
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      auto callerIsolation = isolationCrossing->getCallerIsolation();
+      if (callerIsolation != ActorIsolation::Unspecified)
+        *this << "[callee_isolation=" << callerIsolation << "] ";
+      auto calleeIsolation = isolationCrossing->getCalleeIsolation();
+      if (calleeIsolation != ActorIsolation::Unspecified)
+        *this << "[caller_isolation=" << calleeIsolation << "] ";
+    }
     visitApplyInstBase(AI);
   }
 

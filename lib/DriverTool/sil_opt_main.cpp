@@ -477,6 +477,17 @@ struct SILOptOptions {
       cl::desc("The format used for serializing remarks (default: YAML)"),
       cl::value_desc("format"), cl::init("yaml"));
 
+  // Strict Concurrency
+  llvm::cl::opt<StrictConcurrency> StrictConcurrencyLevel =
+      llvm::cl::opt<StrictConcurrency>(
+          "strict-concurrency", cl::desc("strict concurrency level"),
+          llvm::cl::values(clEnumValN(StrictConcurrency::Complete, "complete",
+                                      "Enable complete strict concurrency"),
+                           clEnumValN(StrictConcurrency::Targeted, "targeted",
+                                      "Enable targeted strict concurrency"),
+                           clEnumValN(StrictConcurrency::Minimal, "minimal",
+                                      "Enable minimal strict concurrency")));
+
   llvm::cl::opt<bool>
       EnableCxxInterop = llvm::cl::opt<bool>("enable-experimental-cxx-interop",
                        llvm::cl::desc("Enable C++ interop."),
@@ -667,6 +678,9 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
+  if (options.StrictConcurrencyLevel.hasArgStr())
+    Invocation.getLangOptions().StrictConcurrencyLevel =
+        options.StrictConcurrencyLevel;
 
   Invocation.getDiagnosticOptions().VerifyMode =
     options.VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;

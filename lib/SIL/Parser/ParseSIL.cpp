@@ -545,10 +545,11 @@ static bool parseSILOptional(StringRef &parsedName, SourceLoc &parsedNameLoc,
   return true;
 }
 
-static bool parseSILOptional(StringRef &Result, SourceLoc &Loc, SILParser &SP) {
-  SILOptionalAttrValue value;
-  SourceLoc valueLoc;
-  return parseSILOptional(Result, Loc, value, valueLoc, SP);
+static bool parseSILOptional(StringRef &attrName, SourceLoc &attrLoc,
+                             SILParser &SP) {
+  SILOptionalAttrValue parsedValue;
+  SourceLoc parsedValueLoc;
+  return parseSILOptional(attrName, attrLoc, parsedValue, parsedValueLoc, SP);
 }
 
 static bool parseSILOptional(StringRef &attrName, SILParser &SP) {
@@ -6548,20 +6549,65 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
   StringRef AttrName;
+  SourceLoc AttrLoc;
+  SILOptionalAttrValue AttrValue;
+  SourceLoc AttrValueLoc;
+  std::optional<ApplyIsolationCrossing> isolationCrossing;
 
-  while (parseSILOptional(AttrName, *this)) {
-    if (AttrName.equals("nothrow"))
+  while (parseSILOptional(AttrName, AttrLoc, AttrValue, AttrValueLoc, *this)) {
+    if (AttrName.equals("nothrow")) {
+      assert(!bool(AttrValue));
       ApplyOpts |= ApplyFlags::DoesNotThrow;
-    else if (AttrName.equals("noasync"))
+      continue;
+    }
+
+    if (AttrName.equals("noasync")) {
+      assert(!bool(AttrValue));
       ApplyOpts |= ApplyFlags::DoesNotAwait;
-    else if (AttrName.equals("callee_guaranteed"))
+      continue;
+    }
+
+    if (AttrName.equals("callee_guaranteed")) {
+      assert(!bool(AttrValue));
       PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
-    else if (AttrName.equals("on_stack"))
+      continue;
+    }
+
+    if (AttrName.equals("on_stack")) {
+      assert(!bool(AttrValue));
       IsNoEscape = true;
-    else
-      return true;
+      continue;
+    }
+
+    if (AttrName.equals("callee_isolation")) {
+      auto applyIsolation =
+          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
+      if (!applyIsolation) {
+        P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
+        return true;
+      }
+      if (!isolationCrossing)
+        isolationCrossing.emplace();
+      isolationCrossing->CalleeIsolation = *applyIsolation;
+      continue;
+    }
+
+    if (AttrName.equals("caller_isolation")) {
+      auto applyIsolation =
+          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
+      if (!applyIsolation) {
+        P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
+        return true;
+      }
+      if (!isolationCrossing)
+        isolationCrossing.emplace();
+      isolationCrossing->CallerIsolation = *applyIsolation;
+      continue;
+    }
+
+    return true;
   }
-  
+
   if (parseValueName(FnName))
     return true;
   SmallVector<ParsedSubstitution, 4> parsedSubs;
@@ -6658,7 +6704,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
-    ResultVal = B.createApply(InstLoc, FnVal, subs, Args, ApplyOpts);
+    ResultVal = B.createApply(InstLoc, FnVal, subs, Args, ApplyOpts, nullptr,
+                              isolationCrossing);
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -6673,8 +6720,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
-    ResultVal =
-      B.createBeginApply(InstLoc, FnVal, subs, Args, ApplyOpts);
+    ResultVal = B.createBeginApply(InstLoc, FnVal, subs, Args, ApplyOpts,
+                                   nullptr, isolationCrossing);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -6689,6 +6736,24 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       SILType expectedTy =
           substConv.getSILArgumentType(ArgNo++, B.getTypeExpansionContext());
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
+    }
+
+    if (isolationCrossing) {
+      if (isolationCrossing->getCalleeIsolation() !=
+          ActorIsolation::Unspecified) {
+        llvm::SmallString<64> name;
+        llvm::raw_svector_ostream os(name);
+        os << isolationCrossing->getCalleeIsolation();
+        P.diagnose(InstLoc.getSourceLoc(), diag::unknown_attribute, name);
+      }
+      if (isolationCrossing->getCallerIsolation() !=
+          ActorIsolation::Unspecified) {
+        llvm::SmallString<64> name;
+        llvm::raw_svector_ostream os(name);
+        os << isolationCrossing->getCalleeIsolation();
+        P.diagnose(InstLoc.getSourceLoc(), diag::unknown_attribute, name);
+      }
+      return true;
     }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
@@ -6723,7 +6788,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     SILBasicBlock *normalBB = getBBForReference(normalBBName, normalBBLoc);
     SILBasicBlock *errorBB = getBBForReference(errorBBName, errorBBLoc);
     ResultVal = B.createTryApply(InstLoc, FnVal, subs, args, normalBB, errorBB,
-                                 ApplyOpts);
+                                 ApplyOpts, nullptr, isolationCrossing);
     break;
   }
   }

@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -2571,16 +2572,15 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
 protected:
-  template <class... As>
-  ApplyInstBase(SILInstructionKind kind, SILDebugLocation DebugLoc, SILValue callee,
-                SILType substCalleeType, SubstitutionMap subs,
+  template <class... BaseArgTys>
+  ApplyInstBase(SILInstructionKind kind, SILDebugLocation DebugLoc,
+                SILValue callee, SILType substCalleeType, SubstitutionMap subs,
                 ArrayRef<SILValue> args,
                 ArrayRef<SILValue> typeDependentOperands,
                 const GenericSpecializationInformation *specializationInfo,
-                As... baseArgs)
+                BaseArgTys... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
-        SpecializationInfo(specializationInfo),
-        NumCallArguments(args.size()),
+        SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs) {
 
@@ -2852,17 +2852,26 @@ struct OperandToAutoDiffSemanticResultArgument {
 using AutoDiffSemanticResultArgumentRange =
     OptionalTransformRange<IntRange<size_t>, OperandToAutoDiffSemanticResultArgument>;
 
-/// The partial specialization of ApplyInstBase for full applications.
-/// Adds some methods relating to 'self' and to result types that don't
-/// make sense for partial applications.
+/// The partial specialization of ApplyInstBase for full applications.  Adds
+/// some state, methods relating to 'self', and to result types that don't make
+/// sense for partial applications.
 template <class Impl, class Base>
 class ApplyInstBase<Impl, Base, true>
   : public ApplyInstBase<Impl, Base, false> {
   using super = ApplyInstBase<Impl, Base, false>;
 protected:
+  std::optional<ApplyIsolationCrossing> IsolationCrossing;
+
+  // Unfortunately parameter packs only match at the end of a function... so we
+  // have to put isolation crossing at the beginning. Luckily, we can hide it in
+  // the constructors of our callers so callers of our child class constructors
+  // will not see isolation crossing at the beginning.
   template <class... As>
-  ApplyInstBase(As &&...args)
-    : ApplyInstBase<Impl, Base, false>(std::forward<As>(args)...) {}
+  ApplyInstBase(SILInstructionKind kind,
+                std::optional<ApplyIsolationCrossing> isolationCrossing,
+                As &&...args)
+      : ApplyInstBase<Impl, Base, false>(kind, std::forward<As>(args)...),
+        IsolationCrossing(isolationCrossing) {}
 
 private:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
@@ -2996,6 +3005,10 @@ public:
   bool hasSemantics(StringRef semanticsString) const {
     return doesApplyCalleeHaveSemantics(getCallee(), semanticsString);
   }
+
+  std::optional<ApplyIsolationCrossing> getIsolationCrossing() const {
+    return IsolationCrossing;
+  }
 };
 
 /// ApplyInst - Represents the full application of a function value.
@@ -3005,20 +3018,21 @@ class ApplyInst final
       public llvm::TrailingObjects<ApplyInst, Operand> {
   friend SILBuilder;
 
-  ApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
-            SILType SubstCalleeType, SILType ReturnType,
-            SubstitutionMap Substitutions,
-            ArrayRef<SILValue> Args,
-            ArrayRef<SILValue> TypeDependentOperands,
+  ApplyInst(SILDebugLocation debugLoc, SILValue callee, SILType substCalleeType,
+            SILType returnType, SubstitutionMap substitutions,
+            ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
             ApplyOptions options,
-            const GenericSpecializationInformation *SpecializationInfo);
+            const GenericSpecializationInformation *sSpecializationInfo,
+            std::optional<ApplyIsolationCrossing> isolationCrossing);
 
   static ApplyInst *
-  create(SILDebugLocation DebugLoc, SILValue Callee,
-         SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
+  create(SILDebugLocation debugLoc, SILValue callee,
+         SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         llvm::Optional<SILModuleConventions> ModuleConventions, SILFunction &F,
-         const GenericSpecializationInformation *SpecializationInfo);
+         llvm::Optional<SILModuleConventions> moduleConventions,
+         SILFunction &parentFunction,
+         const GenericSpecializationInformation *specializationInfo,
+         std::optional<ApplyIsolationCrossing> isolationCrossing);
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -3093,21 +3107,21 @@ class BeginApplyInst final
   using MultipleValueInstructionTrailingObjects::getTrailingObjects;
 
   BeginApplyInst(SILDebugLocation debugLoc, SILValue callee,
-                 SILType substCalleeType,
-                 ArrayRef<SILType> allResultTypes,
+                 SILType substCalleeType, ArrayRef<SILType> allResultTypes,
                  ArrayRef<ValueOwnershipKind> allResultOwnerships,
-                 SubstitutionMap substitutions,
-                 ArrayRef<SILValue> args,
-                 ArrayRef<SILValue> typeDependentOperands,
-                 ApplyOptions options,
-                 const GenericSpecializationInformation *specializationInfo);
+                 SubstitutionMap substitutions, ArrayRef<SILValue> args,
+                 ArrayRef<SILValue> typeDependentOperands, ApplyOptions options,
+                 const GenericSpecializationInformation *specializationInfo,
+                 std::optional<ApplyIsolationCrossing> isolationCrossing);
 
   static BeginApplyInst *
-  create(SILDebugLocation debugLoc, SILValue Callee,
+  create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         llvm::Optional<SILModuleConventions> moduleConventions, SILFunction &F,
-         const GenericSpecializationInformation *specializationInfo);
+         llvm::Optional<SILModuleConventions> moduleConventions,
+         SILFunction &parentFunction,
+         const GenericSpecializationInformation *specializationInfo,
+         std::optional<ApplyIsolationCrossing> isolationCrossing);
 
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
@@ -10529,22 +10543,22 @@ class TryApplyInst final
       public llvm::TrailingObjects<TryApplyInst, Operand> {
   friend SILBuilder;
 
-  TryApplyInst(SILDebugLocation DebugLoc, SILValue callee,
+  TryApplyInst(SILDebugLocation debugLoc, SILValue callee,
                SILType substCalleeType, SubstitutionMap substitutions,
                ArrayRef<SILValue> args,
-               ArrayRef<SILValue> TypeDependentOperands,
+               ArrayRef<SILValue> typeDependentOperands,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
                ApplyOptions options,
-               const GenericSpecializationInformation *SpecializationInfo);
+               const GenericSpecializationInformation *specializationInfo,
+               std::optional<ApplyIsolationCrossing> isolationCrossing);
 
   static TryApplyInst *
-  create(SILDebugLocation DebugLoc, SILValue callee,
+  create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
-         SILBasicBlock *normalBB, SILBasicBlock *errorBB,
-         ApplyOptions options, SILFunction &F,
-         const GenericSpecializationInformation *SpecializationInfo);
-
-
+         SILBasicBlock *normalBB, SILBasicBlock *errorBB, ApplyOptions options,
+         SILFunction &parentFunction,
+         const GenericSpecializationInformation *specializationInfo,
+         std::optional<ApplyIsolationCrossing> isolationCrossing);
 };
 
 /// DifferentiableFunctionInst - creates a `@differentiable` function-typed
