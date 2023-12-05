@@ -568,7 +568,7 @@ bb3:
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: tuple
 // CHECK-NEXT: init_enum_data_addr
-// CHECK-NEXT: store
+// CHECK-NEXT: store %11 to %2 : $*(Int, Unicode.Scalar)
 // CHECK-NEXT: inject_enum_addr
 // CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'constant_fold_switch_enum_addr_with_payload'
@@ -596,7 +596,7 @@ bb2:
 // CHECK: bb0(
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: init_enum_data_addr
-// CHECK-NEXT: store
+// CHECK-NEXT: store %0 to %2 : $*Builtin.NativeObject
 // CHECK-NEXT: inject_enum_addr
 // CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'constant_fold_switch_enum_addr_with_nontrivial_payload'
@@ -627,7 +627,7 @@ bb3:
 // CHECK: bb0(
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: init_enum_data_addr
-// CHECK-NEXT: store
+// CHECK-NEXT: store %0 to %2 : $*Builtin.NativeObject
 // CHECK-NEXT: inject_enum_addr
 // CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'constant_fold_switch_enum_addr_with_nontrivial_payload_2'
