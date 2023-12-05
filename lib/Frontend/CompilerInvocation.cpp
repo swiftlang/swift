@@ -880,6 +880,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.hasFeature(Feature::CompleteConcurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
     Opts.enableFeature(Feature::DisableOutwardActorInference);
+    Opts.enableFeature(Feature::IsolatedDefaultValues);
     Opts.enableFeature(Feature::GlobalConcurrency);
   }
 

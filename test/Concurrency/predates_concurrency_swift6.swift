@@ -59,18 +59,18 @@ func testElsewhere(x: X) {
 // expected-note@-1{{are implicitly asynchronous}}
 
 @preconcurrency @MainActor class MyModelClass {
- // expected-note@-1{{are implicitly asynchronous}}
  func f() { }
   // expected-note@-1{{are implicitly asynchronous}}
 }
 
 func testCalls(x: X) {
-  // expected-note@-1 3{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
+  // expected-note@-1 2{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
   onMainActorAlways() // expected-error{{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
 
   let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-error{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
+  let c = MyModelClass() // okay, synthesized init() is 'nonisolated'
+
   c.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
 }
 
@@ -80,8 +80,8 @@ func testCallsWithAsync() async {
 
   let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  let c = MyModelClass() // okay, synthesized init() is 'nonisolated'
+
   c.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }

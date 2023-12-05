@@ -120,6 +120,7 @@ UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
+UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(FullTypedThrows, 413, 6)
 
@@ -217,9 +218,6 @@ EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
 /// Region Based Isolation testing using the TransferNonSendable pass
 EXPERIMENTAL_FEATURE(RegionBasedIsolation, false)
-
-/// Allow default values to require isolation at the call-site.
-EXPERIMENTAL_FEATURE(IsolatedDefaultValues, false)
 
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
