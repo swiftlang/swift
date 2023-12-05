@@ -418,6 +418,30 @@ if #available(SwiftStdlib 5.11, *) {
     }
   }
 
+  RangeSetTests.test("DiscontiguousSliceSequence") {
+    let initial = 1...100
+    
+    // Build an array of ranges that include alternating groups of 5 elements
+    // e.g. 1...5, 11...15, etc
+    let rangeStarts = initial.indices.every(10)
+    let rangeEnds = rangeStarts.compactMap {
+      initial.index($0, offsetBy: 5, limitedBy: initial.endIndex)
+    }
+    let ranges = zip(rangeStarts, rangeEnds).map(Range.init)
+    let set = RangeSet(ranges)
+    let slice = initial[set]
+
+    // Test various public, underscored members for the slice's
+    // Sequence/Collection conformance
+    expectTrue(slice.contains(2))
+    expectFalse(slice.contains(7))
+    expectEqualSequence(Array(slice), slice)
+    expectEqual(slice.firstIndex(of: 2), slice.index(after: slice.startIndex))
+    expectEqual(slice.firstIndex(of: 7), nil)
+    expectEqual(slice.lastIndex(of: 2), slice.index(after: slice.startIndex))
+    expectEqual(slice.lastIndex(of: 7), nil)
+  }
+
   RangeSetTests.test("DiscontiguousSliceSlicing") {
     let initial = 1...100
     
