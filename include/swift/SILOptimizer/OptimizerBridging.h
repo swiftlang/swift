@@ -169,6 +169,12 @@ struct BridgedPassContext {
     Lowered
   };
 
+  /// Enumeration describing all of the named features.
+  enum class Feature {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) FeatureName,
+#include "swift/Basic/Features.def"
+  };
+
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getModuleDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedChangeNotificationHandler asNotificationHandler() const;
   BRIDGED_INLINE SILStage getSILStage() const;
@@ -301,7 +307,7 @@ struct BridgedPassContext {
   };
 
   BRIDGED_INLINE bool enableStackProtection() const;
-  BRIDGED_INLINE bool enableEmbeddedSwift() const;
+  BRIDGED_INLINE bool hasFeature(Feature feature) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
