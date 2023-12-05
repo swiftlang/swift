@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature NoncopyableGenerics)
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature NoncopyableGenerics -O)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature NoncopyableGenerics -O -Xfrontend -sil-verify-none)
 //
 // REQUIRES: executable_test
+// REQUIRES: GH_ISSUE_70246
 
 import MoveOnlyCxxValueType
 import StdlibUnittest

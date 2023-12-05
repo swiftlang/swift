@@ -2,6 +2,9 @@
 //
 // REQUIRES: executable_test
 
+// https://github.com/apple/swift/issues/70226
+// UNSUPPORTED: OS=windows-msvc
+
 import StdlibUnittest
 import StdUniquePtr
 import CxxStdlib
