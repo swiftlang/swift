@@ -42,10 +42,11 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
     case // Known implemented kinds.
         .arrayExpr, .arrowExpr, .assignmentExpr, .binaryOperatorExpr,
         .booleanLiteralExpr, .closureExpr, .discardAssignmentExpr,
-        .declReferenceExpr, .functionCallExpr, .ifExpr, .integerLiteralExpr,
-        .memberAccessExpr,  .nilLiteralExpr, .postfixOperatorExpr,
-        .prefixOperatorExpr, .sequenceExpr, .stringLiteralExpr, .tupleExpr,
-        .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr, .unresolvedTernaryExpr:
+        .declReferenceExpr, .dictionaryExpr, .functionCallExpr, .ifExpr,
+        .integerLiteralExpr, .memberAccessExpr,  .nilLiteralExpr,
+        .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
+        .stringLiteralExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr,
+        .unresolvedIsExpr, .unresolvedTernaryExpr:
 
       // `generate(stringLiteralExpr:)` doesn't support interpolations.
       if let str = current.as(StringLiteralExprSyntax.self) {
@@ -57,15 +58,14 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
 
       break
     case // Known unimplemented kinds.
-        .asExpr, .awaitExpr,
-        .borrowExpr, .canImportExpr, .canImportVersionInfo, .dictionaryExpr,
-        .doExpr, .editorPlaceholderExpr,
-        .floatLiteralExpr, .forceUnwrapExpr, .inOutExpr, .infixOperatorExpr,
-        .isExpr, .keyPathExpr, .macroExpansionExpr, .consumeExpr, .copyExpr,
-        .optionalChainingExpr, .packElementExpr, .packExpansionExpr,
-        .postfixIfConfigExpr, .regexLiteralExpr, .genericSpecializationExpr,
-        .simpleStringLiteralExpr, .subscriptCallExpr, .superExpr, .switchExpr,
-        .ternaryExpr, .tryExpr, .patternExpr:
+        .asExpr, .awaitExpr, .borrowExpr, .canImportExpr, .canImportVersionInfo,
+        .doExpr, .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr,
+        .inOutExpr, .infixOperatorExpr,  .isExpr, .keyPathExpr,
+        .macroExpansionExpr, .consumeExpr, .copyExpr,  .optionalChainingExpr,
+        .packElementExpr, .packExpansionExpr, .postfixIfConfigExpr,
+        .regexLiteralExpr, .genericSpecializationExpr, .simpleStringLiteralExpr,
+        .subscriptCallExpr, .superExpr, .switchExpr, .ternaryExpr, .tryExpr,
+        .patternExpr:
       return false
     case // Unknown expr kinds.
       _ where current.is(ExprSyntax.self):
@@ -116,8 +116,8 @@ extension ASTGenVisitor {
       break
     case .declReferenceExpr(let node):
       return self.generate(declReferenceExpr: node).asExpr
-    case .dictionaryExpr:
-      break
+    case .dictionaryExpr(let node):
+      return self.generate(dictionaryExpr: node).asExpr
     case .discardAssignmentExpr(let node):
       return self.generate(discardAssignmentExpr: node).asExpr
     case .doExpr:

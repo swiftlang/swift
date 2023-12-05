@@ -661,12 +661,6 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
                                              BridgedTupleExpr args);
 
-SWIFT_NAME("BridgedDotSelfExpr.createParsed(_:subExpr:dotLoc:selfLoc:)")
-BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
-                                                   BridgedExpr cSubExpr,
-                                                   BridgedSourceLoc cDotLoc,
-                                                   BridgedSourceLoc cSelfLoc);
-
 SWIFT_NAME("BridgedClosureExpr.createParsed(_:declContext:body:)")
 BridgedClosureExpr
 BridgedClosureExpr_createParsed(BridgedASTContext cContext,
@@ -690,6 +684,19 @@ SWIFT_NAME("BridgedDiscardAssignmentExpr.createParsed(_:loc:)")
 BridgedDiscardAssignmentExpr
 BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
                                           BridgedSourceLoc cLoc);
+
+SWIFT_NAME("BridgedDictionaryExpr.createParsed(_:lBracketLoc:elements:"
+           "colonLocs:rBracketLoc:)")
+BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLBracketLoc,
+    BridgedArrayRef cElements, BridgedArrayRef cCommaLocs,
+    BridgedSourceLoc cRBracketLoc);
+
+SWIFT_NAME("BridgedDotSelfExpr.createParsed(_:subExpr:dotLoc:selfLoc:)")
+BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
+                                                   BridgedExpr cSubExpr,
+                                                   BridgedSourceLoc cDotLoc,
+                                                   BridgedSourceLoc cSelfLoc);
 
 SWIFT_NAME(
     "BridgedForcedCheckedCastExpr.createParsed(_:asLoc:exclaimLoc:type:)")
@@ -728,6 +735,10 @@ SWIFT_NAME("BridgedTupleExpr.createParsed(_:leftParenLoc:exprs:labels:"
 BridgedTupleExpr BridgedTupleExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLParen, BridgedArrayRef subs,
     BridgedArrayRef names, BridgedArrayRef cNameLocs, BridgedSourceLoc cRParen);
+
+SWIFT_NAME("BridgedTupleExpr.createParsedDictionaryElement(_:key:value:)")
+BridgedTupleExpr BridgedTupleExpr_createParsedDictionaryElement(
+    BridgedASTContext cContext, BridgedExpr cKeyExpr, BridgedExpr cValueExpr);
 
 SWIFT_NAME("BridgedIntegerLiteralExpr.createParsed(_:value:loc:)")
 BridgedIntegerLiteralExpr

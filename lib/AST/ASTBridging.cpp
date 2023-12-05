@@ -917,6 +917,16 @@ BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
       DiscardAssignmentExpr(cLoc.unbridged(), /*Implicit=*/false);
 }
 
+BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLBracketLoc,
+    BridgedArrayRef cElements, BridgedArrayRef cCommaLocs,
+    BridgedSourceLoc cRBracketLoc) {
+  return DictionaryExpr::create(cContext.unbridged(), cLBracketLoc.unbridged(),
+                                cElements.unbridged<Expr *>(),
+                                cCommaLocs.unbridged<SourceLoc>(),
+                                cRBracketLoc.unbridged());
+}
+
 BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
     BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType) {
@@ -957,6 +967,12 @@ BridgedTupleExpr BridgedTupleExpr_createParsed(BridgedASTContext cContext,
       context, cLParen.unbridged(), subs.unbridged<Expr *>(),
       names.unbridged<Identifier>(), cNameLocs.unbridged<SourceLoc>(),
       cRParen.unbridged(), /*Implicit*/ false);
+}
+
+BridgedTupleExpr BridgedTupleExpr_createParsedDictionaryElement(
+    BridgedASTContext cContext, BridgedExpr cKeyExpr, BridgedExpr cValueExpr) {
+  return TupleExpr::createImplicit(
+      cContext.unbridged(), {cKeyExpr.unbridged(), cValueExpr.unbridged()}, {});
 }
 
 BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,

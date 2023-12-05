@@ -63,6 +63,41 @@ extension ASTGenVisitor {
     )
   }
 
+  private func generate(dictionaryElement node: DictionaryElementSyntax) -> BridgedTupleExpr {
+    return BridgedTupleExpr.createParsedDictionaryElement(
+      self.ctx,
+      key: self.generate(expr: node.key),
+      value: self.generate(expr: node.value)
+    )
+  }
+
+  public func generate(dictionaryExpr node: DictionaryExprSyntax) -> BridgedDictionaryExpr {
+    let lBracketLoc = self.generateSourceLoc(node.leftSquare)
+    let rBracketLoc = self.generateSourceLoc(node.rightSquare)
+    let elements: BridgedArrayRef
+    let colonLocs: BridgedArrayRef
+
+    switch node.content {
+    case .colon(_):
+      elements = BridgedArrayRef()
+      colonLocs = BridgedArrayRef()
+    case .elements(let elementNodes):
+      elements = elementNodes.lazy
+        .map({ self.generate(dictionaryElement: $0).asExpr })
+        .bridgedArray(in: self)
+      colonLocs = elementNodes.lazy
+        .map({ self.generateSourceLoc($0.colon) })
+        .bridgedArray(in: self)
+    }
+    return .createParsed(
+      self.ctx,
+      lBracketLoc: lBracketLoc,
+      elements: elements,
+      colonLocs: colonLocs,
+      rBracketLoc: rBracketLoc
+    )
+  }
+
   func generate(nilLiteralExpr node: NilLiteralExprSyntax) -> BridgedNilLiteralExpr {
     .createParsed(
       self.ctx,

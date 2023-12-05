@@ -40,8 +40,13 @@ Int {
 
   let arlit = [0]
   let tuple = (0, 1)
+  let diclit = [0: 1, 2: 3]
 
   return fn(x)
+}
+
+func testEmptyDictionary() -> [Int: Int] {
+  return [:]
 }
 
 func test2(e b: Bool) {
