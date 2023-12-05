@@ -1326,7 +1326,7 @@ public:
 
     functionArgPartition = Partition::singleRegion(nonSendableJoinedIndices);
     for (Element elt : nonSendableSeparateIndices) {
-      functionArgPartition->addElement(elt);
+      functionArgPartition->trackNewElement(elt);
     }
   }
 
@@ -2319,16 +2319,28 @@ class BlockPartitionState {
   /// to discover if an error occured.
   bool recomputeExitFromEntry(PartitionOpTranslator &translator) {
     Partition workingPartition = entryPartition;
-    PartitionOpEvaluator eval(workingPartition, ptrSetFactory);
-    eval.isClosureCapturedCallback = [&](Element element, Operand *op) -> bool {
-      auto iter = translator.getValueForId(element);
-      if (!iter)
-        return false;
-      auto value = iter->getRepresentative().maybeGetValue();
-      if (!value)
-        return false;
-      return translator.isClosureCaptured(value, op->getUser());
+
+    struct ComputeEvaluator final
+        : PartitionOpEvaluatorBaseImpl<ComputeEvaluator> {
+      PartitionOpTranslator &translator;
+
+      ComputeEvaluator(Partition &workingPartition,
+                       TransferringOperandSetFactory &ptrSetFactory,
+                       PartitionOpTranslator &translator)
+          : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
+            translator(translator) {}
+
+      bool isClosureCaptured(Element elt, Operand *op) const {
+        auto iter = translator.getValueForId(elt);
+        if (!iter)
+          return false;
+        auto value = iter->getRepresentative().maybeGetValue();
+        if (!value)
+          return false;
+        return translator.isClosureCaptured(value, op->getUser());
+      }
     };
+    ComputeEvaluator eval(workingPartition, ptrSetFactory, translator);
     for (const auto &partitionOp : blockPartitionOps) {
       // By calling apply without providing a `handleFailure` closure, errors
       // will be suppressed
@@ -2712,6 +2724,89 @@ class PartitionAnalysis {
   void emitDiagnostics() {
     assert(solved && "diagnose should not be called before solve");
 
+    struct DiagnosticEvaluator final
+        : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
+      PartitionOpTranslator &translator;
+      SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+          &transferOpToRequireInstMultiMap;
+
+      DiagnosticEvaluator(Partition &workingPartition,
+                          TransferringOperandSetFactory &ptrSetFactory,
+                          PartitionOpTranslator &translator,
+                          SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+                              &transferOpToRequireInstMultiMap)
+          : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory),
+            translator(translator),
+            transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap) {}
+
+      void handleFailure(const PartitionOp &partitionOp,
+                         TrackableValueID transferredVal,
+                         TransferringOperand transferringOp) const {
+        // Ignore this if we have a gep like instruction that is returning a
+        // sendable type and transferringOp was not set with closure
+        // capture.
+        if (auto *svi =
+                dyn_cast<SingleValueInstruction>(partitionOp.getSourceInst())) {
+          if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
+              !isNonSendableType(svi->getType(), svi->getFunction())) {
+            bool isCapture = transferringOp.isClosureCaptured();
+            if (!isCapture) {
+              return;
+            }
+          }
+        }
+
+        auto rep = translator.getValueForId(transferredVal)
+                       ->getRepresentative()
+                       .getValue();
+        LLVM_DEBUG(llvm::dbgs()
+                   << "    Emitting Use After Transfer Error!\n"
+                   << "        ID:  %%" << transferredVal << "\n"
+                   << "        Rep: " << *rep
+                   << "        Require Inst: " << *partitionOp.getSourceInst()
+                   << "        Transferring Op Num: "
+                   << transferringOp.getOperand()->getOperandNumber() << '\n'
+                   << "        Transferring Inst: "
+                   << *transferringOp.getUser());
+        transferOpToRequireInstMultiMap.insert(transferringOp.getOperand(),
+                                               partitionOp.getSourceInst());
+      }
+
+      ArrayRef<Element> getNonTransferrableElements() const {
+        return translator.getNeverTransferredValues();
+      }
+
+      void
+      handleTransferNonTransferrable(const PartitionOp &partitionOp,
+                                     TrackableValueID transferredVal) const {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "    Emitting TransferNonTransferrable Error!\n"
+                   << "        ID:  %%" << transferredVal << "\n"
+                   << "        Rep: "
+                   << *translator.getValueForId(transferredVal)
+                           ->getRepresentative()
+                           .getValue());
+        diagnose(partitionOp, diag::regionbasedisolation_selforargtransferred);
+      }
+
+      bool isActorDerived(Element element) const {
+        auto iter = translator.getValueForId(element);
+        if (!iter)
+          return false;
+        return iter->isActorDerived();
+      }
+
+      bool isClosureCaptured(Element element, Operand *op) const {
+        auto iter = translator.getValueForId(element);
+        if (!iter)
+          return false;
+        auto value = iter->getRepresentative().maybeGetValue();
+        if (!value)
+          return false;
+        return translator.isClosureCaptured(value, op->getUser());
+      }
+    };
+
     LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
                             << function->getName() << "\n");
 
@@ -2726,68 +2821,8 @@ class PartitionAnalysis {
       // Grab its entry partition and setup an evaluator for the partition that
       // has callbacks that emit diagnsotics...
       Partition workingPartition = blockState.getEntryPartition();
-      PartitionOpEvaluator eval(workingPartition, ptrSetFactory);
-      eval.failureCallback = /*handleFailure=*/
-          [&](const PartitionOp &partitionOp, TrackableValueID transferredVal,
-              TransferringOperand transferringOp) {
-            // Ignore this if we have a gep like instruction that is returning a
-            // sendable type and transferringOp was not set with closure
-            // capture.
-            if (auto *svi = dyn_cast<SingleValueInstruction>(
-                    partitionOp.getSourceInst())) {
-              if (isa<TupleElementAddrInst, StructElementAddrInst>(svi) &&
-                  !isNonSendableType(svi->getType(), svi->getFunction())) {
-                bool isCapture = transferringOp.isClosureCaptured();
-                if (!isCapture) {
-                  return;
-                }
-              }
-            }
-
-            auto rep = translator.getValueForId(transferredVal)
-                           ->getRepresentative()
-                           .getValue();
-            LLVM_DEBUG(
-                llvm::dbgs()
-                << "    Emitting Use After Transfer Error!\n"
-                << "        ID:  %%" << transferredVal << "\n"
-                << "        Rep: " << *rep
-                << "        Require Inst: " << *partitionOp.getSourceInst()
-                << "        Transferring Op Num: "
-                << transferringOp.getOperand()->getOperandNumber() << '\n'
-                << "        Transferring Inst: " << *transferringOp.getUser());
-            transferOpToRequireInstMultiMap.insert(transferringOp.getOperand(),
-                                                   partitionOp.getSourceInst());
-          };
-      eval.transferredNonTransferrableCallback =
-          [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "    Emitting TransferNonTransferrable Error!\n"
-                       << "        ID:  %%" << transferredVal << "\n"
-                       << "        Rep: "
-                       << *translator.getValueForId(transferredVal)
-                               ->getRepresentative()
-                               .getValue());
-            diagnose(partitionOp,
-                     diag::regionbasedisolation_selforargtransferred);
-          };
-      eval.nonTransferrableElements = translator.getNeverTransferredValues();
-      eval.isActorDerivedCallback = [&](Element element) -> bool {
-        auto iter = translator.getValueForId(element);
-        if (!iter)
-          return false;
-        return iter->isActorDerived();
-      };
-      eval.isClosureCapturedCallback = [&](Element element,
-                                           Operand *op) -> bool {
-        auto iter = translator.getValueForId(element);
-        if (!iter)
-          return false;
-        auto value = iter->getRepresentative().maybeGetValue();
-        if (!value)
-          return false;
-        return translator.isClosureCaptured(value, op->getUser());
-      };
+      DiagnosticEvaluator eval(workingPartition, ptrSetFactory, translator,
+                               transferOpToRequireInstMultiMap);
 
       // And then evaluate all of our partition ops on the entry partition.
       for (auto &partitionOp : blockState.getPartitionOps()) {

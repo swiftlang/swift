@@ -359,8 +359,6 @@ public:
   }
 };
 
-struct PartitionOpEvaluator;
-
 /// A map from Element -> Region that represents the current partition set.
 ///
 ///
@@ -369,7 +367,6 @@ public:
   /// A class defined in PartitionUtils unittest used to grab state from
   /// Partition without exposing it to other users.
   struct PartitionTester;
-  friend PartitionOpEvaluator;
 
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
@@ -451,14 +448,16 @@ public:
     return fst.elementToRegionMap == snd.elementToRegionMap;
   }
 
-  bool isTracked(Element val) const { return elementToRegionMap.count(val); }
+  bool isTrackingElement(Element val) const {
+    return elementToRegionMap.count(val);
+  }
 
   /// Mark val as transferred.
   void markTransferred(Element val,
                        TransferringOperandSet *transferredOperandSet) {
     // First see if our val is tracked. If it is not tracked, insert it and mark
     // its new region as transferred.
-    if (!isTracked(val)) {
+    if (!isTrackingElement(val)) {
       elementToRegionMap.insert_or_assign(val, fresh_label);
       regionToTransferredOpMap.insert({fresh_label, transferredOperandSet});
       fresh_label = Region(fresh_label + 1);
@@ -485,7 +484,7 @@ public:
   /// we found that \p val was transferred. We return false otherwise.
   bool undoTransfer(Element val) {
     // First see if our val is tracked. If it is not tracked, insert it.
-    if (!isTracked(val)) {
+    if (!isTrackingElement(val)) {
       elementToRegionMap.insert_or_assign(val, fresh_label);
       fresh_label = Region(fresh_label + 1);
       canonical = false;
@@ -499,7 +498,7 @@ public:
     return regionToTransferredOpMap.erase(iter1->second);
   }
 
-  void addElement(Element newElt) {
+  void trackNewElement(Element newElt) {
     // Map index newElt to a fresh label.
     elementToRegionMap.insert_or_assign(newElt, fresh_label);
 
@@ -507,6 +506,22 @@ public:
     fresh_label = Region(fresh_label + 1);
     canonical = false;
   }
+
+  void assignElement(Element oldElt, Element newElt) {
+    elementToRegionMap.insert_or_assign(oldElt, elementToRegionMap.at(newElt));
+    canonical = false;
+  }
+
+  bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
+    return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
+  }
+
+  Region getRegion(Element elt) const { return elementToRegionMap.at(elt); }
+
+  using iterator = std::map<Element, Region>::iterator;
+  iterator begin() { return elementToRegionMap.begin(); }
+  iterator end() { return elementToRegionMap.end(); }
+  llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
   /// Construct the partition corresponding to the union of the two passed
   /// partitions.
@@ -754,10 +769,12 @@ public:
     return set;
   }
 
-private:
   /// Used only in assertions, check that Partitions promised to be canonical
   /// are actually canonical
   bool is_canonical_correct() {
+#ifdef NDEBUG
+    return true;
+#else
     if (!canonical)
       return true; // vacuously correct
 
@@ -796,53 +813,7 @@ private:
     }
 
     return true;
-  }
-
-  /// For each region label that occurs, find the first index at which it occurs
-  /// and relabel all instances of it to that index.  This excludes the -1 label
-  /// for transferred regions.
-  ///
-  /// This runs in linear time.
-  void canonicalize() {
-    if (canonical)
-      return;
-    canonical = true;
-
-    std::map<Region, Region> oldRegionToRelabeledMap;
-
-    // We rely on in-order traversal of labels to ensure that we always take the
-    // lowest eltNumber.
-    for (auto &[eltNo, regionNo] : elementToRegionMap) {
-      if (!oldRegionToRelabeledMap.count(regionNo)) {
-        // if this is the first time encountering this region label,
-        // then this region label should be relabelled to this index,
-        // so enter that into the map
-        oldRegionToRelabeledMap.insert_or_assign(regionNo, Region(eltNo));
-      }
-
-      // Update this label with either its own index, or a prior index that
-      // shared a region with it.
-      regionNo = oldRegionToRelabeledMap.at(regionNo);
-
-      // The maximum index iterated over will be used here to appropriately
-      // set fresh_label.
-      fresh_label = Region(eltNo + 1);
-    }
-
-    // Then relabel our regionToTransferredInst map if we need to by swapping
-    // out the old map and updating.
-    //
-    // TODO: If we just used an array for this, we could just rewrite and
-    // re-sort and not have to deal with potential allocations.
-    decltype(regionToTransferredOpMap) oldMap =
-        std::move(regionToTransferredOpMap);
-    for (auto &[oldReg, op] : oldMap) {
-      auto iter = oldRegionToRelabeledMap.find(oldReg);
-      assert(iter != oldRegionToRelabeledMap.end());
-      regionToTransferredOpMap[iter->second] = op;
-    }
-
-    assert(is_canonical_correct());
+#endif
   }
 
   /// Merge the regions of two indices while maintaining canonicality. Returns
@@ -890,6 +861,53 @@ private:
   }
 
 private:
+  /// For each region label that occurs, find the first index at which it occurs
+  /// and relabel all instances of it to that index.  This excludes the -1 label
+  /// for transferred regions.
+  ///
+  /// This runs in linear time.
+  void canonicalize() {
+    if (canonical)
+      return;
+    canonical = true;
+
+    std::map<Region, Region> oldRegionToRelabeledMap;
+
+    // We rely on in-order traversal of labels to ensure that we always take the
+    // lowest eltNumber.
+    for (auto &[eltNo, regionNo] : elementToRegionMap) {
+      if (!oldRegionToRelabeledMap.count(regionNo)) {
+        // if this is the first time encountering this region label,
+        // then this region label should be relabelled to this index,
+        // so enter that into the map
+        oldRegionToRelabeledMap.insert_or_assign(regionNo, Region(eltNo));
+      }
+
+      // Update this label with either its own index, or a prior index that
+      // shared a region with it.
+      regionNo = oldRegionToRelabeledMap.at(regionNo);
+
+      // The maximum index iterated over will be used here to appropriately
+      // set fresh_label.
+      fresh_label = Region(eltNo + 1);
+    }
+
+    // Then relabel our regionToTransferredInst map if we need to by swapping
+    // out the old map and updating.
+    //
+    // TODO: If we just used an array for this, we could just rewrite and
+    // re-sort and not have to deal with potential allocations.
+    decltype(regionToTransferredOpMap) oldMap =
+        std::move(regionToTransferredOpMap);
+    for (auto &[oldReg, op] : oldMap) {
+      auto iter = oldRegionToRelabeledMap.find(oldReg);
+      assert(iter != oldRegionToRelabeledMap.end());
+      regionToTransferredOpMap[iter->second] = op;
+    }
+
+    assert(is_canonical_correct());
+  }
+
   /// For the passed `map`, ensure that `key` maps to `val`. If `key` already
   /// mapped to a different value, ensure that all other keys mapped to that
   /// value also now map to `val`. This is a relatively expensive (linear time)
@@ -916,115 +934,73 @@ private:
 /// A data structure that applies a series of PartitionOps to a single Partition
 /// that it modifies.
 ///
-/// Apply the passed PartitionOp to this partition, performing its action.  A
-/// `handleFailure` closure can optionally be passed in that will be called if
-/// a transferred region is required. The closure is given the PartitionOp
-/// that failed, and the index of the SIL value that was required but
-/// transferred. Additionally, a list of "nontransferrable" indices can be
-/// passed in along with a handleTransferNonTransferrable closure. In the
-/// event that a region containing one of the nontransferrable indices is
-/// transferred, the closure will be called with the offending transfer.
+/// Callers use CRTP to modify its behavior. Please see the definition below of
+/// a "blank" subclass PartitionOpEvaluatorBaseImpl for a description of the
+/// methods needing to be implemented by other CRTP subclasses.
+template <typename Impl>
 struct PartitionOpEvaluator {
+private:
+  Impl &asImpl() { return *reinterpret_cast<Impl *>(this); }
+  const Impl &asImpl() const { return *reinterpret_cast<const Impl *>(this); }
+
+public:
   using Element = PartitionPrimitives::Element;
   using Region = PartitionPrimitives::Region;
   using TransferringOperandSetFactory =
       Partition::TransferringOperandSetFactory;
 
+protected:
   TransferringOperandSetFactory &ptrSetFactory;
 
   Partition &p;
 
-  /// If this PartitionOp evaluator should emit log statements.
-  bool emitLog = true;
-
-  /// If set to a non-null function, then this callback will be called if we
-  /// discover a transferred value was used after it was transferred.
-  ///
-  /// The arguments passed to the closure are:
-  ///
-  /// 1. The PartitionOp that required the element to be alive.
-  ///
-  /// 2. The element in the PartitionOp that was asked to be alive.
-  ///
-  /// 3. The operand of the instruction that originally transferred the
-  /// region. Can be used to get the immediate value transferred or the
-  /// transferring instruction.
-  std::function<void(const PartitionOp &, Element, TransferringOperand)>
-      failureCallback = nullptr;
-
-  /// A list of elements that cannot be transferred. Whenever we transfer, we
-  /// check this list to see if we are transferring the element and then call
-  /// transferNonTransferrableCallback. This should consist only of function
-  /// arguments.
-  ArrayRef<Element> nonTransferrableElements = {};
-
-  /// If set to a non-null function_ref, this is called if we detect a never
-  /// transferred element that was passed to a transfer instruction.
-  std::function<void(const PartitionOp &, Element)>
-      transferredNonTransferrableCallback = nullptr;
-
-  /// If set to a non-null function_ref, then this is used to determine if an
-  /// element is actor derived. If we determine that a region containing such an
-  /// element is transferred, we emit an error since actor regions cannot be
-  /// transferred.
-  std::function<bool(Element)> isActorDerivedCallback = nullptr;
-
-  /// Check if the representative value of \p elt is closure captured at \p
-  /// op.
-  ///
-  /// NOTE: We actually just use the user of \p op in our callbacks. The reason
-  /// why we do not just pass in that SILInstruction is that then we would need
-  /// to access the instruction in the evaluator which creates a problem when
-  /// since the operand we pass in is a dummy operand.
-  std::function<bool(Element elt, Operand *op)> isClosureCapturedCallback =
-      nullptr;
-
+public:
   PartitionOpEvaluator(Partition &p,
                        TransferringOperandSetFactory &ptrSetFactory)
       : ptrSetFactory(ptrSetFactory), p(p) {}
 
-  /// A wrapper around the failure callback that checks if it is nullptr.
+  /// Call shouldEmitVerboseLogging on our CRTP subclass.
+  bool shouldEmitVerboseLogging() const {
+    return asImpl().shouldEmitVerboseLogging();
+  }
+
+  /// Call handleFailure on our CRTP subclass.
   void handleFailure(const PartitionOp &op, Element elt,
                      TransferringOperand transferringOp) const {
-    if (!failureCallback)
-      return;
-    failureCallback(op, elt, transferringOp);
+    return asImpl().handleFailure(op, elt, transferringOp);
   }
 
-  /// A wrapper around transferNonTransferrableCallback that only calls it if it
-  /// is not null.
+  /// Call handleTransferNonTransferrable on our CRTP subclass.
   void handleTransferNonTransferrable(const PartitionOp &op,
                                       Element elt) const {
-    if (!transferredNonTransferrableCallback)
-      return;
-    transferredNonTransferrableCallback(op, elt);
+    return asImpl().handleTransferNonTransferrable(op, elt);
   }
 
-  /// A wrapper around isActorDerivedCallback that returns false if
-  /// isActorDerivedCallback is nullptr and otherwise returns
-  /// isActorDerivedCallback().
+  /// Call isActorDerived on our CRTP subclass.
   bool isActorDerived(Element elt) const {
-    return bool(isActorDerivedCallback) && isActorDerivedCallback(elt);
+    return asImpl().isActorDerived(elt);
   }
 
-  /// A wraper around isClosureCapturedCallback that returns false if
-  /// isClosureCapturedCallback is nullptr and otherwise returns
-  /// isClosureCapturedCallback.
+  /// Call isClosureCaptured on our CRTP subclass.
   bool isClosureCaptured(Element elt, Operand *op) const {
-    return bool(isClosureCapturedCallback) &&
-           isClosureCapturedCallback(elt, op);
+    return asImpl().isClosureCaptured(elt, op);
+  }
+
+  /// Call getNonTransferrableElements() on our CRTP subclass.
+  ArrayRef<Element> getNonTransferrableElements() const {
+    return asImpl().getNonTransferrableElements();
   }
 
   /// Apply \p op to the partition op.
   void apply(const PartitionOp &op) const {
-    if (emitLog) {
+    if (shouldEmitVerboseLogging()) {
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                        op.print(llvm::dbgs()));
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
                                        p.print(llvm::dbgs()));
     }
     SWIFT_DEFER {
-      if (emitLog) {
+      if (shouldEmitVerboseLogging()) {
         REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
                                          p.print(llvm::dbgs()));
       }
@@ -1035,7 +1011,7 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Assign:
       assert(op.getOpArgs().size() == 2 &&
              "Assign PartitionOp should be passed 2 arguments");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[1]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[1]) &&
              "Assign PartitionOp's source argument should be already tracked");
       // If we are using a region that was transferred as our assignment source
       // value... emit an error.
@@ -1044,37 +1020,30 @@ struct PartitionOpEvaluator {
           handleFailure(op, op.getOpArgs()[1], transferredOperand);
         }
       }
-
-      p.elementToRegionMap.insert_or_assign(
-          op.getOpArgs()[0], p.elementToRegionMap.at(op.getOpArgs()[1]));
-
-      // assignment could have invalidated canonicality of either the old region
-      // of op.getOpArgs()[0] or the region of op.getOpArgs()[1], or both
-      p.canonical = false;
+      p.assignElement(op.getOpArgs()[0], op.getOpArgs()[1]);
       return;
     case PartitionOpKind::AssignFresh:
       assert(op.getOpArgs().size() == 1 &&
              "AssignFresh PartitionOp should be passed 1 argument");
 
-      p.addElement(op.getOpArgs()[0]);
+      p.trackNewElement(op.getOpArgs()[0]);
       return;
     case PartitionOpKind::Transfer: {
       assert(op.getOpArgs().size() == 1 &&
              "Transfer PartitionOp should be passed 1 argument");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Transfer PartitionOp's argument should already be tracked");
 
       // check if any nontransferrables are transferred here, and handle the
       // failure if so
-      for (Element nonTransferrable : nonTransferrableElements) {
+      for (Element nonTransferrable : getNonTransferrableElements()) {
         assert(
-            p.elementToRegionMap.count(nonTransferrable) &&
+            p.isTrackingElement(nonTransferrable) &&
             "nontransferrables should be function args and self, and therefore"
             "always present in the label map because of initialization at "
             "entry");
         if (!p.isTransferred(nonTransferrable) &&
-            p.elementToRegionMap.at(nonTransferrable) ==
-                p.elementToRegionMap.at(op.getOpArgs()[0])) {
+            p.areElementsInSameRegion(nonTransferrable, op.getOpArgs()[0])) {
           return handleTransferNonTransferrable(op, nonTransferrable);
         }
       }
@@ -1090,8 +1059,8 @@ struct PartitionOpEvaluator {
       bool isClosureCapturedElt =
           isClosureCaptured(op.getOpArgs()[0], op.getSourceOp());
 
-      Region elementRegion = p.elementToRegionMap.at(op.getOpArgs()[0]);
-      for (const auto &pair : p.elementToRegionMap) {
+      Region elementRegion = p.getRegion(op.getOpArgs()[0]);
+      for (const auto &pair : p.range()) {
         if (pair.second == elementRegion && isActorDerived(pair.first))
           return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
         isClosureCapturedElt |= isClosureCaptured(pair.first, op.getSourceOp());
@@ -1106,7 +1075,7 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::UndoTransfer: {
       assert(op.getOpArgs().size() == 1 &&
              "UndoTransfer PartitionOp should be passed 1 argument");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "UndoTransfer PartitionOp's argument should already be tracked");
 
       // Mark op.getOpArgs()[0] as not transferred.
@@ -1116,8 +1085,8 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Merge:
       assert(op.getOpArgs().size() == 2 &&
              "Merge PartitionOp should be passed 2 arguments");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
-             p.elementToRegionMap.count(op.getOpArgs()[1]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
+             p.isTrackingElement(op.getOpArgs()[1]) &&
              "Merge PartitionOp's arguments should already be tracked");
 
       // if attempting to merge a transferred region, handle the failure
@@ -1137,7 +1106,7 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Require:
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
-      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+      assert(p.isTrackingElement(op.getOpArgs()[0]) &&
              "Require PartitionOp's argument should already be tracked");
       if (auto *transferredOperandSet = p.getTransferred(op.getOpArgs()[0])) {
         for (auto transferredOperand : transferredOperandSet->data()) {
@@ -1154,6 +1123,75 @@ struct PartitionOpEvaluator {
     for (auto &o : ops)
       apply(o);
   }
+};
+
+/// A base implementation that can be used to default initialize CRTP
+/// subclasses. Only used to implement base functionality for subclass
+/// CRTPs. For true basic evaluation, use PartitionOpEvaluatorBasic below.
+template <typename Subclass>
+struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
+  using TransferringOperandSetFactory =
+      Partition::TransferringOperandSetFactory;
+  using Super = PartitionOpEvaluator<Subclass>;
+
+  PartitionOpEvaluatorBaseImpl(Partition &workingPartition,
+                               TransferringOperandSetFactory &ptrSetFactory)
+      : Super(workingPartition, ptrSetFactory) {}
+
+  /// Should we emit extra verbose logging statements when evaluating
+  /// PartitionOps.
+  bool shouldEmitVerboseLogging() const { return true; }
+
+  /// A function called if we discover a transferred value was used after it
+  /// was transferred.
+  ///
+  /// The arguments passed to the closure are:
+  ///
+  /// 1. The PartitionOp that required the element to be alive.
+  ///
+  /// 2. The element in the PartitionOp that was asked to be alive.
+  ///
+  /// 3. The operand of the instruction that originally transferred the
+  /// region. Can be used to get the immediate value transferred or the
+  /// transferring instruction.
+  void handleFailure(const PartitionOp &op, Element elt,
+                     TransferringOperand transferringOp) const {}
+
+  /// A list of elements that cannot be transferred. Whenever we transfer, we
+  /// check this list to see if we are transferring the element and then call
+  /// transferNonTransferrableCallback. This should consist only of function
+  /// arguments.
+  ArrayRef<Element> getNonTransferrableElements() const { return {}; }
+
+  /// This is called if we detect a never transferred element that was passed to
+  /// a transfer instruction.
+  void handleTransferNonTransferrable(const PartitionOp &op,
+                                      Element elt) const {}
+
+  /// This is used to determine if an element is actor derived. If we determine
+  /// that a region containing such an element is transferred, we emit an error
+  /// since actor regions cannot be transferred.
+  bool isActorDerived(Element elt) const { return false; }
+
+  /// Check if the representative value of \p elt is closure captured at \p
+  /// op.
+  ///
+  /// NOTE: We actually just use the user of \p op in our callbacks. The reason
+  /// why we do not just pass in that SILInstruction is that then we would need
+  /// to access the instruction in the evaluator which creates a problem when
+  /// since the operand we pass in is a dummy operand.
+  bool isClosureCaptured(Element elt, Operand *op) const { return false; }
+};
+
+/// A subclass of PartitionOpEvaluatorBaseImpl that doesn't have any special
+/// behavior.
+struct PartitionOpEvaluatorBasic final
+    : PartitionOpEvaluatorBaseImpl<PartitionOpEvaluatorBasic> {
+  PartitionOpEvaluatorBasic(Partition &workingPartition,
+                            TransferringOperandSetFactory &ptrSetFactory)
+      : PartitionOpEvaluatorBaseImpl(workingPartition, ptrSetFactory) {}
 };
 
 } // namespace swift
