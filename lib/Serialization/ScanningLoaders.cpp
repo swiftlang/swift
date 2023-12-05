@@ -305,14 +305,14 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 }
 
 ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
-    StringRef moduleName, StringRef moduleOutputPath,
+    Identifier moduleName, StringRef moduleOutputPath,
     llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     InterfaceSubContextDelegate &delegate, llvm::TreePathPrefixMapper *mapper,
     bool isTestableDependencyLookup) {
-  ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
+  ImportPath::Module::Builder builder(moduleName);
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
   llvm::Optional<SwiftDependencyTracker> tracker = llvm::None;
@@ -344,7 +344,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
 
       ModuleDependencyVector moduleDependnecies;
       moduleDependnecies.push_back(
-          std::make_pair(ModuleDependencyID{moduleName.str(),
+          std::make_pair(ModuleDependencyID{moduleName.str().str(),
                                             scanner->dependencies->getKind()},
                          *(scanner->dependencies)));
       return moduleDependnecies;

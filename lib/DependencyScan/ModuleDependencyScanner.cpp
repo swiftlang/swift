@@ -179,7 +179,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
 
 ModuleDependencyVector
 ModuleDependencyScanningWorker::scanFilesystemForModuleDependency(
-    StringRef moduleName, const ModuleDependenciesCache &cache,
+    Identifier moduleName, const ModuleDependenciesCache &cache,
     bool isTestableImport) {
   // First query a Swift module, otherwise lookup a Clang module
   ModuleDependencyVector moduleDependencies =
@@ -203,7 +203,7 @@ ModuleDependencyScanningWorker::scanFilesystemForModuleDependency(
 
 ModuleDependencyVector
 ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
-    StringRef moduleName, const ModuleDependenciesCache &cache) {
+    Identifier moduleName, const ModuleDependenciesCache &cache) {
   return swiftScannerModuleLoader->getModuleDependencies(
       moduleName, cache.getModuleOutputPath(),
       cache.getScanService().getCachingFS(), cache.getAlreadySeenClangModules(),
@@ -213,7 +213,7 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
 
 ModuleDependencyVector
 ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
-    StringRef moduleName, const ModuleDependenciesCache &cache) {
+    Identifier moduleName, const ModuleDependenciesCache &cache) {
   return clangScannerModuleLoader->getModuleDependencies(
       moduleName, cache.getModuleOutputPath(),
       cache.getScanService().getCachingFS(), cache.getAlreadySeenClangModules(),
@@ -250,6 +250,10 @@ auto ModuleDependencyScanner::withDependencyScanningWorker(Function &&F,
   auto result = Task();
   releaseWorker(std::move(worker));
   return result;
+}
+
+Identifier ModuleDependencyScanner::getModuleImportIdentifier(StringRef moduleName) {
+  return ScanASTContext.getIdentifier(moduleName);
 }
 
 ModuleDependencyScanner::ModuleDependencyScanner(
@@ -443,10 +447,11 @@ ModuleDependencyScanner::getNamedClangModuleDependencyInfo(
     return found;
 
   // Otherwise perform filesystem scan
+  auto moduleIdentifier = getModuleImportIdentifier(moduleName);
   auto moduleDependencies = withDependencyScanningWorker(
-      [&cache, moduleName](ModuleDependencyScanningWorker *ScanningWorker) {
+      [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
         return ScanningWorker->scanFilesystemForClangModuleDependency(
-            moduleName, cache);
+            moduleIdentifier, cache);
       });
   if (moduleDependencies.empty())
     return llvm::None;
@@ -474,10 +479,11 @@ ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
     return found;
 
   // Otherwise perform filesystem scan
+  auto moduleIdentifier = getModuleImportIdentifier(moduleName);
   auto moduleDependencies = withDependencyScanningWorker(
-      [&cache, moduleName](ModuleDependencyScanningWorker *ScanningWorker) {
+      [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
         return ScanningWorker->scanFilesystemForSwiftModuleDependency(
-            moduleName, cache);
+            moduleIdentifier, cache);
       });
   if (moduleDependencies.empty())
     return llvm::None;
@@ -552,8 +558,9 @@ void ModuleDependencyScanner::resolveImportDependencies(
   // A scanning task to query a module by-name. If the module already exists
   // in the cache, do nothing and return.
   auto scanForModuleDependency = [this, &cache, &moduleLookupResult](
-                                  StringRef moduleName, bool onlyClangModule,
+                                  Identifier moduleIdentifier, bool onlyClangModule,
                                   bool isTestable) {
+    auto moduleName = moduleIdentifier.str();
     // If this is already in the cache, no work to do here
     if (onlyClangModule) {
       if (cache.hasDependency(moduleName, ModuleDependencyKind::Clang))
@@ -564,13 +571,13 @@ void ModuleDependencyScanner::resolveImportDependencies(
     }
 
     auto moduleDependencies = withDependencyScanningWorker(
-        [&cache, moduleName, onlyClangModule,
+        [&cache, moduleIdentifier, onlyClangModule,
          isTestable](ModuleDependencyScanningWorker *ScanningWorker) {
           return onlyClangModule
                      ? ScanningWorker->scanFilesystemForClangModuleDependency(
-                           moduleName, cache)
+                           moduleIdentifier, cache)
                      : ScanningWorker->scanFilesystemForModuleDependency(
-                           moduleName, cache, isTestable);
+                           moduleIdentifier, cache, isTestable);
         });
     moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
   };
@@ -579,14 +586,14 @@ void ModuleDependencyScanner::resolveImportDependencies(
   for (const auto &dependsOn : moduleDependencyInfo->getModuleImports()) {
     bool underlyingClangModuleLookup = moduleID.ModuleName == dependsOn;
     bool isTestable = moduleDependencyInfo->isTestableImport(dependsOn);
-    ScanningThreadPool.async(scanForModuleDependency, dependsOn,
+    ScanningThreadPool.async(scanForModuleDependency, getModuleImportIdentifier(dependsOn),
                              underlyingClangModuleLookup, isTestable);
   }
   for (const auto &dependsOn :
        moduleDependencyInfo->getOptionalModuleImports()) {
     bool underlyingClangModuleLookup = moduleID.ModuleName == dependsOn;
     bool isTestable = moduleDependencyInfo->isTestableImport(dependsOn);
-    ScanningThreadPool.async(scanForModuleDependency, dependsOn,
+    ScanningThreadPool.async(scanForModuleDependency, getModuleImportIdentifier(dependsOn),
                              underlyingClangModuleLookup, isTestable);
   }
   ScanningThreadPool.wait();
@@ -726,15 +733,16 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
   // A scanning task to query a Swift module by-name. If the module already
   // exists in the cache, do nothing and return.
   auto scanForSwiftDependency = [this, &cache, &swiftOverlayLookupResult](
-                                    StringRef moduleName) {
+                                    Identifier moduleIdentifier) {
+    auto moduleName = moduleIdentifier.str();
     if (cache.hasDependency(moduleName, ModuleDependencyKind::SwiftInterface) ||
         cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary) ||
         cache.hasDependency(moduleName, ModuleDependencyKind::SwiftPlaceholder))
       return;
 
     auto moduleDependencies = withDependencyScanningWorker(
-        [&cache, moduleName](ModuleDependencyScanningWorker *ScanningWorker) {
-          return ScanningWorker->scanFilesystemForSwiftModuleDependency(moduleName,
+        [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
+          return ScanningWorker->scanFilesystemForSwiftModuleDependency(moduleIdentifier,
                                                                         cache);
         });
     swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
@@ -742,7 +750,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
 
   // Enque asynchronous lookup tasks
   for (const auto &clangDep : clangDependencies)
-    ScanningThreadPool.async(scanForSwiftDependency, clangDep);
+    ScanningThreadPool.async(scanForSwiftDependency, getModuleImportIdentifier(clangDep));
   ScanningThreadPool.wait();
 
   // Aggregate both previously-cached and freshly-scanned module results

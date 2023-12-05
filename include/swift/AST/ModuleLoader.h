@@ -341,7 +341,7 @@ public:
   /// Retrieve the dependencies for the given, named module, or \c None
   /// if no such module exists.
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(StringRef moduleName,
+  getModuleDependencies(Identifier moduleName,
                         StringRef moduleOutputPath,
                         llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
