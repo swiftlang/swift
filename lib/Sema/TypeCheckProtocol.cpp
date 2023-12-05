@@ -7253,10 +7253,11 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(proto);
 
   // Find the default for the given associated type.
-  auto findAssociatedTypeDefault = [](AssociatedTypeDecl *assocType)
+  auto findAssociatedTypeDefault = [proto](AssociatedTypeDecl *assocType)
       -> std::pair<Type, AssociatedTypeDecl *> {
     auto defaultedAssocType =
-        AssociatedTypeInference::findDefaultedAssociatedType(assocType);
+        AssociatedTypeInference::findDefaultedAssociatedType(
+            proto, proto, assocType);
     if (!defaultedAssocType)
       return {Type(), nullptr};
 
