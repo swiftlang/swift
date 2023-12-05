@@ -118,6 +118,7 @@ UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
+UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -221,9 +222,6 @@ EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
 /// Defer Sendable checking to SIL diagnostic phase.
 EXPERIMENTAL_FEATURE(SendNonSendable, false)
-
-/// Allow default values to require isolation at the call-site.
-EXPERIMENTAL_FEATURE(IsolatedDefaultValues, false)
 
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.

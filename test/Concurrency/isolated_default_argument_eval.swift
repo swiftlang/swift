@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -I %t  -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature IsolatedDefaultValues -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %t  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature IsolatedDefaultValues -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
