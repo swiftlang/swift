@@ -28,6 +28,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1019,15 +1020,34 @@ public:
       return shouldVerifyChecked(S->getSubExpr());
     }
 
-    void verifyChecked(ThrowStmt *S) {
-      Type thrownError;
-      if (!Functions.empty()) {
-        if (auto fn = AnyFunctionRef::fromDeclContext(Functions.back()))
-          thrownError = fn->getThrownErrorType();
+    DeclContext *getInnermostDC() const {
+      for (auto scope : llvm::reverse(Scopes)) {
+        if (auto dc = scope.dyn_cast<DeclContext *>())
+          return dc;
       }
 
-      if (!thrownError)
-        thrownError = checkExceptionTypeExists("throw expression");
+      return nullptr;
+    }
+
+    void verifyChecked(ThrowStmt *S) {
+      Type thrownError;
+      SourceLoc loc = S->getThrowLoc();
+      if (loc.isValid()) {
+        auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
+        DeclContext *dc = getInnermostDC();
+        if (catchNode && dc) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(dc)) {
+            thrownError = *thrown;
+          } else {
+            thrownError = Ctx.getNeverType();
+          }
+        } else {
+          thrownError = checkExceptionTypeExists("throw expression");
+        }
+      } else {
+        return;
+      }
+
       checkSameType(S->getSubExpr()->getType(), thrownError, "throw operand");
       verifyCheckedBase(S);
     }

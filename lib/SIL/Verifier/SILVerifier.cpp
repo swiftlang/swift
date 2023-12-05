@@ -29,6 +29,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -745,7 +746,7 @@ static void checkAddressWalkerCanVisitAllTransitiveUses(SILValue address) {
 class SILVerifier : public SILVerifierBase<SILVerifier> {
   ModuleDecl *M;
   const SILFunction &F;
-  SILPassManager *passManager;
+  CalleeCache *calleeCache;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
 
@@ -1015,10 +1016,10 @@ public:
     return numInsts;
   }
 
-  SILVerifier(const SILFunction &F, SILPassManager *passManager,
+  SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
               bool SingleFunction, bool checkLinearLifetime)
       : M(F.getModule().getSwiftModule()), F(F),
-        passManager(passManager),
+        calleeCache(calleeCache),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
@@ -6796,7 +6797,7 @@ public:
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !mod.getASTContext().hadError()) {
-      F->verifyMemoryLifetime(passManager);
+      F->verifyMemoryLifetime(calleeCache);
     }
   }
 
@@ -6836,7 +6837,7 @@ static bool verificationEnabled(const SILModule &M) {
 
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
-void SILFunction::verify(SILPassManager *passManager,
+void SILFunction::verify(CalleeCache *calleeCache,
                          bool SingleFunction, bool isCompleteOSSA,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
@@ -6845,7 +6846,7 @@ void SILFunction::verify(SILPassManager *passManager,
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
-  SILVerifier verifier(*this, passManager, SingleFunction, checkLinearLifetime);
+  SILVerifier verifier(*this, calleeCache, SingleFunction, checkLinearLifetime);
   verifier.verify(isCompleteOSSA);
 }
 
@@ -6853,7 +6854,7 @@ void SILFunction::verifyCriticalEdges() const {
   if (!verificationEnabled(getModule()))
     return;
 
-  SILVerifier(*this, /*passManager=*/nullptr,
+  SILVerifier(*this, /*calleeCache=*/nullptr,
                      /*SingleFunction=*/true,
                      /*checkLinearLifetime=*/ false).verifyBranches(this);
 }
@@ -6973,7 +6974,7 @@ void SILVTable::verify(const SILModule &M) const {
 
     if (M.getStage() != SILStage::Lowered &&
         !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-      SILVerifier(*entry.getImplementation(), /*passManager=*/nullptr,
+      SILVerifier(*entry.getImplementation(), /*calleeCache=*/nullptr,
                                               /*SingleFunction=*/true,
                                               /*checkLinearLifetime=*/ false)
           .requireABICompatibleFunctionTypes(
@@ -7118,12 +7119,12 @@ void SILGlobalVariable::verify() const {
 }
 
 void SILModule::verify(bool isCompleteOSSA, bool checkLinearLifetime) const {
-  SILPassManager pm(const_cast<SILModule *>(this), /*isMandatory=*/false, /*IRMod=*/nullptr);
-  verify(&pm, isCompleteOSSA, checkLinearLifetime);
+  CalleeCache calleeCache(*const_cast<SILModule *>(this));
+  verify(&calleeCache, isCompleteOSSA, checkLinearLifetime);
 }
 
 /// Verify the module.
-void SILModule::verify(SILPassManager *passManager,
+void SILModule::verify(CalleeCache *calleeCache,
                        bool isCompleteOSSA, bool checkLinearLifetime) const {
   if (!verificationEnabled(*this))
     return;
@@ -7139,7 +7140,7 @@ void SILModule::verify(SILPassManager *passManager,
       llvm::errs() << "Symbol redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
-    f.verify(passManager, /*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
+    f.verify(calleeCache, /*singleFunction*/ false, isCompleteOSSA, checkLinearLifetime);
   }
 
   // Check all globals.

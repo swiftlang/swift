@@ -15,7 +15,7 @@
 // RUN:   %S/Inputs/syntax_macro_definitions.swift
 
 //#-- Prepare the macro executable plugin.
-// RUN: %swift-build-cxx-plugin -o %t/mock-plugin %t/src/plugin.c
+// RUN: %swift-build-c-plugin -o %t/mock-plugin %t/src/plugin.c
 
 //#-- Prepare the macro library.
 // RUN: %target-swift-frontend \

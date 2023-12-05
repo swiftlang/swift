@@ -24,6 +24,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/AST/ThrownErrorDestination.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
@@ -756,20 +757,25 @@ public:
 class IfStmt : public LabeledConditionalStmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
-  Stmt *Then;
+  BraceStmt *Then;
   Stmt *Else;
   
 public:
   IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
-         Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
+         BraceStmt *Then, SourceLoc ElseLoc, Stmt *Else,
          llvm::Optional<bool> implicit = llvm::None)
       : LabeledConditionalStmt(StmtKind::If,
                                getDefaultImplicitFlag(implicit, IfLoc),
                                LabelInfo, Cond),
-        IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {}
+        IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {
+    assert(Then && "Must have non-null 'then' statement");
+    assert(!Else || isa<BraceStmt>(Else) ||
+           isa<IfStmt>(Else) &&
+               "Else statement must either be BraceStmt or IfStmt");
+  }
 
-  IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
-         llvm::Optional<bool> implicit, ASTContext &Ctx);
+  IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
+         Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx);
 
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
@@ -781,8 +787,8 @@ public:
     return (Else ? Else->getEndLoc() : Then->getEndLoc());
   }
 
-  Stmt *getThenStmt() const { return Then; }
-  void setThenStmt(Stmt *s) { Then = s; }
+  BraceStmt *getThenStmt() const { return Then; }
+  void setThenStmt(BraceStmt *s) { Then = s; }
 
   Stmt *getElseStmt() const { return Else; }
   void setElseStmt(Stmt *s) { Else = s; }
@@ -1381,16 +1387,25 @@ class DoCatchStmt final
     : public LabeledStmt,
       private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
   friend TrailingObjects;
+  friend class DoCatchExplicitThrownTypeRequest;
 
   SourceLoc DoLoc;
+
+  /// Location of the 'throws' token.
+  SourceLoc ThrowsLoc;
+
+  /// The error type that is being thrown.
+  TypeLoc ThrownType;
+
   Stmt *Body;
   ThrownErrorDestination RethrowDest;
 
-  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
+  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, 
+              SourceLoc throwsLoc, TypeLoc thrownType, Stmt *body,
               ArrayRef<CaseStmt *> catches, llvm::Optional<bool> implicit)
       : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
                     labelInfo),
-        DoLoc(doLoc), Body(body) {
+        DoLoc(doLoc), ThrowsLoc(throwsLoc), ThrownType(thrownType), Body(body) {
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
                             getTrailingObjects<CaseStmt *>());
@@ -1400,14 +1415,27 @@ class DoCatchStmt final
 
 public:
   static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                             SourceLoc doLoc, Stmt *body,
+                             SourceLoc doLoc, 
+                             SourceLoc throwsLoc, TypeLoc thrownType,
+                             Stmt *body,
                              ArrayRef<CaseStmt *> catches,
                              llvm::Optional<bool> implicit = llvm::None);
 
   SourceLoc getDoLoc() const { return DoLoc; }
 
+  /// Retrieve the location of the 'throws' keyword, if present.
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
+
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
   SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
+
+  /// Retrieves the type representation for the thrown type.
+  TypeRepr *getThrownTypeRepr() const {
+    return ThrownType.getTypeRepr();
+  }
+
+  // Get the explicitly-specified thrown error type.
+  Type getExplicitlyThrownType(DeclContext *dc) const;
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
@@ -1433,7 +1461,7 @@ public:
   // and caught by the various 'catch' clauses. If this the catch clauses
   // aren't exhausive, this is also the type of the error that is implicitly
   // rethrown.
-  Type getCaughtErrorType() const;
+  Type getCaughtErrorType(DeclContext *dc) const;
 
   /// Retrieves the rethrown error and its conversion to the error type
   /// expected by the enclosing context.

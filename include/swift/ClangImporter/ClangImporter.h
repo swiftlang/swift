@@ -611,6 +611,9 @@ public:
   /// Enable the symbolic import experimental feature for the given callback.
   void withSymbolicFeatureEnabled(llvm::function_ref<void(void)> callback);
 
+  /// Returns true when the symbolic import experimental feature is enabled.
+  bool isSymbolicImportEnabled() const;
+
   const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
       const clang::Decl *candidateDecl) override;
 

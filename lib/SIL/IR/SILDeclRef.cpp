@@ -844,7 +844,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Anything else that is not public is not serializable.
-  if (d->getEffectiveAccess() < AccessLevel::Public)
+  if (d->getEffectiveAccess() < AccessLevel::Public || d->hasPackageAccess())
     return IsNotSerialized;
 
   // Enum element constructors are serializable if the enum is

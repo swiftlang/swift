@@ -203,6 +203,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case none
     case noAllocations
     case noLocks
+    case noRuntime
+    case noExistentials
+    case noObjCRuntime
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -210,6 +213,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .None: return .none
       case .NoAllocation: return .noAllocations
       case .NoLocks: return .noLocks
+      case .NoRuntime: return .noRuntime
+      case .NoExistentials: return .noExistentials
+      case .NoObjCBridging: return .noObjCRuntime
       default: fatalError("unknown performance constraint")
     }
   }
@@ -368,6 +374,24 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       { (f: BridgedFunction, observeRetains: Bool) -> BridgedMemoryBehavior in
         let e = f.function.getSideEffects()
         return e.getMemBehavior(observeRetains: observeRetains)
+      },
+      // argumentMayRead  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in
+        let argOp = Operand(bridged: bridgedArgOp)
+        let addr = bridgedAddr.value
+        let applySite = argOp.instruction as! FullApplySite
+        let addrPath = addr.accessPath
+        let argIdx = argOp.index - ApplyOperands.firstArgumentIndex
+        let calleeArgIdx = applySite.calleeArgIndex(callerArgIndex: argIdx)
+        let convention = applySite.getArgumentConvention(calleeArgIndex: calleeArgIdx)
+        assert(convention.isIndirectIn || convention.isInout)
+        let argPath = argOp.value.accessPath
+        assert(!argPath.isDistinct(from: addrPath))
+        let path = argPath.getProjection(to: addrPath) ?? SmallProjectionPath()
+        let effects = f.function.getSideEffects(forArgument: argOp.value.at(path),
+                                                atIndex: calleeArgIdx,
+                                                withConvention: convention)
+        return effects.memory.read
       }
     )
   }

@@ -9179,8 +9179,8 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   }
 
   if (optTy->isPlaceholder()) {
-    // object type should be simplified because it could be already bound.
-    recordAnyTypeVarAsPotentialHole(simplifyType(second));
+    if (auto *typeVar = second->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
     return SolutionKind::Solved;
   }
 
@@ -9529,34 +9529,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     if (elementTy->is<TypeVariableType>()) {
       result.OverallResult = MemberLookupResult::Unsolved;
       return result;
-    }
-  }
-
-  // Delay solving member constraint for unapplied methods
-  // where the base type has a conditional Sendable conformance
-  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-    if (isPartialApplication(memberLocator)) {
-      auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = DC->getParentModule()->lookupConformance(
-          instanceTy, sendableProtocol);
-
-      if (llvm::any_of(
-              baseConformance.getConditionalRequirements(),
-              [&](const auto &req) {
-                if (req.getKind() != RequirementKind::Conformance)
-                  return false;
-
-                if (auto protocolTy =
-                        req.getSecondType()->template getAs<ProtocolType>()) {
-                  return req.getFirstType()->hasTypeVariable() &&
-                         protocolTy->getDecl()->isSpecificProtocol(
-                             KnownProtocolKind::Sendable);
-                }
-                return false;
-              })) {
-        result.OverallResult = MemberLookupResult::Unsolved;
-        return result;
-      }
     }
   }
 
@@ -10077,6 +10049,46 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
     return OverloadChoice(baseTy, cand, functionRefKind);
   };
+
+  // Delay solving member constraint for unapplied methods
+  // where the base type has a conditional Sendable conformance
+  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    auto shouldCheckSendabilityOfBase = [&]() {
+      // Static members are always sendable because they only capture
+      // metatypes which are Sendable.
+      if (baseObjTy->is<AnyMetatypeType>())
+        return false;
+
+      return isPartialApplication(memberLocator) &&
+             llvm::any_of(lookup, [&](const auto &result) {
+               return isa_and_nonnull<FuncDecl>(result.getValueDecl());
+             });
+    };
+
+    if (shouldCheckSendabilityOfBase()) {
+      auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
+      auto baseConformance = DC->getParentModule()->lookupConformance(
+          instanceTy, sendableProtocol);
+
+      if (llvm::any_of(
+              baseConformance.getConditionalRequirements(),
+              [&](const auto &req) {
+                if (req.getKind() != RequirementKind::Conformance)
+                  return false;
+
+                if (auto protocolTy =
+                        req.getSecondType()->template getAs<ProtocolType>()) {
+                  return req.getFirstType()->hasTypeVariable() &&
+                         protocolTy->getDecl()->isSpecificProtocol(
+                             KnownProtocolKind::Sendable);
+                }
+                return false;
+              })) {
+        result.OverallResult = MemberLookupResult::Unsolved;
+        return result;
+      }
+    }
+  }
 
   // Add all results from this lookup.
   for (auto result : lookup)

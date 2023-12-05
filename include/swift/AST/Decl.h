@@ -2905,6 +2905,10 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
+  /// Returns whether this declaration should be treated as having the \c
+  /// package access level.
+  bool hasPackageAccess() const;
+
   /// FIXME: This is deprecated.
   bool isRecursiveValidation() const;
 
@@ -6090,7 +6094,7 @@ public:
   bool isAsyncLet() const;
 
   /// Is this var known to be a "local" distributed actor,
-  /// if so the implicit throwing ans some isolation checks can be skipped.
+  /// if so the implicit throwing and some isolation checks can be skipped.
   bool isKnownToBeLocal() const;
 
   /// Is this a stored property that will _not_ trigger any user-defined code

@@ -91,7 +91,7 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
          "the de-serializer did set the wrong serialized flag");
   
   F->setBare(IsBare);
-  F->verify();
+  toVerify.push_back(F);
   Worklist.push_back(F);
   Changed = true;
   ++NumFuncLinked;
@@ -462,5 +462,10 @@ void SILLinkerVisitor::process() {
         visit(&I);
       }
     }
+  }
+
+  while (!toVerify.empty()) {
+    auto *fn = toVerify.pop_back_val();
+    fn->verify();
   }
 }

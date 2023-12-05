@@ -1231,6 +1231,11 @@ internal struct _ClosureBasedSequence<Iterator: IteratorProtocol> {
 }
 
 extension _ClosureBasedSequence: Sequence {
+
+#if $NoncopyableGenerics
+  public typealias Element = Iterator.Element
+#endif
+
   @inlinable
   internal func makeIterator() -> Iterator {
     return _makeUnderlyingIterator()

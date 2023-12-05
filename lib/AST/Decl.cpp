@@ -4203,6 +4203,13 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
   return access == AccessLevel::Open;
 }
 
+bool ValueDecl::hasPackageAccess() const {
+  AccessLevel access =
+      getAdjustedFormalAccess(this, /*useDC*/ nullptr,
+                              /*treatUsableFromInlineAsPublic*/ false);
+  return access == AccessLevel::Package;
+}
+
 /// Given the formal access level for using \p VD, compute the scope where
 /// \p VD may be accessed, taking \@usableFromInline, \@testable imports,
 /// \@_spi imports, and enclosing access levels into account.
@@ -11684,7 +11691,7 @@ MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
 }
 
 llvm::Optional<Type>
-CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
+CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
     if (auto thrownError = func->getEffectiveThrownErrorType())
       return func->mapTypeIntoContext(*thrownError);
@@ -11701,7 +11708,7 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   }
 
   auto doCatch = get<DoCatchStmt *>();
-  if (auto thrownError = doCatch->getCaughtErrorType()) {
+  if (auto thrownError = doCatch->getCaughtErrorType(dc)) {
     if (thrownError->isNever())
       return llvm::None;
 
@@ -11709,5 +11716,5 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   }
 
   // If we haven't computed the error type yet, do so now.
-  return ctx.getErrorExistentialType();
+  return dc->getASTContext().getErrorExistentialType();
 }

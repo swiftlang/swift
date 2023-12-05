@@ -35,7 +35,7 @@ public:
   ///
   /// Returns the thrown error type for a throwing context, or \c llvm::None
   /// if this is a non-throwing context.
-  llvm::Optional<Type> getThrownErrorTypeInContext(ASTContext &ctx) const;
+  llvm::Optional<Type> getThrownErrorTypeInContext(DeclContext *dc) const;
 };
 
 } // end namespace swift

@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
+// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -41,4 +42,17 @@ class C1 : P1, P2 {
   func asyncMethod1() async { }
   @GenericGlobalActor<String> func asyncMethod2() async { }
   @GlobalActor func asyncMethod3() async { }
+}
+
+protocol NonIsolatedRequirement {
+  // expected-note@+1 {{mark the protocol requirement 'requirement()' 'async' to allow actor-isolated conformances}}
+  func requirement()
+}
+
+@MainActor class OnMain {}
+
+extension OnMain: NonIsolatedRequirement {
+  // expected-warning@+2 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@+1 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
+  func requirement() {}
 }

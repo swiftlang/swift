@@ -260,11 +260,15 @@ namespace llvm {
   
 } // end namespace llvm
 
+class BridgedDeclBaseName;
+
 namespace swift {
 
 /// Wrapper that may either be an Identifier or a special name
 /// (e.g. for subscripts)
 class DeclBaseName {
+  friend class ::BridgedDeclBaseName;
+
 public:
   enum class Kind: uint8_t {
     Normal,

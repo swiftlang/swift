@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -137,6 +138,9 @@ public:
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(NoLocks)
   IGNORED_ATTR(NoAllocation)
+  IGNORED_ATTR(NoRuntime)
+  IGNORED_ATTR(NoExistentials)
+  IGNORED_ATTR(NoObjCBridging)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(SILGenName)
@@ -1826,6 +1830,22 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     return false;
 
   auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
+
+  // Allow to compose key path type with a `Sendable` protocol as
+  // a way to express sendability requirement.
+  if (auto *existential = paramTy->getAs<ExistentialType>()) {
+    auto layout = existential->getExistentialLayout();
+
+    auto protocols = layout.getProtocols();
+    if (!(protocols.size() == 1 &&
+          protocols[0] == ctx.getProtocol(KnownProtocolKind::Sendable)))
+      return false;
+
+    paramTy = layout.getSuperclass();
+    if (!paramTy)
+      return false;
+  }
+
   return paramTy->isKeyPath() ||
          paramTy->isWritableKeyPath() ||
          paramTy->isReferenceWritableKeyPath();

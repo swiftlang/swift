@@ -536,6 +536,15 @@ SIMPLE_DECL_ATTR(_staticExclusiveOnly, StaticExclusiveOnly,
 SIMPLE_DECL_ATTR(extractConstantsFromMembers, ExtractConstantsFromMembers,
   OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   152)
+SIMPLE_DECL_ATTR(_noRuntime, NoRuntime,
+  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  153)
+SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
+  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  154)
+SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
+  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  155)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

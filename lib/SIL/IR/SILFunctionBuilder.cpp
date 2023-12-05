@@ -193,6 +193,12 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoLocks);
   } else if (Attrs.hasAttribute<NoAllocationAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoAllocation);
+  } else if (Attrs.hasAttribute<NoRuntimeAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoRuntime);
+  } else if (Attrs.hasAttribute<NoExistentialsAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoExistentials);
+  } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
   }
 
   if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {

@@ -30,10 +30,8 @@
 // just be a SmallProjectionPath. For details see `WalkingPath`.
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 /// Result returned by the walker functions
-enum WalkResult {
+public enum WalkResult {
   /// Continue the walk
   case continueWalk
   /// Stop the walks of all uses, a sufficient condition has been found
@@ -44,7 +42,7 @@ enum WalkResult {
 ///
 /// Usually this is just a SmallProjectionPath, but clients can implement their own path, e.g.
 /// to maintain additional data throughout the walk.
-protocol WalkingPath : Equatable {
+public protocol WalkingPath : Equatable {
   typealias FieldKind = SmallProjectionPath.FieldKind
 
   /// Returns the merged path of this path and `with`.
@@ -71,7 +69,7 @@ extension SmallProjectionPath : WalkingPath { }
 
 /// A `WalkingPath` where `push` and `pop` instructions
 /// are forwarded to an underlying `projectionPath`.
-protocol SmallProjectionWalkingPath : WalkingPath {
+public protocol SmallProjectionWalkingPath : WalkingPath {
   /// During the walk, a projection path indicates where the initial value is
   /// contained in an aggregate.
   /// Example for a walk-down:
@@ -88,20 +86,21 @@ protocol SmallProjectionWalkingPath : WalkingPath {
 }
 
 extension SmallProjectionWalkingPath {
-  func pop(kind: FieldKind) -> (index: Int, path: Self)? {
+  public func pop(kind: FieldKind) -> (index: Int, path: Self)? {
     if let (idx, p) = projectionPath.pop(kind: kind) {
       return (idx, with(projectionPath: p))
     }
     return nil
   }
 
-  func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? {
+  public func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? {
     if let p = projectionPath.popIfMatches(kind, index: index) {
       return with(projectionPath: p)
     }
     return nil
   }
-  func push(_ kind: FieldKind, index: Int) -> Self {
+
+  public func push(_ kind: FieldKind, index: Int) -> Self {
     return with(projectionPath: projectionPath.push(kind, index: index))
   }
 }
@@ -109,19 +108,23 @@ extension SmallProjectionWalkingPath {
 /// A walking path which matches everything.
 ///
 /// Useful for walkers which don't care about the path and unconditionally walk to all defs/uses.
-struct UnusedWalkingPath : WalkingPath {
-  func merge(with: Self) -> Self { self }
-  func pop(kind: FieldKind) -> (index: Int, path: Self)? { nil }
-  func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? { self }
-  func push(_ kind: FieldKind, index: Int) -> Self { self }
+public struct UnusedWalkingPath : WalkingPath {
+  public init() {}
+  public func merge(with: Self) -> Self { self }
+  public func pop(kind: FieldKind) -> (index: Int, path: Self)? { nil }
+  public func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? { self }
+  public func push(_ kind: FieldKind, index: Int) -> Self { self }
 }
 
 /// Caches the state of a walk.
 ///
 /// A client must provide this cache in a `walkUpCache` or `walkDownCache` property.
-struct WalkerCache<Path : WalkingPath> {
-  mutating func needWalk(for value: Value, path: Path) -> Path? {
-  
+public struct WalkerCache<Path : WalkingPath> {
+
+  public init() {}
+
+  public mutating func needWalk(for value: Value, path: Path) -> Path? {
+
     // Handle the first inline entry.
     guard let e = inlineEntry0 else {
       inlineEntry0 = (value, path)
@@ -235,7 +238,7 @@ struct WalkerCache<Path : WalkingPath> {
 /// ...    = <instruction>  %fa.ga:               // 4. unknown instruction, leafUse(%fa.ga, "")
 /// ...    = <instruction>  %str:                 // 6. unknown instruction, leafUse(%str, "s0.s1")
 /// ```
-protocol ValueDefUseWalker {
+public protocol ValueDefUseWalker {
   associatedtype Path: WalkingPath
   
   /// Called on each use. The implementor can decide to continue the walk by calling
@@ -283,18 +286,18 @@ protocol ValueDefUseWalker {
 }
 
 extension ValueDefUseWalker {
-  mutating func walkDown(value operand: Operand, path: Path) -> WalkResult {
+  public mutating func walkDown(value operand: Operand, path: Path) -> WalkResult {
     return walkDownDefault(value: operand, path: path)
   }
   
-  mutating func unmatchedPath(value: Operand, path: Path) -> WalkResult {
+  public mutating func unmatchedPath(value: Operand, path: Path) -> WalkResult {
     return .continueWalk
   }
   
   /// Given an operand to an instruction, tries to continue the walk with the uses of
   /// instruction's result if the target value is reachable from it (i.e. matches the `path`) .
   /// If the walk can't continue, it calls `leafUse` or `unmatchedPath`
-  mutating func walkDownDefault(value operand: Operand, path: Path) -> WalkResult {
+  public mutating func walkDownDefault(value operand: Operand, path: Path) -> WalkResult {
     let instruction = operand.instruction
     switch instruction {
     case let str as StructInst:
@@ -404,7 +407,7 @@ extension ValueDefUseWalker {
   }
   
   /// Starts the walk
-  mutating func walkDownUses(ofValue: Value, path: Path) -> WalkResult {
+  public mutating func walkDownUses(ofValue: Value, path: Path) -> WalkResult {
     for operand in ofValue.uses where !operand.isTypeDependent {
       if walkDown(value: operand, path: path) == .abortWalk {
         return .abortWalk
@@ -413,7 +416,7 @@ extension ValueDefUseWalker {
     return .continueWalk
   }
   
-  mutating func walkDownAllResults(of inst: MultipleValueInstruction, path: Path) -> WalkResult {
+  public mutating func walkDownAllResults(of inst: MultipleValueInstruction, path: Path) -> WalkResult {
     for result in inst.results {
       if let path = walkDownCache.needWalk(for: result, path: path) {
         if walkDownUses(ofValue: result, path: path) == .abortWalk {
@@ -432,7 +435,7 @@ extension ValueDefUseWalker {
 /// can't proceed.
 /// All functions return a boolean flag which, if true, can stop the walk of the other uses
 /// and the whole walk.
-protocol AddressDefUseWalker {
+public protocol AddressDefUseWalker {
   associatedtype Path: WalkingPath
   
   /// Called on each use. The implementor can decide to continue the walk by calling
@@ -452,15 +455,15 @@ protocol AddressDefUseWalker {
 }
 
 extension AddressDefUseWalker {
-  mutating func walkDown(address operand: Operand, path: Path) -> WalkResult {
+  public mutating func walkDown(address operand: Operand, path: Path) -> WalkResult {
     return walkDownDefault(address: operand, path: path)
   }
   
-  mutating func unmatchedPath(address: Operand, path: Path) -> WalkResult {
+  public mutating func unmatchedPath(address: Operand, path: Path) -> WalkResult {
     return .continueWalk
   }
   
-  mutating func walkDownDefault(address operand: Operand, path: Path) -> WalkResult {
+  public mutating func walkDownDefault(address operand: Operand, path: Path) -> WalkResult {
     let instruction = operand.instruction
     switch instruction {
     case let sea as StructElementAddrInst:
@@ -513,7 +516,7 @@ extension AddressDefUseWalker {
     }
   }
   
-  mutating func walkDownUses(ofAddress: Value, path: Path) -> WalkResult {
+  public mutating func walkDownUses(ofAddress: Value, path: Path) -> WalkResult {
     for operand in ofAddress.uses where !operand.isTypeDependent {
       if walkDown(address: operand, path: path) == .abortWalk {
         return .abortWalk
@@ -559,7 +562,7 @@ extension AddressDefUseWalker {
 ///     with the operand definition as initial value and same path.
 ///   4. If the instruction is not handled by this walker or the path is empty, then `rootDef` is called to
 ///     denote that the walk can't continue and that the definition of the target has been reached.
-protocol ValueUseDefWalker {
+public protocol ValueUseDefWalker {
   associatedtype Path: WalkingPath
   
   /// Starting point of the walk. The implementor can decide to continue the walk by calling
@@ -591,15 +594,15 @@ protocol ValueUseDefWalker {
 }
 
 extension ValueUseDefWalker {
-  mutating func walkUp(value: Value, path: Path) -> WalkResult {
+  public mutating func walkUp(value: Value, path: Path) -> WalkResult {
     return walkUpDefault(value: value, path: path)
   }
   
-  mutating func unmatchedPath(value: Value, path: Path) -> WalkResult {
+  public mutating func unmatchedPath(value: Value, path: Path) -> WalkResult {
     return .continueWalk
   }
   
-  mutating func walkUpDefault(value def: Value, path: Path) -> WalkResult {
+  public mutating func walkUpDefault(value def: Value, path: Path) -> WalkResult {
     switch def {
     case let str as StructInst:
       if let (index, path) = path.pop(kind: .structField) {
@@ -698,7 +701,7 @@ extension ValueUseDefWalker {
     }
   }
   
-  mutating func walkUpAllOperands(of def: Instruction, path: Path) -> WalkResult {
+  public mutating func walkUpAllOperands(of def: Instruction, path: Path) -> WalkResult {
     for operand in def.operands {
       // `shouldRecompute` is called to avoid exponential complexity in
       // programs like
@@ -717,7 +720,7 @@ extension ValueUseDefWalker {
   }
 }
 
-protocol AddressUseDefWalker {
+public protocol AddressUseDefWalker {
   associatedtype Path: WalkingPath
   
   /// Starting point of the walk. The implementor can decide to continue the walk by calling
@@ -738,15 +741,15 @@ protocol AddressUseDefWalker {
 
 extension AddressUseDefWalker {
   
-  mutating func walkUp(address: Value, path: Path) -> WalkResult {
+  public mutating func walkUp(address: Value, path: Path) -> WalkResult {
     return walkUpDefault(address: address, path: path)
   }
   
-  mutating func unmatchedPath(address: Value, path: Path) -> WalkResult {
+  public mutating func unmatchedPath(address: Value, path: Path) -> WalkResult {
     return .continueWalk
   }
   
-  mutating func walkUpDefault(address def: Value, path: Path) -> WalkResult {
+  public mutating func walkUpDefault(address def: Value, path: Path) -> WalkResult {
     switch def {
     case let sea as StructElementAddrInst:
       return walkUp(address: sea.struct, path: path.push(.structField, index: sea.fieldIndex))

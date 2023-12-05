@@ -409,8 +409,7 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr,
-      /* OptimizeArgs */ true);
+      /* SharedFS */ nullptr);
   SharedFilesystemCache.emplace();
 }
 
@@ -568,8 +567,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       ClangScanningFormat,
       Instance.getInvocation().getFrontendOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS,
-      /* ReuseFileManager */ false, /* OptimizeArgs */ false);
+      UseClangIncludeTree ? nullptr : CacheFS);
 
   return false;
 }

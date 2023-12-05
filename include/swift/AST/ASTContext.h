@@ -239,8 +239,8 @@ class ASTContext final {
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
+      );
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -257,8 +257,8 @@ public:
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
+      );
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -293,6 +293,11 @@ public:
 
   /// OutputBackend for writing outputs.
   llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
+
+  /// Set the callback function that is invoked before Swift module importing is
+  /// performed
+  void SetPreModuleImportCallback(
+      std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback);
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
@@ -404,7 +409,7 @@ private:
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
   /// An optional generic callback function invoked prior to importing a module.
-  mutable std::function<bool(llvm::StringRef ModuleName, bool IsOverlay)>
+  mutable std::function<void(llvm::StringRef ModuleName, bool IsOverlay)>
       PreModuleImportCallback;
 
 public:

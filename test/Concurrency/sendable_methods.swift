@@ -206,3 +206,25 @@ func generic3<T>(_ x: T) async {
 
   await generic3(GenericS<NonSendable>.f)
 }
+
+// Make sure that static members are handled properly
+do {
+  struct X<T> {
+    init(_: T) {
+    }
+
+    static func test(_: T) {}
+  }
+
+  class Test<T> {
+    init(_: T) {
+      _ = X(self) // Ok
+      _ = X.init(self) // Ok
+      _ = Optional.some(self) // Ok
+
+      let _: @Sendable (Int) -> X<Int> = X.init // Ok
+      let _: @Sendable (Test<Int>) -> Void = X.test // Ok
+      let _ = X.test(self) // Ok
+    }
+  }
+}
