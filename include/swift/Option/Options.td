@@ -1027,6 +1027,9 @@ def dwarf_version : Joined<["-"], "dwarf-version=">,
   Flags<[FrontendOption]>,
   HelpText<"DWARF debug info version to produce if requested">,
   MetaVarName<"<version>">;
+def dwarf_fission : Flag<["-"], "dwarf-fission">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit debug info as split-DWARF (Fission) in a separate .dwo file">;
 def emit_split_dwarf_path : Separate<["-"], "split-dwarf-output">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,

@@ -124,6 +124,9 @@
 // RUN: not %swiftc_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
 // INVALID_DWARF_VERSION: invalid value '{{1|6}}' in '-dwarf-version={{1|6}}'
 
+// RUN: %swift_driver -### -g -dwarf-fission -o %t/dwarf-fission.o %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION %s
+// DWARF_FISSION: -split-dwarf-output {{.*}}/dwarf-fission.dwo
+
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
