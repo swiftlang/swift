@@ -247,6 +247,8 @@ cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 
 path %BuildRoot%\toolchains\5.9.0\PFiles64\Swift\runtime-development\usr\bin;%BuildRoot%\toolchains\5.9.0\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin;%Path%
 
+"%BuildRoot%\toolchains\5.9.0\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin\swiftc.exe" --version
+
 :: Build Swift Syntax
 cmake ^
   -B "%BuildRoot%\99" ^
