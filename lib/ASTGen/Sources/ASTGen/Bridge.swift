@@ -167,10 +167,14 @@ extension TokenSyntax {
   /// - Parameter astgen: The visitor providing the `ASTContext`.
   @inline(__always)
   func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
-    var text = self.text
-    return text.withBridgedString { bridged in
-      astgen.ctx.getIdentifier(bridged)
+    var text = self.rawText
+    if rawText == "_" {
+      return nil
     }
+    if rawText.count > 2 && rawText.hasPrefix("`") && rawText.hasSuffix("`") {
+      text = .init(rebasing: text.dropFirst().dropLast())
+    }
+    return astgen.ctx.getIdentifier(rawText.bridged)
   }
 
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the

@@ -110,16 +110,7 @@ BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc) {
 
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr) {
-  StringRef str = cStr.unbridged();
-  if (str.size() == 1 && str.front() == '_')
-    return BridgedIdentifier();
-
-  // If this was a back-ticked identifier, drop the back-ticks.
-  if (str.size() >= 2 && str.front() == '`' && str.back() == '`') {
-    str = str.drop_front().drop_back();
-  }
-
-  return cContext.unbridged().getIdentifier(str);
+  return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
