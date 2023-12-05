@@ -361,8 +361,8 @@ static void highlightOffendingType(InFlightDiagnostic &diag,
   diag.highlight(complainRepr->getSourceRange());
   diag.flush();
 
-  if (auto ITR = dyn_cast<IdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = ITR->getBoundDecl();
+  if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(complainRepr)) {
+    const ValueDecl *VD = declRefTR->getBoundDecl();
     VD->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
 }
@@ -378,8 +378,8 @@ static void noteLimitingImport(ASTContext &ctx,
   assert(limitImport->accessLevel != AccessLevel::Public &&
          "a public import shouldn't limit the access level of a decl");
 
-  if (auto ITR = dyn_cast_or_null<IdentTypeRepr>(complainRepr)) {
-    ValueDecl *VD = ITR->getBoundDecl();
+  if (auto *declRefTR = dyn_cast_or_null<DeclRefTypeRepr>(complainRepr)) {
+    ValueDecl *VD = declRefTR->getBoundDecl();
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here,
                        VD,

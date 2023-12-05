@@ -240,6 +240,15 @@ void DeclRefTypeRepr::setValue(TypeDecl *TD, DeclContext *DC) {
   getLastComponent()->setValue(TD, DC);
 }
 
+unsigned DeclRefTypeRepr::getNumGenericArgs() const {
+  auto *lastComp = const_cast<DeclRefTypeRepr *>(this)->getLastComponent();
+  if (auto *genericTR = dyn_cast<GenericIdentTypeRepr>(lastComp)) {
+    return genericTR->getNumGenericArgs();
+  }
+
+  return 0;
+}
+
 bool DeclRefTypeRepr::hasGenericArgList() const {
   return isa<GenericIdentTypeRepr>(
       const_cast<DeclRefTypeRepr *>(this)->getLastComponent());

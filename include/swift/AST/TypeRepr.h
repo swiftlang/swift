@@ -383,6 +383,8 @@ public:
   /// arguments.
   bool hasGenericArgList() const;
 
+  unsigned getNumGenericArgs() const;
+
   ArrayRef<TypeRepr *> getGenericArgs() const;
 
   SourceRange getAngleBrackets() const;
