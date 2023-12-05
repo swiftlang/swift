@@ -57,6 +57,7 @@ struct Bar {
 }
 
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="wrapper" -is-non-protocol-type -old-name "Foo" >> %t.ranges/custom-attrs-Foo.swift

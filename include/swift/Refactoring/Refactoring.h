@@ -100,6 +100,7 @@ public:
 ///   - valueDecl: The declaration that should be renamed
 RenameLocs localRenameLocs(SourceFile *sourceFile, const ValueDecl *valueDecl);
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
 /// Given a list of `RenameLoc`s, get the corresponding `ResolveLoc`s.
 ///
 /// These resolve locations contain more structured information, such as the
@@ -112,6 +113,7 @@ std::vector<ResolvedLoc> resolveRenameLocations(ArrayRef<RenameLoc> renameLocs,
                                                 StringRef newName,
                                                 SourceFile &sourceFile,
                                                 DiagnosticEngine &diags);
+#endif
 
 struct RangeConfig {
   unsigned BufferID;

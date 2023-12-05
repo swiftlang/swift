@@ -52,6 +52,7 @@ enum /*enum-WithValue:def*/WithValue: Int {
 }
 var _ = /*enum-WithValue*/WithValue . /*case-one*/one
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="class-Foo" -is-non-protocol-type -old-name "Foo" > %t.result/types_class-Foo.swift
 // RUN: diff -u %S/Outputs/types/class-Foo.swift.expected %t.result/types_class-Foo.swift

@@ -83,6 +83,7 @@ _ = Memberwise(/*memberwise-x:ref*/x: 1, z: 3)
 let memberwise = Memberwise.init(/*memberwise-x:ref*/x:z:)
 _ = memberwise . /*memberwise-x:ref*/x
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="import" -is-function-like -old-name "someFunc(a:)" >> %t.ranges/functions_import.swift
 // RUN: diff -u %S/Outputs/functions/import.swift.expected %t.ranges/functions_import.swift
