@@ -3616,6 +3616,10 @@ static bool usesFeatureNonEscapableTypes(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureFixedArrays(Decl *decl) {
+  return false;
+}
+
 static bool hasParameterPacks(Decl *decl) {
   if (auto genericContext = decl->getAsGenericContext()) {
     auto sig = genericContext->getGenericSignature();
