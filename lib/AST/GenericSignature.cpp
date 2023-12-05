@@ -511,10 +511,18 @@ GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) c
       auto other = req.getFirstType();
       return t->isEqual(other);
     });
-    if (found) {
-      requirementsErased.push_back(Requirement(RequirementKind::SameType,
-                                               req.getFirstType(),
-                                               Ptr->getASTContext().getAnyObjectType()));
+    if (found && req.getKind() == RequirementKind::Layout) {
+      if (req.getLayoutConstraint()->isClass()) {
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        Ptr->getASTContext().getAnyObjectType()));
+      } else if (req.getLayoutConstraint()->isBridgeObject()) {
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        Ptr->getASTContext().TheBridgeObjectType));
+      } else {
+        requirementsErased.push_back(req);
+      }
     } else {
       requirementsErased.push_back(req);
     }

@@ -316,14 +316,25 @@ void SpecializedFunction::computeTypeReplacements(const ApplySite &apply) {
     auto resultType =
         fn->getConventions().getSILResultType(fn->getTypeExpansionContext());
     SmallVector<SILResultInfo, 4> indirectResults(substConv.getIndirectSILResults());
+    SmallVector<SILResultInfo, 4> targetIndirectResults(
+        fn->getConventions().getIndirectSILResults());
 
     for (auto pair : llvm::enumerate(apply.getArgumentOperands())) {
       if (pair.index() < substConv.getSILArgIndexOfFirstParam()) {
         auto formalIndex = substConv.getIndirectFormalResultIndexForSILArg(pair.index());
         auto fnResult = indirectResults[formalIndex];
         if (fnResult.isFormalIndirect()) {
-          // FIXME: properly get the type
-          auto indirectResultTy = M.getASTContext().getAnyObjectType();  //fnResult.getReturnValueType(M, fnType, expansion);
+          CanType indirectResultTy;
+          if (targetIndirectResults.size() > formalIndex) {
+            indirectResultTy =
+                targetIndirectResults[formalIndex].getReturnValueType(
+                    M, fnType, expansion);
+          } else {
+            indirectResultTy =
+                fnType->getResults()[formalIndex].getReturnValueType(M, fnType,
+                                                                     expansion);
+          }
+
           addIndirectResultType(formalIndex, indirectResultTy);
         }
 
@@ -2967,7 +2978,7 @@ bool usePrespecialized(
 
     if (specializedReInfo.getSpecializedType() != reInfo.getSpecializedType()) {
       SmallVector<Type, 4> newSubs;
-      auto specializedSig = SA->getSpecializedSignature();
+      auto specializedSig = SA->getUnerasedSpecializedSignature();
 
       auto erasedParams = SA->getTypeErasedParams();
       if(!ctxt.LangOpts.hasFeature(Feature::LayoutPrespecialization) || erasedParams.empty()) {
@@ -2985,8 +2996,12 @@ bool usePrespecialized(
         });
 
         auto layout = specializedSig->getLayoutConstraint(genericParam);
+        if (!specializedSig->getRequiredProtocols(genericParam).empty()) {
+          llvm::report_fatal_error("Unexpected protocol requirements");
+        }
 
-        if (!erased || !layout || !layout->isClass()) {
+        if (!erased || !layout ||
+            (!layout->isClass() && !layout->isBridgeObject())) {
           newSubs.push_back(entry.value());
           continue;
         }
@@ -2997,17 +3012,19 @@ bool usePrespecialized(
           lowered = singleton;
         }
 
-        if (!lowered.hasRetainablePointerRepresentation()) {
-          // non-reference type can't be applied
-          break;
-        } else if (!specializedSig->getRequiredProtocols(genericParam)
-                        .empty()) {
-          llvm::report_fatal_error("Unexpected protocol requirements");
-        } else if (layout->isNativeClass()) {
-          newSubs.push_back(genericParam->getASTContext().TheNativeObjectType);
-          score += 1;
+        if (lowered.isBuiltinBridgeObject() && layout->isBridgeObject()) {
+          newSubs.push_back(genericParam->getASTContext().TheBridgeObjectType);
+        } else if (lowered.hasRetainablePointerRepresentation()) {
+          if (layout->isNativeClass()) {
+            newSubs.push_back(
+                genericParam->getASTContext().TheNativeObjectType);
+            score += 1;
+          } else {
+            newSubs.push_back(genericParam->getASTContext().getAnyObjectType());
+          }
         } else {
-          newSubs.push_back(genericParam->getASTContext().getAnyObjectType());
+          // no match
+          break;
         }
       }
 

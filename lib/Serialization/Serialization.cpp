@@ -1507,6 +1507,9 @@ void Serializer::serializeGenericRequirements(
       case LayoutConstraintKind::UnknownLayout:
         rawKind = LayoutRequirementKind::UnknownLayout;
         break;
+      case LayoutConstraintKind::BridgeObject:
+        rawKind = LayoutRequirementKind::BridgeObject;
+        break;
       }
       scratch.push_back(rawKind);
       scratch.push_back(addTypeRef(req.getFirstType()));
