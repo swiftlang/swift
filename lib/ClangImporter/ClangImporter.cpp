@@ -4949,14 +4949,14 @@ const clang::CXXMethodDecl *getCalledBaseCxxMethod(FuncDecl *baseMember) {
   if (!returnStmt)
     return nullptr;
   Expr *returnExpr = returnStmt->getResult();
-  // Look through a potential 'reinterpresetCast' that can be used
+  // Look through a potential 'reinterpretCast' that can be used
   // to cast UnsafeMutablePointer to UnsafePointer in the synthesized
   // Swift body for `.pointee`.
   if (auto *ce = dyn_cast<CallExpr>(returnExpr)) {
     if (auto *v = ce->getCalledValue()) {
       if (v->getModuleContext() ==
               baseMember->getASTContext().TheBuiltinModule &&
-          v->getBaseName().getIdentifier().str() == "reinterpretCast") {
+          v->getBaseIdentifier().is("reinterpretCast")) {
         returnExpr = ce->getArgs()->get(0).getExpr();
       }
     }

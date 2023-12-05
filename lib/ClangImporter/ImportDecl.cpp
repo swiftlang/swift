@@ -2193,12 +2193,23 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
-        if (decl->isInStdNamespace() && decl->getName() == "promise") {
-          // Do not import std::promise.
+        if (Impl.isCxxInteropCompatVersionAtLeast(
+                version::getUpcomingCxxInteropCompatVersion())) {
+          if (decl->isInStdNamespace() && decl->getName() == "promise") {
+            // Do not import std::promise.
+            return nullptr;
+          }
+          result->getAttrs().add(new (Impl.SwiftContext)
+                                     MoveOnlyAttr(/*Implicit=*/true));
+        } else {
+          Impl.addImportDiagnostic(
+              decl,
+              Diagnostic(
+                  diag::move_only_requires_move_only,
+                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+              decl->getLocation());
           return nullptr;
         }
-        result->getAttrs().add(new (Impl.SwiftContext)
-                                   MoveOnlyAttr(/*Implicit=*/true));
       }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible

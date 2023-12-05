@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -DNO_CONSUME
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -DNO_CONSUME
 
 // Note: some errors need full SIL emission right now.
 // FIXME: they should be type checker errors.
-// RUN: not %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: not %target-swift-emit-sil %s -I %S/Inputs -cxx-interoperability-mode=upcoming-swift 2>&1 | %FileCheck %s
 
 import MoveOnlyCxxOperators
 
