@@ -22,6 +22,7 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -2469,7 +2470,10 @@ bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
 
   auto baseTy =
       simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
-  return getApplicationLevel(*this, baseTy, UDE) < 2;
+  auto level = getApplicationLevel(*this, baseTy, UDE);
+  // Static members have base applied implicitly which means that their
+  // application level is lower.
+  return level < (baseTy->is<MetatypeType>() ? 1 : 2);
 }
 
 DeclReferenceType
@@ -3484,8 +3488,14 @@ void ConstraintSystem::bindOverloadType(
            "subscript always has one argument");
     // Parameter type is KeyPath<T, U> where `T` is a root type
     // and U is a leaf type (aka member type).
-    auto keyPathTy =
-        fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
+    auto paramTy = fnType->getParams()[0].getPlainType();
+
+    if (auto *existential = paramTy->getAs<ExistentialType>()) {
+      paramTy = existential->getSuperclass();
+      assert(isKnownKeyPathType(paramTy));
+    }
+
+    auto keyPathTy = paramTy->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
     assert(isKnownKeyPathType(keyPathTy) &&
@@ -3576,7 +3586,7 @@ void ConstraintSystem::bindOverloadType(
       addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,
                     keyPathLoc);
 
-      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
+      addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy,
                                            originalCallerTy->getResult());
 
       // Bind the overload type to the opened type as usual to match the fact
@@ -3592,8 +3602,7 @@ void ConstraintSystem::bindOverloadType(
       // Form constraints for a x[dynamicMember:] subscript with a key path
       // argument, where the overload type is bound to the result to model the
       // fact that this a property access in the source.
-      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
-                                           boundType);
+      addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy, boundType);
     }
     return;
   }
@@ -7445,6 +7454,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
 std::pair<bool, llvm::Optional<KeyPathCapability>>
 ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   bool didOptionalChain = false;
+  bool isSendable = true;
 
   auto fail = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
     return std::make_pair(false, llvm::None);
@@ -7454,15 +7464,16 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     return std::make_pair(true, llvm::None);
   };
 
-  auto success = [](KeyPathCapability capability)
+  auto success = [](KeyPathMutability mutability, bool isSendable)
       -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    KeyPathCapability capability(mutability, isSendable);
     return std::make_pair(true, capability);
   };
 
   if (keyPath->hasSingleInvalidComponent())
     return fail();
 
-  auto capability = KeyPathCapability::Writable;
+  auto mutability = KeyPathMutability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
 
@@ -7474,10 +7485,33 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     case KeyPathExpr::Component::Kind::CodeCompletion: {
       return fail();
     }
+
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+    case KeyPathExpr::Component::Kind::Subscript: {
+      if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+        // Key path is sendable only when all of its captures are sendable.
+        if (auto *args = component.getSubscriptArgs()) {
+          auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
+
+          for (const auto &arg : *args) {
+            auto argTy = simplifyType(getType(arg.getExpr()));
+
+            // Sendability cannot be determined until the argument
+            // is fully resolved.
+            if (argTy->hasTypeVariable())
+              return delay();
+
+            auto conformance = lookupConformance(argTy, sendable);
+            isSendable &=
+                bool(conformance) &&
+                !conformance.hasMissingConformance(DC->getParentModule());
+          }
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
     case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::Subscript:
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
-    case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+    case KeyPathExpr::Component::Kind::UnresolvedProperty: {
       auto *componentLoc =
           getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
       auto *calleeLoc = getCalleeLocator(componentLoc);
@@ -7513,13 +7547,13 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
         return fail();
 
       if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
-        capability = KeyPathCapability::ReadOnly;
+        mutability = KeyPathMutability::ReadOnly;
         continue;
       }
 
       // A nonmutating setter indicates a reference-writable base.
       if (!storage->isSetterMutating()) {
-        capability = KeyPathCapability::ReferenceWritable;
+        mutability = KeyPathMutability::ReferenceWritable;
         continue;
       }
 
@@ -7552,9 +7586,9 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
 
   // Optional chains force the entire key path to be read-only.
   if (didOptionalChain)
-    capability = KeyPathCapability::ReadOnly;
+    mutability = KeyPathMutability::ReadOnly;
 
-  return success(capability);
+  return success(mutability, isSendable);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)

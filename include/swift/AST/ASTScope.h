@@ -155,7 +155,7 @@ private:
   /// Child scopes, sorted by source range.
   Children storedChildren;
 
-  mutable llvm::Optional<CharSourceRange> cachedCharSourceRange;
+  mutable llvm::Optional<SourceRange> cachedCharSourceRange;
 
 #pragma mark - constructor / destructor
 public:
@@ -194,8 +194,17 @@ public:
 #pragma mark - source ranges
 
 public:
-  CharSourceRange getCharSourceRangeOfScope(SourceManager &SM,
-                                            bool omitAssertions = false) const;
+  /// Retrieve the source range of the given scope, where the end location
+  /// is adjusted to refer to the end of the token.
+  ///
+  /// Since the adjustment to the end of the token requires lexing, this
+  /// routine also caches the result.
+  ///
+  /// Note that the start and end locations might be in different source
+  /// buffers, so we represent the result as SourceRange rather than
+  /// CharSourceRange.
+  SourceRange getCharSourceRangeOfScope(SourceManager &SM,
+                                        bool omitAssertions = false) const;
   bool isCharSourceRangeCached() const;
 
   /// Returns source range of this node alone, without factoring in any

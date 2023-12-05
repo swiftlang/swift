@@ -322,22 +322,6 @@ extension LoadInst {
   }
 }
 
-extension SmallProjectionPath {
-  /// Returns true if the path only contains projections which can be materialized as
-  /// SIL struct or tuple projection instructions - for values or addresses.
-  var isMaterializable: Bool {
-    let (kind, _, subPath) = pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField, .tupleField:
-      return subPath.isMaterializable
-    default:
-      return false
-    }
-  }
-}
-
 extension FunctionPassContext {
   /// Returns true if any blocks were removed.
   func removeDeadBlocks(in function: Function) -> Bool {

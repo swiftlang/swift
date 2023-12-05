@@ -12,74 +12,62 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftSyntax
+@_spi(RawSyntax) import SwiftSyntax
 
-extension BridgedSourceLoc: ExpressibleByNilLiteral {
+protocol BridgedNullable: ExpressibleByNilLiteral {
+  associatedtype RawPtr
+  init(raw: RawPtr?)
+}
+extension BridgedNullable {
   public init(nilLiteral: ()) {
     self.init(raw: nil)
   }
 }
 
-extension BridgedIdentifier: ExpressibleByNilLiteral {
-  public init(nilLiteral: ()) {
-    self.init(raw: nil)
-  }
-}
+extension BridgedSourceLoc: BridgedNullable {}
+extension BridgedIdentifier: BridgedNullable {}
+extension BridgedNullableExpr: BridgedNullable {}
+extension BridgedNullableStmt: BridgedNullable {}
+extension BridgedNullableTypeRepr: BridgedNullable {}
+extension BridgedNullablePattern: BridgedNullable {}
+extension BridgedNullableGenericParamList: BridgedNullable {}
+extension BridgedNullableTrailingWhereClause: BridgedNullable {}
+extension BridgedNullableParameterList: BridgedNullable {}
 
 /// Protocol that declares that there's a "Nullable" variation of the type.
 ///
 /// E.g. BridgedExpr vs BridgedNullableExpr.
-protocol HasNullable {
-  associatedtype Nullable
-
-  /// Convert an `Optional<Self>` to `Nullable`.
-  static func asNullable(_ node: Self?) -> Nullable
+protocol BridgedHasNullable {
+  associatedtype Nullable: BridgedNullable
+  var raw: Nullable.RawPtr { get }
 }
-
-extension Optional where Wrapped: HasNullable {
+extension Optional where Wrapped: BridgedHasNullable {
   /// Convert an Optional to Nullable variation of the wrapped type.
   var asNullable: Wrapped.Nullable {
-    Wrapped.asNullable(self)
+    Wrapped.Nullable(raw: self?.raw)
   }
 }
 
-extension BridgedStmt: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableStmt {
-    .init(raw: node?.raw)
-  }
+extension BridgedStmt: BridgedHasNullable {
+  typealias Nullable = BridgedNullableStmt
+}
+extension BridgedExpr: BridgedHasNullable {
+  typealias Nullable = BridgedNullableExpr
+}
+extension BridgedTypeRepr: BridgedHasNullable {
+  typealias Nullable = BridgedNullableTypeRepr
+}
+extension BridgedGenericParamList: BridgedHasNullable {
+  typealias Nullable = BridgedNullableGenericParamList
+}
+extension BridgedTrailingWhereClause: BridgedHasNullable {
+  typealias Nullable = BridgedNullableTrailingWhereClause
+}
+extension BridgedParameterList: BridgedHasNullable {
+  typealias Nullable = BridgedNullableParameterList
 }
 
-extension BridgedExpr: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableExpr {
-    .init(raw: node?.raw)
-  }
-}
-
-extension BridgedTypeRepr: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableTypeRepr {
-    .init(raw: node?.raw)
-  }
-}
-
-extension BridgedGenericParamList: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableGenericParamList {
-    .init(raw: node?.raw)
-  }
-}
-
-extension BridgedTrailingWhereClause: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableTrailingWhereClause {
-    .init(raw: node?.raw)
-  }
-}
-
-extension BridgedParameterList: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableParameterList {
-    .init(raw: node?.raw)
-  }
-}
-
-extension BridgedSourceLoc {
+public extension BridgedSourceLoc {
   /// Form a source location at the given absolute position in `buffer`.
   init(
     at position: AbsolutePosition,
@@ -109,6 +97,12 @@ extension String {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
+  }
+}
+
+extension SyntaxText {
+  var bridged: BridgedStringRef {
+    BridgedStringRef(data: self.baseAddress, count: self.count)
   }
 }
 

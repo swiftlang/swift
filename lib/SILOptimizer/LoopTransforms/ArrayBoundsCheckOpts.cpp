@@ -24,6 +24,7 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/IVAnalysis.h"
@@ -1319,7 +1320,7 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
   Changed |= hoistChecksInLoop(DT->getNode(Header), ABC, IndVars, Preheader,
                                Header, SingleExitingBlk, /*recursionDepth*/ 0);
   if (Changed) {
-    Preheader->getParent()->verify(getPassManager());
+    Preheader->getParent()->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
   }
   return Changed;
 }

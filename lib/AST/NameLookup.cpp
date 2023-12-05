@@ -1665,6 +1665,15 @@ bool
 namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
   bool inMacroArgument = false;
 
+  // Make sure that the source location is actually within the given source
+  // file.
+  if (sourceFile && loc.isValid()) {
+    sourceFile =
+        sourceFile->getParentModule()->getSourceFileContainingLocation(loc);
+    if (!sourceFile)
+      return false;
+  }
+
   ASTScope::lookupEnclosingMacroScope(
       sourceFile, loc,
       [&](auto potentialMacro) -> bool {

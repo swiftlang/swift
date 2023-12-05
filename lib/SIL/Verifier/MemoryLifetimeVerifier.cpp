@@ -13,12 +13,11 @@
 #define DEBUG_TYPE "sil-memory-lifetime-verifier"
 #include "swift/SIL/MemoryLocations.h"
 #include "swift/SIL/BitDataflow.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -42,7 +41,7 @@ class MemoryLifetimeVerifier {
   using BlockState = BitDataflow::BlockState;
 
   SILFunction *function;
-  AliasAnalysis *aliasAnalysis;
+  CalleeCache *calleeCache;
   MemoryLocations locations;
 
   /// alloc_stack memory locations which are used for store_borrow.
@@ -80,7 +79,9 @@ class MemoryLifetimeVerifier {
   /// \p addr, are set in \p bits.
   void requireBitsSet(const Bits &bits, SILValue addr, SILInstruction *where);
 
-  void requireBitsSetForArgument(const Bits &bits, SILValue addr, SILInstruction *applyInst);
+  void requireBitsSetForArgument(const Bits &bits, Operand *argOp);
+
+  bool applyMayRead(Operand *argOp, SILValue addr);
 
   bool isStoreBorrowLocation(SILValue addr) {
     auto *loc = locations.getLocation(addr);
@@ -137,10 +138,9 @@ class MemoryLifetimeVerifier {
   }
 
 public:
-  MemoryLifetimeVerifier(SILFunction *function, SILPassManager *passManager) :
+  MemoryLifetimeVerifier(SILFunction *function, CalleeCache *calleeCache) :
     function(function),
-    aliasAnalysis(passManager ? passManager->getAnalysis<AliasAnalysis>(function)
-                              : nullptr),
+    calleeCache(calleeCache),
     locations(/*handleNonTrivialProjections*/ true,
               /*handleTrivialLocations*/ true) {}
 
@@ -277,28 +277,39 @@ void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
   }
 }
 
-void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, SILValue addr,
-                                           SILInstruction *applyInst) {
-  // Optimizations can rely on alias analysis to know that an in-argument (or
-  // parts of it) is not actually read.
-  // We have to do the same in the verifier: if alias analysis says that an in-
-  // argument is not read, there is no need that the memory location is initialized.
-
-  // Not all calls to the verifier provide the alias analysis.
-  if (!aliasAnalysis)
-    return;
-
-  if (auto *loc = locations.getLocation(addr)) {
+void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand *argOp) {
+  if (auto *loc = locations.getLocation(argOp->get())) {
     Bits missingBits = ~bits & loc->subLocations;
     for (int errorLocIdx = missingBits.find_first(); errorLocIdx >= 0;
          errorLocIdx = missingBits.find_next(errorLocIdx)) {
       auto *errorLoc = locations.getLocation(errorLocIdx);
-      if (aliasAnalysis->mayReadFromMemory(applyInst, errorLoc->representativeValue)) {
+
+      if (applyMayRead(argOp, errorLoc->representativeValue)) {
         reportError("memory is not initialized, but should be",
-                    errorLocIdx, applyInst);
+                    errorLocIdx, argOp->getUser());
       }
     }
   }
+}
+
+bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
+  FullApplySite as(argOp->getUser());
+  CalleeList callees;
+  if (calleeCache) {
+    callees = calleeCache->getCalleeList(as);
+    if (callees.isIncomplete())
+      return true;
+  } else if (auto *callee = as.getReferencedFunctionOrNull()) {
+    callees = CalleeList(callee);
+  } else {
+    return false;
+  }
+
+  for (SILFunction *callee : callees) {
+    if (callee->argumentMayRead(argOp, addr))
+      return true;
+  }
+  return false;
 }
 
 void MemoryLifetimeVerifier::requireNoStoreBorrowLocation(
@@ -864,7 +875,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
   
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In:
-      requireBitsSetForArgument(bits, argumentOp.get(), applyInst);
+      requireBitsSetForArgument(bits, &argumentOp);
       locations.clearBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
@@ -874,7 +885,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
-      requireBitsSetForArgument(bits, argumentOp.get(), applyInst);
+      requireBitsSetForArgument(bits, &argumentOp);
       break;
     case SILArgumentConvention::Indirect_InoutAliasable:
       // We don't require any locations to be initialized for a partial_apply
@@ -883,7 +894,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       // closures capture the whole "self". When this is done in an initializer
       // it can happen that not all fields of "self" are initialized, yet.
       if (!isa<PartialApplyInst>(applyInst))
-        requireBitsSetForArgument(bits, argumentOp.get(), applyInst);
+        requireBitsSetForArgument(bits, &argumentOp);
       break;
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
@@ -919,7 +930,7 @@ void MemoryLifetimeVerifier::verify() {
 
 } // anonymous namespace
 
-void SILFunction::verifyMemoryLifetime(SILPassManager *passManager) {
-  MemoryLifetimeVerifier verifier(this, passManager);
+void SILFunction::verifyMemoryLifetime(CalleeCache *calleeCache) {
+  MemoryLifetimeVerifier verifier(this, calleeCache);
   verifier.verify();
 }

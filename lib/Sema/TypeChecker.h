@@ -1176,7 +1176,7 @@ llvm::Optional<Type> canThrow(ASTContext &ctx, Expr *expr);
 ///
 /// The error type is used in the catch clauses and, for a nonexhausive
 /// do-catch, is implicitly rethrown out of the do...catch block.
-Type catchErrorType(ASTContext &ctx, DoCatchStmt *stmt);
+Type catchErrorType(DeclContext *dc, DoCatchStmt *stmt);
 
 /// Given two error types, merge them into the "union" of both error types
 /// that is a supertype of both error types.

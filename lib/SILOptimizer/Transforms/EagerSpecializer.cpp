@@ -35,6 +35,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
@@ -879,12 +880,13 @@ void EagerSpecializerTransform::run() {
   // TODO: Optimize the dispatch code to minimize the amount
   // of checks. Use decision trees for this purpose.
   bool Changed = false;
+  CalleeCache *calleeCache = getAnalysis<BasicCalleeAnalysis>()->getCalleeCache();
   if (!onlyCreatePrespecializations)
     for_each3(F.getSpecializeAttrs(), SpecializedFuncs, ReInfoVec,
               [&](const SILSpecializeAttr *SA, SILFunction *NewFunc,
                   const ReabstractionInfo &ReInfo) {
                 if (NewFunc) {
-                  NewFunc->verify(getPassManager());
+                  NewFunc->verify(calleeCache);
                   Changed = true;
                   EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
                 }
@@ -904,7 +906,7 @@ void EagerSpecializerTransform::run() {
   // If any specializations were created, reverify the original body now that it
   // has checks.
   if (!newFunctions.empty())
-    F.verify(getPassManager());
+    F.verify(calleeCache);
 
   for (SILFunction *newF : newFunctions) {
     addFunctionToPassManagerWorklist(newF, nullptr);

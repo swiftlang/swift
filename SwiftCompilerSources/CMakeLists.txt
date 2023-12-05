@@ -59,7 +59,33 @@ function(swift_compiler_sources module)
   set(target_name "SwiftModule${module}")
   set_property(TARGET "SwiftModule${module}" APPEND PROPERTY SOURCES ${sources})
 endfunction()
- 
+
+# Allow the override of the flags used to define the SDK used to compile the
+# Swift compiler sources from the CMake configuration (command line or cache
+# files). This allows supporting complicated sysroots and some cross-compilation
+# scenarios.
+set(SWIFT_COMPILER_SOURCES_SDK_FLAGS_default)
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+  list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${sdk_path}")
+  if(NOT EXISTS "${sdk_path}/usr/include/c++")
+    # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
+    # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
+    # to clang.
+    message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
+    get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
+    if (EXISTS "${absolute_libcxx_path}")
+      list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
+    else()
+      message(ERROR "libc++ not found in the toolchain.")
+    endif()
+  endif()
+elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
+  list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+endif()
+set(SWIFT_COMPILER_SOURCES_SDK_FLAGS ${SWIFT_COMPILER_SOURCES_SDK_FLAGS_default}
+  CACHE STRING "Swift flags used to compiler the Swift compiler sources")
+
 # Add a library target for the swift compiler modules.
 #
 # Adds targets to compile all swift compiler modules and a target for the
@@ -103,35 +129,22 @@ function(add_swift_compiler_modules_library name)
 
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 
-  set(sdk_option "")
+  set(sdk_option ${SWIFT_COMPILER_SOURCES_SDK_FLAGS})
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-    set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
-    set(sdk_option "-sdk" "${sdk_path}")
     if(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
       # Let the cross-compiled compile don't pick up the compiled stdlib by providing
       # an (almost) empty resource dir.
       # The compiler will instead pick up the stdlib from the SDK.
       get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-      set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
-    endif()
-    if(NOT EXISTS "${sdk_path}/usr/include/c++")
-      # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
-      # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
-      # to clang.
-      message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
-      get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
-      if (EXISTS "${absolute_libcxx_path}")
-        set(sdk_option ${sdk_option} "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
-      else()
-        message(ERROR "libc++ not found in the toolchain.")
-      endif()
+      list(APPEND sdk_option "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
     endif()
   elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
-    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
     get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-    set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
+    # NOTE: prepending allows SWIFT_COMPILER_SOURCES_SDK_FLAGS to override the
+    # resource directory if needed.
+    list(PREPEND sdk_option "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
   endif()
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
@@ -140,7 +153,7 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-  set(sdk_option ${sdk_option} "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+  list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
 
   set(all_obj_files)
   set(all_module_targets)
@@ -262,6 +275,15 @@ else()
   #         Note that this library is unused, i.e. not linked to anything.   
   add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
   target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
+
+  # When building unified, we need to make sure all the Clang headers are
+  # generated before we try to use them.
+  # When building Swift against an already compiled LLVM/Clang, like
+  # build-script does, this target does not exist, but the headers
+  # are already completely generated at that point.
+  if(TARGET clang-tablegen-targets)
+    add_dependencies(importedHeaderDependencies clang-tablegen-targets)
+  endif()
 
   if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
 

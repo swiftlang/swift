@@ -22,6 +22,15 @@ import pre_specialized_module_layouts
 @inline(never)
 public func consume<T>(_ x: T) {}
 
+public struct ReferenceWrapperStruct {
+  let x: AnyObject
+}
+
+@_alignment(16)
+public struct OveralignedReferenceWrapperStruct {
+  let x: AnyObject
+}
+
 // Make sure we generate the public pre-specialized entry points.
 
 // OPT-DAG: sil @$s22pre_specialize_layouts10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
@@ -63,7 +72,8 @@ internal func testEmitIntoClient<T>(t: T) {
   print(t)
 }
 
-// OPT: sil @$s22pre_specialize_layouts28usePrespecializedEntryPointsyyF : $@convention(thin) () -> () {
+// OPT: sil @$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overalignedyAA016ReferenceWrapperI0V_AA011OveralignedklI0VtF : $@convention(thin) (@guaranteed ReferenceWrapperStruct, @guaranteed OveralignedReferenceWrapperStruct) -> () {
+// OPT: bb0([[P1:%.*]] : $ReferenceWrapperStruct, [[P2:%.*]] : $OveralignedReferenceWrapperStruct):
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFSi_Ts5 : $@convention(thin) (Int) -> ()
 // OPT:   apply [[F1]]
 // OPT:   [[F2:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
@@ -73,13 +83,17 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT: [[F7:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject) -> ()
 // OPT: [[A1:%.*]] = unchecked_ref_cast {{%.*}} : $SomeClass to $AnyObject
 // OPT: apply [[F7]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
+// OPT: [[A2:%.*]] = unchecked_bitwise_cast [[P1]] : $ReferenceWrapperStruct to $AnyObject
+// OPT: apply [[F7]]([[A2]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
+// OPT: [[A3:%.*]] = alloc_stack $OveralignedReferenceWrapperStruct
+// OPT: apply {{%.*}}<OveralignedReferenceWrapperStruct>([[A3]])
 // OPT:   [[F3:%.*]] = function_ref @$s30pre_specialized_module_layouts36internalEmitIntoClientPrespecializedyyxlFSi_Ts5 : $@convention(thin) (Int) -> ()
 // OPT:   apply [[F3]]
 // OPT:   [[F4:%.*]] = function_ref @$s30pre_specialized_module_layouts36internalEmitIntoClientPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
 // OPT:   apply [[F4]]
 // OPT:   [[F5:%.*]] = function_ref @$s30pre_specialized_module_layouts16useInternalThingyyxlFSi_Tg5
 // OPT:   apply [[F5]]({{.*}}) : $@convention(thin) (Int) -> ()
-// OPT: } // end sil function '$s22pre_specialize_layouts28usePrespecializedEntryPointsyyF'
+// OPT: } // end sil function '$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overalignedyAA016ReferenceWrapperI0V_AA011OveralignedklI0VtF'
 
 // OPT: sil {{.*}} @$s30pre_specialized_module_layouts16useInternalThingyyxlFSi_Tg5 : $@convention(thin) (Int) -> () {
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts14InternalThing2V7computexyFSi_Ts5 : $@convention(method) (InternalThing2<Int>) -> Int
@@ -124,11 +138,14 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   [[R10:%.*]] = unchecked_addr_cast [[R9]] : $*AnyObject to $*SomeClass
 // OPT: } // end sil function '$s30pre_specialized_module_layouts16useInternalThingyyxlFAA9SomeClassC_Tg5'
 
-public func usePrespecializedEntryPoints() {
+public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct) {
   publicPrespecialized(1)
   publicPrespecialized(1.0)
   publicPrespecialized(SomeData())
   publicPrespecialized(SomeClass())
+  publicPrespecialized(wrapperStruct)
+  // should not apply _Class specialization for overaligned struct
+  publicPrespecialized(overaligned)
   useInternalEmitIntoClientPrespecialized(2)
   useInternalEmitIntoClientPrespecialized(2.0)
   useInternalThing(2)

@@ -1029,8 +1029,6 @@ ERROR(parameter_operator_keyword_argument,none,
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
-WARNING(parameter_unnamed_warn,none,
-        "unnamed parameters must be written with the empty name '_'", ())
 
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
@@ -1195,6 +1193,9 @@ ERROR(expected_catch_where_expr,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'catch'", ())
 ERROR(docatch_not_trycatch,PointsToFirstBadToken,
       "the 'do' keyword is used to specify a 'catch' region",
+      ())
+ERROR(do_throws_without_catch,none,
+      "a 'do' statement with a 'throws' clause must have at least one 'catch'",
       ())
 
 // C-Style For Stmt

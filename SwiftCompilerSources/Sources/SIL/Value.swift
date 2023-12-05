@@ -220,3 +220,18 @@ extension Optional where Wrapped == Value {
     OptionalBridgedValue(obj: self?.bridged.obj)
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                            Bridging Utilities
+//===----------------------------------------------------------------------===//
+
+extension Array where Element == Value {
+  public func withBridgedValues<T>(_ c: (BridgedValueArray) -> T) -> T {
+    return self.withUnsafeBufferPointer { bufPtr in
+      assert(bufPtr.count == self.count)
+      return bufPtr.withMemoryRebound(to: BridgeValueExistential.self) { valPtr in
+        return c(BridgedValueArray(base: valPtr.baseAddress, count: self.count))
+      }
+    }
+  }
+}

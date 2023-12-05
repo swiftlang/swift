@@ -404,26 +404,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           // Mark current parameter type as invalid so it is possible
           // to diagnose it as destructuring of the closure parameter list.
           param.isPotentiallyDestructured = true;
-          if (!isClosure) {
-            // Unnamed parameters must be written as "_: Type".
-            diagnose(typeStartLoc, diag::parameter_unnamed)
-                .fixItInsert(typeStartLoc, "_: ");
-          } else {
-            // Unnamed parameters were accidentally possibly accepted after
-            // SE-110 depending on the kind of declaration.  We now need to
-            // warn about the misuse of this syntax and offer to
-            // fix it.
-            // An exception to this rule is when the type is declared with type sugar
-            // Reference: https://github.com/apple/swift/issues/54133
-            if (isa<OptionalTypeRepr>(param.Type)
-                || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
-                diagnose(typeStartLoc, diag::parameter_unnamed)
-                    .fixItInsert(typeStartLoc, "_: ");
-            } else {
-                diagnose(typeStartLoc, diag::parameter_unnamed_warn)
-                    .fixItInsert(typeStartLoc, "_: ");
-            }
-          }
+          // Unnamed parameters must be written as "_: Type".
+          diagnose(typeStartLoc, diag::parameter_unnamed)
+              .fixItInsert(typeStartLoc, "_: ");
         }
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell

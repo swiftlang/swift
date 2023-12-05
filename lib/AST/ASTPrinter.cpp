@@ -3286,6 +3286,10 @@ static bool usesFeatureStrictConcurrency(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDeprecateApplicationMain(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
   ClangNode clangNode = decl->getClangNode();
   if (!clangNode)
@@ -3309,6 +3313,10 @@ static bool usesFeatureImplicitSome(Decl *decl) {
 }
 
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureCompleteConcurrency(Decl *decl) {
   return false;
 }
 
@@ -3693,6 +3701,8 @@ static bool usesFeatureStaticExclusiveOnly(Decl *decl) {
 static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>();
 }
+
+static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,

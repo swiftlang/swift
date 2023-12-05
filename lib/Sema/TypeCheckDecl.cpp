@@ -1058,7 +1058,8 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
   //   - selfTy : ~TARGET
   // and records them in the `InverseMarking` result.
   auto genWhereClauseVisitor = [&](CanType selfTy, InverseMarking &result) {
-    return [&](Requirement req, RequirementRepr *repr) -> bool/*=stop search*/ {
+    return [&, selfTy](Requirement req,
+                       RequirementRepr *repr) -> bool/*=stop search*/ {
       if (req.getKind() != RequirementKind::Conformance)
         return false;
 

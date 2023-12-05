@@ -40,7 +40,7 @@ class LoopARCSequenceDataflowEvaluator {
   llvm::BumpPtrAllocator Allocator;
 
   /// The factory that we use to generate immutable pointer sets.
-  ImmutablePointerSetFactory<SILInstruction> SetFactory;
+  ImmutablePointerSetFactory<SILInstruction *> SetFactory;
 
   /// The SILFunction that we are applying the dataflow to.
   SILFunction &F;

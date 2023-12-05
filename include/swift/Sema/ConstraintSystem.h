@@ -339,11 +339,13 @@ enum TypeVariableOptions {
   TVO_PackExpansion = 0x40,
 };
 
-enum class KeyPathCapability : uint8_t {
+enum class KeyPathMutability : uint8_t {
   ReadOnly,
   Writable,
   ReferenceWritable
 };
+
+using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
 
 /// The implementation object for a type variable used within the
 /// constraint-solving type checker.
@@ -516,6 +518,10 @@ public:
 
   /// Determine whether this type variable represents an opened opaque type.
   bool isOpaqueType() const;
+
+  /// Determine whether this type variable represents a type of an array literal
+  /// (represented by `ArrayExpr` in AST).
+  bool isArrayLiteralType() const;
 
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
@@ -6311,7 +6317,7 @@ public:
 };
 
 /// Determine whether given type is a known one
-/// for a key path `{Writable, ReferenceWritable}KeyPath`.
+/// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathType(Type type);
 
 /// Determine whether given declaration is one for a key path

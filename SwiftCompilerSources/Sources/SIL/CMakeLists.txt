@@ -22,10 +22,12 @@ add_swift_compiler_module(SIL
     Location.swift
     Operand.swift
     Registration.swift
-    SmallProjectionPath.swift
+    SILStage.swift
     SubstitutionMap.swift
     Type.swift
-    Utils.swift
     Value.swift
     VTable.swift
     WitnessTable.swift)
+
+add_subdirectory(Utilities)
+

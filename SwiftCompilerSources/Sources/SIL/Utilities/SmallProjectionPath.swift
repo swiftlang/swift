@@ -12,6 +12,10 @@
 
 import Basic
 
+// Needed to make some important utility functions in `Basic` available to importers of `SIL`.
+// For example, let `Basic.assert` be used in Optimizer module.
+@_exported import Basic
+
 /// A small and very efficient representation of a projection path.
 ///
 /// A `SmallProjectionPath` can be parsed and printed in SIL syntax and parsed from Swift
@@ -500,6 +504,20 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
       return nil
     case .anything, .anyValueFields, .anyClassField, .anyIndexedElement:
       return nil
+    }
+  }
+
+  /// Returns true if the path only contains projections which can be materialized as
+  /// SIL struct or tuple projection instructions - for values or addresses.
+  public var isMaterializable: Bool {
+    let (kind, _, subPath) = pop()
+    switch kind {
+    case .root:
+      return true
+    case .structField, .tupleField:
+      return subPath.isMaterializable
+    default:
+      return false
     }
   }
 }

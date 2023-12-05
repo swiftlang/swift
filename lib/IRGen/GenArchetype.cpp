@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILValue.h"
@@ -172,6 +173,76 @@ public:
   }
 };
 
+class BitwiseCopyableArchetypeTypeInfo
+    : public WitnessSizedTypeInfo<BitwiseCopyableArchetypeTypeInfo> {
+  using Self = BitwiseCopyableArchetypeTypeInfo;
+  using Super = WitnessSizedTypeInfo<Self>;
+  BitwiseCopyableArchetypeTypeInfo(llvm::Type *type,
+                                   IsABIAccessible_t abiAccessible)
+      : Super(type, Alignment(1), IsTriviallyDestroyable, IsBitwiseTakable,
+              IsCopyable, abiAccessible) {}
+
+public:
+  static const BitwiseCopyableArchetypeTypeInfo *
+  create(llvm::Type *type, IsABIAccessible_t abiAccessible) {
+    return new Self(type, abiAccessible);
+  }
+
+  void bitwiseCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                   SILType T, bool isOutlined) const {
+    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
+  }
+
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void destroy(IRGenFunction &IGF, Address address, SILType T,
+               bool isOutlined) const override {
+    // BitwiseCopyable types are trivial, so destroy is a no-op.
+  }
+
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr, SILType T,
+                                       bool isOutlined) const override {
+    return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, enumAddr);
+  }
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T, bool isOutlined) const override {
+    emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases,
+                                      enumAddr);
+  }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    // We'll need formal type metadata for this archetype.
+    collector.collectTypeMetadataForLayout(T);
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayouts) const override {
+    return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
+  }
+};
 } // end anonymous namespace
 
 /// Emit a single protocol witness table reference.
@@ -361,6 +432,19 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
             ? IsABIAccessible
             : IsNotABIAccessible;
   }
+
+  auto &ASTContext = IGM.getSwiftModule()->getASTContext();
+  if (ASTContext.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
+    // TODO: Should this conformance imply isAddressOnlyTrivial is true?
+    auto *proto = ASTContext.getProtocol(KnownProtocolKind::BitwiseCopyable);
+    // It's possible for the protocol not to exist if the stdlib is built
+    // no_asserts.
+    if (proto && IGM.getSwiftModule()->lookupConformance(archetype, proto)) {
+      return BitwiseCopyableArchetypeTypeInfo::create(storageType,
+                                                      abiAccessible);
+    }
+  }
+
   return OpaqueArchetypeTypeInfo::create(storageType, abiAccessible);
 }
 

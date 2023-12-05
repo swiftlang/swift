@@ -13,6 +13,11 @@
 // This file defines all of the kinds of macro roles. Clients should define
 // either MACRO_ROLE or both ATTACHED_MACRO_ROLE and FREESTANDING_MACRO_ROLE.
 //
+// The order of the macro roles in this file is significant for the
+// serialization of module files. Please do not re-order the entries without
+// also bumping the module format version. When introducing new macro roles,
+// please add them to the end of the file.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef ATTACHED_MACRO_ROLE

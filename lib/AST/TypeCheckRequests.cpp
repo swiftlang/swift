@@ -970,6 +970,29 @@ void ThrownTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
+// DoCatchExplicitThrownTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+bool DoCatchExplicitThrownTypeRequest::isCached() const {
+  auto *const stmt = std::get<1>(getStorage());
+  return stmt->getThrowsLoc().isValid();
+}
+
+llvm::Optional<Type> DoCatchExplicitThrownTypeRequest::getCachedResult() const {
+  auto *const stmt = std::get<1>(getStorage());
+  Type thrownType = stmt->ThrownType.getType();
+  if (thrownType.isNull())
+    return llvm::None;
+
+  return thrownType;
+}
+
+void DoCatchExplicitThrownTypeRequest::cacheResult(Type type) const {
+  auto *const stmt = std::get<1>(getStorage());
+  stmt->ThrownType.setType(type);
+}
+
+//----------------------------------------------------------------------------//
 // ResultTypeRequest computation.
 //----------------------------------------------------------------------------//
 

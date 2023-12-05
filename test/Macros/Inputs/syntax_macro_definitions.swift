@@ -2057,6 +2057,31 @@ extension RequiredDefaultInitMacro: MemberMacro {
   }
 }
 
+public struct SendableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if protocols.isEmpty {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(type.trimmed): Sendable {
+      }
+
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -2183,7 +2208,7 @@ public struct TracedPreambleMacro: PreambleMacro {
 }
 
 @_spi(ExperimentalLanguageFeature)
-public struct Log2PreambleMacro: PreambleMacro {
+public struct LoggerMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingPreambleFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
@@ -2203,16 +2228,19 @@ public struct Log2PreambleMacro: PreambleMacro {
     let passedArgs = paramNames.map { "\($0): \\(\($0))" }.joined(separator: ", ")
 
     let entry: CodeBlockItemSyntax = """
-      log2("Entering \(funcBaseName)(\(raw: passedArgs))")
+      logger.log(entering: "\(funcBaseName)(\(raw: passedArgs))")
       """
 
     let argLabels = paramNames.map { "\($0):" }.joined()
 
     let exit: CodeBlockItemSyntax = """
-      log2("Exiting \(funcBaseName)(\(raw: argLabels))")
+      logger.log(exiting: "\(funcBaseName)(\(raw: argLabels))")
       """
 
     return [
+      """
+      let logger = Logger()
+      """,
       entry,
       """
       defer {

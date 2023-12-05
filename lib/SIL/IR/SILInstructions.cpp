@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/AssertImplements.h"
@@ -2964,6 +2965,17 @@ KeyPathInst::~KeyPathInst() {
   // Destroy operands.
   for (auto &operand : getAllOperands())
     operand.~Operand();
+}
+
+BoundGenericType *KeyPathInst::getKeyPathType() const {
+  auto kpTy = getType();
+
+  if (auto existential = kpTy.getAs<ExistentialType>()) {
+    return existential->getExistentialLayout()
+        .explicitSuperclass->castTo<BoundGenericType>();
+  }
+
+  return kpTy.getAs<BoundGenericType>();
 }
 
 KeyPathPattern *KeyPathInst::getPattern() const {

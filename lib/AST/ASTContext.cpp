@@ -646,8 +646,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend,
-    std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
@@ -661,7 +660,7 @@ ASTContext *ASTContext::get(
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                  ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags,
-                 std::move(OutputBackend), PreModuleImportCallback);
+                 std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -670,8 +669,8 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend,
-    std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback)
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend
+    )
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
       SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
@@ -679,7 +678,6 @@ ASTContext::ASTContext(
       TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-      PreModuleImportCallback(PreModuleImportCallback),
       TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
           *this, Type(), RecursiveTypeProperties::HasError)),
       TheUnresolvedType(new(*this, AllocationArena::Permanent)
@@ -729,6 +727,11 @@ ASTContext::ASTContext(
 
 ASTContext::~ASTContext() {
   getImpl().~Implementation();
+}
+
+void ASTContext::SetPreModuleImportCallback(
+    std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback) {
+  PreModuleImportCallback = callback;
 }
 
 llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {

@@ -29,8 +29,6 @@
 // ```
 //===----------------------------------------------------------------------===//
 
-import SIL
-
 /// AccessBase describes the base address of a memory access (e.g. of a `load` or `store``).
 /// The "base address" is defined as the address which is obtained from the access address by
 /// looking through all address projections.
@@ -48,7 +46,7 @@ import SIL
 /// ```
 ///
 /// The base address is never inside an access scope.
-enum AccessBase : CustomStringConvertible, Hashable {
+public enum AccessBase : CustomStringConvertible, Hashable {
 
   /// The address of a boxed variable, i.e. a field of an `alloc_box`.
   case box(ProjectBoxInst)
@@ -78,7 +76,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   /// This should be a very rare situation.
   case unidentified
 
-  init(baseAddress: Value) {
+  public init(baseAddress: Value) {
     switch baseAddress {
     case let rea as RefElementAddrInst   : self = .class(rea)
     case let rta as RefTailAddrInst      : self = .tail(rta)
@@ -97,7 +95,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
     }
   }
 
-  var description: String {
+  public var description: String {
     switch self {
       case .unidentified:      return "?"
       case .box(let pbi):      return "box - \(pbi)"
@@ -112,7 +110,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   }
 
   /// True, if this is an access to a class instance.
-  var isObjectAccess: Bool {
+  public var isObjectAccess: Bool {
     switch self {
       case .class, .tail:
         return true
@@ -122,7 +120,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   }
 
   /// The reference value if this is an access to a referenced objecct (class, box, tail).
-  var reference: Value? {
+  public var reference: Value? {
     switch self {
       case .box(let pbi):      return pbi.box
       case .class(let rea):    return rea.instance
@@ -141,7 +139,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   ///
   /// This is not true for scoped storage such as alloc_stack and @in arguments.
   ///
-  var hasLocalOwnershipLifetime: Bool {
+  public var hasLocalOwnershipLifetime: Bool {
     if let reference = reference {
       // Conservatively assume that everything which is a ref-counted object is within an ownership scope.
       // TODO: we could e.g. exclude guaranteed function arguments.
@@ -151,7 +149,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   }
 
   /// True, if the baseAddress is of an immutable property or global variable
-  var isLet: Bool {
+  public var isLet: Bool {
     switch self {
       case .class(let rea):    return rea.fieldIsLet
       case .global(let g):     return g.isLet
@@ -161,7 +159,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   }
 
   /// True, if the address is immediately produced by an allocation in its function.
-  var isLocal: Bool {
+  public var isLocal: Bool {
     switch self {
       case .box(let pbi):      return pbi.box is AllocBoxInst
       case .class(let rea):    return rea.instance is AllocRefInstBase
@@ -173,7 +171,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   }
 
   /// True, if the kind of storage of the access is known (e.g. a class property, or global variable).
-  var hasKnownStorageKind: Bool {
+  public var hasKnownStorageKind: Bool {
     switch self {
       case .box, .class, .tail, .stack, .global:
         return true
@@ -187,7 +185,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
   /// `isEqual` abstracts away the projection instructions that are included as part of the AccessBase:
   /// multiple `project_box` and `ref_element_addr` instructions are equivalent bases as long as they
   /// refer to the same variable or class property.
-  func isEqual(to other: AccessBase) -> Bool {
+  public func isEqual(to other: AccessBase) -> Bool {
     switch (self, other) {
     case (.box(let pb1), .box(let pb2)):
       return pb1.box.referenceRoot == pb2.box.referenceRoot
@@ -213,8 +211,8 @@ enum AccessBase : CustomStringConvertible, Hashable {
   }
 
   /// Returns `true` if the two access bases do not alias.
-  func isDistinct(from other: AccessBase) -> Bool {
-  
+  public func isDistinct(from other: AccessBase) -> Bool {
+
     func isDifferentAllocation(_ lhs: Value, _ rhs: Value) -> Bool {
       switch (lhs, rhs) {
       case (is Allocation, is Allocation):
@@ -273,21 +271,21 @@ enum AccessBase : CustomStringConvertible, Hashable {
 
 /// An `AccessPath` is a pair of a `base: AccessBase` and a `projectionPath: Path`
 /// which denotes the offset of the access from the base in terms of projections.
-struct AccessPath : CustomStringConvertible {
-  let base: AccessBase
+public struct AccessPath : CustomStringConvertible {
+  public let base: AccessBase
 
   /// address projections only
-  let projectionPath: SmallProjectionPath
+  public let projectionPath: SmallProjectionPath
 
-  static func unidentified() -> AccessPath {
+  public static func unidentified() -> AccessPath {
     return AccessPath(base: .unidentified, projectionPath: SmallProjectionPath())
   }
 
-  var description: String {
+  public var description: String {
     "\(projectionPath): \(base)"
   }
 
-  func isDistinct(from other: AccessPath) -> Bool {
+  public func isDistinct(from other: AccessPath) -> Bool {
     if base.isDistinct(from: other.base) {
       // We can already derived from the bases that there is no alias.
       // No need to look at the projection paths.
@@ -308,11 +306,11 @@ struct AccessPath : CustomStringConvertible {
   /// Note that this access _contains_ `other` if `other` has a _larger_ projection path than this acccess.
   /// For example:
   ///   `%value.s0` contains `%value.s0.s1`
-  func isEqualOrContains(_ other: AccessPath) -> Bool {
+  public func isEqualOrContains(_ other: AccessPath) -> Bool {
     return getProjection(to: other) != nil
   }
 
-  var materializableProjectionPath: SmallProjectionPath? {
+  public var materializableProjectionPath: SmallProjectionPath? {
     if projectionPath.isMaterializable {
       return projectionPath
     }
@@ -325,7 +323,7 @@ struct AccessPath : CustomStringConvertible {
   ///   `%value.s0`.getProjection(to: `%value.s0.s1`)
   /// yields
   ///   `s1`
-  func getProjection(to other: AccessPath) -> SmallProjectionPath? {
+  public func getProjection(to other: AccessPath) -> SmallProjectionPath? {
     if !base.isEqual(to: other.base) {
       return nil
     }
@@ -339,7 +337,7 @@ struct AccessPath : CustomStringConvertible {
   }
 
   /// Like `getProjection`, but also requires that the resulting projection path is materializable.
-  func getMaterializableProjection(to other: AccessPath) -> SmallProjectionPath? {
+  public func getMaterializableProjection(to other: AccessPath) -> SmallProjectionPath? {
     if let projectionPath = getProjection(to: other),
        projectionPath.isMaterializable {
       return projectionPath
@@ -364,7 +362,7 @@ private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
 /// %ptr = address_to_pointer %orig_addr
 /// %addr = pointer_to_address %ptr
 /// ```
-extension PointerToAddressInst {
+private extension PointerToAddressInst {
   var originatingAddress: Value? {
 
     struct Walker : ValueUseDefWalker {
@@ -426,7 +424,7 @@ extension PointerToAddressInst {
 /// %l3 = load %a3 : $*Int64
 /// end_access %a3 : $*Int64
 /// ```
-enum EnclosingScope {
+public enum EnclosingScope {
   case scope(BeginAccessInst)
   case base(AccessBase)
 }
@@ -512,30 +510,30 @@ extension Value {
   // go through phi-arguments, the AccessPathWalker will allocate memnory in its cache.
 
   /// Computes the access base of this address value.
-  var accessBase: AccessBase { accessPath.base }
+  public var accessBase: AccessBase { accessPath.base }
 
   /// Computes the access path of this address value.
-  var accessPath: AccessPath {
+  public var accessPath: AccessPath {
     var walker = AccessPathWalker()
     walker.walk(startAt: self)
     return walker.result
   }
 
-  func getAccessPath(fromInitialPath: SmallProjectionPath) -> AccessPath {
+  public func getAccessPath(fromInitialPath: SmallProjectionPath) -> AccessPath {
     var walker = AccessPathWalker()
     walker.walk(startAt: self, initialPath: fromInitialPath)
     return walker.result
   }
 
   /// Computes the access path of this address value and also returns the scope.
-  var accessPathWithScope: (AccessPath, scope: BeginAccessInst?) {
+  public var accessPathWithScope: (AccessPath, scope: BeginAccessInst?) {
     var walker = AccessPathWalker()
     walker.walk(startAt: self)
     return (walker.result, walker.foundBeginAccess)
   }
 
   /// Computes the enclosing access scope of this address value.
-  var enclosingAccessScope: EnclosingScope {
+  public var enclosingAccessScope: EnclosingScope {
     var walker = AccessPathWalker()
     walker.walk(startAt: self)
     if let ba = walker.foundBeginAccess {
@@ -545,7 +543,7 @@ extension Value {
   }
 
   /// The root definition of a reference, obtained by skipping casts, etc.
-  var referenceRoot: Value {
+  public var referenceRoot: Value {
     var value: Value = self
     while true {
       switch value {
@@ -583,7 +581,7 @@ extension ValueUseDefWalker where Path == SmallProjectionPath {
   /// the `visit` function for all storage roots with a the corresponding path.
   /// Returns true on success.
   /// Returns false if not all storage roots could be identified or if `accessPath` has not a "reference" base.
-  mutating func visitAccessStorageRoots(of accessPath: AccessPath) -> Bool {
+  public mutating func visitAccessStorageRoots(of accessPath: AccessPath) -> Bool {
     walkUpCache.clear()
     let path = accessPath.projectionPath
     switch accessPath.base {

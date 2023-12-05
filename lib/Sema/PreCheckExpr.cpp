@@ -2222,7 +2222,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   std::reverse(components.begin(), components.end());
 
-  KPE->setRootType(rootType);
+  KPE->setExplicitRootType(rootType);
   KPE->setComponents(getASTContext(), components);
 }
 

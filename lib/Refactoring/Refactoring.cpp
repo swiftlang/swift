@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Refactoring/Refactoring.h"
-#include "LocalRename.h"
 #include "RefactoringActions.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
@@ -210,6 +209,7 @@ case RefactoringKind::KIND: {                                                  \
       return true;                                                             \
   }
 #include "swift/Refactoring/RefactoringKinds.def"
+    case RefactoringKind::LocalRename:
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
     case RefactoringKind::FindLocalRenameRanges:

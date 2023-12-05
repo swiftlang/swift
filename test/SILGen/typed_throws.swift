@@ -130,6 +130,23 @@ open class MyClass {
   func f() throws { }
 }
 
+
+struct Foo: Error { }
+struct Bar: Error { }
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B22DifferentFromEnclosingyyAA3FooVYKF : $@convention(thin) () -> @error Foo
+func throwsDifferentFromEnclosing() throws(Foo) {
+  do {
+    throw Bar()
+  } catch {
+    print("Bar was barred")
+  }
+
+  // CHECK: throw [[ERROR:%.*]] : $Foo
+  throw Foo()
+}
+
+
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
 // CHECK-NEXT:  #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKFAA0C5ClassCADyyKFTV [override]

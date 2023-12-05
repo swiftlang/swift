@@ -214,55 +214,37 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   @inline(__always)
   func generate(type node: TypeSyntax?) -> BridgedNullableTypeRepr {
-    self.map(node, generate(type:))
+    node.map(generate(type:)).asNullable
   }
 
   @inline(__always)
   func generate(expr node: ExprSyntax?) -> BridgedNullableExpr {
-    self.map(node, generate(expr:))
+    node.map(generate(expr:)).asNullable
   }
 
   @inline(__always)
   func generate(genericParameterClause node: GenericParameterClauseSyntax?) -> BridgedNullableGenericParamList {
-    self.map(node, generate(genericParameterClause:))
+    node.map(generate(genericParameterClause:)).asNullable
   }
 
   @inline(__always)
   func generate(genericWhereClause node: GenericWhereClauseSyntax?) -> BridgedNullableTrailingWhereClause {
-    self.map(node, generate(genericWhereClause:))
+    node.map(generate(genericWhereClause:)).asNullable
   }
 
   @inline(__always)
   func generate(enumCaseParameterClause node: EnumCaseParameterClauseSyntax?) -> BridgedNullableParameterList {
-    self.map(node, generate(enumCaseParameterClause:))
+    node.map(generate(enumCaseParameterClause:)).asNullable
   }
 
   @inline(__always)
   func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
-    self.map(node, generate(inheritedTypeList:))
+    node.map(generate(inheritedTypeList:)) ?? .init()
   }
 
   @inline(__always)
   func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
-    self.map(node, generate(precedenceGroupNameList:))
-  }
-
-  // Helper function for `generate(foo: FooSyntax?)` methods.
-  @inline(__always)
-  private func map<Node: SyntaxProtocol, Result: HasNullable>(
-    _ node: Node?,
-    _ body: (Node) -> Result
-  ) -> Result.Nullable {
-    return Result.asNullable(node.map(body))
-  }
-
-  // Helper function for `generate(barList: BarListSyntax?)` methods for collection nodes.
-  @inline(__always)
-  private func map<Node: SyntaxCollection>(
-    _ node: Node?,
-    _ body: (Node) -> BridgedArrayRef
-  ) -> BridgedArrayRef {
-    return node.map(body) ?? .init()
+    node.map(generate(precedenceGroupNameList:)) ?? .init()
   }
 }
 

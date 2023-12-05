@@ -17,7 +17,7 @@
 // RUN:   %t/MacroDefinition.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: %swift-build-cxx-plugin -o %t/mock-plugin %t/TestPlugin.c
+// RUN: %swift-build-c-plugin -o %t/mock-plugin %t/TestPlugin.c
 
 //== Nested sandbox. Expected to fail because sandbox-exec doesn't support nested sandboxing.
 // RUN: not sandbox-exec -p '(version 1)(allow default)' \

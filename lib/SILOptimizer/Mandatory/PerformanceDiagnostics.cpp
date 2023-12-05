@@ -388,6 +388,28 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
+  if (perfConstr == PerformanceConstraints::NoExistentials &&
+      (impact & RuntimeEffect::Existential)) {
+    PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
+    if (impactType) {
+      diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
+    } else {
+      diagnose(loc, diag::perf_diag_existential);
+    }
+    return true;
+  }
+
+  if ((perfConstr == PerformanceConstraints::NoObjCBridging ||
+       perfConstr == PerformanceConstraints::NoAllocation ||
+       perfConstr == PerformanceConstraints::NoLocks) &&
+      (impact & RuntimeEffect::ObjectiveC)) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found objc effect", inst);
+
+    diagnose(loc, diag::performance_objectivec);
+    return true;
+  }
+
   if (module.getOptions().EmbeddedSwift) {
     if (impact & RuntimeEffect::Existential) {
       PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
@@ -412,7 +434,9 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     }
   }
 
-  if (perfConstr == PerformanceConstraints::None)
+  if (perfConstr == PerformanceConstraints::None ||
+      perfConstr == PerformanceConstraints::NoExistentials ||
+      perfConstr == PerformanceConstraints::NoObjCBridging)
     return false;
 
   if (impact & RuntimeEffect::Casting) {
@@ -477,6 +501,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     }
     return true;
   }
+  
+  if (perfConstr == PerformanceConstraints::NoRuntime)
+    return false;
+  
   if (impact & RuntimeEffect::Allocating) {
     PrettyStackTracePerformanceDiagnostics stackTrace(
         "found allocation effect", inst);
@@ -521,13 +549,6 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       }
     }
     diagnose(loc, diag::performance_deallocating, "this code pattern");
-    return true;
-  }
-  if (impact & RuntimeEffect::ObjectiveC) {
-    PrettyStackTracePerformanceDiagnostics stackTrace(
-        "found objc effect", inst);
-
-    diagnose(loc, diag::performance_objectivec);
     return true;
   }
 

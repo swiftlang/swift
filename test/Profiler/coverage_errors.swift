@@ -248,7 +248,7 @@ func test6(
 }                        // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors5test7s5Int32VyF"
-func test7() -> Int32 {  // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+31]]:2 : 0
+func test7() -> Int32 {  // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+29]]:2 : 0
   var x : Int32 = 0
 
   do {                   // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+3]]:4 : 0
@@ -271,8 +271,6 @@ func test7() -> Int32 {  // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+31]]:2 : 0
   } catch _ {}           // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE]]:15  : 6
                          // CHECK-NEXT: [[@LINE-1]]:15 -> {{[0-9:]+}} : (((((1 + 2) + 4) + 6) - 3) - 5)
 
-  // TODO: We ought to realize that everything after try! is unreachable
-  // This is similar issue to rdar://100896177
   try! test6 {
     () throws -> () in
     return
@@ -660,62 +658,58 @@ func test49() throws -> Int { // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+6]]:2  : 
 }                             // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test50SiyKF"
-func test50() throws -> Int {     // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+8]]:2  : 0
+func test50() throws -> Int {     // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+7]]:2  : 0
   let x = if try throwingBool() { // CHECK-NEXT: [[@LINE]]:14   -> [[@LINE]]:32   : 0
     try throwingFn()              // CHECK-NEXT: [[@LINE-1]]:32 -> [[@LINE+4]]:11 : (0 - 2)
   } else {                        // CHECK-NEXT: [[@LINE-2]]:33 -> [[@LINE]]:4    : 1
     1                             // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4  : (1 - 3)
-  }                               // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE+1]]:11 : ((0 - 2) - 3)
-  return x                        // CHECK-NEXT: [[@LINE-3]]:10 -> [[@LINE-1]]:4  : ((0 - 1) - 2)
-                                  // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE-1]]:11 : ((0 - 2) - 3)
+  }                               // CHECK-NEXT: [[@LINE-2]]:10 -> [[@LINE]]:4    : ((0 - 1) - 2)
+  return x                        // CHECK-NEXT: [[@LINE-1]]:4  -> [[@LINE]]:11   : ((0 - 2) - 3)
 }                                 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test51SiyKF"
-func test51() throws -> Int {     // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+9]]:2  : 0
+func test51() throws -> Int {     // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+8]]:2  : 0
   let x = if try throwingBool() { // CHECK-NEXT: [[@LINE]]:14   -> [[@LINE]]:32   : 0
     try throwingFn()              // CHECK-NEXT: [[@LINE-1]]:32 -> [[@LINE+4]]:11 : (0 - 2)
   } else {                        // CHECK-NEXT: [[@LINE-2]]:33 -> [[@LINE]]:4    : 1
     try throwingFn()              // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4  : (1 - 3)
-  }                               // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE+1]]:11 : ((0 - 2) - 3)
-  return x                        // CHECK-NEXT: [[@LINE-3]]:10 -> [[@LINE-1]]:4  : ((0 - 1) - 2)
-                                  // CHECK-NEXT: [[@LINE-3]]:21 -> [[@LINE-2]]:4  : (((0 - 1) - 2) - 4)
-                                  // CHECK-NEXT: [[@LINE-3]]:4  -> [[@LINE-2]]:11 : (((0 - 2) - 3) - 4)
+  }                               // CHECK-NEXT: [[@LINE-2]]:10 -> [[@LINE]]:4    : ((0 - 1) - 2)
+  return x                        // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4  : (((0 - 1) - 2) - 4)
+                                  // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE-1]]:11 : (((0 - 2) - 3) - 4)
 }                                 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test52SiyKF"
-func test52() throws -> Int {     // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+10]]:2  : 0
-  let x = if try throwingBool(),  // CHECK-NEXT: [[@LINE]]:14   -> [[@LINE]]:32    : 0
-             try throwingBool() { // CHECK-NEXT: [[@LINE-1]]:32 -> [[@LINE+5]]:11  : (0 - 2)
-    try throwingFn()              // CHECK-NEXT: [[@LINE-1]]:32 -> [[@LINE+4]]:11  : ((0 - 2) - 3)
-  } else {                        // CHECK-NEXT: [[@LINE-2]]:33 -> [[@LINE]]:4     : 1
-    try throwingFn()              // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4   : (1 - 4)
-  }                               // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE+1]]:11  : (((0 - 2) - 3) - 4)
-  return x                        // CHECK-NEXT: [[@LINE-3]]:10 -> [[@LINE-1]]:4   : (((0 - 1) - 2) - 3)
-                                  // CHECK-NEXT: [[@LINE-3]]:21 -> [[@LINE-2]]:4   : ((((0 - 1) - 2) - 3) - 5)
-                                  // CHECK-NEXT: [[@LINE-3]]:4  -> [[@LINE-2]]:11  : ((((0 - 2) - 3) - 4) - 5)
+func test52() throws -> Int {     // CHECK-NEXT: [[@LINE]]:29   -> [[@LINE+9]]:2  : 0
+  let x = if try throwingBool(),  // CHECK-NEXT: [[@LINE]]:14   -> [[@LINE]]:32   : 0
+             try throwingBool() { // CHECK-NEXT: [[@LINE-1]]:32 -> [[@LINE+5]]:11 : (0 - 2)
+    try throwingFn()              // CHECK-NEXT: [[@LINE-1]]:32 -> [[@LINE+4]]:11 : ((0 - 2) - 3)
+  } else {                        // CHECK-NEXT: [[@LINE-2]]:33 -> [[@LINE]]:4    : 1
+    try throwingFn()              // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4  : (1 - 4)
+  }                               // CHECK-NEXT: [[@LINE-2]]:10 -> [[@LINE]]:4    : (((0 - 1) - 2) - 3)
+  return x                        // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4  : ((((0 - 1) - 2) - 3) - 5)
+                                  // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE-1]]:11 : ((((0 - 2) - 3) - 4) - 5)
 }                                 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test53yyKF"
-func test53() throws {     // CHECK-NEXT: [[@LINE]]:22   -> [[@LINE+10]]:2  : 0
-  if try throwingBool(),   // CHECK-NEXT: [[@LINE]]:6    -> [[@LINE]]:24    : 0
-      try throwingBool() { // CHECK-NEXT: [[@LINE-1]]:24 -> [[@LINE+8]]:2   : (0 - 2)
-    try throwingFn()       // CHECK-NEXT: [[@LINE-1]]:25 -> [[@LINE+7]]:2   : ((0 - 2) - 3)
-  } else {                 // CHECK-NEXT: [[@LINE-2]]:26 -> [[@LINE]]:4     : 1
-    try throwingFn()       // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4   : (1 - 4)
-  }                        // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE+4]]:2   : (((0 - 2) - 3) - 4)
-                           // CHECK-NEXT: [[@LINE-3]]:10 -> [[@LINE-1]]:4   : (((0 - 1) - 2) - 3)
-                           // CHECK-NEXT: [[@LINE-3]]:21 -> [[@LINE-2]]:4   : ((((0 - 1) - 2) - 3) - 5)
-                           // CHECK-NEXT: [[@LINE-3]]:4  -> [[@LINE+1]]:2   : ((((0 - 2) - 3) - 4) - 5)
+func test53() throws {     // CHECK-NEXT: [[@LINE]]:22   -> [[@LINE+9]]:2 : 0
+  if try throwingBool(),   // CHECK-NEXT: [[@LINE]]:6    -> [[@LINE]]:24  : 0
+      try throwingBool() { // CHECK-NEXT: [[@LINE-1]]:24 -> [[@LINE+7]]:2 : (0 - 2)
+    try throwingFn()       // CHECK-NEXT: [[@LINE-1]]:25 -> [[@LINE+6]]:2 : ((0 - 2) - 3)
+  } else {                 // CHECK-NEXT: [[@LINE-2]]:26 -> [[@LINE]]:4   : 1
+    try throwingFn()       // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4 : (1 - 4)
+  }                        // CHECK-NEXT: [[@LINE-2]]:10 -> [[@LINE]]:4   : (((0 - 1) - 2) - 3)
+                           // CHECK-NEXT: [[@LINE-2]]:21 -> [[@LINE-1]]:4 : ((((0 - 1) - 2) - 3) - 5)
+                           // CHECK-NEXT: [[@LINE-2]]:4  -> [[@LINE+1]]:2 : ((((0 - 2) - 3) - 4) - 5)
 }                          // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test54SiSgyF"
-func test54()-> Int? {            // CHECK-NEXT: [[@LINE]]:22   -> [[@LINE+7]]:2 : 0
+func test54()-> Int? {            // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+7]]:2 : 0
   if let x = try? throwingFn(),
-      let y = try? throwingFn() { // CHECK-NEXT: [[@LINE]]:33   -> [[@LINE+2]]:4 : 1
-    x + y                         // FIXME: This region is redundant, and not really accurate since we have implicit returns (rdar://118653218)
-  } else {                        // CHECK-NEXT: [[@LINE]]:4    -> [[@LINE+3]]:2 : 0
-    try? throwingFn()             // CHECK-NEXT: [[@LINE-1]]:10 -> [[@LINE+1]]:4 : (0 - 1)
-  }                               // CHECK-NEXT: [[@LINE]]:4    -> [[@LINE+1]]:2 : 0
+      let y = try? throwingFn() { // CHECK-NEXT: [[@LINE]]:33 -> [[@LINE+2]]:4 : 1
+    x + y
+  } else {                        // CHECK-NEXT: [[@LINE]]:10 -> [[@LINE+2]]:4 : (0 - 1)
+    try? throwingFn()
+  }
 }                                 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test55yyKF"
@@ -817,8 +811,8 @@ func test65() throws {       // CHECK-NEXT: [[@LINE]]:22   -> [[@LINE+5]]:2 : 0
                              // CHECK-NEXT: [[@LINE-1]]:29 -> [[@LINE+1]]:2 : (0 - 2)
 }                            // CHECK-NEXT: }
 
-struct TestInit {
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_errors.TestInit.init() -> coverage_errors.TestInit
+struct TestType1 {
+  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_errors.TestType1.init() -> coverage_errors.TestType1
   init() {               // CHECK-NEXT: [[@LINE]]:10 -> [[@LINE+5]]:4 : 0
     do {                 // CHECK-NEXT: [[@LINE]]:8  -> [[@LINE+2]]:6 : 0
       throw SomeErr.Err1
@@ -827,20 +821,33 @@ struct TestInit {
   }                      // CHECK-NEXT: }
 }
 
-struct TestProp {
+@propertyWrapper
+struct Wrapper<T> {
+  var wrappedValue: T
+
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+
+  init(wrappedValue: T, x: T, y: T? = nil) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+struct TestType2 {
   let a = try? throwingFn()
-  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1aSiSgvpfi"
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors9TestType2V1aSiSgvpfi"
   // CHECK-NEXT: [[@LINE-2]]:11 -> [[@LINE-2]]:28 : 0
   // CHECK-NEXT: }
 
   let b = try? (throwingFn(), 0)
-  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1bSi_SitSgvpfi"
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors9TestType2V1bSi_SitSgvpfi"
   // CHECK-NEXT:   [[@LINE-2]]:11 -> [[@LINE-2]]:33 : 0
   // CHECK-NEXT:   [[@LINE-3]]:29 -> [[@LINE-3]]:33 : (0 - 1)
   // CHECK-NEXT: }
 
   let c = try? (throwingFn(), .random() ? 0 : 1)
-  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1cSi_SitSgvpfi"
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors9TestType2V1cSi_SitSgvpfi"
   // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:49 : 0
   // CHECK-NEXT:  [[@LINE-3]]:29 -> [[@LINE-3]]:49 : (0 - 1)
   // CHECK-NEXT:  [[@LINE-4]]:43 -> [[@LINE-4]]:44 : 2
@@ -848,10 +855,71 @@ struct TestProp {
   // CHECK-NEXT: }
 
   let d = (try? (throwingFn(), .random() ? 0 : 1), 0)
-  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors8TestPropV1dSi_SitSg_Sitvpfi"
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors9TestType2V1dSi_SitSg_Sitvpfi"
   // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:54 : 0
   // CHECK-NEXT:  [[@LINE-3]]:30 -> [[@LINE-3]]:50 : (0 - 1)
   // CHECK-NEXT:  [[@LINE-4]]:44 -> [[@LINE-4]]:45 : 2
   // CHECK-NEXT:  [[@LINE-5]]:48 -> [[@LINE-5]]:49 : ((0 - 1) - 2)
   // CHECK-NEXT: }
+}
+
+// rdar://118939162 - Make sure we don't crash when generating coverage for 'try!' in a property wrapper init.
+struct TestType3 {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_errors.TestType3.x
+  // CHECK-NEXT:  [[@LINE+2]]:4 -> [[@LINE+2]]:13 : 0
+  // CHECK-NEXT:  }
+  @Wrapper()
+  var x = try! throwingFn()
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_errors.TestType3.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:28 : 0
+  // CHECK-NEXT:  }
+}
+
+struct TestType4 {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_errors.TestType4.x
+  // CHECK-NEXT:  [[@LINE+2]]:4  -> [[@LINE+2]]:13 : 0
+  // CHECK-NEXT:  }
+  @Wrapper()
+  var x = try! (throwingFn(), 0)
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_errors.TestType4.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:33 : 0
+  // CHECK-NEXT:  [[@LINE-3]]:29 -> [[@LINE-3]]:33 : (0 - 1)
+  // CHECK-NEXT:  }
+}
+
+struct TestType5 {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_errors.TestType5.x
+  // CHECK-NEXT:  [[@LINE+3]]:4  -> [[@LINE+3]]:33 : 0
+  // CHECK-NEXT:  [[@LINE+2]]:32 -> [[@LINE+2]]:33 : (0 - 1)
+  // CHECK-NEXT:  }
+  @Wrapper(x: try! throwingFn())
+  var x = 0
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_errors.TestType5.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:12 : 0
+  // CHECK-NEXT:  }
+}
+
+struct TestType6 {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_errors.TestType6.x
+  // CHECK-NEXT:  [[@LINE+3]]:4  -> [[@LINE+3]]:39 : 0
+  // CHECK-NEXT:  [[@LINE+2]]:32 -> [[@LINE+2]]:39 : (0 - 1)
+  // CHECK-NEXT:  }
+  @Wrapper(x: try! throwingFn(), y: 0)
+  var x = 0
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_errors.TestType6.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:12 : 0
+  // CHECK-NEXT:  }
+}
+
+struct TestType7 {
+  // CHECK-LABEL: sil_coverage_map {{.*}} // property wrapper backing initializer of coverage_errors.TestType7.x
+  // CHECK-NEXT:  [[@LINE+3]]:4  -> [[@LINE+3]]:49 : 0
+  // CHECK-NEXT:  [[@LINE+2]]:33 -> [[@LINE+2]]:49 : (0 - 1)
+  // CHECK-NEXT:  }
+  @Wrapper(x: try! (throwingFn(), 0), y: (0, 0))
+  var x = try! (throwingFn(), 0)
+  // CHECK-LABEL: sil_coverage_map {{.*}} // variable initialization expression of coverage_errors.TestType7.(_x
+  // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:33 : 0
+  // CHECK-NEXT:  [[@LINE-3]]:29 -> [[@LINE-3]]:33 : (0 - 1)
+  // CHECK-NEXT:  }
 }

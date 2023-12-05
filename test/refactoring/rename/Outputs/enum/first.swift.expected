@@ -1,5 +1,5 @@
 enum Foo {
-  case <base>first</base>(<callarg index=0>associated</callarg><callcolon index=0>: </callcolon>Int)
+  case <base>first</base>(<arglabel index=0>associated</arglabel><param index=0></param>: Int)
   case second
 }
 

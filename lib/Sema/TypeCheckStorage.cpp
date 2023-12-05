@@ -1641,14 +1641,13 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   Tmp1DRE->setType(Tmp1VD->getTypeInContext());
   auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
                                       /*implicit*/true);
-
+  auto *ReturnBranch = BraceStmt::createImplicit(Ctx, {Return});
 
   // Build the "if" around the early return.
-  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(),
-                                  SourceLoc(), Ctx.AllocateCopy(Cond), Return,
-                                  /*elseloc*/SourceLoc(), /*else*/nullptr,
-                                  /*implicit*/ true));
-
+  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(), SourceLoc(),
+                                  Ctx.AllocateCopy(Cond), ReturnBranch,
+                                  /*elseloc*/ SourceLoc(),
+                                  /*else*/ nullptr, /*implicit*/ true));
 
   auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                    SourceLoc(), Ctx.getIdentifier("tmp2"),

@@ -37,8 +37,8 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
   if (ComponentIndex == 0) {
     // We are completing on the root and need to extract the key path's root
     // type.
-    if (KeyPath->getRootType()) {
-      BaseType = S.getResolvedType(KeyPath->getRootType());
+    if (auto *rootTy = KeyPath->getExplicitRootType()) {
+      BaseType = S.getResolvedType(rootTy);
     } else {
       // The key path doesn't have a root TypeRepr set, so we can't look the key
       // path's root up through it. Build a constraint locator and look the

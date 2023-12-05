@@ -203,3 +203,33 @@ precedencegroup Precedence2 {
   associativity: left
   assignment: true
 }
+
+struct TestStruct {
+  func method(arg: Int, _ c: Int) {}
+
+  func test() {
+    _ = method(arg:_:)
+    _ = self.method(arg:_:)
+  }
+
+// FIXME: Compute 'static' location
+//  static var shared = TestStruct()
+//  func testUnresolvedMember1() -> Self {
+//    return .shared
+//  }
+//
+// FIXME: Compute 'static' location
+//  static func instance(arg: Int) -> TestStruct { return TestStruct() }
+//  func testUnresolvedMember2() -> Self {
+//    return .instance(arg:)(12)
+//  }
+}
+
+func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
+  _ = arg1 + arg2()
+  _ = arg3 as? Int ?? 31 as Int
+  _ = false ? arg2() : Int(1)
+  _ = [() -> Int]()
+  _ = [@Sendable () -> Int]().count +  [any Collection]().count
+  _ = arg3 is Double || !(arg3 is Int, 0).0
+}

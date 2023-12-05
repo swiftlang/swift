@@ -32,7 +32,7 @@ REFACTORING(FindLocalRenameRanges, "Find Local Rename Ranges", rename.local.find
 
 /// Find and rename all occurrences of the file-local symbol at a given
 /// location.
-CURSOR_REFACTORING(LocalRename, "Local Rename", rename.local)
+REFACTORING(LocalRename, "Local Rename", rename.local)
 
 CURSOR_REFACTORING(FillProtocolStub, "Add Missing Protocol Requirements", fillstub)
 

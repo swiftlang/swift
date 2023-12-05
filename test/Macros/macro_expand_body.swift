@@ -16,8 +16,8 @@ macro Remote() = #externalMacro(module: "MacroDefinition", type: "RemoteBodyMacr
 @attached(preamble)
 macro Traced() = #externalMacro(module: "MacroDefinition", type: "TracedPreambleMacro")
 
-@attached(preamble)
-macro Log2() = #externalMacro(module: "MacroDefinition", type: "Log2PreambleMacro")
+@attached(preamble, names: named(logger))
+macro Logged() = #externalMacro(module: "MacroDefinition", type: "LoggerMacro")
 
 protocol ConjureRemoteValue {
   static func conjureValue() -> Self
@@ -27,36 +27,53 @@ extension String: ConjureRemoteValue {
   static func conjureValue() -> String { "" }
 }
 
+struct Logger {
+  func log(entering function: String) {
+    print("Logger entering \(function)")
+  }
+
+  func log(_ message: String) {
+    print("--- \(message)")
+  }
+
+  func log(exiting function: String) {
+    print("Logger exiting \(function)")
+  }
+}
+
+func log(_ message: String) {
+  print(message)
+}
+
 @available(SwiftStdlib 5.1, *)
 func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String: Any]) async throws -> Result {
-  let printedArgs = arguments.keys.sorted().map { key in 
+  let printedArgs = arguments.keys.sorted().map { key in
     "\(key): \(arguments[key]!)"
   }.joined(separator: ", ")
   print("Remote call \(function)(\(printedArgs))")
   return Result.conjureValue()
 }
 
-func log(_ value: String) {
-  print(value)
-}
-
-func log2(_ value: String) {
-  print("log2(\(value))")
-}
+@available(SwiftStdlib 5.1, *)
+@Remote
+func f(a: Int, b: String) async throws -> String
 
 @Traced
 func doubleTheValue(value: Int) -> Int {
   return value * 2
 }
 
-@available(SwiftStdlib 5.1, *)
-@Remote
-func f(a: Int, b: String) async throws -> String
+@Logged
+func useLogger() {
+  let x = 1
+  logger.log("use it")
+  print(x)
+}
 
 @available(SwiftStdlib 5.1, *)
 @Remote
 @Traced
-@Log2
+@Logged
 func g(a: Int, b: String) async throws -> String {
   doesNotTypeCheck()
 }
@@ -80,9 +97,14 @@ if #available(SwiftStdlib 5.1, *) {
   print(try await f(a: 5, b: "Hello"))
 
   // CHECK: Entering g(a: 5, b: World)
-  // CHECK: log2(Entering g(a: 5, b: World))
+  // CHECK: Logger entering g(a: 5, b: World)
   // CHECK: Remote call g(a: 5, b: World)
-  // CHECK: log2(Exiting g(a:b:))
+  // CHECK: Logger exiting g(a:b:)
   // CHECK: Exiting g(a:b:)
   print(try await g(a: 5, b: "World"))
 }
+
+// CHECK: Logger entering useLogger()
+// CHECK: --- use it
+// CHECK: Logger exiting useLogger()
+useLogger()
