@@ -471,8 +471,16 @@ void BindingSet::inferTransitiveBindings(
                 if (bindings.isDelayed())
                   continue;
 
+                // Copy the bindings over to the root.
                 for (const auto &binding : bindings.Bindings)
                   addBinding(binding);
+
+                // Make a note that the key path root is transitively adjacent
+                // to contextual root type variable and all of its variables.
+                // This is important for ranking.
+                AdjacentVars.insert(contextualRootVar);
+                AdjacentVars.insert(bindings.AdjacentVars.begin(),
+                                    bindings.AdjacentVars.end());
               }
             } else {
               addBinding(

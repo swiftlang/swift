@@ -62,3 +62,23 @@ class FilteringTest {
              .assign(to: \.innerController, on: viewController) // Ok
   }
 }
+
+extension Sequence {
+  func sorted<T: Comparable>(by keyPath: KeyPath<Element, T>) -> [Element] {
+    []
+  }
+}
+
+func testCollectionUpcastWithTupleLabelErasure() {
+  struct Item {}
+
+  enum Info : Int, Hashable {
+    case one = 1
+  }
+
+
+  func test(data: [Info: [Item]]) -> [(Info, [Item])] {
+    data.map { $0 }
+        .sorted(by: \.key.rawValue) // Ok
+  }
+}
