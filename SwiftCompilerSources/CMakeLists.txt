@@ -157,6 +157,7 @@ function(add_swift_compiler_modules_library name)
 
   set(all_obj_files)
   set(all_module_targets)
+  set(all_module_files)
   get_property(modules GLOBAL PROPERTY "swift_compiler_modules")
   foreach(module ${modules})
 
@@ -180,7 +181,7 @@ function(add_swift_compiler_modules_library name)
 
     set(module_obj_file "${build_dir}/${module}.o")
     set(module_file "${build_dir}/${module}.swiftmodule")
-    set_property(TARGET ${module_target} PROPERTY "module_file" "${module_file}")
+    list(APPEND all_module_files ${module_file})
 
     set(all_obj_files ${all_obj_files} ${module_obj_file})
     set(c_include_paths
@@ -231,6 +232,19 @@ function(add_swift_compiler_modules_library name)
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+
+  # Downstream linking should include the swiftmodule in debug builds to allow lldb to
+  # work correctly. Only do this on Darwin since neither gold (currently used by default
+  # on Linux), nor the default Windows linker 'link' support '-add_ast_path'.
+  is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
+  if(debuginfo AND SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    set(public_link_flags)
+    foreach(module_file ${all_module_files})
+      list(APPEND public_link_flags "SHELL:-Xlinker -add_ast_path -Xlinker ${module_file}")
+    endforeach()
+    target_link_options(${name} PUBLIC ${public_link_flags})
+  endif()
+
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
 endfunction()
 
