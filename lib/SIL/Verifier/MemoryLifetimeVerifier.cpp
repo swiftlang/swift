@@ -47,13 +47,14 @@ class MemoryLifetimeVerifier {
   /// alloc_stack memory locations which are used for store_borrow.
   Bits storeBorrowLocations;
 
-  /// Returns true if the enum location \p locIdx can be proven to hold a
-  /// hold a trivial value (e non-payload case) at \p atInst.
-  bool isEnumTrivialAt(int locIdx, SILInstruction *atInst);
+  /// Returns true if the location \p locIdx can be proven to hold a
+  /// hold a trivial value (e.g. non-payload case or thin function) at
+  /// \p atInst.
+  bool isValueTrivialAt(int locIdx, SILInstruction *atInst);
 
   /// Returns true if an instruction in the range between \p start and \p end
   /// stores a trivial enum case into the enum location \p loc.
-  bool storesTrivialEnum(int locIdx,
+  bool storesTrivialValue(int locIdx,
                          SILBasicBlock::reverse_iterator start,
                          SILBasicBlock::reverse_iterator end);
 
@@ -69,7 +70,7 @@ class MemoryLifetimeVerifier {
 
   /// Issue an error if any bit in \p wrongBits is set.
   void require(const Bits &wrongBits, const Twine &complaint,
-               SILInstruction *where, bool excludeTrivialEnums = false);
+               SILInstruction *where, bool excludeTrivialValues = false);
 
   /// Require that all the subLocation bits of the location, associated with
   /// \p addr, are clear in \p bits.
@@ -149,7 +150,7 @@ public:
   void verify();
 };
 
-bool MemoryLifetimeVerifier::isEnumTrivialAt(int locIdx,
+bool MemoryLifetimeVerifier::isValueTrivialAt(int locIdx,
                                              SILInstruction *atInst) {
   SILBasicBlock *startBlock = atInst->getParent();
   
@@ -158,7 +159,7 @@ bool MemoryLifetimeVerifier::isEnumTrivialAt(int locIdx,
   while (SILBasicBlock *block = worklist.pop()) {
     auto start = (block == atInst->getParent() ? atInst->getReverseIterator()
                                                : block->rbegin());
-    if (storesTrivialEnum(locIdx, start, block->rend())) {
+    if (storesTrivialValue(locIdx, start, block->rend())) {
       // Stop at trivial stores to the enum.
       continue;
     }
@@ -191,21 +192,25 @@ static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
   return elemType.isEmpty(*function);
 }
 
-bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
+bool MemoryLifetimeVerifier::storesTrivialValue(int locIdx,
                         SILBasicBlock::reverse_iterator start,
                         SILBasicBlock::reverse_iterator end) {
   for (SILInstruction &inst : make_range(start, end)) {
     if (auto *IEI = dyn_cast<InjectEnumAddrInst>(&inst)) {
       const Location *loc = locations.getLocation(IEI->getOperand());
       if (loc && loc->isSubLocation(locIdx))
-        return isTrivialEnumElem(IEI->getElement(), IEI->getOperand()->getType(),
+        return isTrivialEnumElem(IEI->getElement(),
+                                 IEI->getOperand()->getType(),
                                  function);
     }
     if (auto *SI = dyn_cast<StoreInst>(&inst)) {
       const Location *loc = locations.getLocation(SI->getDest());
-      if (loc && loc->isSubLocation(locIdx) &&
-          SI->getSrc()->getType().isOrHasEnum()) {
-        return SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
+      if (loc && loc->isSubLocation(locIdx)) {
+        auto ty = SI->getSrc()->getType();
+        if (ty.isOrHasEnum() || ty.isFunction()) {
+          return
+            SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
+        }
       }
     }
   }
@@ -256,7 +261,7 @@ void MemoryLifetimeVerifier::require(const Bits &wrongBits,
                                 bool excludeTrivialEnums) {
   for (int errorLocIdx = wrongBits.find_first(); errorLocIdx >= 0;
        errorLocIdx = wrongBits.find_next(errorLocIdx)) {
-    if (!excludeTrivialEnums || !isEnumTrivialAt(errorLocIdx, where))
+    if (!excludeTrivialEnums || !isValueTrivialAt(errorLocIdx, where))
       reportError(complaint, errorLocIdx, where);
   }
 }
