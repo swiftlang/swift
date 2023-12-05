@@ -31,6 +31,13 @@ public extension Eq where Self: Equatable {
   }
 }
 
+/// MARK: Iteration
+
+public protocol Generator: ~Copyable {
+  associatedtype Element: ~Copyable
+  func next() -> Element
+}
+
 
 public struct Vector<T: ~Copyable> {
 

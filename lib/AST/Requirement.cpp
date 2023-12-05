@@ -260,57 +260,54 @@ InvertibleProtocolKind InverseRequirement::getKind() const {
   return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
 }
 
-
 void InverseRequirement::enumerateDefaultedParams(
-    TypeDecl *decl,
+    GenericContext *genericContext,
     SmallVectorImpl<Type> &result) {
 
   auto add = [&](Type t) {
-    assert(t->is<GenericTypeParamType>() || t->is<DependentMemberType>());
+    assert(t->isTypeParameter());
     result.push_back(t);
   };
 
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+  // Nothing to enumerate if it's not generic.
+  if (!genericContext->isGeneric())
+    return;
+
+  if (auto proto = dyn_cast<ProtocolDecl>(genericContext)) {
     add(proto->getSelfInterfaceType());
 
     for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
       add(assocTypeDecl->getDeclaredInterfaceType());
 
-  } else if (auto gtd = dyn_cast<GenericTypeDecl>(decl)) {
-    for (GenericTypeParamDecl *gtpd : *gtd->getGenericParams())
-      add(gtpd->getDeclaredInterfaceType());
-
-  } else if (auto gtpd = dyn_cast<GenericTypeParamDecl>(decl)) {
-    add(gtpd->getDeclaredInterfaceType());
+    return;
   }
+
+  for (GenericTypeParamDecl *gtpd : *genericContext->getGenericParams())
+    add(gtpd->getDeclaredInterfaceType());
 }
 
-void InverseRequirement::expandDefault(
-    Type gp,
-    SourceLoc loc,
-    SmallVectorImpl<StructuralRequirement> &result) {
-  auto &ctx = gp->getASTContext();
-
-  for (auto ip : InvertibleProtocolSet::full()) {
-    auto protoTy =
-        ctx.getProtocol(getKnownProtocolKind(ip))->getDeclaredInterfaceType();
-    result.push_back({
-      { RequirementKind::Conformance, gp, protoTy },
-       loc,
-       /*inferred=*/true,
-       /*default=*/true,
-    });
-  }
+InvertibleProtocolSet InverseRequirement::expandDefault(Type gp) {
+  assert(gp->isTypeParameter());
+  return InvertibleProtocolSet::full();
 }
 
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
-
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return;
 
-  for (auto gp : gps)
-    InverseRequirement::expandDefault(gp, SourceLoc(), result);
+  for (auto gp : gps) {
+    auto protos = InverseRequirement::expandDefault(gp);
+    for (auto ip : protos) {
+      auto protoTy =
+          ctx.getProtocol(getKnownProtocolKind(ip))->getDeclaredInterfaceType();
+      result.push_back({{RequirementKind::Conformance, gp, protoTy},
+                        SourceLoc(),
+                        /*inferred=*/true,
+                        /*default=*/true,
+                       });
+    }
+  }
 }
