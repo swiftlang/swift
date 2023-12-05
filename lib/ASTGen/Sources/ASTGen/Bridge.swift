@@ -129,3 +129,85 @@ extension BridgedStringRef {
     return self.data == nil && self.count == 0
   }
 }
+
+extension SyntaxProtocol {
+  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
+  ///
+  /// - Parameter astgen: The visitor providing the source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
+  @inline(__always)
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
+    astgen.generateSourceLoc(self)
+  }
+}
+
+extension Optional where Wrapped: SyntaxProtocol {
+  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`.
+  ///
+  /// - Parameter astgen: The visitor providing the source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
+  @inline(__always)
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
+    astgen.generateSourceLoc(self)
+  }
+}
+
+extension TokenSyntax {
+  /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
+  ///
+  /// - Parameter astgen: The visitor providing the `ASTContext`.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifier(token:)")
+  @inline(__always)
+  func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
+    astgen.generateIdentifier(self)
+  }
+
+  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// source buffer provided by `astgen`.
+  ///
+  /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
+  @inline(__always)
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
+    astgen.generateIdentifierAndSourceLoc(self)
+  }
+
+  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// source buffer provided by `astgen`.
+  ///
+  /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
+  @inline(__always)
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> BridgedLocatedIdentifier {
+    astgen.generateLocatedIdentifier(self)
+  }
+}
+
+extension Optional<TokenSyntax> {
+  /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
+  ///
+  /// - Parameter astgen: The visitor providing the `ASTContext`.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifier(token:)")
+  @inline(__always)
+  func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
+    astgen.generateIdentifier(self)
+  }
+
+  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// source buffer provided by `astgen` excluding leading trivia.
+  ///
+  /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
+  @inline(__always)
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
+    astgen.generateIdentifierAndSourceLoc(self)
+  }
+}
+
+extension BridgedSourceRange {
+  @available(*, deprecated, message: "use ASTContext.bridgedSourceRange(startToken:endToken:)")
+  @inline(__always)
+  init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
+    self = astgen.generateSourceRange(start: startToken, end: endToken)
+  }
+}
