@@ -274,30 +274,32 @@ operator()(CanType dependentType, Type conformingReplacementType,
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module, Type substBase) {
-  return substBaseType(substBase, LookUpConformanceInModule(module));
+  return substBaseType(substBase, LookUpConformanceInModule(module), llvm::None);
 }
 
 Type DependentMemberType::substBaseType(Type substBase,
-                                        LookupConformanceFn lookupConformance) {
+                                        LookupConformanceFn lookupConformance,
+                                        SubstOptions options) {
   if (substBase.getPointer() == getBase().getPointer() &&
       substBase->hasTypeParameter())
     return this;
 
-  InFlightSubstitution IFS(nullptr, lookupConformance, llvm::None);
+  InFlightSubstitution IFS(nullptr, lookupConformance, options);
   return getMemberForBaseType(IFS, getBase(), substBase,
                               getAssocType(), getName(),
                               /*level=*/0);
 }
 
 Type DependentMemberType::substRootParam(Type newRoot,
-                                         LookupConformanceFn lookupConformance){
+                                         LookupConformanceFn lookupConformance,
+                                         SubstOptions options) {
   auto base = getBase();
   if (base->is<GenericTypeParamType>()) {
-    return substBaseType(newRoot, lookupConformance);
+    return substBaseType(newRoot, lookupConformance, options);
   }
   if (auto depMem = base->getAs<DependentMemberType>()) {
-    return substBaseType(depMem->substRootParam(newRoot, lookupConformance),
-                         lookupConformance);
+    return substBaseType(depMem->substRootParam(newRoot, lookupConformance, options),
+                         lookupConformance, options);
   }
   return Type();
 }
