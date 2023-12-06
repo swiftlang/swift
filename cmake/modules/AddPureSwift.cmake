@@ -57,6 +57,10 @@ function(_add_host_swift_compile_options name)
 
   target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
   _add_host_variant_swift_sanitizer_flags(${name})
+
+  target_compile_options(${name} PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
+  )
 endfunction()
 
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)

@@ -99,6 +99,7 @@ function(add_swift_compiler_modules_library name)
                         ${ARGN})
 
   set(swift_compile_options
+      "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
       "-Xfrontend" "-enable-experimental-cxx-interop"
       "-Xfrontend" "-disable-target-os-checking"
