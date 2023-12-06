@@ -957,6 +957,8 @@ public:
 
   bool ignoreInDebugInfo() const override { return true; }
   
+  DeclAttribute *getDeclAttr() const { return attr; }
+
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
