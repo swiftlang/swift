@@ -146,6 +146,26 @@ func throwsDifferentFromEnclosing() throws(Foo) {
   throw Foo()
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws17forceTryDifferentyyAA7MyErrorOYKF
+func forceTryDifferent() throws(MyError) {
+  // CHECK: try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK: [[NORMAL_BB]]([[RESULT:%.*]] : $()):
+  // CHECK: return
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : $MyBigError):
+  // CHECK-NEXT: unreachable
+  try! throwsMyBigError()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws20optionalTryDifferentyyAA7MyErrorOYKF
+func optionalTryDifferent() throws(MyError) {
+  // CHECK: try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK: [[NORMAL_BB]]([[RESULT:%.*]] : $()):
+  // CHECK: br
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : $MyBigError):
+  // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
+  try? throwsMyBigError()
+}
+
 
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]

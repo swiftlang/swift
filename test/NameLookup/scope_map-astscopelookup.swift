@@ -209,7 +209,7 @@ func HasLabeledDo() {
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
 // CHECK-EXPANDED: ***Complete scope map***
-// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, [1:1 - 480:1] '{{.*}}scope_map-astscopelookup.swift'
+// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, [1:1 - 481:1] '{{.*}}scope_map-astscopelookup.swift'
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [5:1 - 7:1] 'S0'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [5:11 - 7:1] 'S0'
 // CHECK-EXPANDED-NEXT:     `-NominalTypeDeclScope {{.*}}, [6:3 - 6:19] 'InnerC0'
@@ -317,7 +317,8 @@ func HasLabeledDo() {
 // CHECK-EXPANDED-NEXT:                     |-ForEachStmtScope {{.*}}, [80:3 - 82:3] 
 // CHECK-EXPANDED-NEXT:                       `-ForEachPatternScope, [80:52 - 82:3] 
 // CHECK-EXPANDED-NEXT:                     |-DoCatchStmtScope {{.*}}, [84:3 - 88:3] 
-// CHECK-EXPANDED-NEXT:                       |-BraceStmtScope {{.*}}, [84:6 - 86:3] 
+// CHECK-EXPANDED-NEXT:                       |-BraceStmtScope {{.*}}, [84:6 - 86:3]
+// CHECK-EXPANDED-NEXT:                       `-TryScope {{.*}}, [85:5 - 85:18]
 // CHECK-EXPANDED-NEXT:                       |-CaseStmtScope {{.*}}, [86:5 - 87:3] 
 // CHECK-EXPANDED-NEXT:                         `-CaseLabelItemScope, [86:37 - 86:51] 
 // CHECK-EXPANDED-NEXT:                       `-CaseStmtScope {{.*}}, [87:5 - 88:3] 
@@ -396,8 +397,8 @@ func HasLabeledDo() {
 // CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [160:12 - 160:22] 
 // CHECK-EXPANDED-NEXT:       `-ClosureParametersScope {{.*}}, [162:10 - 162:19] 
 // CHECK-EXPANDED-NEXT:         `-BraceStmtScope {{.*}}, [162:10 - 162:19] 
-// CHECK-EXPANDED-NEXT: `-TopLevelCodeScope {{.*}}, [165:1 - 480:1] 
-// CHECK-EXPANDED-NEXT:   `-BraceStmtScope {{.*}}, [165:1 - 480:1] 
+// CHECK-EXPANDED-NEXT: `-TopLevelCodeScope {{.*}}, [165:1 - 481:1] 
+// CHECK-EXPANDED-NEXT:   `-BraceStmtScope {{.*}}, [165:1 - 481:1] 
 // CHECK-EXPANDED-NEXT:     |-ClosureParametersScope {{.*}}, [165:1 - 165:14] 
 // CHECK-EXPANDED-NEXT:       `-BraceStmtScope {{.*}}, [165:1 - 165:14] 
 // CHECK-EXPANDED-NEXT:     |-AbstractFunctionDeclScope {{.*}}, [167:1 - 176:1] 'defaultArguments(i:j:)'

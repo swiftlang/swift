@@ -170,3 +170,9 @@ func testDoCatchExplicitTyped() {
   do throws(HomeworkError) { // expected-error{{a 'do' statement with a 'throws' clause must have at least one 'catch'}}
   }
 }
+
+func tryBangQuestionMismatchingContext() throws(MyError) {
+  try! doHomework()
+  try? doHomework()
+  try doHomework() // expected-error{{thrown expression type 'HomeworkError' cannot be converted to error type 'MyError'}}
+}
