@@ -11,31 +11,31 @@
 #===-----------------------------------------------------------------------===//
 
 atomicTypes = [
-  # Swift               Size   Alignment  Builtin
-  ("UInt8",   "8",   "1",       "Builtin.Int8"),
-  ("UInt16",  "16",  "2",       "Builtin.Int16"),
-  ("UInt32",  "32",  "4",       "Builtin.Int32"),
-  ("UInt64",  "64",  "8",       "Builtin.Int64"),
-  ("WordPair", "128", "16",      "Builtin.Int128"),
+  # Name                   Size   Alignment  Builtin           Swift Type
+  ("_Atomic8BitStorage",   "8",   "1",       "Builtin.Int8",   "UInt8"),
+  ("_Atomic16BitStorage",  "16",  "2",       "Builtin.Int16",  "UInt16"),
+  ("_Atomic32BitStorage",  "32",  "4",       "Builtin.Int32",  "UInt32"),
+  ("_Atomic64BitStorage",  "64",  "8",       "Builtin.Int64",  "UInt64"),
+
+  # Note: WordPair only on 64 bit platforms.
+  ("_Atomic128BitStorage", "128", "16",      "Builtin.Int128", "WordPair"),
 ]
 
 intTypes = [
-  # Swift   Storage Type   Builtin
-  ("Int8",  "UInt8",       "Int8"),
-  ("Int16", "UInt16",      "Int16"),
-  ("Int32", "UInt32",      "Int32"),
-  ("Int64", "UInt64",      "Int64"),
+  # Swift    Storage Type           Builtin
+  ("Int8",   "_Atomic8BitStorage",  "Int8"),
+  ("Int16",  "_Atomic16BitStorage", "Int16"),
+  ("Int32",  "_Atomic32BitStorage", "Int32"),
+  ("Int64",  "_Atomic64BitStorage", "Int64"),
 
   # We handle the word type's storage in source.
-  ("Int",    "",           "Word"),
-  ("UInt",   "",           "Word"),
+  ("Int",    "",                    ""),
+  ("UInt",   "",                    ""),
 
-  # We handle the unsigned integer's storage as the canonical storage types in
-  # AtomicStorage.swift.gyb.
-  ("UInt8",  "",           "Int8"),
-  ("UInt16", "",           "Int16"),
-  ("UInt32", "",           "Int32"),
-  ("UInt64", "",           "Int64"),
+  ("UInt8",  "_Atomic8BitStorage",  "Int8"),
+  ("UInt16", "_Atomic16BitStorage", "Int16"),
+  ("UInt32", "_Atomic32BitStorage", "Int32"),
+  ("UInt64", "_Atomic64BitStorage", "Int64"),
 ]
 
 loadOrderings = [

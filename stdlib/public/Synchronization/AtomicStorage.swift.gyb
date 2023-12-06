@@ -14,37 +14,32 @@ import Builtin
 
 % from SwiftAtomics import *
 
-% for (type, size, alignment, builtin) in atomicTypes:
+% for (type, size, alignment, builtin, swift) in atomicTypes:
 
 //===----------------------------------------------------------------------===//
 // ${size} bit Atomic Storage
 //===----------------------------------------------------------------------===//
 
-% if type == "WordPair":
 @available(SwiftStdlib 5.11, *)
-% end
-extension ${type} {
-  /// The storage representation type that `Self` encodes to and decodes from
-  /// which is a suitable type when used in atomic operations.
-  @available(SwiftStdlib 5.11, *)
-  @_alignment(${alignment})
-  @frozen
-  public struct AtomicRepresentation {
-    public var _storage: ${builtin}
+@frozen
+@_alignment(${alignment})
+public struct ${type} {
+  public var _storage: ${builtin}
 
-    @available(SwiftStdlib 5.11, *)
-    @_alwaysEmitIntoClient
-    @_transparent
-    public init(_ _builtin: ${builtin}) {
-      self._storage = _builtin
-    }
+  @available(SwiftStdlib 5.11, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public init(_ _builtin: ${builtin}) {
+    self._storage = _builtin
   }
 }
 
-// ${size} bit atomic loads
+//===----------------------------------------------------------------------===//
+// ${size} bit atomic load
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
+extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Atomically loads and returns the current value, applying the specified
   /// memory ordering.
   ///
@@ -69,10 +64,12 @@ extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentatio
   }
 }
 
-// ${size} bit atomic stores
+//===----------------------------------------------------------------------===//
+// ${size} bit atomic store
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
+extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Atomically sets the current value to `desired`, applying the specified
   /// memory ordering.
   ///
@@ -101,10 +98,12 @@ extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentatio
   }
 }
 
+//===----------------------------------------------------------------------===//
 // ${size} bit atomic exchanges
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
+extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Atomically sets the current value to `desired` and returns the original
   /// value, applying the specified memory ordering.
   ///
@@ -137,10 +136,12 @@ extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentatio
   }
 }
 
-// ${size} bit atomic compare and exchanges
+//===----------------------------------------------------------------------===//
+// ${size} bit atomic compare exchanges
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
+extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic compare and exchange operation on the current value,
   /// applying the specified memory ordering.
   ///
@@ -181,7 +182,7 @@ extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentatio
 }
 
 @available(SwiftStdlib 5.11, *)
-extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
+extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic compare and exchange operation on the current value,
   /// applying the specified success/failure memory orderings.
   ///
@@ -246,10 +247,12 @@ extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentatio
   }
 }
 
-// ${size} bit atomic weak compare and exchanges
+//===----------------------------------------------------------------------===//
+// ${size} bit weak compare exchanges
+//===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
+extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic weak compare and exchange operation on the current
   /// value, applying the memory ordering. This compare-exchange variant is
   /// allowed to spuriously fail; it is designed to be called in a loop until
@@ -299,7 +302,7 @@ extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentatio
 }
 
 @available(SwiftStdlib 5.11, *)
-extension Atomic where Value.AtomicRepresentation == ${type}.AtomicRepresentation {
+extension Atomic where Value.AtomicRepresentation == ${type} {
   /// Perform an atomic weak compare and exchange operation on the current
   /// value, applying the specified success/failure memory orderings. This
   /// compare-exchange variant is allowed to spuriously fail; it is designed to

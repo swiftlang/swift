@@ -31,16 +31,16 @@ extension ${intType}: AtomicValue {
 %   if intType == "Int" or intType == "UInt":
 #if _pointerBitWidth(_64)
   @available(SwiftStdlib 5.11, *)
-  public typealias AtomicRepresentation = UInt64.AtomicRepresentation
+  public typealias AtomicRepresentation = _Atomic64BitStorage
 #elseif _pointerBitWidth(_32)
   @available(SwiftStdlib 5.11, *)
-  public typealias AtomicRepresentation = UInt32.AtomicRepresentation
+  public typealias AtomicRepresentation = _Atomic32BitStorage
 #else
 #error("Unsupported platform")
 #endif
-%   elif not intType.startswith("U"):
+%   else:
   @available(SwiftStdlib 5.11, *)
-  public typealias AtomicRepresentation = ${intStorage}.AtomicRepresentation
+  public typealias AtomicRepresentation = ${intStorage}
 %   end
 
   /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage

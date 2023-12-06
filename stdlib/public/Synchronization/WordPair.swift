@@ -66,7 +66,17 @@ public struct WordPair {
 
 @available(SwiftStdlib 5.11, *)
 extension WordPair: AtomicValue {
-  // WordPair's AtomicRepresentation is defined in AtomicStorage.swift.gyb.
+#if _pointerBitWidth(_64)
+  /// The storage representation type that `Self` encodes to and decodes from
+  /// which is a suitable type when used in atomic operations.
+  public typealias AtomicRepresentation = _Atomic128BitStorage
+#elseif _pointerBitWidth(_32)
+  /// The storage representation type that `Self` encodes to and decodes from
+  /// which is a suitable type when used in atomic operations.
+  public typealias AtomicRepresentation = _Atomic64BitStorage
+#else
+#error("Unsupported platform")
+#endif
 
   /// Destroys a value of `Self` and prepares an `AtomicRepresentation` storage
   /// type to be used for atomic operations.
