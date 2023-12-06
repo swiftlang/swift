@@ -2346,15 +2346,16 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     attr->setInvalid();
   }
 
-  diagnose(attr->getLocation(),
-           diag::attr_ApplicationMain_deprecated,
-           applicationMainKind)
-    .warnUntilSwiftVersion(6);
+  if (C.LangOpts.hasFeature(Feature::DeprecateApplicationMain)) {
+    diagnose(attr->getLocation(),
+             diag::attr_ApplicationMain_deprecated,
+             applicationMainKind)
+      .warnUntilSwiftVersion(6);
 
-  diagnose(attr->getLocation(),
-           diag::attr_ApplicationMain_deprecated_use_attr_main)
-    .fixItReplace(attr->getRange(), "@main");
-
+    diagnose(attr->getLocation(),
+             diag::attr_ApplicationMain_deprecated_use_attr_main)
+      .fixItReplace(attr->getRange(), "@main");
+  }
 
   if (attr->isInvalid())
     return;
