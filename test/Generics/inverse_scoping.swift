@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonEscapableTypes
 
 // REQUIRES: asserts
 
@@ -23,7 +23,11 @@ extension U where Self: ~Copyable {} // expected-error {{cannot add inverse cons
 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
 extension P {
-  func g() where Self: ~Copyable {} // expected-error {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
+  func g() where Self: ~Copyable, // expected-error {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
+                                  // FIXME: why no similar 2nd error as Escapable here on Self?
+
+                 Self: ~Escapable {}  // expected-error {{cannot add inverse constraint 'Self: ~Escapable' on generic parameter 'Self' defined in outer scope}}
+                                      // expected-error@-1 {{'Self' required to be 'Escapable' but is marked with '~Escapable'}}
 
   typealias Me = Self where Self: ~Copyable // expected-error {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
 
@@ -41,6 +45,12 @@ struct S<T> {
           {}
 
   func onlyCopyable() where T: Copyable {}
+
+    func fn<U>(_ u: U)
+      where T: ~Escapable, // expected-error {{cannot add inverse constraint 'T: ~Escapable' on generic parameter 'T' defined in outer scope}}
+                           // expected-error@-1 {{'T' required to be 'Escapable' but is marked with '~Escapable'}}
+            U: ~Escapable
+            {}
 }
 
 extension S where T: NoCopyReq & ~Copyable {} // expected-error {{cannot add inverse constraint 'T: ~Copyable' on generic parameter 'T' defined in outer scope}}

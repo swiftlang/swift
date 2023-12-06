@@ -161,7 +161,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
       auto inverse = error.getInverse();
       auto protoKind = getKnownProtocolKind(inverse.getKind());
 
-      ctx.Diags.diagnose(loc, diag::noncopyable_generic_but_copyable,
+      ctx.Diags.diagnose(loc, diag::inverse_generic_but_also_conforms,
                          inverse.subject,
                          getProtocolName(protoKind));
       break;

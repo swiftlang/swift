@@ -2680,19 +2680,12 @@ private:
     /// Whether this declaration produces an implicitly unwrapped
     /// optional result.
     unsigned isIUO : 1;
-
-    /// Whether the "isEscapable" bit has been computed yet.
-    unsigned isEscapable : 1;
-
-    /// Whether this declaration is escapable.
-    unsigned isEscapableComputed : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
-  friend class IsEscapableRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
@@ -2980,9 +2973,6 @@ public:
   /// Is this declaration 'final'?
   bool isFinal() const;
 
-  /// Is this declaration escapable?
-  bool isEscapable() const;
-
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
@@ -3190,8 +3180,12 @@ public:
   /// Type if it `isNoncopyable` instead of using this.
   bool canBeNoncopyable() const;
 
-  /// Determine how the ~Copyable was applied to this TypeDecl, if at all.
-  InverseMarking getNoncopyableMarking() const;
+  /// Is this declaration escapable?
+  bool isEscapable() const;
+
+  /// Determine how the given invertible protocol was written on this TypeDecl,
+  /// if at all.
+  InverseMarking getMarking(InvertibleProtocolKind ip) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&

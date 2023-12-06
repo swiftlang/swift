@@ -122,6 +122,11 @@ KnownProtocolKind swift::getKnownProtocolKind(InvertibleProtocolKind ip) {
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const InvertibleProtocolKind &value) {
+  out << getProtocolName(getKnownProtocolKind(value));
+}
+
 namespace {
 enum class SearchPathKind : uint8_t {
   Import = 1 << 0,
@@ -6241,6 +6246,9 @@ BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
     buildFakeExtension(proto);
 
   if (auto *proto = getProtocol(KnownProtocolKind::Copyable))
+    buildFakeExtension(proto);
+
+  if (auto *proto = getProtocol(KnownProtocolKind::Escapable))
     buildFakeExtension(proto);
 
   return result;

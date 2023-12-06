@@ -4348,6 +4348,9 @@ namespace {
         case InvertibleProtocolKind::Copyable:
           printFlag("inverse_copyable");
           break;
+        case InvertibleProtocolKind::Escapable:
+          printFlag("inverse_escapable");
+          break;
         }
       }
 

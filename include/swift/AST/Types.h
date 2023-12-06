@@ -640,11 +640,13 @@ public:
 
   bool isPlaceholder();
 
-  /// DEPRECIATED: Returns true if this is a noncopyable type.
-  bool isNoncopyable();
+  /// Returns true if this type lacks conformance to Copyable in the context,
+  /// if provided.
+  bool isNoncopyable(const DeclContext *dc = nullptr);
 
-  /// Returns true if this type lacks conformance to Copyable in the context.
-  bool isNoncopyable(const DeclContext *dc);
+  /// Returns true if this type conforms to Escapable in the context,
+  /// if provided.
+  bool isEscapable(const DeclContext *dc = nullptr);
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }

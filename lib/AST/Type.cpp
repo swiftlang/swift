@@ -177,22 +177,24 @@ static bool alwaysNoncopyable(Type ty) {
   return false; // otherwise, the conservative assumption is it's copyable.
 }
 
-/// \returns true iff this type lacks conformance to Copyable, using the given
-/// context to substitute unbound types.
-bool TypeBase::isNoncopyable(const DeclContext *dc) {
-  assert(dc);
+static CanType preprocessType(const DeclContext *dc, Type orig) {
+  Type type = orig;
 
-  if (!hasArchetype() || hasOpenedExistential())
-    if (auto env = dc->getGenericEnvironmentOfContext())
-      return GenericEnvironment::mapTypeIntoContext(env, this)->isNoncopyable();
+  // Turn any type parameters into archetypes.
+  if (dc) {
+    if (!type->hasArchetype() || type->hasOpenedExistential())
+      if (auto env = dc->getGenericEnvironmentOfContext())
+        type = GenericEnvironment::mapTypeIntoContext(env, type);
+  }
 
-  return isNoncopyable();
+  // Strip @lvalue and canonicalize.
+  auto canType = type->getRValueType()->getCanonicalType();
+  return canType;
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
-bool TypeBase::isNoncopyable() {
-  // Strip @lvalue and canonicalize.
-  auto canType = getRValueType()->getCanonicalType();
+bool TypeBase::isNoncopyable(const DeclContext *dc) {
+  auto canType = preprocessType(dc, this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
@@ -201,6 +203,22 @@ bool TypeBase::isNoncopyable() {
 
   IsNoncopyableRequest request{canType};
   return evaluateOrDefault(ctx.evaluator, request, /*default=*/true);
+}
+
+bool TypeBase::isEscapable(const DeclContext *dc) {
+  auto canType = preprocessType(dc, this);
+  auto &ctx = canType->getASTContext();
+
+  // for legacy-mode queries that are not dependent on conformances to Escapable
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    if (auto nom = canType.getAnyNominal())
+      return nom->isEscapable();
+    else
+      return false;
+  }
+
+  IsEscapableRequest request{canType};
+  return evaluateOrDefault(ctx.evaluator, request, /*default=*/false);
 }
 
 bool TypeBase::isPlaceholder() {

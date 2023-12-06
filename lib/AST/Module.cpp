@@ -1748,6 +1748,16 @@ static bool isSendableFunctionType(const FunctionType *functionType) {
   }
 }
 
+/// Whether the given function type conforms to Escapable.
+static bool isEscapableFunctionType(const FunctionType *functionType) {
+  if (functionType->isNoEscape())
+    return false;
+
+  // FIXME: do we need to also include autoclosures??
+
+  return true;
+}
+
 /// Synthesize a builtin function type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
@@ -1764,6 +1774,13 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
   // Functions cannot permanently destroy a move-only var/let
   // that they capture, so it's safe to copy functions, like classes.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    return ProtocolConformanceRef(
+        ctx.getBuiltinConformance(type, protocol,
+                                  BuiltinConformanceKind::Synthesized));
+  }
+
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Escapable) &&
+      isEscapableFunctionType(functionType)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -1790,12 +1807,18 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     }
   }
 
-  // All metatypes are Sendable and Copyable
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  // All metatypes are Sendable, Copyable, and Escapable.
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    switch (*kp) {
+    case KnownProtocolKind::Sendable:
+    case KnownProtocolKind::Copyable:
+    case KnownProtocolKind::Escapable:
+      return ProtocolConformanceRef(
+          ctx.getBuiltinConformance(type, protocol,
+                                    BuiltinConformanceKind::Synthesized));
+    default:
+      break;
+    }
   }
 
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
@@ -1990,9 +2013,12 @@ LookupConformanceInModuleRequest::evaluate(
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
-    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
+               || protocol->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+      const auto kp = protocol->getKnownProtocolKind().value();
 
-      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
+          && kp == KnownProtocolKind::Copyable) {
         // Return an abstract conformance to maintain legacy compatability.
         // We only need to do this until we are properly dealing with or
         // omitting Copyable conformances in modules/interfaces.
@@ -2003,9 +2029,8 @@ LookupConformanceInModuleRequest::evaluate(
           return ProtocolConformanceRef(protocol);
       }
 
-      // Try to infer Copyable conformance.
-      ImplicitKnownProtocolConformanceRequest
-          cvRequest{nominal, KnownProtocolKind::Copyable};
+      // Try to infer the conformance.
+      ImplicitKnownProtocolConformanceRequest cvRequest{nominal, kp};
       if (auto conformance = evaluateOrDefault(
           ctx.evaluator, cvRequest, nullptr)) {
         conformances.clear();

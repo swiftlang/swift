@@ -2,6 +2,8 @@
 
 protocol Sando { func make() } // expected-note 2{{protocol requires function 'make()'}}
 
+struct BuggerView: ~Escapable {} // expected-error {{can only suppress 'Copyable'}}
+
 struct S: ~U, // expected-error {{can only suppress 'Copyable'}}
               // expected-error@-1 {{inheritance from non-protocol type 'U'}}
           ~Copyable {}

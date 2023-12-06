@@ -6617,6 +6617,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (NoncopyableGenerics
         && proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       checkCopyableConformance(conformance);
+    } else if (NoncopyableGenerics
+        && proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+      checkEscapableConformance(conformance);
     }
   }
 

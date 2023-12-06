@@ -2014,21 +2014,25 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (otherProto == proto)
       continue;
 
-    if (EnabledNoncopyableGenerics
-        && otherProto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      // For any protocol 'P', there is an implied requirement 'Self: Copyable',
-      // unless it was suppressed via `Self: ~Copyable`. So if this suppression
-      // annotation exists yet Copyable was implied anyway, emit a diagnostic.
-      auto inverse = proto->getNoncopyableMarking().getInverse();
-      if (!inverse.isPresent())
-        continue; // no ~Copyable annotation
+    // For every invertible protocol IP and any protocol 'P', there is an
+    // implied requirement 'Self: IP', unless it was suppressed via
+    // `Self: ~IP`. So if this suppression annotation exists yet IP was
+    // implied anyway, emit a diagnostic.
+    if (EnabledNoncopyableGenerics) {
+      if (auto kp = otherProto->getKnownProtocolKind()) {
+        if (auto ip = getInvertibleProtocolKind(*kp)) {
+          auto inverse = proto->getMarking(*ip).getInverse();
+          if (!inverse.isPresent())
+            continue; // no ~IP annotation
 
-      auto &Diags = proto->getASTContext().Diags;
-      Diags.diagnose(inverse.getLoc(),
-                     diag::noncopyable_generic_but_copyable,
-                     proto->getSelfInterfaceType(),
-                     getProtocolName(KnownProtocolKind::Copyable));
-      continue;
+          auto &Diags = proto->getASTContext().Diags;
+          Diags.diagnose(inverse.getLoc(),
+                         diag::inverse_generic_but_also_conforms,
+                         proto->getSelfInterfaceType(),
+                         getProtocolName(*kp));
+          continue;
+        }
+      }
     }
 
     // SIMDScalar in the standard library currently emits this warning for:
