@@ -45,7 +45,6 @@ target_link_libraries(swiftRefactoring PRIVATE
   swiftAST
   swiftClangImporter
   swiftIDE
-  swiftIDEUtilsBridging
   swiftIndex
   swiftParse
   swiftSema)
@@ -54,6 +53,9 @@ if(SWIFT_BUILD_SWIFT_SYNTAX)
   target_compile_definitions(swiftRefactoring
     PRIVATE
     SWIFT_BUILD_SWIFT_SYNTAX
+  )
+  target_link_libraries(swiftRefactoring PRIVATE
+    swiftIDEUtilsBridging
   )
 endif()
 
