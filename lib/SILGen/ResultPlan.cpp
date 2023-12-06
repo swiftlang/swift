@@ -136,7 +136,8 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
         if (auto *dmt =
                 archTy->getInterfaceType()->getAs<DependentMemberType>()) {
           return dmt->substRootParam(params[index],
-                                     MakeAbstractConformanceForGenericType());
+                                     MakeAbstractConformanceForGenericType(),
+                                     llvm::None);
         }
 
         return params[index];
