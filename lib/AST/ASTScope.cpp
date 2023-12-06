@@ -170,22 +170,6 @@ NullablePtr<Expr> ASTScopeImpl::getExprIfAny() const {
   }
 }
 
-NullablePtr<DeclAttribute> ASTScopeImpl::getDeclAttributeIfAny() const {
-  switch (getKind()) {
-    // Statement scope nodes extract the statement directly.
-#define DECL_ATTRIBUTE_SCOPE_NODE(Name) \
-    case ScopeKind::Name: return cast<Name##Scope>(this)->getDeclAttr();
-#define SCOPE_NODE(Name)
-#include "swift/AST/ASTScopeNodes.def"
-
-    // Everything else returns nullptr.
-#define DECL_ATTRIBUTE_SCOPE_NODE(Name)
-#define SCOPE_NODE(Name) case ScopeKind::Name:
-#include "swift/AST/ASTScopeNodes.def"
-      return nullptr;
-  }
-}
-
 SourceManager &ASTScopeImpl::getSourceManager() const {
   return getASTContext().SourceMgr;
 }

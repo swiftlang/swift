@@ -649,10 +649,10 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
         return;
     }
 
-    auto *attr = scope->getDeclAttributeIfAny().getPtrOrNull();
-    auto *potentialAttached = dyn_cast_or_null<CustomAttr>(attr);
-    if (potentialAttached && consume(potentialAttached))
-      return;
+    if (auto customAttrScope = dyn_cast<CustomAttributeScope>(scope)) {
+      if (consume(customAttrScope->attr))
+        return;
+    }
 
     // If we've reached a source file scope, we can't be inside of
     // a macro argument. Either this is a top-level source file, or

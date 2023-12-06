@@ -237,7 +237,6 @@ public:
   NullablePtr<Decl> getDeclIfAny() const;
   NullablePtr<Stmt> getStmtIfAny() const;
   NullablePtr<Expr> getExprIfAny() const;
-  NullablePtr<DeclAttribute> getDeclAttributeIfAny() const;
 
 #pragma mark - debugging and printing
 
