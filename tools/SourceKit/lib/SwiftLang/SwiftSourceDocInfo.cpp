@@ -2543,8 +2543,6 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
           (isa<ConstructorDecl>(VD) || isa<DestructorDecl>(VD) ||
            isa<SubscriptDecl>(VD)))
         return RelatedIdentsResult::empty();
-      if (VD->isOperator())
-        return RelatedIdentsResult::empty();
 
       llvm::Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
 
