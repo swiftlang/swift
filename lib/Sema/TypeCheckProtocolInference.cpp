@@ -1360,6 +1360,13 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     return nullptr;
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Inferring abstract type witnesses for "
+             << "associated types of " << conformance->getProtocol()->getName()
+             << ":\n";);
+  for (auto *assocType : unresolvedAssocTypes) {
+    LLVM_DEBUG(llvm::dbgs() << "- " << assocType->getName() << "\n";);
+  }
+
   // Attempt to compute abstract type witnesses for associated types that could
   // not resolve otherwise.
   llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
@@ -1429,6 +1436,9 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   for (const auto &witness : abstractTypeWitnesses) {
     auto *const assocType = witness.getAssocType();
     Type type = witness.getType();
+
+    LLVM_DEBUG(llvm::dbgs() << "Checking witness for " << assocType->getName()
+               << " " << type << "\n";);
 
     // Replace type parameters with other known or tentative type witnesses.
     if (type->hasTypeParameter()) {
@@ -1543,10 +1553,14 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         return assocType;
 
       type = dc->mapTypeIntoContext(type);
+
+      LLVM_DEBUG(llvm::dbgs() << "Substituted witness type is " << type << "\n";);
     }
 
     if (const auto failed =
             checkTypeWitness(type, assocType, conformance, substOptions)) {
+      LLVM_DEBUG(llvm::dbgs() << "- Type witness does not satisfy requirements\n";);
+
       // We failed to satisfy a requirement. If this is a default type
       // witness failure and we haven't seen one already, write it down.
       auto *defaultedAssocType = witness.getDefaultedAssocType();
