@@ -2881,22 +2881,23 @@ static void findRelatedIdents(StringRef PrimaryFilePath,
   Lang.findRelatedIdentifiersInFile(
       PrimaryFilePath, InputBufferName, Offset, CancelOnSubsequentRequest, Args,
       CancellationToken,
-      [Rec](const RequestResult<ArrayRef<RelatedIdentInfo>> &Result) {
+      [Rec](const RequestResult<RelatedIdentsResult> &Result) {
         if (Result.isCancelled())
           return Rec(createErrorRequestCancelled());
         if (Result.isError())
           return Rec(createErrorRequestFailed(Result.getError()));
 
-        const ArrayRef<RelatedIdentInfo> &Info = Result.value();
+        const RelatedIdentsResult &Info = Result.value();
 
         ResponseBuilder RespBuilder;
         auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
-        for (auto R : Info) {
+        for (auto R : Info.RelatedIdents) {
           auto Elem = Arr.appendDictionary();
           Elem.set(KeyOffset, R.Offset);
           Elem.set(KeyLength, R.Length);
           Elem.set(KeyNameType, renameLocUsageUID(R.Usage));
         }
+        RespBuilder.getDictionary().set(KeyName, Info.OldName);
 
         Rec(RespBuilder.createResponse());
       });

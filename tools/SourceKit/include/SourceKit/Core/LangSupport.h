@@ -789,6 +789,18 @@ struct RelatedIdentInfo {
   swift::ide::RenameLocUsage Usage;
 };
 
+/// Result of `findRelatedIdentifiersInFile`.
+struct RelatedIdentsResult {
+  SmallVector<RelatedIdentInfo, 8> RelatedIdents;
+  std::string OldName;
+
+  RelatedIdentsResult(SmallVector<RelatedIdentInfo, 8> RelatedIdents,
+                      std::string OldName)
+      : RelatedIdents(RelatedIdents), OldName(OldName) {}
+
+  static RelatedIdentsResult empty() { return RelatedIdentsResult({}, ""); }
+};
+
 /// Represent one branch of an if config.
 /// Either `#if`, `#else` or `#elseif`.
 struct IfConfigInfo {
@@ -1154,7 +1166,7 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
       SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
+      std::function<void(const RequestResult<RelatedIdentsResult> &)>
           Receiver) = 0;
 
   virtual void findActiveRegionsInFile(

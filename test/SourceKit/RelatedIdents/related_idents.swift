@@ -114,6 +114,7 @@ func ifLet(test: Int?) {
 // CHECK1-NEXT: 6:16 - 2 - source.syntacticrename.reference
 // CHECK1-NEXT: 9:11 - 2 - source.syntacticrename.reference
 // CHECK1-NEXT: END RANGES
+// CHECK1: NAME: C1
 
 // RUN: %sourcekitd-test -req=related-idents -pos=5:9 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK2 %s
 // CHECK2: START RANGES
@@ -196,6 +197,7 @@ func ifLet(test: Int?) {
 // CHECK11-NEXT: 74:1 - 13
 // CHECK11-NEXT: 75:1 - 11
 // CHECK11-NEXT: 76:1 - 11
+// CHECK11: NAME: escapedName(x:)
 
 
 // RUN: %sourcekitd-test -req=related-idents -pos=79:7 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK12 %s

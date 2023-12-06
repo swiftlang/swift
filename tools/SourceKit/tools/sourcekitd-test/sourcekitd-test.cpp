@@ -2462,6 +2462,7 @@ static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
        << sourcekitd_uid_get_string_ptr(Usage) << '\n';
   }
   OS << "END RANGES\n";
+  OS << "NAME: " << sourcekitd_variant_dictionary_get_string(Info, KeyName);
 }
 
 static void printActiveRegions(sourcekitd_variant_t Info, StringRef Filename,
