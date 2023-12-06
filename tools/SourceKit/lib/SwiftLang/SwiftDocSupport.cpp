@@ -1190,7 +1190,7 @@ public:
       return true;
     // Ignore things that don't come from this buffer.
     if (!SM.getRangeForBuffer(BufferID).contains(Range.getStart()))
-      return false;
+      return true;
 
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
