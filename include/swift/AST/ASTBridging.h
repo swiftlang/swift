@@ -656,6 +656,16 @@ SWIFT_NAME("BridgedAssignExpr.createParsed(_:equalsLoc:)")
 BridgedAssignExpr BridgedAssignExpr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cEqualsLoc);
 
+SWIFT_NAME("BridgedAwaitExpr.createParsed(_:awaitLoc:subExpr:)")
+BridgedAwaitExpr BridgedAwaitExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAwaitLoc,
+                                               BridgedExpr cSubExpr);
+
+SWIFT_NAME("BridgedBorrowExpr.createParsed(_:borrowLoc:subExpr:)")
+BridgedBorrowExpr BridgedBorrowExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cBorrowLoc,
+                                                 BridgedExpr cSubExpr);
+
 SWIFT_NAME("BridgedCallExpr.createParsed(_:fn:args:)")
 BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
@@ -680,6 +690,16 @@ BridgedConditionalCheckedCastExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cQuestionLoc,
                                                BridgedTypeRepr cType);
 
+SWIFT_NAME("BridgedConsumeExpr.createParsed(_:consumeLoc:subExpr:)")
+BridgedConsumeExpr BridgedConsumeExpr_createParsed(BridgedASTContext cContext,
+                                                   BridgedSourceLoc cConsumeLoc,
+                                                   BridgedExpr cSubExpr);
+
+SWIFT_NAME("BridgedCopyExpr.createParsed(_:copyLoc:subExpr:)")
+BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
+                                             BridgedSourceLoc cCopyLoc,
+                                             BridgedExpr cSubExpr);
+
 SWIFT_NAME("BridgedDiscardAssignmentExpr.createParsed(_:loc:)")
 BridgedDiscardAssignmentExpr
 BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
@@ -698,6 +718,12 @@ BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
                                                    BridgedSourceLoc cDotLoc,
                                                    BridgedSourceLoc cSelfLoc);
 
+SWIFT_NAME("BridgedForceTryExpr.createParsed(_:tryLoc:subExpr:exclaimLoc:)")
+BridgedForceTryExpr
+BridgedForceTryExpr_createParsed(BridgedASTContext cContext,
+                                 BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
+                                 BridgedSourceLoc cExclaimLoc);
+
 SWIFT_NAME(
     "BridgedForcedCheckedCastExpr.createParsed(_:asLoc:exclaimLoc:type:)")
 BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
@@ -708,6 +734,11 @@ SWIFT_NAME("BridgedIsExpr.createParsed(_:isLoc:type:)")
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIsLoc,
                                          BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedOptionalTryExpr.createParsed(_:tryLoc:subExpr:questionLoc:)")
+BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
+    BridgedSourceLoc cQuestionLoc);
 
 SWIFT_NAME("BridgedSingleValueStmtExpr.createWithWrappedBranches(_:stmt:"
            "declContext:mustBeExpr:)")
@@ -729,6 +760,11 @@ SWIFT_NAME("BridgedTernaryExpr.createParsed(_:questionLoc:thenExpr:colonLoc:)")
 BridgedTernaryExpr BridgedTernaryExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cQuestionLoc,
     BridgedExpr cThenExpr, BridgedSourceLoc cColonLoc);
+
+SWIFT_NAME("BridgedTryExpr.createParsed(_:tryLoc:subExpr:)")
+BridgedTryExpr BridgedTryExpr_createParsed(BridgedASTContext cContext,
+                                           BridgedSourceLoc cTryLoc,
+                                           BridgedExpr cSubExpr);
 
 SWIFT_NAME("BridgedTupleExpr.createParsed(_:leftParenLoc:exprs:labels:"
            "labelLocs:rightParenLoc:)")

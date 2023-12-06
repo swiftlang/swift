@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature ParserASTGen > %t/astgen.ast
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking > %t/cpp-parser.ast
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
@@ -243,4 +243,14 @@ func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
   _ = [() -> Int]()
   _ = [@Sendable () -> Int]().count +  [any Collection]().count
   _ = arg3 is Double || !(arg3 is Int, 0).0
+}
+
+func asyncFunc(_ arg: String) async throws -> Int {
+  return 1
+}
+func testUnaryExprs() async throws {
+  let str = String()
+  let foo = try await asyncFunc(_borrow str)
+  let bar = copy foo
+  let baz = consume foo
 }

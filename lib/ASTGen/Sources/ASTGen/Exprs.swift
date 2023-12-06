@@ -40,13 +40,13 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
   while true {
     switch current.kind {
     case // Known implemented kinds.
-        .arrayExpr, .arrowExpr, .assignmentExpr, .binaryOperatorExpr,
-        .booleanLiteralExpr, .closureExpr, .discardAssignmentExpr,
-        .declReferenceExpr, .dictionaryExpr, .functionCallExpr, .ifExpr,
-        .integerLiteralExpr, .memberAccessExpr,  .nilLiteralExpr,
-        .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
-        .stringLiteralExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr,
-        .unresolvedIsExpr, .unresolvedTernaryExpr:
+        .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
+        .booleanLiteralExpr, .borrowExpr, .closureExpr, .consumeExpr, .copyExpr,
+        .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr,
+        .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
+        .nilLiteralExpr, .postfixOperatorExpr, .prefixOperatorExpr,
+        .sequenceExpr, .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr,
+        .unresolvedAsExpr, .unresolvedIsExpr, .unresolvedTernaryExpr:
 
       // `generate(stringLiteralExpr:)` doesn't support interpolations.
       if let str = current.as(StringLiteralExprSyntax.self) {
@@ -58,13 +58,13 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
 
       break
     case // Known unimplemented kinds.
-        .asExpr, .awaitExpr, .borrowExpr, .canImportExpr, .canImportVersionInfo,
+        .asExpr, .canImportExpr, .canImportVersionInfo,
         .doExpr, .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr,
         .inOutExpr, .infixOperatorExpr,  .isExpr, .keyPathExpr,
-        .macroExpansionExpr, .consumeExpr, .copyExpr,  .optionalChainingExpr,
+        .macroExpansionExpr,  .optionalChainingExpr,
         .packElementExpr, .packExpansionExpr, .postfixIfConfigExpr,
         .regexLiteralExpr, .genericSpecializationExpr, .simpleStringLiteralExpr,
-        .subscriptCallExpr, .superExpr, .switchExpr, .ternaryExpr, .tryExpr,
+        .subscriptCallExpr, .superExpr, .switchExpr, .ternaryExpr,
         .patternExpr:
       return false
     case // Unknown expr kinds.
@@ -96,24 +96,24 @@ extension ASTGenVisitor {
       break
     case .assignmentExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
-    case .awaitExpr:
-      break
+    case .awaitExpr(let node):
+      return self.generate(awaitExpr: node).asExpr
     case .binaryOperatorExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
     case .booleanLiteralExpr(let node):
       return self.generate(booleanLiteralExpr: node).asExpr
-    case .borrowExpr:
-      break
+    case .borrowExpr(let node):
+      return self.generate(borrowExpr: node).asExpr
     case .canImportExpr:
       break
     case .canImportVersionInfo:
       break
     case .closureExpr(let node):
       return self.generate(closureExpr: node).asExpr
-    case .consumeExpr:
-      break
-    case .copyExpr:
-      break
+    case .consumeExpr(let node):
+      return self.generate(consumeExpr: node).asExpr
+    case .copyExpr(let node):
+      return self.generate(copyExpr: node).asExpr
     case .declReferenceExpr(let node):
       return self.generate(declReferenceExpr: node).asExpr
     case .dictionaryExpr(let node):
@@ -183,8 +183,8 @@ extension ASTGenVisitor {
       break
     case .ternaryExpr:
       break
-    case .tryExpr:
-      break
+    case .tryExpr(let node):
+      return self.generate(tryExpr: node)
     case .tupleExpr(let node):
       return self.generate(tupleExpr: node).asExpr
     case .typeExpr(let node):
@@ -235,6 +235,22 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, equalsLoc: self.generateSourceLoc(node.equal))
   }
 
+  func generate(awaitExpr node: AwaitExprSyntax) -> BridgedAwaitExpr {
+    return .createParsed(
+      self.ctx,
+      awaitLoc: self.generateSourceLoc(node.awaitKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
+  }
+
+  func generate(borrowExpr node: BorrowExprSyntax) -> BridgedBorrowExpr {
+    return .createParsed(
+      self.ctx,
+      borrowLoc: self.generateSourceLoc(node.borrowKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
+  }
+
   func generate(binaryOperatorExpr node: BinaryOperatorExprSyntax) -> BridgedUnresolvedDeclRefExpr {
     return createOperatorRefExpr(token: node.operator, kind: .binaryOperator)
   }
@@ -249,6 +265,22 @@ extension ASTGenVisitor {
 
     // FIXME: Translate the signature, capture list, 'in' location, etc.
     return .createParsed(self.ctx, declContext: self.declContext, body: body)
+  }
+
+  func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
+    return .createParsed(
+      self.ctx,
+      consumeLoc: self.generateSourceLoc(node.consumeKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
+  }
+
+  func generate(copyExpr node: CopyExprSyntax) -> BridgedCopyExpr {
+    return .createParsed(
+      self.ctx,
+      copyLoc: self.generateSourceLoc(node.copyKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
   }
 
   func generate(functionCallExpr node: FunctionCallExprSyntax) -> BridgedCallExpr {
@@ -469,6 +501,36 @@ extension ASTGenVisitor {
       self.ctx,
       exprs: elements.lazy.bridgedArray(in: self)
     ).asExpr
+  }
+
+  func generate(tryExpr node: TryExprSyntax) -> BridgedExpr {
+    let tryLoc = self.generateSourceLoc(node.tryKeyword)
+    let subExpr = self.generate(expr: node.expression)
+
+    switch node.questionOrExclamationMark {
+    case nil:
+      return BridgedTryExpr.createParsed(
+        self.ctx,
+        tryLoc: tryLoc,
+        subExpr: subExpr
+      ).asExpr
+    case let exclaim? where exclaim.rawTokenKind == .exclamationMark:
+      return BridgedForceTryExpr.createParsed(
+        self.ctx,
+        tryLoc: tryLoc,
+        subExpr: subExpr,
+        exclaimLoc: self.generateSourceLoc(exclaim)
+      ).asExpr
+    case let question? where question.rawTokenKind == .postfixQuestionMark:
+      return BridgedOptionalTryExpr.createParsed(
+        self.ctx,
+        tryLoc: tryLoc,
+        subExpr: subExpr,
+        questionLoc: self.generateSourceLoc(question)
+      ).asExpr
+    default:
+      preconditionFailure("TryExprSyntax.questionOrExclamationMark must be .exclamationMark or .postfixQuestionMark")
+    }
   }
 
   func generate(tupleExpr node: TupleExprSyntax) -> BridgedTupleExpr {

@@ -869,6 +869,20 @@ BridgedAssignExpr BridgedAssignExpr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) AssignExpr(cEqualsLoc.unbridged());
 }
 
+BridgedAwaitExpr BridgedAwaitExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAwaitLoc,
+                                               BridgedExpr cSubExpr) {
+  return new (cContext.unbridged())
+      AwaitExpr(cAwaitLoc.unbridged(), cSubExpr.unbridged());
+}
+
+BridgedBorrowExpr BridgedBorrowExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cBorrowLoc,
+                                                 BridgedExpr cSubExpr) {
+  return new (cContext.unbridged())
+      BorrowExpr(cBorrowLoc.unbridged(), cSubExpr.unbridged());
+}
+
 BridgedClosureExpr
 BridgedClosureExpr_createParsed(BridgedASTContext cContext,
                                 BridgedDeclContext cDeclContext,
@@ -910,6 +924,20 @@ BridgedConditionalCheckedCastExpr_createParsed(BridgedASTContext cContext,
       cType.unbridged());
 }
 
+BridgedConsumeExpr BridgedConsumeExpr_createParsed(BridgedASTContext cContext,
+                                                   BridgedSourceLoc cConsumeLoc,
+                                                   BridgedExpr cSubExpr) {
+  return new (cContext.unbridged())
+      ConsumeExpr(cConsumeLoc.unbridged(), cSubExpr.unbridged());
+}
+
+BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
+                                             BridgedSourceLoc cCopyLoc,
+                                             BridgedExpr cSubExpr) {
+  return new (cContext.unbridged())
+      CopyExpr(cCopyLoc.unbridged(), cSubExpr.unbridged());
+}
+
 BridgedDiscardAssignmentExpr
 BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
                                           BridgedSourceLoc cLoc) {
@@ -925,6 +953,14 @@ BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
                                 cElements.unbridged<Expr *>(),
                                 cCommaLocs.unbridged<SourceLoc>(),
                                 cRBracketLoc.unbridged());
+}
+
+BridgedForceTryExpr
+BridgedForceTryExpr_createParsed(BridgedASTContext cContext,
+                                 BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
+                                 BridgedSourceLoc cExclaimLoc) {
+  return new (cContext.unbridged()) ForceTryExpr(
+      cTryLoc.unbridged(), cSubExpr.unbridged(), cExclaimLoc.unbridged());
 }
 
 BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
@@ -951,9 +987,23 @@ BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                         cType.unbridged());
 }
 
+BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
+    BridgedSourceLoc cQuestionLoc) {
+  return new (cContext.unbridged()) OptionalTryExpr(
+      cTryLoc.unbridged(), cSubExpr.unbridged(), cQuestionLoc.unbridged());
+}
+
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
                                                      BridgedArrayRef exprs) {
   return SequenceExpr::create(cContext.unbridged(), exprs.unbridged<Expr *>());
+}
+
+BridgedTryExpr BridgedTryExpr_createParsed(BridgedASTContext cContext,
+                                           BridgedSourceLoc cTryLoc,
+                                           BridgedExpr cSubExpr) {
+  return new (cContext.unbridged())
+      TryExpr(cTryLoc.unbridged(), cSubExpr.unbridged());
 }
 
 BridgedTupleExpr BridgedTupleExpr_createParsed(BridgedASTContext cContext,
