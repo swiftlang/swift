@@ -1497,8 +1497,10 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         // If the transformed base has the same nominal as the adoptee, we may
         // need to look up a tentative type witness. Otherwise, just substitute
         // the base.
-        if (substBase->getAnyNominal() != adoptee->getAnyNominal()) {
-          return dmt->substBaseType(dc->getParentModule(), substBase);
+        if (substBase->getAnyNominal() != dc->getSelfNominalTypeDecl()) {
+          return dmt->substBaseType(substBase,
+                                    LookUpConformanceInModule(dc->getParentModule()),
+                                    substOptions);
         }
 
         auto *assocTy = dmt->getAssocType();
