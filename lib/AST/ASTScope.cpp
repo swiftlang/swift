@@ -98,10 +98,11 @@ Pattern *AbstractPatternEntryScope::getPattern() const {
 }
 
 NullablePtr<AbstractClosureExpr> BraceStmtScope::parentClosureIfAny() const {
-  return !getParent() ? nullptr : getParent().get()->getClosureIfClosureScope();
-}
+  if (auto parent = getParent()) {
+    if (auto closureScope = dyn_cast<ClosureParametersScope>(parent.get()))
+      return closureScope->closureExpr;
+  }
 
-NullablePtr<AbstractClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
   return nullptr;
 }
 

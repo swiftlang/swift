@@ -233,7 +233,6 @@ public:
   /// Determine the kind of scope node we have.
   ScopeKind getKind() const { return kind; }
 
-  virtual NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const;
   ASTContext &getASTContext() const;
   NullablePtr<Decl> getDeclIfAny() const;
   NullablePtr<Stmt> getStmtIfAny() const;
@@ -1161,9 +1160,6 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
-  NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const override {
-    return closureExpr;
-  }
   Expr *getExpr() const { return closureExpr; }
   bool ignoreInDebugInfo() const override { return true; }
 
