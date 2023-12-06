@@ -374,7 +374,7 @@ void swift::executePassPipelinePlan(SILModule *SM,
 
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
                                irgen::IRGenModule *IRMod)
-    : Mod(M), IRMod(IRMod),
+    : Mod(M), IRMod(IRMod), irgen(nullptr),
       swiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define SIL_ANALYSIS(NAME) \
@@ -901,6 +901,27 @@ void SILPassManager::execute() {
   }
 }
 
+irgen::IRGenModule *SILPassManager::getIRGenModule() {
+  // We need an IRGenModule to get the actual sizes from type lowering.
+  // Creating an IRGenModule involves some effort, let's cache it for the
+  // whole pass.
+  if (IRMod == nullptr) {
+    SILModule *module = getModule();
+
+    auto *irgenOpts = module->getIRGenOptionsOrNull();
+    if (!irgenOpts)
+      return nullptr;
+
+    if (irgen == nullptr)
+      irgen = new irgen::IRGenerator(*irgenOpts, *module);
+    auto targetMachine = irgen->createTargetMachine();
+    assert(targetMachine && "failed to create target");
+    IRMod = new irgen::IRGenModule(*irgen, std::move(targetMachine));
+  }
+
+  return IRMod;
+}
+
 /// D'tor.
 SILPassManager::~SILPassManager() {
 
@@ -939,6 +960,16 @@ SILPassManager::~SILPassManager() {
     assert(!A->isLocked() &&
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
+  }
+
+  if (irgen) {
+    // If irgen is set, we also own the IRGenModule
+    if (IRMod) {
+      delete IRMod;
+      IRMod = nullptr;
+    }
+    delete irgen;
+    irgen = nullptr;
   }
 }
 
@@ -1382,22 +1413,7 @@ void SwiftPassInvocation::finishedInstructionPassRun() {
 }
 
 irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
-  // We need an IRGenModule to get the actual sizes from type lowering.
-  // Creating an IRGenModule involves some effort, let's cache it for the
-  // whole pass.
-  if (irgenModule == nullptr && irgen == nullptr) {
-    SILModule *module = getPassManager()->getModule();
-
-    auto *irgenOpts = module->getIRGenOptionsOrNull();
-    if (!irgenOpts)
-      return nullptr;
-
-    irgen = new irgen::IRGenerator(*irgenOpts, *module);
-    auto targetMachine = irgen->createTargetMachine();
-    assert(targetMachine && "failed to create target");
-    irgenModule = new irgen::IRGenModule(*irgen, std::move(targetMachine));
-  }
-  return irgenModule;
+  return passManager->getIRGenModule();
 }
 
 void SwiftPassInvocation::endPass() {
@@ -1430,16 +1446,7 @@ void SwiftPassInvocation::endTransformFunction() {
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
 }
 
-SwiftPassInvocation::~SwiftPassInvocation() {
-  if (irgenModule) {
-    delete irgenModule;
-    irgenModule = nullptr;
-  }
-  if (irgen) {
-    delete irgen;
-    irgen = nullptr;
-  }
-}
+SwiftPassInvocation::~SwiftPassInvocation() {}
 
 //===----------------------------------------------------------------------===//
 //                           OptimizerBridging

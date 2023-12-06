@@ -31,6 +31,11 @@ public struct OveralignedReferenceWrapperStruct {
   let x: AnyObject
 }
 
+public struct TwoInt32 {
+  let x: Int32 = 0
+  let y: Int32 = 0
+}
+
 // Make sure we generate the public pre-specialized entry points.
 
 // OPT-DAG: sil @$s22pre_specialize_layouts10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
@@ -79,6 +84,11 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   apply [[F1]]
 // OPT:   [[F2:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
 // OPT:   apply [[F2]]
+// OPT:   [[F9:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFBi64__Ts5 : $@convention(thin) (Builtin.Int64) -> ()
+// OPT:   [[A5:%.*]] = unchecked_trivial_bit_cast {{%.*}} : $UInt64 to $Builtin.Int64
+// OPT:   apply [[F9]]([[A5]]) : $@convention(thin) (Builtin.Int64) -> ()
+// OPT:   [[A6:%.*]] = unchecked_trivial_bit_cast {{%.*}} : $TwoInt32 to $Builtin.Int64
+// OPT:   apply [[F9]]([[A6]]) : $@convention(thin) (Builtin.Int64) -> ()
 // OPT-macosx:   [[F6:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 // OPT-macosx:    apply [[F6]]<SomeData>
 // OPT: [[F7:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject) -> ()
@@ -145,6 +155,8 @@ internal func testEmitIntoClient<T>(t: T) {
 public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct, array: [Int]) {
   publicPrespecialized(1)
   publicPrespecialized(1.0)
+  publicPrespecialized(UInt64(1))
+  publicPrespecialized(TwoInt32())
   publicPrespecialized(SomeData())
   publicPrespecialized(SomeClass())
   publicPrespecialized(wrapperStruct)

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -3001,7 +3002,8 @@ bool usePrespecialized(
         }
 
         if (!erased || !layout ||
-            (!layout->isClass() && !layout->isBridgeObject())) {
+            (!layout->isClass() && !layout->isBridgeObject() &&
+             !layout->isFixedSizeTrivial())) {
           newSubs.push_back(entry.value());
           continue;
         }
@@ -3021,6 +3023,18 @@ bool usePrespecialized(
             score += 1;
           } else {
             newSubs.push_back(genericParam->getASTContext().getAnyObjectType());
+          }
+        } else if (layout->isFixedSizeTrivial() && lowered.isTrivial(refF)) {
+          auto *IGM = funcBuilder.getIRGenModule();
+          auto &ti = IGM->getTypeInfo(lowered);
+          auto fixedSize =
+              ti.buildTypeLayoutEntry(*IGM, lowered, false)->fixedSize(*IGM);
+
+          if (fixedSize &&
+              fixedSize->getValueInBits() == layout->getTrivialSizeInBits()) {
+            newSubs.push_back(CanType(
+                BuiltinIntegerType::get(layout->getTrivialSizeInBits(),
+                                        genericParam->getASTContext())));
           }
         } else {
           // no match

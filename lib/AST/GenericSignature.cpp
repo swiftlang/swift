@@ -503,6 +503,7 @@ CanType GenericSignature::getReducedType(Type type) const {
 GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) const {
   bool changedSignature = false;
   llvm::SmallVector<Requirement, 2> requirementsErased;
+  auto &C = Ptr->getASTContext();
 
   for (auto req : getRequirements()) {
     bool found = std::any_of(typeErasedParams.begin(),
@@ -512,14 +513,20 @@ GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) c
       return t->isEqual(other);
     });
     if (found && req.getKind() == RequirementKind::Layout) {
-      if (req.getLayoutConstraint()->isClass()) {
+      auto layout = req.getLayoutConstraint();
+      if (layout->isClass()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.getAnyObjectType()));
+      } else if (layout->isBridgeObject()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.TheBridgeObjectType));
+      } else if (layout->isFixedSizeTrivial()) {
+        unsigned bitWidth = layout->getTrivialSizeInBits();
         requirementsErased.push_back(
             Requirement(RequirementKind::SameType, req.getFirstType(),
-                        Ptr->getASTContext().getAnyObjectType()));
-      } else if (req.getLayoutConstraint()->isBridgeObject()) {
-        requirementsErased.push_back(
-            Requirement(RequirementKind::SameType, req.getFirstType(),
-                        Ptr->getASTContext().TheBridgeObjectType));
+                        CanType(BuiltinIntegerType::get(bitWidth, C))));
       } else {
         requirementsErased.push_back(req);
       }
