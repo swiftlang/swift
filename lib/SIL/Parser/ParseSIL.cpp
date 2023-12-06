@@ -494,40 +494,66 @@ static SILLinkage resolveSILLinkage(llvm::Optional<SILLinkage> linkage,
   }
 }
 
-// Returns false if no optional exists. Returns true on both success and
-// failure. On success, the Result string is nonempty. If the optional is
-// assigned to an integer value, \p value contains the parsed value. Otherwise,
-// value is set to the maximum uint64_t.
-static bool parseSILOptional(StringRef &Result, uint64_t &value, SourceLoc &Loc,
-                             SILParser &SP) {
-  if (!SP.P.consumeIf(tok::l_square))
+namespace {
+
+using SILOptionalAttrValue = std::optional<std::variant<uint64_t, StringRef>>;
+
+} // namespace
+
+/// Returns false if no optional exists. Returns true on both success and
+/// failure. On success, the Result string is nonempty. If the optional is
+/// assigned to an integer value using an equal, \p value contains the parsed
+/// value. Otherwise, value is set to the maximum uint64_t.
+///
+/// Example: [alignment=$NUM]
+static bool parseSILOptional(StringRef &parsedName, SourceLoc &parsedNameLoc,
+                             SILOptionalAttrValue &parsedValue,
+                             SourceLoc &parsedValueLoc, SILParser &parser) {
+  if (!parser.P.consumeIf(tok::l_square))
     return false;
 
-  value = ~uint64_t(0);
-
-  Identifier Id;
-  if (SP.parseSILIdentifier(Id, Loc, diag::expected_in_attribute_list))
+  Identifier parsedNameId;
+  if (parser.parseSILIdentifier(parsedNameId, parsedNameLoc,
+                                diag::expected_in_attribute_list))
     return true;
+  parsedName = parsedNameId.str();
 
-  if (SP.P.consumeIf(tok::equal)) {
-    if (SP.parseInteger(value, diag::expected_in_attribute_list))
-      return true;
+  uint64_t parsedIntValue = ~uint64_t(0);
+  Identifier parsedStringId;
+  if (parser.P.consumeIf(tok::equal)) {
+    auto currentTok = parser.P.Tok;
+    parsedValueLoc = currentTok.getLoc();
+
+    if (currentTok.is(tok::integer_literal)) {
+      if (parser.parseInteger(parsedIntValue,
+                              diag::expected_in_attribute_list)) {
+        return true;
+      }
+      parsedValue = parsedIntValue;
+    } else {
+      if (parser.parseSILIdentifier(parsedStringId, parsedValueLoc,
+                                    diag::expected_in_attribute_list)) {
+        return true;
+      }
+      parsedValue = parsedStringId.str();
+    }
   }
-  if (SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list))
+
+  if (parser.P.parseToken(tok::r_square, diag::expected_in_attribute_list))
     return true;
 
-  Result = Id.str();
   return true;
 }
 
 static bool parseSILOptional(StringRef &Result, SourceLoc &Loc, SILParser &SP) {
-  uint64_t value;
-  return parseSILOptional(Result, value, Loc, SP);
+  SILOptionalAttrValue value;
+  SourceLoc valueLoc;
+  return parseSILOptional(Result, Loc, value, valueLoc, SP);
 }
 
-static bool parseSILOptional(StringRef &Result, SILParser &SP) {
-  SourceLoc Loc;
-  return parseSILOptional(Result, Loc, SP);
+static bool parseSILOptional(StringRef &attrName, SILParser &SP) {
+  SourceLoc attrLoc;
+  return parseSILOptional(attrName, attrLoc, SP);
 }
 
 /// Parse an option attribute ('[' Expected ']')?
@@ -4056,8 +4082,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool isStrict = false;
     bool isInvariant = false;
     llvm::MaybeAlign alignment;
-    uint64_t parsedValue = 0;
-    while (parseSILOptional(attr, parsedValue, ToLoc, *this)) {
+    SILOptionalAttrValue parsedValue;
+    SourceLoc parsedValueLoc;
+    while (parseSILOptional(attr, ToLoc, parsedValue, parsedValueLoc, *this)) {
       if (attr.empty())
         return true;
 
@@ -4068,7 +4095,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         isInvariant = true;
 
       if (attr.equals("align"))
-        alignment = llvm::Align(parsedValue);
+        alignment = llvm::Align(std::get<uint64_t>(*parsedValue));
     }
 
     if (parseSILType(Ty) || parseSILDebugLocation(InstLoc, B))
