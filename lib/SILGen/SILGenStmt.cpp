@@ -1569,7 +1569,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   // If the thrown error type differs from what the throw destination expects,
   // perform the conversion.
   // FIXME: Can the AST tell us what to do here?
-  if (exnType != destErrorType && !shouldDiscard) {
+  if (exnType != destErrorType) {
     assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
     ProtocolConformanceRef conformances[1] = {

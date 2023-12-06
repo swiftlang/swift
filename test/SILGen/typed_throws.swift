@@ -166,6 +166,16 @@ func optionalTryDifferent() throws(MyError) {
   try? throwsMyBigError()
 }
 
+func throwsMyBigErrorOrReturnsInt() throws(MyBigError) -> Int { 5 }
+
+func mightThrowAny(arg: Int) throws { }
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws14forceTryErasedyyF : $@convention(thin) () -> () {
+func forceTryErased() {
+  // CHECK: try_apply {{.*}} @error MyBigError
+  // CHECK: try_apply {{.*}} @error any Error
+  try! mightThrowAny(arg: throwsMyBigErrorOrReturnsInt())
+}
 
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
