@@ -7494,6 +7494,11 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
           auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
 
           for (const auto &arg : *args) {
+            // No need to check more or delay since we already known
+            // that the type is not Sendable.
+            if (!isSendable)
+              break;
+
             auto argTy = simplifyType(getType(arg.getExpr()));
 
             // Sendability cannot be determined until the argument
