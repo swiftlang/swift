@@ -10,24 +10,13 @@ func doit() {
   let bytes: [UInt8] = Array(repeating: 0, count: 64)
   bytes.withUnsafeBufferPointer { bytes in
       let rawBytes = UnsafeRawPointer(bytes.baseAddress!) + 1
-      let vector = rawBytes.myLoadUnaligned(as: SIMD16<UInt8>.self)
+      let vector = rawBytes.loadUnaligned(as: SIMD16<UInt8>.self)
       //CHECK: SIMD16<UInt8>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
       blackhole(vector)
   }
 }
 
 import Builtin
-
-extension UnsafeRawPointer {
-  @inlinable
-  @_alwaysEmitIntoClient
-  public func myLoadUnaligned<T : _BitwiseCopyable>(
-    fromByteOffset offset: Int = 0,
-    as type: T.Type
-  ) -> T {
-    return Builtin.loadRaw((self + offset)._rawValue)
-  }
-}
 
 doit()
 

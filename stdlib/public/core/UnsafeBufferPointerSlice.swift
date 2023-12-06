@@ -378,6 +378,17 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
+#if $BitwiseCopyable
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T : _BitwiseCopyable>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    let buffer = Base(rebasing: self)
+    return buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+#endif
   @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(
@@ -606,6 +617,17 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
+#if $BitwiseCopyable
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T : _BitwiseCopyable>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    let buffer = Base(rebasing: self)
+    return buffer.loadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+#endif
   @inlinable
   @_alwaysEmitIntoClient
   public func loadUnaligned<T>(

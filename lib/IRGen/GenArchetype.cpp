@@ -433,16 +433,14 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
             : IsNotABIAccessible;
   }
 
-  auto &ASTContext = IGM.getSwiftModule()->getASTContext();
-  if (ASTContext.LangOpts.hasFeature(Feature::BitwiseCopyable)) {
-    // TODO: Should this conformance imply isAddressOnlyTrivial is true?
-    auto *proto = ASTContext.getProtocol(KnownProtocolKind::BitwiseCopyable);
-    // It's possible for the protocol not to exist if the stdlib is built
-    // no_asserts.
-    if (proto && IGM.getSwiftModule()->lookupConformance(archetype, proto)) {
-      return BitwiseCopyableArchetypeTypeInfo::create(storageType,
-                                                      abiAccessible);
-    }
+  // TODO: Should this conformance imply isAddressOnlyTrivial is true?
+  auto *bitwiseCopyableProtocol =
+      IGM.getSwiftModule()->getASTContext().getProtocol(
+          KnownProtocolKind::BitwiseCopyable);
+  // The protocol won't be present in swiftinterfaces from older SDKs.
+  if (bitwiseCopyableProtocol && IGM.getSwiftModule()->lookupConformance(
+                                     archetype, bitwiseCopyableProtocol)) {
+    return BitwiseCopyableArchetypeTypeInfo::create(storageType, abiAccessible);
   }
 
   return OpaqueArchetypeTypeInfo::create(storageType, abiAccessible);
