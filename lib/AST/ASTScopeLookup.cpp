@@ -643,9 +643,11 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
   auto *scope = fileScope->findInnermostEnclosingScope(
       sourceFile->getParentModule(), loc, nullptr);
   do {
-    auto *freestanding = scope->getFreestandingMacro().getPtrOrNull();
-    if (freestanding && consume(freestanding))
-      return;
+    if (auto expansionScope = dyn_cast<MacroExpansionDeclScope>(scope)) {
+      auto *expansionDecl = expansionScope->decl;
+      if (expansionDecl && consume(expansionDecl))
+        return;
+    }
 
     auto *attr = scope->getDeclAttributeIfAny().getPtrOrNull();
     auto *potentialAttached = dyn_cast_or_null<CustomAttr>(attr);

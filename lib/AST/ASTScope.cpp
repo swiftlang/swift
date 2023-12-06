@@ -167,6 +167,70 @@ StringRef ASTScopeImpl::getClassName() const {
   }
 }
 
+NullablePtr<Decl> ASTScopeImpl::getDeclIfAny() const {
+  switch (getKind()) {
+    // Declaration scope nodes extract the decl directly.
+#define DECL_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return cast<Name##Scope>(this)->getDecl();
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+    // Everything else returns nullptr.
+#define DECL_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return nullptr;
+  }
+}
+
+NullablePtr<Stmt> ASTScopeImpl::getStmtIfAny() const {
+  switch (getKind()) {
+    // Statement scope nodes extract the statement directly.
+#define STMT_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return cast<Name##Scope>(this)->getStmt();
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+    // Everything else returns nullptr.
+#define STMT_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return nullptr;
+  }
+}
+
+NullablePtr<Expr> ASTScopeImpl::getExprIfAny() const {
+  switch (getKind()) {
+    // Expression scope nodes extract the statement directly.
+#define EXPR_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return cast<Name##Scope>(this)->getExpr();
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+    // Everything else returns nullptr.
+#define EXPR_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return nullptr;
+  }
+}
+
+NullablePtr<DeclAttribute> ASTScopeImpl::getDeclAttributeIfAny() const {
+  switch (getKind()) {
+    // Statement scope nodes extract the statement directly.
+#define DECL_ATTRIBUTE_SCOPE_NODE(Name) \
+    case ScopeKind::Name: return cast<Name##Scope>(this)->getDeclAttr();
+#define SCOPE_NODE(Name)
+#include "swift/AST/ASTScopeNodes.def"
+
+    // Everything else returns nullptr.
+#define DECL_ATTRIBUTE_SCOPE_NODE(Name)
+#define SCOPE_NODE(Name) case ScopeKind::Name:
+#include "swift/AST/ASTScopeNodes.def"
+      return nullptr;
+  }
+}
+
 SourceManager &ASTScopeImpl::getSourceManager() const {
   return getASTContext().SourceMgr;
 }
@@ -192,19 +256,18 @@ LabeledConditionalStmt *GuardStmtScope::getLabeledConditionalStmt() const {
 ASTContext &ASTScopeImpl::getASTContext() const {
   if (auto d = getDeclIfAny())
     return d.get()->getASTContext();
+  if (auto sfScope = dyn_cast<ASTSourceFileScope>(this))
+    return sfScope->SF->getASTContext();
   return getParent().get()->getASTContext();
 }
 
 #pragma mark getSourceFile
 
 const SourceFile *ASTScopeImpl::getSourceFile() const {
+  if (auto sourceFileScope = dyn_cast<ASTSourceFileScope>(this))
+    return sourceFileScope->SF;
+
   return getParent().get()->getSourceFile();
-}
-
-const SourceFile *ASTSourceFileScope::getSourceFile() const { return SF; }
-
-ASTContext &ASTSourceFileScope::getASTContext() const {
-  return SF->getASTContext();
 }
 
 SourceRange ExtensionScope::getBraces() const { return decl->getBraces(); }
