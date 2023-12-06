@@ -305,12 +305,10 @@ PatternEntryInitializerScope::getLookupParent() const {
 
   // Skip generic parameter scopes, which occur here due to named opaque
   // result types.
-  // FIXME: Proper isa/dyn_cast support would be better than a string
-  // comparison here.
-  while (parent->getClassName() == "GenericParamScope")
+  while (isa<GenericParamScope>(parent))
     parent = parent->getLookupParent().get();
 
-  ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
+  ASTScopeAssert(isa<PatternEntryDeclScope>(parent),
                  "PatternEntryInitializerScope in unexpected place");
 
   // Lookups from inside a pattern binding initializer skip the parent
@@ -327,7 +325,7 @@ PatternEntryInitializerScope::getLookupParent() const {
 NullablePtr<const ASTScopeImpl>
 ConditionalClauseInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
-  ASTScopeAssert(parent->getClassName() == "ConditionalClausePatternUseScope",
+  ASTScopeAssert(isa<ConditionalClausePatternUseScope>(parent),
                  "ConditionalClauseInitializerScope in unexpected place");
 
   // Lookups from inside a conditional clause initializer skip the parent
@@ -660,7 +658,7 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
     // macro expansion buffers for freestanding macros are children of
     // MacroExpansionDeclScope, and child scopes of freestanding macros
     // are otherwise inside the macro argument.
-    if (scope->getClassName() == "ASTSourceFileScope")
+    if (isa<ASTSourceFileScope>(scope))
       return;
 
   } while ((scope = scope->getParent().getPtrOrNull()));

@@ -259,7 +259,8 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
-    : SF(SF), scopeCreator(scopeCreator) {
+    : ASTScopeImpl(ScopeKind::ASTSourceFile), SF(SF),
+      scopeCreator(scopeCreator) {
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
     SourceLoc parentLoc;
     auto macroRole = SF->getFulfilledMacroRole();
@@ -1314,8 +1315,8 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
 }
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
-    PatternBindingDecl *declBeingScoped, unsigned entryIndex)
-    : decl(declBeingScoped), patternEntryIndex(entryIndex) {
+    ScopeKind kind, PatternBindingDecl *declBeingScoped, unsigned entryIndex)
+    : ASTScopeImpl(kind), decl(declBeingScoped), patternEntryIndex(entryIndex) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
 }

@@ -160,6 +160,13 @@ DoCatchStmtScope::getCatchNodeBody() const {
   return { const_cast<DoCatchStmt *>(stmt), body };
 }
 
+StringRef ASTScopeImpl::getClassName() const {
+  switch (getKind()) {
+#define SCOPE_NODE(Name) case ScopeKind::Name: return #Name;
+#include "swift/AST/ASTScopeNodes.def"
+  }
+}
+
 SourceManager &ASTScopeImpl::getSourceManager() const {
   return getASTContext().SourceMgr;
 }
@@ -187,53 +194,6 @@ ASTContext &ASTScopeImpl::getASTContext() const {
     return d.get()->getASTContext();
   return getParent().get()->getASTContext();
 }
-
-#pragma mark getClassName
-
-std::string GenericTypeOrExtensionScope::getClassName() const {
-  return declKindName() + portionName() + "Scope";
-}
-
-#define DEFINE_GET_CLASS_NAME(Name)                                            \
-  std::string Name::getClassName() const { return #Name; }
-
-DEFINE_GET_CLASS_NAME(ASTSourceFileScope)
-DEFINE_GET_CLASS_NAME(GenericParamScope)
-DEFINE_GET_CLASS_NAME(AbstractFunctionDeclScope)
-DEFINE_GET_CLASS_NAME(ParameterListScope)
-DEFINE_GET_CLASS_NAME(FunctionBodyScope)
-DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
-DEFINE_GET_CLASS_NAME(CustomAttributeScope)
-DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
-DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
-DEFINE_GET_CLASS_NAME(ConditionalClausePatternUseScope)
-DEFINE_GET_CLASS_NAME(ConditionalClauseInitializerScope)
-DEFINE_GET_CLASS_NAME(CaptureListScope)
-DEFINE_GET_CLASS_NAME(ClosureParametersScope)
-DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
-DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
-DEFINE_GET_CLASS_NAME(DifferentiableAttributeScope)
-DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
-DEFINE_GET_CLASS_NAME(EnumElementScope)
-DEFINE_GET_CLASS_NAME(MacroDeclScope)
-DEFINE_GET_CLASS_NAME(MacroDefinitionScope)
-DEFINE_GET_CLASS_NAME(MacroExpansionDeclScope)
-DEFINE_GET_CLASS_NAME(IfStmtScope)
-DEFINE_GET_CLASS_NAME(WhileStmtScope)
-DEFINE_GET_CLASS_NAME(GuardStmtScope)
-DEFINE_GET_CLASS_NAME(GuardStmtBodyScope)
-DEFINE_GET_CLASS_NAME(RepeatWhileScope)
-DEFINE_GET_CLASS_NAME(DoStmtScope)
-DEFINE_GET_CLASS_NAME(DoCatchStmtScope)
-DEFINE_GET_CLASS_NAME(SwitchStmtScope)
-DEFINE_GET_CLASS_NAME(ForEachStmtScope)
-DEFINE_GET_CLASS_NAME(ForEachPatternScope)
-DEFINE_GET_CLASS_NAME(CaseStmtScope)
-DEFINE_GET_CLASS_NAME(CaseLabelItemScope)
-DEFINE_GET_CLASS_NAME(CaseStmtBodyScope)
-DEFINE_GET_CLASS_NAME(BraceStmtScope)
-
-#undef DEFINE_GET_CLASS_NAME
 
 #pragma mark getSourceFile
 

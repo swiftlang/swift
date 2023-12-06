@@ -116,8 +116,7 @@ SourceRange FunctionBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   // If this function body scope is synthesized for a body macro, use the
   // real source range.
-  if (getChildren().size() == 1 &&
-      getChildren()[0]->getClassName() == "ASTSourceFileScope") {
+  if (getChildren().size() == 1 && isa<ASTSourceFileScope>(getChildren()[0])) {
     return decl->getBodySourceRange();
   }
 
