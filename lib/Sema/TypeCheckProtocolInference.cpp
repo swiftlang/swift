@@ -1391,6 +1391,19 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     for (auto *assocType : unresolvedAssocTypes) {
       auto resolvedTy = system.getResolvedTypeWitness(assocType->getName());
 
+      resolvedTy = resolvedTy.transformRec([&](Type ty) -> llvm::Optional<Type> {
+        if (auto *gp = ty->getAs<GenericTypeParamType>()) {
+          // FIXME: 'computeFixedTypeWitness' uses 'getReducedType',
+          // so if a generic parameter is canonical here, it's 'Self'.
+          if (gp->isCanonical() ||
+              isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
+            return adoptee;
+          }
+        }
+
+        return llvm::None;
+      });
+
       typeWitnesses.insert(assocType, {resolvedTy, reqDepth});
 
       if (auto *defaultedAssocType =
@@ -1406,11 +1419,27 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
       // Try to compute the type without the aid of a specific potential
       // witness.
       if (const auto &typeWitness = computeAbstractTypeWitness(assocType)) {
+        auto resolvedTy = typeWitness->getType();
+
+        resolvedTy = resolvedTy.transformRec([&](Type ty) -> llvm::Optional<Type> {
+          if (auto *gp = ty->getAs<GenericTypeParamType>()) {
+            // FIXME: 'computeFixedTypeWitness' uses 'getReducedType',
+            // so if a generic parameter is canonical here, it's 'Self'.
+            if (gp->isCanonical() ||
+                isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
+              return adoptee;
+            }
+          }
+
+          return llvm::None;
+        });
+
         // Record the type witness immediately to make it available
         // for substitutions into other tentative type witnesses.
-        typeWitnesses.insert(assocType, {typeWitness->getType(), reqDepth});
+        typeWitnesses.insert(assocType, {resolvedTy, reqDepth});
 
-        abstractTypeWitnesses.push_back(std::move(typeWitness.value()));
+        abstractTypeWitnesses.emplace_back(assocType, resolvedTy,
+                                           typeWitness->getDefaultedAssocType());
         continue;
       }
 
@@ -1441,7 +1470,7 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
                << " " << type << "\n";);
 
     // Replace type parameters with other known or tentative type witnesses.
-    if (type->hasTypeParameter()) {
+    if (type->hasDependentMember() || type->hasTypeParameter()) {
       // FIXME: We should find a better way to detect and reason about these
       // cyclic solutions so that we can spot them earlier and express them in
       // diagnostics.
@@ -1450,17 +1479,6 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 
       std::function<Type(Type)> substCurrentTypeWitnesses;
       substCurrentTypeWitnesses = [&](Type ty) -> Type {
-        if (auto *gp = ty->getAs<GenericTypeParamType>()) {
-          // FIXME: 'computeFixedTypeWitness' uses 'getReducedType',
-          // so if a generic parameter is canonical here, it's 'Self'.
-          if (gp->isCanonical() ||
-              isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
-            return adoptee;
-          }
-
-          return ty;
-        }
-
         auto *const dmt = ty->getAs<DependentMemberType>();
         if (!dmt) {
           return ty;
