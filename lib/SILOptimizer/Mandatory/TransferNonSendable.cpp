@@ -482,7 +482,7 @@ bool PartialApplyReachabilityDataflow::isReachable(SILValue value,
     return false;
 
   auto genEnd = genStart;
-  while (genEnd->first == baseValue)
+  while (genEnd != valueToGenInsts.end() && genEnd->first == baseValue)
     ++genEnd;
 
   // Walk forward from the beginning of the block to user. If we do not find a
