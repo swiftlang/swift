@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftCore.dylib > %t/symbols
-// RUN: %abi-symbol-checker %s %t/symbols
+// RUN: %abi-symbol-checker %s %t/symbols --base %S/stdlib.swift
 // RUN: diff -u %S/../../Inputs/macOS/arm64/stdlib/baseline-asserts %t/symbols
 
 // REQUIRES: swift_stdlib_asserts
@@ -34,15 +34,10 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
+// *** NOTE: ***
+// You will normally add new entries in 'abi/macOS/arm64/stdlib.swift' instead
+// of this file. This file is dedicated for assert only symbols.
+
 // Standard Library Symbols
-
-// Swift._getRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss15_getRetainCountySuyXlF
-
-// Swift._getWeakRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss19_getWeakRetainCountySuyXlF
-
-// Swift._getUnownedRetainCount(Swift.AnyObject) -> Swift.UInt
-Added: _$ss22_getUnownedRetainCountySuyXlF
 
 // Runtime Symbols

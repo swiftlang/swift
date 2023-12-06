@@ -4,14 +4,9 @@ import argparse
 import sys
 
 
-def checkSymbols(changesFile, symbolsFile):
+def getAdditionsAndRemovals(changesFile):
     changesF = open(changesFile)
-    # We need to write back to the temporary symbol file for diffing
-    symbolsF = open(symbolsFile, 'r+')
-
     changes = changesF.read()
-    symbols = symbolsF.read().splitlines()
-
     changesF.close()
 
     # Get rid of lines that start with either '//' or a newline
@@ -26,6 +21,29 @@ def checkSymbols(changesFile, symbolsFile):
     additions = list(map(lambda a: a.removeprefix('Added: '), additions))
     # Map the removals by removing the 'Removed: ' prefix to get just the symbol
     removals = list(map(lambda r: r.removeprefix('Removed: '), removals))
+
+    return (additions, removals)
+
+
+def checkSymbols(args):
+    # If we were passed a base file, read those changes first. This most likely
+    # occurs in assert configurations getting the non-assert base.
+    baseAdditions = []
+    baseRemovals = []
+
+    if args.base:
+        (baseAdditions, baseRemovals) = getAdditionsAndRemovals(args.base)
+
+    (additions, removals) = getAdditionsAndRemovals(args.changes)
+
+    # Append the base additions and removals to ours.
+    additions.extend(baseAdditions)
+    removals.extend(baseRemovals)
+
+    # We need to write back to the temporary symbol file for diffing
+    symbolsF = open(args.symbols, 'r+')
+
+    symbols = symbolsF.read().splitlines()
 
     # Check for added symbols that are not actually in the just built dylib.
     notInDylib = [a for a in additions if a not in symbols]
@@ -69,10 +87,11 @@ def main(arguments):
 
     parser.add_argument('changes', help='the changes file')
     parser.add_argument('symbols', help='the symbols file')
+    parser.add_argument('--base',  help='the base changes file')
 
     args = parser.parse_args(arguments)
 
-    checkSymbols(args.changes, args.symbols)
+    checkSymbols(args)
 
 
 sys.exit(main(sys.argv[1:]))
