@@ -109,10 +109,10 @@ func ifLet(test: Int?) {
 
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
-// CHECK1-NEXT: 1:7 - 2
-// CHECK1-NEXT: 6:11 - 2
-// CHECK1-NEXT: 6:16 - 2
-// CHECK1-NEXT: 9:11 - 2
+// CHECK1-NEXT: 1:7 - 2 - source.syntacticrename.definition
+// CHECK1-NEXT: 6:11 - 2 - source.syntacticrename.reference
+// CHECK1-NEXT: 6:16 - 2 - source.syntacticrename.reference
+// CHECK1-NEXT: 9:11 - 2 - source.syntacticrename.reference
 // CHECK1-NEXT: END RANGES
 
 // RUN: %sourcekitd-test -req=related-idents -pos=5:9 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK2 %s

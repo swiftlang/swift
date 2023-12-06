@@ -2858,6 +2858,19 @@ reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
 // FindRelatedIdents
 //===----------------------------------------------------------------------===//
 
+static sourcekitd_uid_t renameLocUsageUID(swift::ide::RenameLocUsage Usage) {
+  switch (Usage) {
+  case swift::ide::RenameLocUsage::Definition:
+    return KindDefinition;
+  case swift::ide::RenameLocUsage::Reference:
+    return KindReference;
+  case swift::ide::RenameLocUsage::Call:
+    return KindCall;
+  case swift::ide::RenameLocUsage::Unknown:
+    return KindUnknown;
+  }
+}
+
 static void findRelatedIdents(StringRef PrimaryFilePath,
                               StringRef InputBufferName, int64_t Offset,
                               bool CancelOnSubsequentRequest,
@@ -2882,6 +2895,7 @@ static void findRelatedIdents(StringRef PrimaryFilePath,
           auto Elem = Arr.appendDictionary();
           Elem.set(KeyOffset, R.Offset);
           Elem.set(KeyLength, R.Length);
+          Elem.set(KeyNameType, renameLocUsageUID(R.Usage));
         }
 
         Rec(RespBuilder.createResponse());

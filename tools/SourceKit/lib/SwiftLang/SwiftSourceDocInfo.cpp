@@ -2596,7 +2596,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
           }
           unsigned Offset = SrcMgr.getLocOffsetInBuffer(
               ResolvedLoc.range.getStart(), BufferID);
-          Ranges.push_back({Offset, ResolvedLoc.range.getByteLength()});
+          Ranges.push_back(
+              {Offset, ResolvedLoc.range.getByteLength(), RenameLoc.Usage});
         }
       };
       Action();

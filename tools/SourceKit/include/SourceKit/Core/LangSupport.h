@@ -786,6 +786,7 @@ struct SemanticRefactoringInfo {
 struct RelatedIdentInfo {
   unsigned Offset;
   unsigned Length;
+  swift::ide::RenameLocUsage Usage;
 };
 
 /// Represent one branch of an if config.
