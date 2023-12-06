@@ -23,14 +23,13 @@ public enum _DebugDescriptionPropertyMacro {}
 /// The job of conversion is split across two macros. This macro performs some analysis on the attached
 /// type, and then delegates to `@_DebugDescriptionProperty` to perform the conversion step.
 extension DebugDescriptionMacro: MemberAttributeMacro {
-  public static func expansion<DeclGroup, DeclSyntax, Context>(
+  public static func expansion(
     of node: AttributeSyntax,
-    attachedTo declaration: DeclGroup,
-    providingAttributesFor member: DeclSyntax,
-    in context: Context
+    attachedTo declaration: some DeclGroupSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   )
   throws -> [AttributeSyntax]
-  where DeclGroup: DeclGroupSyntax, DeclSyntax: DeclSyntaxProtocol, Context: MacroExpansionContext
   {
     guard !declaration.is(ProtocolDeclSyntax.self) else {
       let message: ErrorMessage = "cannot be attached to a protocol"
@@ -119,13 +118,12 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
 ///
 /// See https://lldb.llvm.org/use/variable.html#type-summary
 extension _DebugDescriptionPropertyMacro: PeerMacro {
-  public static func expansion<Decl, Context>(
+  public static func expansion(
     of node: AttributeSyntax,
-    providingPeersOf declaration: Decl,
-    in context: Context
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
   )
   throws -> [DeclSyntax]
-  where Decl: DeclSyntaxProtocol, Context: MacroExpansionContext
   {
     guard let arguments = node.arguments else {
       // Assertion as a diagnostic.
@@ -346,7 +344,7 @@ extension MacroExpansionContext {
 extension MacroExpansionContext {
   /// Determine the module name of the Syntax node, via its fileID.
   /// See https://developer.apple.com/documentation/swift/fileid()
-  fileprivate func moduleName<T: SyntaxProtocol>(of node: T) -> String? {
+  fileprivate func moduleName(of node: some SyntaxProtocol) -> String? {
     if let fileID = self.location(of: node)?.file.as(StringLiteralExprSyntax.self)?.representedLiteralValue,
        let firstSlash = fileID.firstIndex(of: "/") {
       return String(fileID.prefix(upTo: firstSlash))
