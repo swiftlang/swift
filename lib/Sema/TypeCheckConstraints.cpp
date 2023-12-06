@@ -152,6 +152,11 @@ bool TypeVariableType::Implementation::isKeyPathValue() const {
   return locator && locator->isKeyPathValue();
 }
 
+bool TypeVariableType::Implementation::isKeyPathSubscriptIndex() const {
+  return locator &&
+         locator->isLastElement<LocatorPathElt::KeyPathSubscriptIndex>();
+}
+
 bool TypeVariableType::Implementation::isSubscriptResultType() const {
   if (!(locator && locator->getAnchor()))
     return false;
@@ -184,6 +189,11 @@ bool TypeVariableType::Implementation::isOpaqueType() const {
   }
 
   return false;
+}
+
+bool TypeVariableType::Implementation::isCollectionLiteralType() const {
+  return locator && (locator->directlyAt<ArrayExpr>() ||
+                     locator->directlyAt<DictionaryExpr>());
 }
 
 void *operator new(size_t bytes, ConstraintSystem& cs,
@@ -448,8 +458,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // First, pre-check the target, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckTarget(
-          target, /*replaceInvalidRefsWithErrors=*/true,
-          options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
+          target, /*replaceInvalidRefsWithErrors=*/true)) {
     return llvm::None;
   }
 
@@ -467,9 +476,6 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
 
   if (DiagnosticSuppression::isEnabled(Context.Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
-
-  if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
-    csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;

@@ -266,6 +266,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     auto expansion = SF->getMacroExpansion();
 
     // Determine the parent source location based on the macro role.
+    AbstractFunctionDecl *bodyForDecl = nullptr;
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
@@ -275,6 +276,16 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::Conformance:
     case MacroRole::Extension:
       parentLoc = expansion.getStartLoc();
+      break;
+    case MacroRole::Preamble: {
+      // Preamble macro roles start at the beginning of the macro body.
+      auto func = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+      parentLoc = func->getMacroExpandedBody()->getStartLoc();
+      break;
+    }
+    case MacroRole::Body:
+      parentLoc = expansion.getEndLoc();
+      bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
       break;
     case MacroRole::Peer: {
       ASTContext &ctx = SF->getASTContext();
@@ -297,6 +308,12 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     }
 
     if (auto parentScope = findStartingScopeForLookup(enclosingSF, parentLoc)) {
+      if (bodyForDecl) {
+        auto bodyScope = new (bodyForDecl->getASTContext()) FunctionBodyScope(bodyForDecl);
+        bodyScope->parentAndWasExpanded.setPointer(const_cast<ASTScopeImpl *>(parentScope));
+        parentScope = bodyScope;
+      }
+
       parentAndWasExpanded.setPointer(const_cast<ASTScopeImpl *>(parentScope));
     }
   }
@@ -986,7 +1003,7 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // Create scope for the body.
   // We create body scopes when there is no body for source kit to complete
   // erroneous code in bodies.
-  if (decl->getBodySourceRange().isValid()) {
+  if (decl->getOriginalBodySourceRange().isValid()) {
     scopeCreator.constructExpandAndInsert<FunctionBodyScope>(leaf, decl);
   }
 }
@@ -1306,7 +1323,7 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
 #pragma mark - expandBody
 
 void FunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
-  scopeCreator.addToScopeTree(decl->getBody(), this);
+  scopeCreator.addToScopeTree(decl->getMacroExpandedBody(), this);
 }
 
 void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}

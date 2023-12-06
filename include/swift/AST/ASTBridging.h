@@ -16,6 +16,9 @@
 // Do not add other C++/llvm/swift header files here!
 // Function implementations should be placed into ASTBridging.cpp and required header files should be added there.
 //
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+//
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -30,6 +33,8 @@ class ASTContext;
 class DiagnosticArgument;
 class DiagnosticEngine;
 }
+
+class BridgedASTContext;
 
 //===----------------------------------------------------------------------===//
 // MARK: Identifier
@@ -60,13 +65,89 @@ inline const void *_Nullable BridgedIdentifier_raw(BridgedIdentifier ident) {
   return ident.Raw;
 }
 
-struct BridgedIdentifierAndSourceLoc {
+struct BridgedLocatedIdentifier {
   SWIFT_NAME("name")
   BridgedIdentifier Name;
 
   SWIFT_NAME("nameLoc")
   BridgedSourceLoc NameLoc;
 };
+
+class BridgedDeclBaseName {
+  BridgedIdentifier Ident;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDeclBaseName(swift::DeclBaseName baseName) : Ident(baseName.Ident) {}
+
+  swift::DeclBaseName unbridged() const {
+    return swift::DeclBaseName(Ident.unbridged());
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedDeclBaseName.createConstructor()")
+BridgedDeclBaseName BridgedDeclBaseName_createConstructor();
+
+SWIFT_NAME("BridgedDeclBaseName.createDestructor()")
+BridgedDeclBaseName BridgedDeclBaseName_createDestructor();
+
+SWIFT_NAME("BridgedDeclBaseName.createSubscript()")
+BridgedDeclBaseName BridgedDeclBaseName_createSubscript();
+
+SWIFT_NAME("BridgedDeclBaseName.createIdentifier(_:)")
+BridgedDeclBaseName
+BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier);
+
+class BridgedDeclNameRef {
+  void *_Nonnull opaque;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDeclNameRef(swift::DeclNameRef name) : opaque(name.getOpaqueValue()) {}
+
+  swift::DeclNameRef unbridged() const {
+    return swift::DeclNameRef::getFromOpaqueValue(opaque);
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:baseName:argumentLabels:)")
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                BridgedDeclBaseName cBaseName,
+                                BridgedArrayRef cLabels);
+
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:)")
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedDeclBaseName cBaseName);
+
+class BridgedDeclNameLoc {
+  const void *_Nonnull LocationInfo;
+  size_t NumArgumentLabels;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDeclNameLoc(swift::DeclNameLoc loc)
+      : LocationInfo(loc.LocationInfo),
+        NumArgumentLabels(loc.NumArgumentLabels) {}
+
+  swift::DeclNameLoc unbridged() const {
+    return swift::DeclNameLoc(LocationInfo, NumArgumentLabels);
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:baseNameLoc:lParenLoc:"
+           "argumentLabelLocs:rParenLoc:)")
+BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cBaseNameLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cLabelLocs,
+    BridgedSourceLoc cRParenLoc);
+
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:)")
+BridgedDeclNameLoc
+BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
@@ -563,6 +644,18 @@ BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME(
+    "BridgedArrowExpr.createParsed(_:asyncLoc:throwsLoc:thrownType:arrowLoc:)")
+BridgedArrowExpr BridgedArrowExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAsyncLoc,
+                                               BridgedSourceLoc cThrowsLoc,
+                                               BridgedNullableExpr cThrownType,
+                                               BridgedSourceLoc cArrowLoc);
+
+SWIFT_NAME("BridgedAssignExpr.createParsed(_:equalsLoc:)")
+BridgedAssignExpr BridgedAssignExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cEqualsLoc);
+
 SWIFT_NAME("BridgedCallExpr.createParsed(_:fn:args:)")
 BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
@@ -574,9 +667,34 @@ BridgedClosureExpr_createParsed(BridgedASTContext cContext,
                                 BridgedDeclContext cDeclContext,
                                 BridgedBraceStmt body);
 
-SWIFT_NAME("BridgedUnresolvedDeclRefExpr.createParsed(_:base:loc:)")
-BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
-    BridgedASTContext cContext, BridgedIdentifier base, BridgedSourceLoc cLoc);
+SWIFT_NAME("BridgedCoerceExpr.createParsed(_:asLoc:type:)")
+BridgedCoerceExpr BridgedCoerceExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cAsLoc,
+                                                 BridgedTypeRepr cType);
+
+SWIFT_NAME(
+    "BridgedConditionalCheckedCastExpr.createParsed(_:asLoc:questionLoc:type:)")
+BridgedConditionalCheckedCastExpr
+BridgedConditionalCheckedCastExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAsLoc,
+                                               BridgedSourceLoc cQuestionLoc,
+                                               BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedDiscardAssignmentExpr.createParsed(_:loc:)")
+BridgedDiscardAssignmentExpr
+BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
+                                          BridgedSourceLoc cLoc);
+
+SWIFT_NAME(
+    "BridgedForcedCheckedCastExpr.createParsed(_:asLoc:exclaimLoc:type:)")
+BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
+    BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedIsExpr.createParsed(_:isLoc:type:)")
+BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
+                                         BridgedSourceLoc cIsLoc,
+                                         BridgedTypeRepr cType);
 
 SWIFT_NAME("BridgedSingleValueStmtExpr.createWithWrappedBranches(_:stmt:"
            "declContext:mustBeExpr:)")
@@ -593,6 +711,11 @@ BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedSequenceExpr.createParsed(_:exprs:)")
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
                                                      BridgedArrayRef exprs);
+
+SWIFT_NAME("BridgedTernaryExpr.createParsed(_:questionLoc:thenExpr:colonLoc:)")
+BridgedTernaryExpr BridgedTernaryExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cQuestionLoc,
+    BridgedExpr cThenExpr, BridgedSourceLoc cColonLoc);
 
 SWIFT_NAME("BridgedTupleExpr.createParsed(_:leftParenLoc:exprs:labels:"
            "labelLocs:rightParenLoc:)")
@@ -624,10 +747,41 @@ BridgedArrayExpr BridgedArrayExpr_createParsed(BridgedASTContext cContext,
                                                BridgedArrayRef commas,
                                                BridgedSourceLoc cRLoc);
 
+SWIFT_NAME("BridgedPostfixUnaryExpr.createParsed(_:operator:operand:)")
+BridgedPostfixUnaryExpr
+BridgedPostfixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedExpr oper, BridgedExpr operand);
+
+SWIFT_NAME("BridgedPrefixUnaryExpr.createParsed(_:operator:operand:)")
+BridgedPrefixUnaryExpr
+BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedExpr oper, BridgedExpr operand);
+
+SWIFT_NAME("BridgedTypeExpr.createParsed(_:type:)")
+BridgedTypeExpr BridgedTypeExpr_createParsed(BridgedASTContext cContext,
+                                             BridgedTypeRepr cType);
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDeclRefKind : size_t {
+  BridgedDeclRefKindOrdinary,
+  BridgedDeclRefKindBinaryOperator,
+  BridgedDeclRefKindPostfixOperator,
+  BridgedDeclRefKindPrefixOperator,
+};
+
+SWIFT_NAME("BridgedUnresolvedDeclRefExpr.createParsed(_:name:kind:loc:)")
+BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
+    BridgedASTContext cContext, BridgedDeclNameRef cName,
+    BridgedDeclRefKind cKind, BridgedDeclNameLoc cLoc);
+
 SWIFT_NAME("BridgedUnresolvedDotExpr.createParsed(_:base:dotLoc:name:nameLoc:)")
 BridgedUnresolvedDotExpr BridgedUnresolvedDotExpr_createParsed(
     BridgedASTContext cContext, BridgedExpr base, BridgedSourceLoc cDotLoc,
-    BridgedIdentifier name, BridgedSourceLoc cNameLoc);
+    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc);
+
+SWIFT_NAME("BridgedUnresolvedMemberExpr.createParsed(_:dotLoc:name:nameLoc:)")
+BridgedUnresolvedMemberExpr BridgedUnresolvedMemberExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cDotLoc,
+    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc);
 
 SWIFT_NAME("BridgedExpr.dump(self:)")
 void BridgedExpr_dump(BridgedExpr expr);
@@ -646,7 +800,8 @@ SWIFT_NAME("BridgedIfStmt.createParsed(_:ifKeywordLoc:condition:thenStmt:"
            "elseLoc:elseStmt:)")
 BridgedIfStmt BridgedIfStmt_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIfLoc,
-                                         BridgedExpr cond, BridgedStmt then,
+                                         BridgedExpr cond,
+                                         BridgedBraceStmt then,
                                          BridgedSourceLoc cElseLoc,
                                          BridgedNullableStmt elseStmt);
 

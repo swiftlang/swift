@@ -880,8 +880,8 @@ namespace {
       Type resultTy;
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
-        Type erasedTy = resultTy->typeEraseOpenedArchetypesWithRoot(
-            record.Archetype, dc);
+        Type erasedTy = constraints::typeEraseOpenedArchetypesWithRoot(
+            resultTy, record.Archetype);
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
@@ -1590,8 +1590,8 @@ namespace {
         } else {
           // Erase opened existentials from the type of the thunk; we're
           // going to open the existential inside the thunk's body.
-          containerTy = containerTy->typeEraseOpenedArchetypesWithRoot(
-              knownOpened->second, dc);
+          containerTy = constraints::typeEraseOpenedArchetypesWithRoot(
+              containerTy, knownOpened->second);
           selfTy = containerTy;
         }
       }
@@ -1673,8 +1673,8 @@ namespace {
           // If the base was an opened existential, erase the opened
           // existential.
           if (openedExistential) {
-            refType = refType->typeEraseOpenedArchetypesWithRoot(
-                baseTy->castTo<OpenedArchetypeType>(), dc);
+            refType = constraints::typeEraseOpenedArchetypesWithRoot(
+                refType, baseTy->castTo<OpenedArchetypeType>());
           }
 
           return refType;
@@ -1884,8 +1884,8 @@ namespace {
               getConstraintSystem().getConstraintLocator(memberLocator));
           if (knownOpened != solution.OpenedExistentialTypes.end()) {
             curryThunkTy =
-                curryThunkTy
-                    ->typeEraseOpenedArchetypesWithRoot(knownOpened->second, dc)
+                constraints::typeEraseOpenedArchetypesWithRoot(
+                  curryThunkTy, knownOpened->second)
                     ->castTo<FunctionType>();
           }
         }
@@ -2350,11 +2350,10 @@ namespace {
     /// Build an implicit argument for keypath based dynamic lookup,
     /// which consists of KeyPath expression and a single component.
     ///
-    /// \param keyPathTy The type of the keypath argument.
+    /// \param argType The type of the keypath subscript argument.
     /// \param dotLoc The location of the '.' preceding member name.
     /// \param memberLoc The locator to be associated with new argument.
-    Expr *buildKeyPathDynamicMemberArgExpr(BoundGenericType *keyPathTy,
-                                           SourceLoc dotLoc,
+    Expr *buildKeyPathDynamicMemberArgExpr(Type argType, SourceLoc dotLoc,
                                            ConstraintLocator *memberLoc) {
       using Component = KeyPathExpr::Component;
       auto &ctx = cs.getASTContext();
@@ -2363,7 +2362,7 @@ namespace {
       auto makeKeyPath = [&](ArrayRef<Component> components) -> Expr * {
         auto *kp = KeyPathExpr::createImplicit(ctx, /*backslashLoc*/ dotLoc,
                                                components, anchor->getEndLoc());
-        kp->setType(keyPathTy);
+        kp->setType(argType);
         cs.cacheExprTypes(kp);
 
         // See whether there's an equivalent ObjC key path string we can produce
@@ -2371,6 +2370,12 @@ namespace {
         checkAndSetObjCKeyPathString(kp);
         return kp;
       };
+
+      Type keyPathTy = argType;
+      if (auto *existential = keyPathTy->getAs<ExistentialType>()) {
+        keyPathTy = existential->getSuperclass();
+        assert(isKnownKeyPathType(keyPathTy));
+      }
 
       SmallVector<Component, 2> components;
       auto *componentLoc = cs.getConstraintLocator(
@@ -3482,8 +3487,8 @@ namespace {
         auto fieldName = overload.choice.getName().getBaseIdentifier().str();
         argExpr = buildDynamicMemberLookupArgExpr(fieldName, nameLoc, paramTy);
       } else {
-        argExpr = buildKeyPathDynamicMemberArgExpr(
-            paramTy->castTo<BoundGenericType>(), dotLoc, memberLocator);
+        argExpr =
+            buildKeyPathDynamicMemberArgExpr(paramTy, dotLoc, memberLocator);
       }
 
       if (!argExpr)
@@ -5009,6 +5014,11 @@ namespace {
         baseTy = fnTy->getParams()[0].getParameterType();
         leafTy = fnTy->getResult();
         isFunctionType = true;
+      } else if (auto *existential = exprType->getAs<ExistentialType>()) {
+        auto layout = existential->getExistentialLayout();
+        auto keyPathTy = layout.explicitSuperclass->castTo<BoundGenericType>();
+        baseTy = keyPathTy->getGenericArgs()[0];
+        leafTy = keyPathTy->getGenericArgs()[1];
       } else {
         auto keyPathTy = exprType->castTo<BoundGenericType>();
         baseTy = keyPathTy->getGenericArgs()[0];
@@ -8749,11 +8759,8 @@ namespace {
         return true;
 
       case SolutionApplicationToFunctionResult::Delay: {
-        if (!Rewriter.cs.Options
-                .contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked)) {
-          auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
-          ClosuresToTypeCheck.push_back(closure);
-        }
+        auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
+        ClosuresToTypeCheck.push_back(closure);
         return false;
       }
       }

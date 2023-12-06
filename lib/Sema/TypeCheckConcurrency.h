@@ -202,6 +202,10 @@ struct ActorReferenceResult {
 
     /// The declaration is being accessed from a @preconcurrency context.
     Preconcurrency = 1 << 3,
+
+    /// Only arguments cross an isolation boundary, e.g. because they
+    /// escape into an actor in a nonisolated actor initializer.
+    OnlyArgsCrossIsolation = 1 << 4,
   };
 
   using Options = OptionSet<Flags>;
@@ -212,13 +216,13 @@ struct ActorReferenceResult {
 
 private:
   static ActorReferenceResult forSameConcurrencyDomain(
-      ActorIsolation isolation);
+      ActorIsolation isolation, Options options = llvm::None);
 
   static ActorReferenceResult forEntersActor(
       ActorIsolation isolation, Options options);
 
   static ActorReferenceResult forExitsActorToNonisolated(
-      ActorIsolation isolation);
+      ActorIsolation isolation, Options options = llvm::None);
 
 public:
   /// Determine what happens when referencing the given declaration from the
@@ -555,6 +559,13 @@ bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
     const DeclContext *fromDC,
     llvm::Optional<ReferencedActor> actorInstance = llvm::None);
+
+/// Determines if the 'let' can be read from anywhere within the given module,
+/// regardless of the isolation or async-ness of the context in which
+/// the var is read.
+bool isLetAccessibleAnywhere(const ModuleDecl *fromModule,
+                             VarDecl *let,
+                             ActorReferenceResult::Options &options);
 
 /// Check whether given variable references to a potentially
 /// isolated actor.

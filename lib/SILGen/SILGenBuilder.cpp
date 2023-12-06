@@ -681,7 +681,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
   if (!type.isAddressOnly(getFunction()) ||
       !SGF.silConv.useLoweredAddresses()) {
     SILValue noneValue = createOptionalNone(loc, type);
-    return ManagedValue::forObjectRValueWithoutOwnership(noneValue);
+    return SGF.emitManagedRValueWithCleanup(noneValue);
   }
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, type);

@@ -125,12 +125,22 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
                                                  AccessorDecl *getter,
                                                  AccessorDecl *setter) {
   assert(getter);
+  // The synthesized computed property can either use a `get` or an
+  // `unsafeAddress` accessor.
+  auto isAddress = getter->getAccessorKind() == AccessorKind::Address;
   storage->getASTContext().evaluator.cacheOutput(HasStorageRequest{storage}, false);
   if (setter) {
-    storage->setImplInfo(StorageImplInfo::getMutableComputed());
+    if (isAddress)
+      assert(setter->getAccessorKind() == AccessorKind::MutableAddress);
+    storage->setImplInfo(
+        isAddress ? StorageImplInfo(ReadImplKind::Address,
+                                    WriteImplKind::MutableAddress,
+                                    ReadWriteImplKind::MutableAddress)
+                  : StorageImplInfo::getMutableComputed());
     storage->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
   } else {
-    storage->setImplInfo(StorageImplInfo::getImmutableComputed());
+    storage->setImplInfo(isAddress ? StorageImplInfo(ReadImplKind::Address)
+                                   : StorageImplInfo::getImmutableComputed());
     storage->setAccessors(SourceLoc(), {getter}, SourceLoc());
   }
 }
@@ -2183,17 +2193,23 @@ namespace {
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       if (recordHasMoveOnlySemantics(decl)) {
-        if (!Impl.SwiftContext.LangOpts.hasFeature(Feature::MoveOnly)) {
+        if (Impl.isCxxInteropCompatVersionAtLeast(
+                version::getUpcomingCxxInteropCompatVersion())) {
+          if (decl->isInStdNamespace() && decl->getName() == "promise") {
+            // Do not import std::promise.
+            return nullptr;
+          }
+          result->getAttrs().add(new (Impl.SwiftContext)
+                                     MoveOnlyAttr(/*Implicit=*/true));
+        } else {
           Impl.addImportDiagnostic(
-              decl, Diagnostic(
-                        diag::move_only_requires_move_only,
-                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+              decl,
+              Diagnostic(
+                  diag::move_only_requires_move_only,
+                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
               decl->getLocation());
           return nullptr;
         }
-
-        result->getAttrs().add(new (Impl.SwiftContext)
-                                   MoveOnlyAttr(/*Implicit=*/true));
       }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -2294,56 +2310,6 @@ namespace {
         }
 
         if (auto MD = dyn_cast<FuncDecl>(member)) {
-          if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(m)) {
-            ImportedName methodImportedName =
-                Impl.importFullName(cxxMethod, getActiveSwiftVersion());
-            auto cxxOperatorKind = cxxMethod->getOverloadedOperator();
-
-            if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_PlusPlus) {
-              // Make sure the type is not a foreign reference type.
-              // We cannot handle `operator++` for those types, since the
-              // current implementation creates a new instance of the type.
-              if (cxxMethod->param_empty() && !isa<ClassDecl>(result)) {
-                // This is a pre-increment operator. We synthesize a
-                // non-mutating function called `successor() -> Self`.
-                FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(MD);
-                result->addMember(successorFunc);
-
-                Impl.markUnavailable(MD, "use .successor()");
-              } else {
-                Impl.markUnavailable(MD, "unable to create .successor() func");
-              }
-              MD->overwriteAccess(AccessLevel::Private);
-            }
-            // Check if this method _is_ an overloaded operator but is not a
-            // call / subscript / dereference / increment. Those
-            // operators do not need static versions.
-            else if (cxxOperatorKind !=
-                         clang::OverloadedOperatorKind::OO_None &&
-                     cxxOperatorKind !=
-                         clang::OverloadedOperatorKind::OO_PlusPlus &&
-                     cxxOperatorKind !=
-                         clang::OverloadedOperatorKind::OO_Call &&
-                     !methodImportedName.isSubscriptAccessor() &&
-                     !methodImportedName.isDereferenceAccessor()) {
-
-              auto opFuncDecl = synthesizer.makeOperator(MD, cxxMethod);
-
-              Impl.addAlternateDecl(MD, opFuncDecl);
-
-              auto msg = "use " + std::string{clang::getOperatorSpelling(cxxOperatorKind)} + " instead";
-              Impl.markUnavailable(MD,msg);
-
-              // Make the actual member operator private.
-              MD->overwriteAccess(AccessLevel::Private);
-
-              // Make sure the synthesized decl can be found by lookupDirect.
-              result->addMemberToLookupTable(opFuncDecl);
-
-              addEntryToLookupTable(*Impl.findLookupTable(decl), cxxMethod,
-                                    Impl.getNameImporter());
-            }
-          }
           methods.push_back(MD);
           continue;
         }
@@ -2710,13 +2676,13 @@ namespace {
                       ctorUsingShadowDecl->getTargetDecl());
                   if (!baseCtorDecl || baseCtorDecl->isDeleted())
                     continue;
+                  auto loc = ctorUsingShadowDecl->getLocation();
+
                   auto derivedCtorDecl = clangSema.findInheritingConstructor(
-                      clang::SourceLocation(), baseCtorDecl,
-                      ctorUsingShadowDecl);
+                      loc, baseCtorDecl, ctorUsingShadowDecl);
                   if (!derivedCtorDecl->isDefined() &&
                       !derivedCtorDecl->isDeleted())
-                    clangSema.DefineInheritingConstructor(
-                        clang::SourceLocation(), derivedCtorDecl);
+                    clangSema.DefineInheritingConstructor(loc, derivedCtorDecl);
                 }
               }
             }
@@ -3005,6 +2971,21 @@ namespace {
       if (isSpecializationDepthGreaterThan(def, 8))
         return nullptr;
 
+      // For class template instantiations, we need to add their member
+      // operators to the lookup table to make them discoverable with
+      // unqualified lookup. This makes it possible to implement a Swift
+      // protocol requirement with an instantiation of a C++ member operator.
+      // This cannot be done when building the lookup table,
+      // because templates are instantiated lazily.
+      for (auto member : def->decls()) {
+        if (auto method = dyn_cast<clang::CXXMethodDecl>(member)) {
+          if (method->isOverloadedOperator()) {
+            addEntryToLookupTable(*Impl.findLookupTable(decl), method,
+                                  Impl.getNameImporter());
+          }
+        }
+      }
+
       return VisitCXXRecordDecl(def);
     }
 
@@ -3263,12 +3244,19 @@ namespace {
     }
 
     /// Handles special functions such as subscripts and dereference operators.
-    bool processSpecialImportedFunc(FuncDecl *func, ImportedName importedName) {
+    bool
+    processSpecialImportedFunc(FuncDecl *func, ImportedName importedName,
+                               clang::OverloadedOperatorKind cxxOperatorKind) {
+      if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_None)
+        return true;
+
       auto dc = func->getDeclContext();
+      auto typeDecl = dc->getSelfNominalTypeDecl();
+      if (!typeDecl)
+        return true;
 
       if (importedName.isSubscriptAccessor()) {
         assert(func->getParameters()->size() == 1);
-        auto typeDecl = dc->getSelfNominalTypeDecl();
         auto parameter = func->getParameters()->get(0);
         auto parameterType = parameter->getTypeInContext();
         if (!typeDecl || !parameterType)
@@ -3298,10 +3286,10 @@ namespace {
         }
 
         Impl.markUnavailable(func, "use subscript");
+        return true;
       }
 
       if (importedName.isDereferenceAccessor()) {
-        auto typeDecl = dc->getSelfNominalTypeDecl();
         auto &getterAndSetter = Impl.cxxDereferenceOperators[typeDecl];
 
         switch (importedName.getAccessorKind()) {
@@ -3316,6 +3304,42 @@ namespace {
         }
 
         Impl.markUnavailable(func, "use .pointee property");
+        return true;
+      }
+
+      if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_PlusPlus) {
+        // Make sure the type is not a foreign reference type.
+        // We cannot handle `operator++` for those types, since the
+        // current implementation creates a new instance of the type.
+        if (func->getParameters()->size() == 0 && !isa<ClassDecl>(typeDecl)) {
+          // This is a pre-increment operator. We synthesize a
+          // non-mutating function called `successor() -> Self`.
+          FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(func);
+          typeDecl->addMember(successorFunc);
+
+          Impl.markUnavailable(func, "use .successor()");
+        } else {
+          Impl.markUnavailable(func, "unable to create .successor() func");
+        }
+        func->overwriteAccess(AccessLevel::Private);
+        return true;
+      }
+
+      // Check if this method _is_ an overloaded operator but is not a
+      // call / subscript / dereference / increment. Those
+      // operators do not need static versions.
+      if (cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call) {
+        auto opFuncDecl = synthesizer.makeOperator(func, cxxOperatorKind);
+        Impl.addAlternateDecl(func, opFuncDecl);
+
+        Impl.markUnavailable(
+            func, (Twine("use ") + clang::getOperatorSpelling(cxxOperatorKind) +
+                   " instead")
+                      .str());
+
+        // Make sure the synthesized decl can be found by lookupDirect.
+        typeDecl->addMemberToLookupTable(opFuncDecl);
+        return true;
       }
 
       return true;
@@ -3644,7 +3668,8 @@ namespace {
         func->setAccess(AccessLevel::Public);
 
         if (!importFuncWithoutSignature) {
-          bool success = processSpecialImportedFunc(func, importedName);
+          bool success = processSpecialImportedFunc(
+              func, importedName, decl->getOverloadedOperator());
           if (!success)
             return nullptr;
         }
@@ -3711,9 +3736,33 @@ namespace {
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       auto method = VisitFunctionDecl(decl);
       if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
+
+        if (auto dc = method->getDeclContext();
+            !decl->isPure() &&
+            isa_and_nonnull<NominalTypeDecl>(dc->getAsDecl())) {
+
+          // generates the __synthesizedVirtualCall_ C++ thunk
+          clang::CXXMethodDecl *cxxThunk = synthesizeCxxVirtualMethod(
+              *static_cast<ClangImporter *>(
+                  dc->getASTContext().getClangModuleLoader()),
+              decl->getParent(), decl->getParent(), decl);
+
+          // call the __synthesizedVirtualCall_ C++ thunk from a Swift thunk
+          if (Decl *swiftThunk =
+                  cxxThunk ? VisitCXXMethodDecl(cxxThunk) : nullptr;
+              isa_and_nonnull<FuncDecl>(swiftThunk)) {
+            // synthesize the body of the Swift method to call the swiftThunk
+            synthesizeForwardingThunkBody(cast<FuncDecl>(method),
+                                          cast<FuncDecl>(swiftThunk));
+            return method;
+          }
+        }
+
         Impl.markUnavailable(
             cast<ValueDecl>(method),
-            "virtual functions are not yet available in Swift");
+            decl->isPure() ?
+            "virtual function is not available in Swift because it is pure" :
+            "virtual function is not available in Swift");
       }
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
@@ -3931,7 +3980,7 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
       auto dc = Impl.importDeclContextOf(
           decl, importedName.getEffectiveContext());
-
+      
       SmallVector<GenericTypeParamDecl *, 4> genericParams;
       for (auto &param : *decl->getTemplateParameters()) {
         auto genericParamDecl =
@@ -4000,6 +4049,12 @@ namespace {
       if (!importedDC)
         return nullptr;
 
+      // While importing the DeclContext, we might have imported the decl
+      // itself.
+      auto known = Impl.importDeclCached(decl, getVersion());
+      if (known.has_value())
+        return known.value();
+
       if (isa<clang::TypeDecl>(decl->getTargetDecl())) {
         Decl *SwiftDecl = Impl.importDecl(decl->getUnderlyingDecl(), getActiveSwiftVersion());
         if (!SwiftDecl)
@@ -4048,7 +4103,8 @@ namespace {
         if (!clonedMethod)
           return nullptr;
 
-        bool success = processSpecialImportedFunc(clonedMethod, importedName);
+        bool success = processSpecialImportedFunc(
+            clonedMethod, importedName, targetMethod->getOverloadedOperator());
         if (!success)
           return nullptr;
 

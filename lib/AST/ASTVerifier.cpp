@@ -28,6 +28,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -256,6 +257,13 @@ class Verifier : public ASTWalker {
       Out << "\n";
     }
     abort();
+  }
+
+  ModuleDecl *getModuleContext() const {
+    if (auto sourceFile = M.dyn_cast<SourceFile *>())
+      return sourceFile->getParentModule();
+
+    return M.get<ModuleDecl *>();
   }
 
 public:
@@ -1012,15 +1020,34 @@ public:
       return shouldVerifyChecked(S->getSubExpr());
     }
 
-    void verifyChecked(ThrowStmt *S) {
-      Type thrownError;
-      if (!Functions.empty()) {
-        if (auto fn = AnyFunctionRef::fromDeclContext(Functions.back()))
-          thrownError = fn->getThrownErrorType();
+    DeclContext *getInnermostDC() const {
+      for (auto scope : llvm::reverse(Scopes)) {
+        if (auto dc = scope.dyn_cast<DeclContext *>())
+          return dc;
       }
 
-      if (!thrownError)
-        thrownError = checkExceptionTypeExists("throw expression");
+      return nullptr;
+    }
+
+    void verifyChecked(ThrowStmt *S) {
+      Type thrownError;
+      SourceLoc loc = S->getThrowLoc();
+      if (loc.isValid()) {
+        auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
+        DeclContext *dc = getInnermostDC();
+        if (catchNode && dc) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(dc)) {
+            thrownError = *thrown;
+          } else {
+            thrownError = Ctx.getNeverType();
+          }
+        } else {
+          thrownError = checkExceptionTypeExists("throw expression");
+        }
+      } else {
+        return;
+      }
+
       checkSameType(S->getSubExpr()->getType(), thrownError, "throw operand");
       verifyCheckedBase(S);
     }
@@ -3813,7 +3840,17 @@ public:
       } else {
         llvm_unreachable("impossible parent node");
       }
-      
+
+      if (AltEnclosing.isInvalid()) {
+        // A preamble macro introduces child nodes directly into the tree.
+        auto *sourceFile =
+            getModuleContext()->getSourceFileContainingLocation(Current.Start);
+        if (sourceFile &&
+            sourceFile->getFulfilledMacroRole() == MacroRole::Preamble) {
+          AltEnclosing = Current;
+        }
+      }
+
       if (!Ctx.SourceMgr.rangeContains(Enclosing, Current) &&
           !(AltEnclosing.isValid() &&
             Ctx.SourceMgr.rangeContains(AltEnclosing, Current))) {

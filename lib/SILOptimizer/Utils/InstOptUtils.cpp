@@ -1347,55 +1347,6 @@ void swift::replaceLoadSequence(SILInstruction *inst, SILValue value) {
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
 
-/// Are the callees that could be called through Decl statically
-/// knowable based on the Decl and the compilation mode?
-bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
-  if (decl.isForeign)
-    return false;
-  return calleesAreStaticallyKnowable(module, decl.getDecl());
-}
-
-/// Are the callees that could be called through Decl statically
-/// knowable based on the Decl and the compilation mode?
-bool swift::calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd) {
-  assert(isa<AbstractFunctionDecl>(vd) || isa<EnumElementDecl>(vd));
-
-  // Only handle members defined within the SILModule's associated context.
-  if (!cast<DeclContext>(vd)->isChildContextOf(module.getAssociatedContext()))
-    return false;
-
-  if (vd->isDynamic()) {
-    return false;
-  }
-
-  if (!vd->hasAccess())
-    return false;
-
-  // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (vd->getEffectiveAccess()) {
-  case AccessLevel::Open:
-    return false;
-  case AccessLevel::Public:
-  case AccessLevel::Package:
-    if (isa<ConstructorDecl>(vd)) {
-      // Constructors are special: a derived class in another module can
-      // "override" a constructor if its class is "open", although the
-      // constructor itself is not open.
-      auto *nd = vd->getDeclContext()->getSelfNominalTypeDecl();
-      if (nd->getEffectiveAccess() == AccessLevel::Open)
-        return false;
-    }
-    LLVM_FALLTHROUGH;
-  case AccessLevel::Internal:
-    return module.isWholeModule();
-  case AccessLevel::FilePrivate:
-  case AccessLevel::Private:
-    return true;
-  }
-
-  llvm_unreachable("Unhandled access level in switch.");
-}
-
 llvm::Optional<FindLocalApplySitesResult>
 swift::findLocalApplySites(FunctionRefBaseInst *fri) {
   SmallVector<Operand *, 32> worklist(fri->use_begin(), fri->use_end());

@@ -121,3 +121,30 @@ print(\Controller[[42], [42]])
 print(\Controller[array: [42]])
 // CHECK: \Controller.
 print(\Controller[array: [42], array2: [42]])
+
+do {
+  struct S {
+    var i: Int
+  }
+
+  func test<T, U>(v: T, _ kp: any KeyPath<T, U> & Sendable) {
+    print(v[keyPath: kp])
+  }
+
+  // CHECK: 42
+  test(v: S(i: 42), \.i)
+}
+
+do {
+  @dynamicMemberLookup
+  struct Test<T> {
+    var obj: T
+
+    subscript<U>(dynamicMember member: KeyPath<T, U> & Sendable) -> U {
+      get { obj[keyPath: member] }
+    }
+  }
+
+  // CHECK: 5
+  print(Test(obj: "Hello").utf8.count)
+}

@@ -83,6 +83,8 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   /// Worklist of SILFunctions we are processing.
   llvm::SmallVector<SILFunction *, 128> Worklist;
 
+  llvm::SmallVector<SILFunction *, 32> toVerify;
+
   /// The current linking mode.
   LinkingMode Mode;
 

@@ -239,7 +239,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     return;
 
   auto *Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
-  if (SkipTypeProcessing.count(Ty))
+  // Ty is null for properties declared inside an extension of an ObjC type.
+  if (!Ty || SkipTypeProcessing.count(Ty))
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "Replacing access to property '" << *Property

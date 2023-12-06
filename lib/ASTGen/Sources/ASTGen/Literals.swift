@@ -14,45 +14,59 @@ import ASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  public func generate(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedStringLiteralExpr {
-    let openDelimiterOrQuoteLoc = (node.openingPounds ?? node.openingQuote).bridgedSourceLoc(in: self)
+  func generate(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedStringLiteralExpr {
+    let openDelimiterOrQuoteLoc = self.generateSourceLoc(node.openingPounds ?? node.openingQuote)
 
     // FIXME: Handle interpolated strings.
+    // FIXME: Avoid 'String' instantiation
     var segment = node.segments.first!.as(StringSegmentSyntax.self)!.content.text
     return segment.withBridgedString { bridgedSegment in
       return .createParsed(self.ctx, value: bridgedSegment, loc: openDelimiterOrQuoteLoc)
     }
   }
 
-  public func generate(integerLiteralExpr node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
+  func generate(integerLiteralExpr node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
+    // FIXME: Avoid 'String' instantiation
+    // FIXME: Strip '_'.
     var segment = node.literal.text
     return segment.withBridgedString { bridgedSegment in
-      return .createParsed(ctx, value: bridgedSegment, loc: node.literal.bridgedSourceLoc(in: self))
+      return .createParsed(
+        ctx,
+        value: bridgedSegment,
+        loc: self.generateSourceLoc(node.literal)
+      )
     }
   }
 
-  public func generate(booleanLiteralExpr node: BooleanLiteralExprSyntax) -> BridgedBooleanLiteralExpr {
+  func generate(booleanLiteralExpr node: BooleanLiteralExprSyntax) -> BridgedBooleanLiteralExpr {
     let value = node.literal.tokenKind == .keyword(.true)
-    return .createParsed(ctx, value: value, loc: node.literal.bridgedSourceLoc(in: self))
+    return .createParsed(
+      ctx,
+      value: value,
+      loc: self.generateSourceLoc(node.literal)
+    )
   }
 
-  public func generate(arrayExpr node: ArrayExprSyntax) -> BridgedArrayExpr {
+  func generate(arrayExpr node: ArrayExprSyntax) -> BridgedArrayExpr {
     let expressions = node.elements.lazy.map(self.generate)
 
     let commaLocations = node.elements.compactMap(in: self) {
-      $0.trailingComma.bridgedSourceLoc(in: self)
+      self.generateSourceLoc($0.trailingComma)
     }
 
     return .createParsed(
       self.ctx,
-      lSquareLoc: node.leftSquare.bridgedSourceLoc(in: self),
+      lSquareLoc: self.generateSourceLoc(node.leftSquare),
       elements: expressions.bridgedArray(in: self),
       commaLocs: commaLocations,
-      rSquareLoc: node.rightSquare.bridgedSourceLoc(in: self)
+      rSquareLoc: self.generateSourceLoc(node.rightSquare)
     )
   }
 
   func generate(nilLiteralExpr node: NilLiteralExprSyntax) -> BridgedNilLiteralExpr {
-    .createParsed(self.ctx, nilKeywordLoc: node.nilKeyword.bridgedSourceLoc(in: self))
+    .createParsed(
+      self.ctx,
+      nilKeywordLoc: self.generateSourceLoc(node.nilKeyword)
+    )
   }
 }

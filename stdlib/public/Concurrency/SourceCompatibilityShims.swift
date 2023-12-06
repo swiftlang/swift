@@ -70,7 +70,7 @@ extension Task where Success == Never, Failure == Never {
     handler: @Sendable () -> Void,
     operation: () async throws -> T
   ) async rethrows -> T {
-    try await withTaskCancellationHandler(handler: handler, operation: operation)
+    try await withTaskCancellationHandler(operation: operation, onCancel: handler)
   }
 }
 

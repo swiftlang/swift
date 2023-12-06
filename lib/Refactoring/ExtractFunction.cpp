@@ -12,7 +12,6 @@
 
 #include "ExtractExprBase.h"
 #include "RefactoringActions.h"
-#include "Renamer.h"
 #include "Utils.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/IDETool/CompilerInvocation.h"
@@ -78,9 +77,10 @@ static SourceLoc getNewFuncInsertLoc(DeclContext *DC,
   return SourceLoc();
 }
 
-static std::vector<NoteRegion>
-getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
-                  bool IsFunctionLike = false, bool IsNonProtocolType = false) {
+static std::vector<NoteRegion> getNotableRegions(StringRef SourceText,
+                                                 unsigned NameOffset,
+                                                 StringRef Name,
+                                                 bool IsFunctionLike = false) {
   auto InputBuffer =
       llvm::MemoryBuffer::getMemBufferCopy(SourceText, "<extract>");
 
@@ -101,22 +101,18 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
-  UnresolvedLoc UnresoledName{NameLoc, true};
-
   NameMatcher Matcher(*Instance->getPrimarySourceFile());
-  auto Resolved =
-      Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
+  auto Resolved = Matcher.resolve(llvm::makeArrayRef(NameLoc), llvm::None);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
-  RenameLoc RenameConfig = {LineAndCol.first,      LineAndCol.second,
+  RenameLoc RenameConfig = {LineAndCol.first, LineAndCol.second,
                             NameUsage::Definition, /*OldName=*/Name,
-                            /*NewName=*/"",        IsFunctionLike,
-                            IsNonProtocolType};
-  RenameRangeDetailCollector Renamer(SM, Name);
-  Renamer.addSyntacticRenameRanges(Resolved.back(), RenameConfig);
-  auto Ranges = Renamer.Ranges;
+                            IsFunctionLike};
+  std::vector<RenameRangeDetail> Ranges =
+      getSyntacticRenameRangeDetails(SM, Name, Resolved.back(), RenameConfig)
+          .Ranges;
 
-  std::vector<NoteRegion> NoteRegions(Renamer.Ranges.size());
+  std::vector<NoteRegion> NoteRegions(Ranges.size());
   llvm::transform(Ranges, NoteRegions.begin(),
                   [&SM](RenameRangeDetail &Detail) -> NoteRegion {
                     auto Start =

@@ -405,7 +405,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
     FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(),
                          SGFAccessKind::BorrowedAddressRead);
-    emitCopyLValueInto(E, std::move(lv), I);
+    emitCopyLValueInto(L ? *L : E, std::move(lv), I);
     return;
   }
 
@@ -1028,8 +1028,8 @@ RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
 
     ManagedValue noneValue;
     if (enumTy.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
-      noneValue = ManagedValue::forObjectRValueWithoutOwnership(
-          SGF.B.createEnum(E, SILValue(), noneDecl, enumTy));
+      auto *e = SGF.B.createEnum(E, SILValue(), noneDecl, enumTy);
+      noneValue = SGF.emitManagedRValueWithCleanup(e);
     } else {
       noneValue =
           SGF.B.bufferForExpr(E, enumTy, SGF.getTypeLowering(enumTy), C,
@@ -4140,9 +4140,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   SmallVector<KeyPathPatternComponent, 4> loweredComponents;
   auto loweredTy = SGF.getLoweredType(E->getType());
 
-  CanType rootTy = E->getType()->castTo<BoundGenericType>()->getGenericArgs()[0]
-    ->getCanonicalType();
-  
+  CanType rootTy = E->getRootType()->getCanonicalType();
+
   bool needsGenericContext = false;
   if (rootTy->hasArchetype()) {
     needsGenericContext = true;

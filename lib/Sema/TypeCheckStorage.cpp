@@ -397,8 +397,7 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
 
 /// Validate the \c entryNumber'th entry in \c binding.
 const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
-    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber,
-    bool LeaveClosureBodiesUnchecked) const {
+    Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber) const {
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
@@ -513,12 +512,8 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   if (patternType->hasUnresolvedType() ||
       patternType->hasPlaceholder() ||
       patternType->hasUnboundGenericType()) {
-    TypeCheckExprOptions options;
-    if (LeaveClosureBodiesUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber, patternType,
-                                             options)) {
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
+                                             patternType)) {
       binding->setInvalid();
       return &pbe;
     }
@@ -1646,14 +1641,13 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   Tmp1DRE->setType(Tmp1VD->getTypeInContext());
   auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
                                       /*implicit*/true);
-
+  auto *ReturnBranch = BraceStmt::createImplicit(Ctx, {Return});
 
   // Build the "if" around the early return.
-  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(),
-                                  SourceLoc(), Ctx.AllocateCopy(Cond), Return,
-                                  /*elseloc*/SourceLoc(), /*else*/nullptr,
-                                  /*implicit*/ true));
-
+  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(), SourceLoc(),
+                                  Ctx.AllocateCopy(Cond), ReturnBranch,
+                                  /*elseloc*/ SourceLoc(),
+                                  /*else*/ nullptr, /*implicit*/ true));
 
   auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                    SourceLoc(), Ctx.getIdentifier("tmp2"),

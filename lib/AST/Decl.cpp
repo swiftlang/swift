@@ -603,9 +603,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   case SelfAccessKind::Mutating: return OS << "'mutating'";
   case SelfAccessKind::LegacyConsuming: return OS << "'__consuming'";
   case SelfAccessKind::Consuming: return OS << "'consuming'";
-  case SelfAccessKind::Borrowing: return OS << "'borrowing'";
-  case SelfAccessKind::ResultDependsOnSelf:
-    return OS << "'resultDependsOnSelf'";
+  case SelfAccessKind::Borrowing:
+    return OS << "'borrowing'";
   }
   llvm_unreachable("Unknown SelfAccessKind");
 }
@@ -1029,7 +1028,7 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
 
 void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getLastElement();
+  auto body = getBody(/*canSynthesize=*/false)->getLastElement();
   if (auto *stmt = body.dyn_cast<Stmt *>()) {
     if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
       returnStmt->setResult(NewBody);
@@ -2220,12 +2219,11 @@ bool PatternBindingDecl::hasStorage() const {
   return false;
 }
 
-const PatternBindingEntry *PatternBindingDecl::getCheckedPatternBindingEntry(
-    unsigned i, bool leaveClosureBodiesUnchecked) const {
+const PatternBindingEntry *
+PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
   return evaluateOrDefault(
       getASTContext().evaluator,
-      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
-                                 leaveClosureBodiesUnchecked},
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i},
       nullptr);
 }
 
@@ -2428,8 +2426,7 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
     const VarDecl *vd) const {
   unsigned i = getPatternEntryIndexForVarDecl(vd);
   return getASTContext().evaluator.hasActiveRequest(
-      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
-                                 /*LeaveClosureBodyUnchecked=*/false});
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i});
 }
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
@@ -4203,6 +4200,13 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
       getAdjustedFormalAccess(this, useDC,
                               /*treatUsableFromInlineAsPublic*/false);
   return access == AccessLevel::Open;
+}
+
+bool ValueDecl::hasPackageAccess() const {
+  AccessLevel access =
+      getAdjustedFormalAccess(this, /*useDC*/ nullptr,
+                              /*treatUsableFromInlineAsPublic*/ false);
+  return access == AccessLevel::Package;
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -6394,6 +6398,16 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
 
 bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
+}
+
+bool ProtocolDecl::isInvertibleProtocol() const {
+  if (auto kp = getKnownProtocolKind()) {
+    if (getInvertibleProtocolKind(*kp)) {
+      assert(isMarkerProtocol());
+      return true;
+    }
+  }
+  return false;
 }
 
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
@@ -9119,6 +9133,108 @@ bool AbstractFunctionDecl::hasBody() const {
   }
 }
 
+/// Expand all preamble macros attached to the given function declaration.
+static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
+  std::vector<ASTNode> preamble;
+
+  ASTContext &ctx = func->getASTContext();
+  ExpandPreambleMacroRequest request{func};
+  auto module = func->getParentModule();
+  for (auto bufferID : evaluateOrDefault(ctx.evaluator, request, { })) {
+    auto bufferStart = ctx.SourceMgr.getLocForBufferStart(bufferID);
+    auto preambleSF = module->getSourceFileContainingLocation(bufferStart);
+    preamble.insert(preamble.end(),
+                    preambleSF->getTopLevelItems().begin(),
+                    preambleSF->getTopLevelItems().end());
+  }
+
+  return preamble;
+}
+
+/// Expand body macros and produce the resulting body.
+static BraceStmt *expandBodyMacro(AbstractFunctionDecl *fn) {
+  ASTContext &ctx = fn->getASTContext();
+
+  // Expand a body macro, if there is one.
+  BraceStmt *macroExpandedBody = nullptr;
+  if (auto bufferID = evaluateOrDefault(
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+    CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
+    auto bufferStart = bufferRange.getStart();
+    auto module = fn->getParentModule();
+    auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
+
+    if (macroSourceFile->getTopLevelItems().size() == 1) {
+      auto stmt = macroSourceFile->getTopLevelItems()[0].dyn_cast<Stmt *>();
+      macroExpandedBody = dyn_cast<BraceStmt>(stmt);
+    }
+  }
+
+  // Expand the preamble.
+  auto preamble = expandPreamble(fn);
+
+  // If there is no preamble, we're done one way or the other: return the
+  // macro-expanded body.
+  if (preamble.empty())
+    return macroExpandedBody;
+
+  // We have a preamble. The body is either the one produced by macro expansion,
+  // or if not that, the one that was written.
+  auto body = macroExpandedBody ? macroExpandedBody : fn->getBody();
+
+  // If there is no body at this point, the preamble has nowhere to go.
+  if (!body) {
+    // FIXME: diagnose this
+    return nullptr;
+  }
+
+  // Merge the preamble into the body.
+  auto contents = std::move(preamble);
+  contents.insert(
+      contents.end(),
+      body->getElements().begin(),
+      body->getElements().end());
+  return BraceStmt::create(
+      ctx, body->getStartLoc(), contents, body->getEndLoc());
+}
+
+BraceStmt *AbstractFunctionDecl::getMacroExpandedBody() const {
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  switch (getBodyKind()) {
+  case BodyKind::None:
+  case BodyKind::Unparsed:
+  case BodyKind::Parsed:
+    switch (getBodyExpandedStatus()) {
+    case BodyExpandedStatus::NotExpanded:
+      if (auto expandedBody = expandBodyMacro(mutableThis)) {
+        // Save the original body's source range.
+        mutableThis->keepOriginalBodySourceRange();
+
+        // Cache the expanded macro body as the parsed body of the function.
+        mutableThis->setBodyExpandedStatus(BodyExpandedStatus::Expanded);
+        mutableThis->setBodyParsed(expandedBody);
+
+        return expandedBody;
+      }
+
+      mutableThis->setBodyExpandedStatus(BodyExpandedStatus::NoMacros);
+      break;
+
+    case BodyExpandedStatus::NoMacros:
+    case BodyExpandedStatus::Expanded:
+      break;
+    }
+
+    // Fall through to get the body.
+    LLVM_FALLTHROUGH;
+
+  case BodyKind::Synthesize:
+  case BodyKind::TypeChecked:
+  case BodyKind::SILSynthesize:
+  case BodyKind::Deserialized:
+    return getBody(/*canSynthesize=*/true);
+  }
+}
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
@@ -10637,6 +10753,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     DeclContext *dc,
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
+  auto &ctx = dc->getASTContext();
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
   if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
@@ -10657,6 +10774,13 @@ ActorIsolation swift::getActorIsolationOfContext(
   //     actor isolation as the field itself. That default expression may only
   //     be used from inits that meet the required isolation.
   if (auto *var = dcToUse->getNonLocalVarDecl()) {
+    // If IsolatedDefaultValues are enabled, treat this context as having
+    // unspecified isolation. We'll compute the required isolation for
+    // the initializer and validate that it matches the isolation of the
+    // var itself in the DefaultInitializerIsolation request.
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues))
+      return ActorIsolation::forUnspecified();
+
     return getActorIsolation(var);
   }
 
@@ -11319,6 +11443,8 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Accessor:
   case MacroRole::Conformance:
   case MacroRole::MemberAttribute:
+  case MacroRole::Preamble:
+  case MacroRole::Body:
     break;
   }
 }
@@ -11559,7 +11685,7 @@ MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
 }
 
 llvm::Optional<Type>
-CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
+CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
     if (auto thrownError = func->getEffectiveThrownErrorType())
       return func->mapTypeIntoContext(*thrownError);
@@ -11576,7 +11702,7 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   }
 
   auto doCatch = get<DoCatchStmt *>();
-  if (auto thrownError = doCatch->getCaughtErrorType()) {
+  if (auto thrownError = doCatch->getCaughtErrorType(dc)) {
     if (thrownError->isNever())
       return llvm::None;
 
@@ -11584,5 +11710,5 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   }
 
   // If we haven't computed the error type yet, do so now.
-  return ctx.getErrorExistentialType();
+  return dc->getASTContext().getErrorExistentialType();
 }

@@ -15,6 +15,7 @@
 // RUN: %target-swift-frontend -package-name MyPkg -I %t -emit-ir -enable-library-evolution -O %t/package_resilience.swift -package-name MyPkg
 // REQUIRES: objc_codegen
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 // CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1p16resilient_struct5PointVvpWvd" = constant [[INT]] {{8|16}}, align [[#WORDSIZE]]
 // CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = constant [[INT]] {{32|16}}, align [[#WORDSIZE]]

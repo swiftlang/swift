@@ -131,16 +131,11 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x02,
 
-  /// Don't try to type check closure expression bodies, and leave them
-  /// unchecked. This is used by source tooling functionalities such as code
-  /// completion.
-  LeaveClosureBodyUnchecked = 0x04,
-
   /// Don't type check expressions for correct availability.
-  DisableExprAvailabilityChecking = 0x08,
+  DisableExprAvailabilityChecking = 0x04,
 
   /// Don't expand macros.
-  DisableMacroExpansions = 0x10,
+  DisableMacroExpansions = 0x08,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -474,7 +469,7 @@ Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
 
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-void typeCheckDecl(Decl *D, bool LeaveClosureBodiesUnchecked = false);
+void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
@@ -1181,7 +1176,7 @@ llvm::Optional<Type> canThrow(ASTContext &ctx, Expr *expr);
 ///
 /// The error type is used in the catch clauses and, for a nonexhausive
 /// do-catch, is implicitly rethrown out of the do...catch block.
-Type catchErrorType(ASTContext &ctx, DoCatchStmt *stmt);
+Type catchErrorType(DeclContext *dc, DoCatchStmt *stmt);
 
 /// Given two error types, merge them into the "union" of both error types
 /// that is a supertype of both error types.

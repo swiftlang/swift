@@ -38,12 +38,9 @@ using namespace swift;
 ///     expr-sequence(basic | trailing-closure)
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
-/// \param fromASTGen If true , this function in called from ASTGen as the
-/// fallback, so do not attempt a callback to ASTGen.
-ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic,
-                                         bool fromASTGen) {
+ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen)
+  if (IsForASTGen)
     return parseExprFromSyntaxTree();
 #endif
   // If we are parsing a refutable pattern, check to see if this is the start

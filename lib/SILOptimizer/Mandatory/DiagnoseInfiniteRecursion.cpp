@@ -39,6 +39,7 @@
 
 #define DEBUG_TYPE "infinite-recursion"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/LLVMExtras.h"

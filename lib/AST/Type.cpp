@@ -181,20 +181,6 @@ static bool alwaysNoncopyable(Type ty) {
 /// context to substitute unbound types.
 bool TypeBase::isNoncopyable(const DeclContext *dc) {
   assert(dc);
-  auto &ctx = dc->getASTContext();
-
-  // Fast-path for type parameters; ask the generic signature directly.
-  if (isTypeParameter() &&
-      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    auto canType = getCanonicalType();
-
-    auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    if (!copyable)
-      llvm_unreachable("missing Copyable protocol!");
-
-    auto sig = dc->getGenericSignatureOfContext();
-    return !sig->requiresProtocol(canType, copyable);
-  }
 
   if (!hasArchetype() || hasOpenedExistential())
     if (auto env = dc->getGenericEnvironmentOfContext())
@@ -205,7 +191,8 @@ bool TypeBase::isNoncopyable(const DeclContext *dc) {
 
 /// \returns true iff this type lacks conformance to Copyable.
 bool TypeBase::isNoncopyable() {
-  auto canType = getCanonicalType();
+  // Strip @lvalue and canonicalize.
+  auto canType = getRValueType()->getCanonicalType();
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
@@ -337,43 +324,64 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
+/// Adds the inferred default protocols for an ExistentialLayout with respect
+/// to that existential's inverses. For example, if an inverse ~P exists, then
+/// P will not be added to the protocols list.
+///
+/// \param inverses the inverses '& ~P' that are in the existential's type.
+/// \param protocols the output vector of protocols for an ExistentialLayout
+///                  to be modified.
+static void expandDefaultProtocols(
+    ASTContext &ctx,
+    InvertibleProtocolSet inverses,
+    SmallVectorImpl<ProtocolDecl*> &protocols) {
+
+  // Skip unless noncopyable generics is enabled
+  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
+    return;
+
+  // Try to add all invertible protocols, unless an inverse was provided.
+  for (auto ip : InvertibleProtocolSet::full()) {
+    if (inverses.contains(ip))
+      continue;
+
+    auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+    assert(proto);
+
+    protocols.push_back(proto);
+  }
+}
+
 ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
 
   hasExplicitAnyObject = false;
-  hasInverseCopyable = false;
   containsNonObjCProtocol = !isObjCProtocol(protoDecl);
   containsParameterized = false;
+  representsAnyObject = false;
 
   protocols.push_back(protoDecl);
+
+  // NOTE: all the invertible protocols are usable from ObjC.
+  expandDefaultProtocols(type->getASTContext(), {}, protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanInverseType type) {
   hasExplicitAnyObject = false;
-  hasInverseCopyable = false;
   containsNonObjCProtocol = false;
   containsParameterized = false;
+  representsAnyObject = false;
 
-  // Handle inverse.
-  switch (type->getInverseKind()) {
-  case InvertibleProtocolKind::Copyable:
-    hasInverseCopyable = true;
-  }
+  // NOTE: all the invertible protocols are usable from ObjC.
+  expandDefaultProtocols(type->getASTContext(),
+                         {type->getInverseKind()},
+                         protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
-  hasInverseCopyable = false;
   containsNonObjCProtocol = false;
   containsParameterized = false;
-
-  // Handle inverses.
-  for (auto ip : type->getInverses()) {
-    switch (ip) {
-    case InvertibleProtocolKind::Copyable:
-      hasInverseCopyable = true;
-    }
-  }
 
   auto members = type.getMembers();
   if (!members.empty() &&
@@ -395,6 +403,12 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     containsNonObjCProtocol |= !isObjCProtocol(protoDecl);
     protocols.push_back(protoDecl);
   }
+
+  representsAnyObject =
+      hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty();
+
+  // NOTE: all the invertible protocols are usable from ObjC.
+  expandDefaultProtocols(type->getASTContext(), type->getInverses(), protocols);
 }
 
 ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
@@ -466,10 +480,6 @@ Type ExistentialLayout::getSuperclass() const {
   }
 
   return Type();
-}
-
-bool ExistentialLayout::isAnyObject() const {
-  return (hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty());
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -604,83 +614,6 @@ void TypeBase::getRootOpenedExistentials(
 
     return false;
   });
-}
-
-Type TypeBase::typeEraseOpenedArchetypesWithRoot(
-    const OpenedArchetypeType *root, const DeclContext *useDC) const {
-  assert(root->isRoot() && "Expected a root archetype");
-
-  Type type = Type(const_cast<TypeBase *>(this));
-  if (!hasOpenedExistential())
-    return type;
-
-  const auto sig = root->getASTContext().getOpenedExistentialSignature(
-      root->getExistentialType(), useDC->getGenericSignatureOfContext());
-
-  unsigned metatypeDepth = 0;
-
-  std::function<Type(Type)> transformFn;
-  transformFn = [&](Type type) -> Type {
-    return type.transformRec([&](TypeBase *ty) -> llvm::Optional<Type> {
-      // Don't recurse into children unless we have to.
-      if (!ty->hasOpenedExistential())
-        return Type(ty);
-
-      if (isa<MetatypeType>(ty)) {
-        const auto instanceTy = ty->getMetatypeInstanceType();
-        ++metatypeDepth;
-        const auto erasedTy = transformFn(instanceTy);
-        --metatypeDepth;
-
-        if (instanceTy.getPointer() == erasedTy.getPointer()) {
-          return Type(ty);
-        }
-
-        return Type(ExistentialMetatypeType::get(erasedTy));
-      }
-
-      // Opaque types whose substitutions involve this type parameter are
-      // erased to their upper bound.
-      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(ty)) {
-        for (auto replacementType :
-                 opaque->getSubstitutions().getReplacementTypes()) {
-          if (replacementType->hasOpenedExistentialWithRoot(root)) {
-            Type interfaceType = opaque->getInterfaceType();
-            auto genericSig =
-                opaque->getDecl()->getOpaqueInterfaceGenericSignature();
-            return genericSig->getNonDependentUpperBounds(interfaceType);
-          }
-        }
-      }
-
-      auto *const archetype = dyn_cast<OpenedArchetypeType>(ty);
-      if (!archetype) {
-        // Recurse.
-        return llvm::None;
-      }
-
-      if (!root->isEqual(archetype->getRoot())) {
-        return Type(ty);
-      }
-
-      Type erasedTy;
-      if (root->isEqual(archetype)) {
-        erasedTy = root->getExistentialType();
-      } else {
-        erasedTy =
-            sig->getNonDependentUpperBounds(archetype->getInterfaceType());
-      }
-
-      if (metatypeDepth) {
-        if (const auto existential = erasedTy->getAs<ExistentialType>())
-          return existential->getConstraintType();
-      }
-
-      return erasedTy;
-    });
-  };
-
-  return transformFn(type);
 }
 
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
@@ -3681,7 +3614,7 @@ Type ArchetypeType::getExistentialType() const {
   auto interfaceType = getInterfaceType();
   auto genericSig = genericEnv->getGenericSignature();
 
-  auto upperBound = genericSig->getDependentUpperBounds(interfaceType);
+  auto upperBound = genericSig->getUpperBound(interfaceType);
 
   return genericEnv->mapTypeIntoContext(upperBound);
 }

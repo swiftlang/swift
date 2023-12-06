@@ -1426,7 +1426,7 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
     auto anchor = getAnchor();
     auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
     if (componentPathElt->getIndex() == 0) {
-      if (auto rootType = keyPathExpr->getRootType()) {
+      if (auto rootType = keyPathExpr->getExplicitRootType()) {
         return rootType->getSourceRange();
       } else {
         return keyPathExpr->getComponents().front().getLoc();
@@ -1483,7 +1483,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // For members where the base type is an optional key path root
     // let's emit a tailored note suggesting to use its unwrapped type.
     auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
-    if (auto rootType = keyPathExpr->getRootType()) {
+    if (auto rootType = keyPathExpr->getExplicitRootType()) {
       emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
                      unwrappedBaseType);
 
@@ -6134,7 +6134,7 @@ SourceLoc AnyObjectKeyPathRootFailure::getLoc() const {
   auto anchor = getAnchor();
 
   if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
-    if (auto rootTyRepr = KPE->getRootType())
+    if (auto rootTyRepr = KPE->getExplicitRootType())
       return rootTyRepr->getLoc();
   }
 
@@ -6145,7 +6145,7 @@ SourceRange AnyObjectKeyPathRootFailure::getSourceRange() const {
   auto anchor = getAnchor();
 
   if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
-    if (auto rootTyRepr = KPE->getRootType())
+    if (auto rootTyRepr = KPE->getExplicitRootType())
       return rootTyRepr->getSourceRange();
   }
 
@@ -9124,61 +9124,6 @@ bool DefaultExprTypeMismatch::diagnoseAsError() {
   return true;
 }
 
-bool MissingExplicitExistentialCoercion::diagnoseAsError() {
-  auto diagnostic = emitDiagnostic(diag::result_requires_explicit_coercion,
-                                   ErasedResultType);
-  fixIt(diagnostic);
-  return true;
-}
-
-bool MissingExplicitExistentialCoercion::diagnoseAsNote() {
-  auto diagnostic = emitDiagnostic(
-      diag::candidate_result_requires_explicit_coercion, ErasedResultType);
-  fixIt(diagnostic);
-  return true;
-}
-
-bool MissingExplicitExistentialCoercion::fixItRequiresParens() const {
-  auto anchor = getAsExpr(getRawAnchor());
-
-  // If it's a member reference an an existential metatype, let's
-  // use the parent "call" expression.
-  if (auto *UDE = dyn_cast_or_null<UnresolvedDotExpr>(anchor))
-    anchor = findParentExpr(UDE);
-
-  if (!anchor)
-    return false;
-
-  const auto &solution = getSolution();
-  return llvm::any_of(
-      solution.OpenedExistentialTypes,
-      [&anchor](const auto &openedExistential) {
-        if (auto openedLoc = simplifyLocatorToAnchor(openedExistential.first)) {
-          return anchor == getAsExpr(openedLoc);
-        }
-        return false;
-      });
-}
-
-void MissingExplicitExistentialCoercion::fixIt(
-    InFlightDiagnostic &diagnostic) const {
-
-  if (ErasedResultType->hasTypeParameter())
-    return;
-
-  bool requiresParens = fixItRequiresParens();
-
-  auto callRange = getSourceRange();
-
-  if (requiresParens)
-    diagnostic.fixItInsert(callRange.Start, "(");
-
-  auto printOpts = PrintOptions::forDiagnosticArguments();
-  diagnostic.fixItInsertAfter(callRange.End,
-                              "as " + ErasedResultType->getString(printOpts) +
-                                  (requiresParens ? ")" : ""));
-}
-
 bool ConflictingPatternVariables::diagnoseAsError() {
   for (auto *var : Vars) {
     emitDiagnosticAt(var->getStartLoc(),
@@ -9355,5 +9300,10 @@ bool InvalidTypeSpecializationArity::diagnoseAsError() {
                                   NumArgs, NumParams,
                                   HasParameterPack,
                                   /*generic=*/nullptr);
+  return true;
+}
+
+bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
+  emitDiagnostic(diag::cannot_convert_type_to_keypath_subscript_index, ArgType);
   return true;
 }

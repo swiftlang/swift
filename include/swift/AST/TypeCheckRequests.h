@@ -46,6 +46,7 @@ class ContextualPattern;
 class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
+class DoCatchStmt;
 struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
@@ -2303,6 +2304,27 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Determines the explicitly-written thrown error type in a do..catch block.
+class DoCatchExplicitThrownTypeRequest
+    : public SimpleRequest<DoCatchExplicitThrownTypeRequest,
+                           Type(DeclContext *, DoCatchStmt *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, DeclContext *dc, DoCatchStmt *stmt) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+  llvm::Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 /// Determines the result type of a function or element type of a subscript.
 class ResultTypeRequest
     : public SimpleRequest<ResultTypeRequest,
@@ -2327,7 +2349,7 @@ public:
 class PatternBindingEntryRequest
     : public SimpleRequest<PatternBindingEntryRequest,
                            const PatternBindingEntry *(PatternBindingDecl *,
-                                                       unsigned, bool),
+                                                       unsigned),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2336,9 +2358,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  const PatternBindingEntry *evaluate(Evaluator &evaluator,
-                                      PatternBindingDecl *PBD, unsigned i,
-                                      bool LeaveClosureBodiesUnchecked) const;
+  const PatternBindingEntry *
+  evaluate(Evaluator &evaluator, PatternBindingDecl *PBD, unsigned i) const;
 
 public:
   // Separate caching.
@@ -4391,6 +4412,44 @@ private:
   friend SimpleRequest;
 
   ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+class ExpandPreambleMacroRequest
+    : public SimpleRequest<ExpandPreambleMacroRequest,
+                           ArrayRef<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+class ExpandBodyMacroRequest
+    : public SimpleRequest<ExpandBodyMacroRequest,
+                           llvm::Optional<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Optional<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
 
 public:
   bool isCached() const { return true; }

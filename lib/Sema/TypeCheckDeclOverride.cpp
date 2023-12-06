@@ -1509,6 +1509,9 @@ namespace  {
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
+    UNINTERESTING_ATTR(NoRuntime)
+    UNINTERESTING_ATTR(NoExistentials)
+    UNINTERESTING_ATTR(NoObjCBridging)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Expose)
@@ -1622,6 +1625,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
+    UNINTERESTING_ATTR(ExtractConstantsFromMembers)
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
@@ -1630,6 +1634,7 @@ namespace  {
     UNINTERESTING_ATTR(LexicalLifetimes)
     UNINTERESTING_ATTR(NonEscapable)
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
+    UNINTERESTING_ATTR(StaticExclusiveOnly)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

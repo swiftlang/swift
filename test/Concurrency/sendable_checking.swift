@@ -251,12 +251,11 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning@-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-tns-warning@-3 {{passing argument of non-sendable type 'NonSendable' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-note @-2 {{access here could race}}
+    // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -292,14 +291,14 @@ func callNonisolatedAsyncClosure(
   g: (NonSendable) async -> Void
 ) async {
   await g(ns)
-  // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning@-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-tns-warning@-3 {{passing argument of non-sendable type 'NonSendable' from main actor-isolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+  // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // expected-tns-warning @-3 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-note@-2 {{access here could race}}
+  // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
 
 }
 

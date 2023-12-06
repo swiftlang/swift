@@ -632,6 +632,12 @@ Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
 
     return makeParserResult(ty,
         new (Context) PackExpansionTypeRepr(repeatLoc, ty.get()));
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeTypeBeginning();
+    }
+    return makeParserCodeCompletionResult<TypeRepr>(
+        ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
   }
 
   ty = parseTypeScalar(MessageID, reason);
@@ -954,6 +960,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
 
     auto *typeRepr = new (Context) PackElementTypeRepr(eachLoc, packElt.get());
     return makeParserResult(ParserStatus(packElt), typeRepr);
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeTypeSimpleOrComposition();
+    }
+    return makeParserCodeCompletionResult<TypeRepr>(
+        ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {

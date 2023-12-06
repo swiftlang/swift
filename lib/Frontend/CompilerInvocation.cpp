@@ -888,6 +888,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(*feature);
   }
 
+  // CompleteConcurrency enables all data-race safety upcoming features.
+  if (Opts.hasFeature(Feature::CompleteConcurrency)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+    Opts.Features.insert(Feature::DisableOutwardActorInference);
+  }
+
   // Map historical flags over to experimental features. We do this for all
   // compilers because that's how existing experimental feature flags work.
   if (Args.hasArg(OPT_enable_experimental_static_assert))
@@ -1002,7 +1008,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-  } else if (Opts.hasFeature(Feature::StrictConcurrency)) {
+  } else if (Opts.hasFeature(Feature::CompleteConcurrency) ||
+             Opts.hasFeature(Feature::StrictConcurrency)) {
     // Already set above.
   } else {
     // Default to minimal checking in Swift 5.x.
@@ -1503,6 +1510,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
+  Opts.EnableLazyTypecheck |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) &&
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies_is_lazy);
+  // HACK: The driver currently erroneously passes all flags to module interface
+  // verification jobs. -experimental-skip-non-exportable-decls is not
+  // appropriate for verification tasks and should be ignored, though.
+  if (FrontendOpts.RequestedAction ==
+      FrontendOptions::ActionType::TypecheckModuleFromInterface)
+    Opts.EnableLazyTypecheck = false;
 
   return HadError;
 }

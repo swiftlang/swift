@@ -13,8 +13,8 @@ func /*foo:def*/<base>foo</base>() {
         /*foo*/<base>foo</base> = 2
         /*foo*/<base>foo</base>()
         /*foo:call*/<base>foo</base>()
-        /*foo:unknown*/foo = 3
-        /*foo:unknown*/foo()
+        /*foo:unknown*/<base>foo</base> = 3
+        /*foo:unknown*/<base>foo</base>()
         #if false
             /*foo:unknown*/<base>foo</base> += 2
             /*foo:unknown*/<base>foo</base>()

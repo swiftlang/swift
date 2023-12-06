@@ -1090,12 +1090,6 @@ public:
     Expr *E = RS->getResult();
     TypeCheckExprOptions options = {};
     
-    if (LeaveBraceStmtBodyUnchecked) {
-      assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
-             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
@@ -1201,8 +1195,7 @@ public:
         DC->getParentModule(), TS->getThrowLoc());
     Type errorType;
     if (catchNode) {
-      errorType = catchNode.getThrownErrorTypeInContext(getASTContext())
-          .value_or(Type());
+      errorType = catchNode.getThrownErrorTypeInContext(DC).value_or(Type());
     }
 
     // If there was no error type, use 'any Error'. We'll check it later.
@@ -1348,7 +1341,6 @@ public:
         case SelfAccessKind::Borrowing:
         case SelfAccessKind::NonMutating:
         case SelfAccessKind::Mutating:
-        case SelfAccessKind::ResultDependsOnSelf:
           ctx.Diags.diagnose(DS->getDiscardLoc(),
                              diag::discard_wrong_context_nonconsuming,
                              fn->getDescriptiveKind());
@@ -1384,15 +1376,15 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, IS);
 
-    Stmt *S = IS->getThenStmt();
-    typeCheckStmt(S);
-    IS->setThenStmt(S);
+    auto *TS = IS->getThenStmt();
+    typeCheckStmt(TS);
+    IS->setThenStmt(TS);
 
-    if ((S = IS->getElseStmt())) {
-      typeCheckStmt(S);
-      IS->setElseStmt(S);
+    if (auto *ES = IS->getElseStmt()) {
+      typeCheckStmt(ES);
+      IS->setElseStmt(ES);
     }
-    
+
     return IS;
   }
   
@@ -1685,7 +1677,7 @@ public:
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
 
-    Type caughtErrorType = TypeChecker::catchErrorType(Ctx, S);
+    Type caughtErrorType = TypeChecker::catchErrorType(DC, S);
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
@@ -2047,9 +2039,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
         (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
     if (isDiscarded)
       options |= TypeCheckExprFlags::IsDiscarded;
-    if (LeaveBraceStmtBodyUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
 
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
@@ -2087,7 +2076,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(D, LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(D);
     return;
   }
 
@@ -2396,8 +2385,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/false);
+            typeCheckPatternBinding(PBD, i);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
             // This is important to get the correct USR of variables defined
             // in closures initializing lazy variables.
@@ -2788,7 +2776,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   if (AFD->isBodySkipped())
     return nullptr;
 
-  BraceStmt *body = AFD->getBody();
+  BraceStmt *body = AFD->getMacroExpandedBody();
 
   // If there is no function body, there is nothing to type-check.
   if (!body) {
@@ -2868,6 +2856,8 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
     StmtChecker SC(AFD);
     hadError = SC.typeCheckBody(body);
   }
+
+
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means

@@ -74,19 +74,20 @@ SourceManager &NameMatcher::getSourceMgr() const {
   return SrcFile.getASTContext().SourceMgr;
 }
 
-ResolvedLoc NameMatcher::resolve(UnresolvedLoc Loc) {
-  return resolve({Loc}, {}).front();
+ResolvedLoc NameMatcher::resolve(SourceLoc Loc) {
+  return resolve(Loc, {}).front();
 }
 
-std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens) {
+std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<SourceLoc> Locs,
+                                              ArrayRef<Token> Tokens) {
 
   // Note the original indices and sort them in reverse source order
   std::vector<size_t> MapToOriginalIndex(Locs.size());
   std::iota(MapToOriginalIndex.begin(), MapToOriginalIndex.end(), 0);
   std::sort(MapToOriginalIndex.begin(), MapToOriginalIndex.end(),
             [this, Locs](size_t first, size_t second) {
-              return first != second && !getSourceMgr()
-                .isBeforeInBuffer(Locs[first].Loc, Locs[second].Loc);
+              return first != second && !getSourceMgr().isBeforeInBuffer(
+                                            Locs[first], Locs[second]);
             });
 
   // Add the locs themselves
@@ -103,13 +104,12 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
 
   // handle any unresolved locs past the end of the last AST node or comment
   std::vector<ResolvedLoc> Remaining(Locs.size() - ResolvedLocs.size(),
-                                     {ASTWalker::ParentTy(),
-                                      CharSourceRange(),
+                                     {CharSourceRange(),
                                       {},
                                       llvm::None,
                                       LabelRangeType::None,
-                                      /*isActice*/ true,
-                                      /*isInSelector*/ false});
+                                      /*isActive*/ true,
+                                      ResolvedLocContext::Comment});
   ResolvedLocs.insert(ResolvedLocs.end(), Remaining.begin(), Remaining.end());
 
   // return in the original order
@@ -541,13 +541,14 @@ void NameMatcher::skipLocsBefore(SourceLoc Start) {
   while (!isDone() && getSourceMgr().isBeforeInBuffer(nextLoc(), Start)) {
     if (!checkComments()) {
       LocsToResolve.pop_back();
-      ResolvedLocs.push_back({ASTWalker::ParentTy(),
-                              CharSourceRange(),
+      ResolvedLocContext Context = isInSelector() ? ResolvedLocContext::Selector
+                                                  : ResolvedLocContext::Comment;
+      ResolvedLocs.push_back({CharSourceRange(),
                               {},
                               llvm::None,
                               LabelRangeType::None,
                               isActive(),
-                              isInSelector()});
+                              Context});
     }
   }
 }
@@ -587,7 +588,7 @@ bool NameMatcher::shouldSkip(CharSourceRange Range) {
 
 SourceLoc NameMatcher::nextLoc() const {
   assert(!LocsToResolve.empty());
-  return LocsToResolve.back().Loc;
+  return LocsToResolve.back();
 }
 
 std::vector<CharSourceRange> getSelectorLabelRanges(SourceManager &SM,
@@ -625,13 +626,11 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
     return Resolved;
   }
 
-  if (LocsToResolve.back().ResolveArgLocs) {
-    if (Args) {
-      auto Labels = getCallArgLabelRanges(getSourceMgr(), Args,
-                                          LabelRangeEndAt::BeforeElemStart);
-      return tryResolve(Node, NameLoc.getBaseNameLoc(), LabelRangeType::CallArg,
-                        Labels.first, Labels.second);
-    }
+  if (Args) {
+    auto Labels = getCallArgLabelRanges(getSourceMgr(), Args,
+                                        LabelRangeEndAt::BeforeElemStart);
+    return tryResolve(Node, NameLoc.getBaseNameLoc(), LabelRangeType::CallArg,
+                      Labels.first, Labels.second);
   }
 
   return tryResolve(Node, NameLoc.getBaseNameLoc());
@@ -651,15 +650,24 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
   if (isDone())
     return false;
 
+  ResolvedLocContext Context = ResolvedLocContext::Default;
+  if (Node.isNull()) {
+    Context = ResolvedLocContext::Comment;
+  } else if (isa_and_nonnull<StringLiteralExpr>(Node.getAsExpr())) {
+    Context = ResolvedLocContext::StringLiteral;
+  } else if (isInSelector()) {
+    Context = ResolvedLocContext::Selector;
+  }
+
   CharSourceRange Range = Lexer::getCharSourceRangeFromSourceRange(getSourceMgr(),
                                                                    NameLoc);
-  UnresolvedLoc &Next = LocsToResolve.back();
+  SourceLoc &Next = LocsToResolve.back();
   bool WasResolved = false;
   if (Range.isValid()) {
-    if (NameLoc == Next.Loc) {
+    if (NameLoc == Next) {
       LocsToResolve.pop_back();
-      ResolvedLocs.push_back({Node, Range, LabelRanges, FirstTrailingLabel,
-        RangeType, isActive(), isInSelector()});
+      ResolvedLocs.push_back({Range, LabelRanges, FirstTrailingLabel, RangeType,
+                              isActive(), Context});
       if (isDone())
         return true;
       WasResolved = true;
@@ -671,15 +679,14 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
       // properties, e.g. 'foo' in '_foo' and '$foo' occurrences.
       auto NewRange = CharSourceRange(Range.getStart().getAdvancedLoc(1),
                                       Range.getByteLength() - 1);
-      if (NewRange.getStart() == Next.Loc) {
+      if (NewRange.getStart() == Next) {
         LocsToResolve.pop_back();
-        ResolvedLocs.push_back({Node,
-                                NewRange,
+        ResolvedLocs.push_back({NewRange,
                                 {},
                                 llvm::None,
                                 LabelRangeType::None,
                                 isActive(),
-                                isInSelector()});
+                                Context});
         WasResolved = true;
       }
     }

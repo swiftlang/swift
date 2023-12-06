@@ -146,3 +146,27 @@ func rethrowsLike<E>(_ body: () throws(E) -> Void) throws(E) { }
 func fromRethrows(body: () throws -> Void) rethrows {
   try rethrowsLike(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
 }
+
+// Explicit specification of the thrown type within a `do..catch` block.
+func testDoCatchExplicitTyped() {
+  do throws {
+    try doHomework() // would normally infer HomeworkError
+  } catch {
+    let _: Int = error // expected-error{{cannot convert value of type 'any Error' to specified type 'Int'}}
+  }
+
+  do throws(any Error) {
+    try doHomework() // would normally infer HomeworkError
+  } catch {
+    let _: Int = error // expected-error{{cannot convert value of type 'any Error' to specified type 'Int'}}
+  }
+
+  do throws(HomeworkError) {
+    throw .forgot // okay, HomeworkError.forgot based on context
+  } catch {
+    let _: Int = error // expected-error{{cannot convert value of type 'HomeworkError' to specified type 'Int'}}
+  }
+
+  do throws(HomeworkError) { // expected-error{{a 'do' statement with a 'throws' clause must have at least one 'catch'}}
+  }
+}

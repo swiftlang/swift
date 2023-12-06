@@ -48,21 +48,69 @@ static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: Identifier
+//===----------------------------------------------------------------------===//
+
+BridgedDeclBaseName BridgedDeclBaseName_createConstructor() {
+  return DeclBaseName::createConstructor();
+}
+
+BridgedDeclBaseName BridgedDeclBaseName_createDestructor() {
+  return DeclBaseName::createDestructor();
+}
+
+BridgedDeclBaseName BridgedDeclBaseName_createSubscript() {
+  return DeclBaseName::createSubscript();
+}
+
+BridgedDeclBaseName
+BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier) {
+  return DeclBaseName(identifier.unbridged());
+}
+
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                BridgedDeclBaseName cBaseName,
+                                BridgedArrayRef cLabels) {
+  ASTContext &context = cContext.unbridged();
+  SmallVector<Identifier, 4> labels;
+  for (auto &cLabel : cLabels.unbridged<BridgedIdentifier>()) {
+    labels.push_back(cLabel.unbridged());
+  }
+  return DeclNameRef(DeclName(context, cBaseName.unbridged(), labels));
+}
+
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedDeclBaseName cBaseName) {
+  return DeclNameRef(cBaseName.unbridged());
+}
+
+BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cBaseNameLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cLabelLocs,
+    BridgedSourceLoc cRParenLoc) {
+
+  ASTContext &context = cContext.unbridged();
+  SmallVector<SourceLoc, 4> labelLocs;
+  for (auto &cLabelLoc : cLabelLocs.unbridged<BridgedSourceLoc>())
+    labelLocs.push_back(cLabelLoc.unbridged());
+
+  return DeclNameLoc(context, cBaseNameLoc.unbridged(), cLParenLoc.unbridged(),
+                     labelLocs, cRParenLoc.unbridged());
+}
+
+BridgedDeclNameLoc
+BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc) {
+  return DeclNameLoc(cBaseNameLoc.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: ASTContext
 //===----------------------------------------------------------------------===//
 
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr) {
-  StringRef str = cStr.unbridged();
-  if (str.size() == 1 && str.front() == '_')
-    return BridgedIdentifier();
-
-  // If this was a back-ticked identifier, drop the back-ticks.
-  if (str.size() >= 2 && str.front() == '`' && str.back() == '`') {
-    str = str.drop_front().drop_back();
-  }
-
-  return cContext.unbridged().getIdentifier(str);
+  return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
@@ -516,14 +564,11 @@ void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl bridgedDecl,
   setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
 }
 
-static SmallVector<InheritedEntry>
-convertToInheritedEntries(BridgedArrayRef cInheritedTypes) {
-  SmallVector<InheritedEntry> inheritedEntries;
-  for (auto &repr : cInheritedTypes.unbridged<BridgedTypeRepr>()) {
-    inheritedEntries.emplace_back(repr.unbridged());
-  }
-
-  return inheritedEntries;
+static ArrayRef<InheritedEntry>
+convertToInheritedEntries(ASTContext &ctx, BridgedArrayRef cInheritedTypes) {
+  return ctx.AllocateTransform<InheritedEntry>(
+      cInheritedTypes.unbridged<BridgedTypeRepr>(),
+      [](auto &e) { return InheritedEntry(e.unbridged()); });
 }
 
 BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
@@ -537,7 +582,7 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
 
   NominalTypeDecl *decl = new (context) EnumDecl(
       cEnumKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
@@ -589,7 +634,7 @@ BridgedNominalTypeDecl BridgedStructDecl_createParsed(
 
   NominalTypeDecl *decl = new (context) StructDecl(
       cStructKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
@@ -608,7 +653,7 @@ BridgedNominalTypeDecl BridgedClassDecl_createParsed(
 
   NominalTypeDecl *decl = new (context) ClassDecl(
       cClassKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged(), isActor);
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
@@ -623,19 +668,19 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
-  SmallVector<PrimaryAssociatedTypeName, 2> primaryAssociatedTypeNames;
-  for (auto &pair :
-       cPrimaryAssociatedTypeNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
-    primaryAssociatedTypeNames.emplace_back(pair.Name.unbridged(),
-                                            pair.NameLoc.unbridged());
-  }
-
   ASTContext &context = cContext.unbridged();
+
+  auto primaryAssociatedTypeNames =
+      context.AllocateTransform<PrimaryAssociatedTypeName>(
+          cPrimaryAssociatedTypeNames.unbridged<BridgedLocatedIdentifier>(),
+          [](auto &e) -> PrimaryAssociatedTypeName {
+            return {e.Name.unbridged(), e.NameLoc.unbridged()};
+          });
+
   NominalTypeDecl *decl = new (context) ProtocolDecl(
       cDeclContext.unbridged(), cProtocolKeywordLoc.unbridged(),
-      cNameLoc.unbridged(), cName.unbridged(),
-      context.AllocateCopy(primaryAssociatedTypeNames),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      cNameLoc.unbridged(), cName.unbridged(), primaryAssociatedTypeNames,
+      convertToInheritedEntries(context, cInheritedTypes),
       genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
 
@@ -654,8 +699,7 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
       context, cDeclContext.unbridged(), cAssociatedtypeKeywordLoc.unbridged(),
       cName.unbridged(), cNameLoc.unbridged(), defaultType.unbridged(),
       genericWhereClause.unbridged());
-  decl->setInherited(
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)));
+  decl->setInherited(convertToInheritedEntries(context, cInheritedTypes));
 
   return decl;
 }
@@ -670,7 +714,7 @@ BridgedExtensionDecl BridgedExtensionDecl_createParsed(
 
   auto *decl = ExtensionDecl::create(
       context, cExtensionKeywordLoc.unbridged(), extendedType.unbridged(),
-      context.AllocateCopy(convertToInheritedEntries(cInheritedTypes)),
+      convertToInheritedEntries(context, cInheritedTypes),
       cDeclContext.unbridged(), genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
   return decl;
@@ -727,15 +771,13 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedSourceLoc cRightBraceLoc) {
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> higherThanNames;
-  for (auto &pair :
-       cHigherThanNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
+  for (auto &pair : cHigherThanNames.unbridged<BridgedLocatedIdentifier>()) {
     higherThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> lowerThanNames;
-  for (auto &pair :
-       cLowerThanNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
+  for (auto &pair : cLowerThanNames.unbridged<BridgedLocatedIdentifier>()) {
     lowerThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
@@ -757,7 +799,7 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements) {
   ImportPath::Builder builder;
   for (auto &element :
-       cImportPathElements.unbridged<BridgedIdentifierAndSourceLoc>()) {
+       cImportPathElements.unbridged<BridgedLocatedIdentifier>()) {
     builder.push_back(element.Name.unbridged(), element.NameLoc.unbridged());
   }
 
@@ -812,6 +854,21 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
 
+BridgedArrowExpr BridgedArrowExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAsyncLoc,
+                                               BridgedSourceLoc cThrowsLoc,
+                                               BridgedNullableExpr cThrownType,
+                                               BridgedSourceLoc cArrowLoc) {
+  return new (cContext.unbridged())
+      ArrowExpr(cAsyncLoc.unbridged(), cThrowsLoc.unbridged(),
+                cThrownType.unbridged(), cArrowLoc.unbridged());
+}
+
+BridgedAssignExpr BridgedAssignExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cEqualsLoc) {
+  return new (cContext.unbridged()) AssignExpr(cEqualsLoc.unbridged());
+}
+
 BridgedClosureExpr
 BridgedClosureExpr_createParsed(BridgedASTContext cContext,
                                 BridgedDeclContext cDeclContext,
@@ -834,6 +891,45 @@ BridgedClosureExpr_createParsed(BridgedASTContext cContext,
   out->setBody(body.unbridged(), true);
   out->setParameterList(params);
   return out;
+}
+
+BridgedCoerceExpr BridgedCoerceExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cAsLoc,
+                                                 BridgedTypeRepr cType) {
+  return CoerceExpr::create(cContext.unbridged(), cAsLoc.unbridged(),
+                            cType.unbridged());
+}
+
+BridgedConditionalCheckedCastExpr
+BridgedConditionalCheckedCastExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cAsLoc,
+                                               BridgedSourceLoc cQuestionLoc,
+                                               BridgedTypeRepr cType) {
+  return ConditionalCheckedCastExpr::create(
+      cContext.unbridged(), cAsLoc.unbridged(), cQuestionLoc.unbridged(),
+      cType.unbridged());
+}
+
+BridgedDiscardAssignmentExpr
+BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
+                                          BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged())
+      DiscardAssignmentExpr(cLoc.unbridged(), /*Implicit=*/false);
+}
+
+BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
+    BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType) {
+  return ForcedCheckedCastExpr::create(cContext.unbridged(), cAsLoc.unbridged(),
+                                       cExclaimLoc.unbridged(),
+                                       cType.unbridged());
+}
+
+BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
+                                         BridgedSourceLoc cIsLoc,
+                                         BridgedTypeRepr cType) {
+  return IsExpr::create(cContext.unbridged(), cIsLoc.unbridged(),
+                        cType.unbridged());
 }
 
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
@@ -872,11 +968,25 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
-    BridgedASTContext cContext, BridgedIdentifier base, BridgedSourceLoc cLoc) {
-  ASTContext &context = cContext.unbridged();
-  auto name = DeclNameRef{base.unbridged()};
-  return new (context) UnresolvedDeclRefExpr(name, DeclRefKind::Ordinary,
-                                             DeclNameLoc{cLoc.unbridged()});
+    BridgedASTContext cContext, BridgedDeclNameRef cName,
+    BridgedDeclRefKind cKind, BridgedDeclNameLoc cLoc) {
+  DeclRefKind kind;
+  switch (cKind) {
+  case BridgedDeclRefKindOrdinary:
+    kind = DeclRefKind::Ordinary;
+    break;
+  case BridgedDeclRefKindBinaryOperator:
+    kind = DeclRefKind::BinaryOperator;
+    break;
+  case BridgedDeclRefKindPostfixOperator:
+    kind = DeclRefKind::PostfixOperator;
+    break;
+  case BridgedDeclRefKindPrefixOperator:
+    kind = DeclRefKind::PrefixOperator;
+    break;
+  }
+  return new (cContext.unbridged())
+      UnresolvedDeclRefExpr(cName.unbridged(), kind, cLoc.unbridged());
 }
 
 BridgedStringLiteralExpr
@@ -921,6 +1031,20 @@ BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) NilLiteralExpr(cNilKeywordLoc.unbridged());
 }
 
+BridgedPostfixUnaryExpr
+BridgedPostfixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedExpr oper, BridgedExpr operand) {
+  return PostfixUnaryExpr::create(cContext.unbridged(), oper.unbridged(),
+                                  operand.unbridged());
+}
+
+BridgedPrefixUnaryExpr
+BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedExpr oper, BridgedExpr operand) {
+  return PrefixUnaryExpr::create(cContext.unbridged(), oper.unbridged(),
+                                 operand.unbridged());
+}
+
 BridgedSingleValueStmtExpr BridgedSingleValueStmtExpr_createWithWrappedBranches(
     BridgedASTContext cContext, BridgedStmt S, BridgedDeclContext cDeclContext,
     bool mustBeExpr) {
@@ -930,13 +1054,35 @@ BridgedSingleValueStmtExpr BridgedSingleValueStmtExpr_createWithWrappedBranches(
       context, S.unbridged(), declContext, mustBeExpr);
 }
 
+BridgedTernaryExpr BridgedTernaryExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cQuestionLoc,
+    BridgedExpr cThenExpr, BridgedSourceLoc cColonLoc) {
+  return new (cContext.unbridged()) TernaryExpr(
+      cQuestionLoc.unbridged(), cThenExpr.unbridged(), cColonLoc.unbridged());
+}
+
+BridgedTypeExpr BridgedTypeExpr_createParsed(BridgedASTContext cContext,
+                                             BridgedTypeRepr cType) {
+  ASTContext &context = cContext.unbridged();
+  return new (context) TypeExpr(cType.unbridged());
+}
+
 BridgedUnresolvedDotExpr BridgedUnresolvedDotExpr_createParsed(
     BridgedASTContext cContext, BridgedExpr base, BridgedSourceLoc cDotLoc,
-    BridgedIdentifier name, BridgedSourceLoc cNameLoc) {
+    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc) {
   ASTContext &context = cContext.unbridged();
   return new (context) UnresolvedDotExpr(
-      base.unbridged(), cDotLoc.unbridged(), DeclNameRef(name.unbridged()),
-      DeclNameLoc(cNameLoc.unbridged()), false);
+      base.unbridged(), cDotLoc.unbridged(), cName.unbridged(),
+      cNameLoc.unbridged(), /*isImplicit=*/false);
+}
+
+BridgedUnresolvedMemberExpr BridgedUnresolvedMemberExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cDotLoc,
+    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc) {
+  ASTContext &context = cContext.unbridged();
+  return new (context)
+      UnresolvedMemberExpr(cDotLoc.unbridged(), cNameLoc.unbridged(),
+                           cName.unbridged(), /*isImplicit=*/false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -972,13 +1118,14 @@ BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
   }
 
   ASTContext &context = cContext.unbridged();
-  return BraceStmt::create(context, cLBLoc.unbridged(),
-                           context.AllocateCopy(nodes), cRBLoc.unbridged());
+  return BraceStmt::create(context, cLBLoc.unbridged(), nodes,
+                           cRBLoc.unbridged());
 }
 
 BridgedIfStmt BridgedIfStmt_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIfLoc,
-                                         BridgedExpr cond, BridgedStmt then,
+                                         BridgedExpr cond,
+                                         BridgedBraceStmt then,
                                          BridgedSourceLoc cElseLoc,
                                          BridgedNullableStmt elseStmt) {
   ASTContext &context = cContext.unbridged();

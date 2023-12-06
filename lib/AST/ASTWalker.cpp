@@ -1280,7 +1280,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (!E->isObjC()) {
-      auto rootType = E->getRootType();
+      auto rootType = E->getExplicitRootType();
       if (rootType && doIt(rootType))
         return nullptr;
     }
@@ -1813,8 +1813,8 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
   if (doIt(IS->getCond()))
     return nullptr;
 
-  if (Stmt *S2 = doIt(IS->getThenStmt()))
-    IS->setThenStmt(S2);
+  if (auto *S2 = doIt(IS->getThenStmt()))
+    IS->setThenStmt(cast<BraceStmt>(S2));
   else
     return nullptr;
 

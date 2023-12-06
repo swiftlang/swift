@@ -263,6 +263,8 @@ public:
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
   void completeTypeDeclResultBeginning() override;
+  void completeTypeBeginning() override;
+  void completeTypeSimpleOrComposition() override;
   void completeTypeSimpleBeginning() override;
   void completeTypeSimpleWithDot(TypeRepr *TR) override;
   void completeTypeSimpleWithoutDot(TypeRepr *TR) override;
@@ -459,6 +461,16 @@ void CodeCompletionCallbacksImpl::completePoundAvailablePlatform() {
 
 void CodeCompletionCallbacksImpl::completeTypeDeclResultBeginning() {
   Kind = CompletionKind::TypeDeclResultBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeTypeBeginning() {
+  Kind = CompletionKind::TypeBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeTypeSimpleOrComposition() {
+  Kind = CompletionKind::TypeSimpleOrComposition;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -961,10 +973,6 @@ void swift::ide::addSuperKeyword(CodeCompletionResultSink &Sink,
   Builder.addTypeAnnotation(ST, PrintOptions());
 }
 
-static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
-  addKeyword(Sink, "some", CodeCompletionKeywordKind::None, "some");
-}
-
 static void addAnyTypeKeyword(CodeCompletionResultSink &Sink, Type T) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
                                       SemanticContextKind::None);
@@ -1094,16 +1102,15 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     }
     break;
 
-  case CompletionKind::TypeDeclResultBeginning: {
-    auto DC = CurDeclContext;
-    if (ParsedDecl && ParsedDecl == CurDeclContext->getAsDecl())
-      DC = ParsedDecl->getDeclContext();
-    if (!isa<ProtocolDecl>(DC))
-      if (DC->isTypeContext() || isa_and_nonnull<FuncDecl>(ParsedDecl))
-        addOpaqueTypeKeyword(Sink);
-
+  case CompletionKind::TypeBeginning:
+    addKeyword(Sink, "repeat", CodeCompletionKeywordKind::None);
     LLVM_FALLTHROUGH;
-  }
+  case CompletionKind::TypeDeclResultBeginning:
+  case CompletionKind::TypeSimpleOrComposition:
+    addKeyword(Sink, "some", CodeCompletionKeywordKind::None);
+    addKeyword(Sink, "any", CodeCompletionKeywordKind::None);
+    addKeyword(Sink, "each", CodeCompletionKeywordKind::None);
+    LLVM_FALLTHROUGH;
   case CompletionKind::TypeSimpleBeginning:
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
@@ -1299,6 +1306,8 @@ void swift::ide::postProcessCompletionResults(
     // names at non-type name position are "rare".
     if (result->getKind() == CodeCompletionResultKind::Declaration &&
         result->getAssociatedDeclKind() == CodeCompletionDeclKind::Protocol &&
+        Kind != CompletionKind::TypeBeginning &&
+        Kind != CompletionKind::TypeSimpleOrComposition &&
         Kind != CompletionKind::TypeSimpleBeginning &&
         Kind != CompletionKind::TypeSimpleWithoutDot &&
         Kind != CompletionKind::TypeSimpleWithDot &&
@@ -1828,6 +1837,8 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   }
 
   case CompletionKind::TypeDeclResultBeginning:
+  case CompletionKind::TypeBeginning:
+  case CompletionKind::TypeSimpleOrComposition:
   case CompletionKind::TypeSimpleBeginning: {
     auto Loc = Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getTypeCompletionsInDeclContext(Loc);

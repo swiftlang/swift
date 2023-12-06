@@ -970,6 +970,29 @@ void ThrownTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
+// DoCatchExplicitThrownTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+bool DoCatchExplicitThrownTypeRequest::isCached() const {
+  auto *const stmt = std::get<1>(getStorage());
+  return stmt->getThrowsLoc().isValid();
+}
+
+llvm::Optional<Type> DoCatchExplicitThrownTypeRequest::getCachedResult() const {
+  auto *const stmt = std::get<1>(getStorage());
+  Type thrownType = stmt->ThrownType.getType();
+  if (thrownType.isNull())
+    return llvm::None;
+
+  return thrownType;
+}
+
+void DoCatchExplicitThrownTypeRequest::cacheResult(Type type) const {
+  auto *const stmt = std::get<1>(getStorage());
+  stmt->ThrownType.setType(type);
+}
+
+//----------------------------------------------------------------------------//
 // ResultTypeRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1699,6 +1722,7 @@ bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
   case Nonisolated:
+  case NonisolatedUnsafe:
   case Unspecified:
     return false;
 
@@ -1713,6 +1737,7 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
   case Nonisolated:
+  case NonisolatedUnsafe:
   case Unspecified:
     return *this;
 
@@ -2177,4 +2202,36 @@ void UniqueUnderlyingTypeSubstitutionsRequest::cacheResult(
   assert(subs == decl->UniqueUnderlyingType);
   const_cast<OpaqueTypeDecl *>(decl)
       ->LazySemanticInfo.UniqueUnderlyingTypeComputed = true;
+}
+
+void ExpandPreambleMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity,
+                 "preamble",
+                 decl->getName());
+}
+
+void ExpandPreambleMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity_through,
+                 "preamble",
+                 decl->getName());
+}
+
+void ExpandBodyMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity,
+                 "body",
+                 decl->getName());
+}
+
+void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl->getLoc(),
+                 diag::macro_expand_circular_reference_entity_through,
+                 "body",
+                 decl->getName());
 }

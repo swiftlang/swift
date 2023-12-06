@@ -22,6 +22,7 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -2115,165 +2116,193 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
 }
 
 /// Type-erase occurrences of covariant 'Self'-rooted type parameters to their
-/// most specific non-dependent bounds throughout the given type, using
-/// \p baseTy as the existential base object type.
+/// most specific upper bounds throughout the given type, using \p baseTy as
+/// the existential base object type.
 ///
 /// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
 /// routine will recurse into the concrete type.
 static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
-                                               TypePosition outermostPosition) {
+                                               TypePosition outermostPosition,
+                                               GenericSignature existentialSig,
+                                               llvm::function_ref<bool(Type)> containsFn,
+                                               llvm::function_ref<bool(Type)> predicateFn,
+                                               llvm::function_ref<Type(Type)> projectionFn,
+                                               bool force, unsigned metatypeDepth = 0) {
   assert(baseTy->isExistentialType());
-  if (!refTy->hasTypeParameter()) {
+  if (!containsFn(refTy))
     return refTy;
-  }
 
-  const auto existentialSig =
-      baseTy->getASTContext().getOpenedExistentialSignature(baseTy,
-                                                            GenericSignature());
+  return refTy.transformWithPosition(
+    outermostPosition,
+    [&](TypeBase *t, TypePosition currPos) -> llvm::Optional<Type> {
+      if (!containsFn(t)) {
+        return Type(t);
+      }
 
-  unsigned metatypeDepth = 0;
+      if (t->is<MetatypeType>()) {
+        const auto instanceTy = t->getMetatypeInstanceType();
+        const auto erasedTy =
+          typeEraseExistentialSelfReferences(
+            instanceTy, baseTy, currPos,
+            existentialSig, containsFn, predicateFn, projectionFn,
+            force, metatypeDepth + 1);
 
-  /// Check whether the given type has a reference to the generic parameter
-  /// that we are erasing.
-  auto hasErasedGenericParameter = [&](Type type) {
-    if (!type->hasTypeParameter())
-      return false;
+        if (instanceTy.getPointer() == erasedTy.getPointer()) {
+          return Type(t);
+        }
 
-    return type.findIf([&](Type type) {
-      if (auto gp = type->getAs<GenericTypeParamType>())
-        return gp->getDepth() == 0;
-      return false;
+        return Type(ExistentialMetatypeType::get(erasedTy));
+      }
+
+      // Opaque types whose substitutions involve this type parameter are
+      // erased to their upper bound.
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
+        for (auto replacementType :
+             opaque->getSubstitutions().getReplacementTypes()) {
+          auto erasedReplacementType =
+              typeEraseExistentialSelfReferences(
+                replacementType, baseTy, TypePosition::Covariant,
+                existentialSig, containsFn, predicateFn, projectionFn,
+                force, metatypeDepth);
+          if (erasedReplacementType.getPointer() != replacementType.getPointer())
+            return opaque->getExistentialType();
+        }
+      }
+
+      if (auto lvalue = dyn_cast<LValueType>(t)) {
+        auto objTy = lvalue->getObjectType();
+        auto erasedTy =
+          typeEraseExistentialSelfReferences(
+            objTy, baseTy, currPos,
+            existentialSig, containsFn, predicateFn, projectionFn,
+            force, metatypeDepth);
+
+        if (erasedTy.getPointer() == objTy.getPointer())
+          return Type(lvalue);
+
+        return erasedTy;
+      }
+
+      if (!predicateFn(t)) {
+        // Recurse.
+        return llvm::None;
+      }
+
+      auto paramTy = projectionFn(t);
+      if (!paramTy)
+        return Type(t);
+
+      // This can happen with invalid code.
+      if (!existentialSig->isValidTypeParameter(paramTy)) {
+        return Type(t);
+      }
+
+      // If the type parameter is fixed to a concrete type, recurse into it.
+      if (const auto concreteTy = existentialSig->getConcreteType(paramTy)) {
+        auto erasedTy = typeEraseExistentialSelfReferences(
+            concreteTy, baseTy, currPos, existentialSig,
+            [](Type t) { return t->hasTypeParameter(); },
+            [](Type t) { return t->isTypeParameter(); },
+            [](Type t) { return t; },
+            force, metatypeDepth);
+        if (erasedTy.getPointer() == concreteTy.getPointer()) {
+          // Don't return the concrete type if we haven't type-erased
+          // anything inside it, or else we might inadvertently transform a
+          // normal metatype into an existential one.
+          return Type(t);
+        }
+
+        return erasedTy;
+      }
+
+      if (!force) {
+        switch (currPos) {
+        case TypePosition::Covariant:
+          break;
+
+        case TypePosition::Contravariant:
+        case TypePosition::Invariant:
+        case TypePosition::Shape:
+          return Type(t);
+        }
+      }
+
+      Type erasedTy;
+
+      // The upper bounds of 'Self' is the existential base type.
+      if (paramTy->is<GenericTypeParamType>()) {
+        erasedTy = baseTy;
+      } else {
+        erasedTy = existentialSig->getUpperBound(paramTy);
+      }
+
+      if (metatypeDepth) {
+        if (const auto existential = erasedTy->getAs<ExistentialType>())
+          return existential->getConstraintType();
+      }
+
+      return erasedTy;
     });
-  };
-
-  std::function<Type(Type, TypePosition)> transformFn;
-  transformFn = [&](Type type, TypePosition initialPos) -> Type {
-    return type.transformWithPosition(
-        initialPos,
-        [&](TypeBase *t, TypePosition currPos) -> llvm::Optional<Type> {
-          if (!t->hasTypeParameter()) {
-            return Type(t);
-          }
-
-          if (t->is<MetatypeType>()) {
-            const auto instanceTy = t->getMetatypeInstanceType();
-            ++metatypeDepth;
-            const auto erasedTy = transformFn(instanceTy, currPos);
-            --metatypeDepth;
-
-            if (instanceTy.getPointer() == erasedTy.getPointer()) {
-              return Type(t);
-            }
-
-            return Type(ExistentialMetatypeType::get(erasedTy));
-          }
-
-          // Opaque types whose substitutions involve this type parameter are
-          // erased to their upper bound.
-          if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
-            for (auto replacementType :
-                 opaque->getSubstitutions().getReplacementTypes()) {
-              if (hasErasedGenericParameter(replacementType)) {
-                Type interfaceType = opaque->getInterfaceType();
-                auto genericSig =
-                    opaque->getDecl()->getOpaqueInterfaceGenericSignature();
-                return genericSig->getNonDependentUpperBounds(interfaceType);
-              }
-            }
-          }
-
-          if (!t->isTypeParameter()) {
-            // Recurse.
-            return llvm::None;
-          }
-
-          if (t->getRootGenericParam()->getDepth() > 0) {
-            return Type(t);
-          }
-
-          // If the type parameter is beyond the domain of the existential
-          // generic signature, ignore it.
-          if (!existentialSig->isValidTypeParameter(t)) {
-            return Type(t);
-          }
-
-          // If the type parameter is bound to a concrete type, recurse into it.
-          if (const auto concreteTy = existentialSig->getConcreteType(t)) {
-            const auto erasedTy = transformFn(concreteTy, currPos);
-            if (erasedTy.getPointer() == concreteTy.getPointer()) {
-              // Don't return the concrete type if we haven't type-erased
-              // anything inside it, or else we might inadvertently transform a
-              // normal metatype into an existential one.
-              return Type(t);
-            }
-
-            return erasedTy;
-          }
-
-          switch (currPos) {
-          case TypePosition::Covariant:
-            break;
-
-          case TypePosition::Contravariant:
-          case TypePosition::Invariant:
-          case TypePosition::Shape:
-            return Type(t);
-          }
-
-          Type erasedTy;
-
-          // The upper bounds of 'Self' is the existential base type.
-          if (t->is<GenericTypeParamType>()) {
-            erasedTy = baseTy;
-          } else {
-            erasedTy = existentialSig->getNonDependentUpperBounds(t);
-          }
-
-          if (metatypeDepth) {
-            if (const auto existential = erasedTy->getAs<ExistentialType>())
-              return existential->getConstraintType();
-          }
-
-          return erasedTy;
-        });
-  };
-  return transformFn(refTy, outermostPosition);
 }
 
 Type constraints::typeEraseOpenedExistentialReference(
     Type type, Type existentialBaseType, TypeVariableType *openedTypeVar,
     TypePosition outermostPosition) {
-  Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
+  auto existentialSig =
+    type->getASTContext().getOpenedExistentialSignature(
+      existentialBaseType, GenericSignature());
+  auto selfGP = existentialSig.getGenericParams()[0];
 
-  // First, temporarily reconstitute the 'Self' generic parameter.
-  type = type.transformRec([&](TypeBase *t) -> llvm::Optional<Type> {
-    // Don't recurse into children unless we have to.
-    if (!type->hasTypeVariable())
-      return Type(t);
+  return typeEraseExistentialSelfReferences(
+      type, existentialBaseType, outermostPosition, existentialSig,
+      /*containsFn=*/[](Type t) {
+        return t->hasTypeVariable();
+      },
+      /*predicateFn=*/[](Type t) {
+        return t->isTypeVariableOrMember();
+      },
+      /*projectionFn=*/[&](Type t) {
+        bool found = false;
+        auto result = t.transformRec([&](Type t) -> llvm::Optional<Type> {
+          if (t.getPointer() == openedTypeVar) {
+            found = true;
+            return selfGP;
+          }
+          return llvm::None;
+        });
 
-    if (isa<TypeVariableType>(t) && t->isEqual(openedTypeVar))
-      return selfGP;
+        if (!found)
+          return Type();
 
-    // Recurse.
-    return llvm::None;
-  });
+        assert(result->isTypeParameter());
+        return result;
+      },
+      /*force=*/false);
+}
 
-  // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-  type = typeEraseExistentialSelfReferences(type, existentialBaseType,
-                                            outermostPosition);
+Type constraints::typeEraseOpenedArchetypesWithRoot(
+    Type type, const OpenedArchetypeType *root) {
+  assert(root->isRoot() && "Expected a root archetype");
 
-  // Finally, swap the 'Self'-corresponding type variable back in.
-  return type.transformRec([&](TypeBase *t) -> llvm::Optional<Type> {
-    // Don't recurse into children unless we have to.
-    if (!type->hasTypeParameter())
-      return Type(t);
+  auto *env = root->getGenericEnvironment();
+  auto sig = env->getGenericSignature();
 
-    if (isa<GenericTypeParamType>(t) && t->isEqual(selfGP))
-      return Type(openedTypeVar);
+  return typeEraseExistentialSelfReferences(
+      type, root->getExistentialType(), TypePosition::Covariant, sig,
+      /*containsFn=*/[](Type t) {
+        return t->hasOpenedExistential();
+      },
+      /*predicateFn=*/[](Type t) {
+        return t->is<OpenedArchetypeType>();
+      },
+      /*projectionFn=*/[&](Type t) {
+        auto *openedTy = t->castTo<OpenedArchetypeType>();
+        if (openedTy->getGenericEnvironment() == env)
+          return openedTy->getInterfaceType();
 
-    // Recurse.
-    return llvm::None;
-  });
+        return Type();
+      },
+      /*force=*/true);
 }
 
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
@@ -2354,14 +2383,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
       baseObjTy->isExistentialType() && outerDC->getSelfProtocolDecl() &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
-    auto getResultType = [](Type type) {
-      if (auto *funcTy = type->getAs<FunctionType>())
-        return funcTy->getResult();
-      return type;
-    };
-
-    auto nonErasedResultTy = getResultType(type);
-
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
     auto openedTypeVar = replacements.lookup(selfGP);
@@ -2374,19 +2395,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     if (auto *anchor = getAsExpr(simplifyLocatorToAnchor(locator))) {
       contextualTy =
           getContextualType(getParentExpr(anchor), /*forConstraint=*/false);
-    }
-
-    if (!hasFixFor(locator) &&
-        AddExplicitExistentialCoercion::isRequired(
-            *this, nonErasedResultTy,
-            [&](TypeVariableType *typeVar) {
-              return openedTypeVar == typeVar ? baseObjTy
-                                              : llvm::Optional<Type>();
-            },
-            locator) &&
-        !contextualTy) {
-      recordFix(AddExplicitExistentialCoercion::create(
-          *this, getResultType(type), locator));
     }
   }
 
@@ -2462,7 +2470,10 @@ bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
 
   auto baseTy =
       simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
-  return getApplicationLevel(*this, baseTy, UDE) < 2;
+  auto level = getApplicationLevel(*this, baseTy, UDE);
+  // Static members have base applied implicitly which means that their
+  // application level is lower.
+  return level < (baseTy->is<MetatypeType>() ? 1 : 2);
 }
 
 DeclReferenceType
@@ -2632,7 +2643,7 @@ ConstraintSystem::getTypeOfMemberReference(
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
         OpenedArchetypeType::get(baseObjTy->getCanonicalType(),
-                                 useDC->getGenericSignatureOfContext());
+                                 GenericSignature());
     OpenedExistentialTypes.insert(
         {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
@@ -3477,8 +3488,14 @@ void ConstraintSystem::bindOverloadType(
            "subscript always has one argument");
     // Parameter type is KeyPath<T, U> where `T` is a root type
     // and U is a leaf type (aka member type).
-    auto keyPathTy =
-        fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
+    auto paramTy = fnType->getParams()[0].getPlainType();
+
+    if (auto *existential = paramTy->getAs<ExistentialType>()) {
+      paramTy = existential->getSuperclass();
+      assert(isKnownKeyPathType(paramTy));
+    }
+
+    auto keyPathTy = paramTy->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
     assert(isKnownKeyPathType(keyPathTy) &&
@@ -3569,7 +3586,7 @@ void ConstraintSystem::bindOverloadType(
       addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,
                     keyPathLoc);
 
-      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
+      addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy,
                                            originalCallerTy->getResult());
 
       // Bind the overload type to the opened type as usual to match the fact
@@ -3585,8 +3602,7 @@ void ConstraintSystem::bindOverloadType(
       // Form constraints for a x[dynamicMember:] subscript with a key path
       // argument, where the overload type is bound to the result to model the
       // fact that this a property access in the source.
-      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
-                                           boundType);
+      addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy, boundType);
     }
     return;
   }
@@ -3686,16 +3702,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // Key path application looks like a subscript(keyPath: KeyPath<Base, T>).
     // The element type is T or @lvalue T based on the key path subtype and
     // the mutability of the base.
-    auto keyPathIndexTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToInOut);
+    auto *keyPathIndexLoc =
+        getConstraintLocator(locator, ConstraintLocator::KeyPathSubscriptIndex);
+    auto keyPathIndexTy = createTypeVariable(keyPathIndexLoc,
+                                             /*options=*/0);
     auto elementTy = createTypeVariable(
-            getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-            TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-    auto elementObjTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToNoEscape);
-    addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
+        getConstraintLocator(keyPathIndexLoc, ConstraintLocator::KeyPathValue),
+        TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
     // The element result is an lvalue or rvalue based on the key path class.
     addKeyPathApplicationConstraint(
@@ -6097,6 +6110,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::OptionalPayload:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
+    case ConstraintLocator::KeyPathSubscriptIndex:
       break;
     }
 
@@ -7407,9 +7421,6 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   if (getAppliedResultBuilderTransform(closure))
     return true;
 
-  if (Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked))
-    return false;
-
   if (closure->hasEmptyBody())
     return false;
 
@@ -7443,6 +7454,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
 std::pair<bool, llvm::Optional<KeyPathCapability>>
 ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   bool didOptionalChain = false;
+  bool isSendable = true;
 
   auto fail = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
     return std::make_pair(false, llvm::None);
@@ -7452,15 +7464,16 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     return std::make_pair(true, llvm::None);
   };
 
-  auto success = [](KeyPathCapability capability)
+  auto success = [](KeyPathMutability mutability, bool isSendable)
       -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    KeyPathCapability capability(mutability, isSendable);
     return std::make_pair(true, capability);
   };
 
   if (keyPath->hasSingleInvalidComponent())
     return fail();
 
-  auto capability = KeyPathCapability::Writable;
+  auto mutability = KeyPathMutability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
 
@@ -7470,13 +7483,35 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       break;
 
     case KeyPathExpr::Component::Kind::CodeCompletion: {
-      capability = KeyPathCapability::ReadOnly;
-      break;
+      return fail();
+    }
+
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+    case KeyPathExpr::Component::Kind::Subscript: {
+      if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+        // Key path is sendable only when all of its captures are sendable.
+        if (auto *args = component.getSubscriptArgs()) {
+          auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
+
+          for (const auto &arg : *args) {
+            auto argTy = simplifyType(getType(arg.getExpr()));
+
+            // Sendability cannot be determined until the argument
+            // is fully resolved.
+            if (argTy->hasTypeVariable())
+              return delay();
+
+            auto conformance = lookupConformance(argTy, sendable);
+            isSendable &=
+                bool(conformance) &&
+                !conformance.hasMissingConformance(DC->getParentModule());
+          }
+        }
+      }
+      LLVM_FALLTHROUGH;
     }
     case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::Subscript:
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
-    case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+    case KeyPathExpr::Component::Kind::UnresolvedProperty: {
       auto *componentLoc =
           getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
       auto *calleeLoc = getCalleeLocator(componentLoc);
@@ -7512,13 +7547,13 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
         return fail();
 
       if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
-        capability = KeyPathCapability::ReadOnly;
+        mutability = KeyPathMutability::ReadOnly;
         continue;
       }
 
       // A nonmutating setter indicates a reference-writable base.
       if (!storage->isSetterMutating()) {
-        capability = KeyPathCapability::ReferenceWritable;
+        mutability = KeyPathMutability::ReferenceWritable;
         continue;
       }
 
@@ -7551,9 +7586,9 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
 
   // Optional chains force the entire key path to be read-only.
   if (didOptionalChain)
-    capability = KeyPathCapability::ReadOnly;
+    mutability = KeyPathMutability::ReadOnly;
 
-  return success(capability);
+  return success(mutability, isSendable);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)

@@ -12,13 +12,13 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftCompilerPluginMessageHandling
+@_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import SwiftSyntaxMacroExpansion
-import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacroExpansion
+@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
 /// Describes a macro that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
@@ -49,6 +49,8 @@ extension MacroRole {
     case 6: self = .conformance
     case 7: self = .codeItem
     case 8: self = .`extension`
+    case 9: self = .preamble
+    case 10: self = .body
 
     default: fatalError("unknown macro role")
     }
@@ -490,7 +492,7 @@ func expandFreestandingMacroIPC(
   // Map the macro role.
   let pluginMacroRole: PluginMessage.MacroRole
   switch macroRole {
-  case .accessor, .member, .memberAttribute, .peer, .conformance, .extension:
+  case .accessor, .member, .memberAttribute, .peer, .conformance, .extension, .preamble, .body:
     preconditionFailure("unhandled macro role for freestanding macro")
 
   case .expression: pluginMacroRole = .expression
@@ -778,6 +780,9 @@ func expandAttachedMacroIPC(
   case .peer: macroRole = .peer
   case .conformance: macroRole = .conformance
   case .extension: macroRole = .`extension`
+  case .preamble: macroRole = .preamble
+  case .body: macroRole = .body
+
   case .expression,
     .declaration,
     .codeItem:

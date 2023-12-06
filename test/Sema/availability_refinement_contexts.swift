@@ -16,7 +16,8 @@
 // CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someStaticPropertyInferredType
 // CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=multiPatternStaticPropertyA
 // CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=multiPatternStaticPropertyA
-// CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someComputedProperty
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someComputedProperty
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someComputedProperty
 // CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someOtherMethod()
 @available(OSX 10.51, *)
 class SomeClass {
@@ -61,7 +62,8 @@ func someFunction() { }
 
 // CHECK-NEXT: {{^}}  (decl versions=[10.51,+Inf) decl=SomeProtocol
 // CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=protoMethod()
-// CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=protoProperty
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=protoProperty
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=protoProperty
 @available(OSX 10.51, *)
 protocol SomeProtocol {
   @available(OSX 10.52, *)
@@ -232,6 +234,8 @@ extension SomeClass {
     return 53
   }()
 }
+
+// CHECK-NEXT: {{^}}  (decl_implicit versions=[10.13,+Inf) decl=wrappedValue
 
 @propertyWrapper
 struct Wrapper<T> {

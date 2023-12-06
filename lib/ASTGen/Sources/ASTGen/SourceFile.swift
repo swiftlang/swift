@@ -18,10 +18,10 @@ import SwiftSyntax
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
-struct ExportedSourceFile {
+public struct ExportedSourceFile {
   /// The underlying buffer within the C++ SourceManager, which is used
   /// for computations of source locations.
-  let buffer: UnsafeBufferPointer<UInt8>
+  public let buffer: UnsafeBufferPointer<UInt8>
 
   /// The name of the enclosing module.
   let moduleName: String
@@ -30,7 +30,15 @@ struct ExportedSourceFile {
   let fileName: String
 
   /// The syntax tree for the complete source file.
-  let syntax: SourceFileSyntax
+  public let syntax: SourceFileSyntax
+
+  public func position(of location: BridgedSourceLoc) -> AbsolutePosition? {
+    let sourceFileBaseAddress = UnsafeRawPointer(buffer.baseAddress!)
+    guard let opaqueValue = location.getOpaquePointerValue() else {
+      return nil
+    }
+    return AbsolutePosition(utf8Offset: opaqueValue - sourceFileBaseAddress)
+  }
 }
 
 extension Parser.ExperimentalFeatures {

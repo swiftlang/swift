@@ -199,6 +199,8 @@ enum class CompletionKind : uint8_t {
   KeyPathExprObjC,
   KeyPathExprSwift,
   TypeDeclResultBeginning,
+  TypeBeginning,
+  TypeSimpleOrComposition,
   TypeSimpleBeginning,
   TypeSimpleWithDot,
   TypeSimpleWithoutDot,

@@ -17,9 +17,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Effects.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IDE/IDEBridging.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -300,29 +301,6 @@ struct ResolvedStmtStartCursorInfo : public ResolvedCursorInfo {
 
 void simple_display(llvm::raw_ostream &out, ResolvedCursorInfoPtr info);
 
-struct UnresolvedLoc {
-  SourceLoc Loc;
-  bool ResolveArgLocs;
-};
-
-enum class LabelRangeType {
-  None,
-  CallArg,    // foo([a: ]2) or .foo([a: ]String)
-  Param,  // func([a b]: Int)
-  NoncollapsibleParam, // subscript([a a]: Int)
-  Selector,   // #selector(foo.func([a]:))
-};
-
-struct ResolvedLoc {
-  ASTWalker::ParentTy Node;
-  CharSourceRange Range;
-  std::vector<CharSourceRange> LabelRanges;
-  llvm::Optional<unsigned> FirstTrailingLabel;
-  LabelRangeType LabelType;
-  bool IsActive;
-  bool IsInSelector;
-};
-
 /// Used by NameMatcher to track parent CallExprs when walking a checked AST.
 struct CallingParent {
   Expr *ApplicableTo;
@@ -337,7 +315,7 @@ struct CallingParent {
 /// whether it is within active/inactive code, or a selector or string literal).
 class NameMatcher: public ASTWalker {
   SourceFile &SrcFile;
-  std::vector<UnresolvedLoc> LocsToResolve;
+  std::vector<SourceLoc> LocsToResolve;
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
 
@@ -391,8 +369,9 @@ class NameMatcher: public ASTWalker {
 
 public:
   explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }
-  std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
-  ResolvedLoc resolve(UnresolvedLoc Loc);
+  std::vector<ResolvedLoc> resolve(ArrayRef<SourceLoc> Locs,
+                                   ArrayRef<Token> Tokens);
+  ResolvedLoc resolve(SourceLoc Loc);
 };
 
 enum class RangeKind : int8_t {

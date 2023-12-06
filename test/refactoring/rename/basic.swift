@@ -27,6 +27,7 @@ struct Test {
   }
 }
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=2:15 > %t/S1.swift
 // RUN: diff -u %S/Outputs/basic_ranges/S1.swift.expected %t/S1.swift

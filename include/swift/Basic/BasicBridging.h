@@ -20,6 +20,9 @@
 // Do not add other C++/llvm/swift header files here!
 // Function implementations should be placed into BasicBridging.cpp and required header files should be added there.
 //
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+//
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/Compiler.h"
 
@@ -34,6 +37,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
+#include <vector>
 #endif
 
 // FIXME: We ought to be importing '<swift/bridging>' instead.
@@ -303,6 +307,10 @@ public:
 #endif
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedCharSourceRange
+//===----------------------------------------------------------------------===//
+
 class BridgedCharSourceRange {
 public:
   SWIFT_UNAVAILABLE("Use '.start' instead")
@@ -336,6 +344,41 @@ inline SwiftInt
 BridgedCharSourceRange_byteLength(BridgedCharSourceRange range) {
   return static_cast<SwiftInt>(range.ByteLength);
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: std::vector<BridgedCharSourceRange>
+//===----------------------------------------------------------------------===//
+
+/// An opaque, heap-allocated `std::vector<CharSourceRange>`.
+///
+/// This type is manually memory managed. The creator of the object needs to
+/// ensure that `takeUnbridged` is called to free the memory.
+class BridgedCharSourceRangeVector {
+  /// Opaque pointer to `std::vector<CharSourceRange>`.
+  void *_Nonnull vector;
+
+public:
+  BridgedCharSourceRangeVector();
+
+  SWIFT_NAME("append(_:)")
+  void push_back(BridgedCharSourceRange range);
+
+#ifdef USED_IN_CPP_SOURCE
+  /// Returns the `std::vector<swift::CharSourceRange>` that this
+  /// `BridgedCharSourceRangeVector` represents and frees the memory owned by
+  /// this `BridgedCharSourceRangeVector`.
+  ///
+  /// No operations should be called on `BridgedCharSourceRangeVector` after
+  /// `takeUnbridged` is called.
+  std::vector<swift::CharSourceRange> takeUnbridged() {
+    auto *vectorPtr =
+        static_cast<std::vector<swift::CharSourceRange> *>(vector);
+    std::vector<swift::CharSourceRange> unbridged = *vectorPtr;
+    delete vectorPtr;
+    return unbridged;
+  }
+#endif
+};
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins

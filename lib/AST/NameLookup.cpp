@@ -1665,6 +1665,15 @@ bool
 namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
   bool inMacroArgument = false;
 
+  // Make sure that the source location is actually within the given source
+  // file.
+  if (sourceFile && loc.isValid()) {
+    sourceFile =
+        sourceFile->getParentModule()->getSourceFileContainingLocation(loc);
+    if (!sourceFile)
+      return false;
+  }
+
   ASTScope::lookupEnclosingMacroScope(
       sourceFile, loc,
       [&](auto potentialMacro) -> bool {
@@ -3186,18 +3195,16 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 ArrayRef<ProtocolDecl *>
 InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                     ProtocolDecl *PD) const {
-  llvm::SmallVector<ProtocolDecl *, 2> result;
-  SmallPtrSet<const ProtocolDecl *, 2> known;
-  known.insert(PD);
+  llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
   bool anyObject = false;
-  for (const auto &found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      if (known.insert(proto).second)
-        result.push_back(proto);
-    }
+  for (const auto &found :
+       getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+    auto proto = dyn_cast<ProtocolDecl>(found.Item);
+    if (proto && proto != PD)
+      inherited.insert(proto);
   }
 
-  return PD->getASTContext().AllocateCopy(result);
+  return PD->getASTContext().AllocateCopy(inherited.getArrayRef());
 }
 
 ArrayRef<ValueDecl *>
@@ -3710,6 +3717,16 @@ swift::getDirectlyInheritedNominalTypeDecls(
       result.emplace_back(req.getProtocolDecl(), loc, SourceLoc());
     }
     return result;
+  }
+
+  // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
+  // these to add `Sendable` conformances to protocols without modifying the
+  // inherited type list.
+  for (auto attr :
+       protoDecl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    auto loc = attr->getLocation();
+    result.push_back(
+        {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc()});
   }
 
   // Else we have access to this information on the where clause.

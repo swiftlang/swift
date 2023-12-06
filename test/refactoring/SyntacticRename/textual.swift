@@ -36,6 +36,7 @@ _ = /*MyClass:unknown*/Mismatch()
 _ = /*MyClass:unknown*/MyClass()
 #endif
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="foo" -is-function-like -old-name "foo" >> %t.ranges/textual_foo.swift
 // RUN: diff -u %S/Outputs/textual/foo.swift.expected %t.ranges/textual_foo.swift

@@ -322,22 +322,6 @@ extension LoadInst {
   }
 }
 
-extension SmallProjectionPath {
-  /// Returns true if the path only contains projections which can be materialized as
-  /// SIL struct or tuple projection instructions - for values or addresses.
-  var isMaterializable: Bool {
-    let (kind, _, subPath) = pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField, .tupleField:
-      return subPath.isMaterializable
-    default:
-      return false
-    }
-  }
-}
-
 extension FunctionPassContext {
   /// Returns true if any blocks were removed.
   func removeDeadBlocks(in function: Function) -> Bool {
@@ -528,6 +512,28 @@ extension GlobalVariable {
         context.erase(instruction: endAccess)
       default:
         break
+      }
+    }
+  }
+}
+
+extension InstructionRange {
+  /// Adds the instruction range of a borrow-scope by transitively visiting all (potential) re-borrows.
+  mutating func insert(borrowScopeOf borrow: BorrowIntroducingInstruction, _ context: some Context) {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(borrow)
+    while let value = worklist.pop() {
+      for use in value.uses {
+        switch use.instruction {
+        case let endBorrow as EndBorrowInst:
+          self.insert(endBorrow)
+        case let branch as BranchInst:
+          worklist.pushIfNotVisited(branch.getArgument(for: use))
+        default:
+          break
+        }
       }
     }
   }

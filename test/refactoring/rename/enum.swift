@@ -9,6 +9,7 @@ func test() {
   let _ = Foo.second
 }
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=2:8 > %t.result/first_def.swift
 // RUN: diff -u %S/Outputs/enum/first.swift.expected %t.result/first_def.swift

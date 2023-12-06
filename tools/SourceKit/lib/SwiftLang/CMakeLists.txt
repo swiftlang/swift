@@ -68,3 +68,10 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   clangAPINotes
   clangBasic)
 add_dependencies(SourceKitSwiftLang clang-tablegen-targets)
+
+if(SWIFT_BUILD_SWIFT_SYNTAX)
+  target_compile_definitions(SourceKitSwiftLang
+    PRIVATE
+    SWIFT_BUILD_SWIFT_SYNTAX
+  )
+endif()

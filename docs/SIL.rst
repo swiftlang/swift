@@ -4514,8 +4514,15 @@ live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
 
 The optional ``lexical`` attribute specifies that the operand corresponds to a
-local variable in the Swift source, so special care must be taken when moving
-the end_borrow.
+local variable with a lexical lifetime in the Swift source, so special care
+must be taken when moving the end_borrow.  Compare to the ``var_decl``
+attribute.
+
+The optional ``pointer_escape`` attribute specifies that a pointer to the
+operand escapes within the borrow scope introduced by this begin_borrow.
+
+The optional ``var_decl`` attribute specifies that the operand corresponds to a
+local variable in the Swift source.
 
 This instruction is only valid in functions in Ownership SSA form.
 
@@ -6373,7 +6380,14 @@ values'. A move_value instruction is an instruction that introduces (or injects)
 a type `T` into the move only value space.
 
 The ``lexical`` attribute specifies that the value corresponds to a local
-variable in the Swift source.
+variable with a lexical lifetime in the Swift source.  Compare to the
+``var_decl`` attribute.
+
+The optional ``pointer_escape`` attribute specifies that a pointer to the
+operand escapes within the scope introduced by this move_value.
+
+The optional ``var_decl`` attribute specifies that the operand corresponds to a
+local variable in the Swift source.
 
 
 drop_deinit
@@ -6395,6 +6409,23 @@ the call of the move-only type's deinitializer.
 The instruction accepts an object or address type.
 If its argument is an object type it takes in an `@owned T` and produces a new
 `@owned T`. If its argument is an address type, it's an identity projection.
+
+If the operand is an object type, then this is a pseudo type-cast. It
+consumes its operand and produces a new value with the same nominal
+struct or enum type, but as if the type had no user-defined
+deinitializer. It's only use must be a an instruction that ends the
+aggregate lifetime, such as `destroy_value`, `destructure_struct`, or
+`switch_enum`. If the use is a `destroy_value`, then prevents the
+destroy from invoking the deinitializer. For example::
+
+  %1 = drop_deinit %0 : $T
+  destroy_value %1 : $T    // does not invoke deinit()
+
+If the operand and result are addresses, drop_deinit ends the lifetime of the referenced memory value while keeping the value's fields or enum cases alive. The deinit of the value is not called. The returned address can be used to access the value's field, e.g. with struct_element_addr, or enum cases with switch_enum_addr. After the drop_deinit, it is illegal to destroy its operand or result address with destroy_addr. For example::
+
+  %1 = drop_deinit %0 : $S
+  %2 = struct_element_addr %1 : $*T, #S.field
+  destroy_addr %2 : $T
 
 The instruction is only valid in ownership SIL.
 

@@ -17,6 +17,9 @@
 // Function implementations should be placed into SILBridgingImpl.h or SILBridging.cpp and
 // required header files should be added there.
 //
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+//
 #include "swift/AST/ASTBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -299,7 +302,10 @@ struct BridgedFunction {
   enum class PerformanceConstraints {
     None = 0,
     NoAllocation = 1,
-    NoLocks = 2
+    NoLocks = 2,
+    NoRuntime = 3,
+    NoExistentials = 4,
+    NoObjCBridging = 5
   };
 
   enum class InlineStrategy {
@@ -370,13 +376,15 @@ struct BridgedFunction {
   typedef SwiftInt (* _Nonnull CopyEffectsFn)(BridgedFunction, BridgedFunction);
   typedef EffectInfo (* _Nonnull GetEffectInfoFn)(BridgedFunction, SwiftInt);
   typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
+  typedef bool (* _Nonnull ArgumentMayReadFn)(BridgedFunction, BridgedOperand, BridgedValue);
 
   static void registerBridging(SwiftMetatype metatype,
               RegisterFn initFn, RegisterFn destroyFn,
               WriteFn writeFn, ParseFn parseFn,
               CopyEffectsFn copyEffectsFn,
               GetEffectInfoFn effectInfoFn,
-              GetMemBehaviorFn memBehaviorFn);
+              GetMemBehaviorFn memBehaviorFn,
+              ArgumentMayReadFn argumentMayReadFn);
 };
 
 struct OptionalBridgedFunction {

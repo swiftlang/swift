@@ -265,3 +265,42 @@ func rdar32101765() {
   let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
   // expected-error@-1 {{type 'Int' has no member 'unknown'}}
 }
+
+// https://github.com/apple/swift/issues/69795
+func test_invalid_argument_to_keypath_subscript() {
+  func test(x: Int) {
+    x[keyPath: 5]
+    // expected-error@-1 {{cannot use value of type 'Int' as a key path subscript index; argument must be a key path}}
+  }
+
+  let _: (Int) -> Void = {
+    let y = $0
+    y[keyPath: 5]
+    // expected-error@-1 {{cannot use value of type 'Int' as a key path subscript index; argument must be a key path}}
+  }
+
+  func ambiguous(_: (String) -> Void) {}
+  func ambiguous(_: (Int) -> Void) {}
+
+  // FIXME(diagnostic): This is not properly diagnosed in a general case and key path application is even more
+  // complicated because overloads anchored on 'SubscriptExpr -> subscript member' do not point to declarations.
+  // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
+  // for a key path subscript.
+  ambiguous {
+    // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+    $0[keyPath: 5]
+  }
+
+  class A {
+  }
+
+  func test_invalid_existential_protocol(base: String, v: any BinaryInteger) {
+    base[keyPath: v]
+    // expected-error@-1 {{cannot use value of type 'any BinaryInteger' as a key path subscript index; argument must be a key path}}
+  }
+
+  func test_invalid_existential_composition(base: String, v: any A & BinaryInteger) {
+    base[keyPath: v]
+    // expected-error@-1 {{cannot use value of type 'A' as a key path subscript index; argument must be a key path}}
+  }
+}

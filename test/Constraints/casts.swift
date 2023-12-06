@@ -349,8 +349,8 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
   _  = [i: stringAnyDict] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
 
   // These are currently not peepholed.
-  _ = [i].self as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
-  _ = (try [i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = [i].self as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  _ = (try [i]) as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 
   // These are wrong, but make sure we don't warn about the value cast always succeeding.

@@ -67,6 +67,60 @@ struct S5 {
   var test: Int = 10
 }
 
+@attached(preamble)
+macro Traced() = #externalMacro(module: "MacroDefinition", type: "TracedPreambleMacro")
+
+@attached(preamble, names: named(logger))
+macro Logged() = #externalMacro(module: "MacroDefinition", type: "LoggerMacro")
+
+@Traced
+@Logged
+func doubleTheValue(value: Int) -> Int {
+  return value * 2
+}
+
+@attached(body)
+macro Remote() = #externalMacro(module: "MacroDefinition", type: "RemoteBodyMacro")
+
+@available(SwiftStdlib 5.1, *)
+@Remote
+func f(a: Int, b: String) async throws -> String
+
+protocol ConjureRemoteValue {
+  static func conjureValue() -> Self
+}
+
+extension String: ConjureRemoteValue {
+  static func conjureValue() -> String { "" }
+}
+
+struct Logger {
+  func log(entering function: String) {
+    print("Logger entering \(function)")
+  }
+
+  func log(_ message: String) {
+    print("--- \(message)")
+  }
+
+  func log(exiting function: String) {
+    print("Logger exiting \(function)")
+  }
+}
+
+func log(_ message: String) {
+  print(message)
+}
+
+@available(SwiftStdlib 5.1, *)
+func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String: Any]) async throws -> Result {
+  let printedArgs = arguments.keys.sorted().map { key in
+    "\(key): \(arguments[key]!)"
+  }.joined(separator: ", ")
+  print("Remote call \(function)(\(printedArgs))")
+  return Result.conjureValue()
+}
+
 // REQUIRES: swift_swift_parser, executable_test, shell
 
 // RUN: %empty-directory(%t)
@@ -78,6 +132,7 @@ struct S5 {
 // RUN:   -swift-version 5 \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroUser \
+// RUN:   -enable-experimental-feature BodyMacros \
 // RUN: )
 
 // RUN: COMPILER_ARGS=( \
@@ -297,3 +352,29 @@ struct S5 {
 //##-- Expansion on the peer macro attached to pattern binding decl
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=66:4 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=EXPAND_PEER_ON_VAR %s
 // EXPAND_PEER_ON_VAR: 67:21-67:21 (@__swiftmacro_9MacroUser2S5V4test21AddPeerStoredPropertyfMp_.swift) "public var _foo: Int = 100"
+
+//##-- Expansion on a preamble macro.
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=76:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PREAMBLE_EXPAND %s
+// PREAMBLE_EXPAND: source.edit.kind.active:
+// PREAMBLE_EXPAND-NEXT: 78:40-78:40 (@__swiftmacro_9MacroUser14doubleTheValue6TracedfMq_.swift) "log("Entering doubleTheValue(value: \(value))")
+// PREAMBLE_EXPAND: defer {
+// PREAMBLE_EXPAND-NEXT:  log("Exiting doubleTheValue(value:)")
+// PREAMBLE_EXPAND-NEXT: }"
+// PREAMBLE_EXPAND-NEXT: source.edit.kind.active
+
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=77:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=PREAMBLE2_EXPAND %s
+// PREAMBLE2_EXPAND: source.edit.kind.active:
+// PREAMBLE2_EXPAND-NEXT: 78:40-78:40 (@__swiftmacro_9MacroUser14doubleTheValue6LoggedfMq_.swift) "let logger = Logger()
+// PREAMBLE2_EXPAND-NEXT:logger.log(entering: "doubleTheValue(value: \(value))")
+// PREAMBLE2_EXPAND-NEXT:defer {
+// PREAMBLE2_EXPAND-NEXT:  logger.log(exiting: "doubleTheValue(value:)")
+// PREAMBLE2_EXPAND-NEXT:}"
+// PREAMBLE2_EXPAND-NEXT:source.edit.kind.active:
+
+//##-- Expansion on a body macro
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=86:5 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=BODY_EXPAND %s
+// BODY_EXPAND: source.edit.kind.active:
+// BODY_EXPAND-NEXT: 87:49-87:49 (@__swiftmacro_9MacroUser1f6RemotefMb_.swift) "{
+// BODY_EXPAND-NEXT: return try await remoteCall(function: "f", arguments: ["a": a, "b": b])
+// BODY_EXPAND-NEXT: }"
+// BODY_EXPAND-NEXT: source.edit.kind.active:

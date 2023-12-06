@@ -3556,9 +3556,22 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     // Validate the presence of ownership for a noncopyable parameter.
-    if (inStage(TypeResolutionStage::Interface))
+    if (inStage(TypeResolutionStage::Interface)) {
       diagnoseMissingOwnership(getASTContext(), dc, ownership,
                                eltTypeRepr, ty, options);
+
+      // @_staticExclusiveOnly types cannot be passed as 'inout' in function
+      // types.
+      if (auto SD = ty->getStructOrBoundGenericStruct()) {
+        if (getASTContext().LangOpts.hasFeature(Feature::StaticExclusiveOnly) &&
+            SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
+            ownership == ParamSpecifier::InOut) {
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::attr_static_exclusive_only_let_only_param,
+                   ty);
+        }
+      }
+    }
 
     Identifier argumentLabel;
     Identifier parameterName;
@@ -5612,4 +5625,30 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   }
 
   return type;
+}
+
+Type DoCatchExplicitThrownTypeRequest::evaluate(
+    Evaluator &evaluator, DeclContext *dc, DoCatchStmt *stmt
+) const {
+  if (stmt->getThrowsLoc().isInvalid())
+    return Type();
+
+  // If typed throws is not enabled, complain.
+  ASTContext &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+    ctx.Diags.diagnose(stmt->getThrowsLoc(), diag::experimental_typed_throws);
+    return Type();
+}
+
+  auto typeRepr = stmt->getThrownTypeRepr();
+
+  // If there is no explicitly-specified thrown error type, it's 'any Error'.
+  if (!typeRepr) {
+    return ctx.getErrorExistentialType();
+  }
+
+  return TypeResolution::resolveContextualType(
+      typeRepr, dc, TypeResolutionOptions(TypeResolverContext::None),
+      /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+      /*packElementOpener*/ nullptr);
 }

@@ -241,8 +241,7 @@ enum class SelfAccessKind : uint8_t {
   LegacyConsuming,
   Consuming,
   Borrowing,
-  ResultDependsOnSelf,
-  LastSelfAccessKind = ResultDependsOnSelf,
+  LastSelfAccessKind = Borrowing,
 };
 enum : unsigned {
   NumSelfAccessKindBits =
@@ -464,12 +463,15 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+2+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
     /// \see AbstractFunctionDecl::BodySkippedStatus
     BodySkippedStatus : 2,
+
+    /// \see AbstractFunctionDecl::BodyExpandedStatus
+    BodyExpandedStatus : 2,
 
     /// \see AbstractFunctionDecl::SILSynthesizeKind
     SILSynthesizeKind : 2,
@@ -2212,9 +2214,7 @@ public:
   }
 
   /// Returns the typechecked binding entry at the given index.
-  const PatternBindingEntry *
-  getCheckedPatternBindingEntry(unsigned i,
-                                bool leaveClosureBodiesUnchecked = false) const;
+  const PatternBindingEntry *getCheckedPatternBindingEntry(unsigned i) const;
 
   /// Clean up walking the initializers for the pattern
   class InitIterator {
@@ -2903,6 +2903,10 @@ public:
   /// This is mostly only useful when considering requirements on an override:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
+
+  /// Returns whether this declaration should be treated as having the \c
+  /// package access level.
+  bool hasPackageAccess() const;
 
   /// FIXME: This is deprecated.
   bool isRecursiveValidation() const;
@@ -5214,6 +5218,10 @@ public:
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
 
+  /// Determine whether this is an invertible protocol,
+  /// i.e., for a protocol P, the inverse constraint ~P exists.
+  bool isInvertibleProtocol() const;
+
 private:
   void computeKnownProtocolKind() const;
 
@@ -6085,7 +6093,7 @@ public:
   bool isAsyncLet() const;
 
   /// Is this var known to be a "local" distributed actor,
-  /// if so the implicit throwing ans some isolation checks can be skipped.
+  /// if so the implicit throwing and some isolation checks can be skipped.
   bool isKnownToBeLocal() const;
 
   /// Is this a stored property that will _not_ trigger any user-defined code
@@ -7005,6 +7013,19 @@ public:
     // This enum needs to fit in a 2-bit bitfield.
   };
 
+  enum class BodyExpandedStatus {
+    /// We haven't tried to expand any body macros.
+    NotExpanded,
+
+    /// We tried to expand body macros, and there weren't any.
+    NoMacros,
+
+    /// The body was expanded from a body macro.
+    Expanded,
+
+    // This enum needs to fit in a 2-bit bitfield.
+  };
+
   BodyKind getBodyKind() const {
     return BodyKind(Bits.AbstractFunctionDecl.BodyKind);
   }
@@ -7091,6 +7112,7 @@ protected:
         ValueDecl(Kind, Parent, Name, NameLoc), BodyAndFP(), AsyncLoc(AsyncLoc),
         ThrowsLoc(ThrowsLoc), ThrownType(ThrownTy) {
     setBodyKind(BodyKind::None);
+    setBodyExpandedStatus(BodyExpandedStatus::NotExpanded);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Async = Async;
@@ -7110,6 +7132,14 @@ protected:
 
   void setBodySkippedStatus(BodySkippedStatus status) {
     Bits.AbstractFunctionDecl.BodySkippedStatus = unsigned(status);
+  }
+
+  BodyExpandedStatus getBodyExpandedStatus() const {
+    return BodyExpandedStatus(Bits.AbstractFunctionDecl.BodyExpandedStatus);
+  }
+
+  void setBodyExpandedStatus(BodyExpandedStatus status) {
+    Bits.AbstractFunctionDecl.BodyExpandedStatus = unsigned(status);
   }
 
   void setSILSynthesizeKind(SILSynthesizeKind K) {
@@ -7259,6 +7289,10 @@ public:
   ///
   /// \sa hasBody()
   BraceStmt *getBody(bool canSynthesize = true) const;
+
+  /// Retrieve the body after macro expansion, which might also have been
+  /// type-checked.
+  BraceStmt *getMacroExpandedBody() const;
 
   /// Retrieve the type-checked body of the given function, or \c nullptr if
   /// there's no body available.

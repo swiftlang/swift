@@ -9,8 +9,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 // BEGIN MyModule.swift
 

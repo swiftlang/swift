@@ -93,7 +93,7 @@ func multipleLabelsVar(e: E) {
   // CHECK:      bb3:
   // CHECK-NEXT: debug_value [[X_PHI]] : $*Any, var, name "x"
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_box ${ var Any }, var, name "x"
-  // CHECK-NEXT: [[ANY_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ANY_BOX]]
+  // CHECK-NEXT: [[ANY_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[ANY_BOX]]
   // CHECK-NEXT: [[BOX_PAYLOAD:%.*]] = project_box [[ANY_BOX_LIFETIME]] : ${ var Any }, 0
   // CHECK-NEXT: copy_addr [take] [[X_PHI]] to [init] [[BOX_PAYLOAD]]
   // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [read] [unknown] [[BOX_PAYLOAD]]

@@ -2,14 +2,14 @@
 
 // CHECK: struct Base {
 // CHECK-NEXT:  init()
-// CHECK-NEXT:   @available(*, unavailable, message: "virtual functions are not yet available in Swift")
+// CHECK-NEXT:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
 // CHECK-NEXT:   mutating func foo()
 
 // CHECK: struct Derived<CInt> {
-// CHECK: @available(*, unavailable, message: "virtual functions are not yet available in Swift")
-// CHECK:  mutating func foo()
+// CHECK-NEXT:  init()
+// CHECK-NEXT:  mutating func foo()
 // CHECK: }
 
 // CHECK: struct VirtualNonAbstractBase {
-// CHECK:  @available(*, unavailable, message: "virtual functions are not yet available in Swift")
-// CHECK:  func nonAbstractMethod()
+// CHECK-NEXT:  init()
+// CHECK-NEXT:  func nonAbstractMethod()

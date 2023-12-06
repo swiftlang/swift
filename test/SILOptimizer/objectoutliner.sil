@@ -127,6 +127,24 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @outline_global_with_uncheckedrefcast : 
+// CHECK: global_value
+// CHECK: } // end sil function 'outline_global_with_uncheckedrefcast'
+sil @outline_global_with_uncheckedrefcast : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = unchecked_ref_cast %7 : $Obj to $Base
+  %11 = end_cow_mutation %10 : $Base
+  %12 = begin_dealloc_ref %11 : $Base of %7 : $Obj
+  dealloc_ref %12 : $Base
+  %r = tuple ()
+  return %r : $()
+}
 
 // CHECK-LABEL: sil @outline_global_tailelems
 // CHECK: [[G:%[0-9]+]] = global_value @outline_global_tailelemsTv_ : $Obj

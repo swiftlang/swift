@@ -365,6 +365,22 @@ public:
     return decomposeFunction(fn);
   }
 
+  bool isPreconcurrency() const {
+    switch (getKind()) {
+    case Kind::Closure: {
+      auto *closure = dyn_cast<ClosureExpr>(getClosure());
+      return closure && closure->isIsolatedByPreconcurrency();
+    }
+
+    case Kind::Function:
+      return getActorIsolation(getFunction()).preconcurrency();
+
+    case Kind::Opaque:
+    case Kind::Parameter:
+      return false;
+    }
+  }
+
   static AbstractFunction decomposeFunction(Expr *fn) {
     assert(fn->getValueProvidingExpr() == fn);
 
@@ -718,6 +734,8 @@ static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
 class Classification {
   bool IsInvalid = false;  // The AST is malformed.  Don't diagnose.
 
+  bool downgradeToWarning = false;
+
   // Throwing
   ConditionalEffectKind ThrowKind = ConditionalEffectKind::None;
   llvm::Optional<PotentialEffectReason> ThrowReason;
@@ -968,6 +986,13 @@ public:
   bool isInvalid() const { return IsInvalid; }
   void makeInvalid() { IsInvalid = true; }
 
+  bool shouldDowngradeToWarning() const {
+    return downgradeToWarning;
+  }
+  void setDowngradeToWarning(bool downgrade) {
+    downgradeToWarning = downgrade;
+  }
+
   ConditionalEffectKind getConditionalKind(EffectKind kind) const {
     switch (kind) {
     case EffectKind::Throws: return ThrowKind;
@@ -1044,6 +1069,26 @@ public:
     return Classification();
   }
 
+  /// Whether a missing 'await' error on accessing an async var should be
+  /// downgraded to a warning.
+  ///
+  /// Missing 'await' errors are downgraded for synchronous access to isolated
+  /// global or static 'let' variables, which was previously accepted in
+  /// compiler versions before 5.10, or for declarations marked preconcurrency.
+  bool downgradeAsyncAccessToWarning(Decl *decl) {
+    if (auto *var = dyn_cast<VarDecl>(decl)) {
+      ActorReferenceResult::Options options = llvm::None;
+      // The newly-diagnosed cases are invalid regardless of the module context
+      // of the caller, i.e. isolated static and global 'let' variables.
+      auto *module = var->getDeclContext()->getParentModule();
+      if (!isLetAccessibleAnywhere(module, var, options)) {
+        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+      }
+    }
+
+    return decl->preconcurrency();
+  }
+
   Classification classifyLookup(LookupExpr *E) {
     auto member = E->getMember();
     if (!member)
@@ -1059,6 +1104,9 @@ public:
     } else if (isa<SubscriptExpr>(E) || isa<DynamicSubscriptExpr>(E)) {
       reason = PotentialEffectReason::forSubscriptAccess();
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(member.getDecl()));
 
     classification.mergeImplicitEffects(
         member.getDecl()->getASTContext(),
@@ -1085,6 +1133,9 @@ public:
       classification = Classification::forDeclRef(
           declRef, ConditionalEffectKind::Always, reason);
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(E->getDecl()));
 
     classification.mergeImplicitEffects(
         E->getDeclRef().getDecl()->getASTContext(),
@@ -1159,6 +1210,10 @@ public:
     result.mergeImplicitEffects(
         ctx, E->isImplicitlyAsync().has_value(), E->implicitlyThrows(),
         PotentialEffectReason::forApply());
+
+    // Downgrade missing 'await' errors for preconcurrency references.
+    result.setDowngradeToWarning(
+        result.hasAsync() && fnRef.isPreconcurrency());
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
@@ -2548,15 +2603,20 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
-                   PotentialEffectReason reason) :
+                   PotentialEffectReason reason,
+                   bool downgradeToWarning) :
       reason(reason),
-      expr(failingExpr) {}
+      expr(failingExpr),
+      downgradeToWarning(downgradeToWarning) {}
 
     /// Reason for throwing
     PotentialEffectReason reason;
 
     /// Failing expression
     Expr &expr;
+
+    /// Whether the error should be downgraded to a warning.
+    bool downgradeToWarning;
   };
 
   SmallVector<Expr *, 4> errorOrder;
@@ -2751,9 +2811,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// Retrieve the type of the error that can be caught when an error is
   /// thrown from the given location.
   Type getCaughtErrorTypeAt(SourceLoc loc) {
-    auto module = CurContext.getDeclContext()->getParentModule();
+    auto dc = CurContext.getDeclContext();
+    auto module = dc->getParentModule();
     if (CatchNode catchNode = ASTScope::lookupCatchNode(module, loc)) {
-      if (auto caughtType = catchNode.getThrownErrorTypeInContext(Ctx))
+      if (auto caughtType = catchNode.getThrownErrorTypeInContext(dc))
         return *caughtType;
     }
 
@@ -2880,7 +2941,8 @@ private:
     // specialized diagnostic about non-exhaustive catches.
     if (!CurContext.handlesThrows(ConditionalEffectKind::Conditional)) {
       CurContext.setNonExhaustiveCatch(true);
-    } else if (Type rethrownErrorType = S->getCaughtErrorType()) {
+    } else if (Type rethrownErrorType =
+                   S->getCaughtErrorType(CurContext.getDeclContext())) {
       // We're implicitly rethrowing the error out of this do..catch, so make
       // sure that we can throw an error of this type out of this context.
       auto catches = S->getCatches();
@@ -3113,8 +3175,9 @@ private:
                                     CurContext.isWithinInterpolatedString());
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
-        uncoveredAsync[anchor].emplace_back(*expr,
-                                            classification.getAsyncReason());
+        uncoveredAsync[anchor].emplace_back(
+            *expr, classification.getAsyncReason(),
+            classification.shouldDowngradeToWarning());
       }
     }
 
@@ -3335,7 +3398,13 @@ private:
         awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
     }
 
+    bool downgradeToWarning = llvm::all_of(errors,
+        [&](DiagnosticInfo diag) -> bool {
+          return diag.downgradeToWarning;
+        });
+
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
+      .warnUntilSwiftVersionIf(downgradeToWarning, 6)
       .fixItInsert(awaitInsertLoc, "await ")
       .highlight(anchor->getSourceRange());
 
@@ -3510,7 +3579,9 @@ llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   return classification.getThrownError();
 }
 
-Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
+Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
+  ASTContext &ctx = dc->getASTContext();
+
   // When typed throws is disabled, this is always "any Error".
   // FIXME: When we distinguish "precise" typed throws from normal typed
   // throws, we'll be able to compute a more narrow catch error type in some
@@ -3518,7 +3589,13 @@ Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
   if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
     return ctx.getErrorExistentialType();
 
-  // Classify the throwing behavior of the "do" body.
+  // If the do..catch statement explicitly specifies that it throws, use
+  // that type.
+  if (Type explicitError = stmt->getExplicitlyThrownType(dc)) {
+    return explicitError;
+  }
+
+  // Otherwise, infer the thrown error type from the "do" body.
   ApplyClassifier classifier(ctx);
   Classification classification = classifier.classifyStmt(
       stmt->getBody(), EffectKind::Throws);

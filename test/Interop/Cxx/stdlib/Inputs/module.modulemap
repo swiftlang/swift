@@ -28,3 +28,8 @@ module MsvcUseVecIt {
   requires cplusplus
   export *
 }
+
+module StdUniquePtr {
+  header "std-unique-ptr.h"
+  requires cplusplus
+}

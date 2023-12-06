@@ -27,6 +27,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/Basic/Defer.h"
+#include "swift/AST/ASTPrinter.h"
 
 using namespace swift;
 
@@ -210,7 +211,6 @@ static bool checkAdHocRequirementAccessControl(
     return true;
 
   // === check access control
-  // TODO(distributed): this is for ad-hoc requirements and is likely too naive
   if (func->getEffectiveAccess() == decl->getEffectiveAccess()) {
     return false;
   }
@@ -220,6 +220,73 @@ static bool checkAdHocRequirementAccessControl(
                  /*requiredAccess=*/AccessLevel::Public, AccessLevel::Public,
                  proto);
       return true;
+}
+
+static bool diagnoseMissingAdHocProtocolRequirement(ASTContext &C, Identifier identifier, NominalTypeDecl *decl) {
+  assert(decl);
+  auto FixitLocation = decl->getBraces().Start;
+
+  // Prepare the indent (same as `printRequirementStub`)
+  StringRef ExtraIndent;
+  StringRef CurrentIndent =
+      Lexer::getIndentationForLine(C.SourceMgr, decl->getStartLoc(), &ExtraIndent);
+
+  llvm::SmallString<128> Text;
+  llvm::raw_svector_ostream OS(Text);
+  ExtraIndentStreamPrinter Printer(OS, CurrentIndent);
+
+  Printer.printNewline();
+  Printer.printIndent();
+  Printer << (decl->getFormalAccess() == AccessLevel::Public ? "public " : "");
+
+  if (identifier == C.Id_remoteCall) {
+    Printer << "func remoteCall<Act, Err, Res>("
+               "on actor: Act, "
+               "target: RemoteCallTarget, "
+               "invocation: inout InvocationEncoder, "
+               "throwing: Err.Type, "
+               "returning: Res.Type) "
+               "async throws -> Res "
+               "where Act: DistributedActor, "
+               "Act.ID == ActorID, "
+               "Err: Error, "
+               "Res: SerializationRequirement";
+  } else if (identifier == C.Id_remoteCallVoid) {
+    Printer << "func remoteCallVoid<Act, Err>("
+               "on actor: Act, "
+               "target: RemoteCallTarget, "
+               "invocation: inout InvocationEncoder, "
+               "throwing: Err.Type"
+               ") async throws "
+               "where Act: DistributedActor, "
+               "Act.ID == ActorID, "
+               "Err: Error";
+  } else if (identifier == C.Id_recordArgument) {
+    Printer << "mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws";
+  } else if (identifier == C.Id_recordReturnType) {
+    Printer << "mutating func recordReturnType<Res: SerializationRequirement>(_ resultType: Res.Type) throws";
+  } else if (identifier == C.Id_decodeNextArgument) {
+    Printer << "mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument";
+  } else if (identifier == C.Id_onReturn) {
+    Printer << "func onReturn<Success: SerializationRequirement>(value: Success) async throws";
+  } else {
+    llvm_unreachable("Unknown identifier for diagnosing ad-hoc missing requirement.");
+  }
+
+  /// Print the "{ <#code#> }" placeholder body
+  Printer << " {\n";
+  Printer << ExtraIndent << getCodePlaceholder();
+  Printer.printNewline();
+  Printer.printIndent();
+  Printer << "}\n";
+
+  decl->diagnose(
+      diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+      decl, identifier);
+  decl->diagnose(diag::missing_witnesses_general)
+      .fixItInsertAfter(FixitLocation, Text.str());
+
+  return true;
 }
 
 bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
@@ -238,53 +305,21 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     auto remoteCallDecl =
         C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/false);
     if (!remoteCallDecl && diagnose) {
-      auto identifier = C.Id_remoteCall;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl, identifier);
-      decl->diagnose(
-          diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          Proto->getName(), identifier,
-          "func remoteCall<Act, Err, Res>(\n"
-          "    on actor: Act,\n"
-          "    target: RemoteCallTarget,\n"
-          "    invocation: inout InvocationEncoder,\n"
-          "    throwing: Err.Type,\n"
-          "    returning: Res.Type\n"
-          ") async throws -> Res\n"
-          "  where Act: DistributedActor,\n"
-          "        Act.ID == ActorID,\n"
-          "        Err: Error,\n"
-          "        Res: SerializationRequirement\n");
+      anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_remoteCall, decl);
+    }
+    if (checkAdHocRequirementAccessControl(decl, Proto, remoteCallDecl)) {
       anyMissingAdHocRequirements = true;
     }
-    if (checkAdHocRequirementAccessControl(decl, Proto, remoteCallDecl))
-      anyMissingAdHocRequirements = true;
 
     // - remoteCallVoid
     auto remoteCallVoidDecl =
         C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/true);
     if (!remoteCallVoidDecl && diagnose) {
-      auto identifier = C.Id_remoteCallVoid;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl, identifier);
-      decl->diagnose(
-          diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          Proto->getName(), identifier,
-          "func remoteCallVoid<Act, Err>(\n"
-          "    on actor: Act,\n"
-          "    target: RemoteCallTarget,\n"
-          "    invocation: inout InvocationEncoder,\n"
-          "    throwing: Err.Type\n"
-          ") async throws\n"
-          "  where Act: DistributedActor,\n"
-          "        Act.ID == ActorID,\n"
-          "        Err: Error\n");
+      anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_remoteCallVoid, decl);
+    }
+    if (checkAdHocRequirementAccessControl(decl, Proto, remoteCallVoidDecl)) {
       anyMissingAdHocRequirements = true;
     }
-    if (checkAdHocRequirementAccessControl(decl, Proto, remoteCallVoidDecl))
-      anyMissingAdHocRequirements = true;
 
     return anyMissingAdHocRequirements;
   }
@@ -295,32 +330,20 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     // - recordArgument
     auto recordArgumentDecl = C.getRecordArgumentOnDistributedInvocationEncoder(decl);
     if (!recordArgumentDecl) {
-      auto identifier = C.Id_recordArgument;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl, identifier);
-      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     Proto->getName(), identifier,
-                     "mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws\n");
+      anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_recordArgument, decl);
+    }
+    if (checkAdHocRequirementAccessControl(decl, Proto, recordArgumentDecl)) {
       anyMissingAdHocRequirements = true;
     }
-    if (checkAdHocRequirementAccessControl(decl, Proto, recordArgumentDecl))
-      anyMissingAdHocRequirements = true;
 
     // - recordReturnType
     auto recordReturnTypeDecl = C.getRecordReturnTypeOnDistributedInvocationEncoder(decl);
     if (!recordReturnTypeDecl) {
-      auto identifier = C.Id_recordReturnType;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl, identifier);
-      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     Proto->getName(), identifier,
-                     "mutating func recordReturnType<Res: SerializationRequirement>(_ resultType: Res.Type) throws\n");
+      anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_recordReturnType, decl);
+    }
+    if (checkAdHocRequirementAccessControl(decl, Proto, recordReturnTypeDecl)) {
       anyMissingAdHocRequirements = true;
     }
-    if (checkAdHocRequirementAccessControl(decl, Proto, recordReturnTypeDecl))
-      anyMissingAdHocRequirements = true;
 
     return anyMissingAdHocRequirements;
   }
@@ -331,17 +354,11 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     // - decodeNextArgument
     auto decodeNextArgumentDecl = C.getDecodeNextArgumentOnDistributedInvocationDecoder(decl);
     if (!decodeNextArgumentDecl) {
-      auto identifier = C.Id_decodeNextArgument;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl, identifier);
-      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-                     Proto->getName(), identifier,
-                     "mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument\n");
+      anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_decodeNextArgument, decl);
+    }
+    if (checkAdHocRequirementAccessControl(decl, Proto, decodeNextArgumentDecl)) {
       anyMissingAdHocRequirements = true;
     }
-    if (checkAdHocRequirementAccessControl(decl, Proto, decodeNextArgumentDecl))
-      anyMissingAdHocRequirements = true;
 
     return anyMissingAdHocRequirements;
   }
@@ -352,19 +369,11 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     // - onReturn
     auto onReturnDecl = C.getOnReturnOnDistributedTargetInvocationResultHandler(decl);
     if (!onReturnDecl) {
-      auto identifier = C.Id_onReturn;
-      decl->diagnose(
-          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-          decl, identifier);
-      decl->diagnose(
-          diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
-          Proto->getName(), identifier,
-          "func onReturn<Success: SerializationRequirement>(value: "
-          "Success) async throws\n");
+      anyMissingAdHocRequirements = diagnoseMissingAdHocProtocolRequirement(C, C.Id_onReturn, decl);
+    }
+    if (checkAdHocRequirementAccessControl(decl, Proto, onReturnDecl)) {
       anyMissingAdHocRequirements = true;
     }
-    if (checkAdHocRequirementAccessControl(decl, Proto, onReturnDecl))
-      anyMissingAdHocRequirements = true;
 
     return anyMissingAdHocRequirements;
   }

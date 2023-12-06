@@ -5,8 +5,7 @@
 // RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 // BEGIN MyModule.swift
 
@@ -31,7 +30,7 @@ public func main() {
   foo()
 }
 
-// CHECK: @"$s4Main022global_in_client_used_c1_D0Sivp" = global %TSi zeroinitializer
-// CHECK: @"$s4Main024global_in_client_unused_c1_D0Sivp" = global %TSi zeroinitializer
-// CHECK: @"$s8MyModule022global_in_module_used_d1_E0Sivp" = global %TSi zeroinitializer
-// CHECK: @"$s8MyModule024global_in_module_unused_d1_E0Sivp" = global %TSi zeroinitializer
+// CHECK: @"$s4Main022global_in_client_used_c1_D0Sivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$s4Main024global_in_client_unused_c1_D0Sivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$s8MyModule022global_in_module_used_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer
+// CHECK: @"$s8MyModule024global_in_module_unused_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer

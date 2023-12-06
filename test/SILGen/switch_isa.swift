@@ -65,8 +65,8 @@ func guardFn(_ l: D, _ r: D) -> Bool { return true }
 //
 // CHECK:       [[L_CAST_YES]]([[L:%.*]] : @guaranteed $D):
 // CHECK:         [[L2:%.*]] = copy_value [[L]]
-// CHECK:         [[BORROWED_R2:%.*]] = begin_borrow [lexical] [[R2]]
-// CHECK:         [[BORROWED_L2:%.*]] = begin_borrow [lexical] [[L2]]
+// CHECK:         [[BORROWED_R2:%.*]] = begin_borrow [lexical] [var_decl] [[R2]]
+// CHECK:         [[BORROWED_L2:%.*]] = begin_borrow [lexical] [var_decl] [[L2]]
 // CHECK:         function_ref @$s10switch_isa7guardFnySbAA1DC_ADtF
 // CHECK:         cond_br {{%.*}}, [[GUARD_YES:bb[0-9]+]], [[GUARD_NO:bb[0-9]+]]
 //

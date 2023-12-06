@@ -407,6 +407,9 @@ Entities
   macro-expansion-operator ::= decl-name identifier 'fMm' // attached member macro
   macro-expansion-operator ::= decl-name identifier 'fMp' // attached peer macro
   macro-expansion-operator ::= decl-name identifier 'fMc' // attached conformance macro
+  macro-expansion-operator ::= decl-name identifier 'fMe' // attached extension macro
+  macro-expansion-operator ::= decl-name identifier 'fMq' // attached preamble macro
+  macro-expansion-operator ::= decl-name identifier 'fMb' // attached body macro
   macro-expansion-operator ::= decl-name identifier 'fMu' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration

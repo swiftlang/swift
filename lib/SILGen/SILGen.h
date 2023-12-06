@@ -301,6 +301,11 @@ public:
   void visitMacroDecl(MacroDecl *d);
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
 
+  // Same as AbstractStorageDecl::visitEmittedAccessors, but skips over skipped
+  // (unavailable) decls.
+  void visitEmittedAccessors(AbstractStorageDecl *D,
+                             llvm::function_ref<void(AccessorDecl *)>);
+
   void emitEntryPoint(SourceFile *SF);
   void emitEntryPoint(SourceFile *SF, SILFunction *TopLevel);
 

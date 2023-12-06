@@ -16,18 +16,18 @@ func test0(c c: C) {
   var c = c
 // CHECK:    bb0(%0 : @guaranteed $C):
 // CHECK:      [[C:%.*]] = alloc_box ${ var C }
-// CHECK:      [[C_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[C]]
+// CHECK:      [[C_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[C]]
 // CHECK-NEXT: [[PBC:%.*]] = project_box [[C_LIFETIME]]
 
   var a: A
 // CHECK:      [[A1:%.*]] = alloc_box ${ var A }
 // CHECK:      [[MARKED_A1:%.*]] = mark_uninitialized [var] [[A1]]
-// CHECK:      [[A1_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_A1]]
+// CHECK:      [[A1_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MARKED_A1]]
 // CHECK-NEXT: [[PBA:%.*]] = project_box [[A1_LIFETIME]]
 
   weak var x = c
 // CHECK:      [[X:%.*]] = alloc_box ${ var @sil_weak Optional<C> }, var, name "x"
-// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X]]
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
 //   Implicit conversion
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBC]]
@@ -74,7 +74,7 @@ class CC {
   // CHECK:  bb0([[SELF:%.*]] : @owned $CC):
   // CHECK:    [[UNINIT_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]] : $CC
   // CHECK:    [[FOO:%.*]] = alloc_box ${ var Optional<CC> }, var, name "foo"
-  // CHECK:    [[FOO_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[FOO]]
+  // CHECK:    [[FOO_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[FOO]]
   // CHECK:    [[PB:%.*]] = project_box [[FOO_LIFETIME]]
   // CHECK:    [[BORROWED_UNINIT_SELF:%.*]] = begin_borrow [[UNINIT_SELF]]
   // CHECK:    [[X:%.*]] = ref_element_addr [[BORROWED_UNINIT_SELF]] : $CC, #CC.x

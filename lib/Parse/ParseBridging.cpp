@@ -27,8 +27,10 @@ BridgedExpr BridgedLegacyParser_parseExpr(BridgedLegacyParser p,
       P.getParserPosition(loc.unbridged(), /*PreviousLoc=*/loc.unbridged());
   P.CurDeclContext = DC.unbridged();
   P.restoreParserPosition(PP);
+  // Since `SequenceExpr` is implemented in ASTGen, it only delegates sequence
+  // elements parsing.
   ParserResult<Expr> result =
-      P.parseExprImpl(diag::expected_expr, isExprBasic, /*fromASTGen=*/true);
+      P.parseExprSequenceElement(diag::expected_expr, isExprBasic);
   return result.getPtrOrNull();
 }
 

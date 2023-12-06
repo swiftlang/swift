@@ -105,6 +105,8 @@ func ifLet(test: Int?) {
   }
 }
 
+// REQUIRES: swift_swift_parser
+
 // RUN: %sourcekitd-test -req=related-idents -pos=6:17 %s -- -module-name related_idents %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: START RANGES
 // CHECK1-NEXT: 1:7 - 2

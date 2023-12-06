@@ -27,17 +27,16 @@ add_swift_host_library(swiftRefactoring STATIC
   ExtractFunction.cpp
   ExtractRepeatedExpr.cpp
   FillProtocolStubs.cpp
-  FindRenameRangesAnnotatingConsumer.cpp
   LocalizeString.cpp
   LocalRename.cpp
   MemberwiseInitLocalRefactoring.cpp
   MoveMembersToExtension.cpp
   Refactoring.cpp
   RefactoringAction.cpp
-  Renamer.cpp
   ReplaceBodiesWithFatalError.cpp
   SimplifyNumberLiteral.cpp
   SyntacticRename.cpp
+  SyntacticRenameRangeDetails.cpp
   TrailingClosure.cpp
   Utils.cpp
 )
@@ -46,9 +45,16 @@ target_link_libraries(swiftRefactoring PRIVATE
   swiftAST
   swiftClangImporter
   swiftIDE
+  swiftIDEUtilsBridging
   swiftIndex
   swiftParse
   swiftSema)
 
-set_swift_llvm_is_available(swiftRefactoring)
+if(SWIFT_BUILD_SWIFT_SYNTAX)
+  target_compile_definitions(swiftRefactoring
+    PRIVATE
+    SWIFT_BUILD_SWIFT_SYNTAX
+  )
+endif()
 
+set_swift_llvm_is_available(swiftRefactoring)

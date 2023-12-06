@@ -1,6 +1,7 @@
 target_sources(swiftSIL PRIVATE
   BasicBlockUtils.cpp
   BitDataflow.cpp
+  CalleeCache.cpp
   DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
