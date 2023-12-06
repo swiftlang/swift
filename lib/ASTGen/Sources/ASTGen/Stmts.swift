@@ -54,7 +54,7 @@ extension ASTGenVisitor {
     return self.generateWithLegacy(node)
   }
 
-  public func generate(codeBlock node: CodeBlockSyntax) -> BridgedBraceStmt {
+  func generate(codeBlock node: CodeBlockSyntax) -> BridgedBraceStmt {
     BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: self.generateSourceLoc(node.leftBrace),
@@ -86,7 +86,7 @@ extension ASTGenVisitor {
     )
   }
 
-  public func generate(expressionStmt node: ExpressionStmtSyntax) -> BridgedStmt {
+  func generate(expressionStmt node: ExpressionStmtSyntax) -> BridgedStmt {
     switch Syntax(node.expression).as(SyntaxEnum.self) {
     case .ifExpr(let e):
       return makeIfStmt(e).asStmt
@@ -95,7 +95,7 @@ extension ASTGenVisitor {
     }
   }
 
-  public func generate(returnStmt node: ReturnStmtSyntax) -> BridgedReturnStmt {
+  func generate(returnStmt node: ReturnStmtSyntax) -> BridgedReturnStmt {
     .createParsed(
       self.ctx,
       returnKeywordLoc: self.generateSourceLoc(node.returnKeyword),
