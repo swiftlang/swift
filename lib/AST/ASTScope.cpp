@@ -160,11 +160,20 @@ DoCatchStmtScope::getCatchNodeBody() const {
   return { const_cast<DoCatchStmt *>(stmt), body };
 }
 
-StringRef ASTScopeImpl::getClassName() const {
+std::string ASTScopeImpl::getClassName() const {
+  // GenericTypeOrExtensionScope provides a custom implementation that deals
+  // with declaration names and "portions".
+  if (auto generic = dyn_cast<GenericTypeOrExtensionScope>(this))
+    return generic->getClassName();
+
   switch (getKind()) {
-#define SCOPE_NODE(Name) case ScopeKind::Name: return #Name;
+#define SCOPE_NODE(Name) case ScopeKind::Name: return #Name "Scope";
 #include "swift/AST/ASTScopeNodes.def"
   }
+}
+
+std::string GenericTypeOrExtensionScope::getClassName() const {
+  return declKindName() + portionName() + "Scope";
 }
 
 NullablePtr<Decl> ASTScopeImpl::getDeclIfAny() const {

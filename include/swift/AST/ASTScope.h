@@ -246,7 +246,7 @@ public:
 
 public:
   const SourceFile *getSourceFile() const;
-  StringRef getClassName() const;
+  std::string getClassName() const;
 
   /// Print out this scope for debugging/reporting purposes.
   void print(llvm::raw_ostream &out, unsigned level = 0, bool lastChild = false,
@@ -609,6 +609,8 @@ public:
   virtual bool doesDeclHaveABody() const;
   const char *portionName() const { return portion->portionName; }
 
+  std::string getClassName() const;
+
 public:
   // Only for DeclScope, not BodyScope
   // Returns the where clause scope, or the parent if none
@@ -630,6 +632,13 @@ protected:
 public:
   NullablePtr<const ASTScopeImpl> getLookupLimit() const override;
   virtual NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const;
+
+  static bool classof(const ASTScopeImpl *scope) {
+    return scope->getKind() == ScopeKind::NominalType ||
+           scope->getKind() == ScopeKind::Extension ||
+           scope->getKind() == ScopeKind::TypeAlias ||
+           scope->getKind() == ScopeKind::OpaqueType;
+  }
 };
 
 class GenericTypeScope : public GenericTypeOrExtensionScope {
@@ -656,6 +665,11 @@ public:
 
 public:
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+
+  static bool classof(const ASTScopeImpl *scope) {
+    return scope->getKind() == ScopeKind::NominalType ||
+        scope->getKind() == ScopeKind::Extension;
+  }
 };
 
 class NominalTypeScope final : public IterableTypeScope {
