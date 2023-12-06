@@ -612,8 +612,9 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
 
   if (NameLoc.isCompound()) {
     auto Labels = getSelectorLabelRanges(getSourceMgr(), NameLoc);
-    bool Resolved = tryResolve(Node, NameLoc.getBaseNameLoc(),
-                               LabelRangeType::Selector, Labels, llvm::None);
+    bool Resolved =
+        tryResolve(Node, NameLoc.getBaseNameLoc(), LabelRangeType::CompoundName,
+                   Labels, llvm::None);
     if (!isDone()) {
       for (auto Label: Labels) {
         if (tryResolve(Node, Label.getStart())) {
