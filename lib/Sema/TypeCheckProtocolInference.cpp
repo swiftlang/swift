@@ -1360,6 +1360,13 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     return nullptr;
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Inferring abstract type witnesses for "
+             << "associated types of " << conformance->getProtocol()->getName()
+             << ":\n";);
+  for (auto *assocType : unresolvedAssocTypes) {
+    LLVM_DEBUG(llvm::dbgs() << "- " << assocType->getName() << "\n";);
+  }
+
   // Attempt to compute abstract type witnesses for associated types that could
   // not resolve otherwise.
   llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
@@ -1397,6 +1404,8 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         return llvm::None;
       });
 
+      LLVM_DEBUG(llvm::dbgs() << "Inserting tentative witness for "
+                 << assocType->getName() << ": "; resolvedTy.dump(llvm::dbgs()););
       typeWitnesses.insert(assocType, {resolvedTy, reqDepth});
 
       if (auto *defaultedAssocType =
@@ -1429,6 +1438,8 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 
         // Record the type witness immediately to make it available
         // for substitutions into other tentative type witnesses.
+        LLVM_DEBUG(llvm::dbgs() << "Inserting tentative witness for "
+                   << assocType->getName() << ": "; resolvedTy.dump(llvm::dbgs()););
         typeWitnesses.insert(assocType, {resolvedTy, reqDepth});
 
         abstractTypeWitnesses.emplace_back(assocType, resolvedTy,
@@ -1458,6 +1469,9 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   for (const auto &witness : abstractTypeWitnesses) {
     auto *const assocType = witness.getAssocType();
     Type type = witness.getType();
+
+    LLVM_DEBUG(llvm::dbgs() << "Checking witness for " << assocType->getName()
+               << " " << type << "\n";);
 
     // Replace type parameters with other known or tentative type witnesses.
     if (type->hasDependentMember() || type->hasTypeParameter()) {
@@ -1561,10 +1575,14 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         return assocType;
 
       type = dc->mapTypeIntoContext(type);
+
+      LLVM_DEBUG(llvm::dbgs() << "Substituted witness type is " << type << "\n";);
     }
 
     if (const auto failed =
             checkTypeWitness(type, assocType, conformance, substOptions)) {
+      LLVM_DEBUG(llvm::dbgs() << "- Type witness does not satisfy requirements\n";);
+
       // We failed to satisfy a requirement. If this is a default type
       // witness failure and we haven't seen one already, write it down.
       auto *defaultedAssocType = witness.getDefaultedAssocType();
@@ -1579,6 +1597,8 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     }
 
     // Update the entry for this associated type.
+    LLVM_DEBUG(llvm::dbgs() << "Updating tentative witness for "
+               << assocType->getName() << ": "; type.dump(llvm::dbgs()););
     typeWitnesses.insert(assocType, {type, reqDepth});
   }
 
@@ -1765,6 +1785,10 @@ void AssociatedTypeInference::findSolutionsRec(
 
         // Enter a new scope for the type witnesses hash table.
         TypeWitnessesScope typeWitnessesScope(typeWitnesses);
+
+        LLVM_DEBUG(llvm::dbgs() << "Inserting tentative witness for "
+                   << typeWitness.first->getName() << ": ";
+                   typeWitness.second.dump(llvm::dbgs()););
         typeWitnesses.insert(typeWitness.first, {typeWitness.second, reqDepth});
 
         valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
@@ -1849,18 +1873,16 @@ void AssociatedTypeInference::findSolutionsRec(
         }
 
         LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
-                   << "+ Failed " << typeWitness.first->getName()
-                   << " := " << typeWitness.second->getCanonicalType()
-                   << "\n";);
+                   << "+ Failed " << typeWitness.first->getName() << ": ";
+                   typeWitness.second->dump(llvm::dbgs()););
 
         failed = true;
         break;
       }
 
-      LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
-                 << "+ Recording " << typeWitness.first->getName()
-                 << " := " << typeWitness.second->getCanonicalType()
-                 << "\n";);
+      LLVM_DEBUG(llvm::dbgs() << "Inserting tentative witness for "
+                 << typeWitness.first->getName() << ": ";
+                 typeWitness.second.dump(llvm::dbgs()););
 
       // Record the type witness.
       ++numTypeWitnesses;
