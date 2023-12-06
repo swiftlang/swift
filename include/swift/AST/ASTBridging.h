@@ -1035,6 +1035,12 @@ BridgedTypeRepr BridgedImplicitlyUnwrappedOptionalTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedSourceLoc cExclamationLoc);
 
+SWIFT_NAME("BridgedInverseTypeRepr.createParsed(_:tildeLoc:constraint:)")
+BridgedTypeRepr
+BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
+                                    BridgedSourceLoc cTildeLoc,
+                                    BridgedTypeRepr cConstraint);
+
 SWIFT_NAME("BridgedMemberTypeRepr.createParsed(_:base:members:)")
 BridgedTypeRepr
 BridgedMemberTypeRepr_createParsed(BridgedASTContext cContext,
@@ -1051,6 +1057,12 @@ BridgedTypeRepr
 BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr baseType,
                                      BridgedSourceLoc cProtoLoc);
+
+SWIFT_NAME("BridgedPackElementTypeRepr.createParsed(_:base:eachKeywordLoc:)")
+BridgedTypeRepr
+BridgedPackElementTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedTypeRepr base,
+                                        BridgedSourceLoc cEachLoc);
 
 SWIFT_NAME(
     "BridgedPackExpansionTypeRepr.createParsed(_:base:repeatKeywordLoc:)")

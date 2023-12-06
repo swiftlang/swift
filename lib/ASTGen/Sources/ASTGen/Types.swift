@@ -33,13 +33,14 @@ func isTypeMigrated(_ node: TypeSyntax) -> Bool {
   while true {
     switch current.kind {
     case // Known implemented kinds.
-        .arrayType, .attributedType, .compositionType, .someOrAnyType,
-        .dictionaryType, .functionType, .implicitlyUnwrappedOptionalType,
-        .memberType, .metatypeType, .namedOpaqueReturnType, .optionalType,
-        .packExpansionType, .identifierType, .tupleType:
+        .arrayType, .attributedType, .classRestrictionType, .compositionType,
+        .someOrAnyType, .dictionaryType, .functionType, .identifierType,
+        .implicitlyUnwrappedOptionalType, .memberType, .metatypeType,
+        .namedOpaqueReturnType, .optionalType, .packElementType,
+        .packExpansionType, .suppressedType, .tupleType:
       break
     case // Known unimplemented kinds.
-        .suppressedType, .packElementType, .missingType:
+        .missingType:
       return false;
     case // Unknown type kinds
       _ where current.is(TypeSyntax.self):
@@ -66,8 +67,8 @@ extension ASTGenVisitor {
       return self.generate(arrayType: node)
     case .attributedType(let node):
       return self.generate(attributedType: node)
-    case .classRestrictionType:
-      break
+    case .classRestrictionType(let node):
+      return self.generate(classRestrictionType: node)
     case .compositionType(let node):
       return self.generate(compositionType: node)
     case .dictionaryType(let node):
@@ -88,14 +89,14 @@ extension ASTGenVisitor {
       return self.generate(namedOpaqueReturnType: node)
     case .optionalType(let node):
       return self.generate(optionalType: node)
-    case .packElementType:
-      break
+    case .packElementType(let node):
+      return self.generate(packElementType: node)
     case .packExpansionType(let node):
       return self.generate(packExpansionType: node)
     case .someOrAnyType(let node):
       return self.generate(someOrAnyType: node)
-    case .suppressedType:
-      break
+    case .suppressedType(let node):
+      return self.generate(suppressedType: node)
     case .tupleType(let node):
       return self.generate(tupleType: node)
     }
@@ -239,6 +240,16 @@ extension ASTGenVisitor {
     )
   }
 
+  func generate(packElementType node: PackElementTypeSyntax) -> BridgedTypeRepr {
+    let base = generate(type: node.pack)
+    let eachLoc = self.generateSourceLoc(node.eachKeyword)
+    return BridgedPackElementTypeRepr.createParsed(
+      self.ctx,
+      base: base,
+      eachKeywordLoc: eachLoc
+    )
+  }
+
   func generate(packExpansionType node: PackExpansionTypeSyntax) -> BridgedTypeRepr {
     let base = generate(type: node.repetitionPattern)
     let repeatLoc = self.generateSourceLoc(node.repeatKeyword)
@@ -312,6 +323,24 @@ extension ASTGenVisitor {
         base: baseTy
       )
     }
+  }
+
+  func generate(suppressedType node: SuppressedTypeSyntax) -> BridgedTypeRepr {
+    return BridgedInverseTypeRepr.createParsed(
+      self.ctx,
+      tildeLoc: self.generateSourceLoc(node.withoutTilde),
+      constraint: self.generate(type: node.type)
+    )
+  }
+
+  func generate(classRestrictionType node: ClassRestrictionTypeSyntax) -> BridgedTypeRepr {
+    // TODO: diagnostics.
+    // warning: using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead
+    return BridgedSimpleIdentTypeRepr.createParsed(
+      self.ctx,
+      loc: self.generateSourceLoc(node.classKeyword),
+      name: self.ctx.getIdentifier("AnyObject")
+    )
   }
 
   // NOTE: When implementing new `generate(type:)`, please update  `isTypeMigrated(_:)`.

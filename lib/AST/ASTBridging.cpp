@@ -1329,6 +1329,15 @@ BridgedTypeRepr BridgedDictionaryTypeRepr_createParsed(
 }
 
 BridgedTypeRepr
+BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
+                                    BridgedSourceLoc cTildeLoc,
+                                    BridgedTypeRepr cConstraint) {
+
+  return new (cContext.unbridged())
+      InverseTypeRepr(cTildeLoc.unbridged(), cConstraint.unbridged());
+}
+
+BridgedTypeRepr
 BridgedMetatypeTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr baseType,
                                      BridgedSourceLoc cTypeLoc) {
@@ -1344,6 +1353,15 @@ BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
   ASTContext &context = cContext.unbridged();
   SourceLoc protoLoc = cProtoLoc.unbridged();
   return new (context) ProtocolTypeRepr(baseType.unbridged(), protoLoc);
+}
+
+BridgedTypeRepr
+BridgedPackElementTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedTypeRepr base,
+                                        BridgedSourceLoc cEachLoc) {
+  ASTContext &context = cContext.unbridged();
+  return new (context)
+      PackElementTypeRepr(cEachLoc.unbridged(), base.unbridged());
 }
 
 BridgedTypeRepr
