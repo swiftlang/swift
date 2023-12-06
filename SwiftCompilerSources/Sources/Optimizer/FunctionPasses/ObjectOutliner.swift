@@ -85,6 +85,10 @@ private func findEndCOWMutation(of object: Value) -> EndCOWMutationInst? {
       if let ecm = findEndCOWMutation(of: uci) {
         return ecm
       }
+    case let urci as UncheckedRefCastInst:
+      if let ecm = findEndCOWMutation(of: urci) {
+        return ecm
+      }
     case let mv as MoveValueInst:
       if let ecm = findEndCOWMutation(of: mv) {
         return ecm
@@ -132,6 +136,10 @@ private func findInitStores(of object: Value,
     switch use.instruction {
     case let uci as UpcastInst:
       if !findInitStores(of: uci, &fieldStores, &tailStores) {
+        return false
+      }
+    case let urci as UncheckedRefCastInst:
+      if !findInitStores(of: urci, &fieldStores, &tailStores) {
         return false
       }
     case let mvi as MoveValueInst:
@@ -342,6 +350,8 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       context.erase(instruction: endMutation)
     case let upCast as UpcastInst:
       worklist.pushIfNotVisited(usersOf: upCast)
+    case let refCast as UncheckedRefCastInst:
+      worklist.pushIfNotVisited(usersOf: refCast)
     case let moveValue as MoveValueInst:
       worklist.pushIfNotVisited(usersOf: moveValue)
     case is DeallocRefInst, is DeallocStackRefInst:
