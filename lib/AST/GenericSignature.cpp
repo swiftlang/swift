@@ -494,7 +494,7 @@ CanType GenericSignature::getReducedType(Type type) const {
 
 GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) const {
   bool changedSignature = false;
-  llvm::SmallVector<Requirement, 4> requirementsErased;
+  llvm::SmallVector<Requirement, 2> requirementsErased;
 
   for (auto req : getRequirements()) {
     bool found = std::any_of(typeErasedParams.begin(),
@@ -514,8 +514,10 @@ GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) c
   }
 
   if (changedSignature) {
-    return GenericSignature::get(getGenericParams(),
-                                 requirementsErased, false);
+    return buildGenericSignature(
+        Ptr->getASTContext(), GenericSignature(),
+        SmallVector<GenericTypeParamType *>(getGenericParams()),
+        requirementsErased);
   }
 
   return *this;
