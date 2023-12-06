@@ -138,3 +138,19 @@ do {
 
   _ = Test(obj: "Hello").utf8.count // Ok
 }
+
+// Global actor isolated properties.
+do {
+  @MainActor struct Isolated {
+    var data: Int = 42
+    subscript(v: Int) -> Bool { false }
+  }
+
+  let dataKP = \Isolated.data
+  let subscriptKP = \Isolated.[42]
+
+  let _: KeyPath<Isolated, Int> & Sendable = dataKP
+  // expected-warning@-1 {{type 'WritableKeyPath<Isolated, Int>' does not conform to the 'Sendable' protocol}}
+  let _: KeyPath<Isolated, Bool> & Sendable = subscriptKP
+  // expected-warning@-1 {{type 'KeyPath<Isolated, Bool>' does not conform to the 'Sendable' protocol}}
+}

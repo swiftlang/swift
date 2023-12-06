@@ -7551,6 +7551,20 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       if (!storage)
         return fail();
 
+      switch (getActorIsolation(storage)) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+        break;
+
+      // A reference to an actor isolated state make key path non-Sendable.
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+        isSendable = false;
+        break;
+      }
+
       if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
         mutability = KeyPathMutability::ReadOnly;
         continue;
