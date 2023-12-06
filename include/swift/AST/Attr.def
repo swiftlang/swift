@@ -534,7 +534,7 @@ SIMPLE_DECL_ATTR(_staticExclusiveOnly, StaticExclusiveOnly,
   OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   151)
 SIMPLE_DECL_ATTR(extractConstantsFromMembers, ExtractConstantsFromMembers,
-  OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnClass | OnEnum | OnProtocol | OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   152)
 SIMPLE_DECL_ATTR(_noRuntime, NoRuntime,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
