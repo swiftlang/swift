@@ -65,7 +65,7 @@ inline const void *_Nullable BridgedIdentifier_raw(BridgedIdentifier ident) {
   return ident.Raw;
 }
 
-struct BridgedIdentifierAndSourceLoc {
+struct BridgedLocatedIdentifier {
   SWIFT_NAME("name")
   BridgedIdentifier Name;
 

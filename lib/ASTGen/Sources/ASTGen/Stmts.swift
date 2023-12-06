@@ -57,9 +57,9 @@ extension ASTGenVisitor {
   public func generate(codeBlock node: CodeBlockSyntax) -> BridgedBraceStmt {
     BridgedBraceStmt.createParsed(
       self.ctx,
-      lBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
+      lBraceLoc: self.generateSourceLoc(node.leftBrace),
       elements: self.generate(codeBlockItemList: node.statements),
-      rBraceLoc: node.rightBrace.bridgedSourceLoc(in: self)
+      rBraceLoc: self.generateSourceLoc(node.rightBrace)
     )
   }
 
@@ -71,10 +71,10 @@ extension ASTGenVisitor {
 
     return .createParsed(
       self.ctx,
-      ifKeywordLoc: node.ifKeyword.bridgedSourceLoc(in: self),
+      ifKeywordLoc: self.generateSourceLoc(node.ifKeyword),
       condition: conditions.first!.castToExpr,
       thenStmt: self.generate(codeBlock: node.body),
-      elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
+      elseLoc: self.generateSourceLoc(node.elseKeyword),
       elseStmt: node.elseBody.map {
         switch $0 {
         case .codeBlock(let node):
@@ -98,7 +98,7 @@ extension ASTGenVisitor {
   public func generate(returnStmt node: ReturnStmtSyntax) -> BridgedReturnStmt {
     .createParsed(
       self.ctx,
-      returnKeywordLoc: node.returnKeyword.bridgedSourceLoc(in: self),
+      returnKeywordLoc: self.generateSourceLoc(node.returnKeyword),
       expr: self.generate(expr: node.expression)
     )
   }

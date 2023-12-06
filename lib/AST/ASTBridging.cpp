@@ -110,16 +110,7 @@ BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc) {
 
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr) {
-  StringRef str = cStr.unbridged();
-  if (str.size() == 1 && str.front() == '_')
-    return BridgedIdentifier();
-
-  // If this was a back-ticked identifier, drop the back-ticks.
-  if (str.size() >= 2 && str.front() == '`' && str.back() == '`') {
-    str = str.drop_front().drop_back();
-  }
-
-  return cContext.unbridged().getIdentifier(str);
+  return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
@@ -681,8 +672,7 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
 
   auto primaryAssociatedTypeNames =
       context.AllocateTransform<PrimaryAssociatedTypeName>(
-          cPrimaryAssociatedTypeNames
-              .unbridged<BridgedIdentifierAndSourceLoc>(),
+          cPrimaryAssociatedTypeNames.unbridged<BridgedLocatedIdentifier>(),
           [](auto &e) -> PrimaryAssociatedTypeName {
             return {e.Name.unbridged(), e.NameLoc.unbridged()};
           });
@@ -781,15 +771,13 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedSourceLoc cRightBraceLoc) {
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> higherThanNames;
-  for (auto &pair :
-       cHigherThanNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
+  for (auto &pair : cHigherThanNames.unbridged<BridgedLocatedIdentifier>()) {
     higherThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> lowerThanNames;
-  for (auto &pair :
-       cLowerThanNames.unbridged<BridgedIdentifierAndSourceLoc>()) {
+  for (auto &pair : cLowerThanNames.unbridged<BridgedLocatedIdentifier>()) {
     lowerThanNames.push_back(
         {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
   }
@@ -811,7 +799,7 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements) {
   ImportPath::Builder builder;
   for (auto &element :
-       cImportPathElements.unbridged<BridgedIdentifierAndSourceLoc>()) {
+       cImportPathElements.unbridged<BridgedLocatedIdentifier>()) {
     builder.push_back(element.Name.unbridged(), element.NameLoc.unbridged());
   }
 
