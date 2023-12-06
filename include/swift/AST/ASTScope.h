@@ -190,9 +190,8 @@ protected:
     return parentAndWasExpanded.getPointer();
   }
 
-  const Children &getChildren() const { return storedChildren; }
-
 public:
+  const Children &getChildren() const { return storedChildren; }
   void addChild(ASTScopeImpl *child, ASTContext &);
 
 public:
@@ -235,7 +234,6 @@ public:
   ScopeKind getKind() const { return kind; }
 
   virtual NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const;
-  virtual NullablePtr<const BraceStmtScope> getAsBraceStmtScope() const;
   ASTContext &getASTContext() const;
   NullablePtr<Decl> getDeclIfAny() const;
   NullablePtr<Stmt> getStmtIfAny() const;
@@ -311,12 +309,6 @@ public:
   /// Scopes that cannot bind variables may set this to true to create more
   /// compact scope tree in the debug info.
   virtual bool ignoreInDebugInfo() const { return false; }
-
-  /// If this scope node represents a potential catch node, return body the
-  /// AST node describing the catch (a function, closure, or do...catch) and
-  /// the node of it's "body", i.e., the brace statement from which errors
-  /// thrown will be caught by that node.
-  virtual std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const;
 
 #pragma mark - - lookup- starting point
 private:
@@ -896,8 +888,6 @@ public:
   Decl *getDecl() const { return decl; }
   bool ignoreInDebugInfo() const override { return true; }
 
-  std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const override;
-
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 
@@ -1174,8 +1164,6 @@ public:
   NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const override {
     return closureExpr;
   }
-  std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const override;
-
   Expr *getExpr() const { return closureExpr; }
   bool ignoreInDebugInfo() const override { return true; }
 
@@ -1610,8 +1598,6 @@ private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
-  std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const override;
-
   Stmt *getStmt() const override { return stmt; }
 
   static bool classof(const ASTScopeImpl *scope) {
@@ -1848,9 +1834,7 @@ public:
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
   NullablePtr<AbstractClosureExpr> parentClosureIfAny() const; // public??
-  Stmt *getStmt() const override { return stmt; }
-
-  NullablePtr<const BraceStmtScope> getAsBraceStmtScope() const override;
+  BraceStmt *getStmt() const override { return stmt; }
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;

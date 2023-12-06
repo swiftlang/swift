@@ -666,6 +666,43 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
   } while ((scope = scope->getParent().getPtrOrNull()));
 }
 
+static std::pair<CatchNode, const BraceStmtScope *>
+getCatchNodeBody(const ASTScopeImpl *scope, CatchNode node) {
+  const auto &children = scope->getChildren();
+  if (children.empty())
+    return { CatchNode(), nullptr };
+
+  auto stmt = dyn_cast<BraceStmtScope>(children[0]);
+  if (!stmt || stmt->getStmt()->empty())
+    return { CatchNode(), nullptr };
+
+  return std::make_pair(node, stmt);
+}
+
+/// Retrieve the catch node associated with this scope, if any.
+static std::pair<CatchNode, const BraceStmtScope *>
+getCatchNode(const ASTScopeImpl *scope) {
+  // Closures introduce a catch scope for errors initiated in their body.
+  if (auto closureParams = dyn_cast<ClosureParametersScope>(scope)) {
+    return getCatchNodeBody(
+        scope, const_cast<AbstractClosureExpr *>(closureParams->closureExpr));
+  }
+
+  // Functions introduce a catch scope for errors initiated in their body.
+  if (auto function = dyn_cast<FunctionBodyScope>(scope)) {
+    return getCatchNodeBody(
+        scope, const_cast<AbstractFunctionDecl *>(function->decl));
+  }
+
+  // Do..catch blocks introduce a catch scope for errors initiated in the `do`
+  // body.
+  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope)) {
+    return getCatchNodeBody(scope, const_cast<DoCatchStmt *>(doCatch->stmt));
+  }
+
+  return { CatchNode(), nullptr };
+}
+
 CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   auto sourceFile = module->getSourceFileContainingLocation(loc);
   if (!sourceFile)
@@ -682,12 +719,12 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   for (auto scope = innermost; scope; scope = scope->getParent().getPtrOrNull()) {
     // If we are at a catch node and in the body of the region from which that
     // node catches thrown errors, we have our result.
-    auto caught = scope->getCatchNodeBody();
+    auto caught = getCatchNode(scope);
     if (caught.first && caught.second == innerBodyScope) {
       return caught.first;
     }
 
-    innerBodyScope = scope->getAsBraceStmtScope().getPtrOrNull();
+    innerBodyScope = dyn_cast<BraceStmtScope>(scope);
   }
 
   return nullptr;
