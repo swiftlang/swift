@@ -994,6 +994,23 @@ BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(
       cTryLoc.unbridged(), cSubExpr.unbridged(), cQuestionLoc.unbridged());
 }
 
+BridgedPackElementExpr
+BridgedPackElementExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedSourceLoc cEachLoc,
+                                    BridgedExpr cPackRefExpr) {
+  return PackElementExpr::create(cContext.unbridged(), cEachLoc.unbridged(),
+                                 cPackRefExpr.unbridged());
+}
+
+BridgedPackExpansionExpr
+BridgedPackExpansionExpr_createParsed(BridgedASTContext cContext,
+                                      BridgedSourceLoc cRepeatLoc,
+                                      BridgedExpr cPatternExpr) {
+  return PackExpansionExpr::create(cContext.unbridged(), cRepeatLoc.unbridged(),
+                                   cPatternExpr.unbridged(),
+                                   /*genericEnv=*/nullptr);
+}
+
 BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
                                                      BridgedArrayRef exprs) {
   return SequenceExpr::create(cContext.unbridged(), exprs.unbridged<Expr *>());

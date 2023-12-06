@@ -740,6 +740,18 @@ BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
     BridgedSourceLoc cQuestionLoc);
 
+SWIFT_NAME("BridgedPackElementExpr.createParsed(_:eachLoc:packRefExpr:)")
+BridgedPackElementExpr
+BridgedPackElementExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedSourceLoc cEachLoc,
+                                    BridgedExpr cPackRefExpr);
+
+SWIFT_NAME("BridgedPackExpansionExpr.createParsed(_:repeatLoc:patternExpr:)")
+BridgedPackExpansionExpr
+BridgedPackExpansionExpr_createParsed(BridgedASTContext cContext,
+                                      BridgedSourceLoc cRepeatLoc,
+                                      BridgedExpr cPatternExpr);
+
 SWIFT_NAME("BridgedSingleValueStmtExpr.createWithWrappedBranches(_:stmt:"
            "declContext:mustBeExpr:)")
 BridgedSingleValueStmtExpr BridgedSingleValueStmtExpr_createWithWrappedBranches(
