@@ -1341,7 +1341,6 @@ public:
         case SelfAccessKind::Borrowing:
         case SelfAccessKind::NonMutating:
         case SelfAccessKind::Mutating:
-        case SelfAccessKind::ResultDependsOnSelf:
           ctx.Diags.diagnose(DS->getDiscardLoc(),
                              diag::discard_wrong_context_nonconsuming,
                              fn->getDescriptiveKind());

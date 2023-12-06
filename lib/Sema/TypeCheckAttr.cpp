@@ -207,7 +207,14 @@ public:
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitLegacyConsumingAttr(LegacyConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitResultDependsOnSelfAttr(ResultDependsOnSelfAttr *attr) {
-    visitMutationAttr(attr);
+    FuncDecl *FD = cast<FuncDecl>(D);
+    if (FD->getDescriptiveKind() != DescriptiveDeclKind::Method) {
+      diagnoseAndRemoveAttr(attr, diag::attr_methods_only, attr);
+    }
+    if (FD->getResultTypeRepr() == nullptr) {
+      diagnoseAndRemoveAttr(attr, diag::result_depends_on_no_result,
+                            attr->getAttrName());
+    }
   }
   void visitDynamicAttr(DynamicAttr *attr);
 
@@ -486,9 +493,6 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
   case DeclAttrKind::DAK_Borrowing:
     attrModifier = SelfAccessKind::Borrowing;
     break;
-  case DeclAttrKind::DAK_ResultDependsOnSelf:
-    attrModifier = SelfAccessKind::ResultDependsOnSelf;
-    break;
   default:
     llvm_unreachable("unhandled attribute kind");
   }
@@ -503,7 +507,6 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
       case SelfAccessKind::Consuming:
       case SelfAccessKind::LegacyConsuming:
       case SelfAccessKind::Borrowing:
-      case SelfAccessKind::ResultDependsOnSelf:
         // It's still OK to specify the ownership convention of methods in
         // classes.
         break;
@@ -535,8 +538,7 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
        FD->getAttrs().hasAttribute<NonMutatingAttr>() +
        FD->getAttrs().hasAttribute<LegacyConsumingAttr>() +
        FD->getAttrs().hasAttribute<ConsumingAttr>() +
-       FD->getAttrs().hasAttribute<BorrowingAttr>() +
-       FD->getAttrs().hasAttribute<ResultDependsOnSelfAttr>()) > 1) {
+       FD->getAttrs().hasAttribute<BorrowingAttr>()) > 1) {
     if (auto *NMA = FD->getAttrs().getAttribute<NonMutatingAttr>()) {
       if (attrModifier != SelfAccessKind::NonMutating) {
         diagnoseAndRemoveAttr(NMA, diag::functions_mutating_and_not,
@@ -570,24 +572,6 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
         diagnoseAndRemoveAttr(BSA, diag::functions_mutating_and_not,
                               SelfAccessKind::Borrowing, attrModifier);
       }
-    }
-
-    if (auto *RDSA = FD->getAttrs().getAttribute<ResultDependsOnSelfAttr>()) {
-      if (attrModifier != SelfAccessKind::ResultDependsOnSelf) {
-        diagnoseAndRemoveAttr(RDSA, diag::functions_mutating_and_not,
-                              SelfAccessKind::ResultDependsOnSelf,
-                              attrModifier);
-      }
-    }
-  }
-
-  if (auto *RDSA = FD->getAttrs().getAttribute<ResultDependsOnSelfAttr>()) {
-    if (FD->getResultTypeRepr() == nullptr) {
-      diagnoseAndRemoveAttr(RDSA, diag::result_depends_on_no_result,
-                            attr->getAttrName());
-    }
-    if (FD->getDescriptiveKind() != DescriptiveDeclKind::Method) {
-      diagnoseAndRemoveAttr(RDSA, diag::attr_methods_only, attr);
     }
   }
   // Verify that we don't have a static function.

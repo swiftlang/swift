@@ -2151,10 +2151,6 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
     if (!Options.excludeAttrKind(DAK_Borrowing))
       Printer.printKeyword("borrowing", Options, " ");
     break;
-  case SelfAccessKind::ResultDependsOnSelf:
-    if (!Options.excludeAttrKind(DAK_ResultDependsOnSelf))
-      Printer.printKeyword("_resultDependsOnSelf", Options, " ");
-    break;
   }
 }
 

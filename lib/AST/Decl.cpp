@@ -603,9 +603,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   case SelfAccessKind::Mutating: return OS << "'mutating'";
   case SelfAccessKind::LegacyConsuming: return OS << "'__consuming'";
   case SelfAccessKind::Consuming: return OS << "'consuming'";
-  case SelfAccessKind::Borrowing: return OS << "'borrowing'";
-  case SelfAccessKind::ResultDependsOnSelf:
-    return OS << "'resultDependsOnSelf'";
+  case SelfAccessKind::Borrowing:
+    return OS << "'borrowing'";
   }
   llvm_unreachable("Unknown SelfAccessKind");
 }
