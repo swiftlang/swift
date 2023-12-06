@@ -138,12 +138,17 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       "Enable build of the embedded Swift standard library and runtime"
       TRUE)
 
+# Temporarily, by default only build embedded stdlib when building the compiler, to
+# unblock CI jobs that run against old(er) toolchains.
+option(SWIFT_ALLOW_BUILD_EMBEDDED_STDLIB_WITH_HOST_COMPILER
+       "Build embedded Swift standard library and runtime even
+       if we are not building our own compiler"
+       FALSE)
+
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND (NOT SWIFT_HOST_VARIANT STREQUAL "linux"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(NOT SWIFT_INCLUDE_TOOLS)
-  # Temporarily, only build embedded stdlib when building the compiler, to
-  # unblock CI jobs that run against old(er) toolchains.
-  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB ${SWIFT_ALLOW_BUILD_EMBEDDED_STDLIB_WITH_HOST_COMPILER})
 elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 endif()
