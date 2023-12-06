@@ -365,6 +365,22 @@ public:
     return decomposeFunction(fn);
   }
 
+  bool isPreconcurrency() const {
+    switch (getKind()) {
+    case Kind::Closure: {
+      auto *closure = dyn_cast<ClosureExpr>(getClosure());
+      return closure && closure->isIsolatedByPreconcurrency();
+    }
+
+    case Kind::Function:
+      return getActorIsolation(getFunction()).preconcurrency();
+
+    case Kind::Opaque:
+    case Kind::Parameter:
+      return false;
+    }
+  }
+
   static AbstractFunction decomposeFunction(Expr *fn) {
     assert(fn->getValueProvidingExpr() == fn);
 
@@ -1054,8 +1070,11 @@ public:
   }
 
   /// Whether a missing 'await' error on accessing an async var should be
-  /// downgraded to a warning. This is only the case for synchronous access
-  /// to isolated global or static 'let' variables.
+  /// downgraded to a warning.
+  ///
+  /// Missing 'await' errors are downgraded for synchronous access to isolated
+  /// global or static 'let' variables, which was previously accepted in
+  /// compiler versions before 5.10, or for declarations marked preconcurrency.
   bool downgradeAsyncAccessToWarning(Decl *decl) {
     if (auto *var = dyn_cast<VarDecl>(decl)) {
       ActorReferenceResult::Options options = llvm::None;
@@ -1067,7 +1086,7 @@ public:
       }
     }
 
-    return false;
+    return decl->preconcurrency();
   }
 
   Classification classifyLookup(LookupExpr *E) {
@@ -1191,6 +1210,10 @@ public:
     result.mergeImplicitEffects(
         ctx, E->isImplicitlyAsync().has_value(), E->implicitlyThrows(),
         PotentialEffectReason::forApply());
+
+    // Downgrade missing 'await' errors for preconcurrency references.
+    result.setDowngradeToWarning(
+        result.hasAsync() && fnRef.isPreconcurrency());
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
