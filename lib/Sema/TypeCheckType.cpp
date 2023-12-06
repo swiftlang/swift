@@ -5772,9 +5772,12 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
 namespace {
 
-class ExistentialTypeVisitor
-  : public TypeReprVisitor<ExistentialTypeVisitor>, public ASTWalker
-{
+/// Usually, existential types, existential metatypes, and singleton
+/// metatypes of existential must be written using `any` syntax. For example,
+/// `any P`, `any P.Type`, and `(any P).Type` respectively. This walker
+/// traverses an AST in search for occurrences of these types and checks their
+/// written syntax.
+class ExistentialTypeSyntaxChecker : public ASTWalker {
   ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
@@ -5783,22 +5786,21 @@ class ExistentialTypeVisitor
   llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
-  ExistentialTypeVisitor(ASTContext &ctx, bool checkStatements)
-    : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
+  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
+      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    reprStack.push_back(T);
-
     if (T->isInvalid())
       return Action::SkipNode();
+
     if (auto memberTR = dyn_cast<MemberTypeRepr>(T)) {
       // Only visit the last component to check, because nested typealiases in
       // existentials are okay.
-      visit(memberTR->getLastComponent());
+      memberTR->getLastComponent()->walk(*this);
       return Action::SkipNode();
     }
     // Arbitrary protocol constraints are OK on opaque types.
@@ -5809,11 +5811,20 @@ public:
     if (isa<ExistentialTypeRepr>(T))
       return Action::SkipNode();
 
-    visit(T);
+    reprStack.push_back(T);
+
+    auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
+    if (!declRefTR) {
+      return Action::Continue();
+    }
+
+    checkDeclRefTypeRepr(declRefTR);
+
     return Action::Continue();
   }
 
   PostWalkAction walkToTypeReprPost(TypeRepr *T) override {
+    assert(reprStack.back() == T);
     reprStack.pop_back();
     return Action::Continue();
   }
@@ -5841,11 +5852,8 @@ public:
     return Action::Continue(E);
   }
 
-  void visitTypeRepr(TypeRepr *T) {
-    // Do nothing for all TypeReprs except the ones listed below.
-  }
-
-  bool existentialNeedsParens(TypeRepr *parent) {
+private:
+  bool existentialNeedsParens(TypeRepr *parent) const {
     switch (parent->getKind()) {
     case TypeReprKind::Optional:
     case TypeReprKind::Protocol:
@@ -5883,16 +5891,9 @@ public:
     }
   }
 
-  void visitIdentTypeRepr(IdentTypeRepr *T) {
-    if (T->isInvalid())
-      return;
-
-    if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-      return;
-    }
-
-    // Compute the type repr to attach 'any' to.
+  void emitInsertAnyFixit(InFlightDiagnostic &diag, DeclRefTypeRepr *T) const {
     TypeRepr *replaceRepr = T;
+
     // Insert parens in expression context for '(any P).self'
     bool needsParens = (exprCount != 0);
     if (reprStack.size() > 1) {
@@ -5913,26 +5914,42 @@ public:
       }
     }
 
-    std::string fix;
-    llvm::raw_string_ostream OS(fix);
-    if (needsParens)
-      OS << "(";
-    ExistentialTypeRepr existential(SourceLoc(), replaceRepr);
-    existential.print(OS);
-    if (needsParens)
-      OS << ")";
+    llvm::SmallString<64> fix;
+    {
+      llvm::raw_svector_ostream OS(fix);
+      if (needsParens)
+        OS << "(";
+      ExistentialTypeRepr existential(SourceLoc(), replaceRepr);
+      existential.print(OS);
+      if (needsParens)
+        OS << ")";
+    }
 
-    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(T->getBoundDecl())) {
+    diag.fixItReplace(replaceRepr->getSourceRange(), fix);
+  }
+
+  void checkDeclRefTypeRepr(DeclRefTypeRepr *T) const {
+    assert(!T->isInvalid());
+
+    if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+      return;
+    }
+
+    auto *decl = T->getBoundDecl();
+    if (!decl) {
+      return;
+    }
+
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
       if (proto->existentialRequiresAny()) {
-        Ctx.Diags.diagnose(T->getNameLoc(),
-                           diag::existential_requires_any,
-                           proto->getDeclaredInterfaceType(),
-                           proto->getDeclaredExistentialType(),
-                           /*isAlias=*/false)
-            .fixItReplace(replaceRepr->getSourceRange(), fix);
+        auto diag =
+            Ctx.Diags.diagnose(T->getNameLoc(), diag::existential_requires_any,
+                               proto->getDeclaredInterfaceType(),
+                               proto->getDeclaredExistentialType(),
+                               /*isAlias=*/false);
+        emitInsertAnyFixit(diag, T);
       }
-    } else if (auto *alias =
-                   dyn_cast_or_null<TypeAliasDecl>(T->getBoundDecl())) {
+    } else if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
 
       // If this is a type alias to a constraint type, the type
@@ -5944,18 +5961,19 @@ public:
           if (!protoDecl->existentialRequiresAny())
             continue;
 
-          Ctx.Diags.diagnose(T->getNameLoc(),
-                             diag::existential_requires_any,
-                             alias->getDeclaredInterfaceType(),
-                             ExistentialType::get(alias->getDeclaredInterfaceType()),
-                             /*isAlias=*/true)
-              .fixItReplace(replaceRepr->getSourceRange(), fix);
+          auto diag = Ctx.Diags.diagnose(
+              T->getNameLoc(), diag::existential_requires_any,
+              alias->getDeclaredInterfaceType(),
+              ExistentialType::get(alias->getDeclaredInterfaceType()),
+              /*isAlias=*/true);
+          emitInsertAnyFixit(diag, T);
         }
       }
     }
   }
 
-  void visitRequirements(ArrayRef<RequirementRepr> reqts) {
+public:
+  void checkRequirements(ArrayRef<RequirementRepr> reqts) {
     for (auto reqt : reqts) {
       if (reqt.getKind() == RequirementReprKind::SameType) {
         if (auto *repr = reqt.getFirstTypeRepr())
@@ -6003,18 +6021,18 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
     checkExistentialTypes(ctx, macroDecl->getGenericParams());
     checkExistentialTypes(ctx, macroDecl->getTrailingWhereClause());
   } else if (auto *macroExpansionDecl = dyn_cast<MacroExpansionDecl>(decl)) {
-    ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
-    macroExpansionDecl->getArgs()->walk(visitor);
+    ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/false);
+    macroExpansionDecl->getArgs()->walk(checker);
     for (auto *genArg : macroExpansionDecl->getGenericArgs())
-      genArg->walk(visitor);
+      genArg->walk(checker);
   }
 
   if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl) ||
       isa<MacroExpansionDecl>(decl))
     return;
 
-  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
-  decl->walk(visitor);
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/false);
+  decl->walk(checker);
 }
 
 void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
@@ -6027,8 +6045,8 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
   if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
     return;
 
-  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/true);
-  stmt->walk(visitor);
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
+  stmt->walk(checker);
 }
 
 void TypeChecker::checkExistentialTypes(ASTContext &ctx,
@@ -6040,8 +6058,8 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx,
   if (typeAlias->getUnderlyingType()->isConstraintType())
     return;
 
-  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/true);
-  typeAlias->getUnderlyingTypeRepr()->walk(visitor);
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
+  typeAlias->getUnderlyingTypeRepr()->walk(checker);
 }
 
 void TypeChecker::checkExistentialTypes(
@@ -6049,8 +6067,8 @@ void TypeChecker::checkExistentialTypes(
   if (whereClause == nullptr)
     return;
 
-  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
-  visitor.visitRequirements(whereClause->getRequirements());
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/false);
+  checker.checkRequirements(whereClause->getRequirements());
 }
 
 void TypeChecker::checkExistentialTypes(
@@ -6058,8 +6076,8 @@ void TypeChecker::checkExistentialTypes(
   if (genericParams  == nullptr)
     return;
 
-  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
-  visitor.visitRequirements(genericParams->getRequirements());
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/false);
+  checker.checkRequirements(genericParams->getRequirements());
 }
 
 Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
