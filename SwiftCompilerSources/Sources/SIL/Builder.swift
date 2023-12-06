@@ -346,7 +346,7 @@ public struct Builder {
     return notifyNew(metatype.getAs(MetatypeInst.self))
   }
 
-  public func createEndCOWMutation(instance: Value, keepUnique: Bool = false) -> EndCOWMutationInst {
+  public func createEndCOWMutation(instance: Value, keepUnique: Bool) -> EndCOWMutationInst {
     let endMutation = bridged.createEndCOWMutation(instance.bridged, keepUnique)
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }

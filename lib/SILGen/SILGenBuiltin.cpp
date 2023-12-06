@@ -1019,7 +1019,7 @@ emitBuiltinEndCOWMutation(SILGenFunction &SGF,
 
   SILValue refAddr = args[0].getValue();
   auto ref = SGF.B.createLoad(loc, refAddr, LoadOwnershipQualifier::Take);
-  auto endRef = SGF.B.createEndCOWMutation(loc, ref);
+  auto endRef = SGF.B.createEndCOWMutation(loc, ref, /*keepUnique=*/ false);
   SGF.B.createStore(loc, endRef, refAddr, StoreOwnershipQualifier::Init);
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
