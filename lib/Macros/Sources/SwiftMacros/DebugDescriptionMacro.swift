@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
@@ -21,13 +33,13 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
     where DeclGroup: DeclGroupSyntax, DeclSyntax: DeclSyntaxProtocol, Context: MacroExpansionContext
     {
         guard !declaration.is(ProtocolDeclSyntax.self) else {
-           let message: ErrorMessage = "cannot be attached to a protocol"
+            let message: ErrorMessage = "cannot be attached to a protocol"
             context.diagnose(node: node, error: message)
             return []
         }
 
-        guard let typeName = declaration.typeName else {
-           let message: ErrorMessage = "cannot be attached to a \(declaration.kind.declName)"
+        guard let typeName = declaration.concreteTypeName else {
+            let message: ErrorMessage = "cannot be attached to a \(declaration.kind.declName)"
             context.diagnose(node: node, error: message)
             return []
         }
@@ -67,7 +79,9 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
         }
 
         guard let moduleName = context.moduleName(of: declaration) else {
-            assertionFailure("could not determine module name from fileID")
+            // Assertion as a diagnostic.
+            let message: ErrorMessage = "could not determine module name from fileID (internal error)"
+            context.diagnose(node: declaration, error: message)
             return []
         }
 
@@ -113,20 +127,34 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
     throws -> [DeclSyntax]
     where Decl: DeclSyntaxProtocol, Context: MacroExpansionContext
     {
-        guard case .argumentList(let argumentList) = node.arguments else {
-            assertionFailure("expected argumentList")
+        guard let arguments = node.arguments else {
+            // Assertion as a diagnostic.
+            let message: ErrorMessage = "no arguments given to _DebugDescriptionProperty (internal error)"
+            context.diagnose(node: node, error: message)
             return []
         }
 
-        let arguments = argumentList.map(\.expression)
-        guard let typeIdentifier = String(expr: arguments[0]),
-              let computedProperties = Array<String>(expr: arguments[1]) else {
-            assertionFailure("_DebugDescriptionProperty called incorrectly")
+        guard case .argumentList(let argumentList) = arguments else {
+            // Assertion as a diagnostic.
+            let message: ErrorMessage = "unexpected arguments to _DebugDescriptionProperty (internal error)"
+            context.diagnose(node: arguments, error: message)
+            return []
+        }
+
+        let argumentExprs = argumentList.map(\.expression)
+        guard argumentExprs.count == 2,
+              let typeIdentifier = String(expr: argumentExprs[0]),
+              let computedProperties = Array<String>(expr: argumentExprs[1]) else {
+            // Assertion as a diagnostic.
+            let message: ErrorMessage = "incorrect arguments to _DebugDescriptionProperty (internal error)"
+            context.diagnose(node: argumentList, error: message)
             return []
         }
 
         guard let onlyBinding = declaration.as(VariableDeclSyntax.self)?.bindings.only else {
-            assertionFailure("_DebugDescriptionProperty attached to invalid member")
+            // Assertion as a diagnostic.
+            let message: ErrorMessage = "invalid declaration of _DebugDescriptionProperty (internal error)"
+            context.diagnose(node: declaration, error: message)
             return []
         }
 
@@ -182,7 +210,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
                 // Eliminate explicit self references. The debugger doesn't support `self` in
                 // variable paths.
-                propertyChain.removeAll(where: { $0.baseName.text == "self" })
+                propertyChain.removeAll(where: { $0.baseName.tokenKind == .keyword(.self) })
 
                 // Check that the root property is not a computed property of `self`. Ideally, all
                 // properties would be verified, but a macro expansion has limited scope.
@@ -328,14 +356,17 @@ extension MacroExpansionContext {
 }
 
 extension DeclGroupSyntax {
-    fileprivate var typeName: String? {
+    /// The name of the concrete type represented by this `DeclGroupSyntax`.
+    /// This excludes protocols, which return nil.
+    fileprivate var concreteTypeName: String? {
         switch self.kind {
         case .actorDecl, .classDecl, .enumDecl, .structDecl:
             return self.asProtocol(NamedDeclSyntax.self)?.name.text
         case .extensionDecl:
             return self.as(ExtensionDeclSyntax.self)?.extendedType.description
         default:
-            break
+            // New types of decls are not presumed to be valid.
+            return nil
         }
         return nil
     }
@@ -365,16 +396,15 @@ extension PatternBindingSyntax {
 
     /// Predicate which identifies computed properties.
     fileprivate var isComputedProperty: Bool {
-        guard let accessors = self.accessorBlock?.accessors else {
+        switch self.accessorBlock?.accessors {
+        case nil:
             // No accessor block, not computed.
             return false
-        }
-
-        switch accessors {
-        case .accessors(let accessors):
+        case .accessors(let accessors)?:
             // A `get` accessor indicates a computed property.
             return accessors.contains { $0.accessorSpecifier.tokenKind == .keyword(.get) }
-        case .getter:
+        case .getter?:
+            // A property with an implementation block is a computed property.
             return true
         @unknown default:
             return true
@@ -397,9 +427,7 @@ fileprivate struct UnexpectedExpr: Error {
 }
 
 extension MemberAccessExprSyntax {
-
-    /// Parse a member access, producing either an array of references, or throwing an error which contains
-    /// the unexpected expression.
+    /// Parse a member access consisting only of property references. Any other syntax throws an error.
     fileprivate func propertyChain() throws -> [DeclReferenceExprSyntax] {
         // MemberAccess is left associative: a.b.c is ((a.b).c).
         var propertyChain: [DeclReferenceExprSyntax] = []
