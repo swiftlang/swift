@@ -2287,7 +2287,7 @@ public:
                                         Int1Ty, getFunction(), isNative));
   }
   EndCOWMutationInst *createEndCOWMutation(SILLocation Loc, SILValue operand,
-                                           bool keepUnique = false) {
+                                           bool keepUnique) {
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
   }
