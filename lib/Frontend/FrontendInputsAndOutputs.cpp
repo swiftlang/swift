@@ -424,6 +424,13 @@ std::string FrontendInputsAndOutputs::getSingleIndexUnitOutputFilename() const {
                      : std::string();
 }
 
+std::string FrontendInputsAndOutputs::getSingleSplitDwarfObjectPath() const {
+  assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeChecksHaveBeenBypassed();
+  return hasInputs()
+             ? lastInputProducingOutput().getSplitDwarfObjectPath().str()
+             : std::string();
+}
+
 bool FrontendInputsAndOutputs::isOutputFilenameStdout() const {
   return getSingleOutputFilename() == "-";
 }
@@ -566,6 +573,12 @@ bool FrontendInputsAndOutputs::hasBitstreamOptRecordPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
         return outs.BitstreamOptRecordPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasSplitDwarfObjectPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.SplitDwarfObjectPath;
       });
 }
 

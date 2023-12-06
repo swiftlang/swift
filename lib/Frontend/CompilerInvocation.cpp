@@ -2539,8 +2539,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      : "-gdwarf_types");
   }
 
-  if (auto A = Args.getLastArg(OPT_emit_split_dwarf_path)) {
-    Opts.SplitDwarfOutput = A->getValue();
+  if (FrontendOpts.InputsAndOutputs.hasSplitDwarfObjectPath()) {
+    Opts.SplitDwarfOutput =
+        FrontendOpts.InputsAndOutputs.getSingleSplitDwarfObjectPath();
   }
 
   if (auto A = Args.getLastArg(OPT_dwarf_version)) {

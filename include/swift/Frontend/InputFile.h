@@ -140,6 +140,9 @@ public:
   StringRef getFixItsOutputPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.FixItsOutputPath;
   }
+  StringRef getSplitDwarfObjectPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.SplitDwarfObjectPath;
+  }
 };
 } // namespace swift
 
