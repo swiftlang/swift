@@ -45,10 +45,4 @@ Added: _$ss19_getWeakRetainCountySuyXlF
 // Swift._getUnownedRetainCount(Swift.AnyObject) -> Swift.UInt
 Added: _$ss22_getUnownedRetainCountySuyXlF
 
-// Swift.hello() -> ()
-Added: _$ss5helloyyF
-
-// static Swift.Unicode.UTF16._isASCII(Swift.UInt16) -> Swift.Bool
-Removed: _$ss7UnicodeO5UTF16O8_isASCIIySbs6UInt16VFZ
-
 // Runtime Symbols

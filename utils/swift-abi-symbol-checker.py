@@ -87,7 +87,7 @@ def main(arguments):
 
     parser.add_argument('changes', help='the changes file')
     parser.add_argument('symbols', help='the symbols file')
-    parser.add_argument('--base',  help='the base changes file')
+    parser.add_argument('--base', help='the base changes file')
 
     args = parser.parse_args(arguments)
 

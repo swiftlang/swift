@@ -158,6 +158,3 @@ extension EnumeratedSequence: Sequence {
     return Iterator(_base: _base.makeIterator())
   }
 }
-
-@available(SwiftStdlib 5.11, *)
-public func hello() {}
