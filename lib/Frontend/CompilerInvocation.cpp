@@ -3224,8 +3224,7 @@ serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
   serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName,
-      !LangOpts.DebuggerSupport, &extendedInfo);
+      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -3261,7 +3260,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      LangOpts.SDKName, !LangOpts.DebuggerSupport, &extendedInfo);
+      LangOpts.SDKName, &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {
