@@ -103,7 +103,7 @@ function(add_swift_compiler_modules_library name)
       "-Xfrontend" "-enable-experimental-cxx-interop"
       "-Xfrontend" "-disable-target-os-checking"
       "-Xcc" "-std=c++17"
-      "-Xcc" "-DCOMPILED_WITH_SWIFT"
+      "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
@@ -271,6 +271,7 @@ else()
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
        "
 #define COMPILED_WITH_SWIFT
+#define SWIFT_TARGET
 
 #include \"Basic/BasicBridging.h\"
 #include \"SIL/SILBridging.h\"
