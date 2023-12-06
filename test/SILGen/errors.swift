@@ -614,7 +614,8 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[T0:%.*]] = function_ref @$ss27_allocateUninitializedArray{{.*}}F
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
 // CHECK:         ([[ARRAY:%.*]], [[T2:%.*]]) = destructure_tuple [[T1]]
-// CHECK:         [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
+// CHECK:         [[MDI:%.*]] = mark_dependence [[T2]]  : $Builtin.RawPointer on [[ARRAY]]
+// CHECK:         [[ELT0:%.*]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*Cat
 //   Element 0.
 // CHECK:         [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK:         try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]

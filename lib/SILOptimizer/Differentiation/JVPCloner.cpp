@@ -1312,7 +1312,8 @@ public:
         if (!origResult->getType().is<TupleType>()) {
           setTangentValue(bb, origResult,
                           makeConcreteTangentValue(differentialResult));
-        } else if (auto *dti = getSingleDestructureTupleUser(ai)) {
+        } else if (auto *dti =
+                       ai->getSingleUserOfType<DestructureTupleInst>()) {
           bool notSetValue = true;
           for (auto result : dti->getResults()) {
             if (activityInfo.isActive(result, getConfig())) {

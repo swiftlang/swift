@@ -429,12 +429,15 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
       continue;
     // The second tuple field of the return value is the `RawPointer`.
     for (auto use : dti->getResult(1)->getUses()) {
-      // The `RawPointer` passes through a `pointer_to_address`. That
-      // instruction's first use is a `store` whose source is useful; its
+      // The `RawPointer` passes through a `mark_dependence(pointer_to_address`.
+      // That instruction's first use is a `store` whose source is useful; its
       // subsequent uses are `index_addr`s whose only use is a useful `store`.
-      auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
-      assert(ptai && "Expected `pointer_to_address` user for uninitialized "
-                     "array intrinsic");
+      auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
+      assert(
+          mdi &&
+          "Expected a mark_dependence user for uninitialized array intrinsic.");
+      auto *ptai = dyn_cast<PointerToAddressInst>(getSingleNonDebugUser(mdi));
+      assert(ptai && "Expected a pointer_to_address.");
       setUseful(ptai, dependentVariableIndex);
       // Propagate usefulness through array element addresses:
       // `pointer_to_address` and `index_addr` instructions.
