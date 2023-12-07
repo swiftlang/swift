@@ -192,6 +192,13 @@ _Nonnull id CImplFuncMismatch6a(int param);
 void CImplFuncNameMismatch1(int param);
 void CImplFuncNameMismatch2(int param);
 
+int CImplGetComputedGlobal1(void) __attribute__((swift_name("getter:cImplComputedGlobal1()")));
+void CImplSetComputedGlobal1(int param) __attribute__((swift_name("setter:cImplComputedGlobal1(newValue:)")));
+
+typedef struct CImplStruct {} CImplStruct;
+
+void CImplStructStaticFunc1(int param) __attribute__((swift_name("CImplStruct.staticFunc1(_:)")));
+
 struct ObjCStruct {
   int foo;
 };

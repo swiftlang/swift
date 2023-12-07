@@ -464,6 +464,10 @@ protocol EmptySwiftProto {}
   // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
 }
 
+//
+// @_cdecl for global functions
+//
+
 @_objcImplementation @_cdecl("CImplFunc1")
 func CImplFunc1(_: Int32) {
   // OK
@@ -540,6 +544,38 @@ func mismatchedName1(_: Int32) {
 func CImplFuncNameMismatch2(_: Int32) {
   // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure your umbrella or bridging header imports the header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
+}
+
+//
+// TODO: @_cdecl for global functions imported as computed vars
+//
+var cImplComputedGlobal1: Int32 {
+  @_objcImplementation @_cdecl("CImplGetComputedGlobal1")
+  get {
+    // FIXME: Lookup for vars isn't working yet
+    // expected-error@-3 {{could not find imported function 'CImplGetComputedGlobal1' matching getter for var 'cImplComputedGlobal1'; make sure your umbrella or bridging header imports the header that declares it}}
+    return 0
+  }
+
+  @_objcImplementation @_cdecl("CImplSetComputedGlobal1")
+  set {
+    // FIXME: Lookup for vars isn't working yet
+    // expected-error@-3 {{could not find imported function 'CImplSetComputedGlobal1' matching setter for var 'cImplComputedGlobal1'; make sure your umbrella or bridging header imports the header that declares it}}
+    print(newValue)
+  }
+}
+
+//
+// TODO: @_cdecl for import-as-member functions
+//
+extension CImplStruct {
+  @_objcImplementation @_cdecl("CImplStructStaticFunc1")
+  static func staticFunc1(_: Int32) {
+    // FIXME: Add underlying support for this
+    // expected-error@-3 {{@_cdecl can only be applied to global functions}}
+    // FIXME: Lookup in an enclosing type is not working yet
+    // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure your umbrella or bridging header imports the header that declares it}}
+  }
 }
 
 func usesAreNotAmbiguous(obj: ObjCClass) {
