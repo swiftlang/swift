@@ -701,8 +701,8 @@ public:
           auto interfaceType = archetype->getInterfaceType();
           auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
 
-          if (contextType.getPointer() != archetype) {
-            Out << "Archetype " << archetype->getString() << "does not appear"
+          if (!contextType->isEqual(archetype)) {
+            Out << "Archetype " << archetype->getString() << " does not appear"
                 << " inside its own generic environment\n";
             Out << "Interface type: " << interfaceType.getString() << "\n";
             Out << "Contextual type: " << contextType.getString() << "\n";

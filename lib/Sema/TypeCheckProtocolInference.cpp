@@ -919,26 +919,31 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 }
 
 AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
+                                             DeclContext *dc,
+                                             NominalTypeDecl *adoptee,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
   if (assocType->hasDefaultDefinitionType())
     return assocType;
 
-  // Look at overridden associated types.
+  // Otherwise, look for all associated types with the same name along all the
+  // protocols that the adoptee conforms to.
+  SmallVector<ValueDecl *, 4> decls;
+  auto options = NL_ProtocolMembers | NL_OnlyTypes;
+  dc->lookupQualified(adoptee, DeclNameRef(assocType->getName()),
+                      SourceLoc(), options, decls);
+
   SmallPtrSet<CanType, 4> canonicalTypes;
   SmallVector<AssociatedTypeDecl *, 2> results;
-  for (auto overridden : assocType->getOverriddenDecls()) {
-    auto overriddenDefault = findDefaultedAssociatedType(overridden);
-    if (!overriddenDefault) continue;
+  for (auto *decl : decls) {
+    if (auto *assocDecl = dyn_cast<AssociatedTypeDecl>(decl)) {
+      auto defaultType = assocDecl->getDefaultDefinitionType();
+      if (!defaultType) continue;
 
-    Type overriddenType =
-      overriddenDefault->getDefaultDefinitionType();
-    assert(overriddenType);
-    if (!overriddenType) continue;
-
-    CanType key = overriddenType->getCanonicalType();
+      CanType key = defaultType->getCanonicalType();
     if (canonicalTypes.insert(key).second)
-      results.push_back(overriddenDefault);
+      results.push_back(assocDecl);
+    }
   }
 
   // If there was a single result, return it.
@@ -999,7 +1004,8 @@ llvm::Optional<AbstractTypeWitness>
 AssociatedTypeInference::computeDefaultTypeWitness(
     AssociatedTypeDecl *assocType) const {
   // Go find a default definition.
-  auto *const defaultedAssocType = findDefaultedAssociatedType(assocType);
+  auto *const defaultedAssocType = findDefaultedAssociatedType(
+      dc, dc->getSelfNominalTypeDecl(), assocType);
   if (!defaultedAssocType)
     return llvm::None;
 
