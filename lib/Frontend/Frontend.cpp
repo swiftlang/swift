@@ -538,6 +538,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   // DiagConsumers are added.
   setupCachingDiagnosticsProcessorIfNeeded();
 
+  // Dump module search paths if -Rmodule-loading is on.
+  const auto &LangOpts = Invocation.getLangOptions();
+  if (LangOpts.EnableModuleLoadingRemarks) {
+    Invocation.getSearchPathOptions().dump(LangOpts.Target.isOSDarwin());
+  }
+
   // If we expect an implicit stdlib import, load in the standard library. If we
   // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
   // trigger a bunch of other errors due to the stdlib being missing, or at
