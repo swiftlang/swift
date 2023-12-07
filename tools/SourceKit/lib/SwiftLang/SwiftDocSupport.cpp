@@ -1344,22 +1344,6 @@ void RequestRefactoringEditConsumer::handleDiagnostic(
   Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
-static NameUsage getNameUsage(RenameType Type) {
-  switch (Type) {
-  case RenameType::Definition:
-    return NameUsage::Definition;
-  case RenameType::Reference:
-    return NameUsage::Reference;
-  case RenameType::Call:
-    return NameUsage::Call;
-  case RenameType::Unknown:
-    return NameUsage::Unknown;
-  }
-}
-
-static std::vector<RenameLoc>
-getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations);
-
 /// Translates a vector of \c SyntacticRenameRangeDetails to a vector of
 /// \c CategorizedRenameRanges.
 static std::vector<CategorizedRenameRanges> getCategorizedRenameRanges(
@@ -1390,7 +1374,7 @@ static std::vector<CategorizedRenameRanges> getCategorizedRenameRanges(
 
 CancellableResult<std::vector<CategorizedRenameRanges>>
 SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                                   ArrayRef<RenameLocations> RenameLocations,
+                                   ArrayRef<RenameLoc> RenameLocs,
                                    ArrayRef<const char *> Args) {
   using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
@@ -1402,7 +1386,6 @@ SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
     return ResultType::failure(Error);
   }
 
-  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
   auto SyntacticRenameRanges =
       swift::ide::findSyntacticRenameRanges(SF, RenameLocs,
                                             /*NewName=*/StringRef());
@@ -1501,19 +1484,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   if (!SF)
     Error = "Failed to determine SourceFile for input buffer";
   return SF;
-}
-
-static std::vector<RenameLoc>
-getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations) {
-  std::vector<RenameLoc> RenameLocs;
-  for(const auto &Locations: RenameLocations) {
-    for(const auto &Location: Locations.LineColumnLocs) {
-      RenameLocs.push_back({Location.Line, Location.Column,
-                            getNameUsage(Location.Type), Locations.OldName,
-                            Locations.IsFunctionLike});
-    }
-  }
-  return RenameLocs;
 }
 
 void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,

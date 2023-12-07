@@ -52,8 +52,6 @@ private:
                     llvm::Optional<unsigned> FirstTrailingLabel,
                     LabelRangeType RangeType, bool isCallSite);
 
-  bool isOperator() const { return Lexer::isOperator(Old.base()); }
-
 private:
   /// Returns the range of the  (possibly escaped) identifier at the start of
   /// \p Range and updates \p IsEscaped to indicate whether it's escaped or not.
@@ -151,7 +149,7 @@ void RenameRangeDetailCollector::splitAndRenameLabel(CharSourceRange Range,
   case LabelRangeType::NoncollapsibleParam:
     return splitAndRenameParamLabel(Range, NameIndex,
                                     /*IsCollapsible=*/false);
-  case LabelRangeType::Selector:
+  case LabelRangeType::CompoundName:
     return addRenameRange(Range, RefactoringRangeKind::SelectorArgumentLabel,
                           NameIndex);
   case LabelRangeType::None:
@@ -250,7 +248,7 @@ bool RenameRangeDetailCollector::labelRangeMatches(CharSourceRange Range,
       LLVM_FALLTHROUGH;
     case LabelRangeType::CallArg:
     case LabelRangeType::Param:
-    case LabelRangeType::Selector:
+    case LabelRangeType::CompoundName:
       return ExistingLabel == (Expected.empty() ? "_" : Expected);
     case LabelRangeType::None:
       llvm_unreachable("Unhandled label range type");
@@ -277,12 +275,12 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
         if (OldNames.empty())
           return true;
 
-        while (!labelRangeMatches(Label, LabelRangeType::Selector,
+        while (!labelRangeMatches(Label, LabelRangeType::CompoundName,
                                   OldNames.back())) {
           if ((OldNames = OldNames.drop_back()).empty())
             return true;
         }
-        splitAndRenameLabel(Label, LabelRangeType::Selector,
+        splitAndRenameLabel(Label, LabelRangeType::CompoundName,
                             OldNames.size() - 1);
         OldNames = OldNames.drop_back();
         continue;
@@ -297,7 +295,7 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
           if ((OldNames = OldNames.drop_back()).empty())
             return true;
         }
-        splitAndRenameLabel(Label, LabelRangeType::Selector,
+        splitAndRenameLabel(Label, LabelRangeType::CompoundName,
                             OldNames.size() - 1);
         OldNames = OldNames.drop_back();
         continue;
@@ -366,89 +364,154 @@ RegionType RenameRangeDetailCollector::getSyntacticRenameRegionType(
   }
 }
 
+enum class SpecialBaseName {
+  /// The function does not have one of the special base names.
+  None,
+  Subscript,
+  Init,
+  CallAsFunction
+};
+
+static SpecialBaseName specialBaseNameFor(const DeclNameViewer &declName) {
+  if (!declName.isFunction()) {
+    return SpecialBaseName::None;
+  }
+  if (declName.base() == "subscript") {
+    // FIXME: Don't handle as special name if it is backticked.
+    return SpecialBaseName::Subscript;
+  } else if (declName.base() == "init") {
+    // FIXME: Don't handle as special name if it is backticked.
+    return SpecialBaseName::Init;
+  } else if (declName.base() == "callAsFunction") {
+    // FIXME: this should only be treated specially for instance methods.
+    return SpecialBaseName::CallAsFunction;
+  } else {
+    return SpecialBaseName::None;
+  }
+}
+
 RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
-    const ResolvedLoc &Resolved, const RenameLoc &Config) {
+    const ResolvedLoc &resolved, const RenameLoc &config) {
 
-  if (!Resolved.range.isValid())
+  if (!resolved.range.isValid())
     return RegionType::Unmatched;
 
-  auto RegionKind = getSyntacticRenameRegionType(Resolved);
-  // Don't include unknown references coming from active code; if we don't
-  // have a semantic NameUsage for them, then they're likely unrelated symbols
-  // that happen to have the same name.
-  if (RegionKind == RegionType::ActiveCode &&
-      Config.Usage == NameUsage::Unknown)
-    return RegionType::Unmatched;
+  RenameLocUsage usage = config.Usage;
 
-  assert(Config.Usage != NameUsage::Call || Config.IsFunctionLike);
+  auto regionKind = getSyntacticRenameRegionType(resolved);
 
-  // FIXME: handle escaped keyword names `init`
-  bool IsSubscript = Old.base() == "subscript" && Config.IsFunctionLike;
-  bool IsInit = Old.base() == "init" && Config.IsFunctionLike;
+  SpecialBaseName specialBaseName = specialBaseNameFor(Old);
 
-  // FIXME: this should only be treated specially for instance methods.
-  bool IsCallAsFunction =
-      Old.base() == "callAsFunction" && Config.IsFunctionLike;
+  if (usage == RenameLocUsage::Unknown) {
+    // Unknown name usage occurs if we don't have an entry in the index that
+    // tells us whether the location is a call, reference or a definition. The
+    // most common reasons why this happens is if the editor is adding syntactic
+    // results (eg. from comments or string literals).
+    //
+    // Determine whether we should include them.
+    if (regionKind == RegionType::ActiveCode) {
+      // If the reference is in active code, we should have had a name usage
+      // from the index. Since we don't, they are likely unrelated symbols that
+      // happen to have the same name. Don't return them as matching ranges.
+      return RegionType::Unmatched;
+    }
+    if (specialBaseName != SpecialBaseName::None &&
+        resolved.labelType == LabelRangeType::None) {
+      // Filter out non-semantic special basename locations with no labels.
+      // We've already filtered out those in active code, so these are
+      // any appearance of just 'init', 'subscript', or 'callAsFunction' in
+      // strings, comments, and inactive code.
+      return RegionType::Unmatched;
+    }
+  }
 
-  bool IsSpecialBase = IsInit || IsSubscript || IsCallAsFunction;
-
-  // Filter out non-semantic special basename locations with no labels.
-  // We've already filtered out those in active code, so these are
-  // any appearance of just 'init', 'subscript', or 'callAsFunction' in
-  // strings, comments, and inactive code.
-  if (IsSpecialBase && (Config.Usage == NameUsage::Unknown &&
-                        Resolved.labelType == LabelRangeType::None))
-    return RegionType::Unmatched;
-
-  if (!Config.IsFunctionLike || !IsSpecialBase) {
-    if (renameBase(Resolved.range, RefactoringRangeKind::BaseName))
+  switch (specialBaseName) {
+  case SpecialBaseName::None:
+    // If we don't have a special base name, we can just rename it.
+    if (renameBase(resolved.range, RefactoringRangeKind::BaseName)) {
       return RegionType::Mismatch;
-
-  } else if (IsInit || IsCallAsFunction) {
-    if (renameBase(Resolved.range, RefactoringRangeKind::KeywordBaseName)) {
-      // The base name doesn't need to match (but may) for calls, but
-      // it should for definitions and references.
-      if (Config.Usage == NameUsage::Definition ||
-          Config.Usage == NameUsage::Reference) {
+    }
+    break;
+  case SpecialBaseName::Init:
+  case SpecialBaseName::CallAsFunction:
+    if (renameBase(resolved.range, RefactoringRangeKind::KeywordBaseName)) {
+      // The base name doesn't need to match for calls, for example because
+      // an initializer can be called as `MyType()` and `callAsFunction` can
+      // be called as `myStruct()`, so even if the base fails to be renamed,
+      // continue.
+      // But the names do need to match for definitions and references.
+      if (usage == RenameLocUsage::Definition ||
+          usage == RenameLocUsage::Reference) {
         return RegionType::Mismatch;
       }
     }
-  } else if (IsSubscript && Config.Usage == NameUsage::Definition) {
-    if (renameBase(Resolved.range, RefactoringRangeKind::KeywordBaseName))
-      return RegionType::Mismatch;
+    break;
+  case SpecialBaseName::Subscript:
+    // Only try renaming the base for definitions of the subscript.
+    // Accesses to the subscript are modelled as references with `[` as the
+    // base name, which does not match. Subscripts are never called in the
+    // index.
+    if (usage == RenameLocUsage::Definition) {
+      if (renameBase(resolved.range, RefactoringRangeKind::KeywordBaseName)) {
+        return RegionType::Mismatch;
+      }
+    }
+    break;
   }
 
-  bool HandleLabels = false;
-  if (Config.IsFunctionLike) {
-    switch (Config.Usage) {
-    case NameUsage::Call:
-      HandleLabels = !isOperator();
+  bool handleLabels = false;
+  bool isCallSite = false;
+  if (Old.isFunction()) {
+    switch (usage) {
+    case RenameLocUsage::Call:
+      // All calls except for operators have argument labels that should be
+      // renamed.
+      handleLabels = !Lexer::isOperator(Old.base());
+      isCallSite = true;
       break;
-    case NameUsage::Definition:
-      HandleLabels = true;
+    case RenameLocUsage::Definition:
+      // All function definitions have argument labels that should be renamed.
+      handleLabels = true;
+      isCallSite = false;
       break;
-    case NameUsage::Reference:
-      HandleLabels =
-          Resolved.labelType == LabelRangeType::Selector || IsSubscript;
+    case RenameLocUsage::Reference:
+      if (resolved.labelType == LabelRangeType::CompoundName) {
+        // If we have a compound name that specifies argument labels to
+        // disambiguate functions with the same base name, we always need to
+        // rename the labels.
+        handleLabels = true;
+        isCallSite = false;
+      } else if (specialBaseName == SpecialBaseName::Subscript) {
+        // Accesses to a subscript are modeled using a reference to the
+        // subscript (with base name `[`). We always need to rename argument
+        // labels here.
+        handleLabels = true;
+        isCallSite = true;
+      } else {
+        handleLabels = false;
+        isCallSite = false;
+      }
       break;
-    case NameUsage::Unknown:
-      HandleLabels = Resolved.labelType != LabelRangeType::None;
+    case RenameLocUsage::Unknown:
+      // If we don't know where the function is used, fall back to trying to
+      // rename labels if there are some.
+      handleLabels = resolved.labelType != LabelRangeType::None;
+      isCallSite = resolved.labelType == LabelRangeType::CallArg;
       break;
     }
   }
 
-  if (HandleLabels) {
-    bool isCallSite = Config.Usage != NameUsage::Definition &&
-                      (Config.Usage != NameUsage::Reference || IsSubscript) &&
-                      Resolved.labelType == LabelRangeType::CallArg;
-
-    if (renameLabels(Resolved.labelRanges, Resolved.firstTrailingLabel,
-                     Resolved.labelType, isCallSite))
-      return Config.Usage == NameUsage::Unknown ? RegionType::Unmatched
-                                                : RegionType::Mismatch;
+  if (handleLabels) {
+    bool renameLabelsFailed =
+        renameLabels(resolved.labelRanges, resolved.firstTrailingLabel,
+                     resolved.labelType, isCallSite);
+    if (renameLabelsFailed) {
+      return usage == RenameLocUsage::Unknown ? RegionType::Unmatched
+                                              : RegionType::Mismatch;
+    }
   }
 
-  return RegionKind;
+  return regionKind;
 }
 
 } // end anonymous namespace

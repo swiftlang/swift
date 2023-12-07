@@ -684,8 +684,8 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
       SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
-      override;
+      std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
+          Receiver) override;
 
   void findActiveRegionsInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName,
@@ -695,7 +695,7 @@ public:
 
   CancellableResult<std::vector<CategorizedRenameRanges>>
   findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                   ArrayRef<RenameLocations> RenameLocations,
+                   ArrayRef<RenameLoc> RenameLocations,
                    ArrayRef<const char *> Args) override;
 
   void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,

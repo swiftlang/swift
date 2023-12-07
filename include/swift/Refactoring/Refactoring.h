@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_REFACTORING_H
-#define SWIFT_IDE_REFACTORING_H
+#ifndef SWIFT_REFACTORING_REFACTORING_H
+#define SWIFT_REFACTORING_REFACTORING_H
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Refactoring/RenameLoc.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -60,21 +61,6 @@ struct RenameInfo {
 };
 
 llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
-
-enum class NameUsage {
-  Unknown,
-  Reference,
-  Definition,
-  Call
-};
-
-struct RenameLoc {
-  unsigned Line;
-  unsigned Column;
-  NameUsage Usage;
-  StringRef OldName;
-  const bool IsFunctionLike;
-};
 
 /// An array of \c RenameLoc that also keeps the underlying string storage of
 /// the \c StringRef inside the \c RenameLoc alive.
@@ -184,4 +170,4 @@ collectRefactorings(ResolvedCursorInfoPtr CursorInfo, bool ExcludeRename);
 } // namespace ide
 } // namespace swift
 
-#endif // SWIFT_IDE_REFACTORING_H
+#endif // SWIFT_REFACTORING_REFACTORING_H

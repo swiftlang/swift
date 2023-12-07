@@ -23,19 +23,38 @@
 #endif
 
 enum class LabelRangeType {
+  /// The matched location did not have any arguments.
   None,
 
+  /// The argument of a function/initializer/macro/... call
+  ///
+  /// ### Example
   /// `foo([a: ]2) or .foo([a: ]String)`
   CallArg,
 
-  /// `func([a b]: Int)`
+  /// The parameter of a function/initializer/macro/... declaration
+  ///
+  /// ### Example
+  /// `func foo([a b]: Int)`
   Param,
 
+  /// Parameters of a function that can't be collapsed if they are the same.
+  ///
+  /// This is the case for parameters of subscripts since subscripts have
+  /// unnamed
+  /// parameters by default.
+  ///
+  /// ### Example
   /// `subscript([a a]: Int)`
   NoncollapsibleParam,
 
-  /// `#selector(foo.func([a]:))`
-  Selector,
+  /// A reference to a function that also specifies argument labels to
+  /// disambiguate.
+  ///
+  /// ### Examples
+  /// - `#selector(foo.func([a]:))`
+  /// - `foo.func([a]:)`
+  CompoundName,
 };
 
 enum class ResolvedLocContext { Default, Selector, Comment, StringLiteral };

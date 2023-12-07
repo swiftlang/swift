@@ -89,7 +89,7 @@ _ = memberwise . /*memberwise-x:ref*/x
 // RUN: diff -u %S/Outputs/functions/import.swift.expected %t.ranges/functions_import.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="bar" -is-function-like -old-name "bar(_:)" >> %t.ranges/functions_bar.swift
 // RUN: diff -u %S/Outputs/functions/bar.swift.expected %t.ranges/functions_bar.swift
-// RUN: %refactor -find-rename-ranges -source-filename %s -pos="no-args" -is-function-like -old-name "aFunc" >> %t.ranges/functions_no-args.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="no-args" -is-function-like -old-name "aFunc()" >> %t.ranges/functions_no-args.swift
 // RUN: diff -u %S/Outputs/functions/no-args.swift.expected %t.ranges/functions_no-args.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="param-label" -is-function-like -old-name "aFunc(a:)" >> %t.ranges/functions_param-label.swift
 // RUN: diff -u %S/Outputs/functions/param-label.swift.expected %t.ranges/functions_param-label.swift

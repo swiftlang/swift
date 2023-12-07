@@ -51,7 +51,7 @@ fileprivate extension IDEBridging.LabelRangeType {
     case .call: self = .CallArg
     case .parameters: self = .Param
     case .noncollapsibleParameters: self = .NoncollapsibleParam
-    case .selector: self = .Selector
+    case .selector: self = .CompoundName
     }
   }
 }

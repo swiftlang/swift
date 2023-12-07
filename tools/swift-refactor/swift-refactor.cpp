@@ -176,18 +176,18 @@ bool doesFileExist(StringRef Path) {
 struct RefactorLoc {
   unsigned Line;
   unsigned Column;
-  NameUsage Usage;
+  RenameLocUsage Usage;
 };
 
-NameUsage convertToNameUsage(StringRef RoleString) {
+RenameLocUsage convertToNameUsage(StringRef RoleString) {
   if (RoleString == "unknown")
-    return NameUsage::Unknown;
+    return RenameLocUsage::Unknown;
   if (RoleString == "def")
-    return NameUsage::Definition;
+    return RenameLocUsage::Definition;
   if (RoleString == "ref")
-    return NameUsage::Reference;
+    return RenameLocUsage::Reference;
   if (RoleString == "call")
-    return NameUsage::Call;
+    return RenameLocUsage::Call;
   llvm_unreachable("unhandled role string");
 }
 
@@ -201,8 +201,8 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
   if (LabelOrLineCol.contains(':')) {
     auto LineCol = parseLineCol(LabelOrLineCol);
     if (LineCol.has_value()) {
-      LocResults.push_back({LineCol.value().first,LineCol.value().second,
-        NameUsage::Unknown});
+      LocResults.push_back({LineCol.value().first, LineCol.value().second,
+                            RenameLocUsage::Unknown});
     } else {
       llvm::errs() << "cannot parse position pair.";
     }
@@ -231,7 +231,7 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
       unsigned ColumnOffset = 0;
       if (Matches[2].length() > 0 && !llvm::to_integer(Matches[2].str(), ColumnOffset))
         continue; // bad column offset
-      auto Usage = NameUsage::Reference;
+      auto Usage = RenameLocUsage::Reference;
       if (Matches[3].length() > 0)
         Usage = convertToNameUsage(Matches[3].str());
       LocResults.push_back({Line, Column + ColumnOffset, Usage});
@@ -242,14 +242,12 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
 
 std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
                                      ArrayRef<RefactorLoc> Locs,
-                                     StringRef OldName, StringRef NewName,
-                                     bool IsFunctionLike) {
+                                     StringRef OldName, StringRef NewName) {
   std::vector<RenameLoc> Renames;
-  llvm::transform(
-      Locs, std::back_inserter(Renames),
-      [&](const RefactorLoc &Loc) -> RenameLoc {
-        return {Loc.Line, Loc.Column, Loc.Usage, OldName, IsFunctionLike};
-      });
+  llvm::transform(Locs, std::back_inserter(Renames),
+                  [&](const RefactorLoc &Loc) -> RenameLoc {
+                    return {Loc.Line, Loc.Column, Loc.Usage, OldName};
+                  });
   return Renames;
 }
 
@@ -451,8 +449,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::vector<RenameLoc> RenameLocs =
-        getRenameLocs(BufferID, SM, Start, options::OldName, NewName,
-                      options::IsFunctionLike.getNumOccurrences());
+        getRenameLocs(BufferID, SM, Start, options::OldName, NewName);
 
     if (options::Action != RefactoringKind::FindGlobalRenameRanges) {
       llvm_unreachable("unexpected refactoring kind");

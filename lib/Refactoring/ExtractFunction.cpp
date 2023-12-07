@@ -77,10 +77,8 @@ static SourceLoc getNewFuncInsertLoc(DeclContext *DC,
   return SourceLoc();
 }
 
-static std::vector<NoteRegion> getNotableRegions(StringRef SourceText,
-                                                 unsigned NameOffset,
-                                                 StringRef Name,
-                                                 bool IsFunctionLike = false) {
+static std::vector<NoteRegion>
+getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name) {
   auto InputBuffer =
       llvm::MemoryBuffer::getMemBufferCopy(SourceText, "<extract>");
 
@@ -106,8 +104,7 @@ static std::vector<NoteRegion> getNotableRegions(StringRef SourceText,
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
   RenameLoc RenameConfig = {LineAndCol.first, LineAndCol.second,
-                            NameUsage::Definition, /*OldName=*/Name,
-                            IsFunctionLike};
+                            RenameLocUsage::Definition, /*OldName=*/Name};
   std::vector<RenameRangeDetail> Ranges =
       getSyntacticRenameRangeDetails(SM, Name, Resolved.back(), RenameConfig)
           .Ranges;
@@ -290,13 +287,11 @@ bool RefactoringActionExtractFunction::performChange() {
 
   StringRef DeclStr(Buffer.begin() + FuncBegin, FuncEnd - FuncBegin);
   auto NotableFuncRegions =
-      getNotableRegions(DeclStr, FuncNameOffset, ExtractedFuncName,
-                        /*IsFunctionLike=*/true);
+      getNotableRegions(DeclStr, FuncNameOffset, ExtractedFuncName);
 
   StringRef CallStr(Buffer.begin() + ReplaceBegin, ReplaceEnd - ReplaceBegin);
   auto NotableCallRegions =
-      getNotableRegions(CallStr, CallNameOffset, ExtractedFuncName,
-                        /*IsFunctionLike=*/true);
+      getNotableRegions(CallStr, CallNameOffset, ExtractedFuncName);
 
   // Insert the new function's declaration.
   EditConsumer.accept(SM, InsertLoc, DeclStr, NotableFuncRegions);
