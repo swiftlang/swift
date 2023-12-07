@@ -1311,6 +1311,9 @@ BridgedTypeRepr BridgedSpecifierTypeRepr_createParsed(
   case BridgedAttributedTypeSpecifierIsolated: {
     return new (context) IsolatedTypeRepr(baseType, loc);
   }
+  case BridgedAttributedTypeSpecifierResultDependsOn: {
+    return new (context) ResultDependsOnTypeRepr(baseType, loc);
+  }
   }
 }
 

@@ -1535,6 +1535,7 @@ namespace  {
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(RawLayout)
+    UNINTERESTING_ATTR(ResultDependsOn)
     UNINTERESTING_ATTR(ResultDependsOnSelf)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)

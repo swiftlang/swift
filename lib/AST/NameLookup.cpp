@@ -3022,12 +3022,11 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
   case TypeReprKind::Pack:
-    return { };
-
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
   case TypeReprKind::Inverse:
+  case TypeReprKind::ResultDependsOn:
     return { };
 
   case TypeReprKind::Fixed:

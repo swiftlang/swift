@@ -1402,6 +1402,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+#ifndef NDEBUG
+  /// Enable round trip parsing via the new swift parser unless it is disabled
+  /// explicitly. The new Swift parser can have mismatches with C++ parser -
+  /// rdar://118013482 Use this flag to disable round trip through the new
+  /// Swift parser for such cases.
+  if (!Args.hasArg(OPT_disable_experimental_parser_round_trip)) {
+    Opts.Features.insert(Feature::ParserRoundTrip);
+    Opts.Features.insert(Feature::ParserValidation);
+  }
+#endif
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

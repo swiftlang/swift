@@ -156,12 +156,14 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (Tok.is(tok::kw_inout)
-      || (canHaveParameterSpecifierContextualKeyword()
-          && (Tok.getRawText().equals("__shared")
-              || Tok.getRawText().equals("__owned")
-              || Tok.getRawText().equals("consuming")
-              || Tok.getRawText().equals("borrowing")))) {
+  if (Tok.is(tok::kw_inout) ||
+      (canHaveParameterSpecifierContextualKeyword() &&
+       (Tok.getRawText().equals("__shared") ||
+        Tok.getRawText().equals("__owned") ||
+        Tok.getRawText().equals("consuming") ||
+        Tok.getRawText().equals("borrowing") ||
+        (Context.LangOpts.hasFeature(Feature::NonEscapableTypes) &&
+         Tok.getRawText().equals("resultDependsOn"))))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
@@ -408,9 +410,10 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   SourceLoc specifierLoc;
   SourceLoc isolatedLoc;
   SourceLoc constLoc;
+  SourceLoc resultDependsOnLoc;
   TypeAttributes attrs;
-  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc,
-                                   attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc,
+                                   constLoc, resultDependsOnLoc, attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;

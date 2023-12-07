@@ -3385,6 +3385,13 @@ public:
     printFoot();
   }
 
+  void visitResultDependsOnTypeRepr(ResultDependsOnTypeRepr *T,
+                                    StringRef label) {
+    printCommon("_resultDependsOn", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
   void visitOptionalTypeRepr(OptionalTypeRepr *T, StringRef label) {
     printCommon("type_optional", label);
     printRec(T->getBase());

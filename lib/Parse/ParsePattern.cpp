@@ -134,14 +134,14 @@ bool Parser::startsParameterName(bool isClosure) {
   if (nextTok.canBeArgumentLabel()) {
     // If the first name wasn't a contextual keyword, we're done.
     if (!Tok.isContextualKeyword("isolated") &&
-        !Tok.isContextualKeyword("some") &&
-        !Tok.isContextualKeyword("any") &&
+        !Tok.isContextualKeyword("some") && !Tok.isContextualKeyword("any") &&
         !Tok.isContextualKeyword("each") &&
         !Tok.isContextualKeyword("__shared") &&
         !Tok.isContextualKeyword("__owned") &&
         !Tok.isContextualKeyword("borrowing") &&
-        !Tok.isContextualKeyword("consuming") &&
-        !Tok.is(tok::kw_repeat))
+        !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
+        (!Context.LangOpts.hasFeature(Feature::NonEscapableTypes) ||
+         !Tok.isContextualKeyword("_resultDependsOn")))
       return true;
 
     // Parameter specifiers can be an argument label, but they're also
@@ -227,14 +227,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     {
       // ('inout' | '__shared' | '__owned' | isolated)?
       bool hasSpecifier = false;
-      while (Tok.is(tok::kw_inout)
-             || (canHaveParameterSpecifierContextualKeyword()
-                 && (Tok.isContextualKeyword("__shared")
-                     || Tok.isContextualKeyword("__owned")
-                     || Tok.isContextualKeyword("borrowing")
-                     || Tok.isContextualKeyword("consuming")
-                     || Tok.isContextualKeyword("isolated")
-                     || Tok.isContextualKeyword("_const")))) {
+      while (Tok.is(tok::kw_inout) ||
+             (canHaveParameterSpecifierContextualKeyword() &&
+              (Tok.isContextualKeyword("__shared") ||
+               Tok.isContextualKeyword("__owned") ||
+               Tok.isContextualKeyword("borrowing") ||
+               Tok.isContextualKeyword("consuming") ||
+               Tok.isContextualKeyword("isolated") ||
+               Tok.isContextualKeyword("_const") ||
+               (Context.LangOpts.hasFeature(Feature::NonEscapableTypes) &&
+                Tok.isContextualKeyword("_resultDependsOn"))))) {
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
@@ -545,6 +547,12 @@ mapParsedParameters(Parser &parser,
         type = new (parser.Context) CompileTimeConstTypeRepr(
             type, paramInfo.CompileConstLoc);
         param->setCompileTimeConst();
+      }
+
+      if (paramInfo.ResultDependsOnLoc.isValid()) {
+        type = new (parser.Context)
+            ResultDependsOnTypeRepr(type, paramInfo.ResultDependsOnLoc);
+        param->setResultDependsOn();
       }
 
       param->setTypeRepr(type);
