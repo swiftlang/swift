@@ -102,7 +102,7 @@ endif()
 set(compile_options
   ${c_include_paths_args}
   "SHELL: ${cxx_interop_flag}"
-  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
+  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT -Xcc -DSWIFT_TARGET"
 
   # FIXME: Needed to work around an availability issue with CxxStdlib
   "SHELL: -Xfrontend -disable-target-os-checking"
