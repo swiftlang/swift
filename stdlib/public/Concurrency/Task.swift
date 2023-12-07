@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // ==== Task -------------------------------------------------------------------
 
@@ -1061,6 +1060,9 @@ internal func _getGenericSerialExecutor() -> Builtin.Executor {
   // of expected size to the builtin executor type.
   unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
+
+@_extern(c, "exit")
+func exit(_: CInt) -> Never
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
