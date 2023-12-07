@@ -618,7 +618,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
       return true;
     }
   }
-  
+
   llvm::Optional<llvm::vfs::OutputFile> DWOFile;
   SWIFT_DEFER {
     if (!DWOFile)
@@ -628,14 +628,15 @@ bool swift::performLLVM(const IRGenOptions &Opts,
                    Opts.SplitDwarfOutput, toString(std::move(E)));
     }
   };
-  if (Opts.OutputKind == IRGenOutputKind::ObjectFile && !Opts.SplitDwarfOutput.empty()) {
+  if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
+      !Opts.SplitDwarfOutput.empty()) {
     // Try to open the output file.  Clobbering an existing file is fine.
     // Open in binary mode if we're doing binary output.
     llvm::vfs::OutputConfig Config;
-    if (auto Err =
-            Backend.createFile(Opts.SplitDwarfOutput, Config).moveInto(DWOFile)) {
+    if (auto Err = Backend.createFile(Opts.SplitDwarfOutput, Config)
+                       .moveInto(DWOFile)) {
       diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
-                    Opts.SplitDwarfOutput, toString(std::move(Err)));
+                   Opts.SplitDwarfOutput, toString(std::move(Err)));
       return true;
     }
   }
@@ -674,8 +675,7 @@ bool swift::compileAndWriteLLVM(
         targetMachine->getTargetIRAnalysis()));
 
     bool fail = targetMachine->addPassesToEmitFile(
-        EmitPasses, out, dwoOut, FileType,
-        !opts.Verify, nullptr, casid);
+        EmitPasses, out, dwoOut, FileType, !opts.Verify, nullptr, casid);
     if (fail) {
       diagnoseSync(diags, diagMutex, SourceLoc(),
                    diag::error_codegen_init_fail);
