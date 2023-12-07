@@ -3330,8 +3330,11 @@ void Driver::chooseModuleSplitDWARFOutputPath(Compilation &C,
                                               const TypeToPathMap *OutputMap,
                                               StringRef workingDirectory,
                                               CommandOutput *Output) const {
-  chooseModuleAuxiliaryOutputFilePath(C, OutputMap, workingDirectory, Output,
-                                      file_types::TY_SplitDwarfObjectFile);
+  SmallString<128> Path(Output->getPrimaryOutputFilename());
+  StringRef ext = file_types::getExtension(file_types::TY_SplitDwarfObjectFile);
+  llvm::sys::path::replace_extension(Path, ext);
+  assert(!C.isTemporaryFile(Path) && "Target dwo file must not be temporary");
+  Output->setAdditionalOutputForType(file_types::TY_SplitDwarfObjectFile, Path);
 }
 
 void Driver::chooseRemappingOutputPath(Compilation &C,

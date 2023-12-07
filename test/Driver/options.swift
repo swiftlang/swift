@@ -127,6 +127,10 @@
 // RUN: %swift_driver -### -g -dwarf-fission -o %t/dwarf-fission.o %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION %s
 // DWARF_FISSION: -split-dwarf-output {{.*}}/dwarf-fission.dwo
 
+// RUN: %swift_driver -### -g -dwarf-fission -emit-object -module-name test -output-file-map Inputs/fission-ofm.json Inputs/main.swift Inputs/lib.swift %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION_MULTI %s
+// DWARF_FISSION_MULTI: -primary-file main.swift {{.*}} -split-dwarf-output main.dwo {{.*}} -o main.o
+// DWARF_FISSION_MULTI: -primary-file lib.swift {{.*}} -split-dwarf-output lib.dwo {{.*}} -o lib.o
+
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
