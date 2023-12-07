@@ -1792,10 +1792,10 @@ DeclNameRef UnresolvedMacroReference::getMacroName() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getMacroName();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = attr->destructureMacroRef();
-    if (!member)
+    auto [_, macro] = attr->destructureMacroRef();
+    if (!macro)
       return DeclNameRef();
-    return member->getNameRef();
+    return macro->getNameRef();
   }
   llvm_unreachable("Unhandled case");
 }
@@ -1812,10 +1812,10 @@ DeclNameRef UnresolvedMacroReference::getModuleName() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getModuleName();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [base, _] = attr->destructureMacroRef();
-    if (!base)
+    auto [module, _] = attr->destructureMacroRef();
+    if (!module)
       return DeclNameRef();
-    return base->getNameRef();
+    return module->getNameRef();
   }
   llvm_unreachable("Unhandled case");
 }
@@ -1824,10 +1824,10 @@ DeclNameLoc UnresolvedMacroReference::getModuleNameLoc() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getModuleNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [base, _] = attr->destructureMacroRef();
-    if (!base)
+    auto [module, _] = attr->destructureMacroRef();
+    if (!module)
       return DeclNameLoc();
-    return base->getNameLoc();
+    return module->getNameLoc();
   }
   llvm_unreachable("Unhandled case");
 }
@@ -1836,10 +1836,10 @@ DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getMacroNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = attr->destructureMacroRef();
-    if (!member)
+    auto [_, macro] = attr->destructureMacroRef();
+    if (!macro)
       return DeclNameLoc();
-    return member->getNameLoc();
+    return macro->getNameLoc();
   }
   llvm_unreachable("Unhandled case");
 }
@@ -1849,10 +1849,10 @@ SourceRange UnresolvedMacroReference::getGenericArgsRange() const {
     return expansion->getGenericArgsRange();
 
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = attr->destructureMacroRef();
-    if (!member)
+    auto [_, macro] = attr->destructureMacroRef();
+    if (!macro)
       return SourceRange();
-    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(member);
+    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(macro);
     if (!genericTypeRepr)
       return SourceRange();
 
@@ -1867,10 +1867,10 @@ ArrayRef<TypeRepr *> UnresolvedMacroReference::getGenericArgs() const {
     return expansion->getGenericArgs();
 
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = attr->destructureMacroRef();
-    if (!member)
+    auto [_, macro] = attr->destructureMacroRef();
+    if (!macro)
       return {};
-    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(member);
+    auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(macro);
     if (!genericTypeRepr)
       return {};
 

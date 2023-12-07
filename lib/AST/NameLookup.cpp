@@ -3580,9 +3580,9 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.
-  auto [base, member] = attr->destructureMacroRef();
-  auto moduleName = (base) ? base->getNameRef() : DeclNameRef();
-  auto macroName = (member) ? member->getNameRef() : DeclNameRef();
+  auto [module, macro] = attr->destructureMacroRef();
+  auto moduleName = (module) ? module->getNameRef() : DeclNameRef();
+  auto macroName = (macro) ? macro->getNameRef() : DeclNameRef();
   auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
                                          getAttachedMacroRoles());
   if (!macros.empty())
