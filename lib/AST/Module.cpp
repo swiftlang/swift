@@ -1222,7 +1222,8 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
-  if (Kind != SourceFileKind::MacroExpansion)
+  if (Kind != SourceFileKind::MacroExpansion &&
+      Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
   auto genInfo =

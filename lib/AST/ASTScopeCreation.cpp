@@ -272,6 +272,14 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
 
     // Determine the parent source location based on the macro role.
     AbstractFunctionDecl *bodyForDecl = nullptr;
+
+    if (SF->Kind == SourceFileKind::DefaultArgument) {
+      auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
+          *SF->getBufferID());
+      parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
+      goto setParent;
+    }
+
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
@@ -301,6 +309,7 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     }
     }
 
+  setParent:
     if (auto parentScope = findStartingScopeForLookup(enclosingSF, parentLoc)) {
       if (bodyForDecl) {
         auto bodyScope = new (bodyForDecl->getASTContext()) FunctionBodyScope(bodyForDecl);

@@ -774,6 +774,7 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
 #include "swift/AST/MagicIdentifierKinds.def"
 
   case DefaultArgumentKind::ExpressionMacro: {
+    // FIXME: ApolloZhu serialize and deserialize expressions instead
     SmallString<128> scratch;
     const StringRef text = param->getDefaultValueStringRepresentation(scratch);
     SourceFile *defaultArgSourceFile =
