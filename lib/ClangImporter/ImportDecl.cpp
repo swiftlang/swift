@@ -2828,13 +2828,24 @@ namespace {
       }
 
       if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
-        addExplicitProtocolConformances(ntd);
+        addExplicitProtocolConformances(ntd, decl);
 
       return result;
     }
 
-    void addExplicitProtocolConformances(NominalTypeDecl *decl) {
-      auto clangDecl = decl->getClangDecl();
+    void
+    addExplicitProtocolConformances(NominalTypeDecl *decl,
+                                    const clang::CXXRecordDecl *clangDecl) {
+      if (Impl.isCxxInteropCompatVersionAtLeast(
+              version::getUpcomingCxxInteropCompatVersion())) {
+        // Propagate conforms_to attribute from public base classes.
+        for (auto base : clangDecl->bases()) {
+          if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+            continue;
+          if (auto *baseClangDecl = base.getType()->getAsCXXRecordDecl())
+            addExplicitProtocolConformances(decl, baseClangDecl);
+        }
+      }
 
       if (!clangDecl->hasAttrs())
         return;
