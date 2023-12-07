@@ -654,7 +654,11 @@ def disable_experimental_string_processing :
 
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference via type witness systems">;
+  HelpText<"Enable experimental associated type inference improvements">;
+
+def disable_experimental_associated_type_inference :
+  Flag<["-"], "disable-experimental-associated-type-inference">,
+  HelpText<"Disable experimental associated type inference improvements">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,

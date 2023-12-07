@@ -1374,7 +1374,7 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   // not resolve otherwise.
   llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
 
-  if (ctx.LangOpts.hasFeature(Feature::TypeWitnessSystemInference)) {
+  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
     TypeWitnessSystem system(unresolvedAssocTypes);
     collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
 

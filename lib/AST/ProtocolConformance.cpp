@@ -548,7 +548,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   forEachAssociatedConformance(
       [&](Type t, ProtocolDecl *p, unsigned index) {
         if (t->isEqual(assocType) && p == protocol) {
-          if (!ctx.LangOpts.hasFeature(Feature::TypeWitnessSystemInference)) {
+          if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
             // Fill in the signature conformances, if we haven't done so yet.
             if (!hasComputedAssociatedConformances()) {
               const_cast<NormalProtocolConformance *>(this)

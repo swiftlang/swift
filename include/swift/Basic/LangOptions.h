@@ -585,6 +585,9 @@ namespace swift {
     /// Enable warnings for redundant requirements in generic signatures.
     bool WarnRedundantRequirements = false;
 
+    /// Enable experimental associated type inference improvements.
+    bool EnableExperimentalAssociatedTypeInference = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 

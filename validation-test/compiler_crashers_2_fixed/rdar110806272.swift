@@ -1,5 +1,7 @@
 // RUN: not %target-swift-frontend -typecheck %s -enable-experimental-associated-type-inference
 
+// This code is invalid, but we shouldn't crash.
+
 struct SyntaxCollectionIterator<E: SyntaxProtocol>: IteratorProtocol {
   typealias Element = E
 }
