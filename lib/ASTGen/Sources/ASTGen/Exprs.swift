@@ -12,7 +12,7 @@
 
 import ASTBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 /// Check if an `ExprSyntax` can be generated using ASTGen.
 ///
@@ -292,12 +292,12 @@ extension ASTGenVisitor {
 
   private func createDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc) {
     let baseName: BridgedDeclBaseName
-    switch node.baseName.tokenKind {
-    case .keyword(.`init`):
+    switch node.baseName.keywordKind {
+    case .`init`:
       baseName = .createConstructor()
-    case .keyword(.deinit):
+    case .deinit:
       baseName = .createDestructor()
-    case .keyword(.subscript):
+    case .subscript:
       baseName = .createSubscript()
     default:
       baseName = .createIdentifier(self.generateIdentifier(node.baseName))
@@ -480,14 +480,14 @@ extension ASTGenVisitor {
         asLoc: asLoc,
         type: type
       ).asExpr
-    case let question? where question.text == "?":
+    case let question? where question.rawTokenKind == .postfixQuestionMark:
       return BridgedConditionalCheckedCastExpr.createParsed(
         self.ctx,
         asLoc: asLoc,
         questionLoc: self.generateSourceLoc(question),
         type: type
       ).asExpr
-    case let exclaim? where exclaim.text == "!":
+    case let exclaim? where exclaim.rawTokenKind == .exclamationMark:
       return BridgedForcedCheckedCastExpr.createParsed(
         self.ctx,
         asLoc: asLoc,

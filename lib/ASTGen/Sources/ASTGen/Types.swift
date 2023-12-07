@@ -106,7 +106,7 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(node.name)
 
     // If this is the bare 'Any' keyword, produce an empty composition type.
-    if node.name.rawText == "Any" && node.genericArgumentClause == nil {
+    if node.name.keywordKind == .Any && node.genericArgumentClause == nil {
       return BridgedCompositionTypeRepr.createEmpty(self.ctx, anyKeywordLoc: loc)
     }
 
@@ -203,14 +203,14 @@ extension ASTGenVisitor {
   func generate(metatypeType node: MetatypeTypeSyntax) -> BridgedTypeRepr {
     let baseType = generate(type: node.baseType)
     let tyLoc = self.generateSourceLoc(node.metatypeSpecifier)
-    if node.metatypeSpecifier.rawText == "Type" {
+    if node.metatypeSpecifier.keywordKind == .Type {
       return BridgedMetatypeTypeRepr.createParsed(
         self.ctx,
         base: baseType,
         typeKeywordLoc: tyLoc
       )
     } else {
-      assert(node.metatypeSpecifier.rawText == "Protocol")
+      assert(node.metatypeSpecifier.keywordKind == .Protocol)
       return BridgedProtocolTypeRepr.createParsed(
         self.ctx,
         base: baseType,
@@ -298,14 +298,14 @@ extension ASTGenVisitor {
   func generate(someOrAnyType node: SomeOrAnyTypeSyntax) -> BridgedTypeRepr {
     let someOrAnyLoc = self.generateSourceLoc(node.someOrAnySpecifier)
     let baseTy = generate(type: node.constraint)
-    if node.someOrAnySpecifier.rawText == "some" {
+    if node.someOrAnySpecifier.keywordKind == .some {
       return BridgedOpaqueReturnTypeRepr.createParsed(
         self.ctx,
         someKeywordLoc: someOrAnyLoc,
         base: baseTy
       )
     } else {
-      assert(node.someOrAnySpecifier.text == "any")
+      assert(node.someOrAnySpecifier.keywordKind == .any)
       return BridgedExistentialTypeRepr.createParsed(
         self.ctx,
         anyKeywordLoc: someOrAnyLoc,
@@ -320,16 +320,16 @@ extension ASTGenVisitor {
 // MARK: - SpecifierTypeRepr/AttributedTypeRepr
 
 extension BridgedAttributedTypeSpecifier {
-  fileprivate init?(from tokenKind: TokenKind) {
-    switch tokenKind {
-    case .keyword(.inout): self = .inOut
-    case .keyword(.borrowing): self = .borrowing
-    case .keyword(.consuming): self = .consuming
-    case .keyword(.__shared): self = .legacyShared
-    case .keyword(.__owned): self = .legacyOwned
-    case .keyword(._const): self = .const
-    case .keyword(.isolated): self = .isolated
-    case .keyword(._resultDependsOn): self = .resultDependsOn
+  fileprivate init?(from keyword: Keyword?) {
+    switch keyword {
+    case .inout: self = .inOut
+    case .borrowing: self = .borrowing
+    case .consuming: self = .consuming
+    case .__shared: self = .legacyShared
+    case .__owned: self = .legacyOwned
+    case ._const: self = .const
+    case .isolated: self = .isolated
+    case ._resultDependsOn: self = .resultDependsOn
     default: return nil
     }
   }
@@ -341,7 +341,7 @@ extension ASTGenVisitor {
 
     // Handle specifiers.
     if let specifier = node.specifier {
-      if let kind = BridgedAttributedTypeSpecifier(from: specifier.tokenKind) {
+      if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
         type = BridgedSpecifierTypeRepr.createParsed(
           self.ctx,
           base: type,

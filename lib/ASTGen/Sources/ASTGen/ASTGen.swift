@@ -137,11 +137,10 @@ extension ASTGenVisitor {
   /// escaped identifier, backticks are stripped.
   @inline(__always)
   func generateIdentifier(_ token: TokenSyntax) -> BridgedIdentifier {
-    var text = token.rawText
-    // FIXME: Maybe `TokenSyntax.tokenView.rawKind == .wildcard`, or expose it as `.rawTokenKind`.
-    if text == "_" {
+    if token.rawTokenKind == .wildcard {
       return nil
     }
+    var text = token.rawText
     if text.count > 2 && text.hasPrefix("`") && text.hasSuffix("`") {
       text = .init(rebasing: text.dropFirst().dropLast())
     }
@@ -379,6 +378,24 @@ extension Optional where Wrapped: LazyCollectionProtocol {
     }
 
     return self.bridgedArray(in: astgen)
+  }
+}
+
+extension TokenSyntax {
+  /// Get `Keyword` kind if the token is a keyword.
+  var keywordKind: Keyword? {
+    // Performance note:
+    // This is faster than `token.tokenKind == .keyword(.true)` because
+    // `TokenKind.tokenKind` may instantiate `Swift.String`.
+    // That being said, `SwiftSyntax.Keyword` is a non-SPI public type, so it
+    // cannot be `@frozen`. Also `Keyword(_:SyntaxText)` itself is heavier than
+    // simple `token.rawText == "true"`.
+    // We should ensure `token.keywordKind == .true` is optimized out to
+    // a simple `cmp` instruction.
+    guard rawTokenKind == .keyword else {
+      return nil
+    }
+    return Keyword(self.rawText)
   }
 }
 
