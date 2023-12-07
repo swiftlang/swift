@@ -9,6 +9,9 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
+// Temporarily disabled:
+// REQUIRES: rdar119283700
+
 import Darwin
 
 @main

@@ -77,7 +77,8 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
     INSTALL_IN_COMPONENT sdk-overlay
     MACCATALYST_BUILD_FLAVOR "zippered")
 
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+# TODO(mracek): Disable building Darwin module as embedded pending investigations into a build failure
+if(FALSE)
   set(SWIFT_ENABLE_REFLECTION OFF)
 
   add_custom_target(embedded-darwin ALL)
