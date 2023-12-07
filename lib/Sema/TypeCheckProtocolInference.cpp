@@ -1294,8 +1294,17 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
       if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer()))
         type = aliasTy->getSinglyDesugaredType();
 
-      return type->hasArchetype() ? type->mapTypeOutOfContext().getPointer()
-                                  : type.getPointer();
+      if (type->hasArchetype()) {
+        type = type.transformRec([&](Type t) -> llvm::Optional<Type> {
+          if (auto *archetypeTy = dyn_cast<ArchetypeType>(t.getPointer())) {
+            if (!isa<OpaqueTypeArchetypeType>(archetypeTy))
+              return archetypeTy->getInterfaceType();
+          }
+          return llvm::None;
+        });
+      }
+
+      return type.getPointer();
     };
   return options;
 }
