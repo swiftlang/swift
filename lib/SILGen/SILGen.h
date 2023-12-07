@@ -587,7 +587,7 @@ public:
   FuncDecl *getGetMainExecutor();
   /// Retrieve the _Concurrency._swiftJobRun intrinsic.
   FuncDecl *getSwiftJobRun();
-  // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
+  // Retrieve the _Concurrency.exit intrinsic.
   FuncDecl *getExit();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,

@@ -2153,7 +2153,8 @@ bool IsCCompatibleFuncDeclRequest::evaluate(Evaluator &evaluator,
 
   // --- Check for unsupported result types.
   Type resultTy = FD->getResultInterfaceType();
-  if (!resultTy->isVoid() && !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+  if (!resultTy->isVoid() && !resultTy->isNever() &&
+      !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
     FD->diagnose(diag::c_func_unsupported_type, resultTy);
     foundError = true;
   }

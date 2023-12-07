@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)

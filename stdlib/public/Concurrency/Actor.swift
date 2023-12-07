@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 /// Common marker protocol providing a shared "base" for both (local) `Actor`
 /// and (potentially remote) `DistributedActor` types.

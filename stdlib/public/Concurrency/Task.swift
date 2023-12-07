@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // ==== Task -------------------------------------------------------------------
 
@@ -1029,6 +1028,9 @@ internal func _asyncMainDrainQueue() -> Never
 @usableFromInline
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
+
+@_extern(c, "exit")
+func exit(_: CInt) -> Never
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
