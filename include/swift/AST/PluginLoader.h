@@ -86,6 +86,9 @@ public:
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
   LoadedExecutablePlugin *loadExecutablePlugin(llvm::StringRef path);
+
+  /// Add the specified path to the dependency tracker if needed.
+  void recordDependency(StringRef path);
 };
 
 } // namespace swift

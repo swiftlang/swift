@@ -168,8 +168,7 @@ LoadedLibraryPlugin *PluginLoader::loadLibraryPlugin(StringRef path) {
   }
 
   // Track the dependency.
-  if (DepTracker)
-    DepTracker->addDependency(resolvedPath, /*IsSystem=*/false);
+  recordDependency(path);
 
   // Load the plugin.
   auto plugin = getRegistry()->loadLibraryPlugin(resolvedPath);
@@ -192,8 +191,7 @@ LoadedExecutablePlugin *PluginLoader::loadExecutablePlugin(StringRef path) {
   }
 
   // Track the dependency.
-  if (DepTracker)
-    DepTracker->addDependency(resolvedPath, /*IsSystem=*/false);
+  recordDependency(path);
 
   // Load the plugin.
   auto plugin =
@@ -205,4 +203,9 @@ LoadedExecutablePlugin *PluginLoader::loadExecutablePlugin(StringRef path) {
   }
 
   return plugin.get();
+}
+
+void PluginLoader::recordDependency(StringRef path) {
+  if (DepTracker)
+    DepTracker->addDependency(path, /*IsSystem=*/false);
 }
