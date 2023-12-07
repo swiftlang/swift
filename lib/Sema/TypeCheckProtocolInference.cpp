@@ -1126,6 +1126,8 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
 }
 
 Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
+  auto substOptions = getSubstOptionsWithCurrentTypeWitnesses();
+
   // Local function that folds dependent member types with non-dependent
   // bases into actual member references.
   std::function<Type(Type)> foldDependentMemberTypes;
@@ -1148,7 +1150,8 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
       auto *module = dc->getParentModule();
 
       // Try to substitute into the base type.
-      Type result = depMemTy->substBaseType(module, baseTy);
+      Type result = depMemTy->substBaseType(
+          baseTy, LookUpConformanceInModule(module), substOptions);
       if (!result->hasError())
         return result;
 
