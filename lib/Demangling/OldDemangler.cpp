@@ -1664,6 +1664,11 @@ private:
         if (!demangleNatural(size, depth + 1))
           return nullptr;
         name = "m";
+      } else if (Mangled.nextIf('S')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size, depth + 1))
+          return nullptr;
+        name = "S";
       } else {
         return nullptr;
       }

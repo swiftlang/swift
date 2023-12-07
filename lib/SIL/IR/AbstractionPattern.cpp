@@ -2239,6 +2239,7 @@ public:
       case LayoutConstraintKind::RefCountedObject:
       case LayoutConstraintKind::TrivialOfAtMostSize:
       case LayoutConstraintKind::BridgeObject:
+      case LayoutConstraintKind::TrivialStride:
         break;
       
       case LayoutConstraintKind::UnknownLayout:

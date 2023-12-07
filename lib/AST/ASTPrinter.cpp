@@ -7687,6 +7687,7 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
     return; // non-parameterized cases
   case LayoutConstraintKind::TrivialOfAtMostSize:
   case LayoutConstraintKind::TrivialOfExactSize:
+  case LayoutConstraintKind::TrivialStride:
     Printer << "(";
     Printer << SizeInBits;
     if (Alignment)

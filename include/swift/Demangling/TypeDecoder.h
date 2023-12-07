@@ -430,6 +430,7 @@ void decodeRequirement(NodePointer node,
               .Case("B", LayoutConstraintKind::BridgeObject)
               .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
               .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
+              .Case("S", LayoutConstraintKind::TrivialStride)
               .Default(llvm::None);
 
       if (!kind)
@@ -438,7 +439,8 @@ void decodeRequirement(NodePointer node,
       BuiltLayoutConstraint layout;
 
       if (kind != LayoutConstraintKind::TrivialOfExactSize &&
-          kind != LayoutConstraintKind::TrivialOfAtMostSize) {
+          kind != LayoutConstraintKind::TrivialOfAtMostSize &&
+          kind != LayoutConstraintKind::TrivialStride) {
         layout = Builder.getLayoutConstraint(*kind);
       } else {
         auto size = child->getChild(2)->getIndex();

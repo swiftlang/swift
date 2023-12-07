@@ -1185,6 +1185,7 @@ getActualLayoutConstraintKind(uint64_t rawKind) {
   CASE(NativeClass)
   CASE(UnknownLayout)
   CASE(BridgeObject)
+  CASE(TrivialStride)
   }
 #undef CASE
 
@@ -1244,7 +1245,8 @@ llvm::Error ModuleFile::deserializeGenericRequirementsChecked(
       ASTContext &ctx = getContext();
       LayoutConstraint layout;
       if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
-          kind != LayoutConstraintKind::TrivialOfExactSize)
+          kind != LayoutConstraintKind::TrivialOfExactSize &&
+          kind != LayoutConstraintKind::TrivialStride)
         layout = LayoutConstraint::getLayoutConstraint(kind, ctx);
       else
         layout =

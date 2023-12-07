@@ -114,6 +114,8 @@ class LayoutConstraintInfo
 
   bool isBridgeObject() const { return isBridgeObject(Kind); }
 
+  bool isTrivialStride() const { return isTrivialStride(Kind); }
+
   unsigned getTrivialSizeInBytes() const {
     assert(isKnownSizeTrivial());
     return (SizeInBits + 7) / 8;
@@ -153,6 +155,11 @@ class LayoutConstraintInfo
 
     // Otherwise assume the alignment of 8 bytes.
     return 8*8;
+  }
+
+  unsigned getTrivialStrideInBits() const {
+    assert(isTrivialStride());
+    return SizeInBits;
   }
 
   operator bool() const {
@@ -203,6 +210,8 @@ class LayoutConstraintInfo
   static bool isNativeRefCounted(LayoutConstraintKind Kind);
 
   static bool isBridgeObject(LayoutConstraintKind Kind);
+
+  static bool isTrivialStride(LayoutConstraintKind Kind);
 
   /// Uniquing for the LayoutConstraintInfo.
   void Profile(llvm::FoldingSetNodeID &ID) {

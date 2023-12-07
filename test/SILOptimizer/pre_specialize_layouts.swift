@@ -36,6 +36,11 @@ public struct TwoInt32 {
   let y: Int32 = 0
 }
 
+public struct Stride128 {
+  let x: Int64 = 0
+  let y: Bool = false
+}
+
 // Make sure we generate the public pre-specialized entry points.
 
 // OPT-DAG: sil @$s22pre_specialize_layouts10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
@@ -78,8 +83,8 @@ internal func testEmitIntoClient<T>(t: T) {
   print(t)
 }
 
-// OPT: sil @$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overaligned5arrayyAA016ReferenceWrapperI0V_AA011OveralignedlmI0VSaySiGtF : $@convention(thin) (@guaranteed ReferenceWrapperStruct, @guaranteed OveralignedReferenceWrapperStruct, @guaranteed Array<Int>) -> () {
-// OPT: bb0([[P1:%.*]] : $ReferenceWrapperStruct, [[P2:%.*]] : $OveralignedReferenceWrapperStruct, [[P3:%.*]] : $Array<Int>):
+// OPT: sil @$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overaligned5array9stride128yAA016ReferenceWrapperI0V_AA011OveralignedmnI0VSaySiGAA9Stride128VtF : $@convention(thin) (@guaranteed ReferenceWrapperStruct, @guaranteed OveralignedReferenceWrapperStruct, @guaranteed Array<Int>, Stride128) -> () {
+// OPT: bb0([[P1:%.*]] : $ReferenceWrapperStruct, [[P2:%.*]] : $OveralignedReferenceWrapperStruct, [[P3:%.*]] : $Array<Int>, [[P4:%.*]] : $Stride128):
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFSi_Ts5 : $@convention(thin) (Int) -> ()
 // OPT:   apply [[F1]]
 // OPT:   [[F2:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
@@ -101,13 +106,16 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT-macosx: [[F8:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFBb_Ts5 : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
 // OPT-macosx: [[A4:%.*]] = unchecked_bitwise_cast [[P3]] : $Array<Int> to $Builtin.BridgeObject
 // OPT-macosx: apply [[F8]]([[A4]]) : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
+// OPT:   [[F10:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFBi128__Ts5 : $@convention(thin) (Builtin.Int128) -> ()
+// OPT:   [[A6:%.*]] = unchecked_trivial_bit_cast [[P4]] : $Stride128 to $Builtin.Int128
+// OPT:   apply [[F10]]([[A6]]) : $@convention(thin) (Builtin.Int128) -> ()
 // OPT:   [[F3:%.*]] = function_ref @$s30pre_specialized_module_layouts36internalEmitIntoClientPrespecializedyyxlFSi_Ts5 : $@convention(thin) (Int) -> ()
 // OPT:   apply [[F3]]
 // OPT:   [[F4:%.*]] = function_ref @$s30pre_specialized_module_layouts36internalEmitIntoClientPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
 // OPT:   apply [[F4]]
 // OPT:   [[F5:%.*]] = function_ref @$s30pre_specialized_module_layouts16useInternalThingyyxlFSi_Tg5
 // OPT:   apply [[F5]]({{.*}}) : $@convention(thin) (Int) -> ()
-// OPT: } // end sil function '$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overaligned5arrayyAA016ReferenceWrapperI0V_AA011OveralignedlmI0VSaySiGtF'
+// OPT: } // end sil function '$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overaligned5array9stride128yAA016ReferenceWrapperI0V_AA011OveralignedmnI0VSaySiGAA9Stride128VtF'
 
 // OPT: sil {{.*}} @$s30pre_specialized_module_layouts16useInternalThingyyxlFSi_Tg5 : $@convention(thin) (Int) -> () {
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts14InternalThing2V7computexyFSi_Ts5 : $@convention(method) (InternalThing2<Int>) -> Int
@@ -152,7 +160,7 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   [[R10:%.*]] = unchecked_addr_cast [[R9]] : $*AnyObject to $*SomeClass
 // OPT: } // end sil function '$s30pre_specialized_module_layouts16useInternalThingyyxlFAA9SomeClassC_Tg5'
 
-public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct, array: [Int]) {
+public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct, array: [Int], stride128: Stride128) {
   publicPrespecialized(1)
   publicPrespecialized(1.0)
   publicPrespecialized(UInt64(1))
@@ -163,6 +171,7 @@ public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, 
   // should not apply _Class specialization for overaligned struct
   publicPrespecialized(overaligned)
   publicPrespecialized(array)
+  publicPrespecialized(stride128)
   useInternalEmitIntoClientPrespecialized(2)
   useInternalEmitIntoClientPrespecialized(2.0)
   useInternalThing(2)

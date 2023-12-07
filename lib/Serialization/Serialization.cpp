@@ -1480,6 +1480,8 @@ void Serializer::serializeGenericRequirements(
       if (layout->isKnownSizeTrivial()) {
         size = layout->getTrivialSizeInBits();
         alignment = layout->getAlignmentInBits();
+      } else if (layout->isTrivialStride()) {
+        size = layout->getTrivialStrideInBits();
       }
       LayoutRequirementKind rawKind = LayoutRequirementKind::UnknownLayout;
       switch (layout->getKind()) {
@@ -1509,6 +1511,9 @@ void Serializer::serializeGenericRequirements(
         break;
       case LayoutConstraintKind::BridgeObject:
         rawKind = LayoutRequirementKind::BridgeObject;
+        break;
+      case LayoutConstraintKind::TrivialStride:
+        rawKind = LayoutRequirementKind::TrivialStride;
         break;
       }
       scratch.push_back(rawKind);
