@@ -26,11 +26,25 @@ internal func internalFunc() {}
 // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test022internalFuncWithNestedC0yyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF
 internal func internalFuncWithNestedFunc() {
+  defer { internalFunc() }
   func nested() {}
   nested()
+  let _: () -> () = {
+    defer { internalFunc() }
+    internalFunc()
+  }()
 }
+// CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyF6$deferL_yyF : $@convention(thin) () -> () {
+// CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF6$deferL_yyF
+
 // CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyF6nestedL_yyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF6nestedL_yyF
+
+// CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyFyycyXEfU_ : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
+// CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyFyycyXEfU_
+
+// CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyFyycyXEfU_6$deferL_yyF : $@convention(thin) () -> () {
+// CHECK-SKIP-NOT: @$s4Test022internalFuncWithNestedC0yyFyycyXEfU_6$deferL_yyF
 
 // CHECK: sil{{.*}} @$s4Test10publicFuncyyF : $@convention(thin) () -> () {
 public func publicFunc() {}
@@ -66,9 +80,15 @@ public var publicGlobalVar = 1
   defer { publicFunc() }
   func nested() {}
   nested()
+  let _: () -> () = {
+    defer { publicFunc() }
+    publicFunc()
+  }()
 }
 // CHECK: sil shared [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF6$deferL_yyF : $@convention(thin) () -> () {
 // CHECK: sil shared [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF6nestedL_yyF : $@convention(thin) () -> () {
+// CHECK: sil shared [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyFyycyXEfU_ : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
+// CHECK: sil shared [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyFyycyXEfU_6$deferL_yyF : $@convention(thin) () -> () {
 
 private class PrivateClass {
   // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_CFB3F9DC47F5EF9E1D08B58758351A08LLCfd : $@convention(method) (@guaranteed PrivateClass) -> @owned Builtin.NativeObject {
