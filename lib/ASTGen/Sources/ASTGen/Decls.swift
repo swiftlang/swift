@@ -13,7 +13,7 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 // MARK: - TypeDecl
 
@@ -293,7 +293,7 @@ extension ASTGenVisitor {
     let initializer = generate(initializerClause: node.bindings.first!.initializer!)
 
     let isStatic = false  // TODO: compute this
-    let isLet = node.bindingSpecifier.tokenKind == .keyword(.let)
+    let isLet = node.bindingSpecifier.keywordKind == .let
 
     return .createParsed(
       self.ctx,
@@ -347,7 +347,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       initKeywordLoc: self.generateSourceLoc(node.initKeyword),
       failabilityMarkLoc: self.generateSourceLoc(node.optionalMark),
-      isIUO: node.optionalMark?.tokenKind == .exclamationMark,
+      isIUO: node.optionalMark?.rawTokenKind == .exclamationMark,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.signature.parameterClause),
       asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
@@ -385,11 +385,11 @@ extension ASTGenVisitor {
 // MARK: - OperatorDecl
 
 extension BridgedOperatorFixity {
-  fileprivate init?(from tokenKind: TokenKind) {
-    switch tokenKind {
-    case .keyword(.infix): self = .infix
-    case .keyword(.prefix): self = .prefix
-    case .keyword(.postfix): self = .postfix
+  fileprivate init?(from keyword: Keyword?) {
+    switch keyword {
+    case .infix: self = .infix
+    case .prefix: self = .prefix
+    case .postfix: self = .postfix
     default: return nil
     }
   }
@@ -402,7 +402,7 @@ extension ASTGenVisitor {
         self.generateIdentifierAndSourceLoc(node.operatorPrecedenceAndTypes?.precedenceGroup)
 
     let fixity: BridgedOperatorFixity
-    if let value = BridgedOperatorFixity(from: node.fixitySpecifier.tokenKind) {
+    if let value = BridgedOperatorFixity(from: node.fixitySpecifier.keywordKind) {
       fixity = value
     } else {
       fixity = .infix
@@ -428,11 +428,11 @@ extension ASTGenVisitor {
 // MARK: - PrecedenceGroupDecl
 
 extension BridgedAssociativity {
-  fileprivate init?(from tokenKind: TokenKind) {
-    switch tokenKind {
-    case .keyword(.none): self = .none
-    case .keyword(.left): self = .left
-    case .keyword(.right): self = .right
+  fileprivate init?(from keyword: Keyword?) {
+    switch keyword {
+    case .none?: self = .none
+    case .left?: self = .left
+    case .right?: self = .right
     default: return nil
     }
   }
@@ -459,14 +459,14 @@ extension ASTGenVisitor {
       switch element {
       case .precedenceGroupRelation(let relation):
         let keyword = relation.higherThanOrLowerThanLabel
-        switch keyword.tokenKind {
-        case .keyword(.higherThan):
+        switch keyword.keywordKind {
+        case .higherThan:
           if let current = body.higherThanRelation {
             diagnoseDuplicateSyntax(relation, original: current)
           } else {
             body.higherThanRelation = relation
           }
-        case .keyword(.lowerThan):
+        case .lowerThan:
           if let current = body.lowerThanRelation {
             diagnoseDuplicateSyntax(relation, original: current)
           } else {
@@ -492,7 +492,7 @@ extension ASTGenVisitor {
 
     let associativityValue: BridgedAssociativity
     if let token = body.associativity?.value {
-      if let value = BridgedAssociativity(from: token.tokenKind) {
+      if let value = BridgedAssociativity(from: token.keywordKind) {
         associativityValue = value
       } else {
         self.diagnose(Diagnostic(node: token, message: UnexpectedTokenKindError(token: token)))
@@ -504,7 +504,7 @@ extension ASTGenVisitor {
 
     let assignmentValue: Bool
     if let token = body.assignment?.value {
-      if token.tokenKind == .keyword(.true) {
+      if token.keywordKind == .true {
         assignmentValue = true
       } else {
         self.diagnose(Diagnostic(node: token, message: UnexpectedTokenKindError(token: token)))
@@ -538,15 +538,15 @@ extension ASTGenVisitor {
 // MARK: - ImportDecl
 
 extension BridgedImportKind {
-  fileprivate init?(from tokenKind: TokenKind) {
-    switch tokenKind {
-    case .keyword(.typealias): self = .type
-    case .keyword(.struct): self = .struct
-    case .keyword(.class): self = .class
-    case .keyword(.enum): self = .enum
-    case .keyword(.protocol): self = .protocol
-    case .keyword(.var), .keyword(.let): self = .var
-    case .keyword(.func): self = .func
+  fileprivate init?(from keyword: Keyword?) {
+    switch keyword {
+    case .typealias: self = .type
+    case .struct: self = .struct
+    case .class: self = .class
+    case .enum: self = .enum
+    case .protocol: self = .protocol
+    case .var, .let: self = .var
+    case .func: self = .func
     default: return nil
     }
   }
@@ -556,7 +556,7 @@ extension ASTGenVisitor {
   func generate(importDecl node: ImportDeclSyntax) -> BridgedImportDecl {
     let importKind: BridgedImportKind
     if let specifier = node.importKindSpecifier {
-      if let value = BridgedImportKind(from: specifier.tokenKind) {
+      if let value = BridgedImportKind(from: specifier.keywordKind) {
         importKind = value
       } else {
         self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))

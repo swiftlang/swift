@@ -39,7 +39,7 @@ extension ASTGenVisitor {
   }
 
   func generate(booleanLiteralExpr node: BooleanLiteralExprSyntax) -> BridgedBooleanLiteralExpr {
-    let value = node.literal.tokenKind == .keyword(.true)
+    let value = node.literal.keywordKind == .true
     return .createParsed(
       ctx,
       value: value,
