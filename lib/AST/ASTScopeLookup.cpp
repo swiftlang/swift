@@ -724,6 +724,13 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
       return caught.first;
     }
 
+    // If this is a try scope for a try! or try?, it catches the error.
+    if (auto tryScope = dyn_cast<TryScope>(scope)) {
+      if (isa<ForceTryExpr>(tryScope->expr) ||
+          isa<OptionalTryExpr>(tryScope->expr))
+        return tryScope->expr;
+    }
+
     innerBodyScope = dyn_cast<BraceStmtScope>(scope);
   }
 

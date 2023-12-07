@@ -408,3 +408,8 @@ SourceLoc ast_scope::extractNearestSourceLoc(
   const ASTScopeImpl *scope = std::get<0>(scopeAndCreator);
   return scope->getSourceRangeOfThisASTNode().Start;
 }
+
+SourceRange TryScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return expr->getSourceRange();
+}

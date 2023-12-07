@@ -11701,14 +11701,34 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
     return llvm::None;
   }
 
-  auto doCatch = get<DoCatchStmt *>();
-  if (auto thrownError = doCatch->getCaughtErrorType(dc)) {
-    if (thrownError->isNever())
-      return llvm::None;
+  if (auto doCatch = dyn_cast<DoCatchStmt *>()) {
+    if (auto thrownError = doCatch->getCaughtErrorType(dc)) {
+      if (thrownError->isNever())
+        return llvm::None;
 
-    return thrownError;
+      return thrownError;
+    }
+
+    // If we haven't computed the error type yet, return 'any Error'.
+    return dc->getASTContext().getErrorExistentialType();
   }
 
-  // If we haven't computed the error type yet, do so now.
-  return dc->getASTContext().getErrorExistentialType();
+  auto tryExpr = get<AnyTryExpr *>();
+  if (auto forceTry = llvm::dyn_cast<ForceTryExpr>(tryExpr)) {
+    if (auto thrownError = forceTry->getThrownError())
+      return thrownError;
+
+    // If we haven't computed the error type yet, return 'any Error'.
+    return dc->getASTContext().getErrorExistentialType();
+  }
+
+  if (auto optTry = llvm::dyn_cast<OptionalTryExpr>(tryExpr)) {
+    if (auto thrownError = optTry->getThrownError())
+      return thrownError;
+
+    // If we haven't computed the error type yet, return 'any Error'.
+    return dc->getASTContext().getErrorExistentialType();
+  }
+
+  llvm_unreachable("Unhandled catch node kind");
 }

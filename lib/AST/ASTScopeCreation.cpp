@@ -100,8 +100,8 @@ public:
     ASTScopeAssert(expr,
                  "If looking for closures, must have an expression to search.");
 
-    /// AST walker that finds nested scopes in expressions. This handles both
-    /// closures and if/switch expressions.
+    /// AST walker that finds nested scopes in expressions. This handles
+    /// closures, if/switch expressions, and try/try!/try? expressions.
     class NestedExprScopeFinder : public ASTWalker {
       ScopeCreator &scopeCreator;
       ASTScopeImpl *parent;
@@ -130,6 +130,13 @@ public:
           scopeCreator.addToScopeTree(SVE->getStmt(), parent);
           return Action::SkipChildren(E);
         }
+
+        // If we have a try/try!/try?, we need to add a scope for it
+        if (auto anyTry = dyn_cast<AnyTryExpr>(E)) {
+          scopeCreator.constructExpandAndInsert<TryScope>(parent, anyTry);
+          return Action::SkipChildren(E);
+        }
+
         return Action::Continue(E);
       }
       PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -762,6 +769,7 @@ NO_NEW_INSERTION_POINT(MacroDefinitionScope)
 NO_NEW_INSERTION_POINT(MacroExpansionDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
+NO_NEW_INSERTION_POINT(TryScope)
 
 NO_EXPANSION(GenericParamScope)
 NO_EXPANSION(SpecializeAttributeScope)
@@ -1370,6 +1378,11 @@ NullablePtr<ASTScopeImpl>
 IterableTypeBodyPortion::insertionPointForDeferredExpansion(
     IterableTypeScope *s) const {
   return s->getParent().get();
+}
+
+void TryScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(expr->getSubExpr(), this);
 }
 
 #pragma mark verification

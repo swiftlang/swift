@@ -945,8 +945,6 @@ public:
 
   bool ignoreInDebugInfo() const override { return true; }
   
-  DeclAttribute *getDeclAttr() const { return attr; }
-
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
@@ -1222,10 +1220,6 @@ public:
     return specializeAttr;
   }
 
-  DeclAttribute *getDeclAttr() const {
-    return specializeAttr;
-  }
-
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
   bool lookupLocalsOrMembers(DeclConsumer) const override;
@@ -1253,10 +1247,6 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   NullablePtr<const void> addressForPrinting() const override {
-    return differentiableAttr;
-  }
-
-  DeclAttribute *getDeclAttr() const {
     return differentiableAttr;
   }
 
@@ -1839,6 +1829,32 @@ public:
     return scope->getKind() == ScopeKind::BraceStmt;
   }
 };
+
+/// Describes a scope introduced by a try/try!/try? expression.
+class TryScope final : public ASTScopeImpl {
+public:
+  AnyTryExpr *const expr;
+  TryScope(AnyTryExpr *e)
+      : ASTScopeImpl(ScopeKind::Try), expr(e) {}
+  virtual ~TryScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+
+  Expr *getExpr() const { return expr; }
+
+  static bool classof(const ASTScopeImpl *scope) {
+    return scope->getKind() == ScopeKind::Try;
+  }
+};
+
 } // namespace ast_scope
 } // namespace swift
 
