@@ -3723,6 +3723,11 @@ namespace {
       auto elementType = expr->getElementType();
 
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        if (auto packExpr = dyn_cast<PackExpansionExpr>(expr->getElement(i))) {
+          auto countType =
+              cs.getType(packExpr)->castTo<PackExpansionType>()->getCountType();
+          elementType = PackExpansionType::get(elementType, countType);
+        }
         expr->setElement(
             i, coerceToType(expr->getElement(i), elementType,
                             cs.getConstraintLocator(
@@ -7244,7 +7249,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto *pattern = coerceToType(expansion->getPatternExpr(),
                                  toElementType, locator);
     auto *packEnv = cs.DC->getGenericEnvironmentOfContext();
-    auto patternType = packEnv->mapElementTypeIntoPackContext(toElementType);
+    Type patternType = toElementType;
+    // Only map the element type into pack context if the pattern type has an
+    // element archetype.
+    if (toElementType->hasElementArchetype()) {
+      patternType = packEnv->mapElementTypeIntoPackContext(toElementType);
+    }
     auto shapeType = toExpansionType->getCountType();
     auto expansionTy = PackExpansionType::get(patternType, shapeType);
 

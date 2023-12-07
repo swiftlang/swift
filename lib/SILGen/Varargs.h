@@ -64,7 +64,7 @@ public:
 /// Begin a varargs emission sequence.
 VarargsInfo emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                              CanType baseTy, CanType arrayTy,
-                             unsigned numElements);
+                             SILValue numEltsVal);
 
 /// Successfully end a varargs emission sequence.
 ManagedValue emitEndVarargs(SILGenFunction &SGF, SILLocation loc,

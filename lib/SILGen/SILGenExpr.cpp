@@ -2361,15 +2361,11 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
-                                       unsigned numElements) {
+                                       SILValue numEltsVal) {
   // Reabstract the base type against the array element type.
   auto baseAbstraction = AbstractionPattern::getOpaque();
   auto &baseTL = SGF.getTypeLowering(baseAbstraction, baseTy);
 
-  // Allocate the array.
-  SILValue numEltsVal = SGF.B.createIntegerLiteral(loc,
-                             SILType::getBuiltinWordType(SGF.getASTContext()),
-                             numElements);
   // The first result is the array value.
   ManagedValue array;
   // The second result is a RawPointer to the base address of the array.
@@ -4347,37 +4343,119 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     elementType = genericType.getGenericArgs()[0];
   }
 
+  // First, check if there are any value parameter packs in the array.
+  bool arrayHasParameterPacks = false;
+  for (unsigned index : range(E->getNumElements())) {
+    auto element = E->getElements()[index];
+    if (dyn_cast<PackExpansionExpr>(element)) {
+      arrayHasParameterPacks = true;
+      break;
+    }
+  }
+
+  SILValue numElements = SGF.B.createIntegerLiteral(
+      loc, SILType::getBuiltinWordType(SGF.getASTContext()),
+      E->getNumElements());
+
+  auto wordTy = SILType::getBuiltinWordType(SGF.getASTContext());
+
+  // If there are value parameter packs, iterate over the array again and add up
+  // lenghts of all packs encountered to get the total length of the array.
+  if (arrayHasParameterPacks) {
+    numElements = SGF.B.createIntegerLiteral(loc, wordTy, 0);
+    SILValue one = SGF.B.createIntegerLiteral(loc, wordTy, 1);
+
+    // Get number of elements in all packs in the array
+    for (unsigned index : range(E->getNumElements())) {
+      auto element = E->getElements()[index];
+      if (auto packExpansionExpr = dyn_cast<PackExpansionExpr>(element)) {
+        auto type = packExpansionExpr->getType()->getCanonicalType();
+        assert(isa<PackExpansionType>(type));
+        auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
+        SILValue packLength = SGF.B.createPackLength(loc, formalPackType);
+        SGF.B.createBuiltinBinaryFunction(loc, "add", wordTy, wordTy,
+                                          {numElements, packLength});
+      } else {
+        SGF.B.createBuiltinBinaryFunction(loc, "add", wordTy, wordTy,
+                                          {numElements, one});
+      }
+    }
+  }
+
   VarargsInfo varargsInfo =
-      emitBeginVarargs(SGF, loc, elementType, arrayType,
-                       E->getNumElements());
+      emitBeginVarargs(SGF, loc, elementType, arrayType, numElements);
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;
 
   for (unsigned index : range(E->getNumElements())) {
-    auto destAddr = varargsInfo.getBaseAddress();
-    if (index != 0) {
-      SILValue indexValue = SGF.B.createIntegerLiteral(
-          loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
-              /*needsStackProtection=*/ false);
+    auto element = E->getElements()[index];
+    if (auto packExpansionExpr = dyn_cast<PackExpansionExpr>(element)) {
+      auto type = packExpansionExpr->getType()->getCanonicalType();
+      assert(isa<PackExpansionType>(type));
+      auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
+
+      // Emit the dynamic pack loop to populate the array with the elements of
+      // the parameter pack.
+      SGF.emitDynamicPackLoop(
+          packExpansionExpr, formalPackType, 0,
+          packExpansionExpr->getGenericEnvironment(),
+          [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
+              SILValue packIndex) {
+            // TODO: Code duplication here and in the `else` branch, and the
+            // `dynamicIndexValue` should not be created outside of this lambda.
+            auto destAddr = varargsInfo.getBaseAddress();
+            SILValue indexValue = SGF.B.createIntegerLiteral(
+                loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+            auto dynamicIndexValue = SGF.B.createBuiltinBinaryFunction(
+                loc, "add", wordTy, wordTy, {indexValue, packIndex});
+
+            destAddr = SGF.B.createIndexAddr(loc, destAddr, dynamicIndexValue,
+                                             /*needsStackProtection=*/false);
+
+            auto &destTL = varargsInfo.getBaseTypeLowering();
+            // Create a dormant cleanup for the value in case we exit before the
+            // full array has been constructed.
+
+            CleanupHandle destCleanup = CleanupHandle::invalid();
+            if (!destTL.isTrivial()) {
+              destCleanup = SGF.enterDestroyCleanup(destAddr);
+              SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+              cleanups.push_back(destCleanup);
+            }
+
+            TemporaryInitialization init(destAddr, destCleanup);
+
+            init.performPackExpansionInitialization(
+                SGF, E, indexWithinComponent, [&](Initialization *eltInit) {
+                  SGF.emitExprInto(packExpansionExpr->getPatternExpr(),
+                                   eltInit);
+                });
+          });
+    } else {
+      auto destAddr = varargsInfo.getBaseAddress();
+      if (index != 0) {
+        SILValue indexValue = SGF.B.createIntegerLiteral(
+            loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+        destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
+                                         /*needsStackProtection=*/false);
+      }
+      auto &destTL = varargsInfo.getBaseTypeLowering();
+      // Create a dormant cleanup for the value in case we exit before the
+      // full array has been constructed.
+
+      CleanupHandle destCleanup = CleanupHandle::invalid();
+      if (!destTL.isTrivial()) {
+        destCleanup = SGF.enterDestroyCleanup(destAddr);
+        SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+        cleanups.push_back(destCleanup);
+      }
+
+      TemporaryInitialization init(destAddr, destCleanup);
+
+      ArgumentSource(element).forwardInto(
+          SGF, varargsInfo.getBaseAbstractionPattern(), &init, destTL);
     }
-    auto &destTL = varargsInfo.getBaseTypeLowering();
-    // Create a dormant cleanup for the value in case we exit before the
-    // full array has been constructed.
-
-    CleanupHandle destCleanup = CleanupHandle::invalid();
-    if (!destTL.isTrivial()) {
-      destCleanup = SGF.enterDestroyCleanup(destAddr);
-      SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
-      cleanups.push_back(destCleanup);
-    }
-
-    TemporaryInitialization init(destAddr, destCleanup);
-
-    ArgumentSource(E->getElements()[index])
-        .forwardInto(SGF, varargsInfo.getBaseAbstractionPattern(), &init,
-                     destTL);
   }
 
   // Kill the per-element cleanups. The array will take ownership of them.
