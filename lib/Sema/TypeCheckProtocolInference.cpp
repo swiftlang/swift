@@ -1090,49 +1090,59 @@ AssociatedTypeInference::computeAbstractTypeWitness(
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
     TypeWitnessSystem &system,
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
-  // First, look at all the protocols the adoptee conforms to and feed the
-  // same-type constraints in their requirement signatures to the system.
-  for (auto *const conformedProto :
-       dc->getSelfNominalTypeDecl()->getAllProtocols(/*sorted=*/true)) {
+  // Look for suitably-named generic parameters first, before we go digging
+  // through same-type requirements of protocols.
+  if (auto genericSig = dc->getGenericSignatureOfContext()) {
+    for (auto *const assocType : unresolvedAssocTypes) {
+      for (auto *gp : genericSig.getInnermostGenericParams()) {
+        // Packs cannot witness associated type requirements.
+        if (gp->isParameterPack())
+          continue;
+
+        if (gp->getName() == assocType->getName()) {
+          system.addTypeWitness(assocType->getName(), gp);
+        }
+      }
+    }
+  }
+
+  auto considerProtocolRequirements = [&](ProtocolDecl *conformedProto) {
     // FIXME: The RequirementMachine will assert on re-entrant construction.
     // We should find a more principled way of breaking this cycle.
     if (ctx.isRecursivelyConstructingRequirementMachine(
             conformedProto->getGenericSignature().getCanonicalSignature()) ||
         ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
         conformedProto->isComputingRequirementSignature())
-      continue;
+      return;
 
     for (const auto &req :
          conformedProto->getRequirementSignature().getRequirements()) {
-      if (req.getKind() != RequirementKind::SameType) {
-        continue;
-      }
-
-      system.addSameTypeRequirement(req);
+      if (req.getKind() == RequirementKind::SameType)
+        system.addSameTypeRequirement(req);
     }
+  };
+
+
+  // First, look at the conformed protocol for same-type requirements. These
+  // are less likely to cause request cycles.
+  considerProtocolRequirements(conformance->getProtocol());
+
+  // Also look through all other protocols the conforming type conforms to.
+  for (auto *const conformedProto :
+       dc->getSelfNominalTypeDecl()->getAllProtocols(/*sorted=*/true)) {
+    considerProtocolRequirements(conformedProto);
   }
 
   // If the same-type constraints weren't enough to resolve an associated type,
-  // look for more options.
+  // look for default type witnesses.
   for (auto *const assocType : unresolvedAssocTypes) {
-    if (system.hasResolvedTypeWitness(assocType->getName())) {
+    if (system.hasResolvedTypeWitness(assocType->getName()))
       continue;
-    }
 
     // If we find a default type definition, feed it to the system.
     if (const auto &typeWitness = computeDefaultTypeWitness(assocType)) {
       system.addDefaultTypeWitness(typeWitness->getType(),
                                    typeWitness->getDefaultedAssocType());
-    } else {
-      // As a last resort, look for a generic parameter that matches the name
-      // of the associated type.
-      if (auto genericSig = dc->getGenericSignatureOfContext()) {
-        for (auto *gp : genericSig.getInnermostGenericParams()) {
-          if (gp->getName() == assocType->getName()) {
-            system.addTypeWitness(assocType->getName(), gp);
-          }
-        }
-      }
     }
   }
 }
