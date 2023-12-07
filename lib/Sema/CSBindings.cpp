@@ -27,6 +27,9 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
+static llvm::Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
+                                               Type type);
+
 bool BindingSet::forClosureResult() const {
   return Info.TypeVar->getImpl().isClosureResultType();
 }
@@ -473,7 +476,7 @@ void BindingSet::inferTransitiveBindings(
 
                 // Copy the bindings over to the root.
                 for (const auto &binding : bindings.Bindings)
-                  addBinding(binding);
+                  addBinding(binding, /*isTransitive=*/true);
 
                 // Make a note that the key path root is transitively adjacent
                 // to contextual root type variable and all of its variables.
@@ -484,7 +487,8 @@ void BindingSet::inferTransitiveBindings(
               }
             } else {
               addBinding(
-                binding.withSameSource(inferredRootTy, BindingKind::Exact));
+                  binding.withSameSource(inferredRootTy, BindingKind::Exact),
+                  /*isTransitive=*/true);
             }
           }
         }
@@ -553,7 +557,8 @@ void BindingSet::inferTransitiveBindings(
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addBinding(binding.withSameSource(type, BindingKind::Supertypes));
+      addBinding(binding.withSameSource(type, BindingKind::Supertypes),
+                 /*isTransitive=*/true);
     }
   }
 }
@@ -631,7 +636,8 @@ void BindingSet::finalize(
                   continue;
             }
 
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
+            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
+                       /*isTransitive=*/false);
           }
         }
       }
@@ -740,11 +746,11 @@ void BindingSet::finalize(
   }
 }
 
-void BindingSet::addBinding(PotentialBinding binding) {
+void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
   if (Bindings.count(binding))
     return;
 
-  if (!isViable(binding))
+  if (!isViable(binding, isTransitive))
     return;
 
   SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
@@ -1165,13 +1171,16 @@ void PotentialBindings::addLiteral(Constraint *constraint) {
   Literals.insert(constraint);
 }
 
-bool BindingSet::isViable(PotentialBinding &binding) {
+bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
   // for this constraint system, which is problematic for overload
   // resolution.
   auto type = binding.BindingType;
+
+  if (isTransitive && !checkTypeOfBinding(TypeVar, type))
+    return false;
 
   auto *NTD = type->getAnyNominal();
   if (!NTD)

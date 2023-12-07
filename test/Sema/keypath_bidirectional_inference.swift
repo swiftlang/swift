@@ -82,3 +82,29 @@ func testCollectionUpcastWithTupleLabelErasure() {
         .sorted(by: \.key.rawValue) // Ok
   }
 }
+
+do {
+  struct URL {
+    var path: String
+    func appendingPathComponent(_: String) -> URL { fatalError() }
+  }
+
+  struct EntryPoint {
+    var directory: URL { fatalError() }
+  }
+
+  func test(entryPoint: EntryPoint, data: [[String]]) {
+    let _ = data.map { suffixes in
+      let elements = ["a", "b"]
+      .flatMap { dir in
+        let directory = entryPoint.directory.appendingPathComponent(dir)
+        return suffixes.map { suffix in
+          directory.appendingPathComponent("\(suffix)")
+        }
+      }
+      .map(\.path) // Ok
+
+      return elements.joined(separator: ",")
+    }
+  }
+}
