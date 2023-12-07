@@ -57,7 +57,7 @@ func tryKeyPathsMisc(d : Door) {
 
 func tryKeyPathsFromAsync() async {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to actor-isolated property 'unsafeGlobActor_mutable'}}
+    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'}}
 }
 
 func tryNonSendable() {
@@ -68,7 +68,7 @@ func tryNonSendable() {
 
 func tryKeypaths() {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to actor-isolated property 'unsafeGlobActor_mutable'}}
+    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'}}
 
     _ = \Door.immutable
     _ = \Door.globActor_immutable
@@ -83,7 +83,7 @@ func tryKeypaths() {
     let _ : PartialKeyPath<Door> = \.mutable // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
     let _ : AnyKeyPath = \Door.mutable  // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
 
-    _ = \Door.globActor_mutable // expected-error{{cannot form key path to actor-isolated property 'globActor_mutable'}}
+    _ = \Door.globActor_mutable // expected-error{{cannot form key path to main actor-isolated property 'globActor_mutable'}}
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
-    _ = \Door.["hello"] // expected-error {{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
+    _ = \Door.["hello"] // expected-error {{cannot form key path to main actor-isolated subscript 'subscript(_:)'}}
 }

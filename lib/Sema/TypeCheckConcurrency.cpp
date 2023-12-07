@@ -3382,7 +3382,7 @@ namespace {
             {
               auto diagnostic = ctx.Diags.diagnose(
                   component.getLoc(), diag::actor_isolated_keypath_component,
-                  isolation.isDistributedActor(), decl);
+                  isolation, decl);
 
               if (isolation == ActorIsolation::ActorInstance)
                 diagnosed = true;
