@@ -177,6 +177,27 @@ func forceTryErased() {
   try! mightThrowAny(arg: throwsMyBigErrorOrReturnsInt())
 }
 
+func takesClosureThrowingConcrete(_ body: () throws(MyError) -> ()) throws(MyError) {
+}
+
+// CHECK-LABEL: sil private [ossa] @$s12typed_throws30passesClosureWithReabstraction5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError
+// CHECK: bb0:
+// CHECK-NEXT: debug_value undef : $MyError, var, name "$error", argno 1
+func passesClosureWithReabstraction(count: Int) {
+    try! takesClosureThrowingConcrete { }
+}
+
+func takesClosureThrowingConcreteAndRethrows(_ body: () throws(MyError) -> ()) rethrows {
+}
+
+// CHECK-LABEL: sil private [ossa] @$s12typed_throws42passesClosureWithReabstractionToRethrowing5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError {
+// CHECK: bb0:
+// CHECK-NEXT:  debug_value undef : $MyError, var, name "$error", argno 1
+func passesClosureWithReabstractionToRethrowing(count: Int) {
+    try! takesClosureThrowingConcrete { }
+}
+
+
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
 // CHECK-NEXT:  #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKFAA0C5ClassCADyyKFTV [override]

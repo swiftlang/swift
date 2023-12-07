@@ -1264,33 +1264,32 @@ AbstractionPattern::getFunctionThrownErrorType(
     return llvm::None;
 
   auto &ctx = substFnInterfaceType->getASTContext();
-  auto optErrorType = substFnInterfaceType->getEffectiveThrownErrorType();
+  auto substErrorType = substFnInterfaceType->getEffectiveThrownErrorType();
 
   if (isTypeParameterOrOpaqueArchetype()) {
-    if (!optErrorType)
+    if (!substErrorType)
       return llvm::None;
 
-    if (!(*optErrorType)->isEqual(ctx.getErrorExistentialType())) {
+    if (!(*substErrorType)->isEqual(ctx.getErrorExistentialType())) {
       llvm::errs() << "unsupported reabstraction\n";
       abort();
     }
 
-    return std::make_pair(AbstractionPattern(*optErrorType),
-                          (*optErrorType)->getCanonicalType());
+    return std::make_pair(AbstractionPattern(*substErrorType),
+                          (*substErrorType)->getCanonicalType());
   }
 
-  if (!optErrorType) {
-    Type origErrorSubstType =
-        optOrigErrorType->getType()
-          .subst(optOrigErrorType->getGenericSubstitutions());
-    if (origErrorSubstType->isNever())
-      optErrorType = ctx.getNeverType();
-    else
-      optErrorType = ctx.getErrorExistentialType();
+  if (!substErrorType) {
+    Type origErrorSubstType;
+    if (auto errorSubs = optOrigErrorType->getGenericSubstitutions()) {
+      substErrorType = optOrigErrorType->getType().subst(errorSubs);
+    } else {
+      substErrorType = optOrigErrorType->getType();
+    }
   }
 
   return std::make_pair(*optOrigErrorType,
-                        (*optErrorType)->getCanonicalType());
+                        (*substErrorType)->getCanonicalType());
 }
 
 AbstractionPattern

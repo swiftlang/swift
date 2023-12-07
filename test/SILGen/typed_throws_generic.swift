@@ -310,8 +310,8 @@ struct UntypedRes<Success>: P {
 }
 
 struct InfallibleRes<Success>: P {
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic13InfallibleResVyxGAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed InfallibleRes<τ_0_0>) -> @error_indirect any Error
-  // CHECK: bb0(%0 : $*any Error, %1 : $*InfallibleRes<τ_0_0>):
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic13InfallibleResVyxGAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed InfallibleRes<τ_0_0>) -> @error_indirect τ_0_0.E
+  // CHECK: bb0(%0 : $*@error_type τ_0_0.E, %1 : $*InfallibleRes<τ_0_0>):
   // CHECK: [[SELF:%.*]] = load [trivial] %1 : $*InfallibleRes<τ_0_0>
   // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic13InfallibleResV1fyyF : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>) -> ()
   // CHECK: = apply [[WITNESS]]<τ_0_0>([[SELF]]) : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>)
