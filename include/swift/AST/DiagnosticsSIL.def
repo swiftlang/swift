@@ -899,5 +899,13 @@ ERROR(regionbasedisolation_unknown_pattern, none,
 ERROR(deinit_not_visible, none,
       "deinit of non-copyable type not visible in the current module", ())
 
+ERROR(lifetime_value_outside_scope, none,
+      "lifetime-dependent value escapes its scope", ())
+ERROR(vector_capacity_not_constant, none,
+      "vector capacity needs to be constant", ())
+
+ERROR(fixed_arrays_not_available, none,
+      "fixed arrays are only available with -enable-experimental-feature FixedArrays", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

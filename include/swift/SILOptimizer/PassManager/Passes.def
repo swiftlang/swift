@@ -411,6 +411,8 @@ SWIFT_FUNCTION_PASS(NamedReturnValueOptimization, "named-return-value-optimizati
     "Optimize copies to an indirect return value")
 SWIFT_FUNCTION_PASS(StripObjectHeaders, "strip-object-headers",
     "Sets the bare flag on objects which don't need their headers")
+SWIFT_FUNCTION_PASS(AllocVectorLowering, "alloc-vector-lowering",
+     "lowering of allocVector builtins")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",

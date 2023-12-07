@@ -64,3 +64,11 @@ func print(_ n: some BinaryInteger, terminator: StaticString = "\n") {
   n.writeToStdout()
   print("", terminator: terminator)
 }
+
+func print(_ b: Bool, terminator: StaticString = "\n") {
+  if b {
+    print("true", terminator: terminator)
+  } else {
+    print("false", terminator: terminator)
+  }
+}
