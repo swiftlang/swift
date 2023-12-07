@@ -1696,9 +1696,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  if (Args.hasArg(options::OPT_dwarf_fission)) {
-    OI.DWARFFission = true;
-  }
+  OI.DWARFFission = Args.hasArg(options::OPT_dwarf_fission);
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as
