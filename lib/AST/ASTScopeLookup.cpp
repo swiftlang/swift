@@ -305,12 +305,10 @@ PatternEntryInitializerScope::getLookupParent() const {
 
   // Skip generic parameter scopes, which occur here due to named opaque
   // result types.
-  // FIXME: Proper isa/dyn_cast support would be better than a string
-  // comparison here.
-  while (parent->getClassName() == "GenericParamScope")
+  while (isa<GenericParamScope>(parent))
     parent = parent->getLookupParent().get();
 
-  ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
+  ASTScopeAssert(isa<PatternEntryDeclScope>(parent),
                  "PatternEntryInitializerScope in unexpected place");
 
   // Lookups from inside a pattern binding initializer skip the parent
@@ -327,7 +325,7 @@ PatternEntryInitializerScope::getLookupParent() const {
 NullablePtr<const ASTScopeImpl>
 ConditionalClauseInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
-  ASTScopeAssert(parent->getClassName() == "ConditionalClausePatternUseScope",
+  ASTScopeAssert(isa<ConditionalClausePatternUseScope>(parent),
                  "ConditionalClauseInitializerScope in unexpected place");
 
   // Lookups from inside a conditional clause initializer skip the parent
@@ -645,14 +643,16 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
   auto *scope = fileScope->findInnermostEnclosingScope(
       sourceFile->getParentModule(), loc, nullptr);
   do {
-    auto *freestanding = scope->getFreestandingMacro().getPtrOrNull();
-    if (freestanding && consume(freestanding))
-      return;
+    if (auto expansionScope = dyn_cast<MacroExpansionDeclScope>(scope)) {
+      auto *expansionDecl = expansionScope->decl;
+      if (expansionDecl && consume(expansionDecl))
+        return;
+    }
 
-    auto *attr = scope->getDeclAttributeIfAny().getPtrOrNull();
-    auto *potentialAttached = dyn_cast_or_null<CustomAttr>(attr);
-    if (potentialAttached && consume(potentialAttached))
-      return;
+    if (auto customAttrScope = dyn_cast<CustomAttributeScope>(scope)) {
+      if (consume(customAttrScope->attr))
+        return;
+    }
 
     // If we've reached a source file scope, we can't be inside of
     // a macro argument. Either this is a top-level source file, or
@@ -660,10 +660,47 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
     // macro expansion buffers for freestanding macros are children of
     // MacroExpansionDeclScope, and child scopes of freestanding macros
     // are otherwise inside the macro argument.
-    if (scope->getClassName() == "ASTSourceFileScope")
+    if (isa<ASTSourceFileScope>(scope))
       return;
 
   } while ((scope = scope->getParent().getPtrOrNull()));
+}
+
+static std::pair<CatchNode, const BraceStmtScope *>
+getCatchNodeBody(const ASTScopeImpl *scope, CatchNode node) {
+  const auto &children = scope->getChildren();
+  if (children.empty())
+    return { CatchNode(), nullptr };
+
+  auto stmt = dyn_cast<BraceStmtScope>(children[0]);
+  if (!stmt || stmt->getStmt()->empty())
+    return { CatchNode(), nullptr };
+
+  return std::make_pair(node, stmt);
+}
+
+/// Retrieve the catch node associated with this scope, if any.
+static std::pair<CatchNode, const BraceStmtScope *>
+getCatchNode(const ASTScopeImpl *scope) {
+  // Closures introduce a catch scope for errors initiated in their body.
+  if (auto closureParams = dyn_cast<ClosureParametersScope>(scope)) {
+    return getCatchNodeBody(
+        scope, const_cast<AbstractClosureExpr *>(closureParams->closureExpr));
+  }
+
+  // Functions introduce a catch scope for errors initiated in their body.
+  if (auto function = dyn_cast<FunctionBodyScope>(scope)) {
+    return getCatchNodeBody(
+        scope, const_cast<AbstractFunctionDecl *>(function->decl));
+  }
+
+  // Do..catch blocks introduce a catch scope for errors initiated in the `do`
+  // body.
+  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope)) {
+    return getCatchNodeBody(scope, const_cast<DoCatchStmt *>(doCatch->stmt));
+  }
+
+  return { CatchNode(), nullptr };
 }
 
 CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
@@ -682,12 +719,12 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   for (auto scope = innermost; scope; scope = scope->getParent().getPtrOrNull()) {
     // If we are at a catch node and in the body of the region from which that
     // node catches thrown errors, we have our result.
-    auto caught = scope->getCatchNodeBody();
+    auto caught = getCatchNode(scope);
     if (caught.first && caught.second == innerBodyScope) {
       return caught.first;
     }
 
-    innerBodyScope = scope->getAsBraceStmtScope().getPtrOrNull();
+    innerBodyScope = dyn_cast<BraceStmtScope>(scope);
   }
 
   return nullptr;
