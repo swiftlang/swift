@@ -74,7 +74,13 @@ private extension BeginCOWMutationInst {
       return false
     }
     let buffer = instanceResult
-    if buffer.nonDebugUses.contains(where: { !($0.instruction is EndCOWMutationInst) }) {
+    guard buffer.nonDebugUses.allSatisfy({
+        if let endCOW = $0.instruction as? EndCOWMutationInst {
+          return !endCOW.doKeepUnique
+        }
+        return false
+      }) else
+    {
       return false
     }
 
@@ -91,7 +97,8 @@ private extension BeginCOWMutationInst {
     if !uniquenessResult.nonDebugUses.isEmpty {
       return false
     }
-    guard let endCOW = instance as? EndCOWMutationInst else {
+    guard let endCOW = instance as? EndCOWMutationInst,
+          !endCOW.doKeepUnique else {
       return false
     }
     if endCOW.nonDebugUses.contains(where: { $0.instruction != self }) {
