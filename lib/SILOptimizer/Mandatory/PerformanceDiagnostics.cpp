@@ -24,6 +24,9 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool> DumpModuleOnFailure(
+  "performance-diagnostics-dump-module-on-failure", llvm::cl::init(false));
+
 namespace {
 
 class PrettyStackTracePerformanceDiagnostics
@@ -624,6 +627,11 @@ private:
       if (function.getPerfConstraints() == PerformanceConstraints::None) {
         diagnoser.checkNonAnnotatedFunction(&function);
       }
+    }
+
+    if (DumpModuleOnFailure && module->getASTContext().hadError()) {
+      llvm::dbgs() << "In module:\n";
+      module->print(llvm::dbgs());
     }
   }
 };
