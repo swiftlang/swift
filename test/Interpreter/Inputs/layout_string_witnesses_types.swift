@@ -569,10 +569,10 @@ public struct TupleLargeAlignment<T> {
     let x: AnyObject? = nil
     let x1: AnyObject? = nil
     let x2: AnyObject? = nil
-    let x3: (T, SIMD4<Int>)
+    let x3: (T, SIMD4<Int64>)
 
     public init(_ t: T) {
-        self.x3 = (t, .init(Int(Int32.max) + 32, Int(Int32.max) + 32, Int(Int32.max) + 32, Int(Int32.max) + 32))
+        self.x3 = (t, .init(Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32))
     }
 }
 
