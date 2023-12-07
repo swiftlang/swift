@@ -59,7 +59,7 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
     let substring = "\(propertyName)__vg"
     // Ex: "15description__vg"
     let runlengthSubstring = "\(substring.count)\(substring)"
-    guard !mangledName.contains(runlengthSubstring) else {
+    guard !mangledName.hasSubstring(runlengthSubstring) else {
       return []
     }
 
@@ -366,7 +366,6 @@ extension DeclGroupSyntax {
       // New types of decls are not presumed to be valid.
       return nil
     }
-    return nil
   }
 }
 
@@ -483,5 +482,20 @@ extension Collection {
   /// multiple elements, nil is returned.
   fileprivate var only: Element? {
     count == 1 ? first : nil
+  }
+}
+
+extension String {
+  fileprivate func hasSubstring(_ substring: String) -> Bool {
+    if #available(macOS 13, *) {
+      return self.contains(substring)
+    }
+
+    for index in self.indices {
+      if self.suffix(from: index).hasPrefix(substring) {
+        return true
+      }
+    }
+    return false
   }
 }
