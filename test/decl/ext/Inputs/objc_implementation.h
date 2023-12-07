@@ -179,6 +179,19 @@
 void CImplFunc1(int param);
 void CImplFunc2(int param);
 
+void CImplFuncMismatch1(int param);
+void CImplFuncMismatch2(int param);
+void CImplFuncMismatch3(_Nullable id param);
+void CImplFuncMismatch4(_Nullable id param);
+void CImplFuncMismatch5(_Nonnull id param);
+void CImplFuncMismatch6(_Nonnull id param);
+_Nullable id CImplFuncMismatch3a(int param);
+_Nullable id CImplFuncMismatch4a(int param);
+_Nonnull id CImplFuncMismatch5a(int param);
+_Nonnull id CImplFuncMismatch6a(int param);
+void CImplFuncNameMismatch1(int param);
+void CImplFuncNameMismatch2(int param);
+
 struct ObjCStruct {
   int foo;
 };

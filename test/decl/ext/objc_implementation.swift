@@ -479,6 +479,69 @@ func CImplFuncMissing(_: Int32) {
   // expected-error@-2 {{could not find imported function 'CImplFuncMissing' matching global function 'CImplFuncMissing'; make sure your umbrella or bridging header imports the header that declares it}}
 }
 
+@_objcImplementation @_cdecl("CImplFuncMismatch1")
+func CImplFuncMismatch1(_: Float) {
+  // expected-warning@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch2")
+func CImplFuncMismatch2(_: Int32) -> Float {
+  // expected-warning@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(Int32) -> Void' declared by the header}}
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch3")
+func CImplFuncMismatch3(_: Any?) {
+  // OK
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch4")
+func CImplFuncMismatch4(_: Any) {
+  // expected-warning@-1 {{global function 'CImplFuncMismatch4' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch5")
+func CImplFuncMismatch5(_: Any) {
+  // OK
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch6")
+func CImplFuncMismatch6(_: Any!) {
+  // OK, mismatch allowed
+}
+
+
+@_objcImplementation @_cdecl("CImplFuncMismatch3a")
+func CImplFuncMismatch3a(_: Int32) -> Any? {
+  // OK
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch4a")
+func CImplFuncMismatch4a(_: Int32) -> Any {
+  // expected-warning@-1 {{global function 'CImplFuncMismatch4a' of type '(Int32) -> Any' does not match type '(Int32) -> Any?' declared by the header}}
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch5a")
+func CImplFuncMismatch5a(_: Int32) -> Any {
+  // OK
+}
+
+@_objcImplementation @_cdecl("CImplFuncMismatch6a")
+func CImplFuncMismatch6a(_: Int32) -> Any! {
+  // OK, mismatch allowed
+}
+
+@_objcImplementation @_cdecl("CImplFuncNameMismatch1")
+func mismatchedName1(_: Int32) {
+  // expected-error@-2 {{could not find imported function 'CImplFuncNameMismatch1' matching global function 'mismatchedName1'; make sure your umbrella or bridging header imports the header that declares it}}
+  // FIXME: Improve diagnostic for a partial match.
+}
+
+@_objcImplementation @_cdecl("mismatchedName2")
+func CImplFuncNameMismatch2(_: Int32) {
+  // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure your umbrella or bridging header imports the header that declares it}}
+  // FIXME: Improve diagnostic for a partial match.
+}
+
 func usesAreNotAmbiguous(obj: ObjCClass) {
   obj.method(fromHeader1: 1)
   obj.method(fromHeader2: 2)

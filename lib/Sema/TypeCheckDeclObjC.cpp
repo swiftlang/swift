@@ -3389,9 +3389,10 @@ private:
   }
 
   static Type getMemberType(ValueDecl *decl) {
-    if (isa<AbstractFunctionDecl>(decl))
-      // Strip off the uncurried `self` parameter.
-      return decl->getInterfaceType()->getAs<AnyFunctionType>()->getResult();
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(decl))
+      if (fn->hasImplicitSelfDecl())
+        // Strip off the uncurried `self` parameter.
+        return fn->getMethodInterfaceType();
     return decl->getInterfaceType();
   }
 
