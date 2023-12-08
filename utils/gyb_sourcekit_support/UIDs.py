@@ -146,6 +146,7 @@ UID_KEYS = [
     KEY('Simplified', 'key.simplified'),
     KEY('RangeContent', 'key.rangecontent'),
     KEY('CancelOnSubsequentRequest', 'key.cancel_on_subsequent_request'),
+    KEY('IncludeNonEditableBaseNames', 'key.include_non_editable_base_names'),
     KEY('RenameLocations', 'key.renamelocations'),
     KEY('Locations', 'key.locations'),
     KEY('NameType', 'key.nametype'),
