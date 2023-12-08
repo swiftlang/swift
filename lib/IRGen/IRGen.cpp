@@ -668,9 +668,12 @@ bool swift::compileAndWriteLLVM(
   }
   case IRGenOutputKind::NativeAssembly:
   case IRGenOutputKind::ObjectFile: {
-    CodeGenFileType FileType = CGFT_AssemblyFile;
-
     legacy::PassManager EmitPasses;
+    CodeGenFileType FileType;
+    FileType =
+        (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
+                                                            : CGFT_ObjectFile);
+
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
