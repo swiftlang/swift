@@ -12,8 +12,6 @@
 
 import SwiftShims
 
-#if $Macros && hasAttribute(attached)
-
 /// Converts description definitions to a debugger type summary.
 ///
 /// This macro converts compatible `debugDescription` (or `description`)
@@ -43,8 +41,6 @@ public macro _DebugDescription() =
 @attached(peer, names: named(_lldb_summary))
 public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
   #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
-
-#endif
 
 #if SWIFT_ENABLE_REFLECTION
 

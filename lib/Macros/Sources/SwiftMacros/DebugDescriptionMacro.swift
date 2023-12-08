@@ -161,7 +161,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
     //   2. The single item must be a return of a string literal
     //   3. Later on, the interpolation in the string literal will be validated.
     guard let codeBlock = onlyBinding.accessorBlock?.accessors.as(CodeBlockItemListSyntax.self),
-          let descriptionString = codeBlock.onlyReturnExpr?.as(StringLiteralExprSyntax.self) else {
+          let descriptionString = codeBlock.asSingleReturnExpr?.as(StringLiteralExprSyntax.self) else {
       let message: ErrorMessage = "body must consist of a single string literal"
       context.diagnose(node: declaration, error: message)
       return []
@@ -184,25 +184,12 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
         let expr = onlyLabeledExpr.expression
 
         // "Parse" the expression into a flattened chain of property accesses.
-        var propertyChain: [DeclReferenceExprSyntax] = []
-        var invalidExpr: ExprSyntax? = nil
-        if let declRef = expr.as(DeclReferenceExprSyntax.self) {
-          // A reference to a single property on self.
-          propertyChain.append(declRef)
-        } else if let memberAccess = expr.as(MemberAccessExprSyntax.self) {
-          do {
-            propertyChain = try memberAccess.propertyChain()
-          } catch let error as UnexpectedExpr {
-            invalidExpr = error.expr
-          }
-        } else {
-          // The expression was neither a DeclReference nor a MemberAccess.
-          invalidExpr = expr
-        }
-
-        if let invalidExpr {
+        var propertyChain: [DeclReferenceExprSyntax]
+        do {
+          propertyChain = try expr.propertyChain()
+        } catch let error as UnexpectedExpr {
           let message: ErrorMessage = "only references to stored properties are allowed"
-          context.diagnose(node: invalidExpr, error: message)
+          context.diagnose(node: error.expr, error: message)
           return []
         }
 
@@ -397,10 +384,10 @@ extension PatternBindingSyntax {
     case nil:
       // No accessor block, not computed.
       return false
-    case .accessors(let accessors)?:
+    case .accessors(let accessors):
       // A `get` accessor indicates a computed property.
       return accessors.contains { $0.accessorSpecifier.tokenKind == .keyword(.get) }
-    case .getter?:
+    case .getter:
       // A property with an implementation block is a computed property.
       return true
     @unknown default:
@@ -411,7 +398,7 @@ extension PatternBindingSyntax {
 
 extension CodeBlockItemListSyntax {
   /// The return statement or expression for a code block consisting of only a single item.
-  fileprivate var onlyReturnExpr: ExprSyntax? {
+  fileprivate var asSingleReturnExpr: ExprSyntax? {
     guard let item = self.only?.item else {
       return nil
     }
@@ -423,35 +410,48 @@ fileprivate struct UnexpectedExpr: Error {
   let expr: ExprSyntax
 }
 
+extension ExprSyntax {
+  /// Parse an expression consisting only of property references. Any other syntax throws an error.
+  fileprivate func propertyChain() throws -> [DeclReferenceExprSyntax] {
+    if let declRef = self.as(DeclReferenceExprSyntax.self) {
+      // A reference to a single property on self.
+      return [declRef]
+    } else if let memberAccess = self.as(MemberAccessExprSyntax.self) {
+      return try memberAccess.propertyChain()
+    } else {
+      // This expression is neither a DeclReference nor a MemberAccess.
+      throw UnexpectedExpr(expr: self)
+    }
+  }
+}
+
 extension MemberAccessExprSyntax {
-  /// Parse a member access consisting only of property references. Any other syntax throws an error.
   fileprivate func propertyChain() throws -> [DeclReferenceExprSyntax] {
     // MemberAccess is left associative: a.b.c is ((a.b).c).
     var propertyChain: [DeclReferenceExprSyntax] = []
     var current = self
-    while let base = current.base {
+    while true {
+      guard let base = current.base else {
+        throw UnexpectedExpr(expr: ExprSyntax(current))
+      }
+
       propertyChain.append(current.declName)
+
       if let declRef = base.as(DeclReferenceExprSyntax.self) {
-        propertyChain.append(declRef)
         // Terminal case.
-        break
-      }
-      if let next = base.as(MemberAccessExprSyntax.self) {
-        current = next
+        // Top-down traversal produces references in reverse order.
+        propertyChain.append(declRef)
+        propertyChain.reverse()
+        return propertyChain
+      } else if let next = base.as(MemberAccessExprSyntax.self) {
         // Recursive case.
+        current = next
         continue
+      } else {
+        // The expression was neither a DeclReference nor a MemberAccess.
+        throw UnexpectedExpr(expr: base)
       }
-      // The expression was neither a DeclReference nor a MemberAccess.
-      throw UnexpectedExpr(expr: base)
     }
-
-    guard current.base != nil else {
-      throw UnexpectedExpr(expr: ExprSyntax(current))
-    }
-
-    // Top-down traversal produces references in reverse order.
-    propertyChain.reverse()
-    return propertyChain
   }
 }
 
