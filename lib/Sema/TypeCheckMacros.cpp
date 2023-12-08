@@ -325,6 +325,9 @@ initializeExecutablePlugin(ASTContext &ctx,
                          executablePlugin->getExecutablePath(), err.message());
       return nullptr;
     }
+
+    ctx.getPluginLoader().recordDependency(resolvedLibraryPath);
+
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 
