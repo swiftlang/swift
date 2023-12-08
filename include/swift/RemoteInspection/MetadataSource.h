@@ -29,6 +29,7 @@ using llvm::cast;
 
 #include <cerrno>
 #include <climits>
+#include <cstdlib>
 #include <string>
 
 namespace swift {
