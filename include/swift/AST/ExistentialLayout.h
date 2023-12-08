@@ -37,7 +37,6 @@ struct ExistentialLayout {
   }
 
   ExistentialLayout(CanProtocolType type);
-  ExistentialLayout(CanInverseType type);
   ExistentialLayout(CanProtocolCompositionType type);
   ExistentialLayout(CanParameterizedProtocolType type);
 

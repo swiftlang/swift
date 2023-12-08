@@ -1261,7 +1261,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                       Printer << "@_noMetadata ";
                   }
                   auto OptionsCopy = Options;
-                  OptionsCopy.PrintClassLayoutName = typeErased;
+                  OptionsCopy.PrintInternalLayoutName = typeErased;
                   req.print(Printer, OptionsCopy);
                 },
                 [&] { Printer << ", "; });

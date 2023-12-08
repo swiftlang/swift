@@ -3158,11 +3158,11 @@ ERROR(requires_not_suitable_archetype,none,
       (Type))
 
 ERROR(requires_not_suitable_inverse_subject,none,
-      "cannot apply inverse %1 to type %0 in conformance requirement",
-      (Type, Type))
+      "cannot apply inverse '~%1' to type %0 in conformance requirement",
+      (Type, StringRef))
 
 ERROR(requires_not_suitable_inverse_outer_subject,none,
-      "cannot add inverse constraint '%0: %1' "
+      "cannot add inverse constraint '%0: ~%1' "
       "on generic parameter '%0' defined in outer scope",
       (StringRef, StringRef))
 
@@ -7558,6 +7558,11 @@ ERROR(accessor_macro_not_single_var, none,
 ERROR(noncopyable_but_copyable, none,
       "%kind0 required to be 'Copyable' but is marked with '~Copyable'",
       (const ValueDecl *))
+ERROR(noncopyable_generic_but_copyable, none,
+      "%0 required to be '%1' but is marked with '~%1'",
+      (Type, StringRef))
+WARNING(redundant_inverse_constraint,none,
+        "redundant constraint %0 : '~%1'", (Type, StringRef))
 ERROR(noncopyable_class, none,
       "classes cannot be noncopyable",
       ())

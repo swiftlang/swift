@@ -576,6 +576,7 @@ void PropertyMap::inferConditionalRequirements(
 
   // FIXME: Do we need to diagnose these errors?
   SmallVector<RequirementError, 2> errors;
+  SmallVector<InverseRequirement, 2> ignoredInverses;
 
   // First, desugar all conditional requirements.
   for (auto req : conditionalRequirements) {
@@ -585,7 +586,8 @@ void PropertyMap::inferConditionalRequirements(
       llvm::dbgs() << "\n";
     }
 
-    desugarRequirement(req, SourceLoc(), desugaredRequirements, errors);
+    desugarRequirement(req, SourceLoc(), desugaredRequirements,
+                       ignoredInverses, errors);
   }
 
   // Now, convert desugared conditional requirements to rules.

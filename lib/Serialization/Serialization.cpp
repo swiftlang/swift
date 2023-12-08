@@ -5139,10 +5139,6 @@ public:
     llvm_unreachable("modules are currently not first-class values");
   }
 
-  void visitInverseType(const InverseType *) {
-    llvm_unreachable("inverse types should not escape the type checker");
-  }
-
   void visitInOutType(const InOutType *) {
     llvm_unreachable("inout types are only used in function type parameters");
   }

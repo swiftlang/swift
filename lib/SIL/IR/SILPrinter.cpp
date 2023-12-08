@@ -4300,7 +4300,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
             Requirement ReqWithDecls(req.getKind(), FirstTy,
                                      req.getLayoutConstraint());
             auto SubPrinterCopy = SubPrinter;
-            SubPrinterCopy.PrintClassLayoutName = erased;
+            SubPrinterCopy.PrintInternalLayoutName = erased;
             ReqWithDecls.print(OS, SubPrinterCopy);
           }
         },

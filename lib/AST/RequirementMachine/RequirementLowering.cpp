@@ -173,9 +173,12 @@ using namespace rewriting;
 /// Desugar a same-type requirement that possibly has concrete types on either
 /// side into a series of same-type and concrete-type requirements where the
 /// left hand side is always a type parameter.
-static void desugarSameTypeRequirement(Requirement req, SourceLoc loc,
-                                       SmallVectorImpl<Requirement> &result,
-                                       SmallVectorImpl<RequirementError> &errors) {
+static void desugarSameTypeRequirement(
+                                  Requirement req,
+                                  SourceLoc loc,
+                                  SmallVectorImpl<Requirement> &result,
+                                  SmallVectorImpl<InverseRequirement> &inverses,
+                                  SmallVectorImpl<RequirementError> &errors) {
   class Matcher : public TypeMatcher<Matcher> {
     SourceLoc loc;
     SmallVectorImpl<Requirement> &result;
@@ -263,10 +266,12 @@ static void desugarSameTypeRequirement(Requirement req, SourceLoc loc,
   }
 }
 
-static void desugarSuperclassRequirement(Requirement req,
-                                         SourceLoc loc,
-                                         SmallVectorImpl<Requirement> &result,
-                                         SmallVectorImpl<RequirementError> &errors) {
+static void desugarSuperclassRequirement(
+                                  Requirement req,
+                                  SourceLoc loc,
+                                  SmallVectorImpl<Requirement> &result,
+                                  SmallVectorImpl<InverseRequirement> &inverses,
+                                  SmallVectorImpl<RequirementError> &errors) {
   if (req.getFirstType()->isTypeParameter()) {
     result.push_back(req);
     return;
@@ -292,13 +297,15 @@ static void desugarSuperclassRequirement(Requirement req,
   }
 
   for (auto subReq : subReqs)
-    desugarRequirement(subReq, loc, result, errors);
+    desugarRequirement(subReq, loc, result, inverses, errors);
 }
 
-static void desugarLayoutRequirement(Requirement req,
-                                     SourceLoc loc,
-                                     SmallVectorImpl<Requirement> &result,
-                                     SmallVectorImpl<RequirementError> &errors) {
+static void desugarLayoutRequirement(
+                                  Requirement req,
+                                  SourceLoc loc,
+                                  SmallVectorImpl<Requirement> &result,
+                                  SmallVectorImpl<InverseRequirement> &inverses,
+                                  SmallVectorImpl<RequirementError> &errors) {
   if (req.getFirstType()->isTypeParameter()) {
     result.push_back(req);
     return;
@@ -324,16 +331,18 @@ static void desugarLayoutRequirement(Requirement req,
   }
 
   for (auto subReq : subReqs)
-    desugarRequirement(subReq, loc, result, errors);
+    desugarRequirement(subReq, loc, result, inverses, errors);
 }
 
 /// Desugar a protocol conformance requirement by splitting up protocol
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
-static void desugarConformanceRequirement(Requirement req,
-                                          SourceLoc loc,
-                                          SmallVectorImpl<Requirement> &result,
-                                          SmallVectorImpl<RequirementError> &errors) {
+static void desugarConformanceRequirement(
+                                  Requirement req,
+                                  SourceLoc loc,
+                                  SmallVectorImpl<Requirement> &result,
+                                  SmallVectorImpl<InverseRequirement> &inverses,
+                                  SmallVectorImpl<RequirementError> &errors) {
   SmallVector<Requirement, 2> subReqs;
 
   auto constraintType = req.getSecondType();
@@ -379,43 +388,39 @@ static void desugarConformanceRequirement(Requirement req,
           req.getFirstType(), memberType);
     }
 
-    // Add inverses directly as requirements.
-    for (auto ip : compositionType->getInverses()) {
-      // NOTE: perhaps it's better if ProtocolCompositionType just stores
-      // the original InverseType's in its Members array.
-      auto &ctx = compositionType->getASTContext();
-      auto invertedProto =
-        ctx.getProtocol(getKnownProtocolKind(ip))->getDeclaredInterfaceType();
+    // Check if the composition has any inverses.
+    if (!compositionType->getInverses().empty()) {
+      auto subject = req.getFirstType();
 
-      subReqs.emplace_back(RequirementKind::Conformance, req.getFirstType(),
-                           InverseType::get(invertedProto));
-    }
-
-  } else if (constraintType->is<InverseType>()) {
-    auto subject = req.getFirstType();
-
-    // Fast-path
-    if (subject->isTypeParameter()) {
-      if (!subject->isParameterPack()) {
-        result.push_back(req);
-        return;
+      if (!subject->isTypeParameter()) {
+        // Only permit type-parameter subjects.
+        errors.push_back(
+            RequirementError::forInvalidRequirementSubject(req, loc));
+      } else if (subject->isParameterPack()) {
+        // Disallow parameter packs for now.
+        errors.push_back(RequirementError::forInvalidInverseSubject(req, loc));
+      } else {
+        // Record inverse.
+        auto &ctx = req.getFirstType()->getASTContext();
+        for (auto ip : compositionType->getInverses())
+          inverses.push_back({req.getFirstType(),
+                              ctx.getProtocol(getKnownProtocolKind(ip)),
+                              loc});
       }
-      // Disallow parameter packs for now.
-      errors.push_back(RequirementError::forInvalidInverseSubject(req, loc));
-    } else {
-      // Only permit type-parameter subjects.
-      errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
     }
   }
 
   for (auto subReq : subReqs)
-    desugarRequirement(subReq, loc, result, errors);
+    desugarRequirement(subReq, loc, result, inverses, errors);
 }
 
 /// Diagnose shape requirements on non-pack types.
-static void desugarSameShapeRequirement(Requirement req, SourceLoc loc,
-                                        SmallVectorImpl<Requirement> &result,
-                                        SmallVectorImpl<RequirementError> &errors) {
+static void desugarSameShapeRequirement(
+                                  Requirement req,
+                                  SourceLoc loc,
+                                  SmallVectorImpl<Requirement> &result,
+                                  SmallVectorImpl<InverseRequirement> &inverses,
+                                  SmallVectorImpl<RequirementError> &errors) {
   // For now, only allow shape requirements directly between pack types.
   if (!req.getFirstType()->isParameterPack() ||
       !req.getSecondType()->isParameterPack()) {
@@ -432,43 +437,50 @@ static void desugarSameShapeRequirement(Requirement req, SourceLoc loc,
 /// composition, into zero or more "proper" requirements which can then be
 /// converted into rewrite rules by the RuleBuilder.
 void
-swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
-                                     SmallVectorImpl<Requirement> &result,
-                                     SmallVectorImpl<RequirementError> &errors) {
+swift::rewriting::desugarRequirement(
+                                  Requirement req,
+                                  SourceLoc loc,
+                                  SmallVectorImpl<Requirement> &result,
+                                  SmallVectorImpl<InverseRequirement> &inverses,
+                                  SmallVectorImpl<RequirementError> &errors) {
   switch (req.getKind()) {
   case RequirementKind::SameShape:
-    desugarSameShapeRequirement(req, loc, result, errors);
+    desugarSameShapeRequirement(req, loc, result, inverses, errors);
     break;
 
   case RequirementKind::Conformance:
-    desugarConformanceRequirement(req, loc, result, errors);
+    desugarConformanceRequirement(req, loc, result, inverses, errors);
     break;
 
   case RequirementKind::Superclass:
-    desugarSuperclassRequirement(req, loc, result, errors);
+    desugarSuperclassRequirement(req, loc, result, inverses, errors);
     break;
 
   case RequirementKind::Layout:
-    desugarLayoutRequirement(req, loc, result, errors);
+    desugarLayoutRequirement(req, loc, result, inverses, errors);
     break;
 
   case RequirementKind::SameType:
-    desugarSameTypeRequirement(req, loc, result, errors);
+    desugarSameTypeRequirement(req, loc, result, inverses, errors);
     break;
   }
 }
 
-void swift::rewriting::desugarRequirements(SmallVector<StructuralRequirement, 2> &reqs,
-                                           SmallVectorImpl<RequirementError> &errors) {
+void swift::rewriting::desugarRequirements(
+                                  SmallVector<StructuralRequirement, 2> &reqs,
+                                  SmallVectorImpl<InverseRequirement> &inverses,
+                                  SmallVectorImpl<RequirementError> &errors) {
   SmallVector<StructuralRequirement, 2> result;
   for (auto req : reqs) {
     SmallVector<Requirement, 2> desugaredReqs;
     SmallVector<RequirementError, 2> ignoredErrors;
 
     if (req.inferred)
-      desugarRequirement(req.req, SourceLoc(), desugaredReqs, ignoredErrors);
+      desugarRequirement(req.req, SourceLoc(), desugaredReqs,
+                         inverses, ignoredErrors);
     else
-      desugarRequirement(req.req, req.loc, desugaredReqs, errors);
+      desugarRequirement(req.req, req.loc, desugaredReqs,
+                         inverses, errors);
 
     for (auto desugaredReq : desugaredReqs)
       result.push_back({desugaredReq, req.loc, req.inferred});
@@ -546,10 +558,6 @@ struct InferRequirementsWalker : public TypeWalker {
     // don't have enough info to do any useful substitutions.
     if (ty->is<UnboundGenericType>())
       return Action::Stop;
-
-    // An inverse's children do not contribute any requirements.
-    if (ty->is<InverseType>())
-      return Action::SkipChildren;
 
     return Action::Continue;
   }
@@ -764,50 +772,25 @@ void swift::rewriting::realizeRequirement(
   }
 }
 
-/// Desugars and expands all default conformance requirements on \c subject,
-/// accounting for and eliminating inverse constraints.
-///
-/// For inverse constraints on subjects other than the ones specified, they are
-/// removed and diagnosed as errors.
-///
-/// \param subjects the subject types for which we should expand defaults.
-void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
-                                 SmallVectorImpl<Type> const& subjects,
-                                 SmallVectorImpl<StructuralRequirement> &result,
-                                 SmallVectorImpl<RequirementError> &errors) {
+void swift::rewriting::applyInverses(
+    ASTContext &ctx,
+    ArrayRef<Type> gps,
+    ArrayRef<InverseRequirement> inverseList,
+    SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors) {
+
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return;
 
-  // TODO(kavon): we can be more efficient in two ways:
-  // 1. Instead of allocating space in this map for each target to describe
-  //    defaults, which are much more common, we use the set to track inverses
-  //    only so that the more common case has no overhead beyond just adding
-  //    the defaults. This should yield a constant-time improvement.
-  //
-  // 2. Instead of searching the _entire_ results vector for inverses, we can
-  //    take advantage of the fact that the requirements appended by nesting
-  //    level. Thus, we could get an iterator position for the start of the
-  //    removal search, which would be the end of the `result` vector before
-  //    requirements for the current subjects got pushed there. This should
-  //    yield a O(|result|^2) -> O(|result|)  performance improvement.
+  // Summarize the inverses and flag ones that are incorrect.
+  llvm::DenseMap<CanType, InvertibleProtocolSet> inverses;
+  for (auto inverse : inverseList) {
+    auto canSubject = inverse.subject->getCanonicalType();
 
-  llvm::DenseMap<CanType, InvertibleProtocolSet> defaults;
-  for (auto subject : subjects)
-    defaults.insert({ subject->getCanonicalType(),
-                     InvertibleProtocolSet::full() });
-
-  result.erase(llvm::remove_if(result, [&](StructuralRequirement structReq) {
-    auto req = structReq.req;
-
-    if (req.getKind() != RequirementKind::Conformance)
-      return false;
-
-    auto inverse = req.getSecondType()->getAs<InverseType>();
-    if (!inverse)
-      return false;
-
-    // At this point, we have a conformance constraint with an inverse.
-    auto subject = req.getFirstType()->getCanonicalType();
+    // WARNING: possible quadratic behavior, but should be OK in practice.
+    auto notInScope = llvm::none_of(gps, [=](Type t) {
+      return t->getCanonicalType() == canSubject;
+    });
 
     // If the inverse is on a subject that wasn't permitted by our caller, then
     // remove and diagnose as an error. This can happen when an inner context
@@ -817,44 +800,60 @@ void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
     //       func f() where Self: ~Copyable
     //     }
     //
-    if (defaults.count(subject) == 0) {
+    if (notInScope) {
       errors.push_back(
-          RequirementError::forInvalidInverseOuterSubject(req, structReq.loc));
-      return true;
+          RequirementError::forInvalidInverseOuterSubject(inverse));
+      continue;
     }
 
-    auto currentDefaults = defaults[subject];
-    auto inverseKind = inverse->getInverseKind();
+    auto state = inverses.getOrInsertDefault(canSubject);
 
-    // Check if this inverse is redundant.
-    if (!currentDefaults.contains(inverseKind)) {
+    // Check if this inverse has already been seen.
+    auto inverseKind = inverse.getKind();
+    if (state.contains(inverseKind)) {
       errors.push_back(
-          RequirementError::forRedundantRequirement(req, structReq.loc));
-      return true;
+          RequirementError::forRedundantInverseRequirement(inverse));
+      continue;
     }
 
-    // Apply the inverse to the subject's defaults.
-    currentDefaults.remove(inverseKind);
-    defaults[subject] = currentDefaults;
-
-    // Remove this inverse conformance requirement.
-    return true;
-  }), result.end());
-
-  for (auto &[subject, remainingDefaults] : defaults) {
-    // Expand the remaining default conformance requirements for this subject.
-    for (auto ip : remainingDefaults) {
-      ProtocolDecl *decl = ctx.getProtocol(getKnownProtocolKind(ip));
-      if (!decl) llvm_unreachable("missing known protocol!");
-
-      SourceLoc loc = decl->getLoc();
-      Type protocolType = decl->getDeclaredInterfaceType();
-
-      // Add the protocol as an "inferred" requirement.
-      Requirement req(RequirementKind::Conformance, subject, protocolType);
-      result.push_back({req, loc, /*wasInferred=*/true});
-    }
+    state.insert(inverseKind);
+    inverses[canSubject] = state;
   }
+
+  // Scan the structural requirements and cancel out any inferred requirements
+  // based on the inverses we saw.
+  result.erase(llvm::remove_if(result, [&](StructuralRequirement structReq) {
+    auto req = structReq.req;
+
+    if (req.getKind() != RequirementKind::Conformance)
+      return false;
+
+    // Only consider requirements from defaults-expansion...
+    if (!structReq.fromDefault)
+      return false;
+
+    // involving an invertible protocol.
+    llvm::Optional<InvertibleProtocolKind> proto;
+    if (auto kp = req.getProtocolDecl()->getKnownProtocolKind())
+      if (auto ip = getInvertibleProtocolKind(*kp))
+        proto = *ip;
+
+    if (!proto) {
+      assert(false && "suspicious!");
+      return false;
+    }
+
+    // See if this subject is in-scope.
+    auto subject = req.getFirstType()->getCanonicalType();
+    auto result = inverses.find(subject);
+    if (result == inverses.end())
+      return false;
+
+    // We now have found the inferred constraint 'Subject : Proto'.
+    // So, remove it if we have recorded a 'Subject : ~Proto'.
+    auto recordedInverses = result->getSecond();
+    return recordedInverses.contains(*proto);
+  }), result.end());
 }
 
 /// Collect structural requirements written in the inheritance clause of an
@@ -916,11 +915,13 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   SmallVector<StructuralRequirement, 2> result;
   SmallVector<RequirementError, 2> errors;
+  SmallVector<InverseRequirement> inverses;
+
+  SmallVector<Type, 4> needsDefaultRequirements;
+  InverseRequirement::enumerateDefaultedParams(proto, needsDefaultRequirements);
 
   auto &ctx = proto->getASTContext();
   auto selfTy = proto->getSelfInterfaceType();
-
-  SmallVector<Type, 4> needsDefaultRequirements({selfTy});
 
   unsigned errorCount = errors.size();
   realizeInheritedRequirements(proto, selfTy,
@@ -961,8 +962,9 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     result.push_back({Requirement(RequirementKind::Layout, selfTy, layout),
                       proto->getLoc(), /*inferred=*/true});
 
-    desugarRequirements(result, errors);
-    expandDefaultRequirements(ctx, needsDefaultRequirements, result, errors);
+    desugarRequirements(result, inverses, errors);
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
+    applyInverses(ctx, needsDefaultRequirements, inverses, result, errors);
 
     diagnoseRequirementErrors(ctx, errors,
                               AllowConcreteTypePolicy::NestedAssocTypes);
@@ -991,8 +993,6 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                              result, errors);
           return false;
         });
-
-    needsDefaultRequirements.push_back(assocType);
   }
 
   // Add requirements for each typealias.
@@ -1030,8 +1030,10 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  desugarRequirements(result, errors);
-  expandDefaultRequirements(ctx, needsDefaultRequirements, result, errors);
+  desugarRequirements(result, inverses, errors);
+
+  InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
+  applyInverses(ctx, needsDefaultRequirements, inverses, result, errors);
 
   diagnoseRequirementErrors(ctx, errors,
                             AllowConcreteTypePolicy::NestedAssocTypes);
@@ -1059,6 +1061,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
   SmallVector<Requirement, 2> result;
   SmallVector<RequirementError, 2> errors;
+  SmallVector<InverseRequirement, 4> ignoredInverses;
 
   auto &ctx = proto->getASTContext();
 
@@ -1103,7 +1106,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     desugarRequirement(Requirement(RequirementKind::SameType,
                                    getStructuralType(first),
                                    getStructuralType(second)),
-                               SourceLoc(), result, errors);
+                               SourceLoc(), result, ignoredInverses, errors);
   };
 
   // Local function to find the insertion point for the protocol's "where"

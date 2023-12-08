@@ -115,8 +115,10 @@ class RequirementMachine final {
 
   void freeze();
 
-  void computeRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
-                                     SourceLoc signatureLoc);
+  void computeRequirementDiagnostics(
+                            SmallVectorImpl<RequirementError> &errors,
+                            ArrayRef<InverseRequirement> inverses,
+                            SourceLoc signatureLoc);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 

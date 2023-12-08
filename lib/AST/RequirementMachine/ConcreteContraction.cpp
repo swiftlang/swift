@@ -690,6 +690,7 @@ bool ConcreteContraction::performConcreteContraction(
     // Otherwise, desugar the requirement again, since we might now have a
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
+    SmallVector<InverseRequirement, 4> ignoreInverses;
     if (req.inferred) {
       // Discard errors from desugaring a substituted requirement that
       // was inferred. For example, if we have something like
@@ -703,9 +704,10 @@ bool ConcreteContraction::performConcreteContraction(
       // but we want to ignore that, since the user did not explicitly
       // write 'Int : Hashable' (or 'T : Hashable') anywhere.
       SmallVector<RequirementError, 4> discardErrors;
-      desugarRequirement(substReq, SourceLoc(), reqs, discardErrors);
+      desugarRequirement(substReq, SourceLoc(), reqs,
+                         ignoreInverses, discardErrors);
     } else {
-      desugarRequirement(substReq, req.loc, reqs, errors);
+      desugarRequirement(substReq, req.loc, reqs, ignoreInverses, errors);
     }
 
     for (auto desugaredReq : reqs) {

@@ -966,9 +966,7 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
   };
 
   auto isInverseTarget = [&](Type t) -> bool {
-    if (auto inverse = t->getAs<InverseType>())
-      return inverse->getInverseKind() == TARGET;
-    else if (auto pct = t->getAs<ProtocolCompositionType>())
+    if (auto pct = t->getAs<ProtocolCompositionType>())
       return pct->getInverses().contains(TARGET);
 
     return false;
@@ -1067,7 +1065,7 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
         return false;
 
       // Check constraint type
-      auto loc = repr->getSecondTypeRepr()->getLoc();
+      auto loc = repr->getConstraintRepr()->getLoc();
       auto constraint = req.getSecondType();
 
       if (isTarget(constraint))

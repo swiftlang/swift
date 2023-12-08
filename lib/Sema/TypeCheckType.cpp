@@ -5029,11 +5029,6 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         continue;
       }
 
-      if (auto inverse = ty->getAs<InverseType>()) {
-        Inverses.insert(inverse->getInverseKind());
-        continue;
-      }
-
       if (ty->is<ParameterizedProtocolType>() &&
           !options.isConstraintImplicitExistential() &&
           options.getContext() != TypeResolverContext::ExistentialConstraint) {
@@ -5042,7 +5037,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         continue;
       }
 
-      if (ty->is<ProtocolCompositionType>()) {
+      if (auto pct = ty->getAs<ProtocolCompositionType>()) {
         auto layout = ty->getExistentialLayout();
         if (auto superclass = layout.explicitSuperclass)
           if (checkSuperclass(tyR->getStartLoc(), superclass))
@@ -5050,6 +5045,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         if (!layout.getProtocols().empty())
           HasProtocol = true;
 
+        Inverses.insertAll(pct->getInverses());
         Members.push_back(ty);
         continue;
       }
@@ -5197,8 +5193,8 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
     return ErrorType::get(getASTContext());
 
   if (auto kp = ty->getKnownProtocol())
-    if (getInvertibleProtocolKind(*kp))
-      return InverseType::get(ty);
+    if (auto kind = getInvertibleProtocolKind(*kp))
+      return ProtocolCompositionType::getInverseOf(getASTContext(), *kind);
 
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());

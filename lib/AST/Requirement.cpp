@@ -14,8 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
@@ -242,4 +244,73 @@ int Requirement::compare(const Requirement &other) const {
   assert(compareProtos != 0 && "Duplicate conformance requirements");
 
   return compareProtos;
+}
+
+InverseRequirement::InverseRequirement(Type subject,
+                                       ProtocolDecl *protocol,
+                                       SourceLoc loc)
+    : subject(subject), protocol(protocol), loc(loc) {
+  // Ensure it's an invertible protocol.
+  assert(protocol);
+  assert(protocol->getKnownProtocolKind());
+  assert(getInvertibleProtocolKind(*(protocol->getKnownProtocolKind())));
+}
+
+InvertibleProtocolKind InverseRequirement::getKind() const {
+  return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
+}
+
+
+void InverseRequirement::enumerateDefaultedParams(
+    TypeDecl *decl,
+    SmallVectorImpl<Type> &result) {
+
+  auto add = [&](Type t) {
+    assert(t->is<GenericTypeParamType>() || t->is<DependentMemberType>());
+    result.push_back(t);
+  };
+
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    add(proto->getSelfInterfaceType());
+
+    for (auto *assocTypeDecl : proto->getAssociatedTypeMembers())
+      add(assocTypeDecl->getDeclaredInterfaceType());
+
+  } else if (auto gtd = dyn_cast<GenericTypeDecl>(decl)) {
+    for (GenericTypeParamDecl *gtpd : *gtd->getGenericParams())
+      add(gtpd->getDeclaredInterfaceType());
+
+  } else if (auto gtpd = dyn_cast<GenericTypeParamDecl>(decl)) {
+    add(gtpd->getDeclaredInterfaceType());
+  }
+}
+
+void InverseRequirement::expandDefault(
+    Type gp,
+    SourceLoc loc,
+    SmallVectorImpl<StructuralRequirement> &result) {
+  auto &ctx = gp->getASTContext();
+
+  for (auto ip : InvertibleProtocolSet::full()) {
+    auto protoTy =
+        ctx.getProtocol(getKnownProtocolKind(ip))->getDeclaredInterfaceType();
+    result.push_back({
+      { RequirementKind::Conformance, gp, protoTy },
+       loc,
+       /*inferred=*/true,
+       /*default=*/true,
+    });
+  }
+}
+
+void InverseRequirement::expandDefaults(
+    ASTContext &ctx,
+    ArrayRef<Type> gps,
+    SmallVectorImpl<StructuralRequirement> &result) {
+
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return;
+
+  for (auto gp : gps)
+    InverseRequirement::expandDefault(gp, SourceLoc(), result);
 }
