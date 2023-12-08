@@ -670,7 +670,7 @@ function Build-CMakeProject {
 
           $SwiftArgs += @("-resource-dir", "$SwiftResourceDir")
           $SwiftArgs += @("-L", "$SwiftResourceDir\windows")
-          $SwiftArgs += @("-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml")
+          $SwiftArgs += @("-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml", "-strict-implicit-module-context", "-Xcc", "-Xclang", "-Xcc", "-fbuiltin-headers-in-system-modules")
         }
       } else {
         $SwiftArgs += @("-sdk", (Get-PinnedToolchainSDK))
