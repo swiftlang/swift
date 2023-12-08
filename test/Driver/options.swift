@@ -124,10 +124,10 @@
 // RUN: not %swiftc_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
 // INVALID_DWARF_VERSION: invalid value '{{1|6}}' in '-dwarf-version={{1|6}}'
 
-// RUN: %swift_driver -### -g -dwarf-fission -o %t/dwarf-fission.o %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION %s
-// DWARF_FISSION: -split-dwarf-output {{.*}}/dwarf-fission.dwo
+// RUN: %swiftc_driver -### -g -dwarf-fission -o dwarf-fission.o %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION %s
+// DWARF_FISSION: -split-dwarf-output dwarf-fission.dwo
 
-// RUN: %swift_driver -### -g -dwarf-fission -emit-object -module-name test -output-file-map Inputs/fission-ofm.json Inputs/main.swift Inputs/lib.swift %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION_MULTI %s
+// RUN: %swiftc_driver -### -g -dwarf-fission -emit-object -module-name test -output-file-map Inputs/fission-ofm.json Inputs/main.swift Inputs/lib.swift %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION_MULTI %s
 // DWARF_FISSION_MULTI: -primary-file main.swift {{.*}} -split-dwarf-output main.dwo {{.*}} -o main.o
 // DWARF_FISSION_MULTI: -primary-file lib.swift {{.*}} -split-dwarf-output lib.dwo {{.*}} -o lib.o
 
