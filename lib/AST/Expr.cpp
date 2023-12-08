@@ -2769,10 +2769,15 @@ MacroExpansionExpr *MacroExpansionExpr::create(
 ) {
   ASTContext &ctx = dc->getASTContext();
   MacroExpansionInfo *info = new (ctx) MacroExpansionInfo{
-      sigilLoc, macroName, macroNameLoc,
-      leftAngleLoc, rightAngleLoc, genericArgs,
-      argList ? argList : ArgumentList::createImplicit(ctx, {})
-  };
+      sigilLoc,
+      /*moduleName*/ DeclNameRef(),
+      /*moduleNameLoc*/ DeclNameLoc(),
+      macroName,
+      macroNameLoc,
+      leftAngleLoc,
+      rightAngleLoc,
+      genericArgs,
+      argList ? argList : ArgumentList::createImplicit(ctx, {})};
   return new (ctx) MacroExpansionExpr(dc, info, roles, isImplicit, ty);
 }
 

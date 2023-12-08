@@ -1367,9 +1367,9 @@ namespace {
           return Type();
 
         auto macroIdent = ctx.getIdentifier(kind);
-        auto macros = lookupMacros(
-            macroIdent, FunctionRefKind::Unapplied,
-            MacroRole::Expression);
+        auto macros =
+            lookupMacros(Identifier(), macroIdent, FunctionRefKind::Unapplied,
+                         MacroRole::Expression);
         if (!macros.empty()) {
           // Introduce an overload set for the macro reference.
           auto locator = CS.getConstraintLocator(expr);
@@ -3993,13 +3993,13 @@ namespace {
     }
 
     /// Lookup all macros with the given macro name.
-    SmallVector<OverloadChoice, 1>
-    lookupMacros(Identifier macroName,
-                 FunctionRefKind functionRefKind,
-                 MacroRoles roles) {
+    SmallVector<OverloadChoice, 1> lookupMacros(Identifier moduleName,
+                                                Identifier macroName,
+                                                FunctionRefKind functionRefKind,
+                                                MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
-      auto results = namelookup::lookupMacros(
-          CurDC, DeclNameRef(macroName), roles);
+      auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
+                                              DeclNameRef(macroName), roles);
       for (const auto &result : results) {
         OverloadChoice choice = OverloadChoice(Type(), result, functionRefKind);
         choices.push_back(choice);
@@ -4021,10 +4021,11 @@ namespace {
       CS.associateArgumentList(locator, expr->getArgs());
 
       // Look up the macros with this name.
+      auto moduleIdent = expr->getModuleName().getBaseIdentifier();
       auto macroIdent = expr->getMacroName().getBaseIdentifier();
       FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
-      auto macros = lookupMacros(
-          macroIdent, functionRefKind, expr->getMacroRoles());
+      auto macros = lookupMacros(moduleIdent, macroIdent, functionRefKind,
+                                 expr->getMacroRoles());
       if (macros.empty()) {
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                            macroIdent)

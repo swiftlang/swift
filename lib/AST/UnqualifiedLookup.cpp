@@ -281,6 +281,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
                                   "performUnqualifiedLookup",
                                   DC->getParentSourceFile());
 
+  if (options.contains(UnqualifiedLookupFlags::ModuleLookup)) {
+    lookForAModuleWithTheGivenName(DC->getModuleScopeContext());
+    recordCompletionOfAScope();
+    return;
+  }
+
   if (Loc.isValid() && DC->getParentSourceFile()) {
     // Operator lookup is always global, for the time being.
     if (!Name.isOperator())
