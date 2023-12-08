@@ -1438,6 +1438,18 @@ AllowInvalidPackExpansion::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) AllowInvalidPackExpansion(cs, locator);
 }
 
+bool IgnoreWhereClauseInPackIteration::diagnose(const Solution &solution,
+                                                bool asNote) const {
+  InvalidWhereClauseInPackIteration failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreWhereClauseInPackIteration *
+IgnoreWhereClauseInPackIteration::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreWhereClauseInPackIteration(cs, locator);
+}
+
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
                                                    bool asNote) const {
   CollectionElementContextualFailure failure(

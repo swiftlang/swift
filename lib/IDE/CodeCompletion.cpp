@@ -1070,6 +1070,8 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addSuperKeyword(Sink, CurDeclContext);
     addExprKeywords(Sink, CurDeclContext);
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
+    if (Kind == CompletionKind::ForEachSequence)
+      addKeyword(Sink, "repeat", CodeCompletionKeywordKind::kw_repeat);
     break;
 
   case CompletionKind::CallArg:

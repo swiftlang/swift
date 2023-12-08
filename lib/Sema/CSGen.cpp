@@ -3198,18 +3198,9 @@ namespace {
         auto expansionType =
             CS.getType(packEnvironment)->castTo<PackExpansionType>();
         CS.addConstraint(ConstraintKind::ShapeOf, expansionType->getCountType(),
-                         elementType,
+                         packType,
                          CS.getConstraintLocator(packEnvironment,
                                                  ConstraintLocator::PackShape));
-        auto *elementShape = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::PackShape),
-            TVO_CanBindToPack);
-        CS.addConstraint(
-            ConstraintKind::ShapeOf, elementShape, elementType,
-            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
-        CS.addConstraint(
-            ConstraintKind::Equal, elementShape, expansionType->getCountType(),
-            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
       } else {
         CS.recordFix(AllowInvalidPackReference::create(
             CS, packType, CS.getConstraintLocator(expr->getPackRefExpr())));
@@ -4455,17 +4446,51 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
   return false;
 }
 
-static llvm::Optional<SyntacticElementTarget>
-generateForEachStmtConstraints(ConstraintSystem &cs,
-                               SyntacticElementTarget target) {
+/// Generate constraints for a for-in statement preamble, expecting a
+/// `PackExpansionExpr`.
+static llvm::Optional<PackIterationInfo>
+generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
+                               PackExpansionExpr *expansion, Type patternType) {
+  auto packIterationInfo = PackIterationInfo();
+  auto elementLocator = cs.getConstraintLocator(
+      expansion, ConstraintLocator::SequenceElementType);
+
+  {
+    SyntacticElementTarget target(expansion, dc, CTP_Unused,
+                                  /*contextualType=*/Type(),
+                                  /*isDiscarded=*/false);
+
+    if (cs.generateConstraints(target))
+      return llvm::None;
+
+    cs.setTargetFor(expansion, target);
+  }
+
+  auto elementType = cs.getType(expansion->getPatternExpr());
+
+  cs.addConstraint(ConstraintKind::Conversion, elementType, patternType,
+                   elementLocator);
+
+  packIterationInfo.patternType = patternType;
+  return packIterationInfo;
+}
+
+/// Generate constraints for a for-in statement preamble, expecting an
+/// expression that conforms to `Swift.Sequence`.
+static llvm::Optional<SequenceIterationInfo>
+generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
+                               ForEachStmt *stmt, Pattern *typeCheckedPattern,
+                               bool shouldBindPatternVarsOneWay,
+                               bool ignoreForEachWhereClause) {
   ASTContext &ctx = cs.getASTContext();
-  auto forEachStmtInfo = target.getForEachStmtInfo();
-  ForEachStmt *stmt = target.getAsForEachStmt();
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getParsedSequence();
-  auto *dc = target.getDeclContext();
   auto contextualLocator = cs.getConstraintLocator(
       sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+  auto elementLocator = cs.getConstraintLocator(
+      sequenceExpr, ConstraintLocator::SequenceElementType);
+
+  auto sequenceIterationInfo = SequenceIterationInfo();
 
   // The expression type must conform to the Sequence protocol.
   auto sequenceProto = TypeChecker::getProtocol(
@@ -4498,7 +4523,6 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
 
     auto *makeIteratorCall =
         CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
-
     Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
     auto *PB = PatternBindingDecl::createImplicit(
         ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
@@ -4514,8 +4538,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
     if (cs.generateConstraints(makeIteratorTarget))
       return llvm::None;
 
-    forEachStmtInfo.makeIteratorVar = PB;
-
+    sequenceIterationInfo.makeIteratorVar = PB;
     // Type of sequence expression has to conform to Sequence protocol.
     //
     // Note that the following emulates having `$generator` separately
@@ -4534,7 +4557,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
                        sequenceProto->getDeclaredInterfaceType(),
                        contextualLocator);
 
-      forEachStmtInfo.sequenceType = cs.getType(sequenceExpr);
+      sequenceIterationInfo.sequenceType = cs.getType(sequenceExpr);
     }
 
     cs.setTargetFor({PB, /*index=*/0}, makeIteratorTarget);
@@ -4578,27 +4601,14 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
     if (cs.generateConstraints(nextTarget, FreeTypeVariableBinding::Disallow))
       return llvm::None;
 
-    forEachStmtInfo.nextCall = nextTarget.getAsExpr();
-    cs.setTargetFor(forEachStmtInfo.nextCall, nextTarget);
+    sequenceIterationInfo.nextCall = nextTarget.getAsExpr();
+    cs.setTargetFor(sequenceIterationInfo.nextCall, nextTarget);
   }
 
-  Pattern *pattern = TypeChecker::resolvePattern(stmt->getPattern(), dc,
-                                                 /*isStmtCondition*/ false);
-  if (!pattern)
-    return llvm::None;
-
-  auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-  Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    return llvm::None;
-  }
-
-  // Collect constraints from the element pattern.
-  auto elementLocator = cs.getConstraintLocator(
-      sequenceExpr, ConstraintLocator::SequenceElementType);
+  // Generate constraints for the pattern
   Type initType =
-      cs.generateConstraints(pattern, elementLocator,
-                             target.shouldBindPatternVarsOneWay(), nullptr, 0);
+      cs.generateConstraints(typeCheckedPattern, elementLocator,
+                             shouldBindPatternVarsOneWay, nullptr, 0);
   if (!initType)
     return llvm::None;
 
@@ -4609,7 +4619,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
   auto elementType = cs.createTypeVariable(elementTypeLoc,
                                            /*flags=*/0);
   {
-    auto nextType = cs.getType(forEachStmtInfo.nextCall);
+    auto nextType = cs.getType(sequenceIterationInfo.nextCall);
     cs.addConstraint(ConstraintKind::OptionalObject, nextType, elementType,
                      elementTypeLoc);
     cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
@@ -4618,7 +4628,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
 
   // Generate constraints for the "where" expression, if there is one.
   auto *whereExpr = stmt->getWhere();
-  if (whereExpr && !target.ignoreForEachWhereClause()) {
+  if (whereExpr && !ignoreForEachWhereClause) {
     Type boolType = dc->getASTContext().getBoolType();
     if (!boolType)
       return llvm::None;
@@ -4635,10 +4645,66 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
   }
 
   // Populate all of the information for a for-each loop.
-  forEachStmtInfo.elementType = elementType;
-  forEachStmtInfo.initType = initType;
+  sequenceIterationInfo.elementType = elementType;
+  sequenceIterationInfo.initType = initType;
+
+  return sequenceIterationInfo;
+}
+
+static llvm::Optional<SyntacticElementTarget>
+generateForEachStmtConstraints(ConstraintSystem &cs,
+                               SyntacticElementTarget target) {
+  ForEachStmt *stmt = target.getAsForEachStmt();
+  auto *forEachExpr = stmt->getParsedSequence();
+  auto *dc = target.getDeclContext();
+
+  auto elementLocator = cs.getConstraintLocator(
+      forEachExpr, ConstraintLocator::SequenceElementType);
+
+  Pattern *pattern = TypeChecker::resolvePattern(stmt->getPattern(), dc,
+                                                 /*isStmtCondition*/ false);
+  if (!pattern)
+    return llvm::None;
   target.setPattern(pattern);
-  target.getForEachStmtInfo() = forEachStmtInfo;
+
+  auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+
+  if (TypeChecker::typeCheckPattern(contextualPattern)->hasError()) {
+    return llvm::None;
+  }
+
+  if (isa<PackExpansionExpr>(forEachExpr)) {
+    auto *expansion = cast<PackExpansionExpr>(forEachExpr);
+
+    // Generate constraints for the pattern
+    Type patternType = cs.generateConstraints(
+        pattern, elementLocator, target.shouldBindPatternVarsOneWay(), nullptr,
+        0);
+    if (!patternType)
+      return llvm::None;
+
+    if (auto whereClause = stmt->getWhere()) {
+      cs.recordFix(IgnoreWhereClauseInPackIteration::create(
+          cs, cs.getConstraintLocator(whereClause)));
+    }
+
+    auto packIterationInfo =
+        generateForEachStmtConstraints(cs, dc, expansion, patternType);
+    if (!packIterationInfo) {
+      return llvm::None;
+    }
+
+    target.getForEachStmtInfo() = *packIterationInfo;
+  } else {
+    auto sequenceIterationInfo = generateForEachStmtConstraints(
+        cs, dc, stmt, pattern, target.shouldBindPatternVarsOneWay(),
+        target.ignoreForEachWhereClause());
+    if (!sequenceIterationInfo) {
+      return llvm::None;
+    }
+
+    target.getForEachStmtInfo() = *sequenceIterationInfo;
+  }
   return target;
 }
 

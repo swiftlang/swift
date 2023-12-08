@@ -9313,11 +9313,7 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
   }
 
   if (isSingleUnlabeledPackExpansionTuple(patternType)) {
-    auto *packVar =
-        createTypeVariable(getConstraintLocator(locator), TVO_CanBindToPack);
-    addConstraint(ConstraintKind::MaterializePackExpansion, patternType,
-                  packVar,
-                  getConstraintLocator(locator, {ConstraintLocator::Member}));
+    auto *packVar = addMaterializePackExpansionConstraint(patternType, locator);
     addConstraint(ConstraintKind::PackElementOf, elementType, packVar, locator);
     return SolutionKind::Solved;
   }
@@ -13453,6 +13449,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
     return SolutionKind::Solved;
   }
 
+  if (isSingleUnlabeledPackExpansionTuple(packTy)) {
+    auto *packVar = addMaterializePackExpansionConstraint(packTy, locator);
+    addConstraint(ConstraintKind::ShapeOf, shapeTy, packVar, locator);
+    return SolutionKind::Solved;
+  }
+
   // Map element archetypes to the pack context to check for equality.
   if (packTy->hasElementArchetype()) {
     auto *packEnv = DC->getGenericEnvironmentOfContext();
@@ -14908,6 +14910,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidPackElement:
   case FixKind::AllowInvalidPackReference:
   case FixKind::AllowInvalidPackExpansion:
+  case FixKind::IgnoreWhereClauseInPackIteration:
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
   case FixKind::AllowAssociatedValueMismatch:
@@ -15634,6 +15637,16 @@ void ConstraintSystem::addExplicitConversionConstraint(
   }
 
   addDisjunctionConstraint(constraints, locator, rememberChoice);
+}
+
+TypeVariableType *ConstraintSystem::addMaterializePackExpansionConstraint(
+    Type patternType, ConstraintLocatorBuilder locator) {
+  assert(isSingleUnlabeledPackExpansionTuple(patternType));
+  TypeVariableType *packVar =
+      createTypeVariable(getConstraintLocator(locator), TVO_CanBindToPack);
+  addConstraint(ConstraintKind::MaterializePackExpansion, patternType, packVar,
+                getConstraintLocator(locator, {ConstraintLocator::Member}));
+  return packVar;
 }
 
 ConstraintSystem::SolutionKind

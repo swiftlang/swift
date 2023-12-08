@@ -1903,6 +1903,16 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose that a `where` clause is not supported with pack iteration.
+class InvalidWhereClauseInPackIteration final : public FailureDiagnostic {
+public:
+  InvalidWhereClauseInPackIteration(const Solution &solution,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:

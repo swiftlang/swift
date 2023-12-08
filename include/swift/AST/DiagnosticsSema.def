@@ -5859,8 +5859,8 @@ ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
       "tuple element, or generic argument of a variadic type", (Type))
 ERROR(expansion_expr_not_allowed,none,
-      "value pack expansion can only appear inside a function argument list "
-      "or tuple element", ())
+      "value pack expansion can only appear inside a function argument list, "
+      "tuple element, or as the expression of a for-in loop", ())
 ERROR(invalid_expansion_argument,none,
       "cannot pass value pack expansion to non-pack parameter of type %0",
       (Type))
@@ -7729,6 +7729,13 @@ ERROR(referencebindings_binding_must_be_to_lvalue,none,
 
 ERROR(result_depends_on_no_result,none,
       "Incorrect use of %0 with no result", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Pack Iteration Diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(pack_iteration_where_clause_not_supported, none,
+      "'where' clause in pack iteration is not supported", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

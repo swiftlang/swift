@@ -446,6 +446,9 @@ void ForEachStmt::setPattern(Pattern *p) {
 }
 
 Expr *ForEachStmt::getTypeCheckedSequence() const {
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(getParsedSequence()))
+    return expansion;
+
   return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
 }
 
