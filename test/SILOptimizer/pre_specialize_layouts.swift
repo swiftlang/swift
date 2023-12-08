@@ -66,14 +66,15 @@ public func testPublic<T>(t: T) {
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Float)
 @_specialize(exported: true, where @_noMetadata T : _Class)
+@_specialize(exported: true, where @_noMetadata T : _BridgeObject)
 @_specialize(exported: true, availability: macOS 10.5, *; where T == Double)
 @_alwaysEmitIntoClient
 internal func testEmitIntoClient<T>(t: T) {
   print(t)
 }
 
-// OPT: sil @$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overalignedyAA016ReferenceWrapperI0V_AA011OveralignedklI0VtF : $@convention(thin) (@guaranteed ReferenceWrapperStruct, @guaranteed OveralignedReferenceWrapperStruct) -> () {
-// OPT: bb0([[P1:%.*]] : $ReferenceWrapperStruct, [[P2:%.*]] : $OveralignedReferenceWrapperStruct):
+// OPT: sil @$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overaligned5arrayyAA016ReferenceWrapperI0V_AA011OveralignedlmI0VSaySiGtF : $@convention(thin) (@guaranteed ReferenceWrapperStruct, @guaranteed OveralignedReferenceWrapperStruct, @guaranteed Array<Int>) -> () {
+// OPT: bb0([[P1:%.*]] : $ReferenceWrapperStruct, [[P2:%.*]] : $OveralignedReferenceWrapperStruct, [[P3:%.*]] : $Array<Int>):
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFSi_Ts5 : $@convention(thin) (Int) -> ()
 // OPT:   apply [[F1]]
 // OPT:   [[F2:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
@@ -87,13 +88,16 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT: apply [[F7]]([[A2]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
 // OPT: [[A3:%.*]] = alloc_stack $OveralignedReferenceWrapperStruct
 // OPT: apply {{%.*}}<OveralignedReferenceWrapperStruct>([[A3]])
+// OPT-macosx: [[F8:%.*]] = function_ref @$s30pre_specialized_module_layouts20publicPrespecializedyyxlFBb_Ts5 : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
+// OPT-macosx: [[A4:%.*]] = unchecked_bitwise_cast [[P3]] : $Array<Int> to $Builtin.BridgeObject
+// OPT-macosx: apply [[F8]]([[A4]]) : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
 // OPT:   [[F3:%.*]] = function_ref @$s30pre_specialized_module_layouts36internalEmitIntoClientPrespecializedyyxlFSi_Ts5 : $@convention(thin) (Int) -> ()
 // OPT:   apply [[F3]]
 // OPT:   [[F4:%.*]] = function_ref @$s30pre_specialized_module_layouts36internalEmitIntoClientPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
 // OPT:   apply [[F4]]
 // OPT:   [[F5:%.*]] = function_ref @$s30pre_specialized_module_layouts16useInternalThingyyxlFSi_Tg5
 // OPT:   apply [[F5]]({{.*}}) : $@convention(thin) (Int) -> ()
-// OPT: } // end sil function '$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overalignedyAA016ReferenceWrapperI0V_AA011OveralignedklI0VtF'
+// OPT: } // end sil function '$s22pre_specialize_layouts28usePrespecializedEntryPoints13wrapperStruct11overaligned5arrayyAA016ReferenceWrapperI0V_AA011OveralignedlmI0VSaySiGtF'
 
 // OPT: sil {{.*}} @$s30pre_specialized_module_layouts16useInternalThingyyxlFSi_Tg5 : $@convention(thin) (Int) -> () {
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts14InternalThing2V7computexyFSi_Ts5 : $@convention(method) (InternalThing2<Int>) -> Int
@@ -138,7 +142,7 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   [[R10:%.*]] = unchecked_addr_cast [[R9]] : $*AnyObject to $*SomeClass
 // OPT: } // end sil function '$s30pre_specialized_module_layouts16useInternalThingyyxlFAA9SomeClassC_Tg5'
 
-public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct) {
+public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct, array: [Int]) {
   publicPrespecialized(1)
   publicPrespecialized(1.0)
   publicPrespecialized(SomeData())
@@ -146,6 +150,7 @@ public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, 
   publicPrespecialized(wrapperStruct)
   // should not apply _Class specialization for overaligned struct
   publicPrespecialized(overaligned)
+  publicPrespecialized(array)
   useInternalEmitIntoClientPrespecialized(2)
   useInternalEmitIntoClientPrespecialized(2.0)
   useInternalThing(2)
@@ -170,19 +175,29 @@ public func usePrespecializedThrowsEntryPoints() throws {
   consume(try publicPrespecializedThrows(SomeClass()))
 }
 
-// OPT: {{bb.*}}([[A1:%.*]] : $SomeClass, [[A2:%.*]] : $SomeOtherClass, [[A3:%.*]] : $Int64):
+// OPT: sil @$s22pre_specialize_layouts40usePresepcializedMultipleIndirectResults___2xs2ysy0a20_specialized_module_C09SomeClassC_AA0m5OtherN0Cs5Int64VSaySiGSaySfGtF : $@convention(thin) (@guaranteed SomeClass, @guaranteed SomeOtherClass, Int64, @guaranteed Array<Int>, @guaranteed Array<Float>) -> () {
+// OPT: {{bb.*}}([[P1:%.*]] : $SomeClass, [[P2:%.*]] : $SomeOtherClass, [[P3:%.*]] : $Int64, [[P4:.*]] : $Array<Int>, [[P5:%.*]] : $Array<Float>):
 // OPT:   [[R1:%.*]] = alloc_stack $SomeOtherClass
 // OPT:   [[R2:%.*]] = alloc_stack $SomeClass
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts43publicPresepcializedMultipleIndirectResultsyq__s5Int64Vxtx_q_ADtr0_lFyXl_yXlTs5 : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Int64) -> (@out AnyObject, Int64, @out AnyObject)
 // OPT:   [[R3:%.*]] = unchecked_addr_cast [[R1]] : $*SomeOtherClass to $*AnyObject
 // OPT:   [[R4:%.*]] = unchecked_addr_cast [[R2]] : $*SomeClass to $*AnyObject
-// OPT:   [[A4:%.*]] = unchecked_ref_cast [[A1]] : $SomeClass to $AnyObject
-// OPT:   [[A5:%.*]] = unchecked_ref_cast [[A2]] : $SomeOtherClass to $AnyObject
-// OPT:   [[R5:%.*]] = apply [[F1]]([[R3]], [[R4]], [[A4]], [[A5]], [[A3]]) : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Int64) -> (@out AnyObject, Int64, @out AnyObject)
-// OPT: } // end sil function '$s22pre_specialize_layouts40usePresepcializedMultipleIndirectResultsyy0a20_specialized_module_C09SomeClassC_AA0k5OtherL0Cs5Int64VtF'
+// OPT:   [[A1:%.*]] = unchecked_ref_cast [[P1]] : $SomeClass to $AnyObject
+// OPT:   [[A2:%.*]] = unchecked_ref_cast [[P2]] : $SomeOtherClass to $AnyObject
+// OPT:   apply [[F1]]([[R3]], [[R4]], [[A1]], [[A2]], [[P3]]) : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Int64) -> (@out AnyObject, Int64, @out AnyObject)
+// OPT-macosx:   [[R6:%.*]] = alloc_stack $Array<Float>
+// OPT-macosx:   [[R7:%.*]] = alloc_stack $Array<Int>
+// OPT-macosx:   [[F2:%.*]] = function_ref @$s30pre_specialized_module_layouts43publicPresepcializedMultipleIndirectResultsyq__s5Int64Vxtx_q_ADtr0_lFBb_BbTs5 : $@convention(thin) (@guaranteed Builtin.BridgeObject, @guaranteed Builtin.BridgeObject, Int64) -> (@out Builtin.BridgeObject, Int64, @out Builtin.BridgeObject)
+// OPT-macosx:   [[R8:%.*]] = unchecked_addr_cast [[R6]] : $*Array<Float> to $*Builtin.BridgeObject
+// OPT-macosx:   [[R9:%.*]] = unchecked_addr_cast [[R7]] : $*Array<Int> to $*Builtin.BridgeObject
+// OPT-macosx:   [[A3:%.*]] = unchecked_bitwise_cast [[P4]] : $Array<Int> to $Builtin.BridgeObject
+// OPT-macosx:   [[A4:%.*]] = unchecked_bitwise_cast [[P5]] : $Array<Float> to $Builtin.BridgeObject
+// OPT-macosx:   [[F2]]([[R8]], [[R9]], [[A3]], [[A4]], [[P3]]) : $@convention(thin) (@guaranteed Builtin.BridgeObject, @guaranteed Builtin.BridgeObject, Int64) -> (@out Builtin.BridgeObject, Int64, @out Builtin.BridgeObject) // user: %38
+// OPT: } // end sil function '$s22pre_specialize_layouts40usePresepcializedMultipleIndirectResults___2xs2ysy0a20_specialized_module_C09SomeClassC_AA0m5OtherN0Cs5Int64VSaySiGSaySfGtF'
 public final class SomeOtherClass {}
-public func usePresepcializedMultipleIndirectResults(_ c: SomeClass, _ d: SomeOtherClass, _ x: Int64) {
+public func usePresepcializedMultipleIndirectResults(_ c: SomeClass, _ d: SomeOtherClass, _ x: Int64, xs: [Int], ys: [Float]) {
   consume(publicPresepcializedMultipleIndirectResults(c, d, x))
+  consume(publicPresepcializedMultipleIndirectResults(xs, ys, x))
 }
 
 // OPT: sil [noinline] @$s22pre_specialize_layouts15usePartialApply1y0a20_specialized_module_C09SomeClassCAFcAF_tF : $@convention(thin) (@guaranteed SomeClass) -> @owned @callee_guaranteed (@guaranteed SomeClass) -> @owned SomeClass {

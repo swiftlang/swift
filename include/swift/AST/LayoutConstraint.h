@@ -112,6 +112,8 @@ class LayoutConstraintInfo
     return isNativeRefCounted(Kind);
   }
 
+  bool isBridgeObject() const { return isBridgeObject(Kind); }
+
   unsigned getTrivialSizeInBytes() const {
     assert(isKnownSizeTrivial());
     return (SizeInBits + 7) / 8;
@@ -200,6 +202,8 @@ class LayoutConstraintInfo
 
   static bool isNativeRefCounted(LayoutConstraintKind Kind);
 
+  static bool isBridgeObject(LayoutConstraintKind Kind);
+
   /// Uniquing for the LayoutConstraintInfo.
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Kind, SizeInBits, Alignment);
@@ -217,6 +221,7 @@ class LayoutConstraintInfo
   static LayoutConstraintInfo ClassConstraintInfo;
   static LayoutConstraintInfo NativeClassConstraintInfo;
   static LayoutConstraintInfo TrivialConstraintInfo;
+  static LayoutConstraintInfo BridgeObjectConstraintInfo;
 };
 
 /// A wrapper class containing a reference to the actual LayoutConstraintInfo

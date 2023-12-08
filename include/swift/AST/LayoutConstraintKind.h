@@ -39,7 +39,9 @@ enum class LayoutConstraintKind : uint8_t {
   RefCountedObject,
   // It is a layout constraint representing a native reference counted object.
   NativeRefCountedObject,
-  LastLayout = NativeRefCountedObject,
+  // It is a layout constraint representing a bridge object
+  BridgeObject,
+  LastLayout = BridgeObject,
 };
 
 #endif

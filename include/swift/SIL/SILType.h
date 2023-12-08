@@ -284,6 +284,8 @@ public:
     return is<BuiltinVectorType>();
   }
 
+  bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
+
   SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();

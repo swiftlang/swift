@@ -3801,6 +3801,9 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
       appendOperatorParam("M", Index(layout->getTrivialSizeInBits()),
                           Index(layout->getAlignmentInBits()));
     break;
+  case LayoutConstraintKind::BridgeObject:
+    appendOperatorParam("B");
+    break;
   }
 }
 
