@@ -7494,6 +7494,11 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
           auto *sendable = Context.getProtocol(KnownProtocolKind::Sendable);
 
           for (const auto &arg : *args) {
+            // No need to check more or delay since we already known
+            // that the type is not Sendable.
+            if (!isSendable)
+              break;
+
             auto argTy = simplifyType(getType(arg.getExpr()));
 
             // Sendability cannot be determined until the argument
@@ -7545,6 +7550,20 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
 
       if (!storage)
         return fail();
+
+      switch (getActorIsolation(storage)) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+        break;
+
+      // A reference to an actor isolated state make key path non-Sendable.
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+        isSendable = false;
+        break;
+      }
 
       if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
         mutability = KeyPathMutability::ReadOnly;

@@ -5410,8 +5410,8 @@ ERROR(concurrent_access_local,none,
         "use of local %kind0 in concurrently-executing code",
         (const ValueDecl *))
 ERROR(actor_isolated_keypath_component,none,
-      "cannot form key path to%select{| distributed}0 actor-isolated %kind1",
-      (bool, const ValueDecl *))
+      "cannot form key path to %0 %kind1",
+      (ActorIsolation, const ValueDecl *))
 ERROR(effectful_keypath_component,none,
       "cannot form key path to %0 with 'throws' or 'async'",
       (DescriptiveDeclKind))

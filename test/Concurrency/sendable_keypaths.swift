@@ -138,3 +138,64 @@ do {
 
   _ = Test(obj: "Hello").utf8.count // Ok
 }
+
+// Global actor isolated properties.
+func testGlobalActorIsolatedReferences() {
+  @MainActor struct Isolated {
+    var data: Int = 42
+    subscript(v: Int) -> Bool { false }
+  }
+
+  let dataKP = \Isolated.data
+  // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in Swift 6}}
+  let subscriptKP = \Isolated.[42]
+  // expected-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in Swift 6}}
+
+  let _: KeyPath<Isolated, Int> & Sendable = dataKP
+  // expected-warning@-1 {{type 'WritableKeyPath<Isolated, Int>' does not conform to the 'Sendable' protocol}}
+  let _: KeyPath<Isolated, Bool> & Sendable = subscriptKP
+  // expected-warning@-1 {{type 'KeyPath<Isolated, Bool>' does not conform to the 'Sendable' protocol}}
+
+  func testNonIsolated() {
+    _ = \Isolated.data
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'data'; this is an error in Swift 6}}
+  }
+
+  @MainActor func testIsolated() {
+    _ = \Isolated.data // Ok
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor SomeActor {
+}
+
+@available(SwiftStdlib 5.1, *)
+@globalActor
+actor GlobalActor {
+  static let shared: SomeActor = SomeActor()
+}
+
+@available(SwiftStdlib 5.1, *)
+func testReferencesToDifferentGlobalActorIsolatedMembers() {
+  struct Info {
+    @MainActor var name: String  { "" }
+  }
+
+  struct Isolated {
+    @GlobalActor var info: Info { Info() }
+  }
+
+  @MainActor func testIsolatedToMain() {
+    _ = \Info.name // Ok
+    _ = \Isolated.info.name
+    // expected-warning@-1 {{cannot form key path to global actor 'GlobalActor'-isolated property 'info'; this is an error in Swift 6}}
+  }
+
+  @GlobalActor func testIsolatedToCustom() {
+    _ = \Info.name // Ok
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in Swift 6}}
+    _ = \Isolated.info.name
+    // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in Swift 6}}
+  }
+}
