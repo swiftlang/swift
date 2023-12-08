@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
 
+// https://github.com/apple/swift/issues/70330
+// We can't yet call member functions correctly on Windows.
+// XFAIL: OS=windows-msvc
+
 import SIMod
 
 // Step 0: Copy relevant files into the temp dir which will serve as the search path
