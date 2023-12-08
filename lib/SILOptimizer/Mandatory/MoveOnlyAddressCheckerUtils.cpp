@@ -950,6 +950,9 @@ void UseState::initializeLiveness(
                              reinitInstAndValue.second);
     }
   }
+  
+  // FIXME: Whether the initial use is an initialization ought to be entirely
+  // derivable from the CheckKind of the mark instruction.
 
   // Then check if our markedValue is from an argument that is in,
   // in_guaranteed, inout, or inout_aliasable, consider the marked address to be
@@ -1045,6 +1048,12 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found pointer to address use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(address, liveness.getTopLevelSpan());
+  }
+  
+  if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
+        stripAccessMarkers(address->getOperand())->getDefiningInstruction())) {
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }

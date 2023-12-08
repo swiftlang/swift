@@ -113,6 +113,21 @@ static void getVariableNameForValue(SILValue value2,
       break;
     }
 
+    if (auto bai = dyn_cast_or_null<BeginApplyInst>(searchValue->getDefiningInstruction())) {
+      // Use the name of the property being accessed if we can get to it.
+      if (isa<FunctionRefBaseInst>(bai->getCallee())
+          || isa<MethodInst>(bai->getCallee())) {
+        variableNamePath.push_back(bai->getCallee()->getDefiningInstruction());
+        // Try to name the base of the property if this is a method.
+        if (bai->getSubstCalleeType()->hasSelfParam()) {
+          searchValue = bai->getSelfArgument();
+          continue;
+        } else {
+          break;
+        }
+      }
+    }
+
     // If we do not do an exact match, see if we can find a debug_var inst. If
     // we do, we always break since we have a root value.
     if (auto *use = getAnyDebugUse(searchValue)) {
@@ -132,12 +147,25 @@ static void getVariableNameForValue(SILValue value2,
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
-
+    
     // If we do not pattern match successfully, just set resulting string to
     // unknown and return early.
     resultingString += "unknown";
     return;
   }
+  
+  auto nameFromDecl = [&](Decl *d) -> StringRef {
+    if (d) {
+      if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+        return accessor->getStorage()->getBaseName().userFacingName();
+      }
+      if (auto vd = dyn_cast<ValueDecl>(d)) {
+        return vd->getBaseName().userFacingName();
+      }
+    }
+    
+    return "<unknown decl>";
+  };
 
   // Walk backwards, constructing our string.
   while (true) {
@@ -148,6 +176,16 @@ static void getVariableNameForValue(SILValue value2,
         resultingString += i.getName();
       } else if (auto i = VarDeclCarryingInst(inst)) {
         resultingString += i.getName();
+      } else if (auto f = dyn_cast<FunctionRefBaseInst>(inst)) {
+        if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
+          resultingString += nameFromDecl(dc->getAsDecl());
+        } else {
+          resultingString += "<unknown decl>";
+        }
+      } else if (auto m = dyn_cast<MethodInst>(inst)) {
+        resultingString += nameFromDecl(m->getMember().getDecl());
+      } else {
+        resultingString += "<unknown decl>";      
       }
     } else {
       auto value = next.get<SILValue>();

@@ -4822,17 +4822,28 @@ namespace {
 /// Cleanup to end a coroutine application.
 class EndCoroutineApply : public Cleanup {
   SILValue ApplyToken;
+  std::vector<BeginBorrowInst *> BorrowedMoveOnlyValues;
 public:
   EndCoroutineApply(SILValue applyToken) : ApplyToken(applyToken) {}
 
+  void setBorrowedMoveOnlyValues(ArrayRef<BeginBorrowInst *> values) {
+    BorrowedMoveOnlyValues.insert(BorrowedMoveOnlyValues.end(),
+                                  values.begin(), values.end());
+  }
+
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
+    for (auto i = BorrowedMoveOnlyValues.rbegin(), e = BorrowedMoveOnlyValues.rend();
+         i != e; ++i) {
+      SGF.B.createEndBorrow(l, *i);
+      SGF.B.createDestroyValue(l, (*i)->getOperand());
+    }
     if (forUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
       SGF.B.createEndApply(l, ApplyToken);
     }
   }
-
+  
   void dump(SILGenFunction &SGF) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndCoroutineApply "
@@ -4897,22 +4908,50 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   auto yieldInfos = substFnType->getYields();
   assert(yieldValues.size() == yieldInfos.size());
   bool useLoweredAddresses = silConv.useLoweredAddresses();
+  SmallVector<BeginBorrowInst *, 2> borrowedMoveOnlyValues;
   for (auto i : indices(yieldValues)) {
     auto value = yieldValues[i];
     auto info = yieldInfos[i];
     if (info.isIndirectInOut()) {
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
+      if (value->getType().isMoveOnly()) {
+        value = B.createMarkUnresolvedNonCopyableValueInst(loc, value,
+         MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+      }
       !useLoweredAddresses && value->getType().isTrivial(getFunction())
           ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
           : yields.push_back(emitManagedRValueWithCleanup(value));
     } else if (info.isGuaranteed()) {
-      !useLoweredAddresses && value->getType().isTrivial(getFunction())
-          ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
-          : yields.push_back(ManagedValue::forBorrowedRValue(value));
+      if (value->getType().isMoveOnly()) {
+        if (!value->getType().isAddress()) {
+          // The move checker uses the lifetime of the "copy" for borrow checking.
+          value = B.createCopyValue(loc, value);
+          value = B.createMarkUnresolvedNonCopyableValueInst(loc, value,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          auto borrow = B.createBeginBorrow(loc, value);
+          yields.push_back(ManagedValue::forBorrowedRValue(borrow));
+          borrowedMoveOnlyValues.push_back(borrow);
+        } else {
+          value = B.createMarkUnresolvedNonCopyableValueInst(loc, value,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          yields.push_back(ManagedValue::forRValueWithoutOwnership(value));
+        }
+      } else {
+        !useLoweredAddresses && value->getType().isTrivial(getFunction())
+            ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
+            : yields.push_back(ManagedValue::forBorrowedRValue(value));
+      }
     } else {
+      assert(!value->getType().isMoveOnly()
+             && "move-only types shouldn't be trivial");
       yields.push_back(ManagedValue::forRValueWithoutOwnership(value));
     }
+  }
+  
+  if (!borrowedMoveOnlyValues.empty()) {
+    auto &endApply = static_cast<EndCoroutineApply &>(Cleanups.getCleanup(endApplyHandle));
+    endApply.setBorrowedMoveOnlyValues(borrowedMoveOnlyValues);
   }
 
   return endApplyHandle;
