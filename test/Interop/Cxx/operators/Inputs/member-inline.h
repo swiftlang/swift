@@ -30,7 +30,7 @@ struct LoadableIntWrapper {
   }
 
   // Friend functions
-  friend bool operator==(const LoadableIntWrapper lhs,
+  friend bool operator==(const LoadableIntWrapper &lhs,
                          const LoadableIntWrapper &rhs) {
     return lhs.value == rhs.value;
   }
