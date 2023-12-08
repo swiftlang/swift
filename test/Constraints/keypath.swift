@@ -304,3 +304,17 @@ func test_invalid_argument_to_keypath_subscript() {
     // expected-error@-1 {{cannot use value of type 'A' as a key path subscript index; argument must be a key path}}
   }
 }
+
+extension Collection {
+  func prefix<R: RangeExpression>(
+    _ range: R,
+    while predicate: ((Element) -> Bool)? = nil
+  ) -> SubSequence where R.Bound == Self.Index {
+    fatalError()
+  }
+}
+
+// https://github.com/apple/swift/issues/56393
+func keypathToFunctionWithOptional() {
+  _ = Array("").prefix(1...4, while: \.isNumber) // Ok
+}
