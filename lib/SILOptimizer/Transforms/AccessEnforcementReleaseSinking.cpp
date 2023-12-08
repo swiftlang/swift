@@ -157,6 +157,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::StackDealloc:
     case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::AssumeAlignment:
+    case BuiltinValueKind::GetEnumTag:
+    case BuiltinValueKind::InjectEnumTag:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime

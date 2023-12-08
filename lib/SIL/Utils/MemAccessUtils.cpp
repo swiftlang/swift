@@ -2645,6 +2645,15 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       }
       return;
 
+    case BuiltinValueKind::GetEnumTag:
+      visitor(&builtin->getAllOperands()[0]);
+      return;
+
+    case BuiltinValueKind::InjectEnumTag:
+      visitor(&builtin->getAllOperands()[0]);
+      visitor(&builtin->getAllOperands()[1]);
+      return;
+
     // Arrays: (T.Type, Builtin.RawPointer, Builtin.RawPointer,
     // Builtin.Word)
     case BuiltinValueKind::CopyArray:

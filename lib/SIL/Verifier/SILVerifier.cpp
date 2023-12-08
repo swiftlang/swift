@@ -559,6 +559,11 @@ struct ImmutableAddressUseVerifier {
           if (isPolymorphicBuiltin(*builtinKind)) {
             break;
           }
+
+          // Get enum tag borrows its operand address value.
+          if (builtinKind == BuiltinValueKind::GetEnumTag) {
+            return false;
+          }
         }
 
         // Otherwise this is a builtin that we are not expecting to see, so bail
