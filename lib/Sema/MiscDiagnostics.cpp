@@ -3912,7 +3912,8 @@ private:
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
       // Diagnose a SingleValueStmtExpr in a context that we do not currently
-      // support.
+      // support. If we start allowing these in arbitrary places, we'll need
+      // to ensure that autoclosures correctly contextualize them.
       if (!ValidSingleValueStmtExprs.contains(SVE)) {
         Diags.diagnose(SVE->getLoc(), diag::single_value_stmt_out_of_place,
                        SVE->getStmt()->getKind());
