@@ -2243,10 +2243,6 @@ namespace {
         if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
           if (friendDecl->getFriendDecl()) {
             m = friendDecl->getFriendDecl();
-
-            auto lookupTable = Impl.findLookupTable(decl);
-            addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
-                                  Impl.getNameImporter());
           }
         }
 
@@ -2989,7 +2985,11 @@ namespace {
       // This cannot be done when building the lookup table,
       // because templates are instantiated lazily.
       for (auto member : def->decls()) {
-        if (auto method = dyn_cast<clang::CXXMethodDecl>(member)) {
+        if (auto friendDecl = dyn_cast<clang::FriendDecl>(member))
+          if (auto underlyingDecl = friendDecl->getFriendDecl())
+            member = underlyingDecl;
+
+        if (auto method = dyn_cast<clang::FunctionDecl>(member)) {
           if (method->isOverloadedOperator()) {
             addEntryToLookupTable(*Impl.findLookupTable(decl), method,
                                   Impl.getNameImporter());

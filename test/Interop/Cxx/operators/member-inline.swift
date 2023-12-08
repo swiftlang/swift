@@ -83,6 +83,15 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(42, wrapper.value)
 }
 
+OperatorsTestSuite.test("IntWrapperInNamespace.equal (inline)") {
+  let lhs = NS.IntWrapperInNamespace(value: 42)
+  let rhs = NS.IntWrapperInNamespace(value: 42)
+
+  let result = lhs == rhs
+
+  expectTrue(result)
+}
+
 OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
   let lhs = TemplatedWithFriendOperatorSpec()
   let rhs = TemplatedWithFriendOperatorSpec()

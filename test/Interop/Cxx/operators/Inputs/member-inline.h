@@ -45,6 +45,16 @@ struct LoadableIntWrapper {
   }
 };
 
+namespace NS {
+struct IntWrapperInNamespace {
+  int value;
+  friend bool operator==(const IntWrapperInNamespace &lhs,
+                         const IntWrapperInNamespace &rhs) {
+    return lhs.value == rhs.value;
+  }
+};
+} // namespace NS
+
 struct LoadableBoolWrapper {
   bool value;
   LoadableBoolWrapper operator!() {
