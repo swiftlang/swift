@@ -40,12 +40,14 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
   while true {
     switch current.kind {
     case // Known implemented kinds.
-        .arrayExpr, .arrowExpr, .assignmentExpr, .binaryOperatorExpr,
-        .booleanLiteralExpr, .closureExpr, .discardAssignmentExpr,
-        .declReferenceExpr, .functionCallExpr, .ifExpr, .integerLiteralExpr,
-        .memberAccessExpr,  .nilLiteralExpr, .postfixOperatorExpr,
-        .prefixOperatorExpr, .sequenceExpr, .stringLiteralExpr, .tupleExpr,
-        .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr, .unresolvedTernaryExpr:
+        .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
+        .booleanLiteralExpr, .borrowExpr, .closureExpr, .consumeExpr, .copyExpr,
+        .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr,
+        .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
+        .nilLiteralExpr, .packElementExpr, .packExpansionExpr,
+        .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
+        .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr,  .unresolvedAsExpr,
+        .unresolvedIsExpr, .unresolvedTernaryExpr:
 
       // `generate(stringLiteralExpr:)` doesn't support interpolations.
       if let str = current.as(StringLiteralExprSyntax.self) {
@@ -57,15 +59,13 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
 
       break
     case // Known unimplemented kinds.
-        .asExpr, .awaitExpr,
-        .borrowExpr, .canImportExpr, .canImportVersionInfo, .dictionaryExpr,
-        .doExpr, .editorPlaceholderExpr,
-        .floatLiteralExpr, .forceUnwrapExpr, .inOutExpr, .infixOperatorExpr,
-        .isExpr, .keyPathExpr, .macroExpansionExpr, .consumeExpr, .copyExpr,
-        .optionalChainingExpr, .packElementExpr, .packExpansionExpr,
+        .asExpr, .canImportExpr, .canImportVersionInfo,
+        .doExpr, .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr,
+        .inOutExpr, .infixOperatorExpr,  .isExpr, .keyPathExpr,
+        .macroExpansionExpr,  .optionalChainingExpr,
         .postfixIfConfigExpr, .regexLiteralExpr, .genericSpecializationExpr,
         .simpleStringLiteralExpr, .subscriptCallExpr, .superExpr, .switchExpr,
-        .ternaryExpr, .tryExpr, .patternExpr:
+        .ternaryExpr, .patternExpr:
       return false
     case // Unknown expr kinds.
       _ where current.is(ExprSyntax.self):
@@ -96,28 +96,28 @@ extension ASTGenVisitor {
       break
     case .assignmentExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
-    case .awaitExpr:
-      break
+    case .awaitExpr(let node):
+      return self.generate(awaitExpr: node).asExpr
     case .binaryOperatorExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
     case .booleanLiteralExpr(let node):
       return self.generate(booleanLiteralExpr: node).asExpr
-    case .borrowExpr:
-      break
+    case .borrowExpr(let node):
+      return self.generate(borrowExpr: node).asExpr
     case .canImportExpr:
       break
     case .canImportVersionInfo:
       break
     case .closureExpr(let node):
       return self.generate(closureExpr: node).asExpr
-    case .consumeExpr:
-      break
-    case .copyExpr:
-      break
+    case .consumeExpr(let node):
+      return self.generate(consumeExpr: node).asExpr
+    case .copyExpr(let node):
+      return self.generate(copyExpr: node).asExpr
     case .declReferenceExpr(let node):
       return self.generate(declReferenceExpr: node).asExpr
-    case .dictionaryExpr:
-      break
+    case .dictionaryExpr(let node):
+      return self.generate(dictionaryExpr: node).asExpr
     case .discardAssignmentExpr(let node):
       return self.generate(discardAssignmentExpr: node).asExpr
     case .doExpr:
@@ -155,10 +155,10 @@ extension ASTGenVisitor {
     case .optionalChainingExpr:
       // Need special care to wrap the entire postfix chain with OptionalEvaluationExpr.
       break
-    case .packElementExpr:
-      break
-    case .packExpansionExpr:
-      break
+    case .packElementExpr(let node):
+      return self.generate(packElementExpr: node).asExpr
+    case .packExpansionExpr(let node):
+      return self.generate(packExpansionExpr: node).asExpr
     case .patternExpr:
       break
     case .postfixIfConfigExpr:
@@ -183,8 +183,8 @@ extension ASTGenVisitor {
       break
     case .ternaryExpr:
       break
-    case .tryExpr:
-      break
+    case .tryExpr(let node):
+      return self.generate(tryExpr: node)
     case .tupleExpr(let node):
       return self.generate(tupleExpr: node).asExpr
     case .typeExpr(let node):
@@ -235,6 +235,22 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, equalsLoc: self.generateSourceLoc(node.equal))
   }
 
+  func generate(awaitExpr node: AwaitExprSyntax) -> BridgedAwaitExpr {
+    return .createParsed(
+      self.ctx,
+      awaitLoc: self.generateSourceLoc(node.awaitKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
+  }
+
+  func generate(borrowExpr node: BorrowExprSyntax) -> BridgedBorrowExpr {
+    return .createParsed(
+      self.ctx,
+      borrowLoc: self.generateSourceLoc(node.borrowKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
+  }
+
   func generate(binaryOperatorExpr node: BinaryOperatorExprSyntax) -> BridgedUnresolvedDeclRefExpr {
     return createOperatorRefExpr(token: node.operator, kind: .binaryOperator)
   }
@@ -249,6 +265,22 @@ extension ASTGenVisitor {
 
     // FIXME: Translate the signature, capture list, 'in' location, etc.
     return .createParsed(self.ctx, declContext: self.declContext, body: body)
+  }
+
+  func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
+    return .createParsed(
+      self.ctx,
+      consumeLoc: self.generateSourceLoc(node.consumeKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
+  }
+
+  func generate(copyExpr node: CopyExprSyntax) -> BridgedCopyExpr {
+    return .createParsed(
+      self.ctx,
+      copyLoc: self.generateSourceLoc(node.copyKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
   }
 
   func generate(functionCallExpr node: FunctionCallExprSyntax) -> BridgedCallExpr {
@@ -348,26 +380,55 @@ extension ASTGenVisitor {
   }
 
   func generate(memberAccessExpr node: MemberAccessExprSyntax) -> BridgedExpr {
+    let dotLoc = self.generateSourceLoc(node.period)
     let nameAndLoc = createDeclNameRef(declReferenceExpr: node.declName)
 
     if let base = node.base {
-      return BridgedUnresolvedDotExpr.createParsed(
-        self.ctx,
-        base: self.generate(expr: base),
-        dotLoc: self.generateSourceLoc(node.period),
-        name: nameAndLoc.name,
-        nameLoc: nameAndLoc.loc
-      ).asExpr
+      if node.declName.baseName.keywordKind == .`self` {
+        // TODO: Diagnose if there's arguments
+        assert(node.declName.argumentNames == nil)
+
+        return BridgedDotSelfExpr.createParsed(
+          self.ctx,
+          subExpr: self.generate(expr: base),
+          dotLoc: dotLoc,
+          selfLoc: self.generateSourceLoc(node.declName)
+        ).asExpr
+      } else {
+        return BridgedUnresolvedDotExpr.createParsed(
+          self.ctx,
+          base: self.generate(expr: base),
+          dotLoc: dotLoc,
+          name: nameAndLoc.name,
+          nameLoc: nameAndLoc.loc
+        ).asExpr
+      }
     } else {
       return BridgedUnresolvedMemberExpr.createParsed(
         self.ctx,
-        dotLoc: self.generateSourceLoc(node.period),
+        dotLoc: dotLoc,
         name: nameAndLoc.name,
         nameLoc: nameAndLoc.loc
       ).asExpr
     }
   }
 
+  func generate(packElementExpr node: PackElementExprSyntax) -> BridgedPackElementExpr {
+    return .createParsed(
+      self.ctx,
+      eachLoc: self.generateSourceLoc(node.eachKeyword),
+      packRefExpr: self.generate(expr: node.pack)
+    )
+  }
+
+  func generate(packExpansionExpr node: PackExpansionExprSyntax) -> BridgedPackExpansionExpr {
+    return .createParsed(
+      self.ctx,
+      repeatLoc: self.generateSourceLoc(node.repeatKeyword),
+      patternExpr: self.generate(expr: node.repetitionPattern)
+    )
+  }
+  
   func generate(ifExpr node: IfExprSyntax) -> BridgedSingleValueStmtExpr {
     let stmt = makeIfStmt(node).asStmt
 
@@ -456,6 +517,36 @@ extension ASTGenVisitor {
       self.ctx,
       exprs: elements.lazy.bridgedArray(in: self)
     ).asExpr
+  }
+
+  func generate(tryExpr node: TryExprSyntax) -> BridgedExpr {
+    let tryLoc = self.generateSourceLoc(node.tryKeyword)
+    let subExpr = self.generate(expr: node.expression)
+
+    switch node.questionOrExclamationMark {
+    case nil:
+      return BridgedTryExpr.createParsed(
+        self.ctx,
+        tryLoc: tryLoc,
+        subExpr: subExpr
+      ).asExpr
+    case let exclaim? where exclaim.rawTokenKind == .exclamationMark:
+      return BridgedForceTryExpr.createParsed(
+        self.ctx,
+        tryLoc: tryLoc,
+        subExpr: subExpr,
+        exclaimLoc: self.generateSourceLoc(exclaim)
+      ).asExpr
+    case let question? where question.rawTokenKind == .postfixQuestionMark:
+      return BridgedOptionalTryExpr.createParsed(
+        self.ctx,
+        tryLoc: tryLoc,
+        subExpr: subExpr,
+        questionLoc: self.generateSourceLoc(question)
+      ).asExpr
+    default:
+      preconditionFailure("TryExprSyntax.questionOrExclamationMark must be .exclamationMark or .postfixQuestionMark")
+    }
   }
 
   func generate(tupleExpr node: TupleExprSyntax) -> BridgedTupleExpr {

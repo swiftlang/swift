@@ -41,3 +41,14 @@ func test13(body: (_ value: Int) -> Void, i: Int) {
 func test14() {
   _ = Array<Array<Array<Int>>>().count
 }
+
+func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
+  fatalError()
+}
+
+struct FileDescriptor: ~Copyable {
+  var fd = 1
+}
+
+// FIXME: warning for 'class'
+protocol ClassOnly: class {}

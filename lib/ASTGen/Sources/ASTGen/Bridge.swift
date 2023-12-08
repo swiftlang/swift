@@ -130,6 +130,12 @@ extension BridgedStringRef {
   }
 }
 
+extension BridgedStringRef: ExpressibleByStringLiteral {
+  public init(stringLiteral str: StaticString) {
+    self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
+  }
+}
+
 extension SyntaxProtocol {
   /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
   ///
