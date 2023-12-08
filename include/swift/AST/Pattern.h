@@ -566,6 +566,7 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   DeclNameRef getName() const { return Name; }
 
@@ -705,6 +706,12 @@ public:
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
 
   DeclContext *getDeclContext() const { return DC; }
+
+  void setDeclContext(DeclContext *newDC) {
+    DC = newDC;
+    if (MatchVar)
+      MatchVar->setDeclContext(newDC);
+  }
 
   /// The match expression if it has been computed, \c nullptr otherwise.
   /// Should only be used by the ASTDumper and ASTWalker.
