@@ -719,9 +719,10 @@ static SourceFile *createDefaultArgumentSourceFile(StringRef macroExpression,
 
   llvm::SmallString<256> builder;
   unsigned line, column;
-  std::tie(line, column) =
-      sourceMgr.getPresumedLineAndColumnForLoc(insertionPoint);
-  auto file = dc->getOutermostParentSourceFile()->getFilename();
+  // TODO: ApolloZhu check getPresumedLineAndColumnForLoc
+  std::tie(line, column) = sourceMgr.getLineAndColumnInBuffer(insertionPoint);
+  // TODO: ApolloZhu check getVirtualFile/getOutermostParentSourceFile
+  auto file = dc->getParentSourceFile()->getFilename();
 
   // find a way to pass the file:line:column to macro expansion
   // so that we can share same buffer for the same default argument
