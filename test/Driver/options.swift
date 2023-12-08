@@ -117,12 +117,23 @@
 // MISSING_OPTION_G_ERROR: error: option '-debug-info-format={{.*}}' is missing a required argument (-g)
 
 // RUN: %swift_driver -### -g -dwarf-version=3 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_3 %s
+// DWARF_VERSION_4: -dwarf-version=4
 // DWARF_VERSION_3: -dwarf-version=3
+// DWARF_VERSION_2: -dwarf-version=2
 // RUN: not %swift_driver -dwarf-version=1 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
 // RUN: not %swift_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
 // RUN: not %swiftc_driver -dwarf-version=1 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
 // RUN: not %swiftc_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
 // INVALID_DWARF_VERSION: invalid value '{{1|6}}' in '-dwarf-version={{1|6}}'
+
+// RUN: %swift_driver -### -g -target x86_64-apple-macosx10.10 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-macosx10.11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-macos14.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-ios8.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-ios9.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-ios17.0-macabi %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-tvos17.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
