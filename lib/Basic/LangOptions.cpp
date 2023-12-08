@@ -672,26 +672,30 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   llvm_unreachable("covered switch");
 }
 
+namespace {
+  static constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
+       {"-I",
+        "-F",
+        "-fmodule-map-file=",
+        "-iquote",
+        "-idirafter",
+        "-iframeworkwithsysroot",
+        "-iframework",
+        "-iprefix",
+        "-iwithprefixbefore",
+        "-iwithprefix",
+        "-isystemafter",
+        "-isystem",
+        "-isysroot",
+        "-ivfsoverlay",
+        "-working-directory=",
+        "-working-directory"};
+}
+
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     std::function<std::string(StringRef)> pathRemapCallback) const {
   auto consumeIncludeOption = [](StringRef &arg, StringRef &prefix) {
-    static StringRef options[] = {"-I",
-                                  "-F",
-                                  "-fmodule-map-file=",
-                                  "-iquote",
-                                  "-idirafter",
-                                  "-iframeworkwithsysroot",
-                                  "-iframework",
-                                  "-iprefix",
-                                  "-iwithprefixbefore",
-                                  "-iwithprefix",
-                                  "-isystemafter",
-                                  "-isystem",
-                                  "-isysroot",
-                                  "-ivfsoverlay",
-                                  "-working-directory=",
-                                  "-working-directory"};
-    for (StringRef &option : options)
+    for (const auto &option : knownSearchPathPrefiexes)
       if (arg.consume_front(option)) {
         prefix = option;
         return true;
@@ -723,4 +727,35 @@ std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     }
   }
   return args;
+}
+
+std::vector<std::string>
+ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
+  auto matchIncludeOption = [](StringRef &arg) {
+    for (const auto &option : knownSearchPathPrefiexes)
+      if (arg.consume_front(option))
+        return true;
+    return false;
+  };
+
+  std::vector<std::string> filtered_args;
+  bool skip_next = false;
+  std::vector<std::string> args;
+  for (auto A : ExtraArgs) {
+    StringRef arg(A);
+    if (skip_next) {
+      skip_next = false;
+      continue;
+    } else if (matchIncludeOption(arg)) {
+      if (arg.empty()) {
+        // Option pair
+        skip_next = true;
+      } // else non-pair option e.g. '-I/search/path'
+      continue;
+    } else {
+      filtered_args.push_back(A);
+    }
+  }
+
+  return filtered_args;
 }
