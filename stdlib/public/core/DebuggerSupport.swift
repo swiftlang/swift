@@ -12,6 +12,36 @@
 
 import SwiftShims
 
+/// Converts description definitions to a debugger type summary.
+///
+/// This macro converts compatible `debugDescription` (or `description`)
+/// implementations to a debugger type summary. This improves debugging in
+/// situations where expression evaluation is not performed, such as the
+/// variable list of an IDE.
+///
+/// For example, this code allows the debugger to display strings such as
+/// "Rams [11-2]" without invoking `debugDescription`:
+///
+///     @DebugDescription
+///     struct Team: CustomDebugStringConvertible {
+///        var name: String
+///        var wins, losses: Int
+///
+///        var debugDescription: String {
+///            "\(name) [\(wins)-\(losses)]"
+///        }
+///     }
+@available(SwiftStdlib 5.11, *)
+@attached(memberAttribute)
+public macro _DebugDescription() =
+  #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
+
+/// Internal-only macro. See `@_DebugDescription`.
+@available(SwiftStdlib 5.11, *)
+@attached(peer, names: named(_lldb_summary))
+public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
+  #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
+
 #if SWIFT_ENABLE_REFLECTION
 
 @frozen // namespace
