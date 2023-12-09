@@ -3878,8 +3878,9 @@ StringRef ValueDecl::getCDeclName() const {
   }
 
   // Handle explicit cdecl attributes.
-  if (auto *cdecl = getAttrs().getAttribute<CDeclAttr>())
-    return cdecl->Name;
+  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
+    return cdeclAttr->Name;
+  }
 
   return "";
 }
