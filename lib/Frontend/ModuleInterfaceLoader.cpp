@@ -2244,6 +2244,21 @@ bool ExplicitSwiftModuleLoader::canImportModule(
                        it->second.modulePath);
     return false;
   }
+
+  // If it's a forwarding module, load the YAML file from disk and get the path
+  // to the actual module for the version check.
+  if (!serialization::isSerializedAST((*moduleBuf)->getBuffer())) {
+    if (auto forwardingModule = ForwardingModule::load(**moduleBuf)) {
+      moduleBuf = fs.getBufferForFile(forwardingModule->underlyingModulePath);
+      if (!moduleBuf) {
+        Ctx.Diags.diagnose(SourceLoc(),
+                           diag::error_opening_explicit_module_file,
+                           forwardingModule->underlyingModulePath);
+        return false;
+      }
+    }
+  }
+
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
       Ctx.LangOpts.SDKName);
