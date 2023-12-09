@@ -2491,126 +2491,139 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken,
-    std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
-        Receiver) {
+    bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver) {
 
   std::string Error;
   SwiftInvocationRef Invok =
       ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::fromError(Error));
+    Receiver(RequestResult<RelatedIdentsResult>::fromError(Error));
     return;
   }
 
   class RelatedIdConsumer : public SwiftASTConsumer {
     std::string InputFile;
     unsigned Offset;
-    std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
-        Receiver;
+    bool IncludeNonEditableBaseNames;
+    std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver;
     SwiftInvocationRef Invok;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    // FIXME: Don't silently eat errors here.
+    RelatedIdentsResult getRelatedIdents(SourceFile *SrcFile,
+                                         CompilerInstance &CompInst) {
+      unsigned BufferID = SrcFile->getBufferID().value();
+      SourceLoc Loc = Lexer::getLocForStartOfToken(CompInst.getSourceMgr(),
+                                                   BufferID, Offset);
+      if (Loc.isInvalid())
+        return RelatedIdentsResult::empty();
+
+      SourceManager &SrcMgr = CompInst.getASTContext().SourceMgr;
+
+      ResolvedCursorInfoPtr CursorInfo =
+          evaluateOrDefault(CompInst.getASTContext().evaluator,
+                            CursorInfoRequest{CursorInfoOwner(SrcFile, Loc)},
+                            new ResolvedCursorInfo());
+      auto ValueRefCursorInfo =
+          dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
+      if (!ValueRefCursorInfo)
+        return RelatedIdentsResult::empty();
+      if (ValueRefCursorInfo->isKeywordArgument())
+        return RelatedIdentsResult::empty();
+
+      ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
+      if (!VD)
+        return RelatedIdentsResult::empty(); // This was a module reference.
+
+      // Only accept pointing to an identifier.
+      if (!IncludeNonEditableBaseNames && !ValueRefCursorInfo->isRef() &&
+          (isa<ConstructorDecl>(VD) || isa<DestructorDecl>(VD) ||
+           isa<SubscriptDecl>(VD)))
+        return RelatedIdentsResult::empty();
+
+      llvm::Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
+
+      if (!Info) {
+        return RelatedIdentsResult::empty();
+      }
+
+      RenameLocs Locs = localRenameLocs(SrcFile, Info->VD);
+
+      std::string OldName = Locs.getLocations().front().OldName.str();
+#ifndef NDEBUG
+      for (auto loc : Locs.getLocations()) {
+        assert(loc.OldName == OldName &&
+               "Found related identfiers with different names?");
+      }
+#endif
+
+      // Ignore any errors produced by `resolveRenameLocations` since, if some
+      // symbol failed to resolve, we still want to return all the other
+      // symbols. This makes related idents more fault-tolerant.
+      DiagnosticEngine Diags(SrcMgr);
+
+      std::vector<ResolvedLoc> ResolvedLocs = resolveRenameLocations(
+          Locs.getLocations(), /*NewName=*/StringRef(), *SrcFile, Diags);
+
+      SmallVector<RelatedIdentInfo, 8> Ranges;
+      assert(ResolvedLocs.size() == Locs.getLocations().size());
+      for (auto [RenameLoc, ResolvedLoc] :
+           llvm::zip_equal(Locs.getLocations(), ResolvedLocs)) {
+        if (ResolvedLoc.range.isInvalid()) {
+          continue;
+        }
+        unsigned Offset =
+            SrcMgr.getLocOffsetInBuffer(ResolvedLoc.range.getStart(), BufferID);
+        Ranges.push_back(
+            {Offset, ResolvedLoc.range.getByteLength(), RenameLoc.Usage});
+      }
+
+      return RelatedIdentsResult(Ranges, OldName);
+    }
+#endif
 
   public:
     RelatedIdConsumer(
-        StringRef InputFile, unsigned Offset,
-        std::function<void(const RequestResult<ArrayRef<RelatedIdentInfo>> &)>
+        StringRef InputFile, unsigned Offset, bool IncludeNonEditableBaseNames,
+        std::function<void(const RequestResult<RelatedIdentsResult> &)>
             Receiver,
         SwiftInvocationRef Invok)
         : InputFile(InputFile.str()), Offset(Offset),
+          IncludeNonEditableBaseNames(IncludeNonEditableBaseNames),
           Receiver(std::move(Receiver)), Invok(Invok) {}
 
-    // FIXME: Don't silently eat errors here.
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      using ResultType = RequestResult<ArrayRef<RelatedIdentInfo>>;
+      using ResultType = RequestResult<RelatedIdentsResult>;
 #if !SWIFT_BUILD_SWIFT_SYNTAX
-      Receiver(
-          ResultType::fromError("relatedidents is not supported because "
-                                "sourcekitd was built without swift-syntax"));
+      ResultType::fromError(
+          "relatedidents is not supported because sourcekitd was built without "
+          "swift-syntax");
       return;
 #else
       auto &CompInst = AstUnit->getCompilerInstance();
 
       auto *SrcFile = retrieveInputFile(InputFile, CompInst);
       if (!SrcFile) {
-        Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::fromError(
+        Receiver(RequestResult<RelatedIdentsResult>::fromError(
             "Unable to find input file"));
         return;
       }
 
-      SmallVector<RelatedIdentInfo, 8> Ranges;
-
-      auto Action = [&]() {
-        unsigned BufferID = SrcFile->getBufferID().value();
-        SourceLoc Loc =
-          Lexer::getLocForStartOfToken(CompInst.getSourceMgr(), BufferID, Offset);
-        if (Loc.isInvalid())
-          return;
-
-        SourceManager &SrcMgr = CompInst.getASTContext().SourceMgr;
-
-        ResolvedCursorInfoPtr CursorInfo =
-            evaluateOrDefault(CompInst.getASTContext().evaluator,
-                              CursorInfoRequest{CursorInfoOwner(SrcFile, Loc)},
-                              new ResolvedCursorInfo());
-        auto ValueRefCursorInfo =
-            dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
-        if (!ValueRefCursorInfo)
-          return;
-        if (ValueRefCursorInfo->isKeywordArgument())
-          return;
-
-        ValueDecl *VD = ValueRefCursorInfo->typeOrValue();
-        if (!VD)
-          return; // This was a module reference.
-
-        // Only accept pointing to an identifier.
-        if (!ValueRefCursorInfo->isRef() &&
-            (isa<ConstructorDecl>(VD) || isa<DestructorDecl>(VD) ||
-             isa<SubscriptDecl>(VD)))
-          return;
-        if (VD->isOperator())
-          return;
-
-        llvm::Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
-
-        if (!Info) {
-          return;
-        }
-
-        RenameLocs Locs = localRenameLocs(SrcFile, Info->VD);
-
-        // Ignore any errors produced by `resolveRenameLocations` since, if some
-        // symbol failed to resolve, we still want to return all the other
-        // symbols. This makes related idents more fault-tolerant.
-        DiagnosticEngine Diags(SrcMgr);
-
-        std::vector<ResolvedLoc> ResolvedLocs = resolveRenameLocations(
-            Locs.getLocations(), /*NewName=*/StringRef(), *SrcFile, Diags);
-
-        assert(ResolvedLocs.size() == Locs.getLocations().size());
-        for (auto ResolvedLoc : ResolvedLocs) {
-          if (ResolvedLoc.range.isInvalid()) {
-            continue;
-          }
-          unsigned Offset = SrcMgr.getLocOffsetInBuffer(
-              ResolvedLoc.range.getStart(), BufferID);
-          Ranges.push_back({Offset, ResolvedLoc.range.getByteLength()});
-        }
-      };
-      Action();
-      Receiver(ResultType::fromResult(Ranges));
+      RelatedIdentsResult Result = getRelatedIdents(SrcFile, CompInst);
+      Receiver(ResultType::fromResult(Result));
 #endif
     }
 
     void cancelled() override {
-      Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::cancelled());
+      Receiver(RequestResult<RelatedIdentsResult>::cancelled());
     }
 
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("related idents failed: " << Error);
-      Receiver(RequestResult<ArrayRef<RelatedIdentInfo>>::fromError(Error));
+      Receiver(RequestResult<RelatedIdentsResult>::fromError(Error));
     }
 
     static CaseStmt *getCaseStmtOfCanonicalVar(Decl *D) {
@@ -2624,8 +2637,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     }
   };
 
-  auto Consumer = std::make_shared<RelatedIdConsumer>(InputBufferName, Offset,
-                                                      Receiver, Invok);
+  auto Consumer = std::make_shared<RelatedIdConsumer>(
+      InputBufferName, Offset, IncludeNonEditableBaseNames, Receiver, Invok);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

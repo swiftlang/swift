@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature ParserASTGen > %t/astgen.ast
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking > %t/cpp-parser.ast
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
@@ -40,8 +40,13 @@ Int {
 
   let arlit = [0]
   let tuple = (0, 1)
+  let diclit = [0: 1, 2: 3]
 
   return fn(x)
+}
+
+func testEmptyDictionary() -> [Int: Int] {
+  return [:]
 }
 
 func test2(e b: Bool) {
@@ -207,9 +212,15 @@ precedencegroup Precedence2 {
 struct TestStruct {
   func method(arg: Int, _ c: Int) {}
 
+  enum Ty {
+    case `self`
+    case `Self`
+  }
+
   func test() {
     _ = method(arg:_:)
-    _ = self.method(arg:_:)
+    _ = self.method(arg:_:).self
+    _ = Ty.`Self` ==  Ty.`self`
   }
 
 // FIXME: Compute 'static' location
@@ -232,4 +243,18 @@ func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
   _ = [() -> Int]()
   _ = [@Sendable () -> Int]().count +  [any Collection]().count
   _ = arg3 is Double || !(arg3 is Int, 0).0
+}
+
+func asyncFunc(_ arg: String) async throws -> Int {
+  return 1
+}
+func testUnaryExprs() async throws {
+  let str = String()
+  let foo = try await asyncFunc(_borrow str)
+  let bar = copy foo
+  let baz = consume foo
+}
+
+func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
+  return (repeat each t)
 }

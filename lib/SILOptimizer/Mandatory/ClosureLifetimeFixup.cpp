@@ -896,10 +896,11 @@ static SILValue tryRewriteToPartialApplyStack(
     SILBuilderWithScope builder(std::next(destroy->getIterator()));
     // This getCapturedArg hack attempts to perfectly compensate for all the
     // other hacks involved in gathering new arguments above.
+    // argValue may be 'undef'
     auto getArgToDestroy = [&](SILValue argValue) -> SILValue {
       // A MoveOnlyWrapperToCopyableValueInst may produce a trivial value. Be
       // careful not to emit an extra destroy of the original.
-      if (argValue->getType().isTrivial(argValue->getFunction()))
+      if (argValue->getType().isTrivial(destroy->getFunction()))
         return SILValue();
 
       // We may have inserted a new begin_borrow->moveonlywrapper_to_copyvalue

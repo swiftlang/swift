@@ -113,6 +113,7 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
       {UnqualifiedLookupFlags::MacroLookup, "MacroLookup"},
+      {UnqualifiedLookupFlags::ModuleLookup, "ModuleLookup"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
@@ -1621,34 +1622,16 @@ static DeclName adjustLazyMacroExpansionNameKey(
   return name;
 }
 
-SmallVector<MacroDecl *, 1>
-namelookup::lookupMacros(DeclContext *dc, DeclNameRef macroName,
-                         MacroRoles roles) {
+SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
+                                                     DeclNameRef moduleName,
+                                                     DeclNameRef macroName,
+                                                     MacroRoles roles) {
   SmallVector<MacroDecl *, 1> choices;
   auto moduleScopeDC = dc->getModuleScopeContext();
   ASTContext &ctx = moduleScopeDC->getASTContext();
 
-  // When performing lookup for freestanding macro roles, only consider
-  // macro names, ignoring types.
-  bool onlyMacros = static_cast<bool>(roles & getFreestandingMacroRoles()) &&
-      !(roles - getFreestandingMacroRoles());
-
-  // Macro lookup should always exclude macro expansions; macro
-  // expansions cannot introduce new macro declarations. Note that
-  // the source location here doesn't matter.
-  UnqualifiedLookupDescriptor descriptor{
-    macroName, moduleScopeDC, SourceLoc(),
-    UnqualifiedLookupFlags::ExcludeMacroExpansions
-  };
-
-  if (onlyMacros)
-    descriptor.Options |= UnqualifiedLookupFlags::MacroLookup;
-
-  auto lookup = evaluateOrDefault(
-      ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
-
-  for (const auto &found : lookup.allResults()) {
-    if (auto macro = dyn_cast<MacroDecl>(found.getValueDecl())) {
+  auto addChoiceIfApplicable = [&](ValueDecl *decl) {
+    if (auto macro = dyn_cast<MacroDecl>(decl)) {
       auto candidateRoles = macro->getMacroRoles();
       if ((candidateRoles && roles.contains(candidateRoles)) ||
           // FIXME: `externalMacro` should have all roles.
@@ -1656,6 +1639,42 @@ namelookup::lookupMacros(DeclContext *dc, DeclNameRef macroName,
         choices.push_back(macro);
       }
     }
+  };
+
+  // When a module is specified, it's a module-qualified lookup.
+  if (moduleName) {
+    UnqualifiedLookupDescriptor moduleLookupDesc(
+        moduleName, moduleScopeDC, SourceLoc(),
+        UnqualifiedLookupFlags::ModuleLookup);
+    auto moduleLookup = evaluateOrDefault(
+        ctx.evaluator, UnqualifiedLookupRequest{moduleLookupDesc}, {});
+    auto foundTypeDecl = moduleLookup.getSingleTypeResult();
+    auto *moduleDecl = dyn_cast_or_null<ModuleDecl>(foundTypeDecl);
+    if (!moduleDecl)
+      return {};
+
+    ModuleQualifiedLookupRequest req{moduleScopeDC, moduleDecl, macroName,
+                                     SourceLoc(),
+                                     NL_ExcludeMacroExpansions | NL_OnlyMacros};
+    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    for (auto *found : lookup)
+      addChoiceIfApplicable(found);
+  }
+  // Otherwise it's an unqualified lookup.
+  else {
+    // Macro lookup should always exclude macro expansions; macro
+    // expansions cannot introduce new macro declarations. Note that
+    // the source location here doesn't matter.
+    UnqualifiedLookupDescriptor descriptor{
+        macroName, moduleScopeDC, SourceLoc(),
+        UnqualifiedLookupFlags::ExcludeMacroExpansions |
+            UnqualifiedLookupFlags::MacroLookup};
+
+    auto lookup = evaluateOrDefault(ctx.evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
+
+    for (const auto &found : lookup.allResults())
+      addChoiceIfApplicable(found.getValueDecl());
   }
 
   return choices;
@@ -1683,8 +1702,9 @@ namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
           inMacroArgument = true;
         } else if (auto *attr = macro.getAttr()) {
           auto *moduleScope = sourceFile->getModuleScopeContext();
-          auto results = lookupMacros(moduleScope, macro.getMacroName(),
-                                      getAttachedMacroRoles());
+          auto results =
+              lookupMacros(moduleScope, macro.getModuleName(),
+                           macro.getMacroName(), getAttachedMacroRoles());
           inMacroArgument = !results.empty();
         }
 
@@ -1705,9 +1725,9 @@ void namelookup::forEachPotentialResolvedMacro(
 ) {
   ASTContext &ctx = moduleScopeCtx->getASTContext();
   UnqualifiedLookupDescriptor lookupDesc{
-    macroName, moduleScopeCtx, SourceLoc(),
-    UnqualifiedLookupFlags::ExcludeMacroExpansions
-  };
+      macroName, moduleScopeCtx, SourceLoc(),
+      UnqualifiedLookupFlags::ExcludeMacroExpansions |
+          UnqualifiedLookupFlags::MacroLookup};
 
   auto lookup = evaluateOrDefault(
       ctx.evaluator, UnqualifiedLookupRequest{lookupDesc}, {});
@@ -3568,13 +3588,13 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.
-  if (auto *identTypeRepr =
-          dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr())) {
-    auto macros = namelookup::lookupMacros(
-        dc, identTypeRepr->getNameRef(), getAttachedMacroRoles());
-    if (!macros.empty())
-      return nullptr;
-  }
+  auto [module, macro] = attr->destructureMacroRef();
+  auto moduleName = (module) ? module->getNameRef() : DeclNameRef();
+  auto macroName = (macro) ? macro->getNameRef() : DeclNameRef();
+  auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
+                                         getAttachedMacroRoles());
+  if (!macros.empty())
+    return nullptr;
 
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();

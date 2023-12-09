@@ -2456,10 +2456,13 @@ static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
     sourcekitd_variant_t Range = sourcekitd_variant_array_get_value(Res, i);
     int64_t Offset = sourcekitd_variant_dictionary_get_int64(Range, KeyOffset);
     int64_t Length = sourcekitd_variant_dictionary_get_int64(Range, KeyLength);
+    auto Usage = sourcekitd_variant_dictionary_get_uid(Range, KeyNameType);
     auto LineCol = resolveToLineCol(Offset, Filename, VFSFiles);
-    OS << LineCol.first << ':' << LineCol.second << " - " << Length << '\n';
+    OS << LineCol.first << ':' << LineCol.second << " - " << Length << " - "
+       << sourcekitd_uid_get_string_ptr(Usage) << '\n';
   }
   OS << "END RANGES\n";
+  OS << "NAME: " << sourcekitd_variant_dictionary_get_string(Info, KeyName);
 }
 
 static void printActiveRegions(sourcekitd_variant_t Info, StringRef Filename,
