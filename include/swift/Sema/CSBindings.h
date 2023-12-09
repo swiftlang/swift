@@ -388,7 +388,7 @@ public:
   BindingSet(const PotentialBindings &info)
       : CS(info.CS), TypeVar(info.TypeVar), Info(info) {
     for (const auto &binding : info.Bindings)
-      addBinding(binding);
+      addBinding(binding, /*isTransitive=*/false);
 
     for (auto *literal : info.Literals)
       addLiteralRequirement(literal);
@@ -479,7 +479,12 @@ public:
   }
 
   /// Check if this binding is viable for inclusion in the set.
-  bool isViable(PotentialBinding &binding);
+  ///
+  /// \param binding The binding to validate.
+  /// \param isTransitive Indicates whether this binding has been
+  /// acquired through transitive inference and requires extra
+  /// checking.
+  bool isViable(PotentialBinding &binding, bool isTransitive);
 
   explicit operator bool() const {
     return hasViableBindings() || isDirectHole();
@@ -618,7 +623,13 @@ public:
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 
 private:
-  void addBinding(PotentialBinding binding);
+  /// Add a new binding to the set.
+  ///
+  /// \param binding The binding to add.
+  /// \param isTransitive Indicates whether this binding has been
+  /// acquired through transitive inference and requires validity
+  /// checking.
+  void addBinding(PotentialBinding binding, bool isTransitive);
 
   void addLiteralRequirement(Constraint *literal);
 
