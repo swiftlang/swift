@@ -1,27 +1,22 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded %s -c -o %t/a.o
+
+// RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
+// RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
+
+// Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
+// RUN: test -z `comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`
+
+// DEP: ___stack_chk_fail
+// DEP: ___stack_chk_guard
+// DEP: _free
+// DEP: _memset
+// DEP: _putchar
+// DEP: _posix_memalign
+
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
-
-// backslash is not doing anything, just to make the grep not match its own line
-// RUN: grep DEP-%target-os %s | sed 's#// DEP-%target-os: ##' | sort > %t/expected-dependencies.txt
-// RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.out | sort > %t/actual-dependencies.txt
-// RUN: diff -u %t/expected-dependencies.txt %t/actual-dependencies.txt
-
-// DEP-macosx: ___stack_chk_fail
-// DEP-macosx: ___stack_chk_guard
-// DEP-macosx: _free
-// DEP-macosx: _posix_memalign
-// DEP-macosx: _printf
-// DEP-macosx: _putchar
-// DEP-macosx: dyld_stub_binder
-
-// DEP-linux-gnu: __stack_chk_fail
-// DEP-linux-gnu: __stack_chk_guard
-// DEP-linux-gnu: free
-// DEP-linux-gnu: posix_memalign
-// DEP-linux-gnu: putchar
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
