@@ -1179,6 +1179,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::TypeVariable:
       llvm_unreachable("mangling type variable");
 
+    case TypeKind::ErrorUnion:
+      llvm_unreachable("Error unions should not persist to mangling");
+
     case TypeKind::Module:
       llvm_unreachable("Cannot mangle module type yet");
 

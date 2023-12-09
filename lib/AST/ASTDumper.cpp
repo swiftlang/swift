@@ -4432,6 +4432,13 @@ namespace {
       printFoot();
     }
 
+    void visitErrorUnionType(ErrorUnionType *T, StringRef label) {
+      printCommon("error_union_type", label);
+      for (auto term : T->getTerms())
+        printRec(term);
+      printFoot();
+    }
+
 #undef TRIVIAL_TYPE_PRINTER
   };
 

@@ -1974,6 +1974,7 @@ private:
   NEVER_VISIT(PackExpansionType)
   NEVER_VISIT(PackElementType)
   NEVER_VISIT(TypeVariableType)
+  NEVER_VISIT(ErrorUnionType)
 
   VISIT(SugarType, recurse)
 

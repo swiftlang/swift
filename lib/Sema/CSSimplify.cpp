@@ -7458,6 +7458,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       return matchTypes(pack1, pack2, kind, subflags, locator);
     }
+
+    case TypeKind::ErrorUnion:
+      break;
     }
   }
 
@@ -8118,6 +8121,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::ParameterizedProtocol:
   case TypeKind::Protocol:
   case TypeKind::Existential:
+  case TypeKind::ErrorUnion:
     // Break out to handle the actual construction below.
     break;
 
