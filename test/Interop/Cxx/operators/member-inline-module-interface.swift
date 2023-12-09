@@ -151,7 +151,7 @@
 // CHECK-NEXT: }
 
 // CHECK: struct TemplatedOperatorArrayByVal {
-// CHECK:   subscript(i: T) -> T { mutating get }
+// CHECK:   subscript<T>(i: T) -> T { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst<T>(_ i: T) -> T
 // CHECK-NOT: mutating func __operatorPlus<T>(_ i: T) -> UnsafeMutablePointer<T>

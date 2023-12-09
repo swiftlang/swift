@@ -1683,7 +1683,8 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
   SubscriptDecl *subscript = SubscriptDecl::createImported(
       ctx, name, getterImpl->getLoc(), bodyParams, getterImpl->getLoc(),
-      elementTy, dc, getterImpl->getClangNode());
+      elementTy, dc, getterImpl->getGenericParams(),
+      getterImpl->getClangNode());
   subscript->setAccess(AccessLevel::Public);
 
   AccessorDecl *getterDecl = AccessorDecl::create(
