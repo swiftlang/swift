@@ -1246,8 +1246,6 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
-  // Emit the 'iterator' variable that we'll be using for iteration.
-  LexicalScope OuterForScope(SGF, CleanupLocation(S));
 
   if (auto *expansion =
           dyn_cast<PackExpansionExpr>(S->getTypeCheckedSequence())) {
@@ -1256,8 +1254,6 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
             ->getCanonicalType());
 
     JumpDest loopDest = createJumpDest(S->getBody());
-
-    // Set the destinations for 'break' and 'continue'.
     JumpDest endDest = createJumpDest(S->getBody());
 
     SGF.emitDynamicPackLoop(
@@ -1271,6 +1267,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
           SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
 
+          // Set the destinations for 'break' and 'continue'.
           SGF.BreakContinueDestStack.push_back({S, endDest, loopDest});
           visit(S->getBody());
           SGF.BreakContinueDestStack.pop_back();
@@ -1284,6 +1281,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     return;
   }
 
+  // Emit the 'iterator' variable that we'll be using for iteration.
+  LexicalScope OuterForScope(SGF, CleanupLocation(S));
   SGF.emitPatternBinding(S->getIteratorVar(),
                          /*index=*/0, /*debuginfo*/ true);
 
