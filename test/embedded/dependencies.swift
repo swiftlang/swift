@@ -2,6 +2,10 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded %s -c -o %t/a.o
 
 // RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
+
+// Linux/ELF doesn't use the "_" prefix in symbol mangling.
+// RUN: if [ %target-os == "linux-gnu" ]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
+
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
