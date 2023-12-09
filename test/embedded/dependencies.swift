@@ -1,5 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded %s -c -o %t/a.o
+// RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
+// RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // backslash is not doing anything, just to make the grep not match its own line
 // RUN: grep DEP-%target-os %s | sed 's#// DEP-%target-os: ##' | sort > %t/expected-dependencies.txt
