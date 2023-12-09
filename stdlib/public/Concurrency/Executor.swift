@@ -396,7 +396,6 @@ where E: SerialExecutor {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
-// Used by the concurrency runtime
 @_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
@@ -412,7 +411,7 @@ internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if SWIFT_CONCURRENCY_USES_DISPATCH
 // This must take a DispatchQueueShim, not something like AnyObject,
 // or else SILGen will emit a retain/release in unoptimized builds,
 // which won't work because DispatchQueues aren't actually
@@ -439,4 +438,4 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
     return UnownedSerialExecutor(ordinary: self)
   }
 }
-#endif // SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#endif // SWIFT_CONCURRENCY_USES_DISPATCH

@@ -294,7 +294,7 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
   return JobPriority::UserInitiated;
 #elif SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   return JobPriority::Unspecified;
-#elif defined(__APPLE__)
+#elif defined(__APPLE__) && SWIFT_CONCURRENCY_ENABLE_DISPATCH
   return static_cast<JobPriority>(qos_class_self());
 #else
   if (isExecutingOnMainThread())
