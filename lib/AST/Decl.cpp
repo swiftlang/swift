@@ -7149,8 +7149,9 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getTypeInContext() const {
-  // If we are performing pack iteration, use the generic environment of the
-  // pack expansion expression to get the right context of a local variable.
+  // If the variable is declared in context of a for-in loop over the elements
+  // of a parameter pack, its interface type must be mapped into context using
+  // the opened element environment of the pack expansion.
   if (auto *env = getOpenedElementEnvironment())
     return GenericEnvironment::mapTypeIntoContext(env, getInterfaceType());
 

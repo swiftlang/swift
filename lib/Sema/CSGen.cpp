@@ -4447,8 +4447,8 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
   return false;
 }
 
-/// Generate constraints for a for-in statement preamble, expecting a
-/// `PackExpansionExpr`.
+/// Generate constraints for a for-in statement preamble where the expression
+/// is a `PackExpansionExpr`.
 static llvm::Optional<PackIterationInfo>
 generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                PackExpansionExpr *expansion, Type patternType) {
@@ -4524,6 +4524,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
     auto *makeIteratorCall =
         CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
+
     Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
     auto *PB = PatternBindingDecl::createImplicit(
         ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
@@ -4540,6 +4541,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
       return llvm::None;
 
     sequenceIterationInfo.makeIteratorVar = PB;
+
     // Type of sequence expression has to conform to Sequence protocol.
     //
     // Note that the following emulates having `$generator` separately
@@ -4606,7 +4608,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     cs.setTargetFor(sequenceIterationInfo.nextCall, nextTarget);
   }
 
-  // Generate constraints for the pattern
+  // Generate constraints for the pattern.
   Type initType =
       cs.generateConstraints(typeCheckedPattern, elementLocator,
                              shouldBindPatternVarsOneWay, nullptr, 0);
@@ -4677,7 +4679,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
   if (isa<PackExpansionExpr>(forEachExpr)) {
     auto *expansion = cast<PackExpansionExpr>(forEachExpr);
 
-    // Generate constraints for the pattern
+    // Generate constraints for the pattern.
     Type patternType = cs.generateConstraints(
         pattern, elementLocator, target.shouldBindPatternVarsOneWay(), nullptr,
         0);
