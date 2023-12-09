@@ -1553,6 +1553,22 @@ BridgedBindingPattern_createParsed(BridgedASTContext cContext,
       cKeywordLoc.unbridged(), introducer, cSubPattern.unbridged());
 }
 
+BridgedExprPattern
+BridgedExprPattern_createParsed(BridgedDeclContext cDeclContext,
+                                BridgedExpr cExpr) {
+  auto *DC = cDeclContext.unbridged();
+  auto &context = DC->getASTContext();
+  return ExprPattern::createParsed(context, cExpr.unbridged(), DC);
+}
+
+BridgedIsPattern BridgedIsPattern_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cIsLoc,
+                                               BridgedTypeExpr cTypeExpr) {
+  return new (cContext.unbridged())
+      IsPattern(cIsLoc.unbridged(), cTypeExpr.unbridged(),
+                /*subPattern=*/nullptr, CheckedCastKind::Unresolved);
+}
+
 BridgedNamedPattern
 BridgedNamedPattern_createParsed(BridgedASTContext cContext,
                                  BridgedDeclContext cDeclContext,

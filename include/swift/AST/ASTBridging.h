@@ -1121,6 +1121,16 @@ BridgedBindingPattern_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cKeywordLoc, bool isLet,
                                    BridgedPattern cSubPattern);
 
+SWIFT_NAME("BridgedExprPattern.createParsed(_:expr:)")
+BridgedExprPattern
+BridgedExprPattern_createParsed(BridgedDeclContext cDeclContext,
+                                BridgedExpr cExpr);
+
+SWIFT_NAME("BridgedIsPattern.createParsed(_:isLoc:typeExpr:)")
+BridgedIsPattern BridgedIsPattern_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cIsLoc,
+                                               BridgedTypeExpr cTypeExpr);
+
 SWIFT_NAME("BridgedNamedPattern.createParsed(_:declContext:name:loc:)")
 BridgedNamedPattern
 BridgedNamedPattern_createParsed(BridgedASTContext astContext,
