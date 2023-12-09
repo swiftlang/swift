@@ -1076,6 +1076,10 @@ public:
   /// global or static 'let' variables, which was previously accepted in
   /// compiler versions before 5.10, or for declarations marked preconcurrency.
   bool downgradeAsyncAccessToWarning(Decl *decl) {
+    if (decl->preconcurrency()) {
+      return true;
+    }
+
     if (auto *var = dyn_cast<VarDecl>(decl)) {
       ActorReferenceResult::Options options = llvm::None;
       // The newly-diagnosed cases are invalid regardless of the module context
@@ -1086,7 +1090,7 @@ public:
       }
     }
 
-    return decl->preconcurrency();
+    return false;
   }
 
   Classification classifyLookup(LookupExpr *E) {
