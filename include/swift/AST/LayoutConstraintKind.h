@@ -41,7 +41,9 @@ enum class LayoutConstraintKind : uint8_t {
   NativeRefCountedObject,
   // It is a layout constraint representing a bridge object
   BridgeObject,
-  LastLayout = BridgeObject,
+  // It is a layout constraint representing a trivial type of a known stride.
+  TrivialStride,
+  LastLayout = TrivialStride,
 };
 
 #endif
