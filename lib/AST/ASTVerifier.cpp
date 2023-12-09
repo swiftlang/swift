@@ -2644,14 +2644,17 @@ public:
         abort();
       }
 
-      // If we are performing pack iteration, variables have to carry the
-      // generic environment. Catching the missing environment here will prevent
-      // the code from being lowered.
-      if (var->getTypeInContext()->is<ErrorType>()) {
-        Out << "VarDecl is missing a Generic Environment: ";
-        var->getInterfaceType().print(Out);
-        Out << "\n";
-        abort();
+      // FIXME: Workaround for invalid AST for imported C++ templates.
+      if (!var->hasClangNode()) {
+        // If we are performing pack iteration, variables have to carry the
+        // generic environment. Catching the missing environment here will prevent
+        // the code from being lowered.
+        if (var->getTypeInContext()->is<ErrorType>()) {
+          Out << "VarDecl is missing a Generic Environment: ";
+          var->getInterfaceType().print(Out);
+          Out << "\n";
+          abort();
+        }
       }
 
       // The fact that this is *directly* be a reference storage type
