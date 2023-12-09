@@ -3319,8 +3319,8 @@ namespace {
       for (const auto &component : keyPath->getComponents()) {
         // The decl referred to by the path component cannot be within an actor.
         if (component.hasDeclRef()) {
-          auto concDecl = component.getDeclRef();
-          auto decl = concDecl.getDecl();
+          auto declRef = component.getDeclRef();
+          auto decl = declRef.getDecl();
           auto isolation = getActorIsolationForReference(
               decl, getDeclContext());
           switch (isolation) {
@@ -3330,13 +3330,22 @@ namespace {
             break;
 
           case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe:
-            // Disable global actor checking for now.
-            if (isolation.isGlobalActor() &&
-                !ctx.LangOpts.isSwiftVersionAtLeast(6))
+          case ActorIsolation::GlobalActorUnsafe: {
+            // Perform the check only in `complete` mode or
+            // stricter.
+            if (ctx.LangOpts.StrictConcurrencyLevel <
+                StrictConcurrency::Complete)
+              break;
+
+            auto result = ActorReferenceResult::forReference(
+                declRef, component.getLoc(), getDeclContext(),
+                kindOfUsage(decl, keyPath));
+
+            if (result == ActorReferenceResult::SameConcurrencyDomain)
               break;
 
             LLVM_FALLTHROUGH;
+          }
 
           case ActorIsolation::ActorInstance:
             // If this entity is always accessible across actors, just check
@@ -3352,11 +3361,17 @@ namespace {
               break;
             }
 
-            ctx.Diags.diagnose(component.getLoc(),
-                               diag::actor_isolated_keypath_component,
-                               isolation.isDistributedActor(),
-                               decl);
-            diagnosed = true;
+            {
+              auto diagnostic = ctx.Diags.diagnose(
+                  component.getLoc(), diag::actor_isolated_keypath_component,
+                  isolation, decl);
+
+              if (isolation == ActorIsolation::ActorInstance)
+                diagnosed = true;
+              else
+                diagnostic.warnUntilSwiftVersion(6);
+            }
+
             break;
           }
         }
