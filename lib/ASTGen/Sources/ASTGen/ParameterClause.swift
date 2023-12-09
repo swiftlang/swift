@@ -84,7 +84,7 @@ extension ASTGenVisitor {
         self.ctx,
         base: base,
         ellipsisLoc: self.generateSourceLoc(ellipsis)
-      )
+      ).asTypeRepr
     }
 
     return .createParsed(

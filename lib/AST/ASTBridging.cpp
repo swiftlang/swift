@@ -1263,18 +1263,22 @@ void BridgedTypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
     typeAttributes->AtLoc = cAtLoc.unbridged();
 }
 
+bool BridgedTypeAttributes_isEmpty(BridgedTypeAttributes cAttributes) {
+  return cAttributes.unbridged()->empty();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//
 
-BridgedTypeRepr BridgedSimpleIdentTypeRepr_createParsed(
+BridgedSimpleIdentTypeRepr BridgedSimpleIdentTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLoc, BridgedIdentifier id) {
   ASTContext &context = cContext.unbridged();
   return new (context) SimpleIdentTypeRepr(DeclNameLoc(cLoc.unbridged()),
                                            DeclNameRef(id.unbridged()));
 }
 
-BridgedTypeRepr BridgedGenericIdentTypeRepr_createParsed(
+BridgedGenericIdentTypeRepr BridgedGenericIdentTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedIdentifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef genericArgs,
     BridgedSourceLoc cLAngleLoc, BridgedSourceLoc cRAngleLoc) {
@@ -1288,7 +1292,7 @@ BridgedTypeRepr BridgedGenericIdentTypeRepr_createParsed(
                                       SourceRange{lAngleLoc, rAngleLoc});
 }
 
-BridgedTypeRepr
+BridgedOptionalTypeRepr
 BridgedOptionalTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr base,
                                      BridgedSourceLoc cQuestionLoc) {
@@ -1297,7 +1301,8 @@ BridgedOptionalTypeRepr_createParsed(BridgedASTContext cContext,
       OptionalTypeRepr(base.unbridged(), cQuestionLoc.unbridged());
 }
 
-BridgedTypeRepr BridgedImplicitlyUnwrappedOptionalTypeRepr_createParsed(
+BridgedImplicitlyUnwrappedOptionalTypeRepr
+BridgedImplicitlyUnwrappedOptionalTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedSourceLoc cExclamationLoc) {
   ASTContext &context = cContext.unbridged();
@@ -1305,7 +1310,7 @@ BridgedTypeRepr BridgedImplicitlyUnwrappedOptionalTypeRepr_createParsed(
       base.unbridged(), cExclamationLoc.unbridged());
 }
 
-BridgedTypeRepr BridgedArrayTypeRepr_createParsed(
+BridgedArrayTypeRepr BridgedArrayTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedSourceLoc cLSquareLoc, BridgedSourceLoc cRSquareLoc) {
   ASTContext &context = cContext.unbridged();
@@ -1315,7 +1320,7 @@ BridgedTypeRepr BridgedArrayTypeRepr_createParsed(
       ArrayTypeRepr(base.unbridged(), SourceRange{lSquareLoc, rSquareLoc});
 }
 
-BridgedTypeRepr BridgedDictionaryTypeRepr_createParsed(
+BridgedDictionaryTypeRepr BridgedDictionaryTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLSquareLoc,
     BridgedTypeRepr keyType, BridgedSourceLoc cColonloc,
     BridgedTypeRepr valueType, BridgedSourceLoc cRSquareLoc) {
@@ -1328,7 +1333,7 @@ BridgedTypeRepr BridgedDictionaryTypeRepr_createParsed(
                          SourceRange{lSquareLoc, rSquareLoc});
 }
 
-BridgedTypeRepr
+BridgedInverseTypeRepr
 BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cTildeLoc,
                                     BridgedTypeRepr cConstraint) {
@@ -1337,7 +1342,7 @@ BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
       InverseTypeRepr(cTildeLoc.unbridged(), cConstraint.unbridged());
 }
 
-BridgedTypeRepr
+BridgedMetatypeTypeRepr
 BridgedMetatypeTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr baseType,
                                      BridgedSourceLoc cTypeLoc) {
@@ -1346,7 +1351,7 @@ BridgedMetatypeTypeRepr_createParsed(BridgedASTContext cContext,
   return new (context) MetatypeTypeRepr(baseType.unbridged(), tyLoc);
 }
 
-BridgedTypeRepr
+BridgedProtocolTypeRepr
 BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr baseType,
                                      BridgedSourceLoc cProtoLoc) {
@@ -1355,7 +1360,7 @@ BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
   return new (context) ProtocolTypeRepr(baseType.unbridged(), protoLoc);
 }
 
-BridgedTypeRepr
+BridgedPackElementTypeRepr
 BridgedPackElementTypeRepr_createParsed(BridgedASTContext cContext,
                                         BridgedTypeRepr base,
                                         BridgedSourceLoc cEachLoc) {
@@ -1364,7 +1369,7 @@ BridgedPackElementTypeRepr_createParsed(BridgedASTContext cContext,
       PackElementTypeRepr(cEachLoc.unbridged(), base.unbridged());
 }
 
-BridgedTypeRepr
+BridgedPackExpansionTypeRepr
 BridgedPackExpansionTypeRepr_createParsed(BridgedASTContext cContext,
                                           BridgedTypeRepr base,
                                           BridgedSourceLoc cRepeatLoc) {
@@ -1373,13 +1378,12 @@ BridgedPackExpansionTypeRepr_createParsed(BridgedASTContext cContext,
       PackExpansionTypeRepr(cRepeatLoc.unbridged(), base.unbridged());
 }
 
-BridgedTypeRepr
+BridgedAttributedTypeRepr
 BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
                                        BridgedTypeRepr base,
                                        BridgedTypeAttributes cAttributes) {
   TypeAttributes *typeAttributes = cAttributes.unbridged();
-  if (typeAttributes->empty())
-    return base;
+  assert(!typeAttributes->empty());
 
   ASTContext &context = cContext.unbridged();
   auto attributedType =
@@ -1388,7 +1392,7 @@ BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
   return attributedType;
 }
 
-BridgedTypeRepr BridgedSpecifierTypeRepr_createParsed(
+BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedAttributedTypeSpecifier specifier, BridgedSourceLoc cSpecifierLoc) {
   ASTContext &context = cContext.unbridged();
@@ -1427,7 +1431,7 @@ BridgedTypeRepr BridgedSpecifierTypeRepr_createParsed(
   }
 }
 
-BridgedTypeRepr
+BridgedVarargTypeRepr
 BridgedVarargTypeRepr_createParsed(BridgedASTContext cContext,
                                    BridgedTypeRepr base,
                                    BridgedSourceLoc cEllipsisLoc) {
@@ -1437,10 +1441,9 @@ BridgedVarargTypeRepr_createParsed(BridgedASTContext cContext,
   return new (context) VarargTypeRepr(baseType, ellipsisLoc);
 }
 
-BridgedTypeRepr BridgedTupleTypeRepr_createParsed(BridgedASTContext cContext,
-                                                  BridgedArrayRef elements,
-                                                  BridgedSourceLoc cLParenLoc,
-                                                  BridgedSourceLoc cRParenLoc) {
+BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedArrayRef elements,
+    BridgedSourceLoc cLParenLoc, BridgedSourceLoc cRParenLoc) {
   ASTContext &context = cContext.unbridged();
   SourceLoc lParen = cLParenLoc.unbridged();
   SourceLoc rParen = cRParenLoc.unbridged();
@@ -1474,7 +1477,7 @@ BridgedMemberTypeRepr_createParsed(BridgedASTContext cContext,
                                 memberComponents);
 }
 
-BridgedTypeRepr
+BridgedCompositionTypeRepr
 BridgedCompositionTypeRepr_createEmpty(BridgedASTContext cContext,
                                        BridgedSourceLoc cAnyLoc) {
   ASTContext &context = cContext.unbridged();
@@ -1482,7 +1485,7 @@ BridgedCompositionTypeRepr_createEmpty(BridgedASTContext cContext,
   return CompositionTypeRepr::createEmptyComposition(context, anyLoc);
 }
 
-BridgedTypeRepr
+BridgedCompositionTypeRepr
 BridgedCompositionTypeRepr_createParsed(BridgedASTContext cContext,
                                         BridgedArrayRef cTypes,
                                         BridgedSourceLoc cFirstAmpLoc) {
@@ -1494,7 +1497,7 @@ BridgedCompositionTypeRepr_createParsed(BridgedASTContext cContext,
       SourceRange{firstAmpLoc, types.back()->getEndLoc()});
 }
 
-BridgedTypeRepr BridgedFunctionTypeRepr_createParsed(
+BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr argsTy,
     BridgedSourceLoc cAsyncLoc, BridgedSourceLoc cThrowsLoc,
     BridgedNullableTypeRepr thrownType, BridgedSourceLoc cArrowLoc,
@@ -1506,14 +1509,14 @@ BridgedTypeRepr BridgedFunctionTypeRepr_createParsed(
       resultType.unbridged());
 }
 
-BridgedTypeRepr
+BridgedNamedOpaqueReturnTypeRepr
 BridgedNamedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
                                               BridgedTypeRepr baseTy) {
   ASTContext &context = cContext.unbridged();
   return new (context) NamedOpaqueReturnTypeRepr(baseTy.unbridged(), nullptr);
 }
 
-BridgedTypeRepr
+BridgedOpaqueReturnTypeRepr
 BridgedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cOpaqueLoc,
                                          BridgedTypeRepr baseTy) {
@@ -1521,7 +1524,8 @@ BridgedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
   return new (context)
       OpaqueReturnTypeRepr(cOpaqueLoc.unbridged(), baseTy.unbridged());
 }
-BridgedTypeRepr
+
+BridgedExistentialTypeRepr
 BridgedExistentialTypeRepr_createParsed(BridgedASTContext cContext,
                                         BridgedSourceLoc cAnyLoc,
                                         BridgedTypeRepr baseTy) {
