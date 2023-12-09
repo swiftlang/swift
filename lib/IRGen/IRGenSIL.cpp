@@ -1846,6 +1846,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     CurFn->addFnAttr(llvm::Attribute::NoInline);
   }
 
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    CurFn->addFnAttr(llvm::Attribute::NoUnwind);
+  }
+
   auto optMode = f->getOptimizationMode();
   if (optMode != OptimizationMode::NotSet &&
       optMode != f->getModule().getOptions().OptMode) {

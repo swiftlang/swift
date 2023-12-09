@@ -1444,6 +1444,10 @@ void IRGenModule::constructInitialFnAttributes(
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
+
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    Attrs.addAttribute(llvm::Attribute::NoUnwind);
+  }
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
