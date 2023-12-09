@@ -35,10 +35,6 @@
 #include <atomic>
 #include <new>
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
-#include <mutex>
-#endif
-
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
@@ -310,7 +306,7 @@ protected:
   void unlock() const {}
 #else
   // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
-  mutable std::mutex mutex_;
+  mutable Mutex mutex_;
 
   void lock() const { mutex_.lock(); }
   void unlock() const { mutex_.unlock(); }
