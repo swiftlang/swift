@@ -181,11 +181,11 @@ func k() -> Any {
   return type(of: k())  // expected-warning {{function call causes an infinite recursion}}
 }
 
-@_silgen_name("exit") func exit(_: Int32) -> Never
+@_silgen_name("my_exit") func my_exit(_: Int32) -> Never
 
 func l() {
   guard Bool.random() else {
-    exit(0) // no warning; calling 'exit' terminates the program
+    my_exit(0) // no warning; calling 'exit' terminates the program
   }
   l()
 }

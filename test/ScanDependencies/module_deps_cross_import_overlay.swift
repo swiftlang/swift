@@ -24,7 +24,6 @@ import SubEWrapper
 // CHECK-DAG:   "swift": "_Concurrency"
 // CHECK-DAG:   "swift": "_StringProcessing"
 // CHECK-DAG:   "swift": "_cross_import_E"
-// CHECK-DAG:   "clang": "_SwiftConcurrencyShims"
 // CHECK-DAG:   "clang": "CrossImportTestModule"
 // Ensure a transitive dependency via "_cross_import_E" is not a direct dep of main module
 // CHECK-NOT:   "clang": "X"
