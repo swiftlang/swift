@@ -7,6 +7,11 @@
 // RUN: %target-swift-frontend -swift-version 5 -typecheck -I%t -verify -primary-file %s %S/Inputs/macro_expand_other.swift -verify-ignore-unknown  -load-plugin-library %t/%target-library-name(MacroDefinition) -dump-macro-expansions > %t/expansions-dump.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
 
+// Re-test with the macro library module emitted using -experimental-lazy-typecheck.
+// RUN: %target-swift-frontend -enable-experimental-feature ExtensionMacros -swift-version 5 -emit-module -o %t/lazy/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition) -experimental-lazy-typecheck
+// RUN: %target-swift-frontend -swift-version 5 -typecheck -I%t/lazy -verify -primary-file %s %S/Inputs/macro_expand_other.swift -verify-ignore-unknown  -load-plugin-library %t/%target-library-name(MacroDefinition) -dump-macro-expansions > %t/expansions-dump.txt 2>&1
+// RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
+
 import macro_library
 
 struct Treat {}

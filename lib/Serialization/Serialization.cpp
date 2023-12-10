@@ -3206,6 +3206,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       unsigned numNames = introducedDeclNames.size();
 
+      (void)evaluateOrDefault(S.getASTContext().evaluator,
+                              ResolveMacroConformances{theAttr, D}, {});
+
       unsigned numConformances = 0;
       for (auto conformance : theAttr->getConformances()) {
         introducedDeclNames.push_back(
