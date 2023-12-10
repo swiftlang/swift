@@ -12,7 +12,7 @@ setlocal enableextensions enabledelayedexpansion
 path %PATH%;%PYTHON_HOME%
 
 :: Versioning
-set ProductVersion=5.9.1
+set ProductVersion=5.9.2
 set ProductTag=
 
 :: Identify the SourceRoot
