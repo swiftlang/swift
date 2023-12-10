@@ -153,7 +153,6 @@ public:
   UNREACHABLE(PoundDiagnostic);
   UNREACHABLE(Missing);
   UNREACHABLE(MissingMember);
-  UNREACHABLE(MacroExpansion);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
 
@@ -172,6 +171,7 @@ public:
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);
+  UNINTERESTING(MacroExpansion);
 
 #undef UNINTERESTING
 };
