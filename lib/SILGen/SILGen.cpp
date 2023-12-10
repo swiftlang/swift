@@ -510,7 +510,7 @@ FuncDecl *SILGenModule::getSwiftJobRun() {
 
 FuncDecl *SILGenModule::getExit() {
   return lookupConcurrencyIntrinsic(getASTContext(), ExitFunc,
-                                    "exit");
+                                    "_swiftExit");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
