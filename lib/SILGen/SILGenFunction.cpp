@@ -1353,7 +1353,7 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
       FuncDecl *exitFuncDecl = SGM.getExit();
       assert(exitFuncDecl && "Failed to find exit function declaration");
       SILFunction *exitSILFunc = SGM.getFunction(
-          SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
+          SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func),
           NotForDefinition);
 
       SILFunctionType &funcType =

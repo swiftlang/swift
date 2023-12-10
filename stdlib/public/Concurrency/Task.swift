@@ -1030,7 +1030,14 @@ internal func _asyncMainDrainQueue() -> Never
 internal func _getMainExecutor() -> Builtin.Executor
 
 @_extern(c, "exit")
+@usableFromInline
 func exit(_: CInt) -> Never
+
+@available(SwiftStdlib 5.11, *)
+@_alwaysEmitIntoClient
+internal func _swiftExit(_ exitCode: CInt) -> Never {
+  exit(exitCode)
+}
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
