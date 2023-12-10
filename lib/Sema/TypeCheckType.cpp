@@ -5192,9 +5192,20 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
-  if (auto kp = ty->getKnownProtocol())
-    if (auto kind = getInvertibleProtocolKind(*kp))
+  if (auto kp = ty->getKnownProtocol()) {
+    if (auto kind = getInvertibleProtocolKind(*kp)) {
+
+      // Gate the '~Escapable' type behind a specific flag for now.
+      if (*kind == InvertibleProtocolKind::Escapable &&
+          !getASTContext().LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+        diagnoseInvalid(repr, repr->getLoc(),
+                        diag::escapable_requires_feature_flag);
+        return ErrorType::get(getASTContext());
+      }
+
       return ProtocolCompositionType::getInverseOf(getASTContext(), *kind);
+    }
+  }
 
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());

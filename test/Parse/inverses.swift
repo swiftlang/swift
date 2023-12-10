@@ -46,7 +46,7 @@ protocol Foo: ~Copyable
 
 protocol Sando { func make() }
 
-class C: ~Copyable,  // expected-error {{classes cannot be noncopyable}}
+class C: ~Copyable,  // expected-error {{classes cannot be '~Copyable'}}
          ~Sando // expected-error {{type 'Sando' is not invertible}}
          {}
 

@@ -1232,8 +1232,10 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
 
-    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
       trySynthesize(KnownProtocolKind::Copyable);
+      trySynthesize(KnownProtocolKind::Escapable);
+    }
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

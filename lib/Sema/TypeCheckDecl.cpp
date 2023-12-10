@@ -916,41 +916,46 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 }
 
 InverseMarking
-NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
-                                       TypeDecl *decl) const {
+InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
+                                       TypeDecl *decl,
+                                       InvertibleProtocolKind ip) const {
   auto &ctx = decl->getASTContext();
-  const auto TARGET = InvertibleProtocolKind::Copyable;
+  const auto TARGET = ip;
   using Kind = InverseMarking::Kind;
   using Mark = InverseMarking::Mark;
 
-  // ----------------
-  // The legacy check
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
-      if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>()) {
-        if (!decl->getASTContext().supportsMoveOnlyTypes())
-          decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+  switch (TARGET) {
+  case InvertibleProtocolKind::Copyable:
+    // Handle the legacy '@_moveOnly' attribute
+    if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>()) {
+      assert((isa<StructDecl, EnumDecl, ClassDecl>(decl)));
 
-        return InverseMarking::forInverse(Kind::LegacyExplicit,
-                                          attr->getLocation());
-      }
+      // FIXME: just never allow lexical-lifetimes to be disabled?
+      if (!ctx.supportsMoveOnlyTypes())
+        decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+
+      return InverseMarking::forInverse(Kind::LegacyExplicit,
+                                        attr->getLocation());
     }
-    return InverseMarking::forInverse(Kind::None);
+    break;
+
+  case InvertibleProtocolKind::Escapable:
+    // Handle the legacy '@_nonEscapable' attribute
+    if (auto attr = decl->getAttrs().getAttribute<NonEscapableAttr>()) {
+      assert((isa<ClassDecl, StructDecl, EnumDecl>(decl)));
+      return InverseMarking::forInverse(Kind::LegacyExplicit,
+                                        attr->getLocation());
+    }
+    break;
   }
-  // ----------------
+
+  // Legacy support stops here.
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return InverseMarking::forInverse(Kind::None);
 
   // FIXME: just never allow lexical-lifetimes to be disabled?
   if (!ctx.supportsMoveOnlyTypes())
     decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
-
-  // Handle the legacy '@_moveOnly' attribute
-  if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>()) {
-    assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl)
-               || (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)
-                   && isa<ClassDecl>(decl)));
-    return InverseMarking::forInverse(Kind::LegacyExplicit,
-                                      attr->getLocation());
-  }
 
   /// The invertible protocol being targeted by this annotation request.
 
@@ -972,7 +977,7 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
     return false;
   };
 
-  // Function to check an inheritance clause for the noncopyable marking.
+  // Function to check an inheritance clause for the ~IP marking.
   auto searchInheritanceClause =
       [&](InheritedTypes inherited) -> InverseMarking {
     InverseMarking result;
@@ -1082,7 +1087,9 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
   /// MARK: procedure for determining if a nominal is marked with ~TARGET.
 
   if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    assert(!isa<BuiltinTupleDecl>(nominal));
+    // Claim that the tuple decl has an inferred ~TARGET marking.
+    if (isa<BuiltinTupleDecl>(nominal))
+      return InverseMarking::forInverse(InverseMarking::Kind::Inferred);
 
     if (!isa<ProtocolDecl>(nominal)) {
       // Handle non-protocol nominals specially because they infer a ~TARGET
@@ -1121,13 +1128,6 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
   }
 
   return result;
-}
-
-bool IsEscapableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
-  if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
-    return !decl->getAttrs().hasAttribute<NonEscapableAttr>();
-  }
-  return true;
 }
 
 bool
@@ -2579,7 +2579,7 @@ static Type validateParameterType(ParamDecl *decl) {
     return ErrorType::get(ctx);
   }
 
-  // Validate the presence of ownership for a noncopyable parameter.
+  // Validate the presence of ownership for a parameter with an inverse applied.
   if (diagnoseMissingOwnership(ctx, dc, ownership,
                                decl->getTypeRepr(), Ty, options)) {
     decl->setInvalid();
@@ -3286,6 +3286,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   switch (kp) {
   case KnownProtocolKind::Sendable:
     return deriveImplicitSendableConformance(evaluator, nominal);
+  case KnownProtocolKind::Escapable:
   case KnownProtocolKind::Copyable:
     return deriveConformanceForInvertible(evaluator, nominal, kp);
   default:

@@ -314,29 +314,6 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// isEscapable computation.
-//----------------------------------------------------------------------------//
-
-llvm::Optional<bool> IsEscapableRequest::getCachedResult() const {
-  auto decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.isEscapableComputed)
-    return static_cast<bool>(decl->LazySemanticInfo.isEscapable);
-
-  return llvm::None;
-}
-
-void IsEscapableRequest::cacheResult(bool value) const {
-  auto decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.isEscapableComputed = true;
-  decl->LazySemanticInfo.isEscapable = value;
-
-  // Add an attribute for printing
-  if (!value && !decl->getAttrs().hasAttribute<NonEscapableAttr>())
-    decl->getAttrs().add(new (decl->getASTContext())
-                             NonEscapableAttr(/*Implicit=*/true));
-}
-
-//----------------------------------------------------------------------------//
 // isDynamic computation.
 //----------------------------------------------------------------------------//
 

@@ -3684,12 +3684,6 @@ bool ValueDecl::isFinal() const {
                            getAttrs().hasAttribute<FinalAttr>());
 }
 
-bool ValueDecl::isEscapable() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsEscapableRequest{const_cast<ValueDecl *>(this)},
-                           !getAttrs().hasAttribute<NonEscapableAttr>());
-}
-
 bool ValueDecl::isDynamic() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -4903,16 +4897,21 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         llvm::None);
 }
 
-InverseMarking TypeDecl::getNoncopyableMarking() const {
+InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
   return evaluateOrDefault(
       getASTContext().evaluator,
-      NoncopyableAnnotationRequest{const_cast<TypeDecl *>(this)},
+      InvertibleAnnotationRequest{const_cast<TypeDecl *>(this), ip},
       InverseMarking::forInverse(InverseMarking::Kind::None)
   );
 }
 
 bool TypeDecl::canBeNoncopyable() const {
-  return getNoncopyableMarking().getInverse().isPresent();
+  return getMarking(InvertibleProtocolKind::Copyable).getInverse().isPresent();
+}
+
+bool TypeDecl::isEscapable() const {
+  auto escapable = getMarking(InvertibleProtocolKind::Escapable);
+  return !escapable.getInverse().isPresent();
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
@@ -4926,6 +4925,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
       return ErrorType::get(ctx);
     return DependentMemberType::get(
         selfTy, const_cast<AssociatedTypeDecl *>(ATD));
+
   }
 
   return getInterfaceType()->getMetatypeInstanceType();

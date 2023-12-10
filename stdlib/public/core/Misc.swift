@@ -169,6 +169,8 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
 
 @_marker public protocol Copyable {}
 
+@_marker public protocol Escapable {}
+
 #if $BitwiseCopyable
 @_marker public protocol _BitwiseCopyable {}
 #endif

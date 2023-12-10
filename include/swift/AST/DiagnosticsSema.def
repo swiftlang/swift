@@ -7555,27 +7555,27 @@ ERROR(accessor_macro_not_single_var, none,
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
-ERROR(noncopyable_but_copyable, none,
-      "%kind0 required to be 'Copyable' but is marked with '~Copyable'",
-      (const ValueDecl *))
-ERROR(noncopyable_generic_but_copyable, none,
+ERROR(inverse_but_also_conforms, none,
+      "%kind0 required to be '%1' but is marked with '~%1'",
+      (const ValueDecl *, StringRef))
+ERROR(inverse_generic_but_also_conforms, none,
       "%0 required to be '%1' but is marked with '~%1'",
       (Type, StringRef))
 WARNING(redundant_inverse_constraint,none,
         "redundant constraint %0 : '~%1'", (Type, StringRef))
-ERROR(noncopyable_class, none,
-      "classes cannot be noncopyable",
-      ())
+ERROR(inverse_on_class, none,
+      "classes cannot be '~%0'",
+      (StringRef))
 ERROR(inverse_extension, none,
       "cannot apply inverse %0 to extension",
       (Type))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
       (const ValueDecl *))
-ERROR(noncopyable_type_member_in_copyable,none,
+ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
-      "'Copyable'-conforming %kind3 has noncopyable type %0",
-      (Type, bool, DeclName, const ValueDecl *))
+      "'%4'-conforming %kind3 has non-%4 type %0",
+      (Type, bool, DeclName, const ValueDecl *, StringRef))
 NOTE(add_inverse,none,
      "consider adding '~%1' to %kind0",
      (const ValueDecl *, StringRef))
@@ -7592,6 +7592,9 @@ NOTE(note_inverse_preventing_conformance_explicit,none,
 NOTE(add_explicit_protocol_for_conformance,none,
      "consider making %kind0 explicitly conform to the '%1' protocol",
      (const ValueDecl *, StringRef))
+ERROR(escapable_requires_feature_flag,none,
+      "type '~Escapable' requires -enable-experimental-feature NonEscapableTypes",
+      ())
 
 // -- older ones below --
 
