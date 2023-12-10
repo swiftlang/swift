@@ -4,6 +4,8 @@
 
 import Swift
 
+#warning("!")
+
 // CHECK-NO-SKIP: sil_global private @$s4Test17internalGlobalVar_Wz : $Builtin.Word
 // CHECK-SKIP-NOT: s4Test17internalGlobalVar_Wz
 

@@ -150,7 +150,6 @@ public:
   }
   UNREACHABLE(Module);
   UNREACHABLE(TopLevelCode);
-  UNREACHABLE(PoundDiagnostic);
   UNREACHABLE(Missing);
   UNREACHABLE(MissingMember);
   UNREACHABLE(GenericTypeParam);
@@ -168,6 +167,7 @@ public:
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
   UNINTERESTING(IfConfig);
   UNINTERESTING(Import);
+  UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);
