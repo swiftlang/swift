@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded %s -c -o %t/a.o
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded %s -c -o %t/a.o
 
 // RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
 
@@ -9,7 +9,7 @@
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
-// RUN: test -z `comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`
+// RUN: test -z "`comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`"
 
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
@@ -43,4 +43,26 @@ public func print(_ s: StaticString, terminator: StaticString = "\n") {
   }
 }
 
-print("Hello Embedded Swift!") // CHECK: Hello Embedded Swift!
+class MyClass {
+  func foo() { print("MyClass.foo") }
+}
+
+class MySubClass: MyClass {
+  override func foo() { print("MySubClass.foo") }
+}
+
+@main
+struct Main {
+  static var objects: [MyClass] = []
+  static func main() {
+    print("Hello Embedded Swift!")
+    // CHECK: Hello Embedded Swift!
+    objects.append(MyClass())
+    objects.append(MySubClass())
+    for o in objects {
+      o.foo()
+    }
+    // CHECK: MyClass.foo
+    // CHECK: MySubClass.foo
+  }
+}
