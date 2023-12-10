@@ -3485,10 +3485,6 @@ static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureOpaqueTypeErasure(Decl *decl) {
   return false;
 }

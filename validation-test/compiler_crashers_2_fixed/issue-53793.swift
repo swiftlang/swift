@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -verify -emit-ir %s
+// RUN: %target-swift-frontend -disable-experimental-associated-type-inference -verify -emit-ir %s
 
 // Works with experimental associated type inference.
 // RUN: %target-swift-frontend -enable-experimental-associated-type-inference -emit-ir %s

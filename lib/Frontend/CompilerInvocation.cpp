@@ -910,8 +910,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   if (Args.hasArg(OPT_experimental_one_way_closure_params))
     Opts.Features.insert(Feature::OneWayClosureParameters);
-  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
-    Opts.Features.insert(Feature::TypeWitnessSystemInference);
   if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
@@ -1350,6 +1348,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_warn_redundant_requirements))
     Opts.WarnRedundantRequirements = true;
+
+  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
+    Opts.EnableExperimentalAssociatedTypeInference = true;
+  if (Args.hasArg(OPT_disable_experimental_associated_type_inference))
+    Opts.EnableExperimentalAssociatedTypeInference = false;
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
