@@ -5,6 +5,8 @@
 
 import CxxStdlib
 
+@_silgen_name("my_exit") public func my_exit () -> Never
+
 func test() {
     let x: Double = 1.0
     let y: Double = 2.0
@@ -24,5 +26,5 @@ func test() {
     let _ = strstr("a", "aaa")
 #endif
 
-    exit(0)
+    my_exit()
 }

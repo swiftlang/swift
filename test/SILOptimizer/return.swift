@@ -26,7 +26,7 @@ func diagnoseNeverWithBody(i : Int) -> Never {
   } else {
     switch i {
     case 0:
-      exit()
+      my_exit()
     case 1:
       fatalError()
     default:
@@ -58,19 +58,19 @@ func multipleBlocksAllMissing(x: Int) -> Int {
   x += 1
 } // expected-error {{missing return in global function expected to return 'Int'}}
 
-@_silgen_name("exit") func exit () -> Never
+@_silgen_name("my_exit") func my_exit () -> Never
 
 func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
   if (i) {
-    exit() 
+    my_exit() 
   } 
 } // expected-error {{missing return in global function expected to return 'Int'}}
 
 func diagnose_missing_return_no_error_after_noreturn(i: Bool) -> Int {
   if (i) {
-    exit()
+    my_exit()
   } else {
-    exit()
+    my_exit()
   }
 } // no error
 
@@ -111,29 +111,29 @@ func whileTrueLoop() -> Int {
 }
 
 func testUnreachableAfterNoReturn(x: Int) -> Int {
-  exit(); // expected-note{{a call to a never-returning function}}
+  my_exit(); // expected-note{{a call to a never-returning function}}
   return x; // expected-warning {{will never be executed}}
 }
 
 func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
   let x:Int = 5
   if 1 == 1 {  // expected-note {{condition always evaluates to true}}
-    exit(); 
+    my_exit(); 
   }
   return x; // expected-warning {{will never be executed}}
 }
 
 func testReachableAfterNoReturnInADifferentBlock(x: Int) -> Int {
   if x == 5 {
-    exit();
+    my_exit();
   }
   return x; // no warning
 }
 
 func testUnreachableAfterNoReturnFollowedByACall() -> Int {
   let x:Int = 5
-  exit(); // expected-note{{a call to a never-returning function}}
-  exit(); // expected-warning {{will never be executed}}
+  my_exit(); // expected-note{{a call to a never-returning function}}
+  my_exit(); // expected-warning {{will never be executed}}
   return x
 }
 
@@ -147,7 +147,7 @@ func testCleanupCodeEmptyTuple(fn: @autoclosure () -> Bool = false,
           file: String = #file,
           line: Int = #line) {
   if true {
-    exit()
+    my_exit()
   }
 } // no warning
 

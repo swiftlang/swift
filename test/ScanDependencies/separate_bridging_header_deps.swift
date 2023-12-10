@@ -13,7 +13,6 @@ import E
 // CHECK-DAG:          "swift": "Swift"
 // CHECK-DAG:          "swift": "SwiftOnoneSupport"
 // CHECK-DAG:          "swift": "_Concurrency"
-// CHECK-DAG:          "clang": "_SwiftConcurrencyShims"
 // CHECK-DAG:          "swift": "_StringProcessing"
 // The source of dependency on clang:F is the bridging header, ensure it is captured here
 // CHECK-DAG:          "clang": "F"

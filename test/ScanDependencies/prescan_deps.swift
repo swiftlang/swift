@@ -21,6 +21,5 @@ import SubE
 // CHECK-DAG:  "Swift"
 // CHECK-DAG:  "SwiftOnoneSupport"
 // CHECK-DAG:  "_Concurrency"
-// CHECK-DAG:  "_SwiftConcurrencyShims"
 // CHECK-DAG:  "_StringProcessing"
 // CHECK: ]

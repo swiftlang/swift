@@ -193,11 +193,11 @@ func testSwitchEnum(_ xi: Int) -> Int {
   return x
 }
 
-@_silgen_name("exit") func exit() -> Never
+@_silgen_name("my_exit") func my_exit() -> Never
 
 func reachableThroughNonFoldedPredecessor(fn: @autoclosure () -> Bool = false) {
   if !_fastPath(fn()) {
-    exit()
+    my_exit()
   }
   var _: Int = 0 // no warning
 }
@@ -223,7 +223,7 @@ func intConstantTest2() -> Int{
 
 func test_single_statement_closure(_ fn:() -> ()) {}
 test_single_statement_closure() {
-    exit() // no-warning
+    my_exit() // no-warning
 }
 
 class C { }
@@ -235,7 +235,7 @@ class Super {
 class D : Super { 
   var c = C()
   deinit { // no-warning
-    exit()
+    my_exit()
   }
 }
 

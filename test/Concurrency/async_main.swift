@@ -51,9 +51,9 @@ func asyncFunc() async {
 // CHECK-SIL: bb1(%3 : $()):
 // CHECK-SIL-NEXT:  %4 = integer_literal $Builtin.Int32, 0
 // CHECK-SIL-NEXT:  %5 = struct $Int32 (%4 : $Builtin.Int32)
-// CHECK-SIL-NEXT:  // function_ref exit
-// CHECK-SIL-NEXT:  %6 = function_ref @exit : $@convention(c) (Int32) -> Never
-// CHECK-SIL-NEXT:  %7 = apply %6(%5) : $@convention(c) (Int32) -> Never
+// CHECK-SIL-NEXT:  // function_ref _swiftExit(_:)
+// CHECK-SIL-NEXT:  %6 = function_ref @$ss10_swiftExitys5NeverOs5Int32VF : $@convention(thin) (Int32) -> Never
+// CHECK-SIL-NEXT:  %7 = apply %6(%5) : $@convention(thin) (Int32) -> Never
 // CHECK-SIL-NEXT:  unreachable
 
 // CHECK-SIL: bb2(%9 : $any Error):
