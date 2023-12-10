@@ -6859,7 +6859,9 @@ public:
                                        SourceLoc SubscriptLoc,
                                        ParameterList *Indices,
                                        SourceLoc ArrowLoc, Type ElementTy,
-                                       DeclContext *Parent, ClangNode ClangN);
+                                       DeclContext *Parent,
+                                       GenericParamList *GenericParams,
+                                       ClangNode ClangN);
   
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
