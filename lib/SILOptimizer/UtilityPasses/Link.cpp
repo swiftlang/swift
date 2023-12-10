@@ -43,21 +43,33 @@ public:
     // In embedded Swift, the stdlib contains all the runtime functions needed
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
     if (M.getOptions().EmbeddedSwift && LinkEmbeddedRuntime) {
-      linkEmbeddedRuntimeFromStdlib();
+      linkEmbeddedRuntimeFromStdlib(!M.getOptions().NoAllocations);
     }
   }
 
-  void linkEmbeddedRuntimeFromStdlib() {
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
-                 MEMORY_EFFECTS)                                               \
-  linkEmbeddedRuntimeFunctionByName(#NAME);
+  void linkEmbeddedRuntimeFromStdlib(bool includeAllocatingFunctions) {
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT, \
+                 MEMORY_EFFECTS)                                           \
+  {                                                                        \
+    using namespace RuntimeConstants;                                      \
+    ArrayRef<RuntimeEffect> effects = {EFFECT};                            \
+    bool allocating = false;                                               \
+    for (RuntimeEffect rt : effects) {                                     \
+      if (rt == RuntimeEffect::Allocating ||                               \
+          rt == RuntimeEffect::Deallocating)                               \
+        allocating = true;                                                 \
+    }                                                                      \
+    bool include = true;                                                   \
+    if (allocating) include = includeAllocatingFunctions;                  \
+    if (include) linkEmbeddedRuntimeFunctionByName(#NAME);                 \
+  }
 
 #define RETURNS(...)
 #define ARGS(...)
 #define NO_ARGS
 #define ATTRS(...)
 #define NO_ATTRS
-#define EFFECT(...)
+#define EFFECT(...) __VA_ARGS__
 #define MEMORY_EFFECTS(...)
 #define UNKNOWN_MEMEFFECTS
 

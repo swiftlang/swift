@@ -787,20 +787,6 @@ namespace RuntimeConstants {
   const auto FirstParamReturned = llvm::Attribute::Returned;
   const auto WillReturn = llvm::Attribute::WillReturn;
 
-#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
-  const auto NoEffect = RuntimeEffect::NoEffect;
-  const auto Locking = RuntimeEffect::Locking;
-  const auto Allocating = RuntimeEffect::Allocating;
-  const auto Deallocating = RuntimeEffect::Deallocating;
-  const auto RefCounting = RuntimeEffect::RefCounting;
-  const auto ObjectiveC = RuntimeEffect::ObjectiveC;
-  const auto Concurrency = RuntimeEffect::Concurrency;
-  const auto AutoDiff = RuntimeEffect::AutoDiff;
-  const auto MetaData = RuntimeEffect::MetaData;
-  const auto Casting = RuntimeEffect::Casting;
-  const auto ExclusivityChecking = RuntimeEffect::ExclusivityChecking;
-#endif
-
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
     return RuntimeAvailability::AlwaysAvailable;
   }
