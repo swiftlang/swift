@@ -2645,13 +2645,10 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       }
       return;
 
+    // These builtins take a generic 'T' as their operand.
     case BuiltinValueKind::GetEnumTag:
-      visitor(&builtin->getAllOperands()[0]);
-      return;
-
     case BuiltinValueKind::InjectEnumTag:
       visitor(&builtin->getAllOperands()[0]);
-      visitor(&builtin->getAllOperands()[1]);
       return;
 
     // Arrays: (T.Type, Builtin.RawPointer, Builtin.RawPointer,
