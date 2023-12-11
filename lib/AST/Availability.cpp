@@ -590,7 +590,7 @@ ASTContext::getInitRawStructMetadataAvailability() {
 }
 
 AvailabilityContext ASTContext::getObjCSymbolicReferencesAvailability() {
-  return getSwiftFutureAvailability();
+  return getSwift511Availability();
 }
 
 AvailabilityContext ASTContext::getSwift52Availability() {
