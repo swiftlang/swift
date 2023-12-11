@@ -179,7 +179,9 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
   if (cache.getScanService().hasPathMapping())
     InputPath = cache.getScanService().remapPath(InputPath);
 
-  auto key = createCompileJobCacheKeyForOutput(CAS, *base, InputPath);
+  // Module compilation commands always have only one input and the input
+  // index is always 0.
+  auto key = createCompileJobCacheKeyForOutput(CAS, *base, /*InputIndex=*/0);
   if (!key)
     return key.takeError();
 

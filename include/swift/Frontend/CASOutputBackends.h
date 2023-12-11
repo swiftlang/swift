@@ -33,8 +33,7 @@ protected:
                  llvm::Optional<llvm::vfs::OutputConfig> Config) override;
 
   virtual llvm::Error storeImpl(llvm::StringRef Path, llvm::StringRef Bytes,
-                                llvm::StringRef CorrespondingInput,
-                                file_types::ID OutputKind);
+                                unsigned InputIndex, file_types::ID OutputKind);
 
 private:
   file_types::ID getOutputFileType(llvm::StringRef Path) const;
@@ -47,7 +46,7 @@ public:
                         FrontendOptions::ActionType Action);
   ~SwiftCASOutputBackend();
 
-  llvm::Error storeCachedDiagnostics(llvm::StringRef InputFile,
+  llvm::Error storeCachedDiagnostics(unsigned InputIndex,
                                      llvm::StringRef Bytes);
 
 private:

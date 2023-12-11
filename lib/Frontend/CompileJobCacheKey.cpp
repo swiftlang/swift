@@ -23,6 +23,7 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -84,13 +85,16 @@ llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
     return Out.takeError();
 }
 
-llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobCacheKeyForOutput(
-    llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef BaseKey,
-    StringRef ProducingInput) {
-  SmallString<256> OutputInfo;
+llvm::Expected<llvm::cas::ObjectRef>
+swift::createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
+                                         llvm::cas::ObjectRef BaseKey,
+                                         unsigned InputIndex) {
+  std::string InputInfo;
+  llvm::raw_string_ostream OS(InputInfo);
 
-  // CacheKey is the producting input + the base key.
-  OutputInfo.append(ProducingInput);
+  // CacheKey is the index of the producting input + the base key.
+  // Encode the unsigned value as little endian in the field.
+  llvm::support::endian::write<uint32_t>(OS, InputIndex, llvm::support::little);
 
-  return CAS.storeFromString({BaseKey}, OutputInfo);
+  return CAS.storeFromString({BaseKey}, OS.str());
 }

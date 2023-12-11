@@ -159,6 +159,10 @@ FrontendInputsAndOutputs::getFirstOutputProducingInput() const {
   return isWholeModule() ? firstInput() : firstPrimaryInput();
 }
 
+unsigned FrontendInputsAndOutputs::getIndexOfFirstOutputProducingInput() const {
+  return isWholeModule() ? 0 : PrimaryInputsInOrder[0];
+}
+
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
   return primaryInputNamed(file) != nullptr;
 }
