@@ -782,17 +782,46 @@ private:
     }
 
     if (getModule()->getOptions().EmbeddedSwift) {
+      // Run embedded Swift SIL checks for metatype/existential use, and
+      // allocation use (under -no-allocations mode). Try to start with public
+      // and exported functions to get better call tree information.
+      SmallVector<SILFunction *, 8> externallyVisibleFunctions;
+      SmallVector<SILFunction *, 8> vtableMembers;
+      SmallVector<SILFunction *, 8> others;
+      SmallVector<SILFunction *, 8> constructorsAndDestructors;
+
       for (SILFunction &function : *module) {
-        // Don't check constructors and destructors directly, they will be
-        // checked if called from other functions, with better source loc info.
         auto func = function.getLocation().getAsASTNode<AbstractFunctionDecl>();
         if (func) {
           if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func)) {
+            constructorsAndDestructors.push_back(&function);
+            continue;
+          }
+          if (getMethodDispatch(func) == MethodDispatch::Class) {
+            vtableMembers.push_back(&function);
             continue;
           }
         }
 
-        diagnoser.visitFunctionEmbeddedSwift(&function);
+        if (function.isPossiblyUsedExternally()) {
+          externallyVisibleFunctions.push_back(&function);
+          continue;
+        }
+
+        others.push_back(&function);
+      }
+
+      for (SILFunction *function : externallyVisibleFunctions) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
+      }
+      for (SILFunction *function : vtableMembers) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
+      }
+      for (SILFunction *function : others) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
+      }
+      for (SILFunction *function : constructorsAndDestructors) {
+        diagnoser.visitFunctionEmbeddedSwift(function);
       }
     }    
   }
