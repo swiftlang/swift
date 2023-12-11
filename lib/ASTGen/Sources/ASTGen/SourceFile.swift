@@ -51,6 +51,9 @@ extension Parser.ExperimentalFeatures {
         insert(feature)
       }
     }
+
+    // Establish mapping between the compiler's experimental features and the
+    // parser's experimental features.
     mapFeature(.ThenStatements, to: .thenStatements)
     mapFeature(.TypedThrows, to: .typedThrows)
     mapFeature(.DoExpressions, to: .doExpressions)
