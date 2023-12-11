@@ -176,6 +176,7 @@
 /test/ScanDependencies/                             @artemcm
 /test/Sema/                                         @hborla @slavapestov @xedin
 /test/SymbolGraph/                                  @QuietMisdreavus
+/test/abi/                                          @apple/standard-librarians
 /test/decl/                                         @hborla @slavapestov
 /test/decl/protocol/                                @AnthonyLatsis @hborla @slavapestov
 # FIXME: This file could have a dedicated directory.
