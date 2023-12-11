@@ -214,7 +214,7 @@ bool TypeBase::isEscapable(const DeclContext *dc) {
     if (auto nom = canType.getAnyNominal())
       return nom->isEscapable();
     else
-      return false;
+      return true;
   }
 
   IsEscapableRequest request{canType};
