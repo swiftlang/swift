@@ -7958,6 +7958,9 @@ void Parser::parseTopLevelAccessors(
     consumeTokenWithoutFeedingReceiver();
 
   ParameterList *indices = nullptr;
+  if (auto subscript = dyn_cast<SubscriptDecl>(storage))
+    indices = subscript->getIndices();
+
   bool hadLBrace = consumeIf(tok::l_brace);
 
   // Prepopulate the field for any accessors that were already parsed parsed accessors
