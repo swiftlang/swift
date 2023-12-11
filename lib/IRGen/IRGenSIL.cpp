@@ -1846,8 +1846,9 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     CurFn->addFnAttr(llvm::Attribute::NoInline);
   }
 
-  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
-      !IGM.Context.LangOpts.EnableCXXInterop) {
+  // Mark as 'nounwind' to avoid referencing exception personality symbols, this
+  // is okay even with C++ interop on because the landinpads are trapping.
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     CurFn->addFnAttr(llvm::Attribute::NoUnwind);
   }
 
