@@ -1666,6 +1666,9 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
 
 void SILGenModule::
 emitPropertyWrapperBackingInitializer(VarDecl *var) {
+  if (M.getOptions().SkipNonExportableDecls)
+    return;
+
   auto initInfo = var->getPropertyWrapperInitializerInfo();
 
   if (initInfo.hasInitFromWrappedValue()) {
