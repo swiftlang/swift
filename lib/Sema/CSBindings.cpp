@@ -667,8 +667,9 @@ void BindingSet::finalize(
         assert(isKnownKeyPathType(bindingTy) || bindingTy->is<FunctionType>());
 
         // Functions don't have capability so we can simply add them.
-        if (bindingTy->is<FunctionType>())
-          updatedBindings.insert(binding);
+        if (auto *fnType = bindingTy->getAs<FunctionType>()) {
+          updatedBindings.insert(binding.withType(fnType));
+        }
       }
 
       // Note that even though key path literal maybe be invalid it's
