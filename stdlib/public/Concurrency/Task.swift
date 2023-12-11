@@ -1061,9 +1061,10 @@ internal func _getGenericSerialExecutor() -> Builtin.Executor {
   unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
 
+@available(SwiftStdlib 5.1, *)
 @_extern(c, "exit")
 @usableFromInline
-func exit(_: CInt) -> Never
+internal func exit(_: CInt) -> Never
 
 @available(SwiftStdlib 5.11, *)
 @_alwaysEmitIntoClient
