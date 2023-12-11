@@ -76,24 +76,28 @@ public protocol SerialExecutor: Executor {
   /// executor references.
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
 
-  /// If this executor has complex equality semantics, and the runtime needs to compare
-  /// two executors, it will first attempt the usual pointer-based equality check,
-  /// and if it fails it will compare the types of both executors, if they are the same,
-  /// it will finally invoke this method, in an attempt to let the executor itself decide
-  /// if this and the `other` executor represent the same serial, exclusive, isolation context.
+  /// If this executor has complex equality semantics, and the runtime needs to
+  /// compare two executors, it will first attempt the usual pointer-based
+  /// equality / check, / and if it fails it will compare the types of both
+  /// executors, if they are the same, / it will finally invoke this method,
+  ///  in an
+  /// attempt to let the executor itself decide / if this and the `other`
+  /// executor represent the same serial, exclusive, isolation context.
   ///
-  /// This method must be implemented with great care, as wrongly returning `true` would allow
-  /// code from a different execution context (e.g. thread) to execute code which was intended
-  /// to be isolated by another actor.
+  /// This method must be implemented with great care, as wrongly returning
+  /// `true` would allow / code from a different execution context (e.g. thread)
+  /// to execute code which was intended to be isolated by another actor.
   ///
   /// This check is not used when performing executor switching.
   ///
-  /// This check is used when performing ``Actor/assertIsolated()``, ``Actor/preconditionIsolated()``,
-  /// ``Actor/assumeIsolated()`` and similar APIs which assert about the same "exclusive serial execution context".
+  /// This check is used when performing ``Actor/assertIsolated()``,
+  /// ``Actor/preconditionIsolated()``, ``Actor/assumeIsolated()`` and similar
+  /// APIs which assert about the same "exclusive serial execution context".
   ///
   /// - Parameter other: the executor to compare with.
-  /// - Returns: true, if `self` and the `other` executor actually are mutually exclusive
-  ///            and it is safe–from a concurrency perspective–to execute code assuming one on the other.
+  /// - Returns: `true`, if `self` and the `other` executor actually are
+  ///            mutually exclusive and it is safe–from a concurrency
+  ///            perspective–to execute code assuming one on the other.
   @available(SwiftStdlib 5.9, *)
   func isSameExclusiveExecutionContext(other: Self) -> Bool
 }
@@ -101,13 +105,20 @@ public protocol SerialExecutor: Executor {
 /// An executor that may be used as preferred executor by a task.
 ///
 /// ### Impact of setting a task executor preference
-/// By default, without setting a task executor preference, nonisolated asynchronous functions,
-/// as well as methods declared on default actors -- that is actors which do not require a specific executor --
-/// execute on Swift's default global concurrent executor. This is an executor shared by the entire runtime
-/// to execute any work which does not have strict executor requirements.
+/// By default, without setting a task executor preference, nonisolated
+/// asynchronous functions, as well as methods declared on default actors --
+/// that is actors which do not require a specific executor -- execute on
+/// Swift's default global concurrent executor. This is an executor shared by
+/// the entire runtime to execute any work which does not have strict executor
+/// requirements.
 ///
-/// By setting a task executor preference, either with a ``_withTaskExecutor(_:operation:)``, creating
-/// a task with a preference (`Task(_on:)`), or
+/// By setting a task executor preference, either with a
+/// ``_withTaskExecutor(_:operation:)``, creating a task with a preference
+/// (`Task(_on:)`, or `group.addTask(on:)`), the task and all of its child
+/// tasks (unless a new preference is set) will be preferring to execute on
+/// the provided task executor.
+///
+/// Unstructured tasks do not inherit the task executor.
 @_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 public protocol _TaskExecutor: Executor {
