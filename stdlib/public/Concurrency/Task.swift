@@ -720,6 +720,7 @@ extension Task where Failure == Error {
 }
 
 // ==== Detached Tasks ---------------------------------------------------------
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

@@ -155,6 +155,139 @@ extension Task where Failure == Error {
   }
 }
 
+// ==== Detached tasks ---------------------------------------------------------
+
+@available(SwiftStdlib 9999, *)
+extension Task where Failure == Never {
+  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func _detached(
+    on executor: any _TaskExecutor,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  #else
+  /// Runs the given nonthrowing operation asynchronously
+  /// as part of a new top-level task.
+  ///
+  /// Don't use a detached task if it's possible
+  /// to model the operation using structured concurrency features like child tasks.
+  /// Child tasks inherit the parent task's priority and task-local storage,
+  /// and canceling a parent task automatically cancels all of its child tasks.
+  /// You need to handle these considerations manually with a detached task.
+  ///
+  /// You need to keep a reference to the detached task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - executor: The task executor preference to use for this task.
+  ///   - priority: The priority of the task.
+  ///   - operation: The operation to perform.
+  ///
+  /// - Returns: A reference to the task.
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public static func _detached(
+    on executor: any _TaskExecutor,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> Success
+  ) -> Task<Success, Failure> {
+    #if $BuiltinCreateAsyncTaskWithExecutor
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
+
+    // Create the asynchronous task.
+    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, taskExecutorRef.executor, operation)
+
+    return Task(task)
+    #else
+    fatalError("Unsupported Swift compiler")
+    #endif
+  }
+  #endif
+}
+
+@available(SwiftStdlib 9999, *)
+extension Task where Failure == Error {
+  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func _detached(
+    on executor: any _TaskExecutor,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  #else
+  /// Runs the given throwing operation asynchronously
+  /// as part of a new top-level task.
+  ///
+  /// If the operation throws an error, this method propagates that error.
+  ///
+  /// Don't use a detached task if it's possible
+  /// to model the operation using structured concurrency features like child tasks.
+  /// Child tasks inherit the parent task's priority and task-local storage,
+  /// and canceling a parent task automatically cancels all of its child tasks.
+  /// You need to handle these considerations manually with a detached task.
+  ///
+  /// You need to keep a reference to the detached task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - executor: The task executor preference to use for this task.
+  ///   - priority: The priority of the task.
+  ///   - operation: The operation to perform.
+  ///
+  /// - Returns: A reference to the task.
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public static func _detached(
+    on executor: any _TaskExecutor,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Success
+  ) -> Task<Success, Failure> {
+    #if $BuiltinCreateAsyncTaskWithExecutor
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
+
+    // Create the asynchronous task.
+    // Create the asynchronous task.
+    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, taskExecutorRef.executor, operation)
+
+    return Task(task)
+    #else
+    fatalError("Unsupported Swift compiler")
+    #endif
+  }
+  #endif
+}
+
+// ==== Unsafe Current Task ----------------------------------------------------
+
 @available(SwiftStdlib 9999, *)
 extension UnsafeCurrentTask {
 
