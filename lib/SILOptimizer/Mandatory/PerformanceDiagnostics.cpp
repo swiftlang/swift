@@ -181,6 +181,12 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
 
     for (SILInstruction &inst : block) {
       if (visitInst(&inst, perfConstr, parentLoc)) {
+        if (inst.getLoc().getSourceLoc().isInvalid()) {
+          auto demangledName = Demangle::demangleSymbolAsString(
+              inst.getFunction()->getName(),
+              Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+          llvm::errs() << "in function " << demangledName << "\n";
+        }
         LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
         return true;
       }
@@ -582,6 +588,12 @@ void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
       if (function->getModule().getOptions().EmbeddedSwift) {
         auto loc = LocWithParent(inst.getLoc().getSourceLoc(), nullptr);
         if (visitInst(&inst, PerformanceConstraints::None, &loc)) {
+          if (inst.getLoc().getSourceLoc().isInvalid()) {
+            auto demangledName = Demangle::demangleSymbolAsString(
+                inst.getFunction()->getName(),
+                Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+            llvm::errs() << "in function " << demangledName << "\n";
+          }
           LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
         }
       }
