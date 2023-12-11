@@ -152,7 +152,7 @@ func hasCallToAsyncAlternative(c: ConvertAsync) {
 // RUN: %sourcekitd-test -req=cursor -pos=95:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=96:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=96:25  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
-// RUN: %sourcekitd-test -req=cursor -pos=97:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=97:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
 // RUN: %sourcekitd-test -req=cursor -pos=97:27  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=98:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
 

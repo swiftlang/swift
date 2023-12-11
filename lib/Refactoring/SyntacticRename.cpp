@@ -84,7 +84,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
       swift_SwiftIDEUtilsBridging_runNameMatcher(SF.getExportedSourceFile(),
                                                  BridgedUnresolvedLocs.data(),
                                                  BridgedUnresolvedLocs.size());
-  const std::vector<ResolvedLoc> &resolvedLocsInSourceOrder =
+  std::vector<ResolvedLoc> resolvedLocsInSourceOrder =
       bridgedResolvedLocs.takeUnbridged();
 
   // Callers need to corrolate the `ResolvedLoc` with the `RenameLoc` that they
