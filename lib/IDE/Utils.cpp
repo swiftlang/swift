@@ -1094,3 +1094,21 @@ void swift::ide::getReceiverType(Expr *Base,
     Types.push_back(TyD);
   }
 }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+std::vector<ResolvedLoc>
+swift::ide::runNameMatcher(const SourceFile &sourceFile,
+                           ArrayRef<SourceLoc> locations) {
+  std::vector<BridgedSourceLoc> bridgedUnresolvedLocs;
+  bridgedUnresolvedLocs.reserve(locations.size());
+  for (SourceLoc loc : locations) {
+    bridgedUnresolvedLocs.push_back(BridgedSourceLoc(loc));
+  }
+
+  BridgedResolvedLocVector bridgedResolvedLocs =
+      swift_SwiftIDEUtilsBridging_runNameMatcher(
+          sourceFile.getExportedSourceFile(), bridgedUnresolvedLocs.data(),
+          bridgedUnresolvedLocs.size());
+  return bridgedResolvedLocs.takeUnbridged();
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX

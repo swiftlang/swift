@@ -715,6 +715,19 @@ bool isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> get
 void getReceiverType(Expr *Base,
                      SmallVectorImpl<NominalTypeDecl *> &Types);
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// Entry point to run the NameMatcher written in swift-syntax.
+///
+/// - Parameters:
+///   - sourceFile: The source file from which to load the SwiftSyntax tree
+///   - locations: The locations to resolve
+/// - Returns: A list of `ResolvedLoc` that have been resolved. This list might
+///   be shorteder than `locations` if some locations could not be resolved and
+///   the resolved locations might be in a different order than `locations`.
+std::vector<ResolvedLoc> runNameMatcher(const SourceFile &sourceFile,
+                                        ArrayRef<SourceLoc> locations);
+#endif
+
 } // namespace ide
 } // namespace swift
 

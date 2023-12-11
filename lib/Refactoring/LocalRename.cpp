@@ -57,11 +57,8 @@ isReferenceWithoutArguments(const llvm::Optional<RenameRefInfo> &refInfo) {
   if (refInfo->IsArgLabel) {
     return false;
   }
-  BridgedSourceLoc Loc(refInfo->Loc);
-  BridgedResolvedLocVector bridgedResolvedLocs =
-      swift_SwiftIDEUtilsBridging_runNameMatcher(
-          refInfo->SF->getExportedSourceFile(), &Loc, 1);
-  std::vector<ResolvedLoc> resolvedLocs = bridgedResolvedLocs.takeUnbridged();
+  std::vector<ResolvedLoc> resolvedLocs =
+      runNameMatcher(*refInfo->SF, refInfo->Loc);
   if (!resolvedLocs.empty()) {
     ResolvedLoc resolvedLoc = resolvedLocs.front();
     return resolvedLoc.labelRanges.empty();

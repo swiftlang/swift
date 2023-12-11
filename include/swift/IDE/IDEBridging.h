@@ -164,8 +164,10 @@ public:
 extern "C" {
 #endif
 
-/// Entry point to run the NameMatcher written in swift-syntax.
-/// 
+/// Low-level entry point to run the NameMatcher written in swift-syntax.
+///
+/// - Warning: The only caller of this should be `swift::ide::runNameMatcher`.
+///
 /// - Parameters:
 ///   - sourceFilePtr: A pointer to an `ExportedSourceFile`, used to access the
 ///     syntax tree
