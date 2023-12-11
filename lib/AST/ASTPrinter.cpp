@@ -3300,6 +3300,10 @@ static bool usesFeatureDeprecateApplicationMain(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureGroupActorErrors(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
   ClangNode clangNode = decl->getClangNode();
   if (!clangNode)

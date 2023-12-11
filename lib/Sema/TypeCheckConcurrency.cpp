@@ -1921,39 +1921,6 @@ static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
   return fn;
 }
 
-/// Note when the enclosing context could be put on a global actor.
-// FIXME: This should handle closures too.
-static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
-  // If we are in a synchronous function on the global actor,
-  // suggest annotating with the global actor itself.
-  if (auto fn = findAnnotatableFunction(dc)) {
-    // Suppress this for accessories because you can't change the
-    // actor isolation of an individual accessor.  Arguably we could
-    // add this to the entire storage declaration, though.
-    // Suppress this for async functions out of caution; but don't
-    // suppress it if we looked through a defer.
-    if (!isa<AccessorDecl>(fn) &&
-        (!fn->isAsyncContext() || fn != dc)) {
-      switch (getActorIsolation(fn)) {
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
-      case ActorIsolation::Nonisolated:
-      case ActorIsolation::NonisolatedUnsafe:
-        return;
-
-      case ActorIsolation::Unspecified:
-        fn->diagnose(diag::note_add_globalactor_to_function,
-            globalActor->getWithoutParens().getString(),
-            fn, globalActor)
-          .fixItInsert(fn->getAttributeInsertionLoc(false),
-            diag::insert_globalactor_attr, globalActor);
-          return;
-      }
-    }
-  }
-}
-
 bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *declContext) {
   auto isolationCrossing = apply->getIsolationCrossing();
   if (!isolationCrossing.has_value())
@@ -2036,6 +2003,12 @@ namespace {
     /// an expression or function.
     llvm::SmallDenseMap<const DeclContext *, ActorIsolation> requiredIsolation;
 
+    using IsolationPair = std::pair<ReferencedActor::Kind, ActorIsolation>;
+
+    using DiagnosticList = std::vector<IsolationError>;
+
+    llvm::DenseMap<IsolationPair, DiagnosticList> isoErrors;
+
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
     llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
@@ -2054,6 +2027,70 @@ namespace {
       return applyStack.back().dyn_cast<ApplyExpr *>();
     }
 
+    /// Note when the enclosing context could be put on a global actor.
+    // FIXME: This should handle closures too.
+    static bool missingGlobalActorOnContext(DeclContext *dc, Type globalActor) {
+      // If we are in a synchronous function on the global actor,
+      // suggest annotating with the global actor itself.
+      if (auto fn = findAnnotatableFunction(dc)) {
+        // Suppress this for accessories because you can't change the
+        // actor isolation of an individual accessor.  Arguably we could
+        // add this to the entire storage declaration, though.
+        // Suppress this for async functions out of caution; but don't
+        // suppress it if we looked through a defer.
+        if (!isa<AccessorDecl>(fn) &&
+            (!fn->isAsyncContext() || fn != dc)) {
+          switch (getActorIsolation(fn)) {
+          case ActorIsolation::ActorInstance:
+          case ActorIsolation::GlobalActor:
+          case ActorIsolation::GlobalActorUnsafe:
+          case ActorIsolation::Nonisolated:
+          case ActorIsolation::NonisolatedUnsafe:
+              return false;
+
+          case ActorIsolation::Unspecified:
+            fn->diagnose(diag::add_globalactor_to_function,
+                         globalActor->getWithoutParens().getString(),
+                         fn, globalActor)
+            .fixItInsert(fn->getAttributeInsertionLoc(false),
+                         diag::insert_globalactor_attr, globalActor);
+              return true;
+          }
+        }
+      }
+      return false;
+    }
+
+  public:
+    bool diagnoseIsolationErrors() {
+      bool diagnosedError = false;
+
+      for (auto list : isoErrors) {
+        IsolationPair key = list.getFirst();
+        DiagnosticList errors = list.getSecond();
+        ActorIsolation isolation = key.second;
+
+        auto behavior = DiagnosticBehavior::Error;
+
+        // Add Fix-it for missing @SomeActor annotation
+        if (isolation.isGlobalActor()) {
+          if (missingGlobalActorOnContext(
+                                          const_cast<DeclContext*>(getDeclContext()), isolation.getGlobalActor())) {
+            behavior= DiagnosticBehavior::Note;
+          }
+        }
+
+        for (IsolationError error : errors) {
+          // Diagnose actor_isolated_non_self_reference as note
+          // if we provide fix-it in missingGlobalActorOnContext
+          ctx.Diags.diagnose(error.loc, error.diag)
+              .limitBehavior(behavior);
+        }
+      }
+      return diagnosedError;
+    }
+
+  private:
     const PatternBindingDecl *getTopPatternBindingDecl() const {
       return patternBindingStack.empty() ? nullptr : patternBindingStack.back();
     }
@@ -2385,6 +2422,8 @@ namespace {
         requiredIsolationLoc = expr->getLoc();
 
       expr->walk(*this);
+      // print all diagnostics here :)
+      //diagnoseIsolationErrors(getDeclContext(), isoErrors);
       requiredIsolationLoc = SourceLoc();
       return requiredIsolation[getDeclContext()];
     }
@@ -3203,11 +3242,11 @@ namespace {
             .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
         }
 
-        if (unsatisfiedIsolation->isGlobalActor()) {
-          noteGlobalActorOnContext(
-              const_cast<DeclContext *>(getDeclContext()),
-              unsatisfiedIsolation->getGlobalActor());
-        }
+//        if (unsatisfiedIsolation->isGlobalActor()) {
+//          noteGlobalActorOnContext(
+//              const_cast<DeclContext *>(getDeclContext()),
+//              unsatisfiedIsolation->getGlobalActor());
+//        }
 
         return true;
       }
@@ -3576,22 +3615,38 @@ namespace {
         bool preconcurrencyContext =
           result.options.contains(ActorReferenceResult::Flags::Preconcurrency);
 
-        ctx.Diags.diagnose(
-            loc, diag::actor_isolated_non_self_reference,
-            decl,
-            useKind,
-            refKind + 1, refGlobalActor,
-            result.isolation)
-          .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
+          if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
+            IsolationError isoMismatch = IsolationError(loc, Diagnostic(diag::actor_isolated_non_self_reference,
+                                                                        decl,
+                                                                        useKind,
+                                                                        refKind + 1, refGlobalActor,
+                                                                        result.isolation));
 
-        noteIsolatedActorMember(decl, context);
+            auto iter = isoErrors.find(std::make_pair(refKind,result.isolation));
+            if (iter != isoErrors.end()){
+              iter->second.push_back(isoMismatch);
+            } else {
+              DiagnosticList list;
+              list.push_back(isoMismatch);
+              auto keyPair = std::make_pair(refKind,result.isolation);
+              isoErrors.insert(std::make_pair(keyPair, list));
+            }
+          } else {
+            ctx.Diags.diagnose(
+                               loc, diag::actor_isolated_non_self_reference,
+                               decl,
+                               useKind,
+                               refKind + 1, refGlobalActor,
+                               result.isolation)
+            .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
 
-        if (result.isolation.isGlobalActor()) {
-          noteGlobalActorOnContext(
-              const_cast<DeclContext *>(getDeclContext()),
-              result.isolation.getGlobalActor());
-        }
-
+            noteIsolatedActorMember(decl, context);
+            if (result.isolation.isGlobalActor()) {
+              missingGlobalActorOnContext(
+                                       const_cast<DeclContext *>(getDeclContext()),
+                                       result.isolation.getGlobalActor());
+            }
+          }
         return true;
       }
     }
@@ -3733,9 +3788,11 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   if (decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
     return;
 
+  auto &ctx = decl->getASTContext();
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);
+    if(ctx.LangOpts.hasFeature(Feature::GroupActorErrors)){ checker.diagnoseIsolationErrors(); }
   }
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     if (auto superInit = ctor->getSuperInitCall())
