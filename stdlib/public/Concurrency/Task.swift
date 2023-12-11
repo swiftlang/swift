@@ -1029,9 +1029,10 @@ internal func _asyncMainDrainQueue() -> Never
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
+@available(SwiftStdlib 5.1, *)
 @_extern(c, "exit")
 @usableFromInline
-func exit(_: CInt) -> Never
+internal func exit(_: CInt) -> Never
 
 @available(SwiftStdlib 5.11, *)
 @_alwaysEmitIntoClient
