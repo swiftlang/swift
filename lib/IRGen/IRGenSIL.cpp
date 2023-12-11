@@ -1846,7 +1846,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     CurFn->addFnAttr(llvm::Attribute::NoInline);
   }
 
-  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+      !IGM.Context.LangOpts.EnableCXXInterop) {
     CurFn->addFnAttr(llvm::Attribute::NoUnwind);
   }
 
