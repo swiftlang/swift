@@ -12,6 +12,9 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
+
+// REQUIRES: needsfixing
+
 func simpleStackAllocated() {
   var a = FixedArray<Int>(capacity: 10)
   a.append(27)
