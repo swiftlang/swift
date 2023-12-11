@@ -262,6 +262,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )
+    swift_install_in_component(
+      TARGETS embedded-concurrency-${mod}
+      DESTINATION "lib/swift/embedded/${mod}"
+      COMPONENT "stdlib"
+      )
     set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
