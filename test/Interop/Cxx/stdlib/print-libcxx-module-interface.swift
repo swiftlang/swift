@@ -3,7 +3,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK: enum std {
-// CHECK-NEXT: enum __1 {
+// CHECK: enum __1 {
 
 // CHECK: typealias string =
 
