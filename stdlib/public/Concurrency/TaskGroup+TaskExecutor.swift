@@ -13,7 +13,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-// None of TaskExecutor APIs are available in task-to-thread concurrency model.
+// None of _TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 @_unavailableInEmbedded
@@ -25,15 +25,15 @@ extension TaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  public mutating func addTask(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTask(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -64,7 +64,7 @@ extension TaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
@@ -73,8 +73,8 @@ extension TaskGroup {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTaskUnlessCancelled(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
@@ -118,15 +118,15 @@ extension ThrowingTaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  public mutating func addTask(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTask(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
@@ -157,7 +157,7 @@ extension ThrowingTaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
@@ -166,8 +166,8 @@ extension ThrowingTaskGroup {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTaskUnlessCancelled(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
@@ -211,15 +211,15 @@ extension DiscardingTaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  public mutating func addTask(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTask(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
@@ -251,7 +251,7 @@ extension DiscardingTaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
@@ -260,8 +260,8 @@ extension DiscardingTaskGroup {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTaskUnlessCancelled(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Void
   ) -> Bool {
@@ -305,15 +305,15 @@ extension ThrowingDiscardingTaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
-  public mutating func addTask(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTask(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
@@ -345,7 +345,7 @@ extension ThrowingDiscardingTaskGroup {
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
   ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
@@ -354,8 +354,8 @@ extension ThrowingDiscardingTaskGroup {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    on taskExecutor: (any TaskExecutor)?,
+  public mutating func _addTaskUnlessCancelled(
+    on taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) -> Bool {

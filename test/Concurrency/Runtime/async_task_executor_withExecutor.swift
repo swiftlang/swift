@@ -10,7 +10,7 @@
 import Dispatch
 @_spi(ConcurrencyExecutors) import _Concurrency
 
-final class MyTaskExecutor: TaskExecutor, @unchecked Sendable, CustomStringConvertible {
+final class MyTaskExecutor: _TaskExecutor, @unchecked Sendable, CustomStringConvertible {
   let queue: DispatchQueue
 
   init(queue: DispatchQueue) {
@@ -39,7 +39,7 @@ func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
   MainActor.preconditionIsolated()
   dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
 
-  await withTaskExecutor(firstExecutor) {
+  await _withTaskExecutor(firstExecutor) {
     // the block immediately hops to the expected executor
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
     print("OK: withTaskExecutor body")
@@ -47,8 +47,8 @@ func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
   }
   MainActor.preconditionIsolated()
 
-  await withTaskExecutor(firstExecutor) {
-    await withTaskExecutor(secondExecutor) {
+  await _withTaskExecutor(firstExecutor) {
+    await _withTaskExecutor(secondExecutor) {
       // the block immediately hops to the expected executor
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
@@ -58,13 +58,13 @@ func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
   }
   MainActor.preconditionIsolated()
 
-  await withTaskExecutor(firstExecutor) {
+  await _withTaskExecutor(firstExecutor) {
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
-    await withTaskExecutor(secondExecutor) {
+    await _withTaskExecutor(secondExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
-      await withTaskExecutor(firstExecutor) {
+      await _withTaskExecutor(firstExecutor) {
         // the block immediately hops to the expected executor
         dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
         dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -86,15 +86,15 @@ func testNestingWithExecutorMainActor(_ firstExecutor: MyTaskExecutor,
 
 func testNestingWithExecutorNonisolated(_ firstExecutor: MyTaskExecutor,
                                         _ secondExecutor: MyTaskExecutor) async {
-  await withTaskExecutor(firstExecutor) {
+  await _withTaskExecutor(firstExecutor) {
     // the block immediately hops to the expected executor
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
     print("OK: withTaskExecutor body")
     await nonisolatedAsyncMethod(expectedOn: firstExecutor)
   }
 
-  await withTaskExecutor(firstExecutor) {
-    await withTaskExecutor(secondExecutor) {
+  await _withTaskExecutor(firstExecutor) {
+    await _withTaskExecutor(secondExecutor) {
       // the block immediately hops to the expected executor
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
@@ -103,13 +103,13 @@ func testNestingWithExecutorNonisolated(_ firstExecutor: MyTaskExecutor,
     }
   }
 
-  await withTaskExecutor(firstExecutor) {
+  await _withTaskExecutor(firstExecutor) {
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
-    await withTaskExecutor(secondExecutor) {
+    await _withTaskExecutor(secondExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
-      await withTaskExecutor(firstExecutor) {
+      await _withTaskExecutor(firstExecutor) {
         // the block immediately hops to the expected executor
         dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
         dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -132,14 +132,14 @@ func testDisablingTaskExecutorPreference(_ firstExecutor: MyTaskExecutor,
   dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
   dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
 
-  await withTaskExecutor(firstExecutor) {
+  await _withTaskExecutor(firstExecutor) {
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
-    await withTaskExecutor(nil) {
+    await _withTaskExecutor(nil) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
-      print("OK: withTaskExecutor(nil) { ... }")
+      print("OK: _withTaskExecutor(nil) { ... }")
     } // on second
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
@@ -151,16 +151,16 @@ func testGetCurrentTaskExecutor(_ firstExecutor: MyTaskExecutor,
 
   _ = await Task {
     withUnsafeCurrentTask { task in
-      precondition(nil == task!.unownedTaskExecutor, "unexpected task executor value, should be nil")
+      precondition(nil == task!._unownedTaskExecutor, "unexpected task executor value, should be nil")
     }
   }.value
 
-  await withTaskExecutor(firstExecutor) {
+  await _withTaskExecutor(firstExecutor) {
     withUnsafeCurrentTask { task in
       guard let task else {
         fatalError("Missing task?")
       }
-      guard let currentTaskExecutor = task.unownedTaskExecutor else {
+      guard let currentTaskExecutor = task._unownedTaskExecutor else {
         fatalError("Expected to have task executor")
       }
       // Test that we can compare UnownedExecutors:
@@ -177,7 +177,7 @@ func testGetCurrentTaskExecutor(_ firstExecutor: MyTaskExecutor,
     let secondExecutor = MyTaskExecutor(queue: DispatchQueue(label: "second"))
 
     // === nonisolated func
-    await Task(on: firstExecutor) {
+    await Task(_on: firstExecutor) {
       await nonisolatedAsyncMethod(expectedOn: firstExecutor)
     }.value
 

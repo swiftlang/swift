@@ -11,7 +11,7 @@ import Dispatch
 import StdlibUnittest
 import _Concurrency
 
-final class NaiveQueueExecutor: TaskExecutor {
+final class NaiveQueueExecutor: _TaskExecutor {
   let queue: DispatchQueue
 
   init(_ queue: DispatchQueue) {
@@ -41,12 +41,12 @@ actor ThreaddyTheDefaultActor {
 
     let defaultActor = ThreaddyTheDefaultActor()
 
-    await Task(on: executor) {
+    await Task(_on: executor) {
       dispatchPrecondition(condition: .onQueue(executor.queue))
       await defaultActor.actorIsolated(expectedExecutor: executor)
     }.value
 
-    await withTaskExecutor(executor) {
+    await _withTaskExecutor(executor) {
       await defaultActor.actorIsolated(expectedExecutor: executor)
     }
   }

@@ -22,7 +22,7 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
-final class NaiveQueueExecutor: TaskExecutor {
+final class NaiveQueueExecutor: _TaskExecutor {
   let queue: DispatchQueue
 
   init(_ queue: DispatchQueue) {
@@ -66,7 +66,7 @@ distributed actor Worker {
     // CHECK: | assign id
     // CHECK: | actor ready
 
-    await withTaskExecutor(executor) {
+    await _withTaskExecutor(executor) {
       try! await worker.test(x: 42)
       // CHECK: test: executed on expected queue
     }

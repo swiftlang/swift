@@ -13,17 +13,17 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-// None of TaskExecutor APIs are available in task-to-thread concurrency model.
+// None of _TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-/// Configure the current task hierarchy's task executor preference to the passed ``TaskExecutor``,
+/// Configure the current task hierarchy's task executor preference to the passed ``_TaskExecutor``,
 /// and execute the passed in closure by immediately hopping to that executor.
 ///
 /// ### Task executor preference semantics
 /// Task executors influence _where_ nonisolated asynchronous functions, and default actor methods execute.
 /// The preferred executor will be used whenever possible, rather than hopping to the global concurrent pool.
 ///
-/// For an in depth discussion of this topic, see ``TaskExecutor``.
+/// For an in depth discussion of this topic, see ``_TaskExecutor``.
 ///
 /// ### Disabling task executor preference
 /// Passing `nil` as executor means disabling any preference preference (if it was set) and the task hierarchy
@@ -34,12 +34,12 @@ import Swift
 ///   - operation: the operation to execute on the passed executor; if the executor was `nil`, this will execute on the default global concurrent executor.
 /// - Returns: the value returned from the `operation` closure
 /// - Throws: if the operation closure throws
-/// - SeeAlso: `TaskExecutor`
+/// - SeeAlso: `_TaskExecutor`
 @_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
-public func withTaskExecutor<T: Sendable>(
-  _ executor: (any TaskExecutor)?,
+public func _withTaskExecutor<T: Sendable>(
+  _ executor: (any _TaskExecutor)?,
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
   let taskExecutorBuiltin: Builtin.Executor =
@@ -75,9 +75,9 @@ extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
-  /// This overload allows specifying a preferred ``TaskExecutor`` on which
+  /// This overload allows specifying a preferred ``_TaskExecutor`` on which
   /// the `operation`, as well as all child tasks created from this task will be
-  /// executing whenever possible. Refer to ``TaskExecutor`` for a detailed discussion
+  /// executing whenever possible. Refer to ``_TaskExecutor`` for a detailed discussion
   // of the effect of task executors on execution semantics of asynchronous code.
   ///
   /// Use this function when creating asynchronous work
@@ -104,7 +104,7 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    on executor: any TaskExecutor,
+    _on executor: any _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) {
@@ -132,7 +132,7 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    on executor: any TaskExecutor,
+    _on executor: any _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) {
@@ -158,7 +158,7 @@ extension Task where Failure == Error {
 @available(SwiftStdlib 9999, *)
 extension UnsafeCurrentTask {
 
-  /// The current ``TaskExecutor`` preference, if this task has one configured.
+  /// The current ``_TaskExecutor`` preference, if this task has one configured.
   ///
   /// The executor may be used to compare for equality with an expected executor preference.
   ///
@@ -166,7 +166,7 @@ extension UnsafeCurrentTask {
   /// so accessing it must be handled with great case -- and the program must use other
   /// means to guarantee the executor remains alive while it is in use.
   @available(SwiftStdlib 9999, *)
-  public var unownedTaskExecutor: UnownedTaskExecutor? {
+  public var _unownedTaskExecutor: UnownedTaskExecutor? {
     let ref = _getPreferredTaskExecutor()
     return UnownedTaskExecutor(ref)
   }

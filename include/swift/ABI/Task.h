@@ -543,7 +543,7 @@ public:
   /// Returns true if the task has a task executor preference set,
   /// specifically at creation time of the task. This may be from
   /// inheriting the preference from a parent task, or by explicitly
-  /// setting it during creation (`Task(on:...)`).
+  /// setting it during creation (`Task(_on:...)`).
   ///
   /// This means that during task tear down the record should be deallocated
   /// because it will not be taken care of by a paired "pop" as the normal

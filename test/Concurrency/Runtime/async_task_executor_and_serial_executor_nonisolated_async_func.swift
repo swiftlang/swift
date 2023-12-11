@@ -11,7 +11,7 @@ import Dispatch
 import StdlibUnittest
 import _Concurrency
 
-final class NaiveQueueExecutor: TaskExecutor, SerialExecutor {
+final class NaiveQueueExecutor: _TaskExecutor, SerialExecutor {
   let queue: DispatchQueue
 
   init(_ queue: DispatchQueue) {
@@ -83,7 +83,7 @@ actor Worker {
     let queue = DispatchQueue(label: "example-queue")
     let executor = NaiveQueueExecutor(queue)
 
-    await Task(on: executor) {
+    await Task(_on: executor) {
       let worker = Worker(on: executor)
       await worker.test(executor)
     }.value
