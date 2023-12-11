@@ -142,6 +142,8 @@ extension Instruction {
          is IntegerLiteralInst,
          is FloatLiteralInst,
          is ObjectInst,
+         is VectorInst,
+         is AllocVectorInst,
          is ValueToBridgeObjectInst,
          is ConvertFunctionInst,
          is ThinToThickFunctionInst,

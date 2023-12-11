@@ -43,9 +43,13 @@ extension Context {
     }
   }
 
+  var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
+
   func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
   }
+
+  func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 }
 
 /// A context which allows mutation of a function's SIL.
@@ -493,6 +497,11 @@ extension Instruction {
     context.notifyInstructionsChanged()
     bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
+  }
+
+  func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedPassContext.moveInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
   }
 }
 

@@ -128,6 +128,7 @@ SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
 SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 SHOULD_NEVER_VISIT_INST(TestSpecification)
 SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
+SHOULD_NEVER_VISIT_INST(Vector)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -148,6 +149,7 @@ OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
 OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
+OPERAND_OWNERSHIP(TrivialUse, AllocVector)
 OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
 OPERAND_OWNERSHIP(TrivialUse, MoveOnlyWrapperToCopyableAddr)
 OPERAND_OWNERSHIP(TrivialUse, CopyableToMoveOnlyWrapperAddr)
@@ -834,6 +836,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SSubOver)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StackAlloc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnprotectedStackAlloc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StackDealloc)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocVector)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToSCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Expect)

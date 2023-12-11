@@ -73,6 +73,7 @@ public struct Builder {
     }
   }
 
+  @discardableResult
   public func createCondFail(condition: Value, message: String) -> CondFailInst {
     return message._withBridgedStringRef { messageStr in
       let cf = bridged.createCondFail(condition.bridged, messageStr)
@@ -91,6 +92,11 @@ public struct Builder {
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
 
+  public func createAllocVector(capacity: Value, elementType: Type) -> AllocVectorInst {
+    let dr = bridged.createAllocVector(capacity.bridged, elementType.bridged)
+    return notifyNew(dr.getAs(AllocVectorInst.self))
+  }
+
   @discardableResult
   public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
     let dr = bridged.createDeallocStack(operand.bridged)
@@ -101,6 +107,12 @@ public struct Builder {
   public func createDeallocStackRef(_ operand: Value) -> DeallocStackRefInst {
     let dr = bridged.createDeallocStackRef(operand.bridged)
     return notifyNew(dr.getAs(DeallocStackRefInst.self))
+  }
+
+  public func createAddressToPointer(address: Value, pointerType: Type,
+                                     needStackProtection: Bool) -> AddressToPointerInst {
+    let dr = bridged.createAddressToPointer(address.bridged, pointerType.bridged, needStackProtection)
+    return notifyNew(dr.getAs(AddressToPointerInst.self))
   }
 
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {
@@ -116,6 +128,11 @@ public struct Builder {
   public func createLoad(fromAddress: Value, ownership: LoadInst.LoadOwnership) -> LoadInst {
     let load = bridged.createLoad(fromAddress.bridged, ownership.rawValue)
     return notifyNew(load.getAs(LoadInst.self))
+  }
+
+  public func createLoadBorrow(fromAddress: Value) -> LoadBorrowInst {
+    let load = bridged.createLoadBorrow(fromAddress.bridged)
+    return notifyNew(load.getAs(LoadBorrowInst.self))
   }
 
   public func createBeginDeallocRef(reference: Value, allocation: AllocRefInstBase) -> BeginDeallocRefInst {
@@ -278,6 +295,14 @@ public struct Builder {
       return bridged.createObject(type.bridged, valuesRef, numBaseElements)
     }
     return notifyNew(objectInst.getAs(ObjectInst.self))
+  }
+
+  @discardableResult
+  public func createVector(type: Type, arguments: [Value]) -> VectorInst {
+    let vectorInst = arguments.withBridgedValues { valuesRef in
+      return bridged.createVector(valuesRef)
+    }
+    return notifyNew(vectorInst.getAs(VectorInst.self))
   }
 
   public func createGlobalAddr(global: GlobalVariable) -> GlobalAddrInst {

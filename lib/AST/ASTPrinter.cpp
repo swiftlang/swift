@@ -3212,6 +3212,10 @@ static bool usesFeatureBuiltinUnprotectedStackAlloc(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinAllocVector(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinAssumeAlignment(Decl *decl) {
   return false;
 }
@@ -3611,6 +3615,10 @@ static bool usesFeatureNonEscapableTypes(Decl *decl) {
   if (pd && pd->hasResultDependsOn()) {
     return true;
   }
+  return false;
+}
+
+static bool usesFeatureFixedArrays(Decl *decl) {
   return false;
 }
 

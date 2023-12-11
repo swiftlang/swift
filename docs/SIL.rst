@@ -3790,6 +3790,28 @@ type, use ``alloc_box``.
 
 ``T`` must not be a pack type.  To allocate a pack, use ``alloc_pack``.
 
+alloc_vector
+````````````
+::
+
+  sil-instruction ::= 'alloc_vector' sil-type, sil-operand
+
+  %1 = alloc_vector $T, %0 : $Builtin.Word
+  // %1 has type $*T
+
+Allocates uninitialized memory that is sufficiently aligned on the stack to
+contain a vector of values of type ``T``. The result of the instruction is
+the address of the allocated memory.
+The number of vector elements is specified by the operand, which must be a
+builtin integer value.
+
+``alloc_vector`` either allocates memory on the stack or - if contained in a
+global variable static initializer list - in the data section.
+
+``alloc_vector`` is a stack allocation instruction, unless it's contained in a
+global initializer list.  See the section above on stack discipline.  The
+corresponding stack deallocation instruction is ``dealloc_stack``.
+
 alloc_pack
 ``````````
 
@@ -6687,6 +6709,20 @@ object
   // Optionally there may be more elements, which are tail-allocated to T
 
 Constructs a statically initialized object. This instruction can only appear
+as final instruction in a global variable static initializer list.
+
+vector
+``````
+
+::
+
+  sil-instruction ::= 'vector' '(' (sil-operand (',' sil-operand)*)? ')'
+
+  vector (%a : $T, %b : $T, ...)
+  // $T must be a non-generic or bound generic reference type
+  // All operands must have the same type
+
+Constructs a statically initialized vector of elements. This instruction can only appear
 as final instruction in a global variable static initializer list.
 
 ref_element_addr

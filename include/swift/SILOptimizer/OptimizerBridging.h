@@ -169,10 +169,17 @@ struct BridgedPassContext {
     Lowered
   };
 
+  /// Enumeration describing all of the named features.
+  enum class Feature {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) FeatureName,
+#include "swift/Basic/Features.def"
+  };
+
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getModuleDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedChangeNotificationHandler asNotificationHandler() const;
   BRIDGED_INLINE SILStage getSILStage() const;
   BRIDGED_INLINE bool hadError() const;
+  BRIDGED_INLINE bool moduleIsSerialized() const;
 
   // Analysis
 
@@ -200,6 +207,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
+  static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
@@ -275,6 +283,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
 
   // Passmanager housekeeping
 
@@ -298,7 +307,7 @@ struct BridgedPassContext {
   };
 
   BRIDGED_INLINE bool enableStackProtection() const;
-  BRIDGED_INLINE bool enableEmbeddedSwift() const;
+  BRIDGED_INLINE bool hasFeature(Feature feature) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;

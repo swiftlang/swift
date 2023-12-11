@@ -418,6 +418,16 @@ public:
         wasMoved));
   }
 
+  AllocVectorInst *
+  createAllocVector(SILLocation loc, SILValue capacity, SILType elementType) {
+    if (isInsertingIntoGlobal()) {
+      return insert(AllocVectorInst::createInInitializer(
+          getSILDebugLocation(loc, true), capacity, elementType, getModule()));
+    }
+    return insert(AllocVectorInst::create(
+        getSILDebugLocation(loc, true), capacity, elementType, getFunction()));
+  }
+
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));
@@ -1612,6 +1622,11 @@ public:
     return insert(ObjectInst::create(getSILDebugLocation(Loc), Ty, Elements,
                                      NumBaseElements, getModule(),
                                      forwardingOwnershipKind));
+  }
+
+  VectorInst *createVector(SILLocation Loc, ArrayRef<SILValue> Elements) {
+    return insert(VectorInst::create(getSILDebugLocation(Loc), Elements,
+                                     getModule()));
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,

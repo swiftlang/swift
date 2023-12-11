@@ -29,7 +29,11 @@ struct Options {
   }
 
   var enableEmbeddedSwift: Bool {
-    _bridged.enableEmbeddedSwift()
+    _bridged.hasFeature(.Embedded)
+  }
+
+  func hasFeature(_ feature: BridgedPassContext.Feature) -> Bool {
+    _bridged.hasFeature(feature)
   }
 
   enum AssertConfiguration {

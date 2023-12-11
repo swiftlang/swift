@@ -890,6 +890,17 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitAllocVectorInst(
+    AllocVectorInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createAllocVector(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getCapacity()),
+                                    getOpType(Inst->getElementType())));
+}
+
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitAllocPackMetadataInst(
     AllocPackMetadataInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2152,6 +2163,16 @@ SILCloner<ImplClass>::visitObjectInst(ObjectInst *Inst) {
                                 getBuilder().hasOwnership()
                                     ? Inst->getForwardingOwnershipKind()
                                     : ValueOwnershipKind(OwnershipKind::None)));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitVectorInst(VectorInst *Inst) {
+  auto Elements = getOpValueArray<8>(Inst->getElements());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst,
+      getBuilder().createVector(getOpLocation(Inst->getLoc()), Elements));
 }
 
 template<typename ImplClass>

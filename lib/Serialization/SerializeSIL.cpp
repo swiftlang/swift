@@ -913,6 +913,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)OI->getType().getCategory(), Args);
     break;
   }
+  case SILInstructionKind::VectorInst: {
+    auto *vi = cast<VectorInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Elt : vi->getElements()) {
+      ListOfValues.push_back(addValueRef(Elt));
+    }
+
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(),
+        S.addTypeRef(vi->getType().getRawASTType()),
+        (unsigned)vi->getType().getCategory(),
+        ListOfValues);
+    break;
+  }
 
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugStepInst:
@@ -1845,6 +1860,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                          ? 0 : 1;
     writeOneTypeOneOperandLayout(open.getKind(), attrs, open.getType(),
                                  open.getOperand());
+    break;
+  }
+  case SILInstructionKind::AllocVectorInst: {
+    auto &avi = cast<AllocVectorInst>(SI);
+    assert(avi.getNumOperands() - avi.getTypeDependentOperands().size() == 1);
+    writeOneTypeOneOperandLayout(avi.getKind(), /*attrs*/ 0, avi.getType(),
+                                 avi.getOperand());
     break;
   }
   case SILInstructionKind::DynamicPackIndexInst: {

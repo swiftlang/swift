@@ -1134,6 +1134,7 @@ public:
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
+  void visitAllocVectorInst(AllocVectorInst *i);
   void visitAllocPackInst(AllocPackInst *i);
   void visitAllocPackMetadataInst(AllocPackMetadataInst *i);
   void visitAllocRefInst(AllocRefInst *i);
@@ -1236,6 +1237,9 @@ public:
   void visitEndInitLetRefInst(EndInitLetRefInst *i);
   void visitObjectInst(ObjectInst *i)  {
     llvm_unreachable("object instruction cannot appear in a function");
+  }
+  void visitVectorInst(VectorInst *i)  {
+    llvm_unreachable("vector instruction cannot appear in a function");
   }
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
@@ -5883,6 +5887,15 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   }
   emitDebugInfoForAllocStack(i, type, addr.getAddress());
 }
+
+void IRGenSILFunction::visitAllocVectorInst(AllocVectorInst *i) {
+  const TypeInfo &type = getTypeInfo(i->getElementType());
+  Explosion capacity = getLoweredExplosion(i->getCapacity());
+  auto stackAddr = type.allocateVector(*this, i->getElementType(),
+                                       capacity.claimNext(), StringRef());
+  setLoweredStackAddress(i, stackAddr);
+}
+
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   auto addr = allocatePack(*this, i->getPackType());

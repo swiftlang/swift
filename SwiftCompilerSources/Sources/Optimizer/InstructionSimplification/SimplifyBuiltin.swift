@@ -41,6 +41,7 @@ extension BuiltinInst : OnoneSimplifyable {
            .AssignCopyArrayFrontToBack,
            .AssignCopyArrayBackToFront,
            .AssignTakeArray,
+           .AllocVector,
            .IsPOD:
         optimizeArgumentToThinMetatype(argument: 0, context)
       case .CreateAsyncTask:

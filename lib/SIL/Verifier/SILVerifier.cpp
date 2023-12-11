@@ -1596,6 +1596,13 @@ public:
     // It's illegal code but the compiler should not crash on it.
   }
 
+  void checkAllocVectorInst(AllocVectorInst *AI) {
+    require(AI->getType().isAddress(),
+            "result of alloc_vector must be an address type");
+    require(AI->getOperand()->getType().is<BuiltinIntegerType>(),
+            "capacity needs integer type");
+  }
+
   void checkAllocPackInst(AllocPackInst *AI) {
     requireAddressType(SILPackType, AI->getType(),
                        "result of alloc_pack must be an address of "
@@ -2267,6 +2274,10 @@ public:
 
   void checkObjectInst(ObjectInst *) {
     require(false, "object instruction is only allowed in a static initializer");
+  }
+
+  void checkVectorInst(VectorInst *) {
+    require(false, "vector instruction is only allowed in a static initializer");
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
@@ -3371,9 +3382,10 @@ public:
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()) ||
+                isa<AllocVectorInst>(DI->getOperand()) ||
                 (isa<PartialApplyInst>(DI->getOperand()) &&
                  cast<PartialApplyInst>(DI->getOperand())->isOnStack()),
-            "Operand of dealloc_stack must be an alloc_stack or partial_apply "
+            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or partial_apply "
             "[stack]");
   }
   void checkDeallocPackInst(DeallocPackInst *DI) {
@@ -7109,10 +7121,18 @@ void SILGlobalVariable::verify() const {
     auto init = cast<SingleValueInstruction>(&I);
     if (init == &StaticInitializerBlock.back()) {
       assert(init->use_empty() && "Init value must not have another use");
+      if (auto *vi = dyn_cast<VectorInst>(init)) {
+        for (SILValue element : vi->getElements()) {
+          assert(element->getType() == vi->getType() &&
+                 "all vector elements must be of the same type");
+        }
+      }
     } else {
       assert(!init->use_empty() && "dead instruction in static initializer");
       assert(!isa<ObjectInst>(init) &&
              "object instruction is only allowed for final initial value");
+      assert(!isa<VectorInst>(init) &&
+             "vector instruction is only allowed for final initial value");
     }
     assert(I.getParent() == &StaticInitializerBlock);
   }
