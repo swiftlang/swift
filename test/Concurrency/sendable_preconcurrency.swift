@@ -8,7 +8,7 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
-import StrictModule // no remark: we never recommend @preconcurrency due to an explicitly non-Sendable (via -warn-concurrency) type
+import StrictModule // no remark: we never recommend @preconcurrency due to an explicitly non-Sendable (via -strict-concurrency=complete) type
 @preconcurrency import NonStrictModule
 
 actor A {
