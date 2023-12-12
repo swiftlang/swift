@@ -2989,7 +2989,7 @@ class DarwinLegacyFilterDeclConsumer : public swift::VisibleDeclConsumer {
     if (clangModule->Name == "MacTypes") {
       if (!VD->hasName() || VD->getBaseName().isSpecial())
         return true;
-      return llvm::StringSwitch<bool>(VD->getBaseIdentifier().str())
+      return llvm::StringSwitch<bool>(VD->getBaseName().userFacingName())
           .Cases("OSErr", "OSStatus", "OptionBits", false)
           .Cases("FourCharCode", "OSType", false)
           .Case("Boolean", false)
@@ -4981,7 +4981,7 @@ const clang::CXXMethodDecl *getCalledBaseCxxMethod(FuncDecl *baseMember) {
     if (auto *v = ce->getCalledValue()) {
       if (v->getModuleContext() ==
               baseMember->getASTContext().TheBuiltinModule &&
-          v->getBaseIdentifier().is("reinterpretCast")) {
+          v->getBaseName().userFacingName() == "reinterpretCast") {
         returnExpr = ce->getArgs()->get(0).getExpr();
       }
     }
@@ -6914,7 +6914,7 @@ bool ClangImporter::isUnsafeCXXMethod(const FuncDecl *func) {
     return false;
   if (!func->hasName())
     return false;
-  auto id = func->getBaseIdentifier().str();
+  auto id = func->getBaseName().userFacingName();
   return id.startswith("__") && id.endswith("Unsafe");
 }
 

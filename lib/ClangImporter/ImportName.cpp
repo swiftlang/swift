@@ -2393,6 +2393,14 @@ bool ClangImporter::shouldIgnoreMacro(StringRef Name,
   return ::shouldIgnoreMacro(Name, Macro, Impl.getClangPreprocessor());
 }
 
+Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
+  auto baseName = declName.getBaseName();
+  if (!baseName.isSpecial())
+    return baseName.getIdentifier();
+
+  return ctx.getIdentifier(baseName.userFacingName());
+}
+
 Identifier
 NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
                               const clang::MacroInfo *macro) {
