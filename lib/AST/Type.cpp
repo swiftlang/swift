@@ -1128,6 +1128,23 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
                       : Type(this);
   }
 
+  if (auto *tuple = getAs<TupleType>()) {
+    if (!recurse)
+      return Type(this);
+
+    bool anyChanged = false;
+    SmallVector<TupleTypeElt, 2> elts;
+    llvm::transform(
+        tuple->getElements(), std::back_inserter(elts), [&](const auto &elt) {
+          auto eltTy = elt.getType();
+          auto strippedTy = eltTy->stripConcurrency(recurse, dropGlobalActor);
+          anyChanged |= !strippedTy->isEqual(eltTy);
+          return elt.getWithType(strippedTy);
+        });
+
+    return anyChanged ? TupleType::get(elts, getASTContext()) : Type(this);
+  }
+
   return Type(this);
 }
 
