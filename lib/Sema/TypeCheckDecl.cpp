@@ -2287,34 +2287,6 @@ static Type buildAddressorResultType(AccessorDecl *addressor,
 }
 
 Type
-ThrownTypeRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *func
-) const {
-  ASTContext &ctx = func->getASTContext();
-
-  TypeRepr *typeRepr = func->getThrownTypeRepr();
-  if (!typeRepr) {
-    // There is no explicit thrown type, so return a NULL type.
-    return Type();
-  }
-
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-    ctx.Diags.diagnose(typeRepr->getLoc(), diag::experimental_typed_throws);
-  }
-
-  auto options = TypeResolutionOptions(TypeResolverContext::None);
-  if (func->preconcurrency())
-    options |= TypeResolutionFlags::Preconcurrency;
-
-  auto *const dc = func->getInnermostDeclContext();
-  return TypeResolution::forInterface(dc, options,
-                                      /*unboundTyOpener*/ nullptr,
-                                      PlaceholderType::get,
-                                      /*packElementOpener*/ nullptr)
-      .resolveType(typeRepr);
-}
-
-Type
 ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto &ctx = decl->getASTContext();
 

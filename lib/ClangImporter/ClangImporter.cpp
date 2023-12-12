@@ -6502,7 +6502,7 @@ static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
           func->getASTContext(), func->getNameLoc(),
           func->getName(), func->getNameLoc(),
           func->hasAsync(), func->hasThrows(),
-          /*FIXME:ThrownType=*/func->getThrownInterfaceType(),
+          func->getThrownInterfaceType(),
           fixedParams, originalFnSubst->getResult(),
           /*genericParams=*/nullptr, func->getDeclContext(), newDecl->getClangDecl());
       if (func->isStatic()) newFnDecl->setStatic();

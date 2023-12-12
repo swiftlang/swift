@@ -2046,11 +2046,14 @@ bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }
 
-void ClosureExpr::setExplicitThrownType(Type thrownType) {
-  assert(thrownType && !thrownType->hasTypeVariable() &&
-         !thrownType->hasPlaceholder());
-  assert(ThrownType);
-  ThrownType->setType(MetatypeType::get(thrownType));
+Type ClosureExpr::getExplicitThrownType() const {
+  if (getThrowsLoc().isInvalid())
+    return Type();
+  
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<ClosureExpr *>(this);
+  ExplicitCaughtTypeRequest request{mutableThis, mutableThis};
+  return evaluateOrDefault(ctx.evaluator, request, Type());
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {

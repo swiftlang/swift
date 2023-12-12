@@ -1387,7 +1387,7 @@ class DoCatchStmt final
     : public LabeledStmt,
       private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
   friend TrailingObjects;
-  friend class DoCatchExplicitThrownTypeRequest;
+  friend class ExplicitCaughtTypeRequest;
 
   SourceLoc DoLoc;
 
@@ -1429,13 +1429,13 @@ public:
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
   SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
 
-  /// Retrieves the type representation for the thrown type.
-  TypeRepr *getThrownTypeRepr() const {
+  /// Retrieves the type representation for the caught type.
+  TypeRepr *getCaughtTypeRepr() const {
     return ThrownType.getTypeRepr();
   }
 
-  // Get the explicitly-specified thrown error type.
-  Type getExplicitlyThrownType(DeclContext *dc) const;
+  // Get the explicitly-specified caught error type.
+  Type getExplicitCaughtType(DeclContext *dc) const;
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }

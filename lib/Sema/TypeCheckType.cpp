@@ -5654,28 +5654,116 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   return type;
 }
 
-Type DoCatchExplicitThrownTypeRequest::evaluate(
-    Evaluator &evaluator, DeclContext *dc, DoCatchStmt *stmt
+
+Type ExplicitCaughtTypeRequest::evaluate(
+    Evaluator &evaluator, DeclContext *dc, CatchNode catchNode
 ) const {
-  if (stmt->getThrowsLoc().isInvalid())
-    return Type();
-
-  // If typed throws is not enabled, complain.
   ASTContext &ctx = dc->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-    ctx.Diags.diagnose(stmt->getThrowsLoc(), diag::experimental_typed_throws);
-    return Type();
-}
 
-  auto typeRepr = stmt->getThrownTypeRepr();
-
-  // If there is no explicitly-specified thrown error type, it's 'any Error'.
-  if (!typeRepr) {
+  // try!/try? always catch 'any Error'.
+  if (catchNode.is<AnyTryExpr *>()) {
     return ctx.getErrorExistentialType();
   }
 
-  return TypeResolution::resolveContextualType(
-      typeRepr, dc, TypeResolutionOptions(TypeResolverContext::None),
-      /*unboundTyOpener*/ nullptr, PlaceholderType::get,
-      /*packElementOpener*/ nullptr);
+  // Functions
+  if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>()) {
+    assert(dc == func && "Key mismatch for explicit caught type request");
+    TypeRepr *thrownTypeRepr = func->getThrownTypeRepr();
+
+    // If there is no explicit thrown type, check whether it throws at all.
+    if (!thrownTypeRepr) {
+      // If it throws, it throws 'any Error'.
+      if (func->hasThrows())
+        return ctx.getErrorExistentialType();
+
+      // Otherwise, 'Never'.
+      return ctx.getNeverType();
+    }
+
+    // We have an explici thrown error type, so resolve it.
+    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+      ctx.Diags.diagnose(thrownTypeRepr->getLoc(), diag::experimental_typed_throws);
+    }
+
+    auto options = TypeResolutionOptions(TypeResolverContext::None);
+    if (func->preconcurrency())
+      options |= TypeResolutionFlags::Preconcurrency;
+
+    return TypeResolution::forInterface(func, options,
+                                        /*unboundTyOpener*/ nullptr,
+                                        PlaceholderType::get,
+                                        /*packElementOpener*/ nullptr)
+        .resolveType(thrownTypeRepr);
+  }
+
+  // Closures
+  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
+    if (auto closure = dyn_cast<ClosureExpr>(abstractClosure)) {
+      assert(dc == closure && "Key mismatch for explicit caught type request");
+
+      // Explicit thrown error type.
+      if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
+        if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+          ctx.Diags.diagnose(thrownTypeRepr->getLoc(),
+                             diag::experimental_typed_throws);
+        }
+
+        return TypeResolution::resolveContextualType(
+                 thrownTypeRepr, dc,
+                 TypeResolutionOptions(TypeResolverContext::None),
+                 /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+                 /*packElementOpener*/ nullptr);
+      }
+
+      // Explicit 'throws' implies that this throws 'any Error'.
+      if (closure->getThrowsLoc().isValid()) {
+        return ctx.getErrorExistentialType();
+      }
+
+      // If there is no potential throw site (based on syntactic analysis),
+      // then this closure is non-throwing.
+      auto effects = evaluateOrDefault(
+          evaluator, ClosureEffectsRequest{closure}, FunctionType::ExtInfo());
+      if (!effects.isThrowing())
+        return ctx.getNeverType();
+    }
+
+    // TODO: A throwing closure with no explicit 'throws' annotation will infer
+    // the thrown error type in Swift 6 and under FullTypedThrows.
+
+    // Otherwise, we throw 'any Error'.
+    return ctx.getErrorExistentialType();
+  }
+
+  // do..catch statements.
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    // A do..catch block with no explicit 'throws' annotation will infer
+    // the thrown error type.
+    if (doCatch->getThrowsLoc().isInvalid()) {
+      // Prior to typed throws, the do..catch always throws 'any Error'.
+      if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
+        return ctx.getErrorExistentialType();
+
+      return Type();
+    }
+
+    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+      ctx.Diags.diagnose(doCatch->getThrowsLoc(), diag::experimental_typed_throws);
+      return ctx.getErrorExistentialType();
+    }
+
+    auto typeRepr = doCatch->getCaughtTypeRepr();
+
+    // If there is no explicitly-specified thrown error type, it's 'any Error'.
+    if (!typeRepr) {
+      return ctx.getErrorExistentialType();
+    }
+
+    return TypeResolution::resolveContextualType(
+        typeRepr, dc, TypeResolutionOptions(TypeResolverContext::None),
+        /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+        /*packElementOpener*/ nullptr);
+  }
+
+  llvm_unreachable("Unhandled catch node");
 }

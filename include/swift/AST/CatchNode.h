@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_CATCHNODE_H
 #define SWIFT_AST_CATCHNODE_H
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/Decl.h"
@@ -36,7 +37,14 @@ public:
   /// Returns the thrown error type for a throwing context, or \c llvm::None
   /// if this is a non-throwing context.
   llvm::Optional<Type> getThrownErrorTypeInContext(DeclContext *dc) const;
+
+  friend llvm::hash_code hash_value(CatchNode catchNode) {
+    using llvm::hash_value;
+    return hash_value(catchNode.getOpaqueValue());
+  }
 };
+
+void simple_display(llvm::raw_ostream &out, CatchNode catchNode);
 
 } // end namespace swift
 

@@ -2564,11 +2564,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     if (llvm::is_contained(solution.preconcurrencyClosures, closure))
       closure->setIsolatedByPreconcurrency();
 
-    // Coerce the thrown type, if it was written explicitly.
-    if (closure->getExplicitThrownType()) {
-      closure->setExplicitThrownType(closureFnType->getThrownError());
-    }
-
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {
       closure->setExplicitResultType(closureFnType->getResult());
