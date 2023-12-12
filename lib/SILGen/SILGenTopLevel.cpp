@@ -87,7 +87,7 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
     FuncDecl *exitFuncDecl = getExit();
     assert(exitFuncDecl && "Failed to find exit function declaration");
     exitFunc = getFunction(
-        SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
+        SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func),
         NotForDefinition);
     SILFunctionType &funcType =
         *exitFunc->getLoweredType().getAs<SILFunctionType>();

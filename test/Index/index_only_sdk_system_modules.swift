@@ -63,5 +63,4 @@ module LocalSystemModule [system] { }
 // expected-remark @-4 {{'LocalSystemModule' has a required transitive dependency on 'SwiftOnoneSupport'}}
 // expected-remark @-5 {{'LocalSystemModule' has a required transitive dependency on '_Concurrency'}}
 // expected-remark @-6 {{'LocalSystemModule' has a required transitive dependency on '_StringProcessing'}}
-// expected-remark @-7 {{'LocalSystemModule' has a required transitive dependency on '_SwiftConcurrencyShims'}}
 

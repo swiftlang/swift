@@ -8,7 +8,6 @@
 // CHECK: import Swift
 // CHECK: import _Concurrency
 // CHECK: import _StringProcessing
-// CHECK: import _SwiftConcurrencyShims
 
 // CHECK: public func something(with x: Builtin.RawPointer)
 

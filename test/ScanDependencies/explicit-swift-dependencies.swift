@@ -23,7 +23,6 @@ import F
 // CHECK-DAG:     "swift": "Swift"
 // CHECK-DAG:     "swift": "SwiftOnoneSupport"
 // CHECK-DAG:     "swift": "_Concurrency"
-// CHECK-DAG:     "clang": "_SwiftConcurrencyShims"
 // CHECK-DAG:     "swift": "_StringProcessing"
 // CHECK: ],
 
@@ -52,4 +51,3 @@ import F
 // CHECK-DAG:             "-swift-module-file=Swift={{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-fmodule-file=F={{.*}}{{/|\\}}F-{{.*}}.pcm",
-// CHECK-DAG:             "-fmodule-file=SwiftShims={{.*}}{{/|\\}}SwiftShims-{{.*}}.pcm",

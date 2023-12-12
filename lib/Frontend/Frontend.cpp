@@ -1110,13 +1110,6 @@ bool CompilerInstance::canImportSwiftConcurrency() const {
   return getASTContext().canImportModule(modulePath);
 }
 
-bool CompilerInstance::canImportSwiftConcurrencyShims() const {
-  ImportPath::Module::Builder builder(
-      getASTContext().getIdentifier(SWIFT_CONCURRENCY_SHIMS_NAME));
-  auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
-}
-
 void CompilerInstance::verifyImplicitStringProcessingImport() {
   if (Invocation.shouldImportSwiftStringProcessing() &&
       !canImportSwiftStringProcessing()) {
@@ -1212,8 +1205,6 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     case ImplicitStdlibKind::Stdlib:
       if (canImportSwiftConcurrency())
         pushImport(SWIFT_CONCURRENCY_NAME);
-      if (canImportSwiftConcurrencyShims())
-        pushImport(SWIFT_CONCURRENCY_SHIMS_NAME);
       break;
     }
   }

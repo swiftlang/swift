@@ -50,7 +50,6 @@ import SomeExternalModule
 // CHECK-DAG: "swift": "SwiftOnoneSupport"
 // CHECK-DAG: "swift": "_Concurrency"
 // CHECK-DAG: "swift": "_StringProcessing"
-// CHECK-DAG: "clang": "_SwiftConcurrencyShims"
 // CHECK: ],
 
 // CHECK: "bridgingHeader":

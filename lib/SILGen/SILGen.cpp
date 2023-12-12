@@ -514,19 +514,8 @@ FuncDecl *SILGenModule::getSwiftJobRun() {
 }
 
 FuncDecl *SILGenModule::getExit() {
-  if (ExitFunc)
-    return *ExitFunc;
-
-  ASTContext &C = getASTContext();
-  ModuleDecl *concurrencyShims =
-      C.getModuleByIdentifier(C.getIdentifier("_SwiftConcurrencyShims"));
-
-  if (!concurrencyShims) {
-    ExitFunc = nullptr;
-    return nullptr;
-  }
-
-  return lookupIntrinsic(*concurrencyShims, ExitFunc, C.getIdentifier("exit"));
+  return lookupConcurrencyIntrinsic(getASTContext(), ExitFunc,
+                                    "_swiftExit");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {

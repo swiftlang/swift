@@ -19,7 +19,6 @@ import SubEWrapper
 // CHECK-DAG:   "swift": "SwiftOnoneSupport"
 // CHECK-DAG:   "swift": "_Concurrency"
 // CHECK-DAG:   "swift": "_StringProcessing"
-// CHECK-DAG:   "clang": "_SwiftConcurrencyShims"
 // CHECK-NOT:   "swift": "_cross_import_E"
 // CHECK: ]
 
