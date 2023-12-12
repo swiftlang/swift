@@ -128,7 +128,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
     uint16_t Column = 0;
     llvm::DIFile *File = nullptr;
     StringRef getFilename() const { return File ? File->getFilename() : ""; }
-    bool operator==(const FileAndLocation &other) {
+    bool operator==(const FileAndLocation &other) const {
       return Line == other.Line && Column == other.Column && File == other.File;
     }
   };
