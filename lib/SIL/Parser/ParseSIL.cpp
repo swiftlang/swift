@@ -46,6 +46,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/SaveAndRestore.h"
 
+#include <variant>
+
 using namespace swift;
 
 static llvm::cl::opt<bool>
