@@ -4913,6 +4913,10 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
     auto value = yieldValues[i];
     auto info = yieldInfos[i];
     if (info.isIndirectInOut()) {
+      if (value->getType().isMoveOnly()) {
+        value = B.createMarkUnresolvedNonCopyableValueInst(loc, value,
+         MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+      }
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
       if (value->getType().isMoveOnly()) {
