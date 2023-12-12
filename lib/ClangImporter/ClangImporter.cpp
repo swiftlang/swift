@@ -1205,6 +1205,10 @@ ClangImporter::create(ASTContext &ctx,
   // Create a new Clang compiler invocation.
   {
     importer->Impl.ClangArgs = getClangArguments(ctx);
+    if (fileMapping.requiresBuiltinHeadersInSystemModules) {
+      importer->Impl.ClangArgs.push_back("-Xclang");
+      importer->Impl.ClangArgs.push_back("-fbuiltin-headers-in-system-modules");
+    }
     ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
     if (importerOpts.DumpClangDiagnostics) {
       llvm::errs() << "'";

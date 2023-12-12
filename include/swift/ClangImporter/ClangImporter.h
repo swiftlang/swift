@@ -650,6 +650,7 @@ bool isCxxConstReferenceType(const clang::Type *type);
 struct ClangInvocationFileMapping {
   SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
   SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
+  bool requiresBuiltinHeadersInSystemModules;
 };
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.

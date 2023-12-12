@@ -194,6 +194,11 @@ struct SILOptOptions {
                                         "default"));
 
   llvm::cl::opt<bool>
+  StrictImplicitModuleContext = llvm::cl::opt<bool>("strict-implicit-module-context",
+                              llvm::cl::desc("Enable the strict forwarding of compilation "
+                                             "context to downstream implicit module dependencies"));
+
+  llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
       "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
       llvm::cl::desc(
@@ -518,6 +523,10 @@ struct SILOptOptions {
                       swift::UnavailableDeclOptimization::Complete, "complete",
                       "Eliminate unavailable decls from lowered SIL/IR")),
               llvm::cl::init(swift::UnavailableDeclOptimization::None));
+
+  llvm::cl::list<std::string> ClangXCC = llvm::cl::list<std::string>(
+      "Xcc",
+      llvm::cl::desc("option to pass to clang"));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -608,6 +617,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.setRuntimeResourcePath(options.ResourceDir);
   Invocation.getFrontendOptions().EnableLibraryEvolution
     = options.EnableLibraryEvolution;
+  Invocation.getFrontendOptions().StrictImplicitModuleContext
+    = options.StrictImplicitModuleContext;
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
@@ -670,6 +681,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getDiagnosticOptions().VerifyMode =
     options.VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+
+  ClangImporterOptions &clangImporterOptions =
+      Invocation.getClangImporterOptions();
+  for (const auto &xcc : options.ClangXCC) {
+    clangImporterOptions.ExtraArgs.push_back(xcc);
+  }
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
