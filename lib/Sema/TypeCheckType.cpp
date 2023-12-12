@@ -5680,7 +5680,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
       return ctx.getNeverType();
     }
 
-    // We have an explici thrown error type, so resolve it.
+    // We have an explicit thrown error type, so resolve it.
     if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
       ctx.Diags.diagnose(thrownTypeRepr->getLoc(), diag::experimental_typed_throws);
     }
@@ -5719,20 +5719,10 @@ Type ExplicitCaughtTypeRequest::evaluate(
       if (closure->getThrowsLoc().isValid()) {
         return ctx.getErrorExistentialType();
       }
-
-      // If there is no potential throw site (based on syntactic analysis),
-      // then this closure is non-throwing.
-      auto effects = evaluateOrDefault(
-          evaluator, ClosureEffectsRequest{closure}, FunctionType::ExtInfo());
-      if (!effects.isThrowing())
-        return ctx.getNeverType();
     }
 
-    // TODO: A throwing closure with no explicit 'throws' annotation will infer
-    // the thrown error type in Swift 6 and under FullTypedThrows.
-
-    // Otherwise, we throw 'any Error'.
-    return ctx.getErrorExistentialType();
+    // Thrown error type will be inferred.
+    return Type();
   }
 
   // do..catch statements.

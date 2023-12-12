@@ -925,7 +925,16 @@ private:
         dc->getParentModule(), throwStmt->getThrowLoc());
     Type errorType;
     if (catchNode) {
-      errorType = catchNode.getThrownErrorTypeInContext(dc).value_or(Type());
+      // FIXME: Introduce something like getThrownErrorTypeInContext() for the
+      // constraint solver.
+      if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
+        if (auto closure = dyn_cast<ClosureExpr>(abstractClosure)) {
+          errorType = cs.getClosureType(closure)->getThrownError();
+        }
+      }
+
+      if (!errorType)
+        errorType = catchNode.getThrownErrorTypeInContext(dc).value_or(Type());
     }
 
     if (!errorType) {

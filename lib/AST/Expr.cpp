@@ -1937,8 +1937,10 @@ Type AbstractClosureExpr::getResultType(
 }
 
 llvm::Optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
-  return getType()->castTo<AnyFunctionType>()
-      ->getEffectiveThrownErrorType();
+  if (auto fnType = getType()->getAs<AnyFunctionType>())
+    return fnType->getEffectiveThrownErrorType();
+
+  return llvm::None;
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
