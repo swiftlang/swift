@@ -95,3 +95,39 @@ public enum CaseWitness: CaseProtocol {
   case b(_: A)
   case c(_: A)
 }
+
+// rdar://119499800 #1
+public typealias A8 = Batch.Iterator
+
+public struct Batch: Collection {
+  public typealias Element = Int
+  public typealias Index = Array<Element>.Index
+
+  var elements: [Element]
+
+  init(_ elements: some Collection<Element>) {
+    self.elements = Array(elements)
+  }
+
+  public var startIndex: Index { return elements.startIndex }
+  public var endIndex: Index { return elements.endIndex }
+
+  public subscript(index: Index) -> Iterator.Element {
+    return elements[index]
+  }
+
+  public func index(after i: Index) -> Index {
+    return elements.index(after: i)
+  }
+}
+
+// rdar://119499800 #2
+public typealias A9 = LogTypes.RawValue
+
+public struct LogTypes: OptionSet {
+  public init(rawValue: Self.RawValue) {
+    self.rawValue = rawValue
+  }
+
+  public let rawValue: Int
+}
