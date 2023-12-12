@@ -4389,6 +4389,10 @@ SolutionResult ConstraintSystem::salvage() {
       return SolutionResult::forSolved(std::move(viable[0]));
     }
 
+    if (shouldSuppressDiagnostics())
+      return viable.empty() ? SolutionResult::forUndiagnosedError()
+                            : SolutionResult::forAmbiguous(viable);
+
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
 
@@ -5228,7 +5232,7 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
 
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     SmallVectorImpl<Solution> &solutions) {
-  if (solutions.empty())
+  if (solutions.empty() || shouldSuppressDiagnostics())
     return false;
 
   SolutionDiff solutionDiff(solutions);
