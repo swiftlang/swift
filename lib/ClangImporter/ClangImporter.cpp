@@ -7626,6 +7626,11 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
   // The libc++ modulemap doesn't currently declare the requirement.
   if (module->getTopLevelModuleName() == "std")
     return true;
+  // In recent libc++ versions the module is split into multiple top-level
+  // modules (std_vector, std_utility, etc).
+  if (module->getTopLevelModule()->IsSystem &&
+      module->getTopLevelModuleName().starts_with("std_"))
+    return true;
 
   // Modulemaps often declare the requirement for the top-level module only.
   if (auto parent = module->Parent) {
