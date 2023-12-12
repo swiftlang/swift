@@ -12,6 +12,7 @@
 
 import SwiftShims
 
+// Swift can be built without swift-syntax, which disables macros support.
 #if $Macros && hasAttribute(attached)
 
 /// Converts description definitions to a debugger type summary.
