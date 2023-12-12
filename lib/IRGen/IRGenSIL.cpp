@@ -1850,6 +1850,12 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     CurFn->addFnAttr(llvm::Attribute::NoInline);
   }
 
+  // Mark as 'nounwind' to avoid referencing exception personality symbols, this
+  // is okay even with C++ interop on because the landinpads are trapping.
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    CurFn->addFnAttr(llvm::Attribute::NoUnwind);
+  }
+
   auto optMode = f->getOptimizationMode();
   if (optMode != OptimizationMode::NotSet &&
       optMode != f->getModule().getOptions().OptMode) {

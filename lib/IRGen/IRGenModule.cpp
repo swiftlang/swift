@@ -1458,6 +1458,12 @@ void IRGenModule::constructInitialFnAttributes(
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
+
+  // Mark as 'nounwind' to avoid referencing exception personality symbols, this
+  // is okay even with C++ interop on because the landinpads are trapping.
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    Attrs.addAttribute(llvm::Attribute::NoUnwind);
+  }
 }
 
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
