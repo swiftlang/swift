@@ -1552,6 +1552,9 @@ synthesizeReadCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 namespace {
   /// This ASTWalker explores an expression tree looking for expressions (which
   /// are DeclContext's) and changes their parent DeclContext to NewDC.
+  /// TODO: We ought to consider merging this with
+  /// ContextualizeClosuresAndMacros, or better yet removing it in favor of
+  /// avoiding the recontextualization for lazy vars.
   class RecontextualizeClosures : public ASTWalker {
     DeclContext *NewDC;
   public:
@@ -1567,34 +1570,42 @@ namespace {
         CE->setParent(NewDC);
         return Action::SkipChildren(E);
       }
-      
-      if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
-        // Make sure to recontextualize any decls in the capture list as well.
-        for (auto &CLE : CLE->getCaptureList()) {
-          CLE.getVar()->setDeclContext(NewDC);
-          CLE.PBD->setDeclContext(NewDC);
-        }
-      }
-      
-      // Unlike a closure, a TapExpr is not a DeclContext, so we need to
-      // recontextualize its variable and then anything else in its body.
-      // FIXME: Might be better to change walkToDeclPre() and walkToStmtPre()
-      // below, but I don't know what other effects that might have.
-      if (auto TE = dyn_cast<TapExpr>(E)) {
-        TE->getVar()->setDeclContext(NewDC);
-        for (auto node : TE->getBody()->getElements())
-          node.walk(RecontextualizeClosures(NewDC));
-      }
 
       return Action::Continue(E);
     }
 
-    /// We don't want to recurse into declarations or statements.
-    PreWalkAction walkToDeclPre(Decl *) override {
-      return Action::SkipChildren();
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      if (auto *EP = dyn_cast<ExprPattern>(P))
+        EP->setDeclContext(NewDC);
+      if (auto *EP = dyn_cast<EnumElementPattern>(P))
+        EP->setDeclContext(NewDC);
+
+      return Action::Continue(P);
     }
+
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      // The ASTWalker doesn't walk the case body variables, contextualize them
+      // ourselves.
+      if (auto *CS = dyn_cast<CaseStmt>(S)) {
+        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
+          CaseVar->setDeclContext(NewDC);
+      }
+      return Action::Continue(S);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      D->setDeclContext(NewDC);
+
+      // Auxiliary decls need to have their contexts adjusted too.
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        VD->visitAuxiliaryDecls([&](VarDecl *D) {
+          D->setDeclContext(NewDC);
+        });
+      }
+
+      // Skip walking the children of any Decls that are also DeclContexts,
+      // they will already have the right parent.
+      return Action::SkipChildrenIf(isa<DeclContext>(D));
     }
   };
 } // end anonymous namespace
