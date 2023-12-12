@@ -11059,17 +11059,18 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
 
 ActorIsolation::ActorIsolation(Kind kind, NominalTypeDecl *actor,
                                unsigned parameterIndex)
-    : actorInstance(actor), kind(kind), 
-      isolatedByPreconcurrency(false),
-      parameterIndex(parameterIndex) { }
+    : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
+      silParsed(false), parameterIndex(parameterIndex) {}
 
 ActorIsolation::ActorIsolation(Kind kind, VarDecl *capturedActor)
-    : actorInstance(capturedActor), kind(kind),
-      isolatedByPreconcurrency(false), 
-      parameterIndex(0) { }
+    : actorInstance(capturedActor), kind(kind), isolatedByPreconcurrency(false),
+      silParsed(false), parameterIndex(0) {}
 
 NominalTypeDecl *ActorIsolation::getActor() const {
   assert(getKind() == ActorInstance);
+
+  if (silParsed)
+    return nullptr;
 
   if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
     return instance->getTypeInContext()
@@ -11081,10 +11082,17 @@ NominalTypeDecl *ActorIsolation::getActor() const {
 
 VarDecl *ActorIsolation::getActorInstance() const {
   assert(getKind() == ActorInstance);
+
+  if (silParsed)
+    return nullptr;
+
   return actorInstance.dyn_cast<VarDecl *>();
 }
 
 bool ActorIsolation::isMainActor() const {
+  if (silParsed)
+    return false;
+
   if (isGlobalActor()) {
     if (auto *nominal = getGlobalActor()->getAnyNominal())
       return nominal->isMainActor();
@@ -11094,6 +11102,9 @@ bool ActorIsolation::isMainActor() const {
 }
 
 bool ActorIsolation::isDistributedActor() const {
+  if (silParsed)
+    return false;
+
   return getKind() == ActorInstance && getActor()->isDistributedActor();
 }
 

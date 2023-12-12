@@ -1158,6 +1158,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     return ValueOwnershipKind(field+1);
   };
 
+  unsigned ApplyCallerIsolation = unsigned(ActorIsolation::Unspecified);
+  unsigned ApplyCalleeIsolation = unsigned(ActorIsolation::Unspecified);
+
   switch (RecordKind) {
   default:
     llvm_unreachable("Record kind for a SIL instruction is not supported.");
@@ -1234,8 +1237,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   case SIL_INST_APPLY: {
     unsigned Kind, RawApplyOpts;
-    SILInstApplyLayout::readRecord(scratch, Kind, RawApplyOpts, NumSubs, TyID, TyID2,
-                                   ValID, ListOfValues);
+    SILInstApplyLayout::readRecord(scratch, Kind, RawApplyOpts, NumSubs, TyID,
+                                   TyID2, ValID, ApplyCallerIsolation,
+                                   ApplyCalleeIsolation, ListOfValues);
     switch (Kind) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
@@ -1753,13 +1757,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                        I, Builder.getTypeExpansionContext())));
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
+    std::optional<ApplyIsolationCrossing> IsolationCrossing;
+    if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      IsolationCrossing = {caller, callee};
+    }
+
     if (OpCode == SILInstructionKind::ApplyInst) {
       ResultInst =
           Builder.createApply(Loc, getLocalValue(ValID, FnTy), Substitutions,
-                              Args, ApplyOpts);
+                              Args, ApplyOpts, nullptr, IsolationCrossing);
     } else {
       ResultInst = Builder.createBeginApply(Loc, getLocalValue(ValID, FnTy),
-                                            Substitutions, Args, ApplyOpts);
+                                            Substitutions, Args, ApplyOpts,
+                                            nullptr, IsolationCrossing);
     }
     break;
   }
@@ -1789,9 +1801,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                        I, Builder.getTypeExpansionContext())));
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
+    std::optional<ApplyIsolationCrossing> IsolationCrossing;
+    if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      IsolationCrossing = {caller, callee};
+    }
+
     ResultInst = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
                                         Substitutions, Args, normalBB, errorBB,
-                                        ApplyOpts);
+                                        ApplyOpts, nullptr, IsolationCrossing);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {

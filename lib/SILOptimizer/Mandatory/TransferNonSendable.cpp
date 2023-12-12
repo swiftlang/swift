@@ -55,9 +55,11 @@ using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
 /// see if the ActorIsolationChecker determined it crossed isolation.  It's
 /// possible this is brittle and a more nuanced check is needed, but this
 /// suffices for all cases tested so far.
-static bool isIsolationBoundaryCrossingApply(const SILInstruction *inst) {
+static bool isIsolationBoundaryCrossingApply(SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
     return apply->getIsolationCrossing().has_value();
+  if (auto fas = FullApplySite::isa(inst))
+    return bool(fas.getIsolationCrossing());
 
   // We assume that any instruction that does not correspond to an ApplyExpr
   // cannot cross an isolation domain.
@@ -597,6 +599,13 @@ struct InferredCallerArgumentTypeInfo {
 
   void init(const Operand *op);
 
+  /// Init for an apply that does not have an associated apply expr.
+  ///
+  /// This should only occur when writing SIL test cases today. In the future,
+  /// we may represent all of the actor isolation information at the SIL level,
+  /// but we are not there yet today.
+  void initForApply(ApplyIsolationCrossing isolationCrossing);
+
   void initForApply(const Operand *op, ApplyExpr *expr);
   void initForAutoclosure(const Operand *op, AutoClosureExpr *expr);
 
@@ -622,6 +631,11 @@ struct InferredCallerArgumentTypeInfo {
 };
 
 } // namespace
+
+void InferredCallerArgumentTypeInfo::initForApply(
+    ApplyIsolationCrossing isolationCrossing) {
+  applyUses.emplace_back(baseInferredType, isolationCrossing);
+}
 
 void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
                                                   ApplyExpr *sourceApply) {
@@ -729,26 +743,33 @@ struct Walker : ASTWalker {
 
 void InferredCallerArgumentTypeInfo::init(const Operand *op) {
   baseInferredType = op->get()->getType().getASTType();
+  auto *nonConstOp = const_cast<Operand *>(op);
 
   auto loc = op->getUser()->getLoc();
   if (auto *sourceApply = loc.getAsASTNode<ApplyExpr>()) {
-    initForApply(op, sourceApply);
-  } else {
-    auto *autoClosureExpr = loc.getAsASTNode<AutoClosureExpr>();
-    if (!autoClosureExpr) {
-      llvm::report_fatal_error("Unknown node");
-    }
-
-    SILInstruction *i = const_cast<SILInstruction *>(op->getUser());
-    auto pai = ApplySite::isa(i);
-    unsigned captureIndex = pai.getAppliedArgIndex(*op);
-
-    auto captureInfo =
-        autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
-    auto *captureDecl = captureInfo.getDecl();
-    Walker walker(*this, captureDecl);
-    autoClosureExpr->walk(walker);
+    return initForApply(op, sourceApply);
   }
+
+  if (auto fas = FullApplySite::isa(nonConstOp->getUser())) {
+    if (auto isolationCrossing = fas.getIsolationCrossing()) {
+      return initForApply(*isolationCrossing);
+    }
+  }
+
+  auto *autoClosureExpr = loc.getAsASTNode<AutoClosureExpr>();
+  if (!autoClosureExpr) {
+    llvm::report_fatal_error("Unknown node");
+  }
+
+  auto *i = const_cast<SILInstruction *>(op->getUser());
+  auto pai = ApplySite::isa(i);
+  unsigned captureIndex = pai.getAppliedArgIndex(*op);
+
+  auto captureInfo =
+      autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
+  auto *captureDecl = captureInfo.getDecl();
+  Walker walker(*this, captureDecl);
+  autoClosureExpr->walk(walker);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1660,9 +1681,10 @@ public:
   /// Handles the semantics for SIL applies that cross isolation.
   ///
   /// Semantically this causes all arguments of the applysite to be transferred.
-  void translateIsolationCrossingSILApply(ApplySite applySite) {
+  void translateIsolationCrossingSILApply(FullApplySite applySite) {
     ApplyExpr *sourceApply = applySite.getLoc().getAsASTNode<ApplyExpr>();
-    assert(sourceApply && "only ApplyExpr's should cross isolation domains");
+    assert((sourceApply || bool(applySite.getIsolationCrossing())) &&
+           "only ApplyExpr's should cross isolation domains");
 
     // require all operands
     for (auto op : applySite->getOperandValues())

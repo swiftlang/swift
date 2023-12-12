@@ -5927,11 +5927,28 @@ Function Application
 These instructions call functions or wrap them in partial application or
 specialization thunks.
 
+In the following we allow for `apply`_, `begin_apply`_, and `try_apply`_ to have
+a callee or caller actor isolation attached to them::
+
+  sil-actor-isolation        ::= unspecified
+                             ::= actor_instance
+                             ::= nonisolated
+                             ::= nonisolated_unsafe
+                             ::= global_actor
+                             ::= global_actor_unsafe
+
+  sil-actor-isolation-callee ::= [callee_isolation=sil-actor-isolation]
+  sil-actor-isolation-caller ::= [caller_isolation=sil-actor-isolation]
+
+These can be used to write test cases with actor isolation using these
+instructions and is not intended to be used in SILGen today.
+
 apply
 `````
 ::
 
-  sil-instruction ::= 'apply' '[nothrow]'? sil-value
+  sil-instruction ::= 'apply' '[nothrow]'? sil-actor-isolation-callee?
+                        sil-actor-isolation-caller? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type

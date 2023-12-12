@@ -1156,14 +1156,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(S.addTypeRef(Arg->getType().getRawASTType()));
       Args.push_back((unsigned)Arg->getType().getCategory());
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-                             SILAbbrCodes[SILInstApplyLayout::Code],
-                             SIL_BUILTIN, 0,
-                             S.addSubstitutionMapRef(BI->getSubstitutions()),
-                             S.addTypeRef(BI->getType().getRawASTType()),
-                             (unsigned)BI->getType().getCategory(),
-                             S.addDeclBaseNameRef(BI->getName()),
-                             Args);
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_BUILTIN,
+        0, S.addSubstitutionMapRef(BI->getSubstitutions()),
+        S.addTypeRef(BI->getType().getRawASTType()),
+        (unsigned)BI->getType().getCategory(),
+        S.addDeclBaseNameRef(BI->getName()),
+        unsigned(swift::ActorIsolation::Unspecified),
+        unsigned(swift::ActorIsolation::Unspecified), Args);
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -1177,15 +1177,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: AI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code],
-        SIL_APPLY,
+
+    auto callerIsolation = swift::ActorIsolation::Unspecified;
+    auto calleeIsolation = swift::ActorIsolation::Unspecified;
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      callerIsolation = isolationCrossing->getCallerIsolation();
+      calleeIsolation = isolationCrossing->getCalleeIsolation();
+    }
+
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_APPLY,
         unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
-        S.addTypeRef(AI->getSubstCalleeType()),
-        addValueRef(AI->getCallee()),
-        Args);
+        S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
+        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -1199,14 +1205,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: AI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], SIL_BEGIN_APPLY,
-        unsigned(AI->getApplyOptions().toRaw()),
+
+    auto callerIsolation = swift::ActorIsolation::Unspecified;
+    auto calleeIsolation = swift::ActorIsolation::Unspecified;
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      callerIsolation = isolationCrossing->getCallerIsolation();
+      calleeIsolation = isolationCrossing->getCalleeIsolation();
+    }
+
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
+        SIL_BEGIN_APPLY, unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
-        S.addTypeRef(AI->getSubstCalleeType()),
-        addValueRef(AI->getCallee()),
-        Args);
+        S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
+        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -1223,14 +1236,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     Args.push_back(BasicBlockMap[AI->getNormalBB()]);
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], SIL_TRY_APPLY,
-        unsigned(AI->getApplyOptions().toRaw()),
+
+    auto callerIsolation = swift::ActorIsolation::Unspecified;
+    auto calleeIsolation = swift::ActorIsolation::Unspecified;
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      callerIsolation = isolationCrossing->getCallerIsolation();
+      calleeIsolation = isolationCrossing->getCalleeIsolation();
+    }
+
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
+        SIL_TRY_APPLY, unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
-        S.addTypeRef(AI->getSubstCalleeType()),
-        addValueRef(AI->getCallee()),
-        Args);
+        S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
+        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1239,14 +1259,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: PAI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], SIL_PARTIAL_APPLY,
-        0,
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
+        SIL_PARTIAL_APPLY, 0,
         S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
         addValueRef(PAI->getCallee()),
-        Args);
+        unsigned(swift::ActorIsolation::Unspecified),
+        unsigned(swift::ActorIsolation::Unspecified), Args);
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {
