@@ -1538,6 +1538,37 @@ BridgedExistentialTypeRepr_createParsed(BridgedASTContext cContext,
 // MARK: Patterns
 //===----------------------------------------------------------------------===//
 
+BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged()) AnyPattern(cLoc.unbridged());
+}
+
+BridgedBindingPattern
+BridgedBindingPattern_createParsed(BridgedASTContext cContext,
+                                   BridgedSourceLoc cKeywordLoc, bool isLet,
+                                   BridgedPattern cSubPattern) {
+  VarDecl::Introducer introducer =
+      isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
+  return new (cContext.unbridged()) BindingPattern(
+      cKeywordLoc.unbridged(), introducer, cSubPattern.unbridged());
+}
+
+BridgedExprPattern
+BridgedExprPattern_createParsed(BridgedDeclContext cDeclContext,
+                                BridgedExpr cExpr) {
+  auto *DC = cDeclContext.unbridged();
+  auto &context = DC->getASTContext();
+  return ExprPattern::createParsed(context, cExpr.unbridged(), DC);
+}
+
+BridgedIsPattern BridgedIsPattern_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cIsLoc,
+                                               BridgedTypeExpr cTypeExpr) {
+  return new (cContext.unbridged())
+      IsPattern(cIsLoc.unbridged(), cTypeExpr.unbridged(),
+                /*subPattern=*/nullptr, CheckedCastKind::Unresolved);
+}
+
 BridgedNamedPattern
 BridgedNamedPattern_createParsed(BridgedASTContext cContext,
                                  BridgedDeclContext cDeclContext,
@@ -1552,6 +1583,37 @@ BridgedNamedPattern_createParsed(BridgedASTContext cContext,
       name.unbridged(), dc);
   auto *pattern = new (context) NamedPattern(varDecl);
   return pattern;
+}
+
+BridgedParenPattern BridgedParenPattern_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
+    BridgedPattern cSubPattern, BridgedSourceLoc cRParenLoc) {
+  return new (cContext.unbridged()) ParenPattern(
+      cLParenLoc.unbridged(), cSubPattern.unbridged(), cRParenLoc.unbridged());
+}
+
+BridgedTuplePattern BridgedTuplePattern_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
+    BridgedArrayRef cElements, BridgedSourceLoc cRParenLoc) {
+  ASTContext &context = cContext.unbridged();
+  llvm::SmallVector<TuplePatternElt, 4> elements;
+  elements.reserve(cElements.Length);
+  llvm::transform(cElements.unbridged<BridgedTuplePatternElt>(),
+                  elements.begin(), [](const BridgedTuplePatternElt &elt) {
+                    return TuplePatternElt(elt.Label.unbridged(),
+                                           elt.LabelLoc.unbridged(),
+                                           elt.ThePattern.unbridged());
+                  });
+
+  return TuplePattern::create(context, cLParenLoc.unbridged(), elements,
+                              cRParenLoc.unbridged());
+}
+
+BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
+                                                     BridgedPattern cPattern,
+                                                     BridgedTypeRepr cType) {
+  return new (cContext.unbridged())
+      TypedPattern(cPattern.unbridged(), cType.unbridged());
 }
 
 //===----------------------------------------------------------------------===//

@@ -1111,11 +1111,53 @@ void BridgedTypeRepr_dump(BridgedTypeRepr type);
 // MARK: Patterns
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
+BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cLoc);
+
+SWIFT_NAME("BridgedBindingPattern.createParsed(_:keywordLoc:isLet:subPattern:)")
+BridgedBindingPattern
+BridgedBindingPattern_createParsed(BridgedASTContext cContext,
+                                   BridgedSourceLoc cKeywordLoc, bool isLet,
+                                   BridgedPattern cSubPattern);
+
+SWIFT_NAME("BridgedExprPattern.createParsed(_:expr:)")
+BridgedExprPattern
+BridgedExprPattern_createParsed(BridgedDeclContext cDeclContext,
+                                BridgedExpr cExpr);
+
+SWIFT_NAME("BridgedIsPattern.createParsed(_:isLoc:typeExpr:)")
+BridgedIsPattern BridgedIsPattern_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cIsLoc,
+                                               BridgedTypeExpr cTypeExpr);
+
 SWIFT_NAME("BridgedNamedPattern.createParsed(_:declContext:name:loc:)")
 BridgedNamedPattern
 BridgedNamedPattern_createParsed(BridgedASTContext astContext,
                                  BridgedDeclContext declContext,
                                  BridgedIdentifier name, BridgedSourceLoc cLoc);
+
+SWIFT_NAME(
+    "BridgedParenPattern.createParsed(_:lParenLoc:subPattern:rParenLoc:)")
+BridgedParenPattern BridgedParenPattern_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
+    BridgedPattern cSubPattern, BridgedSourceLoc cRParenLoc);
+
+struct BridgedTuplePatternElt {
+  BridgedIdentifier Label;
+  BridgedSourceLoc LabelLoc;
+  BridgedPattern ThePattern;
+};
+
+SWIFT_NAME("BridgedTuplePattern.createParsed(_:lParenLoc:elements:rParenLoc:)")
+BridgedTuplePattern BridgedTuplePattern_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
+    BridgedArrayRef cElements, BridgedSourceLoc cRParenLoc);
+
+SWIFT_NAME("BridgedTypedPattern.createParsed(_:pattern:type:)")
+BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
+                                                     BridgedPattern cPattern,
+                                                     BridgedTypeRepr cType);
 
 //===----------------------------------------------------------------------===//
 // MARK: Misc
