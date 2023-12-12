@@ -11344,7 +11344,10 @@ ActorIsolation::forActorInstanceSelf(ValueDecl *decl) {
 }
 
 NominalTypeDecl *ActorIsolation::getActor() const {
-  assert(getKind() == ActorInstance);
+  fprintf(stderr, "[%s:%d](%s) getKind() == %d\n", __FILE_NAME__, __LINE__,
+          __FUNCTION__, getKind());
+  assert(getKind() == ActorInstance ||
+         getKind() == GlobalActor);
 
   if (silParsed)
     return nullptr;
