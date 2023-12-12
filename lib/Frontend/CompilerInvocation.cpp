@@ -2425,6 +2425,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.OSSACompleteLifetimes |= Args.hasArg(OPT_enable_ossa_complete_lifetimes);
 
+  Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
+
   return false;
 }
 
@@ -3228,6 +3230,11 @@ bool CompilerInvocation::parseArgs(
     SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
     SILOpts.EmbeddedSwift = true;
+  } else {
+    if (SILOpts.NoAllocations) {
+      Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);
+      return true;
+    }
   }
 
   return false;

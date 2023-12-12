@@ -561,6 +561,8 @@ ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 ERROR(objc_with_embedded,none,
       "Objective-C interoperability cannot be enabled with embedded Swift.", ())
+ERROR(no_allocations_without_embedded,none,
+      "-no-allocations is only applicable with embedded Swift.", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -872,6 +872,10 @@ def save_optimization_record_passes :
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
+def no_allocations : Flag<["-"], "no-allocations">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Diagnose any code that needs to heap allocate (classes, closures, etc.)">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,

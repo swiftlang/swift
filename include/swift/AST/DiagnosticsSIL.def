@@ -364,6 +364,10 @@ ERROR(embedded_swift_metatype_type,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_metatype,none,
       "cannot use metatype in embedded Swift", ())
+ERROR(embedded_swift_allocating_type,none,
+      "cannot use allocating type %0 in -no-allocations mode", (Type))
+ERROR(embedded_swift_allocating,none,
+      "cannot use allocating type in -no-allocations mode", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
