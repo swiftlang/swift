@@ -87,6 +87,12 @@ public:
 RenameLocs localRenameLocs(SourceFile *sourceFile, const ValueDecl *valueDecl);
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
+/// A `RenameLoc` together with the `ResolvedLoc` that it resolved to.
+struct ResolvedAndRenameLoc {
+  RenameLoc renameLoc;
+  ResolvedLoc resolved;
+};
+
 /// Given a list of `RenameLoc`s, get the corresponding `ResolveLoc`s.
 ///
 /// These resolve locations contain more structured information, such as the
@@ -95,10 +101,9 @@ RenameLocs localRenameLocs(SourceFile *sourceFile, const ValueDecl *valueDecl);
 /// If a \p newName is passed, it is used to verify that all \p renameLocs can
 /// be renamed to this name. If any the names cannot be renamed, an empty vector
 /// is returned and the issue is diagnosed via \p diags.
-std::vector<ResolvedLoc> resolveRenameLocations(ArrayRef<RenameLoc> renameLocs,
-                                                StringRef newName,
-                                                SourceFile &sourceFile,
-                                                DiagnosticEngine &diags);
+std::vector<ResolvedAndRenameLoc>
+resolveRenameLocations(ArrayRef<RenameLoc> renameLocs, StringRef newName,
+                       SourceFile &sourceFile, DiagnosticEngine &diags);
 #endif
 
 struct RangeConfig {

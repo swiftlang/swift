@@ -2565,20 +2565,19 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
       // symbols. This makes related idents more fault-tolerant.
       DiagnosticEngine Diags(SrcMgr);
 
-      std::vector<ResolvedLoc> ResolvedLocs = resolveRenameLocations(
-          Locs.getLocations(), /*NewName=*/StringRef(), *SrcFile, Diags);
+      std::vector<ResolvedAndRenameLoc> ResolvedAndRenameLocs =
+          resolveRenameLocations(Locs.getLocations(), /*NewName=*/StringRef(),
+                                 *SrcFile, Diags);
 
       SmallVector<RelatedIdentInfo, 8> Ranges;
-      assert(ResolvedLocs.size() == Locs.getLocations().size());
-      for (auto [RenameLoc, ResolvedLoc] :
-           llvm::zip_equal(Locs.getLocations(), ResolvedLocs)) {
-        if (ResolvedLoc.range.isInvalid()) {
+      for (auto Loc : ResolvedAndRenameLocs) {
+        if (Loc.resolved.range.isInvalid()) {
           continue;
         }
-        unsigned Offset =
-            SrcMgr.getLocOffsetInBuffer(ResolvedLoc.range.getStart(), BufferID);
+        unsigned Offset = SrcMgr.getLocOffsetInBuffer(
+            Loc.resolved.range.getStart(), BufferID);
         Ranges.push_back(
-            {Offset, ResolvedLoc.range.getByteLength(), RenameLoc.Usage});
+            {Offset, Loc.resolved.range.getByteLength(), Loc.renameLoc.Usage});
       }
 
       return RelatedIdentsResult(Ranges, OldName);
