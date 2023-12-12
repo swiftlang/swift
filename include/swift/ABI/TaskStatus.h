@@ -276,6 +276,29 @@ public:
   }
 };
 
+/// This record signifies that the task has an executor preference.
+/// This preference may be added or removed at runtime, e.g. when multiple
+/// `_withTaskExecutor { ... }` blocks are nested, they add more executor
+/// preferences.
+///
+/// Any number of these preferences may be present at runtime, and the
+/// innermost preference takes priority.
+class TaskExecutorPreferenceStatusRecord : public TaskStatusRecord {
+private:
+  const TaskExecutorRef Preferred;
+
+public:
+  TaskExecutorPreferenceStatusRecord(TaskExecutorRef executor)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskExecutorPreference),
+        Preferred(executor) {}
+
+  TaskExecutorRef getPreferredExecutor() { return Preferred; }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskExecutorPreference;
+  }
+};
+
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.
 class TaskDependencyStatusRecord : public TaskStatusRecord {

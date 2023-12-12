@@ -655,7 +655,7 @@ struct Runner {
 
                 // In order to test that we properly hand off the access, we
                 // need to await here.
-                let handle2 = await Task { @CustomActor in
+                let handle2 = Task { @CustomActor in
                     debugLog("==> In inner handle")
                 }
                 await handle2.value
@@ -749,7 +749,7 @@ struct Runner {
 
                 // In order to test that we properly hand off the access, we
                 // need to await here.
-                let handle2 = await Task { @CustomActor in
+                let handle2 = Task { @CustomActor in
                     debugLog("==> In inner handle")
                 }
                 await handle2.value

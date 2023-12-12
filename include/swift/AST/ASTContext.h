@@ -916,6 +916,9 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the runtime availability of task executors.
+  AvailabilityContext getTaskExecutorAvailability();
+
   /// Get the runtime availability of the `DiscardingTaskGroup`,
   /// and supporting runtime functions function
   AvailabilityContext getConcurrencyDiscardingTaskGroupAvailability();

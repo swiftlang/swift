@@ -38,6 +38,7 @@ struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
 class TaskDependencyStatusRecord;
+class TaskExecutorPreferenceStatusRecord;
 class TaskOptionRecord;
 class TaskGroup;
 class ContinuationAsyncContext;
@@ -399,7 +400,7 @@ private:
 
 public:
   /// Flag that the task is to be enqueued on the provided executor and actually
-  /// enqueue it
+  /// enqueue it.
   void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
@@ -409,6 +410,30 @@ public:
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const;
+
+  // ==== Task Executor Preference ---------------------------------------------
+
+  /// Get the preferred task executor reference if there is one set for this
+  /// task.
+  TaskExecutorRef getPreferredTaskExecutor();
+
+  /// WARNING: Only to be used during task creation, in other situations prefer
+  /// to use `swift_task_pushTaskExecutorPreference` and
+  /// `swift_task_popTaskExecutorPreference`.
+  void pushInitialTaskExecutorPreference(TaskExecutorRef preferred);
+
+  /// WARNING: Only to be used during task completion (destroy).
+  ///
+  /// This is because between task creation and its destory, we cannot carry the
+  /// exact record to `pop(record)`, and instead assume that there will be
+  /// exactly one record remaining -- the "initial" record (added during
+  /// creating the task), and it must be that record that is removed by this
+  /// api.
+  ///
+  /// All other situations from user code should be using the
+  /// `swift_task_pushTaskExecutorPreference`, and
+  /// `swift_task_popTaskExecutorPreference(record)` method pair.
+  void dropInitialTaskExecutorPreferenceRecord();
 
   // ==== Task Local Values ----------------------------------------------------
 
@@ -512,6 +537,26 @@ public:
 
     return reinterpret_cast<GroupChildFragment *>(offset);
   }
+
+  // ==== Task Executor Preference --------------------------------------------
+
+  /// Returns true if the task has a task executor preference set,
+  /// specifically at creation time of the task. This may be from
+  /// inheriting the preference from a parent task, or by explicitly
+  /// setting it during creation (`Task(_on:...)`).
+  ///
+  /// This means that during task tear down the record should be deallocated
+  /// because it will not be taken care of by a paired "pop" as the normal
+  /// user-land "push / pop" pair of setting a task executor preference would
+  /// have been.
+  bool hasInitialTaskExecutorPreferenceRecord() const {
+    return Flags.task_hasInitialTaskExecutorPreference();
+  }
+
+  /// Returns true if the current task has any task preference record,
+  /// including if it has an initial task preference record or onces
+  /// set during the lifetime of the task.
+  bool hasTaskExecutorPreferenceRecord() const;
 
   // ==== Future ---------------------------------------------------------------
 

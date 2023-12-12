@@ -986,6 +986,34 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
     "createAsyncTaskInGroup", "", Special)
 
+/// createAsyncTaskWithExecutor(): (
+///     Int,                            // flags
+///     Builtin.Executor,               // executor
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
+    "createAsyncTaskWithExecutor", "", Special)
+
+/// createAsyncTaskWithExecutor(): (
+///     Int,                            // flags
+///     Builtin.RawPointer,             // group
+///     Builtin.Executor,               // executor
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
+    "createAsyncTaskInGroupWithExecutor", "", Special)
+
+/// Build a Builtin.Executor value from an "ordinary" task executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryTaskExecutorRef,
+    "buildOrdinaryTaskExecutorRef", "n", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it

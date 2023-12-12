@@ -1107,6 +1107,11 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
+// The emitBuiltinCreateAsyncTask function symbol is exposed from
+// SILGenBuiltin so that it is available from SILGenFunction. There is a
+// fair bit of work involved going from what is available at the SGF to
+// what is needed for actually calling the CreateAsyncTask builtin, so in
+// order to avoid additional maintenance, it's good to re-use that.
 ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         SubstitutionMap subs,
                                         ArrayRef<ManagedValue> args,
@@ -1449,7 +1454,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
           *this, moduleLoc, subs,
           {ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
            ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef)},
-          {})
+          {}) //, /*inGroup=*/false, /*withExecutor=*/false)
           .forward(*this);
   DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
   task = structure->getResult(0);

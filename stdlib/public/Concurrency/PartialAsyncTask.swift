@@ -21,6 +21,21 @@ import Swift
 internal func _swiftJobRun(_ job: UnownedJob,
                            _ executor: UnownedSerialExecutor) -> ()
 
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_job_run_on_task_executor")
+@usableFromInline
+internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
+                                         _ executor: UnownedTaskExecutor) -> ()
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_job_run_on_serial_and_task_executor")
+@usableFromInline
+internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
+                                         _ serialExecutor: UnownedSerialExecutor,
+                                         _ taskExecutor: UnownedTaskExecutor) -> ()
+
 // ==== -----------------------------------------------------------------------
 // MARK: UnownedJob
 
@@ -94,10 +109,27 @@ public struct UnownedJob: Sendable {
     _swiftJobRun(self, executor)
   }
 
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 9999, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  public func runSynchronously(on executor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(self, executor)
+  }
+
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 9999, *)
+  @_alwaysEmitIntoClient
+  @inlinable
+  public func runSynchronously(isolated serialExecutor: UnownedSerialExecutor,
+                               taskExecutor: UnownedTaskExecutor) {
+    _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
+  }
+
 }
 
-@available(SwiftStdlib 5.9, *)
 @_unavailableInEmbedded
+@available(SwiftStdlib 5.9, *)
 extension UnownedJob: CustomStringConvertible {
   @available(SwiftStdlib 5.9, *)
   public var description: String {

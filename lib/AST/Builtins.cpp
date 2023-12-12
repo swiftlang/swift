@@ -1465,27 +1465,21 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
-static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
-  BuiltinFunctionBuilder builder(ctx);
-  auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 1 operation
-  builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
-  return builder.build(id);
-}
-
-static ValueDecl *getCreateAsyncTaskInGroup(ASTContext &ctx, Identifier id) {
+static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
+                                     bool inGroup, bool withTaskExecutor) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder); // <T>
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
-  builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // 1 group
+  if (inGroup) {
+    builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // group
+  }
+  if (withTaskExecutor) {
+    builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
+  }
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 2 operation
+      makeConcrete(FunctionType::get({}, genericParam, extInfo))); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
-
   return builder.build(id);
 }
 
@@ -1615,6 +1609,15 @@ static ValueDecl *getTargetOSVersionAtLeast(ASTContext &Context,
                                             Identifier Id) {
   auto int32Type = BuiltinIntegerType::get(32, Context);
   return getBuiltinFunction(Id, {int32Type, int32Type, int32Type}, int32Type);
+}
+
+static ValueDecl *getBuildOrdinaryTaskExecutorRef(ASTContext &ctx,
+                                                  Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _conformsTo(_typeparam(0), _taskExecutor)),
+                            _parameters(_typeparam(0)),
+                            _executor);
 }
 
 static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
@@ -2904,10 +2907,17 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getCancelAsyncTask(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTask:
-    return getCreateAsyncTask(Context, Id);
-
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
+                              /*withExecutor=*/false);
   case BuiltinValueKind::CreateAsyncTaskInGroup:
-    return getCreateAsyncTaskInGroup(Context, Id);
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/false);
+  case BuiltinValueKind::CreateAsyncTaskWithExecutor:
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
+                              /*withExecutor=*/true);
+  case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/true);
 
   case BuiltinValueKind::TaskRunInline:
     return getTaskRunInline(Context, Id);
@@ -2923,6 +2933,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::BuildDefaultActorExecutorRef:
     return getBuildDefaultActorExecutorRef(Context, Id);
+
+  case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
+    return getBuildOrdinaryTaskExecutorRef(Context, Id);
 
   case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     return getBuildOrdinarySerialExecutorRef(Context, Id);

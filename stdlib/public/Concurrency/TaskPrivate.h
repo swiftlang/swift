@@ -213,6 +213,30 @@ SWIFT_CC(swift)
 void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
 
+/// Update the status record by scanning through all records and removing
+/// those which match the condition. This can also be used to inspect
+/// "remaining" records.
+///
+/// The `whenRemoved` function is called after a record indicated by
+/// `condition` returning `true` was removed. It can be used to e.g.
+/// deallocate or perform additional cleanup.
+///
+/// The `updateStatus` function can be used to update the status after all
+/// records have been inspected. It may be invoked multiple times inside a RMW
+/// loop, therefore must be idempotent.
+SWIFT_CC(swift)
+void removeStatusRecordWhere(
+    AsyncTask *task,
+    ActiveTaskStatus& status,
+    llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
+
+SWIFT_CC(swift)
+void removeStatusRecordWhere(
+    AsyncTask *task,
+    llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>updateStatus = nullptr);
+
 /// Remove a status record from the current task. This must be called
 /// synchronously with the task.
 SWIFT_CC(swift)
@@ -406,7 +430,8 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
 
 #if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     /// Whether the task is actively running. On systems which cannot track the
-    /// identity of the drainer (see above), we use one bit in the flags to track
+    /// identity of the drainer (see above), we use one bit in the flags to
+    /// track
     /// whether or not task is running. Otherwise, the drain lock tells us
     /// whether or not it is running.
     IsRunning = 0x800,
@@ -429,6 +454,16 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// The task has a dependency and therefore, also a
     /// TaskDependencyStatusRecord in the status record list.
     HasTaskDependency = 0x4000,
+
+    /// Whether the task has a task executor preference record stored.
+    /// By storing this flag we can avoid taking the task record lock
+    /// when running a task when we know there is no task executor preference
+    /// to look for.
+    ///
+    /// If a task has a task executor preference, we must find the record and
+    /// use the task executor preference when we'd otherwise be running on
+    /// the generic global pool.
+    HasTaskExecutorPreference = 0x8000,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -594,6 +629,25 @@ public:
 #endif
   }
 
+  /// Is there a task preference record in the linked list of status records?
+  bool hasTaskExecutorPreference() const {
+    return Flags & HasTaskExecutorPreference;
+  }
+  ActiveTaskStatus withTaskExecutorPreference() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | HasTaskExecutorPreference);
+#endif
+  }
+  ActiveTaskStatus withoutTaskExecutorPreference() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags & ~HasTaskExecutorPreference);
+#endif
+  }
+
   JobPriority getStoredPriority() const {
     return JobPriority(Flags & PriorityMask);
   }
@@ -731,6 +785,15 @@ struct AsyncTask::PrivateStorage {
   /// Called on the thread that was previously executing the task that we are
   /// now trying to complete.
   void complete(AsyncTask *task) {
+    // If during task creation we created a task preference record;
+    // we must destroy it here; The record is task-local allocated,
+    // so we must do so specifically here, before the task-local storage
+    // elements are destroyed; in order to respect stack-discipline of
+    // the task-local allocator.
+    if (task->hasInitialTaskExecutorPreferenceRecord()) {
+    task->dropInitialTaskExecutorPreferenceRecord();
+    }
+
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
@@ -935,7 +998,8 @@ inline void AsyncTask::flagAsRunning() {
 /// onto by the original enqueueing thread.
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
-inline void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
+inline void
+AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
@@ -973,6 +1037,8 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor)
     // dependency record (Eg. newly created)
     assert(_private().dependencyRecord == nullptr);
 
+    // TODO: do we need to do tracking for task executors...? I guess no since
+    // they can't escalate.
     void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
     TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(this, newExecutor);
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() with dependencyRecord %p", this,
@@ -1108,12 +1174,28 @@ inline void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {
   this->flagAsSuspended(record);
 }
 
+/// Returns true if the task has any kind of task executor preference,
+/// including an initial task executor preference (set during task creation).
+inline bool AsyncTask::hasTaskExecutorPreferenceRecord() const {
+  if (hasInitialTaskExecutorPreferenceRecord()) {
+    // an "initial" setting is valid for the entire lifetime of a task,
+    // so we don't need to check anything else; there definitely is at
+    // least one preference record.
+    return true;
+  }
+
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+  return oldStatus.hasTaskExecutorPreference();
+}
+
 // READ ME: This is not a dead function! Do not remove it! This is a function
 // that can be used when debugging locally to instrument when a task
 // actually is dealloced.
 inline void AsyncTask::flagAsDestroyed() {
   SWIFT_TASK_DEBUG_LOG("task destroyed %p", this);
 }
+
+// ==== Task Local Values -----------------------------------------------------
 
 inline void AsyncTask::localValuePush(const HeapObject *key,
                                       /* +1 */ OpaqueValue *value,

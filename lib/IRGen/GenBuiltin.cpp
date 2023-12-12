@@ -319,13 +319,23 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup) {
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor) {
 
     auto flags = args.claimNext();
     auto taskGroup =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
-        ? args.claimNext()
-        : nullptr;
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+            ? args.claimNext()
+            : nullptr;
+
+    // ExecutorRef is two pointers: {Identity, Implementation}
+    std::pair<llvm::Value *, llvm::Value *> executorRef =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+            ? std::pair(args.claimNext(), args.claimNext())
+            : std::pair(nullptr, nullptr);
 
     // In embedded Swift, futureResultType is a thin metatype, not backed by any
     // actual value.
@@ -334,17 +344,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       futureResultType = args.claimNext();
     }
-
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF,
-        flags,
-        taskGroup,
-        futureResultType,
-        taskFunction, taskContext,
-        substitutions);
+        IGF, flags, taskGroup, executorRef.first, executorRef.second,
+        futureResultType, taskFunction, taskContext, substitutions);
 
     // Cast back to NativeObject/RawPointer.
     auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });
@@ -416,6 +421,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::BuildDefaultActorExecutorRef) {
     auto actor = args.claimNext();
     emitBuildDefaultActorExecutorRef(IGF, actor, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildOrdinaryTaskExecutorRef) {
+    auto actor = args.claimNext();
+    auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto conf = substitutions.getConformances()[0];
+    emitBuildOrdinaryTaskExecutorRef(IGF, actor, type, conf, out);
     return;
   }
 

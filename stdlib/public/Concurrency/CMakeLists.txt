@@ -111,8 +111,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PartialAsyncTask.swift
   SourceCompatibilityShims.swift
   Task.swift
+  Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
+  TaskGroup+TaskExecutor.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift

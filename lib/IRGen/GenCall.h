@@ -224,13 +224,15 @@ namespace irgen {
   /// Emit a call to swift_task_create[_f] with the given flags, options, and
   /// task function.
   llvm::Value *emitTaskCreate(
-    IRGenFunction &IGF,
-    llvm::Value *flags,
-    llvm::Value *taskGroup,
-    llvm::Value *futureResultType,
-    llvm::Value *taskFunction,
-    llvm::Value *localContextInfo,
-    SubstitutionMap subs);
+          IRGenFunction &IGF,
+          llvm::Value *flags,
+          llvm::Value *taskGroup,
+          llvm::Value *executor1,
+          llvm::Value *executor2,
+          llvm::Value *futureResultType,
+          llvm::Value *taskFunction,
+          llvm::Value *localContextInfo,
+          SubstitutionMap subs);
 
   /// Allocate task local storage for the provided dynamic size.
   Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
