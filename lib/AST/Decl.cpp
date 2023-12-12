@@ -11702,11 +11702,19 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
     return llvm::None;
   }
 
-  if (auto closure = dyn_cast<AbstractClosureExpr *>()) {
-    if (closure->getType())
-      return closure->getEffectiveThrownType();
+  if (auto abstractClosure = dyn_cast<AbstractClosureExpr *>()) {
+    if (abstractClosure->getType())
+      return abstractClosure->getEffectiveThrownType();
 
-    // FIXME: Should we lazily compute this?
+    if (auto closure = llvm::dyn_cast<ClosureExpr>(abstractClosure)) {
+      if (Type thrownType = closure->getExplicitThrownType()) {
+        if (thrownType->isNever())
+          return llvm::None;
+
+        return thrownType;
+      }
+    }
+
     return llvm::None;
   }
 

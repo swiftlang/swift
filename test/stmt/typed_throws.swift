@@ -176,3 +176,18 @@ func tryBangQuestionMismatchingContext() throws(MyError) {
   try? doHomework()
   try doHomework() // expected-error{{thrown expression type 'HomeworkError' cannot be converted to error type 'MyError'}}
 }
+
+func apply<T, E: Error>(body: () throws(E) -> T) throws(E) -> T {
+  return try body()
+}
+
+func testDoCatchErrorTypedInClosure(cond: Bool) {
+  apply {
+    do throws(MyError) {
+      throw .failed
+    } catch {
+      assert(error == .failed)
+      processMyError(error)
+    }
+  }
+}

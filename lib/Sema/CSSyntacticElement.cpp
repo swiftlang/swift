@@ -919,16 +919,22 @@ private:
   }
 
   void visitThrowStmt(ThrowStmt *throwStmt) {
+    // Look up the catch node for this "throw" to determine the error type.
+    auto dc = context.getAsDeclContext();
+    CatchNode catchNode = ASTScope::lookupCatchNode(
+        dc->getParentModule(), throwStmt->getThrowLoc());
+    Type errorType;
+    if (catchNode) {
+      errorType = catchNode.getThrownErrorTypeInContext(dc).value_or(Type());
+    }
 
-    // Find the thrown type of our current context.
-    Type errType = getContextualThrownErrorType();
-    if (!errType) {
+    if (!errorType) {
       if (!cs.getASTContext().getErrorDecl()) {
         hadError = true;
         return;
       }
 
-      errType = cs.getASTContext().getErrorExistentialType();
+      errorType = cs.getASTContext().getErrorExistentialType();
     }
 
     auto *errorExpr = throwStmt->getSubExpr();
@@ -937,7 +943,7 @@ private:
         {makeElement(errorExpr,
                      cs.getConstraintLocator(
                          locator, LocatorPathElt::SyntacticElement(errorExpr)),
-                     {errType, CTP_ThrowStmt})},
+                     {errorType, CTP_ThrowStmt})},
         locator);
   }
 
@@ -1053,8 +1059,12 @@ private:
       if (parent.isStmt(StmtKind::Switch)) {
         auto *switchStmt = cast<SwitchStmt>(parent.get<Stmt *>());
         contextualTy = cs.getType(switchStmt->getSubjectExpr());
-      } else if (parent.isStmt(StmtKind::DoCatch)) {
-        contextualTy = cs.getASTContext().getErrorExistentialType();
+      } else if (auto doCatch =
+                     dyn_cast_or_null<DoCatchStmt>(parent.dyn_cast<Stmt *>())) {
+        auto dc = context.getAsDeclContext();
+        contextualTy = doCatch->getExplicitCaughtType(dc);
+        if (!contextualTy)
+          contextualTy = cs.getASTContext().getErrorExistentialType();
       } else {
         hadError = true;
         return;
@@ -1330,18 +1340,6 @@ private:
       return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult};
 
     return {funcRef->getBodyResultType(), CTP_ReturnStmt};
-  }
-
-  Type getContextualThrownErrorType() const {
-    auto funcRef = AnyFunctionRef::fromDeclContext(context.getAsDeclContext());
-    if (!funcRef)
-      return Type();
-
-    if (auto *closure =
-            getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
-      return cs.getClosureType(closure)->getThrownError();
-
-    return funcRef->getThrownErrorType();
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
