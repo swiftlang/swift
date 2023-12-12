@@ -1670,7 +1670,8 @@ public class LoadableSubscriptGetSetTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $
 // CHECK: [[MARK_TEMP:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[CORO_RESULT]]
@@ -1707,7 +1708,8 @@ public class LoadableSubscriptGetSetTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[CORO_RESULT]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $
 // CHECK: [[MARK_TEMP:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
@@ -1759,7 +1761,8 @@ public class LoadableSubscriptGetSetTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $
 // CHECK: [[MARK_TEMP:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK: [[LOAD:%.*]] = load_borrow [[CORO_RESULT]]
@@ -1819,7 +1822,8 @@ public struct LoadableSubscriptReadModifyTester : ~Copyable {
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}) : $@convention(method) (@thin AddressOnlyProtocol.Type) -> @out AddressOnlyProtocol
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: copy_addr [take] [[MARK_TEMP]] to [[CORO_RESULT]]
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -1827,7 +1831,8 @@ public struct LoadableSubscriptReadModifyTester : ~Copyable {
 // The mutating function call.
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -1877,14 +1882,16 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_Let() {
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[MARK_TEMP:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[MARK]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: copy_addr [take] [[MARK_TEMP]] to [[CORO_RESULT]]
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
 //
 // The mutating function call.
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[MARK]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -1917,7 +1924,8 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_InOut(m: inou
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}) : $@convention(method) (@thin AddressOnlyProtocol.Type) -> @out AddressOnlyProtocol
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: copy_addr [take] [[MARK_TEMP]] to [[CORO_RESULT]]
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -1926,7 +1934,8 @@ public func testSubscriptReadModify_BaseLoadable_ResultAddressOnly_InOut(m: inou
 // CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @$s8moveonly39globalLoadableSubscriptReadModifyTesterAA0cdefG0Vvp :
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -1966,7 +1975,8 @@ public struct LoadableSubscriptReadModifyTesterNonCopyableStructParent : ~Copyab
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[MARK]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -2029,7 +2039,8 @@ public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_R
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[MARK]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[ACCESS]]
-// CHECK:   ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK:   ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK:   [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK:   apply {{%.*}}([[CORO_RESULT]])
 // CHECK:   end_apply [[CORO_TOKEN]]
 // CHECK:   end_access [[ACCESS]]
@@ -2056,7 +2067,8 @@ public func testSubscriptReadModifyThroughNonCopyableParentStruct_BaseLoadable_R
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]]
 // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[MARK]]
-// CHECK:   ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK:   ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK:   [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK:   apply {{%.*}}([[CORO_RESULT]])
 // CHECK:   end_apply [[CORO_TOKEN]]
 // CHECK:   end_access [[ACCESS]]
@@ -2104,8 +2116,10 @@ public class LoadableSubscriptReadModifyTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: ([[CORO_RESULT_2:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
+// CHECK: ([[CORO_RESULT_2_ORIG:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: [[CORO_RESULT_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_2_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT_2]])
 // CHECK: end_apply [[CORO_TOKEN_2]]
 // CHECK: end_apply [[CORO_TOKEN]]
@@ -2136,9 +2150,11 @@ public class LoadableSubscriptReadModifyTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[CORO_RESULT]]
-// CHECK: ([[CORO_RESULT_2:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: ([[CORO_RESULT_2_ORIG:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: [[CORO_RESULT_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_2_ORIG]]
 // Mutating func
 // CHECK: apply {{%.*}}([[CORO_RESULT_2]])
 // CHECK: end_apply [[CORO_TOKEN_2]]
@@ -2182,8 +2198,10 @@ public class LoadableSubscriptReadModifyTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: ([[CORO_RESULT_2:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
+// CHECK: ([[CORO_RESULT_2_ORIG:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: [[CORO_RESULT_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_2_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT_2]])
 // CHECK: end_apply [[CORO_TOKEN_2]]
 // CHECK: end_apply [[CORO_TOKEN]]
@@ -2236,7 +2254,8 @@ public struct LoadableSubscriptGetModifyTester : ~Copyable {
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}) : $@convention(method) (@thin AddressOnlyProtocol.Type) -> @out AddressOnlyProtocol
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: copy_addr [take] [[MARK_TEMP]] to [[CORO_RESULT]]
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -2244,7 +2263,8 @@ public struct LoadableSubscriptGetModifyTester : ~Copyable {
 // The mutating function call.
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -2297,14 +2317,16 @@ public func testSubscriptGetModify_BaseLoadable_ResultAddressOnly_Let() {
 // CHECK: [[MARK_TEMP:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}) : $@convention(method) (@thin AddressOnlyProtocol.Type) -> @out AddressOnlyProtocol
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[MARK]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: copy_addr [take] [[MARK_TEMP]] to [[CORO_RESULT]]
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
 //
 // The mutating function call.
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[MARK]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[ACCESS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -2338,7 +2360,8 @@ public func testSubscriptGetModify_BaseLoadable_ResultAddressOnly_InOut(m: inout
 // CHECK: apply {{%.*}}([[MARK_TEMP]], {{%.*}}) : $@convention(method) (@thin AddressOnlyProtocol.Type) -> @out AddressOnlyProtocol
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: copy_addr [take] [[MARK_TEMP]] to [[CORO_RESULT]]
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -2347,7 +2370,8 @@ public func testSubscriptGetModify_BaseLoadable_ResultAddressOnly_InOut(m: inout
 // CHECK: [[GLOBAL_ADDR:%.*]] = global_addr @$s8moveonly38globalLoadableSubscriptGetModifyTesterAA0cdefG0Vvp :
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[MARK]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -2388,7 +2412,8 @@ public struct LoadableSubscriptGetModifyTesterNonCopyableStructParent : ~Copyabl
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[MARK]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT]])
 // CHECK: end_apply [[CORO_TOKEN]]
 // CHECK: end_access [[ACCESS]]
@@ -2455,7 +2480,8 @@ public func testSubscriptGetModifyThroughNonCopyableParentStruct_BaseLoadable_Re
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]]
 // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[MARK]]
-// CHECK:   ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK:   ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK:   [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK:   apply {{%.*}}([[CORO_RESULT]])
 // CHECK:   end_apply [[CORO_TOKEN]]
 // CHECK:   end_access [[ACCESS]]
@@ -2504,8 +2530,10 @@ public class LoadableSubscriptGetModifyTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: ([[CORO_RESULT_2:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
+// CHECK: ([[CORO_RESULT_2_ORIG:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: [[CORO_RESULT_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_2_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT_2]])
 // CHECK: end_apply [[CORO_TOKEN_2]]
 // CHECK: end_apply [[CORO_TOKEN]]
@@ -2535,9 +2563,11 @@ public class LoadableSubscriptGetModifyTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[CORO_RESULT]]
-// CHECK: ([[CORO_RESULT_2:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: ([[CORO_RESULT_2_ORIG:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[GEP]])
+// CHECK: [[CORO_RESULT_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_2_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT_2]])
 // CHECK: end_apply [[CORO_TOKEN_2]]
 // CHECK: end_apply [[CORO_TOKEN]]
@@ -2581,8 +2611,10 @@ public class LoadableSubscriptGetModifyTesterClassParent {
 // CHECK: [[COPYABLE_CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: [[BORROW_COPYABLE_CLASS:%.*]] = begin_borrow [[COPYABLE_CLASS]]
-// CHECK: ([[CORO_RESULT:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
-// CHECK: ([[CORO_RESULT_2:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[BORROW_COPYABLE_CLASS]])
+// CHECK: [[CORO_RESULT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_ORIG]]
+// CHECK: ([[CORO_RESULT_2_ORIG:%.*]], [[CORO_TOKEN_2:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[CORO_RESULT]])
+// CHECK: [[CORO_RESULT_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[CORO_RESULT_2_ORIG]]
 // CHECK: apply {{%.*}}([[CORO_RESULT_2]])
 // CHECK: end_apply [[CORO_TOKEN_2]]
 // CHECK: end_apply [[CORO_TOKEN]]

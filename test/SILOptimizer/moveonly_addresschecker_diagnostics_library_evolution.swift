@@ -83,33 +83,34 @@ public func callerBorrowClassLetFieldForArgumentSpillingTestVarGlobal() {
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestLet() {
     let x = CopyableKlass()
-    consumeVal(x.letS.e)
+    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestVar() {
     var x = CopyableKlass()
     x = CopyableKlass()
-    consumeVal(x.letS.e)
+    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestArg(_ x: CopyableKlass) {
-    consumeVal(x.letS.e)
+    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestInOutArg(_ x: inout CopyableKlass) {
-    consumeVal(x.letS.e)
+    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'x.letS'}}
 }
 
+// TODO: more specific error message path than "unknown"
 public func callerConsumeClassLetFieldForArgumentSpillingTestConsumingArg(_ x: consuming CopyableKlass) {
-    consumeVal(x.letS.e)
+    consumeVal(x.letS.e) // expected-error{{cannot partially consume 'unknown'}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestLetGlobal() {
-    consumeVal(copyableKlassLetGlobal.letS.e)
+    consumeVal(copyableKlassLetGlobal.letS.e) // expected-error{{cannot partially consume 'copyableKlassLetGlobal.letS'}}
 }
 
 public func callerConsumeClassLetFieldForArgumentSpillingTestVarGlobal() {
-    consumeVal(copyableKlassVarGlobal.letS.e)
+    consumeVal(copyableKlassVarGlobal.letS.e) // expected-error{{cannot partially consume 'copyableKlassVarGlobal.letS'}}
 }
 
 ////////////////////
@@ -149,31 +150,32 @@ public func callerBorrowClassVarFieldForArgumentSpillingTestVarGlobal() {
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestLet() {
     let x = CopyableKlass()
-    consumeVal(x.varS.e)
+    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestVar() {
     var x = CopyableKlass()
     x = CopyableKlass()
-    consumeVal(x.varS.e)
+    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestArg(_ x: CopyableKlass) {
-    consumeVal(x.varS.e)
+    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestInOutArg(_ x: inout CopyableKlass) {
-    consumeVal(x.varS.e)
+    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'x.varS'}}
 }
 
+// TODO: more precise error path reporting than 'unknown'
 public func callerConsumeClassVarFieldForArgumentSpillingTestConsumingArg(_ x: consuming CopyableKlass) {
-    consumeVal(x.varS.e)
+    consumeVal(x.varS.e) // expected-error{{cannot partially consume 'unknown'}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestLetGlobal() {
-    consumeVal(copyableKlassLetGlobal.varS.e)
+    consumeVal(copyableKlassLetGlobal.varS.e) // expected-error{{cannot partially consume 'copyableKlassLetGlobal.varS'}}
 }
 
 public func callerConsumeClassVarFieldForArgumentSpillingTestVarGlobal() {
-    consumeVal(copyableKlassVarGlobal.varS.e)
+    consumeVal(copyableKlassVarGlobal.varS.e) // expected-error{{cannot partially consume 'copyableKlassVarGlobal.varS'}}
 }

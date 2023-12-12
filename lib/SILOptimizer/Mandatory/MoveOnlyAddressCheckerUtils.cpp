@@ -402,6 +402,9 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(
         return true;
       }
     }
+    if (auto bai = dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
+      return true;
+    }
   }
 
   return false;
