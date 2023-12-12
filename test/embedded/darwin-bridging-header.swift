@@ -11,9 +11,6 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
-// Temporarily disabled:
-// REQUIRES: rdar119283700
-
 // BEGIN BridgingHeader.h
 
 #include <unistd.h>

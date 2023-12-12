@@ -255,6 +255,17 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addOnoneSimplification();
   P.addAllocVectorLowering();
   P.addInitializeStaticGlobals();
+
+  // MandatoryPerformanceOptimizations might create specializations that are not
+  // used, and by being unused they are might have unspecialized applies.
+  // Eliminate them via the DeadFunctionAndGlobalElimination in embedded Swift
+  // to avoid getting metadata/existential use errors in them. We don't want to
+  // run this pass in regular Swift: Even unused functions are expected to be
+  // available in debug (-Onone) builds for debugging and development purposes.
+  if (P.getOptions().EmbeddedSwift) {
+    P.addDeadFunctionAndGlobalElimination();
+  }
+
   P.addPerformanceDiagnostics();
 }
 
