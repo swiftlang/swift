@@ -481,6 +481,11 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
             i = copyToMoveOnly;
           }
 
+          // TODO: Instead of pattern matching specific code generation patterns,
+          // we should be able to eliminate any `copy_value` whose canonical
+          // lifetime fits within the borrow scope of the borrowed value being
+          // copied from.
+
           // Handle:
           //
           // bb0(%0 : @guaranteed $Type):
@@ -519,6 +524,24 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
                 cvi->eraseFromParent();
                 continue;
               }
+            }
+          }
+          
+          // Handle:
+          //   (%yield, ..., %handle) = begin_apply
+          //   %copy = copy_value %yield
+          //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign] %copy
+          if (auto bai = dyn_cast_or_null<BeginApplyInst>(i->getOperand(0)->getDefiningInstruction())) {
+            if (i->getOperand(0)->getOwnershipKind() == OwnershipKind::Guaranteed) {
+              for (auto *use : markedInst->getConsumingUses()) {
+                destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+              }
+              while (!destroys.empty())
+                destroys.pop_back_val()->eraseFromParent();
+              markedInst->replaceAllUsesWith(i->getOperand(0));
+              markedInst->eraseFromParent();
+              cvi->eraseFromParent();
+              continue;
             }
           }
         }
