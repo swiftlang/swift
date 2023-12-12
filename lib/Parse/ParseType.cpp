@@ -557,10 +557,11 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
       }
 
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-        if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
-          if (auto decl = ident->getBoundDecl()) {
-            if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
-              ident->overwriteNameRef(genericParam->createNameRef());
+        // Only unqualified identifiers can reference generic parameters.
+        if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+          if (auto *genericParam = dyn_cast_or_null<GenericTypeParamDecl>(
+                  simpleIdentTR->getBoundDecl())) {
+            simpleIdentTR->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return Action::Continue();

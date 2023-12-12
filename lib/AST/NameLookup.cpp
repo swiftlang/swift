@@ -3361,15 +3361,19 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
         if (!composition->isTypeReprAny())
           Reprs.push_back(composition);
         return Action::SkipNode();
-      } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
-        if (generic->isProtocolOrProtocolComposition(dc)){
-          Reprs.push_back(generic);
-          return Action::SkipNode();
+      } else if (isa<DeclRefTypeRepr>(repr)) {
+        // We only care about the type of an outermost member type
+        // representation. For example, in `A<T>.B.C<U>`, check `C` and generic
+        // arguments `U` and `T`, but not `A` or `B`.
+        if (auto *parentMemberTR =
+                dyn_cast_or_null<MemberTypeRepr>(Parent.getAsTypeRepr())) {
+          if (repr == parentMemberTR->getBase()) {
+            return Action::Continue();
+          }
         }
-        return Action::Continue();
-      } else if (auto declRef = dyn_cast<DeclRefTypeRepr>(repr)) {
-        if (declRef->isProtocolOrProtocolComposition(dc))
-          Reprs.push_back(declRef);
+
+        if (repr->isProtocolOrProtocolComposition(dc))
+          Reprs.push_back(repr);
       }
       return Action::Continue();
     }

@@ -487,13 +487,13 @@ namespace {
     }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T)) {
-      if (auto *identRoot = dyn_cast<IdentTypeRepr>(declRefTR->getRoot())) {
-        auto name = identRoot->getNameRef().getBaseIdentifier();
-        if (auto *paramDecl = params->lookUpGenericParam(name))
-          identRoot->setValue(paramDecl, dc);
+      // Only unqualified identifiers can reference generic parameters.
+      if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+        auto name = simpleIdentTR->getNameRef().getBaseIdentifier();
+        if (auto *paramDecl = params->lookUpGenericParam(name)) {
+          simpleIdentTR->setValue(paramDecl, dc);
+        }
       }
-    }
 
       return Action::Continue();
     }

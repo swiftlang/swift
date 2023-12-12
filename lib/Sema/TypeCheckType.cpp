@@ -5797,12 +5797,6 @@ public:
     if (T->isInvalid())
       return Action::SkipNode();
 
-    if (auto memberTR = dyn_cast<MemberTypeRepr>(T)) {
-      // Only visit the last component to check, because nested typealiases in
-      // existentials are okay.
-      memberTR->getLastComponent()->walk(*this);
-      return Action::SkipNode();
-    }
     // Arbitrary protocol constraints are OK on opaque types.
     if (isa<OpaqueReturnTypeRepr>(T))
       return Action::SkipNode();
@@ -5816,6 +5810,16 @@ public:
     auto *declRefTR = dyn_cast<DeclRefTypeRepr>(T);
     if (!declRefTR) {
       return Action::Continue();
+    }
+
+    // We only care about the type of an outermost member type representation.
+    // For example, in `A<T>.B.C<U>`, check `C` and generic arguments `U` and
+    // `T`, but not `A` or `B`.
+    if (auto *parentMemberTR =
+            dyn_cast_or_null<MemberTypeRepr>(Parent.getAsTypeRepr())) {
+      if (T == parentMemberTR->getBase()) {
+        return Action::Continue();
+      }
     }
 
     checkDeclRefTypeRepr(declRefTR);

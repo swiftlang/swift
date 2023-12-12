@@ -62,6 +62,10 @@ private:
     return SEWalker.getMacroWalkingBehavior();
   }
 
+  MemberTypeReprWalkingScheme getMemberTypeReprWalkingScheme() const override {
+    return MemberTypeReprWalkingScheme::SourceOrderRecursive;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override;
   PreWalkAction walkToDeclPreProper(Decl *D);
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
@@ -627,15 +631,15 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (!Continue)
     return Action::Stop();
 
-  if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
-    if (ValueDecl *VD = IdT->getBoundDecl()) {
+  if (auto *DeclRefT = dyn_cast<DeclRefTypeRepr>(T)) {
+    if (ValueDecl *VD = DeclRefT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
-        auto ident = IdT->getNameRef().getBaseIdentifier();
-        auto Continue = passReference(ModD, {ident, IdT->getLoc()});
+        auto ident = DeclRefT->getNameRef().getBaseIdentifier();
+        auto Continue = passReference(ModD, {ident, DeclRefT->getLoc()});
         return Action::StopIf(!Continue);
       }
       auto Continue = passReference(
-          VD, Type(), IdT->getNameLoc(),
+          VD, Type(), DeclRefT->getNameLoc(),
           ReferenceMetaData(SemaReferenceKind::TypeRef, llvm::None));
       return Action::StopIf(!Continue);
     }
