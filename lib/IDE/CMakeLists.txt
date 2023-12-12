@@ -47,10 +47,6 @@ target_link_libraries(swiftIDE PRIVATE
   swiftSema)
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftIDE
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-  )
   target_link_libraries(swiftIDE PRIVATE
     swiftIDEUtilsBridging
   )

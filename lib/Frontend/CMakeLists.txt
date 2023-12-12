@@ -38,10 +38,3 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftSymbolGraphGen)
 
 set_swift_llvm_is_available(swiftFrontend)
-
-if (SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftFrontend
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-    )
-endif()

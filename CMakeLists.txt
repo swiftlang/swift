@@ -872,6 +872,7 @@ if(SWIFT_BUILD_SWIFT_SYNTAX)
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
+  add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
