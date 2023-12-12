@@ -259,8 +259,6 @@ public:
 
 };
 
-static bool diagnoseIsolationErrors(DeclContext *dc, ArrayRef<IsolationError> errors);
-
 /// Individual options used with \c FunctionCheckOptions
 enum class FunctionCheckKind {
   /// Check params

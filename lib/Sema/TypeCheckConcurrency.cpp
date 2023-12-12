@@ -2003,11 +2003,15 @@ namespace {
     /// an expression or function.
     llvm::SmallDenseMap<const DeclContext *, ActorIsolation> requiredIsolation;
 
-    using IsolationPair = std::pair<ReferencedActor::Kind, ActorIsolation>;
+    using ActorRefKindPair = std::pair<ReferencedActor::Kind, ActorIsolation>;
+
+    using IsolationPair = std::pair<ActorIsolation, ActorIsolation>;
 
     using DiagnosticList = std::vector<IsolationError>;
 
-    llvm::DenseMap<IsolationPair, DiagnosticList> isoErrors;
+    llvm::DenseMap<ActorRefKindPair, DiagnosticList> refErrors;
+
+    llvm::DenseMap<IsolationPair, DiagnosticList> applyErrors;
 
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
@@ -2065,8 +2069,8 @@ namespace {
     bool diagnoseIsolationErrors() {
       bool diagnosedError = false;
 
-      for (auto list : isoErrors) {
-        IsolationPair key = list.getFirst();
+      for (auto list : refErrors) {
+        ActorRefKindPair key = list.getFirst();
         DiagnosticList errors = list.getSecond();
         ActorIsolation isolation = key.second;
 
@@ -2087,6 +2091,30 @@ namespace {
               .limitBehavior(behavior);
         }
       }
+
+      for (auto list : applyErrors) {
+        IsolationPair key = list.getFirst();
+        DiagnosticList errors = list.getSecond();
+        ActorIsolation isolation = key.first;
+
+        auto behavior = DiagnosticBehavior::Error;
+
+        // Add Fix-it for missing @SomeActor annotation
+        if (isolation.isGlobalActor()) {
+          if (missingGlobalActorOnContext(
+                                          const_cast<DeclContext*>(getDeclContext()), isolation.getGlobalActor())) {
+            behavior= DiagnosticBehavior::Note;
+          }
+        }
+
+        for (IsolationError error : errors) {
+          // Diagnose actor_isolated_non_self_reference as note
+          // if we provide fix-it in missingGlobalActorOnContext
+          ctx.Diags.diagnose(error.loc, error.diag)
+              .limitBehavior(behavior);
+        }
+      }
+
       return diagnosedError;
     }
 
@@ -2422,8 +2450,6 @@ namespace {
         requiredIsolationLoc = expr->getLoc();
 
       expr->walk(*this);
-      // print all diagnostics here :)
-      //diagnoseIsolationErrors(getDeclContext(), isoErrors);
       requiredIsolationLoc = SourceLoc();
       return requiredIsolation[getDeclContext()];
     }
@@ -3225,28 +3251,49 @@ namespace {
       // If we need to mark the call as implicitly asynchronous, make sure
       // we're in an asynchronous context.
       if (requiresAsync && !getDeclContext()->isAsyncContext()) {
-        if (calleeDecl) {
-          auto preconcurrency = getContextIsolation().preconcurrency() ||
-              calleeDecl->preconcurrency();
-          ctx.Diags.diagnose(
-              apply->getLoc(), diag::actor_isolated_call_decl,
-              *unsatisfiedIsolation,
-              calleeDecl,
-              getContextIsolation())
-            .warnUntilSwiftVersionIf(preconcurrency, 6);
-          calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
-        } else {
-          ctx.Diags.diagnose(
-              apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
-              getContextIsolation())
-            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
-        }
 
-//        if (unsatisfiedIsolation->isGlobalActor()) {
-//          noteGlobalActorOnContext(
-//              const_cast<DeclContext *>(getDeclContext()),
-//              unsatisfiedIsolation->getGlobalActor());
-//        }
+        if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
+          IsolationError isoMismatch =
+          IsolationError(
+                         apply->getLoc(),
+                         Diagnostic(diag::actor_isolated_call_decl,
+                                    *unsatisfiedIsolation,
+                                    calleeDecl,
+                                    getContextIsolation()));
+
+            auto iter = applyErrors.find(std::make_pair(*unsatisfiedIsolation, getContextIsolation()));
+            if (iter != applyErrors.end()){
+              iter->second.push_back(isoMismatch);
+            } else {
+              DiagnosticList list;
+              list.push_back(isoMismatch);
+              auto keyPair = std::make_pair(*unsatisfiedIsolation, getContextIsolation());
+              applyErrors.insert(std::make_pair(keyPair, list));
+            }
+        } else {
+          if (calleeDecl) {
+            auto preconcurrency = getContextIsolation().preconcurrency() ||
+            calleeDecl->preconcurrency();
+            ctx.Diags.diagnose(
+                               apply->getLoc(), diag::actor_isolated_call_decl,
+                               *unsatisfiedIsolation,
+                               calleeDecl,
+                               getContextIsolation())
+            .warnUntilSwiftVersionIf(preconcurrency, 6);
+            calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
+          } else {
+            ctx.Diags.diagnose(
+                               apply->getLoc(), diag::actor_isolated_call, *unsatisfiedIsolation,
+                               getContextIsolation())
+            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
+          }
+
+          if (unsatisfiedIsolation->isGlobalActor()) {
+            missingGlobalActorOnContext(
+                                        const_cast<DeclContext *>(getDeclContext()),
+                                        unsatisfiedIsolation->getGlobalActor());
+          }
+        }
 
         return true;
       }
@@ -3622,14 +3669,14 @@ namespace {
                                                                         refKind + 1, refGlobalActor,
                                                                         result.isolation));
 
-            auto iter = isoErrors.find(std::make_pair(refKind,result.isolation));
-            if (iter != isoErrors.end()){
+            auto iter = refErrors.find(std::make_pair(refKind,result.isolation));
+            if (iter != refErrors.end()){
               iter->second.push_back(isoMismatch);
             } else {
               DiagnosticList list;
               list.push_back(isoMismatch);
               auto keyPair = std::make_pair(refKind,result.isolation);
-              isoErrors.insert(std::make_pair(keyPair, list));
+              refErrors.insert(std::make_pair(keyPair, list));
             }
           } else {
             ctx.Diags.diagnose(
