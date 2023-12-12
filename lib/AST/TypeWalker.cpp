@@ -250,6 +250,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
   
+  bool visitErrorUnionType(ErrorUnionType *ty) {
+    for (auto term : ty->getTerms())
+      if (doIt(term))
+        return true;
+    return false;
+  }
+
   bool visitSILBlockStorageType(SILBlockStorageType *ty) {
     return doIt(ty->getCaptureType());
   }

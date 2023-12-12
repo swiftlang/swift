@@ -1180,7 +1180,12 @@ Type catchErrorType(DeclContext *dc, DoCatchStmt *stmt);
 
 /// Given two error types, merge them into the "union" of both error types
 /// that is a supertype of both error types.
-Type errorUnion(Type type1, Type type2);
+///
+/// The \c simplifyType function is applied to any types that involve type
+/// variables, to substitute away the type variables when possible. It need
+/// not substitute all type variables, though.
+Type errorUnion(Type type1, Type type2,
+                llvm::function_ref<Type(Type)> simplifyType);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.

@@ -5162,6 +5162,10 @@ public:
     llvm_unreachable("type variables should not escape the type checker");
   }
 
+  void visitErrorUnionType(const ErrorUnionType *) {
+    llvm_unreachable("error union types do not persist in the AST");
+  }
+
   void visitBuiltinTypeImpl(Type ty) {
     using namespace decls_block;
     TypeAliasDecl *typeAlias =

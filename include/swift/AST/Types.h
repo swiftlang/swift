@@ -439,6 +439,11 @@ protected:
     ID : 29
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
+    // Number of terms in the union.
+    NumTerms : 32
+  );
+    
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
     ExtInfoBits : NumSILExtInfoBits,
     HasClangTypeInfo : 1,
@@ -874,6 +879,9 @@ public:
   /// existential type: a protocol type, a protocol composition type, or
   /// an existential metatype.
   bool isAnyExistentialType();
+
+  /// isErrorExistentialType - Determines whether this type is 'any Error'.
+  bool isErrorExistentialType();
 
   /// isObjCExistentialType - Determines whether this type is an
   /// class-bounded existential type whose required conformances are
@@ -6926,6 +6934,43 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
+/// Represents the union of two or more
+class ErrorUnionType final
+    : public TypeBase,
+      public llvm::FoldingSetNode,
+      private llvm::TrailingObjects<ErrorUnionType, Type> {
+  friend TrailingObjects;
+
+  ErrorUnionType(const ASTContext *ctx, ArrayRef<Type> terms,
+                 RecursiveTypeProperties properties) 
+        : TypeBase(TypeKind::ErrorUnion, /*Context=*/ctx, properties) {
+    Bits.ErrorUnionType.NumTerms = terms.size();
+    std::uninitialized_copy(terms.begin(), terms.end(),
+                            getTrailingObjects<Type>());
+  }
+
+public:
+  /// Form a new error union type from a set of terms.
+  static Type get(const ASTContext &ctx, ArrayRef<Type> terms);
+
+  ArrayRef<Type> getTerms() const {
+    return { getTrailingObjects<Type>(), Bits.ErrorUnionType.NumTerms };
+  };
+
+  // Support for FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    Profile(id, getTerms());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ErrorUnion;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorUnionType, Type)
+
 /// PlaceholderType - This represents a placeholder type for a type variable
 /// or dependent member type that cannot be resolved to a concrete type
 /// because the expression is ambiguous. This type is only used by the
@@ -7281,6 +7326,10 @@ inline bool CanType::isExistentialTypeImpl(CanType type) {
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
   return isExistentialTypeImpl(type) || isa<ExistentialMetatypeType>(type);
+}
+
+inline bool TypeBase::isErrorExistentialType() {
+  return getCanonicalType().isErrorExistentialType();
 }
 
 inline bool TypeBase::isClassExistentialType() {

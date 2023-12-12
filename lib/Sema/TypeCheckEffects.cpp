@@ -955,8 +955,10 @@ public:
     }
 
     if (ThrowKind != ConditionalEffectKind::None ||
-        other.ThrowKind != ConditionalEffectKind::None)
-      ThrownError = TypeChecker::errorUnion(ThrownError, other.ThrownError);
+        other.ThrowKind != ConditionalEffectKind::None) {
+      ThrownError =
+          TypeChecker::errorUnion(ThrownError, other.ThrownError, nullptr);
+      }
 
     if (other.ThrowKind > ThrowKind) {
       ThrowKind = other.ThrowKind;
@@ -3611,27 +3613,83 @@ Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
   return classification.getThrownError();
 }
 
-Type TypeChecker::errorUnion(Type type1, Type type2) {
+/// Explode the given type into the set of error unions.
+///
+/// \returns \c true if any of the types is the error existential type, which
+/// means the entire error union is any Error.
+static bool expandErrorUnions(Type type,
+                              llvm::function_ref<Type(Type)> simplifyType,
+                              SmallVectorImpl<Type> &terms) {
+  // If we have a type variable in the type and a type simplification function,
+  // apply it first.
+  if (type->hasTypeVariable() && simplifyType)
+    type = simplifyType(type);
+
+  // If we have an error union type, handle it's terms individually.
+  if (auto errorUnionType = type->getAs<ErrorUnionType>()) {
+    for (auto term : errorUnionType->getTerms())
+      if (expandErrorUnions(term, simplifyType, terms))
+        return true;
+
+    return false;
+  }
+
+  // If we have 'any Error', we're done.
+  if (type->isErrorExistentialType())
+    return true;
+
+  // If we have anything other than 'Never', record it.
+  if (!isNeverThrownError(type))
+    terms.push_back(type);
+
+  return false;
+}
+
+Type TypeChecker::errorUnion(Type type1, Type type2,
+                             llvm::function_ref<Type(Type)> simplifyType) {
   // If one type is NULL, return the other.
   if (!type1)
     return type2;
   if (!type2)
     return type1;
 
-  // If the two types are the same, the union is trivial.
-  if (type1->isEqual(type2))
-    return type1;
+  // Expand the error types we're given.
+  //   - If any term is 'any Error', early return 'any Error'
+  //   - Every 'Never' term is dropped.
+  SmallVector<Type, 2> terms;
+  if (expandErrorUnions(type1, simplifyType, terms))
+    return type1->getASTContext().getErrorExistentialType();
+  if (expandErrorUnions(type2, simplifyType, terms))
+    return type1->getASTContext().getErrorExistentialType();
 
-  // If either type is Never, return the other.
-  if (isNeverThrownError(type1))
-    return type2;
-  if (isNeverThrownError(type2))
-    return type1;
+  // If we have more than one term, filter out duplicates and look to see if
+  // we have obviously-different types.
+  if (terms.size() > 1) {
+    llvm::SmallDenseMap<CanType, Type> knownTypes;
+    unsigned distinctConcreteTypes = 0;
+    auto newEnd = std::remove_if(terms.begin(), terms.end(),
+                                 [&](Type type) -> bool {
+      // If we have already seen this type, remove it from the list of terms.
+      if (!knownTypes.insert({type->getCanonicalType(), type}).second)
+        return true;
 
-  // The union of two different error types is "any Error".
-  // FIXME: When either or both contain type variables, we'll need to form an
-  // actual union type here.
-  return type1->getASTContext().getErrorExistentialType();
+      // We have not seen this type before. If it doesn't involve any
+      // type variables, note that we've seen another concrete type.
+      if (!type->hasTypeVariable())
+        ++distinctConcreteTypes;
+
+      return false;
+    });
+
+    // If we saw more than one distinct concrete type, return 'any Error'.
+    if (distinctConcreteTypes > 1)
+      return type1->getASTContext().getErrorExistentialType();
+
+    // Remove any duplicated terms.
+    terms.erase(newEnd, terms.end());
+  }
+
+  return ErrorUnionType::get(type1->getASTContext(), terms);
 }
 
 namespace {
