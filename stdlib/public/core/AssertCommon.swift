@@ -252,10 +252,20 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
+/// Used to evaluate editor placeholders.
 @_unavailableInEmbedded
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
+  file: StaticString = #file, line: UInt = #line
+) -> T {
+  _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
+}
+
+/// Used to evaluate editor placeholders.
+public // COMPILER_INTRINSIC
+func _undefined<T>(
+  _ message: @autoclosure () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
