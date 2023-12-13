@@ -644,6 +644,14 @@ BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
 // MARK: Exprs
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME("BridgedArrayExpr.createParsed(_:lSquareLoc:elements:commaLocs:"
+           "rSquareLoc:)")
+BridgedArrayExpr BridgedArrayExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cLLoc,
+                                               BridgedArrayRef elements,
+                                               BridgedArrayRef commas,
+                                               BridgedSourceLoc cRLoc);
+
 SWIFT_NAME(
     "BridgedArrowExpr.createParsed(_:asyncLoc:throwsLoc:thrownType:arrowLoc:)")
 BridgedArrowExpr BridgedArrowExpr_createParsed(BridgedASTContext cContext,
@@ -660,6 +668,11 @@ SWIFT_NAME("BridgedAwaitExpr.createParsed(_:awaitLoc:subExpr:)")
 BridgedAwaitExpr BridgedAwaitExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAwaitLoc,
                                                BridgedExpr cSubExpr);
+
+SWIFT_NAME("BridgedBooleanLiteralExpr.createParsed(_:value:loc:)")
+BridgedBooleanLiteralExpr
+BridgedBooleanLiteralExpr_createParsed(BridgedASTContext cContext, bool value,
+                                       BridgedSourceLoc cTokenLoc);
 
 SWIFT_NAME("BridgedBorrowExpr.createParsed(_:borrowLoc:subExpr:)")
 BridgedBorrowExpr BridgedBorrowExpr_createParsed(BridgedASTContext cContext,
@@ -700,17 +713,17 @@ BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
                                              BridgedSourceLoc cCopyLoc,
                                              BridgedExpr cSubExpr);
 
-SWIFT_NAME("BridgedDiscardAssignmentExpr.createParsed(_:loc:)")
-BridgedDiscardAssignmentExpr
-BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
-                                          BridgedSourceLoc cLoc);
-
 SWIFT_NAME("BridgedDictionaryExpr.createParsed(_:lBracketLoc:elements:"
            "colonLocs:rBracketLoc:)")
 BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLBracketLoc,
     BridgedArrayRef cElements, BridgedArrayRef cCommaLocs,
     BridgedSourceLoc cRBracketLoc);
+
+SWIFT_NAME("BridgedDiscardAssignmentExpr.createParsed(_:loc:)")
+BridgedDiscardAssignmentExpr
+BridgedDiscardAssignmentExpr_createParsed(BridgedASTContext cContext,
+                                          BridgedSourceLoc cLoc);
 
 SWIFT_NAME("BridgedDotSelfExpr.createParsed(_:subExpr:dotLoc:selfLoc:)")
 BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
@@ -730,10 +743,21 @@ BridgedForcedCheckedCastExpr BridgedForcedCheckedCastExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAsLoc,
     BridgedSourceLoc cExclaimLoc, BridgedTypeRepr cType);
 
+SWIFT_NAME("BridgedIntegerLiteralExpr.createParsed(_:value:loc:)")
+BridgedIntegerLiteralExpr
+BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
+                                       BridgedStringRef cStr,
+                                       BridgedSourceLoc cTokenLoc);
+
 SWIFT_NAME("BridgedIsExpr.createParsed(_:isLoc:type:)")
 BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
                                          BridgedSourceLoc cIsLoc,
                                          BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedNilLiteralExpr.createParsed(_:nilKeywordLoc:)")
+BridgedNilLiteralExpr
+BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
+                                   BridgedSourceLoc cNilKeywordLoc);
 
 SWIFT_NAME("BridgedOptionalTryExpr.createParsed(_:tryLoc:subExpr:questionLoc:)")
 BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(
@@ -752,6 +776,20 @@ BridgedPackExpansionExpr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceLoc cRepeatLoc,
                                       BridgedExpr cPatternExpr);
 
+SWIFT_NAME("BridgedPostfixUnaryExpr.createParsed(_:operator:operand:)")
+BridgedPostfixUnaryExpr
+BridgedPostfixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                     BridgedExpr oper, BridgedExpr operand);
+
+SWIFT_NAME("BridgedPrefixUnaryExpr.createParsed(_:operator:operand:)")
+BridgedPrefixUnaryExpr
+BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedExpr oper, BridgedExpr operand);
+
+SWIFT_NAME("BridgedSequenceExpr.createParsed(_:exprs:)")
+BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
+                                                     BridgedArrayRef exprs);
+
 SWIFT_NAME("BridgedSingleValueStmtExpr.createWithWrappedBranches(_:stmt:"
            "declContext:mustBeExpr:)")
 BridgedSingleValueStmtExpr BridgedSingleValueStmtExpr_createWithWrappedBranches(
@@ -763,10 +801,6 @@ BridgedStringLiteralExpr
 BridgedStringLiteralExpr_createParsed(BridgedASTContext cContext,
                                       BridgedStringRef cStr,
                                       BridgedSourceLoc cTokenLoc);
-
-SWIFT_NAME("BridgedSequenceExpr.createParsed(_:exprs:)")
-BridgedSequenceExpr BridgedSequenceExpr_createParsed(BridgedASTContext cContext,
-                                                     BridgedArrayRef exprs);
 
 SWIFT_NAME("BridgedTernaryExpr.createParsed(_:questionLoc:thenExpr:colonLoc:)")
 BridgedTernaryExpr BridgedTernaryExpr_createParsed(
@@ -787,40 +821,6 @@ BridgedTupleExpr BridgedTupleExpr_createParsed(
 SWIFT_NAME("BridgedTupleExpr.createParsedDictionaryElement(_:key:value:)")
 BridgedTupleExpr BridgedTupleExpr_createParsedDictionaryElement(
     BridgedASTContext cContext, BridgedExpr cKeyExpr, BridgedExpr cValueExpr);
-
-SWIFT_NAME("BridgedIntegerLiteralExpr.createParsed(_:value:loc:)")
-BridgedIntegerLiteralExpr
-BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
-                                       BridgedStringRef cStr,
-                                       BridgedSourceLoc cTokenLoc);
-
-SWIFT_NAME("BridgedBooleanLiteralExpr.createParsed(_:value:loc:)")
-BridgedBooleanLiteralExpr
-BridgedBooleanLiteralExpr_createParsed(BridgedASTContext cContext, bool value,
-                                       BridgedSourceLoc cTokenLoc);
-
-SWIFT_NAME("BridgedNilLiteralExpr.createParsed(_:nilKeywordLoc:)")
-BridgedNilLiteralExpr
-BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
-                                   BridgedSourceLoc cNilKeywordLoc);
-
-SWIFT_NAME("BridgedArrayExpr.createParsed(_:lSquareLoc:elements:commaLocs:"
-           "rSquareLoc:)")
-BridgedArrayExpr BridgedArrayExpr_createParsed(BridgedASTContext cContext,
-                                               BridgedSourceLoc cLLoc,
-                                               BridgedArrayRef elements,
-                                               BridgedArrayRef commas,
-                                               BridgedSourceLoc cRLoc);
-
-SWIFT_NAME("BridgedPostfixUnaryExpr.createParsed(_:operator:operand:)")
-BridgedPostfixUnaryExpr
-BridgedPostfixUnaryExpr_createParsed(BridgedASTContext cContext,
-                                     BridgedExpr oper, BridgedExpr operand);
-
-SWIFT_NAME("BridgedPrefixUnaryExpr.createParsed(_:operator:operand:)")
-BridgedPrefixUnaryExpr
-BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
-                                    BridgedExpr oper, BridgedExpr operand);
 
 SWIFT_NAME("BridgedTypeExpr.createParsed(_:type:)")
 BridgedTypeExpr BridgedTypeExpr_createParsed(BridgedASTContext cContext,
