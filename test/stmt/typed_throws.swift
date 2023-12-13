@@ -192,7 +192,19 @@ func testDoCatchErrorTypedInClosure(cond: Bool) {
   }
 }
 
-func testDoCatchInClosure(cond: Bool) {
+struct ThrowingMembers {
+  subscript(i: Int) -> Int {
+    get throws(MyError) { i }
+  }
+}
+
+struct ThrowingStaticSubscript {
+  static subscript(i: Int) -> Int {
+    get throws(MyError) { i }
+  }
+}
+
+func testDoCatchInClosure(cond: Bool, x: ThrowingMembers) {
   apply {
     do {
       _ = try doSomething()
@@ -229,6 +241,23 @@ func testDoCatchInClosure(cond: Bool) {
       } catch .failed {
         // pick off one case, but this still rethrows
       }
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  // Subscripts as potential throw sites
+  apply {
+    do {
+      _ = try x[5]
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      _ = try ThrowingStaticSubscript[5]
     } catch {
       let _: MyError = error
     }

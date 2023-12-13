@@ -2674,6 +2674,18 @@ ConstraintSystem::getTypeOfMemberReference(
           [&](Type type) { return openType(type, replacements, locator); });
     }
   } else {
+    // Figure out the effect information for the reference.
+    FunctionType::ExtInfo info;
+    auto storage = cast<AbstractStorageDecl>(value);
+
+    // If the storage has a throwing getter, record that in the type.
+    if (auto effectfulGetter = storage->getEffectfulGetAccessor()) {
+      if (effectfulGetter->hasThrows()) {
+        Type thrownErrorType = effectfulGetter->getThrownInterfaceType();
+        info = info.withThrows(true, thrownErrorType);
+      }
+    }
+
     // For a property, build a type (Self) -> PropType.
     // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
     //
@@ -2687,8 +2699,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
       auto indices = subscript->getInterfaceType()
                               ->castTo<AnyFunctionType>()->getParams();
-      // FIXME: Verify ExtInfo state is correct, not working by accident.
-      FunctionType::ExtInfo info;
+
       refType = FunctionType::get(indices, elementTy, info);
     } else {
       // Delay the adjustment for preconcurrency until after we've formed
@@ -2720,8 +2731,6 @@ ConstraintSystem::getTypeOfMemberReference(
     }
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
 
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    FunctionType::ExtInfo info;
     openedType = FunctionType::get({selfParam}, refType, info);
   }
   assert(!openedType->hasTypeParameter());
