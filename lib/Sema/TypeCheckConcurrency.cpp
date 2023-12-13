@@ -2033,11 +2033,11 @@ namespace {
 
     /// Note when the enclosing context could be put on a global actor.
     // FIXME: This should handle closures too.
-    static bool missingGlobalActorOnContext(DeclContext *dc, Type globalActor) {
+    static bool missingGlobalActorOnContext(DeclContext *dc, Type globalActor, DiagnosticBehavior behavior) {
       // If we are in a synchronous function on the global actor,
       // suggest annotating with the global actor itself.
       if (auto fn = findAnnotatableFunction(dc)) {
-        // Suppress this for accessories because you can't change the
+        // Suppress this for accessors because you can't change the
         // actor isolation of an individual accessor.  Arguably we could
         // add this to the entire storage declaration, though.
         // Suppress this for async functions out of caution; but don't
@@ -2056,6 +2056,7 @@ namespace {
             fn->diagnose(diag::add_globalactor_to_function,
                          globalActor->getWithoutParens().getString(),
                          fn, globalActor)
+            .limitBehavior(behavior)
             .fixItInsert(fn->getAttributeInsertionLoc(false),
                          diag::insert_globalactor_attr, globalActor);
               return true;
@@ -2079,14 +2080,14 @@ namespace {
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
           if (missingGlobalActorOnContext(
-                                          const_cast<DeclContext*>(getDeclContext()), isolation.getGlobalActor())) {
+                                          const_cast<DeclContext*>(getDeclContext()), isolation.getGlobalActor(), behavior)) {
             behavior= DiagnosticBehavior::Note;
           }
         }
 
         for (IsolationError error : errors) {
           // Diagnose actor_isolated_non_self_reference as note
-          // if we provide fix-it in missingGlobalActorOnContext
+          // if fix-it provided in missingGlobalActorOnContext
           ctx.Diags.diagnose(error.loc, error.diag)
               .limitBehavior(behavior);
         }
@@ -2102,14 +2103,14 @@ namespace {
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
           if (missingGlobalActorOnContext(
-                                          const_cast<DeclContext*>(getDeclContext()), isolation.getGlobalActor())) {
+                                          const_cast<DeclContext*>(getDeclContext()), isolation.getGlobalActor(), behavior)) {
             behavior= DiagnosticBehavior::Note;
           }
         }
 
         for (IsolationError error : errors) {
-          // Diagnose actor_isolated_non_self_reference as note
-          // if we provide fix-it in missingGlobalActorOnContext
+          // Diagnose actor_isolated_call as note if
+          // fix-it provided in missingGlobalActorOnContext
           ctx.Diags.diagnose(error.loc, error.diag)
               .limitBehavior(behavior);
         }
@@ -3253,23 +3254,33 @@ namespace {
       if (requiresAsync && !getDeclContext()->isAsyncContext()) {
 
         if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-          IsolationError isoMismatch =
-          IsolationError(
-                         apply->getLoc(),
-                         Diagnostic(diag::actor_isolated_call_decl,
-                                    *unsatisfiedIsolation,
-                                    calleeDecl,
-                                    getContextIsolation()));
 
-            auto iter = applyErrors.find(std::make_pair(*unsatisfiedIsolation, getContextIsolation()));
-            if (iter != applyErrors.end()){
-              iter->second.push_back(isoMismatch);
+          IsolationError mismatch([calleeDecl, apply, unsatisfiedIsolation, getContextIsolation]() {
+            if (calleeDecl) {
+              return IsolationError(
+                             apply->getLoc(),
+                             Diagnostic(diag::actor_isolated_call_decl,
+                                        *unsatisfiedIsolation,
+                                        calleeDecl,
+                                        getContextIsolation()));
             } else {
-              DiagnosticList list;
-              list.push_back(isoMismatch);
-              auto keyPair = std::make_pair(*unsatisfiedIsolation, getContextIsolation());
-              applyErrors.insert(std::make_pair(keyPair, list));
+              return IsolationError(
+                             apply->getLoc(),
+                             Diagnostic(diag::actor_isolated_call,
+                                        *unsatisfiedIsolation,
+                                        getContextIsolation()));
             }
+          }());
+
+          auto iter = applyErrors.find(std::make_pair(*unsatisfiedIsolation, getContextIsolation()));
+          if (iter != applyErrors.end()){
+            iter->second.push_back((mismatch));
+          } else {
+            DiagnosticList list;
+            list.push_back((mismatch));
+            auto keyPair = std::make_pair(*unsatisfiedIsolation, getContextIsolation());
+            applyErrors.insert(std::make_pair(keyPair, list));
+          }
         } else {
           if (calleeDecl) {
             auto preconcurrency = getContextIsolation().preconcurrency() ||
@@ -3291,7 +3302,7 @@ namespace {
           if (unsatisfiedIsolation->isGlobalActor()) {
             missingGlobalActorOnContext(
                                         const_cast<DeclContext *>(getDeclContext()),
-                                        unsatisfiedIsolation->getGlobalActor());
+                                        unsatisfiedIsolation->getGlobalActor(), DiagnosticBehavior::Note);
           }
         }
 
@@ -3663,7 +3674,7 @@ namespace {
           result.options.contains(ActorReferenceResult::Flags::Preconcurrency);
 
           if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-            IsolationError isoMismatch = IsolationError(loc, Diagnostic(diag::actor_isolated_non_self_reference,
+            IsolationError mismatch = IsolationError(loc, Diagnostic(diag::actor_isolated_non_self_reference,
                                                                         decl,
                                                                         useKind,
                                                                         refKind + 1, refGlobalActor,
@@ -3671,10 +3682,10 @@ namespace {
 
             auto iter = refErrors.find(std::make_pair(refKind,result.isolation));
             if (iter != refErrors.end()){
-              iter->second.push_back(isoMismatch);
+              iter->second.push_back(mismatch);
             } else {
               DiagnosticList list;
-              list.push_back(isoMismatch);
+              list.push_back(mismatch);
               auto keyPair = std::make_pair(refKind,result.isolation);
               refErrors.insert(std::make_pair(keyPair, list));
             }
@@ -3691,7 +3702,7 @@ namespace {
             if (result.isolation.isGlobalActor()) {
               missingGlobalActorOnContext(
                                        const_cast<DeclContext *>(getDeclContext()),
-                                       result.isolation.getGlobalActor());
+                                       result.isolation.getGlobalActor(), DiagnosticBehavior::Note);
             }
           }
         return true;
