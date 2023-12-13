@@ -25,7 +25,7 @@ namespace swift {
 /// An AST node that represents a point where a thrown error can be caught and
 /// or rethrown, which includes functions do...catch statements.
 class CatchNode: public llvm::PointerUnion<
-    AbstractFunctionDecl *, AbstractClosureExpr *, DoCatchStmt *, AnyTryExpr *
+    AbstractFunctionDecl *, ClosureExpr *, DoCatchStmt *, AnyTryExpr *
   > {
 public:
   using PointerUnion::PointerUnion;
