@@ -668,6 +668,14 @@ void BindingSet::finalize(
 
         // Functions don't have capability so we can simply add them.
         if (auto *fnType = bindingTy->getAs<FunctionType>()) {
+          auto extInfo = fnType->getExtInfo();
+
+          bool isKeyPathSendable = capability && capability->second;
+          if (!isKeyPathSendable && extInfo.isSendable()) {
+            fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
+                                       extInfo.withConcurrent(false));
+          }
+
           updatedBindings.insert(binding.withType(fnType));
         }
       }

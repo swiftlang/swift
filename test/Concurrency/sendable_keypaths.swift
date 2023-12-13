@@ -96,13 +96,13 @@ do {
   testSendableFn(v: v, \.[42]) // Ok
 
   testSendableKP(v: v, \.[NonSendable()]) // expected-warning {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
-  // Note that there is no warning here because the key path is wrapped in a closure and not captured by it: `{ $0[keyPath: \.[NonSendable()]] }`
-  testSendableFn(v: v, \.[NonSendable()]) // Ok
+  testSendableFn(v: v, \.[NonSendable()]) // expected-warning {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
 
   testNonSendableKP(v: v, \.[NonSendable()]) // Ok
   testNonSendableFn(v: v, \.[NonSendable()]) // Ok
 
-  let _: @Sendable (V) -> Int = \.[NonSendable()] // Ok
+  let _: @Sendable (V) -> Int = \.[NonSendable()]
+  // expected-warning@-1 {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
 
   let _: KeyPath<V, Int> & Sendable = \.[42, CondSendable(NonSendable(data: [1, 2, 3]))]
   // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
@@ -114,15 +114,16 @@ do {
 
   testSendableKP(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
   // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
-  testSendableFn(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))]) // Ok
+  testSendableFn(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
+  // expected-warning@-1 {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
   testSendableKP(v: v, \.[42, CondSendable(42)]) // Ok
 
   let nonSendable = NonSendable()
   testSendableKP(v: v, \.[42, CondSendable(nonSendable)])
   // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
 
-  // TODO: This should be diagnosed by the isolation checker because implicitly synthesized closures captures a non-Sendable value.
   testSendableFn(v: v, \.[42, CondSendable(nonSendable)])
+  // expected-warning@-1 {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
 }
 
 // @dynamicMemberLookup with Sendable requirement
