@@ -1828,13 +1828,20 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 /// appropriate.
 static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
     Type type, const BuiltinType *builtinType, ProtocolDecl *protocol) {
-  // All builtin are Sendable and Copyable
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    ASTContext &ctx = protocol->getASTContext();
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
+  // All builtin are Sendable, Copyable, and Escapable
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    switch (*kp) {
+    case KnownProtocolKind::Sendable:
+    case KnownProtocolKind::Copyable:
+    case KnownProtocolKind::Escapable: {
+      ASTContext &ctx = protocol->getASTContext();
+      return ProtocolConformanceRef(
+          ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
+    }
+    default:
+      break;
+    }
   }
 
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);

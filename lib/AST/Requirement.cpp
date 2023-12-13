@@ -301,8 +301,11 @@ void InverseRequirement::expandDefaults(
   for (auto gp : gps) {
     auto protos = InverseRequirement::expandDefault(gp);
     for (auto ip : protos) {
-      auto protoTy =
-          ctx.getProtocol(getKnownProtocolKind(ip))->getDeclaredInterfaceType();
+      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      if (!proto)
+        llvm_unreachable("failed to load Copyable/Escapable/etc from stdlib!");
+      
+      auto protoTy = proto->getDeclaredInterfaceType();
       result.push_back({{RequirementKind::Conformance, gp, protoTy},
                         SourceLoc(),
                         /*inferred=*/true,
