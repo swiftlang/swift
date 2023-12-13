@@ -32,7 +32,7 @@ struct Options {
     _bridged.hasFeature(.Embedded)
   }
 
-  func hasFeature(_ feature: BridgedPassContext.Feature) -> Bool {
+  func hasFeature(_ feature: BridgedFeature) -> Bool {
     _bridged.hasFeature(feature)
   }
 

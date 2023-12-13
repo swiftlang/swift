@@ -414,7 +414,7 @@ bool BridgedPassContext::enableStackProtection() const {
   return mod->getOptions().EnableStackProtection;
 }
 
-bool BridgedPassContext::hasFeature(Feature feature) const {
+bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getASTContext().LangOpts.hasFeature((swift::Feature)feature);
 }
