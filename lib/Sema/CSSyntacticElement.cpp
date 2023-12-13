@@ -931,8 +931,10 @@ private:
         errorType = cs.getClosureType(closure)->getThrownError();
       }
 
-      if (!errorType)
-        errorType = catchNode.getThrownErrorTypeInContext(dc).value_or(Type());
+      if (!errorType) {
+        ASTContext &ctx = cs.getASTContext();
+        errorType = catchNode.getThrownErrorTypeInContext(ctx).value_or(Type());
+      }
     }
 
     if (!errorType) {
@@ -1069,7 +1071,7 @@ private:
       } else if (auto doCatch =
                      dyn_cast_or_null<DoCatchStmt>(parent.dyn_cast<Stmt *>())) {
         auto dc = context.getAsDeclContext();
-        contextualTy = doCatch->getExplicitCaughtType(dc);
+        contextualTy = doCatch->getExplicitCaughtType();
         if (!contextualTy)
           contextualTy = cs.getASTContext().getErrorExistentialType();
       } else {

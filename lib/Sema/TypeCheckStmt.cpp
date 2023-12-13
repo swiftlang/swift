@@ -1195,7 +1195,7 @@ public:
         DC->getParentModule(), TS->getThrowLoc());
     Type errorType;
     if (catchNode) {
-      errorType = catchNode.getThrownErrorTypeInContext(DC).value_or(Type());
+      errorType = catchNode.getThrownErrorTypeInContext(Ctx).value_or(Type());
     }
 
     // If there was no error type, use 'any Error'. We'll check it later.

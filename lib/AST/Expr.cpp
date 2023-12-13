@@ -2054,7 +2054,7 @@ Type ClosureExpr::getExplicitThrownType() const {
   
   ASTContext &ctx = getASTContext();
   auto mutableThis = const_cast<ClosureExpr *>(this);
-  ExplicitCaughtTypeRequest request{mutableThis, mutableThis};
+  ExplicitCaughtTypeRequest request{&ctx, mutableThis};
   return evaluateOrDefault(ctx.evaluator, request, Type());
 }
 

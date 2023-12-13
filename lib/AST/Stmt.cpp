@@ -452,16 +452,18 @@ Expr *ForEachStmt::getTypeCheckedSequence() const {
   return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
 }
 
-DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
+DoCatchStmt *DoCatchStmt::create(DeclContext *dc,
+                                 LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc,
                                  SourceLoc throwsLoc, TypeLoc thrownType,
                                  Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
                                  llvm::Optional<bool> implicit) {
+  ASTContext &ctx = dc->getASTContext();
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
-  return ::new (mem) DoCatchStmt(labelInfo, doLoc, throwsLoc, thrownType, body,
-                                 catches, implicit);
+  return ::new (mem) DoCatchStmt(dc, labelInfo, doLoc, throwsLoc, thrownType,
+                                 body, catches, implicit);
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
@@ -478,15 +480,14 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
   return false;
 }
 
-Type DoCatchStmt::getExplicitCaughtType(DeclContext *dc) const {
-  ASTContext &ctx = dc->getASTContext();
-  ExplicitCaughtTypeRequest request{dc, const_cast<DoCatchStmt *>(this)};
-  return evaluateOrDefault(ctx.evaluator, request, Type());
+Type DoCatchStmt::getExplicitCaughtType() const {
+  ASTContext &ctx = DC->getASTContext();
+  return CatchNode(const_cast<DoCatchStmt *>(this)).getExplicitCaughtType(ctx);
 }
 
-Type DoCatchStmt::getCaughtErrorType(DeclContext *dc) const {
+Type DoCatchStmt::getCaughtErrorType() const {
   // Check for an explicitly-specified error type.
-  if (Type explicitError = getExplicitCaughtType(dc))
+  if (Type explicitError = getExplicitCaughtType())
     return explicitError;
 
   auto firstPattern = getCatches()

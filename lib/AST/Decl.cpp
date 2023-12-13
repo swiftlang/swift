@@ -983,10 +983,7 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
     return ThrownType.getType();
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      ExplicitCaughtTypeRequest{mutableThis, mutableThis},
-      Type());
+  return CatchNode(mutableThis).getExplicitCaughtType(getASTContext());
 }
 
 llvm::Optional<Type> 
@@ -11710,7 +11707,7 @@ MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
 }
 
 llvm::Optional<Type>
-CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
+CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
     if (auto thrownError = func->getEffectiveThrownErrorType())
       return func->mapTypeIntoContext(*thrownError);
@@ -11733,7 +11730,7 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
   }
 
   if (auto doCatch = dyn_cast<DoCatchStmt *>()) {
-    if (auto thrownError = doCatch->getCaughtErrorType(dc)) {
+    if (auto thrownError = doCatch->getCaughtErrorType()) {
       if (thrownError->isNever())
         return llvm::None;
 
@@ -11741,7 +11738,7 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
     }
 
     // If we haven't computed the error type yet, return 'any Error'.
-    return dc->getASTContext().getErrorExistentialType();
+    return ctx.getErrorExistentialType();
   }
 
   auto tryExpr = get<AnyTryExpr *>();
@@ -11750,7 +11747,7 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
       return thrownError;
 
     // If we haven't computed the error type yet, return 'any Error'.
-    return dc->getASTContext().getErrorExistentialType();
+    return ctx.getErrorExistentialType();
   }
 
   if (auto optTry = llvm::dyn_cast<OptionalTryExpr>(tryExpr)) {
@@ -11758,14 +11755,31 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
       return thrownError;
 
     // If we haven't computed the error type yet, return 'any Error'.
-    return dc->getASTContext().getErrorExistentialType();
+    return ctx.getErrorExistentialType();
   }
 
   llvm_unreachable("Unhandled catch node kind");
 }
 
+Type CatchNode::getExplicitCaughtType(ASTContext &ctx) const {
+  return evaluateOrDefault(
+      ctx.evaluator, ExplicitCaughtTypeRequest{&ctx, *this}, Type());
+}
+
 void swift::simple_display(llvm::raw_ostream &out, CatchNode catchNode) {
   out << "catch node";
+}
+
+SourceLoc swift::extractNearestSourceLoc(CatchNode catchNode) {
+  if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>())
+    return func->getLoc();
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>())
+    return closure->getLoc();
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>())
+    return doCatch->getDoLoc();
+  if (auto tryExpr = catchNode.dyn_cast<AnyTryExpr *>())
+    return tryExpr->getTryLoc();
+  llvm_unreachable("Unhandled catch node");
 }
 
 //----------------------------------------------------------------------------//
