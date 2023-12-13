@@ -26,6 +26,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 @_silgen_name("putchar")
 func putchar(_: UInt8)
