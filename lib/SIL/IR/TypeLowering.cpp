@@ -2406,7 +2406,11 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeNoncopyable()) {
+      GenericEnvironment *env = nullptr;
+      if (auto sig = origType.getGenericSignatureOrNull())
+        env = sig.getGenericEnvironment();
+
+      if (structType->isNoncopyable(env)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2414,7 +2418,7 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-      if (!D->isEscapable()) {
+      if (!structType->isEscapable(env)) {
         properties.setNonTrivial();
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2493,7 +2497,11 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->canBeNoncopyable()) {
+      GenericEnvironment *env = nullptr;
+      if (auto sig = origType.getGenericSignatureOrNull())
+        env = sig.getGenericEnvironment();
+
+      if (enumType->isNoncopyable(env)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2501,6 +2509,8 @@ namespace {
         return new (TC)
             MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
+
+      assert(enumType->isEscapable(env) && "missing typelowering case here!");
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);

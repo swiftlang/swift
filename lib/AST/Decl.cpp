@@ -4910,12 +4910,13 @@ InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
 }
 
 bool TypeDecl::canBeNoncopyable() const {
-  return getMarking(InvertibleProtocolKind::Copyable).getInverse().isPresent();
+  auto copyable = getMarking(InvertibleProtocolKind::Copyable);
+  return bool(copyable.getInverse()) && !copyable.getPositive();
 }
 
 bool TypeDecl::isEscapable() const {
   auto escapable = getMarking(InvertibleProtocolKind::Escapable);
-  return !escapable.getInverse().isPresent();
+  return !escapable.getInverse() || bool(escapable.getPositive());
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
