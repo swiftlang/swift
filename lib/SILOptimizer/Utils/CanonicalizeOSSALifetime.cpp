@@ -978,9 +978,10 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
           auto *insertionPoint = &*successor->begin();
           insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(),
                                          consumes, getCallbacks());
-          LLVM_DEBUG(llvm::dbgs()
-                     << "  Destroy after terminator " << instruction
-                     << " at beginning of " << successor << "\n");
+          LLVM_DEBUG(llvm::dbgs() << "  Destroy after terminator "
+                                  << *instruction << " at beginning of ";
+                     successor->printID(llvm::dbgs(), false);
+                     llvm::dbgs() << "\n";);
         }
         continue;
       }
