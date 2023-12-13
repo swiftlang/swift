@@ -192,11 +192,10 @@ public:
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
       LexicalFlag                = 1 << 7,
-      HasValueDeinitFlag         = 1 << 8,
     };
     // clang-format on
 
-    uint16_t Flags;
+    uint8_t Flags;
   public:
     /// Construct a default RecursiveProperties, which corresponds to
     /// a trivial, loadable, fixed-layout type.
@@ -273,9 +272,6 @@ public:
     IsLexical_t isLexical() const {
       return IsLexical_t((Flags & LexicalFlag) != 0);
     }
-    bool hasValueDeinit() const {
-      return (Flags & HasValueDeinitFlag) != 0;
-    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -289,7 +285,6 @@ public:
     void setLexical(IsLexical_t isLexical) {
       Flags = (Flags & ~LexicalFlag) | (isLexical ? LexicalFlag : 0);
     }
-    void setHasValueDeinit() { Flags |= HasValueDeinitFlag; }
   };
 
 private:
@@ -368,10 +363,6 @@ public:
     return Properties.isOrContainsRawPointer();
   }
   
-  bool selfOrAnyFieldHasValueDeinit() const {
-    return Properties.hasValueDeinit();
-  }
-
   /// Returns true if the type is a scalar reference-counted reference, which
   /// can be retained and released.
   bool isReferenceCounted() const {
