@@ -459,7 +459,7 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
     std::error_code EC;
     for (auto &Arch : AllSupportedArches) {
       SmallString<256> LayoutFile(RuntimeLibPath);
-      llvm::sys::path::append(LayoutFile, "layout-" + Arch + ".yaml");
+      llvm::sys::path::append(LayoutFile, "layouts-" + Arch + ".yaml");
       FS->status(LayoutFile);
     }
   }
