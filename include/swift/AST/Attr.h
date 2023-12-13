@@ -54,6 +54,7 @@ class ASTContext;
 struct PrintOptions;
 class CustomAttr;
 class Decl;
+class DeclRefTypeRepr;
 class AbstractFunctionDecl;
 class FuncDecl;
 class ClassDecl;
@@ -1766,7 +1767,7 @@ public:
   ///
   /// For an identifier type repr, return a pair of `nullptr` and the
   /// identifier.
-  std::pair<IdentTypeRepr *, IdentTypeRepr *> destructureMacroRef();
+  std::pair<IdentTypeRepr *, DeclRefTypeRepr *> destructureMacroRef();
 
   /// Whether the attribute has any arguments.
   bool hasArgs() const { return argList != nullptr; }

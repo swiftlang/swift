@@ -356,6 +356,9 @@ public:
   /// is a \c MemberTypeRepr, and the method returns its last member component.
   IdentTypeRepr *getLastComponent();
 
+  DeclNameLoc getNameLoc() const;
+  DeclNameRef getNameRef() const;
+
   /// Returns whether this instance has been bound to a type declaration. This
   /// happens during type resolution.
   bool isBound() const;
@@ -363,8 +366,9 @@ public:
   /// Returns the type declaration this instance has been bound to.
   TypeDecl *getBoundDecl() const;
 
-  /// The identifier that describes the last component.
-  DeclNameRef getNameRef() const;
+  DeclContext *getDeclContext() const;
+
+  void setValue(TypeDecl *TD, DeclContext *DC);
 
   /// Returns whether this instance has a generic argument list. That is, either
   /// a valid angle bracket source range, or a positive number of generic
@@ -373,12 +377,19 @@ public:
 
   ArrayRef<TypeRepr *> getGenericArgs() const;
 
+  SourceRange getAngleBrackets() const;
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent ||
            T->getKind() == TypeReprKind::Member;
   }
   static bool classof(const DeclRefTypeRepr *T) { return true; }
+
+protected:
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+
+  friend class TypeRepr;
 };
 
 /// An identifier type with an optional set of generic arguments.
@@ -435,9 +446,8 @@ public:
   static bool classof(const IdentTypeRepr *T) { return true; }
 
 protected:
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
-
   SourceLoc getLocImpl() const { return Loc.getBaseNameLoc(); }
+
   friend class TypeRepr;
 };
 
@@ -583,7 +593,6 @@ private:
   SourceLoc getEndLocImpl() const { return getLastComponent()->getEndLoc(); }
   SourceLoc getLocImpl() const { return getLastComponent()->getLoc(); }
 
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 

@@ -203,6 +203,10 @@ const TypeRepr *DeclRefTypeRepr::getRoot() const {
   return cast<MemberTypeRepr>(this)->getRoot();
 }
 
+DeclNameLoc DeclRefTypeRepr::getNameLoc() const {
+  return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->getNameLoc();
+}
+
 bool DeclRefTypeRepr::isBound() const {
   return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->isBound();
 }
@@ -211,6 +215,16 @@ TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
   return const_cast<DeclRefTypeRepr *>(this)
       ->getLastComponent()
       ->getBoundDecl();
+}
+
+DeclContext *DeclRefTypeRepr::getDeclContext() const {
+  return const_cast<DeclRefTypeRepr *>(this)
+      ->getLastComponent()
+      ->getDeclContext();
+}
+
+void DeclRefTypeRepr::setValue(TypeDecl *TD, DeclContext *DC) {
+  getLastComponent()->setValue(TD, DC);
 }
 
 bool DeclRefTypeRepr::hasGenericArgList() const {
@@ -225,6 +239,15 @@ ArrayRef<TypeRepr *> DeclRefTypeRepr::getGenericArgs() const {
   }
 
   return {};
+}
+
+SourceRange DeclRefTypeRepr::getAngleBrackets() const {
+  auto *lastComp = const_cast<DeclRefTypeRepr *>(this)->getLastComponent();
+  if (auto *genericTR = dyn_cast<GenericIdentTypeRepr>(lastComp)) {
+    return genericTR->getAngleBrackets();
+  }
+
+  return SourceRange();
 }
 
 DeclNameRef DeclRefTypeRepr::getNameRef() const {
@@ -341,19 +364,13 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   }
 }
 
-static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
-                             ArrayRef<TypeRepr *> Args) {
-  if (Args.empty())
-    return;
+void DeclRefTypeRepr::printImpl(ASTPrinter &Printer,
+                                const PrintOptions &Opts) const {
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(this)) {
+    printTypeRepr(memberTR->getBase(), Printer, Opts);
+    Printer << ".";
+  }
 
-  Printer << "<";
-  interleave(Args, [&](TypeRepr *Arg) { printTypeRepr(Arg, Printer, Opts); },
-             [&] { Printer << ", "; });
-  Printer << ">";
-}
-
-void IdentTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
   if (auto *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
     if (auto MD = dyn_cast<ModuleDecl>(TD))
       Printer.printModuleRef(MD, getNameRef().getBaseIdentifier());
@@ -363,16 +380,13 @@ void IdentTypeRepr::printImpl(ASTPrinter &Printer,
     Printer.printName(getNameRef().getBaseIdentifier());
   }
 
-  if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(this))
-    printGenericArgs(Printer, Opts, GenIdT->getGenericArgs());
-}
-
-void MemberTypeRepr::printImpl(ASTPrinter &Printer,
-                               const PrintOptions &Opts) const {
-  printTypeRepr(getRoot(), Printer, Opts);
-  for (auto C : getMemberComponents()) {
-    Printer << ".";
-    printTypeRepr(C, Printer, Opts);
+  if (hasGenericArgList()) {
+    Printer << "<";
+    interleave(
+        getGenericArgs(),
+        [&](TypeRepr *Arg) { printTypeRepr(Arg, Printer, Opts); },
+        [&] { Printer << ", "; });
+    Printer << ">";
   }
 }
 
