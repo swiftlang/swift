@@ -478,15 +478,15 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
   return false;
 }
 
-Type DoCatchStmt::getExplicitlyThrownType(DeclContext *dc) const {
+Type DoCatchStmt::getExplicitCaughtType(DeclContext *dc) const {
   ASTContext &ctx = dc->getASTContext();
-  DoCatchExplicitThrownTypeRequest request{dc, const_cast<DoCatchStmt *>(this)};
+  ExplicitCaughtTypeRequest request{dc, const_cast<DoCatchStmt *>(this)};
   return evaluateOrDefault(ctx.evaluator, request, Type());
 }
 
 Type DoCatchStmt::getCaughtErrorType(DeclContext *dc) const {
   // Check for an explicitly-specified error type.
-  if (Type explicitError = getExplicitlyThrownType(dc))
+  if (Type explicitError = getExplicitCaughtType(dc))
     return explicitError;
 
   auto firstPattern = getCatches()

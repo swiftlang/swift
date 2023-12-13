@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -2284,10 +2285,16 @@ public:
   void cacheResult(ParamSpecifier value) const;
 };
 
-/// Determines the explicitly-written thrown result type of a function.
-class ThrownTypeRequest
-    : public SimpleRequest<ThrownTypeRequest,
-                           Type(AbstractFunctionDecl *),
+/// Determines the explicitly-written caught result type for any catch node,
+/// including functions/closures and do..catch statements.
+///
+/// Returns the caught result type for the catch node, which will be
+/// `Never` if no error can be thrown from within the context (e.g., a
+/// non-throwing function). Returns a NULL type if the caught error type
+/// requires type inference.
+class ExplicitCaughtTypeRequest
+    : public SimpleRequest<ExplicitCaughtTypeRequest,
+                           Type(DeclContext *, CatchNode),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2296,28 +2303,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
-  void cacheResult(Type value) const;
-};
-
-/// Determines the explicitly-written thrown error type in a do..catch block.
-class DoCatchExplicitThrownTypeRequest
-    : public SimpleRequest<DoCatchExplicitThrownTypeRequest,
-                           Type(DeclContext *, DoCatchStmt *),
-                           RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  Type evaluate(Evaluator &evaluator, DeclContext *dc, DoCatchStmt *stmt) const;
+  Type evaluate(Evaluator &evaluator, DeclContext *dc, CatchNode catchNode) const;
 
 public:
   // Separate caching.

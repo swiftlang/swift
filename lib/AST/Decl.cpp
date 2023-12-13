@@ -979,9 +979,13 @@ bool Decl::preconcurrency() const {
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
+  if (!getThrownTypeRepr())
+    return ThrownType.getType();
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(
       getASTContext().evaluator,
-      ThrownTypeRequest{const_cast<AbstractFunctionDecl *>(this)},
+      ExplicitCaughtTypeRequest{mutableThis, mutableThis},
       Type());
 }
 
@@ -11714,11 +11718,19 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
     return llvm::None;
   }
 
-  if (auto closure = dyn_cast<AbstractClosureExpr *>()) {
-    if (closure->getType())
-      return closure->getEffectiveThrownType();
+  if (auto abstractClosure = dyn_cast<AbstractClosureExpr *>()) {
+    if (abstractClosure->getType())
+      return abstractClosure->getEffectiveThrownType();
 
-    // FIXME: Should we lazily compute this?
+    if (auto closure = llvm::dyn_cast<ClosureExpr>(abstractClosure)) {
+      if (Type thrownType = closure->getExplicitThrownType()) {
+        if (thrownType->isNever())
+          return llvm::None;
+
+        return thrownType;
+      }
+    }
+
     return llvm::None;
   }
 
@@ -11752,4 +11764,97 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
   }
 
   llvm_unreachable("Unhandled catch node kind");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, CatchNode catchNode) {
+  out << "catch node";
+}
+
+//----------------------------------------------------------------------------//
+// ExplicitCaughtTypeRequest computation.
+//----------------------------------------------------------------------------//
+bool ExplicitCaughtTypeRequest::isCached() const {
+  auto catchNode = std::get<1>(getStorage());
+
+  // try? and try! never need to be cached.
+  if (catchNode.is<AnyTryExpr *>())
+    return false;
+
+  // Functions with explicitly-written thrown types need the result cached.
+  if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>()) {
+    return func->ThrownType.getTypeRepr() != nullptr;
+  }
+
+  // Closures with explicitly-written thrown types need the result cached.
+  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
+    if (auto closure = dyn_cast<ClosureExpr>(abstractClosure)) {
+      return closure->ThrownType != nullptr;
+    }
+
+    return false;
+  }
+
+  // Do..catch with explicitly-written thrown types need the result cached.
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    return doCatch->getThrowsLoc().isValid();
+  }
+
+  llvm_unreachable("Unhandled catch node");
+}
+
+llvm::Optional<Type> ExplicitCaughtTypeRequest::getCachedResult() const {
+  // Map a possibly-null Type to llvm::Optional<Type>.
+  auto nonnullTypeOrNone = [](Type type) -> llvm::Optional<Type> {
+    if (type.isNull())
+      return llvm::None;
+
+    return type;
+  };
+
+  auto catchNode = std::get<1>(getStorage());
+
+  if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>()) {
+    return nonnullTypeOrNone(func->ThrownType.getType());
+  }
+
+  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
+    auto closure = cast<ClosureExpr>(abstractClosure);
+    if (closure->ThrownType) {
+      return nonnullTypeOrNone(closure->ThrownType->getInstanceType());
+    }
+
+    return llvm::None;
+  }
+
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    return nonnullTypeOrNone(doCatch->ThrownType.getType());
+  }
+
+  llvm_unreachable("Unhandled catch node");
+}
+
+void ExplicitCaughtTypeRequest::cacheResult(Type type) const {
+  auto catchNode = std::get<1>(getStorage());
+
+  if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>()) {
+    func->ThrownType.setType(type);
+    return;
+  }
+
+  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
+    auto closure = cast<ClosureExpr>(abstractClosure);
+    if (closure->ThrownType)
+      closure->ThrownType->setType(MetatypeType::get(type));
+    else
+      closure->ThrownType =
+          TypeExpr::createImplicit(type, type->getASTContext());
+    return;
+  }
+
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    doCatch->ThrownType.setType(type);
+    return;
+  }
+
+  llvm_unreachable("Unhandled catch node");
 }

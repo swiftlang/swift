@@ -3588,16 +3588,9 @@ llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
 Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
   ASTContext &ctx = dc->getASTContext();
 
-  // When typed throws is disabled, this is always "any Error".
-  // FIXME: When we distinguish "precise" typed throws from normal typed
-  // throws, we'll be able to compute a more narrow catch error type in some
-  // case, e.g., from a `try` but not a `throws`.
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
-    return ctx.getErrorExistentialType();
-
   // If the do..catch statement explicitly specifies that it throws, use
   // that type.
-  if (Type explicitError = stmt->getExplicitlyThrownType(dc)) {
+  if (Type explicitError = stmt->getExplicitCaughtType(dc)) {
     return explicitError;
   }
 

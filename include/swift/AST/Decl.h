@@ -6985,7 +6985,7 @@ void simple_display(llvm::raw_ostream &out, BodyAndFingerprint value);
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
   friend class NeedsNewVTableEntryRequest;
-  friend class ThrownTypeRequest;
+  friend class ExplicitCaughtTypeRequest;
 
 public:
   /// records the kind of SILGen-synthesized body this decl represents

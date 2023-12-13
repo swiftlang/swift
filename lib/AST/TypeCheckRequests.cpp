@@ -929,47 +929,6 @@ void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
 }
 
 //----------------------------------------------------------------------------//
-// ThrownTypeRequest computation.
-//----------------------------------------------------------------------------//
-
-llvm::Optional<Type> ThrownTypeRequest::getCachedResult() const {
-  auto *const func = std::get<0>(getStorage());
-  Type thrownType = func->ThrownType.getType();
-  if (thrownType.isNull())
-    return llvm::None;
-
-  return thrownType;
-}
-
-void ThrownTypeRequest::cacheResult(Type type) const {
-  auto *const func = std::get<0>(getStorage());
-  func->ThrownType.setType(type);
-}
-
-//----------------------------------------------------------------------------//
-// DoCatchExplicitThrownTypeRequest computation.
-//----------------------------------------------------------------------------//
-
-bool DoCatchExplicitThrownTypeRequest::isCached() const {
-  auto *const stmt = std::get<1>(getStorage());
-  return stmt->getThrowsLoc().isValid();
-}
-
-llvm::Optional<Type> DoCatchExplicitThrownTypeRequest::getCachedResult() const {
-  auto *const stmt = std::get<1>(getStorage());
-  Type thrownType = stmt->ThrownType.getType();
-  if (thrownType.isNull())
-    return llvm::None;
-
-  return thrownType;
-}
-
-void DoCatchExplicitThrownTypeRequest::cacheResult(Type type) const {
-  auto *const stmt = std::get<1>(getStorage());
-  stmt->ThrownType.setType(type);
-}
-
-//----------------------------------------------------------------------------//
 // ResultTypeRequest computation.
 //----------------------------------------------------------------------------//
 

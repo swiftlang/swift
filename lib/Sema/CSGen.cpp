@@ -2459,12 +2459,9 @@ namespace {
       // Determine the thrown error type, when appropriate.
       Type thrownErrorTy = [&] {
         // Explicitly-specified thrown type.
-        if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
-          Type resolvedTy = resolveTypeReferenceInExpression(
-              thrownTypeRepr, TypeResolverContext::InExpression,
-              thrownErrorLocator);
-          if (resolvedTy)
-            return resolvedTy;
+        if (closure->getExplicitThrownTypeRepr()) {
+          if (Type explicitType = closure->getExplicitThrownType())
+            return explicitType;
         }
 
         // Thrown type inferred from context.

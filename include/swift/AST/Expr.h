@@ -3987,6 +3987,8 @@ public:
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
+  friend class ExplicitCaughtTypeRequest;
+
 public:
   enum class BodyState {
     /// The body was parsed, but not ready for type checking because
@@ -4034,7 +4036,7 @@ private:
   /// The location of the "in", if present.
   SourceLoc InLoc;
 
-  /// The explcitly-specified thrown type.
+  /// The explicitly-specified thrown type.
   TypeExpr *ThrownType;
 
   /// The explicitly-specified result type.
@@ -4149,14 +4151,7 @@ public:
   }
 
   /// Retrieve the explicitly-thrown type.
-  Type getExplicitThrownType() const {
-    if (ThrownType)
-      return ThrownType->getInstanceType();
-
-    return nullptr;
-  }
-
-  void setExplicitThrownType(Type thrownType);
+  Type getExplicitThrownType() const;
 
   /// Retrieve the explicitly-thrown type representation.
   TypeRepr *getExplicitThrownTypeRepr() const {
