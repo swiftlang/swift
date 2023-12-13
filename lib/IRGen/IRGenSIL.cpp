@@ -18,6 +18,7 @@
 #include "GenKeyPath.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -2474,6 +2475,56 @@ void IRGenSILFunction::emitSILFunction() {
   if (CurSILFn->isDistributed() && CurSILFn->isThunk() == IsThunk) {
     IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
+
+//    fprintf(stderr, "[%s:%d](%s) CLANG:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//    val->dump();
+    if (auto val = CurSILFn->getLocation().castToASTNode<ValueDecl>()) {
+      if (auto attr =
+              val->getAttrs().getAttribute<DistributedThunkTargetAttr>()) {
+        fprintf(stderr, "[%s:%d](%s) HAS DistributedThunkTargetAttr: %s\n",
+                __FILE_NAME__, __LINE__, __FUNCTION__,
+                attr->getTargetFunction()->getNameStr().str().c_str());
+
+        fprintf(stderr, "[%s:%d](%s) add accessible function: %s\n",
+                __FILE_NAME__, __LINE__, __FUNCTION__,
+                CurSILFn->getName().str().c_str());
+
+        // the original `distributed func`
+        auto func = attr->getTargetFunction();
+
+        auto distributedRequirements = func->getDistributedMethodWitnessedProtocolRequirements();
+        if (distributedRequirements.size() == 1) {
+          fprintf(stderr, "[%s:%d](%s) IMPLS REQUIREMENT!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+          auto protocolFunc = distributedRequirements.front();
+          if (auto clazz = func->getDeclContext()->getSelfNominalTypeDecl()) {
+            fprintf(stderr, "[%s:%d](%s) THE CLAZZ: %s\n", __FILE_NAME__,
+                    __LINE__, __FUNCTION__, clazz->getNameStr().str().c_str());
+          }
+          Mangle::ASTMangler mangler;
+          // The mangled name of the requirement is the name of the record
+          auto mangledProtocolFuncName =
+            mangler.mangleDistributedThunk(cast<FuncDecl>(protocolFunc));
+
+          std::optional<std::string> mangledActorTypeName;
+          if (isa<ClassDecl>(func->getDeclContext()->getAsDecl())) {
+            // a concrete type, not a "distributed" protocol
+            mangledActorTypeName = mangler.mangleAnyDecl(
+                func->getDeclContext()->getSelfNominalTypeDecl(),
+                /*prefix=*/true);
+          }
+
+          IGM.addAccessibleFunctionDistributedAliased(
+              /*mangledRecordName=*/mangledProtocolFuncName,
+              /*mangledActorTypeName=*/mangledActorTypeName,
+              CurSILFn);
+        }
+
+      } else {
+        fprintf(stderr,
+                "[%s:%d](%s) DOES NOT HAVE DistributedThunkTargetAttr\n",
+                __FILE_NAME__, __LINE__, __FUNCTION__);
+      }
+    }
   }
 
   // Configure the dominance resolver.

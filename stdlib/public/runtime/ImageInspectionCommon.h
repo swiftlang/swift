@@ -40,6 +40,7 @@
 /// The Mach-O section name for the section containing accessible functions.
 /// This lives within SEG_TEXT.
 #define MachOAccessibleFunctionsSection "__swift5_acfuncs"
+#define MachODistributedAccessibleFunctionsSection "__swift5_dacfuns"
 
 #define MachOTextSegment "__TEXT"
 

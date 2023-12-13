@@ -159,6 +159,7 @@ public:
     DistributedThunk,
     DistributedAccessor,
     AccessibleFunctionRecord,
+    DistributedAccessibleFunctionRecord,
     BackDeploymentThunk,
     BackDeploymentFallback,
     HasSymbolQuery,

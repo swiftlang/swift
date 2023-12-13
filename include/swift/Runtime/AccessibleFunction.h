@@ -28,6 +28,13 @@ SWIFT_RUNTIME_STDLIB_SPI const AccessibleFunctionRecord *
 swift_findAccessibleFunction(const char *targetNameStart,
                              size_t targetNameLength);
 
+SWIFT_RUNTIME_STDLIB_SPI const DistributedAccessibleFunctionRecord *
+swift_findDistributedAccessibleFunction(
+    // method (concrete method name, or protocol method name)
+    const char *targetNameStart, size_t targetNameLength,
+    // concrete target type, when performing a protocol method call
+    const char *typeNameStart, size_t typeNameLength);
+
 } // end namespace runtime
 } // end namespace swift
 

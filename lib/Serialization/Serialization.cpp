@@ -3024,6 +3024,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.addDeclRef(afd), pieces.size(), pieces);
       return;
     }
+    case DAK_DistributedThunkTarget: {
+      assert(false && "not implemented");
+    }
 
     case DeclAttrKind::TypeEraser: {
       auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];

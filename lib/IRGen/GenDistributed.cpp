@@ -304,6 +304,10 @@ void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
   assert(target->isDistributed());
 
   auto *f = getAddrOfDistributedTargetAccessor(target, ForDefinition);
+
+  fprintf(stderr, "[%s:%d](%s) EMIT DISTRIBUTED ACCESSOR:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  f->dump();
+
   if (!f->isDeclaration())
     return;
 

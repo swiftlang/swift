@@ -520,6 +520,7 @@ class LinkEntity {
     /// Accessible function record, which describes a function that can be
     /// looked up by name by the runtime.
     AccessibleFunctionRecord,
+    DistributedAccessibleFunctionRecord,
 
     /// Extended existential type shape.
     /// Pointer is the (generalized) existential type.

@@ -32,6 +32,20 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
   return nullptr;
 }
 
+static const DistributedAccessibleFunctionRecord *
+findDistributedProtocolMethodAccessor(
+    const char *targetNameStart, size_t targetNameLength,
+    const char *targetActorTypeNameStart, size_t targetActorTypeNameLength) {
+  if (auto *func = runtime::swift_findDistributedAccessibleFunction(
+          targetNameStart, targetNameLength,
+          targetActorTypeNameStart, targetActorTypeNameLength)) {
+    assert(func->Flags.isDistributed());
+    return func;
+  }
+  fprintf(stderr, "[%s:%d](%s) NOPE\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  return nullptr;
+}
+
 SWIFT_CC(swift)
 SWIFT_EXPORT_FROM(swiftDistributed)
 void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
@@ -130,9 +144,28 @@ void swift_distributed_execute_target(
     size_t numWitnessTables,
     Metadata *decoderType,
     Metadata *actorType,
+  std::string targetName(targetNameStart, targetNameLength);
+
+  auto actorTy = swift_getObjectType(actor);
+  auto actorTyNamePair = swift_getMangledTypeName(actorTy);
+  std::string actorTyName = actorTyNamePair.data;
+
     void **decoderWitnessTable,
     void **actorWitnessTable) {
-  auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
+  std::string targetName(targetNameStart, targetNameLength);
+
+  auto actorTy = swift_getObjectType(actor);
+  auto actorTyNamePair = swift_getMangledTypeName(actorTy);
+  std::string actorTyName = actorTyNamePair.data;
+
+  fprintf(stderr, "[%s:%d](%s) LOOKING FOR ACCESSOR: %s FOR CONCRETE [%s]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          targetName.c_str(),
+          actorTyName.c_str());
+
+  auto *accessor = findDistributedProtocolMethodAccessor(
+      targetNameStart, targetNameLength,
+      actorTyNamePair.data, actorTyNamePair.length);
+
   if (!accessor) {
     SwiftError *error =
         swift_distributed_makeDistributedTargetAccessorNotFoundError();

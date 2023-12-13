@@ -1372,6 +1372,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Find out if a distributed method is implementing a distributed protocol
+/// requirement.
+class GetDistributedMethodWitnessedProtocolRequirements :
+    public SimpleRequest<GetDistributedMethodWitnessedProtocolRequirements,
+                         llvm::TinyPtrVector<ValueDecl *> (AbstractFunctionDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::TinyPtrVector<ValueDecl *> evaluate(
+      Evaluator &evaluator,
+      AbstractFunctionDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///

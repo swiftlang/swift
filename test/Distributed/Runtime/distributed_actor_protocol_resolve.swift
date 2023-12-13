@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s --color --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -18,9 +18,7 @@ import FakeDistributedActorSystems
 // ==== Known actor system -----------------------------------------------------
 
 // @DistributedRemotelyJustViaProxyAccessible
-protocol GreeterP_ConcreteSystem: DistributedActor {
-  typealias ActorSystem = FakeRoundtripActorSystem
-
+protocol GreeterP_ConcreteSystem: DistributedActor where ActorSystem == FakeRoundtripActorSystem {
   distributed func greet() -> String
 }
 
@@ -31,20 +29,41 @@ extension GreeterP_ConcreteSystem where Self == GreeterP_ConcreteSystem_Stub {
   ) throws -> any GreeterP_ConcreteSystem {
     print("\(Self.self).\(#function) -> return \(GreeterP_ConcreteSystem_Stub.self)")
 
-    return try GreeterP_ConcreteSystem_Stub(actorSystem: system)
+    return try GreeterP_ConcreteSystem_Stub.resolve(id: id, using: system)
   }
 }
 
 distributed actor GreeterP_ConcreteSystem_Stub: GreeterP_ConcreteSystem {
   typealias ActorSystem = FakeRoundtripActorSystem
+  let hint: String
+  init(actorSystem: ActorSystem) {
+    self.hint = ""
+    self.actorSystem = actorSystem
+  }
+  init(hint: String, actorSystem: ActorSystem) {
+    self.hint = hint
+    self.actorSystem = actorSystem
+  }
 
   distributed func greet() -> String {
-    let message = "STUB:\(Self.self).\(#function)"
+    let message = "STUB[\(self.hint)]:\(Self.self).\(#function)"
     print(message)
     return message
   }
+
+  func call_greet<Act: GreeterP_ConcreteSystem>(actor: Act/*, ... params ... */) async throws -> String {
+    try await actor.greet()
+  }
 }
 // end of @Proxy output =======
+
+distributed actor GreeterImpl: GreeterP_ConcreteSystem {
+  typealias ActorSystem = FakeRoundtripActorSystem
+
+  distributed func greet() -> String {
+    "[IMPL]:Hello from \(Self.self)"
+  }
+}
 
 // ==== ------------------------------------------------------------------------
 
@@ -54,25 +73,20 @@ distributed actor GreeterP_ConcreteSystem_Stub: GreeterP_ConcreteSystem {
     let roundtripSystem = FakeRoundtripActorSystem()
     let localTestingSystem = LocalTestingDistributedActorSystem()
 
-    // normal concrete type resolve calls:
-    // let g0: Greeter = try Greeter.resolve(id: .init(parse: "one"), using: s)
-    // let g1: Greeter = try .resolve(id: .init(parse: "one"), using: s)
+    let real: any GreeterP_ConcreteSystem = GreeterImpl(actorSystem: roundtripSystem)
+    let realGreeting = try await real.greet()
+    print("local call greeting: \(realGreeting)")
+    // CHECK: local call greeting: [IMPL]:Hello from GreeterImpl
 
-    // Checking if errors are helpful:
+    let proxy: any GreeterP_ConcreteSystem = try .resolve(id: real.id, using: roundtripSystem)
+    let greeting = try await proxy.greet()
+    // CHECK: >> remoteCall: on:main.GreeterP_ConcreteSystem_Stub, target:greet(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: > execute distributed target: greet(), identifier: $s4main23GreeterP_ConcreteSystemP5greetSSyFTE
 
-    // what newcomer would expect to write:
-    // let g3 = try GreeterP.resolve(id: .init(parse: "one"), using: s)
-    // ERROR: Static member 'resolve' cannot be used on protocol metatype '(any GreeterP).Type'
-    // TODO: maybe we could offer a better diagnostic specific to DA
+    // CHECK: << remoteCall return: [IMPL]:Hello from GreeterImpl
 
-    // let g2: GreeterP = try .resolve(id: .init(parse: "one"), using: s)
-    // ERROR: Use of protocol 'GreeterP' as a type must be written 'any GreeterP'
-
-    // YAY!
-    let gx: any GreeterP_ConcreteSystem = try .resolve(id: .init(parse: "one"), using: roundtripSystem)
-    // precondition(!__isLocalActor(gx), "Expected remote reference")
-    _ = try await gx.greet()
-    // CHECK: STUB:GreeterP_ConcreteSystem_Stub.greet()
+    print("protocol call greeting: \(greeting)")
+    // CHECK: protocol call greeting: [IMPL]:Hello from GreeterImpl
   }
 }
 
