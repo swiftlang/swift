@@ -927,10 +927,8 @@ private:
     if (catchNode) {
       // FIXME: Introduce something like getThrownErrorTypeInContext() for the
       // constraint solver.
-      if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
-        if (auto closure = dyn_cast<ClosureExpr>(abstractClosure)) {
-          errorType = cs.getClosureType(closure)->getThrownError();
-        }
+      if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+        errorType = cs.getClosureType(closure)->getThrownError();
       }
 
       if (!errorType)

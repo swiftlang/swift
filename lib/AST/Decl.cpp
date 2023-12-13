@@ -11702,17 +11702,15 @@ CatchNode::getThrownErrorTypeInContext(DeclContext *dc) const {
     return llvm::None;
   }
 
-  if (auto abstractClosure = dyn_cast<AbstractClosureExpr *>()) {
-    if (abstractClosure->getType())
-      return abstractClosure->getEffectiveThrownType();
+  if (auto closure = dyn_cast<ClosureExpr *>()) {
+    if (closure->getType())
+      return closure->getEffectiveThrownType();
 
-    if (auto closure = llvm::dyn_cast<ClosureExpr>(abstractClosure)) {
-      if (Type thrownType = closure->getExplicitThrownType()) {
-        if (thrownType->isNever())
-          return llvm::None;
+    if (Type thrownType = closure->getExplicitThrownType()) {
+      if (thrownType->isNever())
+        return llvm::None;
 
-        return thrownType;
-      }
+      return thrownType;
     }
 
     return llvm::None;
@@ -11770,12 +11768,8 @@ bool ExplicitCaughtTypeRequest::isCached() const {
   }
 
   // Closures with explicitly-written thrown types need the result cached.
-  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
-    if (auto closure = dyn_cast<ClosureExpr>(abstractClosure)) {
-      return closure->ThrownType != nullptr;
-    }
-
-    return false;
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+    return closure->ThrownType != nullptr;
   }
 
   // Do..catch with explicitly-written thrown types need the result cached.
@@ -11801,8 +11795,7 @@ llvm::Optional<Type> ExplicitCaughtTypeRequest::getCachedResult() const {
     return nonnullTypeOrNone(func->ThrownType.getType());
   }
 
-  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
-    auto closure = cast<ClosureExpr>(abstractClosure);
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
     if (closure->ThrownType) {
       return nonnullTypeOrNone(closure->ThrownType->getInstanceType());
     }
@@ -11825,8 +11818,7 @@ void ExplicitCaughtTypeRequest::cacheResult(Type type) const {
     return;
   }
 
-  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
-    auto closure = cast<ClosureExpr>(abstractClosure);
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
     if (closure->ThrownType)
       closure->ThrownType->setType(MetatypeType::get(type));
     else

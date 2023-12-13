@@ -684,8 +684,9 @@ static std::pair<CatchNode, const BraceStmtScope *>
 getCatchNode(const ASTScopeImpl *scope) {
   // Closures introduce a catch scope for errors initiated in their body.
   if (auto closureParams = dyn_cast<ClosureParametersScope>(scope)) {
-    return getCatchNodeBody(
-        scope, const_cast<AbstractClosureExpr *>(closureParams->closureExpr));
+    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr)) {
+      return getCatchNodeBody(scope, const_cast<ClosureExpr *>(closure));
+    }
   }
 
   // Functions introduce a catch scope for errors initiated in their body.

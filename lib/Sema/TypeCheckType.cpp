@@ -5697,28 +5697,26 @@ Type ExplicitCaughtTypeRequest::evaluate(
   }
 
   // Closures
-  if (auto abstractClosure = catchNode.dyn_cast<AbstractClosureExpr *>()) {
-    if (auto closure = dyn_cast<ClosureExpr>(abstractClosure)) {
-      assert(dc == closure && "Key mismatch for explicit caught type request");
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+    assert(dc == closure && "Key mismatch for explicit caught type request");
 
-      // Explicit thrown error type.
-      if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
-        if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-          ctx.Diags.diagnose(thrownTypeRepr->getLoc(),
-                             diag::experimental_typed_throws);
-        }
-
-        return TypeResolution::resolveContextualType(
-                 thrownTypeRepr, dc,
-                 TypeResolutionOptions(TypeResolverContext::None),
-                 /*unboundTyOpener*/ nullptr, PlaceholderType::get,
-                 /*packElementOpener*/ nullptr);
+    // Explicit thrown error type.
+    if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
+      if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+        ctx.Diags.diagnose(thrownTypeRepr->getLoc(),
+                           diag::experimental_typed_throws);
       }
 
-      // Explicit 'throws' implies that this throws 'any Error'.
-      if (closure->getThrowsLoc().isValid()) {
-        return ctx.getErrorExistentialType();
-      }
+      return TypeResolution::resolveContextualType(
+               thrownTypeRepr, dc,
+               TypeResolutionOptions(TypeResolverContext::None),
+               /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+               /*packElementOpener*/ nullptr);
+    }
+
+    // Explicit 'throws' implies that this throws 'any Error'.
+    if (closure->getThrowsLoc().isValid()) {
+      return ctx.getErrorExistentialType();
     }
 
     // Thrown error type will be inferred.
