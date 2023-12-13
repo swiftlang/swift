@@ -252,7 +252,9 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-@_unavailableInEmbedded
+#if !$Embedded
+
+/// Used to evaluate editor placeholders.
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
@@ -260,6 +262,19 @@ func _undefined<T>(
 ) -> T {
   _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
 }
+
+#else
+
+/// Used to evaluate editor placeholders.
+public // COMPILER_INTRINSIC
+func _undefined<T>(
+  _ message: @autoclosure () -> StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) -> T {
+  _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
+}
+
+#endif
 
 /// Called when falling off the end of a switch and the type can be represented
 /// as a raw value.
