@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -I %S/Inputs -enable-experimental-cxx-interop %s -validate-tbd-against-ir=none | %FileCheck %s
+// RUN: %target-swift-emit-ir -I %S/Inputs -cxx-interoperability-mode=upcoming-swift %s -validate-tbd-against-ir=none | %FileCheck %s
 
 // FIXME: enable on Windows
 // XFAIL: OS=windows-msvc
