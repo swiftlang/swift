@@ -191,3 +191,46 @@ func testDoCatchErrorTypedInClosure(cond: Bool) {
     }
   }
 }
+
+func testDoCatchInClosure(cond: Bool) {
+  apply {
+    do {
+      _ = try doSomething()
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      throw MyError.failed
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      if cond {
+        throw MyError.failed
+      }
+
+      try doHomework()
+    } catch {
+      let _: MyError = error
+      // expected-error@-1{{cannot convert value of type 'any Error' to specified type 'MyError'}}
+    }
+  }
+
+  apply {
+    do {
+      do {
+        _ = try doSomething()
+      } catch .failed {
+        // pick off one case, but this still rethrows
+      }
+    } catch {
+      let _: MyError = error
+    }
+  }
+}

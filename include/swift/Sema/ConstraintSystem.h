@@ -1440,6 +1440,31 @@ struct MatchCallArgumentResult {
   }
 };
 
+/// Describes a potential throw site in the constraint system.
+///
+/// For example, given `try f() + a[b] + x.y`, each of `f()`, `a[b]`, `x`, and
+/// `x.y` is a potential throw site.
+struct PotentialThrowSite {
+  enum Kind {
+    /// The application of a function or subscript.
+    Application,
+
+    /// An explicit 'throw'.
+    ExplicitThrow,
+
+    /// A non-exhaustive do...catch, which rethrows whatever is thrown from
+    /// inside it's `do` block.
+    NonExhaustiveDoCatch,
+  } kind;
+
+  /// The type that describes the potential throw site, such as the type of the
+  /// function being called or type being thrown.
+  Type type;
+
+  /// The locator that specifies where the throwing operation occurs.
+  ConstraintLocator *locator;
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1546,6 +1571,13 @@ public:
   /// being solved.
   llvm::MapVector<const CaseLabelItem *, CaseLabelItemInfo>
       caseLabelItems;
+
+  /// Maps catch nodes to the set of potential throw sites that will be caught
+  /// at that location.
+
+  /// The set of opened types for a given locator.
+  std::vector<std::pair<CatchNode, PotentialThrowSite>>
+      potentialThrowSites;
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
@@ -2210,6 +2242,11 @@ private:
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
 
+  /// Keep track of all of the potential throw sites.
+  /// FIXME: This data structure should be replaced with something that
+  /// is, in effect, a multimap-vector.
+  std::vector<std::pair<CatchNode, PotentialThrowSite>> potentialThrowSites;
+
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
   llvm::SmallMapVector<Expr *, ExprPattern *, 2> exprPatterns;
@@ -2821,6 +2858,9 @@ public:
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
 
+    /// The length of \c potentialThrowSites.
+    unsigned numPotentialThrowSites;
+
     /// The length of \c exprPatterns.
     unsigned numExprPatterns;
 
@@ -3292,6 +3332,14 @@ public:
 
     return known->second;
   }
+
+  /// Note that there is a potential throw site at the given location.
+  void recordPotentialThrowSite(
+      PotentialThrowSite::Kind kind, Type type,
+      ConstraintLocatorBuilder locator);
+
+  /// Determine the caught error type for the given catch node.
+  Type getCaughtErrorType(CatchNode node);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.

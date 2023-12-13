@@ -368,6 +368,114 @@ bool ConstraintSystem::containsIDEInspectionTarget(
                                             Context.SourceMgr);
 }
 
+void ConstraintSystem::recordPotentialThrowSite(
+    PotentialThrowSite::Kind kind, Type type,
+    ConstraintLocatorBuilder locator) {
+  ASTContext &ctx = getASTContext();
+
+  // Only record potential throw sites when typed throws is enabled.
+  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
+    return;
+
+  // Catch node location is determined by the source location.
+  auto sourceLoc = locator.getAnchor().getStartLoc();
+  if (!sourceLoc)
+    return;
+
+  auto catchNode = ASTScope::lookupCatchNode(DC->getParentModule(), sourceLoc);
+  if (!catchNode)
+    return;
+
+  // If there is an explicit caught type for this node, we don't need to
+  // record a potential throw site.
+  if (Type explicitCaughtType = catchNode.getExplicitCaughtType(ctx))
+    return;
+
+  // do..catch statements without an explicit `throws` clause do infer
+  // thrown types.
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    potentialThrowSites.push_back(
+        {catchNode,
+         PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+    return;
+  }
+
+  // Closures without an explicit `throws` clause, and which syntactically
+  // appear that they can throw, do infer thrown types.
+  auto closure = catchNode.get<ClosureExpr *>();
+
+  // Check whether the closure syntactically throws. If not, there is no
+  // need to record a throw site.
+  if (!closureEffects(closure).isThrowing())
+    return;
+
+  potentialThrowSites.push_back(
+      {catchNode,
+       PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+}
+
+Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
+  ASTContext &ctx = getASTContext();
+
+  // If there is an explicit caught type for this node, use it.
+  if (Type explicitCaughtType = catchNode.getExplicitCaughtType(ctx)) {
+    if (explicitCaughtType->hasTypeParameter())
+      explicitCaughtType = DC->mapTypeIntoContext(explicitCaughtType);
+
+    return explicitCaughtType;
+  }
+
+  // Retrieve the thrown error type of a closure.
+  // FIXME: This will need to change when we do inference of thrown error
+  // types in closures.
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+    return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
+  }
+
+  // Handle inference of caught error types.
+
+  // Collect all of the potential throw sites for this catch node.
+  SmallVector<PotentialThrowSite, 2> throwSites;
+  for (const auto &potentialThrowSite : potentialThrowSites) {
+    if (potentialThrowSite.first == catchNode) {
+      throwSites.push_back(potentialThrowSite.second);
+    }
+  }
+
+  Type caughtErrorType = ctx.getNeverType();
+  for (const auto &throwSite : throwSites) {
+    Type type = simplifyType(throwSite.type);
+
+    Type thrownErrorType;
+    switch (throwSite.kind) {
+    case PotentialThrowSite::Application: {
+      auto fnType = type->castTo<AnyFunctionType>();
+      thrownErrorType = fnType->getEffectiveThrownErrorTypeOrNever();
+      break;
+    }
+
+    case PotentialThrowSite::ExplicitThrow:
+    case PotentialThrowSite::NonExhaustiveDoCatch:
+      thrownErrorType = type;
+      break;
+    }
+
+    // Perform the errorUnion() of the caught error type so far with the
+    // thrown error type of this potential throw site.
+    caughtErrorType = TypeChecker::errorUnion(
+        caughtErrorType, thrownErrorType,
+        [&](Type type) {
+      return simplifyType(type);
+    });
+
+    // If we ended up at 'any Error', we're done.
+    if (caughtErrorType->isErrorExistentialType())
+      break;
+  }
+
+  return caughtErrorType;
+}
+
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
     ASTNode anchor, ArrayRef<ConstraintLocator::PathElement> path) {
   auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
