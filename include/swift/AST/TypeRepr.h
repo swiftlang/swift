@@ -356,7 +356,11 @@ public:
   /// is a \c MemberTypeRepr, and the method returns its last member component.
   IdentTypeRepr *getLastComponent();
 
-  /// The type declaration the last component is bound to.
+  /// Returns whether this instance has been bound to a type declaration. This
+  /// happens during type resolution.
+  bool isBound() const;
+
+  /// Returns the type declaration this instance has been bound to.
   TypeDecl *getBoundDecl() const;
 
   /// The identifier that describes the last component.

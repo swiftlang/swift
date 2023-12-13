@@ -203,6 +203,10 @@ const TypeRepr *DeclRefTypeRepr::getRoot() const {
   return cast<MemberTypeRepr>(this)->getRoot();
 }
 
+bool DeclRefTypeRepr::isBound() const {
+  return const_cast<DeclRefTypeRepr *>(this)->getLastComponent()->isBound();
+}
+
 TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
   return const_cast<DeclRefTypeRepr *>(this)
       ->getLastComponent()

@@ -3294,8 +3294,8 @@ public:
     printRec(T->getTypeRepr());
   }
 
-  void visitIdentTypeRepr(IdentTypeRepr *T, StringRef label) {
-    printCommon("type_ident", label);
+  void visitDeclRefTypeRepr(DeclRefTypeRepr *T, StringRef label) {
+    printCommon(isa<IdentTypeRepr>(T) ? "type_ident" : "type_member", label);
 
     printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
     if (T->isBound())
@@ -3303,21 +3303,12 @@ public:
     else
       printFlag("unbound");
 
-    if (auto *GenIdT = dyn_cast<GenericIdentTypeRepr>(T)) {
-      for (auto genArg : GenIdT->getGenericArgs()) {
-        printRec(genArg);
-      }
+    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
+      printRec(memberTR->getBase());
     }
 
-    printFoot();
-  }
-
-  void visitMemberTypeRepr(MemberTypeRepr *T, StringRef label) {
-    printCommon("type_member", label);
-
-    printRec(T->getRoot());
-    for (auto *comp : T->getMemberComponents()) {
-      printRec(comp);
+    for (auto *genArg : T->getGenericArgs()) {
+      printRec(genArg);
     }
 
     printFoot();
