@@ -2813,8 +2813,7 @@ namespace {
         return false;
 
       if (auto attr = value->getAttrs().getAttribute<NonisolatedAttr>();
-          ctx.LangOpts.hasFeature(Feature::GlobalConcurrency) && attr &&
-          attr->isUnsafe()) {
+          attr && attr->isUnsafe()) {
         return false;
       }
 
@@ -3282,8 +3281,7 @@ namespace {
         }
 
         if (auto attr = var->getAttrs().getAttribute<NonisolatedAttr>();
-            ctx.LangOpts.hasFeature(Feature::GlobalConcurrency) && attr &&
-            attr->isUnsafe()) {
+            attr && attr->isUnsafe()) {
           return false;
         }
 

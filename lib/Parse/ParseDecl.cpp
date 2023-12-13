@@ -5344,8 +5344,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   }
 
   // If this is 'nonisolated', check to see if it is valid.
-  if (Context.LangOpts.hasFeature(Feature::GlobalConcurrency) &&
-      Tok.isContextualKeyword("nonisolated") && Tok2.is(tok::l_paren) &&
+  if (Tok.isContextualKeyword("nonisolated") && Tok2.is(tok::l_paren) &&
       isParenthesizedNonisolated(*this)) {
     BacktrackingScope backtrack(*this);
     consumeToken(tok::identifier);
