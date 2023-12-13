@@ -6560,7 +6560,10 @@ public:
 
     auto *typeAliasDecl = T->getDecl();
     if (typeAliasDecl->isGeneric()) {
-      printGenericArgs(T->getExpandedGenericArgs());
+      if (Options.PrintTypesForDebugging)
+        printGenericArgs(T->getDirectGenericArgs());
+      else
+        printGenericArgs(T->getExpandedGenericArgs());
     }
   }
 
@@ -6571,7 +6574,7 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
@@ -6582,7 +6585,7 @@ public:
       visit(EltType);
     }
 
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "}";
   }
 
@@ -6607,7 +6610,8 @@ public:
 
     if (rootParameterPacks.empty() &&
         (T->getCountType()->isParameterPack() ||
-         T->getCountType()->is<PackArchetypeType>())) {
+         T->getCountType()->is<PackArchetypeType>() ||
+         Options.PrintTypesForDebugging)) {
       Printer << "/* shape: ";
       visit(T->getCountType());
       Printer << " */ ";
@@ -6682,7 +6686,10 @@ public:
     }
     printQualifiedType(T);
 
-    printGenericArgs(T->getExpandedGenericArgs());
+    if (Options.PrintTypesForDebugging)
+      printGenericArgs(T->getGenericArgs());
+    else
+      printGenericArgs(T->getExpandedGenericArgs());
   }
 
   void visitParentType(Type T) {
