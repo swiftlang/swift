@@ -2962,7 +2962,8 @@ namespace {
         return false;
       }
 
-      ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value);
+      ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value)
+          .warnUntilSwiftVersion(6);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       return true;
     }
