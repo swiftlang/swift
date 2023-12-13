@@ -1133,7 +1133,12 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
-    if (TempVFS->exists(ModuleMapFile)) {
+    if (ctx.ClangImporterOpts.UseClangIncludeTree) {
+      // There is no need to add any module map file here. Issue a warning and
+      // drop the option.
+      importer->Impl.diagnose(SourceLoc(), diag::module_map_ignored,
+                              ModuleMapFile);
+    } else if (TempVFS->exists(ModuleMapFile)) {
       FilteredModuleMapFiles.push_back(ModuleMapFile);
     } else {
       importer->Impl.diagnose(SourceLoc(), diag::module_map_not_found,
