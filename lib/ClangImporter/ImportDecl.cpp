@@ -3389,7 +3389,10 @@ namespace {
                     ->getTopLevelModule()
                     ->getFullModuleName() == n;
         };
-        if (topLevelModuleEq(decl, "std")) {
+        if (topLevelModuleEq(decl, "std") ||
+            (decl->getOwningModule() && decl->getOwningModule()->IsSystem &&
+             StringRef(decl->getOwningModule()->getTopLevelModule()->Name)
+                 .starts_with("std_"))) {
           if (isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
             return nullptr;
           }
