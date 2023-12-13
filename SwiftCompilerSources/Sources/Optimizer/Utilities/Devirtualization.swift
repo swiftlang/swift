@@ -30,7 +30,7 @@ func devirtualizeDeinits(of destroy: DestroyAddrInst, _ context: some MutatingCo
 
 private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some MutatingContext) -> Bool {
   let type = destroy.type
-  guard type.isMoveOnly && type.selfOrAnyFieldHasValueDeinit(in: destroy.parentFunction) else {
+  if !type.isMoveOnly {
     return true
   }
   precondition(type.isNominal, "non-copyable non-nominal types not supported, yet")
@@ -47,9 +47,12 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     // the struct fields or enum cases.
     if type.isStruct {
       result = destroy.devirtualizeStructFields(context)
-    } else {
-      precondition(type.isEnum, "unknown nominal value type")
+    } else if type.isEnum {
       result = destroy.devirtualizeEnumPayloads(context)
+    } else {
+      precondition(type.isClass, "unknown non-copyable type")
+      // A class reference cannot be further de-composed.
+      return true
     }
   }
   context.erase(instruction: destroy)

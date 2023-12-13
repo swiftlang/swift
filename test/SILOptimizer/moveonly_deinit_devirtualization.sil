@@ -284,7 +284,9 @@ bb2(%4 : $Builtin.Int32):
 
 
 bb3(%6 : @owned $(Klass, Klass)):
-  destroy_value %6 : $(Klass, Klass)
+  (%7, %8) = destructure_tuple %6 : $(Klass, Klass)
+  destroy_value %7 : $Klass
+  destroy_value %8 : $Klass
   br bb6
 
 bb4(%9 : $(Builtin.Int64, Builtin.Int64)):

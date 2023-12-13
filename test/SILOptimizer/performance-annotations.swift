@@ -471,3 +471,12 @@ func useOfExistentialNoRuntime() -> P {
   Str(x: 1) // expected-error {{Using type 'any P' can cause metadata allocation or locks}}
 }
 
+public struct NonCopyable: ~Copyable {
+  var value: Int
+}
+
+@_noAllocation
+public func testNonCopyable(_ foo: consuming NonCopyable) {
+  let _ = foo.value
+}
+

@@ -285,7 +285,10 @@ bb2:
 
 bb3:
   %6 = unchecked_take_enum_data_addr %0 : $*NonTrivialMoveOnlyEnum, #NonTrivialMoveOnlyEnum.third
-  destroy_addr %6 : $*(Klass, Klass)
+  %7 = tuple_element_addr %6 : $*(Klass, Klass), 0
+  %8 = tuple_element_addr %6 : $*(Klass, Klass), 1
+  destroy_addr %7 : $*Klass
+  destroy_addr %8 : $*Klass
   br bb6
 
 bb4:
