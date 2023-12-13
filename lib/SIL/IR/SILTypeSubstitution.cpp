@@ -348,6 +348,8 @@ public:
                                 [&](Type substExpansionShape) {
       CanType substComponentType = visit(origType.getPatternType());
       if (substExpansionShape) {
+        if (auto packArchetype = substExpansionShape->getAs<PackArchetypeType>())
+          substExpansionShape = packArchetype->getReducedShape();
         substComponentType = CanPackExpansionType::get(substComponentType,
                                     substExpansionShape->getCanonicalType());
       }
