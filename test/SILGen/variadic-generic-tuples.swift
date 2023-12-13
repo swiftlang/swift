@@ -358,8 +358,8 @@ func testStructOfLoadableTuple() -> StructOfLoadableTuple<Int> {
 //   The verifier had some home-grown type-lowering logic that didn't
 //   know about pack expansions.
 // CHECK-LABEL: sil {{.*}}@$s4main22testExistentialErasureyyxxQpRvzlF1gL_yyqd__qd__QpRvzRvd__r__lF :
-// CHECK:         [[T0:%.*]] = init_existential_addr {{.*}} : $*Any, $(repeat each T.Type)
-// CHECK:         tuple_pack_element_addr {{.*}} of [[T0]] : $*(repeat @thick each T.Type) as $*@thick (@pack_element("{{.*}}") each T).Type
+// CHECK:         [[T0:%.*]] = init_existential_addr {{.*}} : $*Any, $(repeat (each T).Type)
+// CHECK:         tuple_pack_element_addr {{.*}} of [[T0]] : $*(repeat @thick (each T).Type) as $*@thick (@pack_element("{{.*}}") each T).Type
 func testExistentialErasure<each T>(_: repeat each T) {
   func g<each U>(_: repeat each U) {
     print((repeat (each T).self))

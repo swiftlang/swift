@@ -6244,7 +6244,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       if (param->isParameterPack())
         return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
-      if (archetype->isParameterPack())
+      if (isa<PackArchetypeType>(archetype))
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
         return false;
