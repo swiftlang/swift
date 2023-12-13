@@ -8,6 +8,10 @@
 // CHECK:   mutating func callAsFunction(_ x: Int32) -> Int32
 // CHECK:   mutating func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK: }
+// CHECK: func == (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
+// CHECK: func -= (lhs: inout LoadableIntWrapper, rhs: LoadableIntWrapper)
+
+// CHECK: func == (lhs: NS.IntWrapperInNamespace, rhs: NS.IntWrapperInNamespace) -> Bool
 
 // CHECK: struct LoadableBoolWrapper
 // CHECK:   prefix static func ! (lhs: inout LoadableBoolWrapper) -> LoadableBoolWrapper
