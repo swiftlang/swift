@@ -1978,6 +1978,26 @@ static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getGetEnumTag(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto paramTy = makeGenericParam();
+  builder.addParameter(paramTy);
+  builder.setResult(makeConcrete(BuiltinIntegerType::get(32, ctx)));
+
+  return builder.build(id);
+}
+
+static ValueDecl *getInjectEnumTag(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  builder.addParameter(makeGenericParam(), ParamSpecifier::InOut);
+  builder.addParameter(makeConcrete(BuiltinIntegerType::get(32, ctx)));
+  builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
+
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -3019,6 +3039,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::PackLength:
     return getPackLength(Context, Id);
+
+  case BuiltinValueKind::GetEnumTag:
+    return getGetEnumTag(Context, Id);
+
+  case BuiltinValueKind::InjectEnumTag:
+    return getInjectEnumTag(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

@@ -879,6 +879,8 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
 OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
                                                               StringRef) {
   if (bi->getFunction()->getConventions().useLoweredAddresses()) {

@@ -1048,6 +1048,21 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
                                    "buildMainActorExecutorRef", "n", Special)
 
+/// getEnumTag: <T>(_: T) -> Builtin.Int32
+///
+/// Given a dynamic generic value, unsafely assume it is an enum type and call
+/// the getEnumTag vwt function.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetEnumTag, "getEnumTag", "", Special)
+
+/// injectEnumTag: <T>(_: inout T, _: Builtin.Int32) -> ()
+///
+/// Given a dynamic inout generic value, unsafely assume it is an enum type and
+/// inject the given tag into it.
+///
+/// Note: This assume that either 1. the given tag has no payload or 2. the
+/// tag's payload is already initialized with the given source.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(InjectEnumTag, "injectEnumTag", "", Special)
+
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 
 #undef BUILTIN_MISC_OPERATION

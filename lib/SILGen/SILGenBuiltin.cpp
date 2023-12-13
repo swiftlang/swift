@@ -1817,6 +1817,34 @@ static ManagedValue emitBuiltinBuildMainActorExecutorRef(
                               BuiltinValueKind::BuildMainActorExecutorRef);
 }
 
+static ManagedValue emitBuiltinGetEnumTag(SILGenFunction &SGF, SILLocation loc,
+                                          SubstitutionMap subs,
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+
+  auto bi = SGF.B.createBuiltin(
+    loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetEnumTag)),
+    SILType::getBuiltinIntegerType(32, ctx), subs,
+    { args[0].getValue() });
+
+  return ManagedValue::forObjectRValueWithoutOwnership(bi);
+}
+
+static ManagedValue emitBuiltinInjectEnumTag(SILGenFunction &SGF, SILLocation loc,
+                                             SubstitutionMap subs,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+
+  auto bi = SGF.B.createBuiltin(
+    loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::InjectEnumTag)),
+    SILType::getEmptyTupleType(ctx), subs,
+    { args[0].getValue(), args[1].getValue() });
+
+  return ManagedValue::forObjectRValueWithoutOwnership(bi);
+}
+
 llvm::Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
