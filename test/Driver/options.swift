@@ -127,13 +127,21 @@
 // INVALID_DWARF_VERSION: invalid value '{{1|6}}' in '-dwarf-version={{1|6}}'
 
 // RUN: %swift_driver -### -g -target x86_64-apple-macosx10.10 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-macosx10.10 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
 // RUN: %swift_driver -### -g -target x86_64-apple-macosx10.11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-macosx10.11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 // RUN: %swift_driver -### -g -target x86_64-apple-macos14.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
-// RUN: %swift_driver -### -g -target x86_64-apple-ios8.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
-// RUN: %swift_driver -### -g -target x86_64-apple-ios9.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-macos14.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target arm64-apple-ios8.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-ios8.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swift_driver -### -g -target arm64-apple-ios9.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-ios9.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 // RUN: %swift_driver -### -g -target x86_64-apple-ios17.0-macabi %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
-// RUN: %swift_driver -### -g -target x86_64-apple-tvos17.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
-// RUN: %swift_driver -### -g -target x86_64-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-ios17.0-macabi %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target arm64-apple-tvos17.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-tvos17.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
