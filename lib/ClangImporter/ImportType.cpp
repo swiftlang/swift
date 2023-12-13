@@ -2468,8 +2468,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
                                    const bool isParamTypeImplicitlyUnwrapped) {
   // Figure out the name for this parameter.
   Identifier bodyName = impl->importFullName(param, impl->CurrentVersion)
-                            .getDeclName()
-                            .getBaseIdentifier();
+                            .getBaseIdentifier(impl->SwiftContext);
 
   // It doesn't actually matter which DeclContext we use, so just use the
   // imported header unit.
@@ -3284,7 +3283,7 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
     ImportedName fullBodyName = importFullName(param, CurrentVersion);
-    Identifier bodyName = fullBodyName.getDeclName().getBaseIdentifier();
+    Identifier bodyName = fullBodyName.getBaseIdentifier(SwiftContext);
     SourceLoc nameLoc = importSourceLoc(param->getLocation());
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo
