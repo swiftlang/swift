@@ -1,10 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -o %t/a.out.fragile %s 
+// RUN: %target-codesign %t/a.out.fragile
 // RUN: %target-run %t/a.out.fragile | %FileCheck %s
 
 // FIXME: miscompiles cause extra deinits with library evolution enabled
 
 // R/UN: %target-build-swift -enable-library-evolution -o %t/a.out.resilient %s 
+// R/UN: %target-codesign %t/a.out.resilient
 // R/UN: %target-run %t/a.out.resilient | %FileCheck %s
 
 // REQUIRES: executable_test
