@@ -313,6 +313,7 @@ static bool isSILValueFoldable(SILValue value) {
   return (!silType.isAddress() && !isa<LiteralInst>(definingInst) &&
           !isa<LoadBorrowInst>(definingInst) &&
           !isa<BeginBorrowInst>(definingInst) &&
+          !isa<MoveValueInst>(definingInst) &&
           !isa<CopyValueInst>(definingInst) &&
           (isFoldableIntOrBool(value, astContext) ||
            isFoldableString(value, astContext) ||
