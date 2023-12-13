@@ -2745,23 +2745,20 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
-        // TypeRepr version: Builtin.AnyObject
-        if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
-          if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
-            auto memberComps = memberTR->getMemberComponents();
-            if (memberComps.size() == 1 &&
-                memberComps.front()->getNameRef().isSimpleName("AnyObject") &&
-                memberTR->getRoot()->isSimpleUnqualifiedIdentifier("Builtin")) {
-              anyObject = true;
-            }
-          }
-        }
-
         // Type version: an empty class-bound existential.
         if (typealias->hasInterfaceType()) {
           if (auto type = typealias->getUnderlyingType())
             if (type->isAnyObject())
               anyObject = true;
+        }
+        // TypeRepr version: Builtin.AnyObject
+        else if (auto *memberTR = dyn_cast_or_null<MemberTypeRepr>(
+                     typealias->getUnderlyingTypeRepr())) {
+          if (!memberTR->hasGenericArgList() &&
+              memberTR->getNameRef().isSimpleName("AnyObject") &&
+              memberTR->getBase()->isSimpleUnqualifiedIdentifier("Builtin")) {
+            anyObject = true;
+          }
         }
       }
 
@@ -2922,50 +2919,25 @@ static DirectlyReferencedTypeDecls
 directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                    DeclRefTypeRepr *repr, DeclContext *dc,
                                    bool allowUsableFromInline) {
-  DirectlyReferencedTypeDecls current;
-
-  auto *rootComp = repr->getRoot();
-  if (auto *identBase = dyn_cast<IdentTypeRepr>(rootComp)) {
-    // If we already set a declaration, use it.
-    if (auto *typeDecl = identBase->getBoundDecl()) {
-      current = {1, typeDecl};
-    } else {
-      // For the base component, perform unqualified name lookup.
-      current = directReferencesForUnqualifiedTypeLookup(
-          identBase->getNameRef(), identBase->getLoc(), dc,
-          LookupOuterResults::Excluded, allowUsableFromInline);
-    }
-  } else {
-    current = directReferencesForTypeRepr(evaluator, ctx, rootComp, dc,
-                                          allowUsableFromInline);
+  // If we already set a declaration, use it.
+  if (auto *typeDecl = repr->getBoundDecl()) {
+    return {typeDecl};
   }
 
-  auto *memberTR = dyn_cast<MemberTypeRepr>(repr);
-  if (!memberTR)
-    return current;
+  if (auto *memberTR = dyn_cast<MemberTypeRepr>(repr)) {
+    DirectlyReferencedTypeDecls baseTypeDecls = directReferencesForTypeRepr(
+        evaluator, ctx, memberTR->getBase(), dc, allowUsableFromInline);
 
-  // If we didn't find anything, fail now.
-  if (current.empty())
-    return current;
-
-  for (const auto &component : memberTR->getMemberComponents()) {
-    // If we already set a declaration, use it.
-    if (auto typeDecl = component->getBoundDecl()) {
-      current = {1, typeDecl};
-      continue;
-    }
-
-    // For subsequent components, perform qualified name lookup.
-    current =
-        directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
-                                               component->getNameRef(), dc,
-                                               component->getLoc(),
-                                               allowUsableFromInline);
-    if (current.empty())
-      return current;
+    // For a qualified identifier, perform qualified name lookup.
+    return directReferencesForQualifiedTypeLookup(
+        evaluator, ctx, baseTypeDecls, repr->getNameRef(), dc, repr->getLoc(),
+        allowUsableFromInline);
   }
 
-  return current;
+  // For an unqualified identifier, perform unqualified name lookup.
+  return directReferencesForUnqualifiedTypeLookup(
+      repr->getNameRef(), repr->getLoc(), dc, LookupOuterResults::Excluded,
+      allowUsableFromInline);
 }
 
 static DirectlyReferencedTypeDecls
@@ -3654,11 +3626,12 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                assocType->getDescriptiveKind(),
                                assocType->getName());
 
-            auto *baseComp = new (ctx) SimpleIdentTypeRepr(
+            auto *baseTR = new (ctx) SimpleIdentTypeRepr(
                 identTypeRepr->getNameLoc(), DeclNameRef(moduleName));
 
             auto *newTE = new (ctx) TypeExpr(
-                MemberTypeRepr::create(ctx, baseComp, {identTypeRepr}));
+                MemberTypeRepr::create(ctx, baseTR, identTypeRepr->getNameLoc(),
+                                       identTypeRepr->getNameRef()));
             attr->resetTypeInformation(newTE);
             return nominal;
           }

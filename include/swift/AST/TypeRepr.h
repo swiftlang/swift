@@ -362,6 +362,11 @@ public:
   /// The identifier that describes the last component.
   DeclNameRef getNameRef() const;
 
+  /// Returns whether this instance has a generic argument list. That is, either
+  /// a valid angle bracket source range, or a positive number of generic
+  /// arguments.
+  bool hasGenericArgList() const;
+
   ArrayRef<TypeRepr *> getGenericArgs() const;
 
   static bool classof(const TypeRepr *T) {
@@ -518,11 +523,14 @@ class MemberTypeRepr final : public DeclRefTypeRepr,
       private llvm::TrailingObjects<MemberTypeRepr, IdentTypeRepr *> {
   friend TrailingObjects;
 
+  const ASTContext *C;
+
   /// The root component, which is not necessarily an identifier type.
   TypeRepr *Root;
 
-  MemberTypeRepr(TypeRepr *Root, ArrayRef<IdentTypeRepr *> MemberComponents)
-      : DeclRefTypeRepr(TypeReprKind::Member), Root(Root) {
+  MemberTypeRepr(TypeRepr *Root, ArrayRef<IdentTypeRepr *> MemberComponents,
+                 const ASTContext &C)
+      : DeclRefTypeRepr(TypeReprKind::Member), C(&C), Root(Root) {
     Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
     assert(MemberComponents.size() > 0 &&
            "MemberTypeRepr requires at least 1 member component");
@@ -531,11 +539,23 @@ class MemberTypeRepr final : public DeclRefTypeRepr,
   }
 
 public:
+  static MemberTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                DeclNameLoc NameLoc, DeclNameRef Name);
+
+  static MemberTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                DeclNameLoc NameLoc, DeclNameRef Name,
+                                ArrayRef<TypeRepr *> GenericArgs,
+                                SourceRange AngleBrackets);
+
   static TypeRepr *create(const ASTContext &Ctx, TypeRepr *Root,
                           ArrayRef<IdentTypeRepr *> MemberComponents);
 
   static DeclRefTypeRepr *create(const ASTContext &Ctx,
                                  ArrayRef<IdentTypeRepr *> Components);
+
+  /// Returns the qualifier or base type representation. For example, `A.B`
+  /// for `A.B.C`.
+  TypeRepr *getBase() const;
 
   /// Returns the root qualifier. For example, `A` for `A.B.C`.
   TypeRepr *getRoot() const { return Root; }

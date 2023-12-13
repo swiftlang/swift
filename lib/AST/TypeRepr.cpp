@@ -209,6 +209,11 @@ TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
       ->getBoundDecl();
 }
 
+bool DeclRefTypeRepr::hasGenericArgList() const {
+  return isa<GenericIdentTypeRepr>(
+      const_cast<DeclRefTypeRepr *>(this)->getLastComponent());
+}
+
 ArrayRef<TypeRepr *> DeclRefTypeRepr::getGenericArgs() const {
   auto *lastComp = const_cast<DeclRefTypeRepr *>(this)->getLastComponent();
   if (auto *genericTR = dyn_cast<GenericIdentTypeRepr>(lastComp)) {
@@ -454,6 +459,21 @@ GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
   return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
 }
 
+MemberTypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                       DeclNameLoc NameLoc, DeclNameRef Name) {
+  assert(Base);
+  return cast<MemberTypeRepr>(DeclRefTypeRepr::create(C, Base, NameLoc, Name));
+}
+
+MemberTypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Base,
+                                       DeclNameLoc NameLoc, DeclNameRef Name,
+                                       ArrayRef<TypeRepr *> GenericArgs,
+                                       SourceRange AngleBrackets) {
+  assert(Base);
+  return cast<MemberTypeRepr>(DeclRefTypeRepr::create(
+      C, Base, NameLoc, Name, GenericArgs, AngleBrackets));
+}
+
 TypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Root,
                                  ArrayRef<IdentTypeRepr *> MemberComponents) {
   if (MemberComponents.empty())
@@ -461,13 +481,18 @@ TypeRepr *MemberTypeRepr::create(const ASTContext &C, TypeRepr *Root,
 
   auto size = totalSizeToAlloc<IdentTypeRepr *>(MemberComponents.size());
   auto mem = C.Allocate(size, alignof(MemberTypeRepr));
-  return new (mem) MemberTypeRepr(Root, MemberComponents);
+  return new (mem) MemberTypeRepr(Root, MemberComponents, C);
 }
 
 DeclRefTypeRepr *MemberTypeRepr::create(const ASTContext &Ctx,
                                         ArrayRef<IdentTypeRepr *> Components) {
   return cast<DeclRefTypeRepr>(
       create(Ctx, Components.front(), Components.drop_front()));
+}
+
+TypeRepr *MemberTypeRepr::getBase() const {
+  return MemberTypeRepr::create(*C, getRoot(),
+                                getMemberComponents().drop_back());
 }
 
 PackTypeRepr::PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,
