@@ -515,6 +515,10 @@ ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   if (decl->isImplicit())
     return { };
 
+  // Member attribute macros do not apply to accessors.
+  if (isa<AccessorDecl>(decl))
+    return { };
+
   // Member attribute macros do not apply to macro-expanded members.
   if (decl->isInMacroExpansionInContext())
     return { };

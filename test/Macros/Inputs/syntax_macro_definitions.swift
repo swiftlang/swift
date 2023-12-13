@@ -2259,3 +2259,18 @@ public struct LoggerMacro: PreambleMacro {
     ]
   }
 }
+
+public struct AddMemberPeersMacro: MemberAttributeMacro {
+    public static func expansion(of node: AttributeSyntax, attachedTo declaration: some DeclGroupSyntax, providingAttributesFor member: some DeclSyntaxProtocol, in context: some MacroExpansionContext) throws -> [AttributeSyntax] {
+        ["@_AddPeer"]
+    }
+}
+
+public struct _AddPeerMacro: PeerMacro {
+    public static func expansion<Decl: DeclSyntaxProtocol>(of node: AttributeSyntax, providingPeersOf declaration: Decl, in context: some MacroExpansionContext) throws -> [DeclSyntax] {
+        guard let name = declaration.as(VariableDeclSyntax.self)?.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else {
+            return []
+        }
+        return ["static let \(raw: name)_special = 41"]
+    }
+}
