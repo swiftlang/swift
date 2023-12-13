@@ -1,9 +1,13 @@
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency -enable-experimental-feature GlobalConcurrency -swift-version 6 -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -swift-version 6 -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -swift-version 6 -emit-sil -o /dev/null -verify -verify-additional-prefix region-isolation- -enable-experimental-feature RegionBasedIsolation %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables -parse-as-library -strict-concurrency=minimal -swift-version 5 %S/Inputs/GlobalVariables.swift
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency -enable-experimental-feature GlobalConcurrency -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify -verify-additional-prefix region-isolation- -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+
+@preconcurrency import GlobalVariables
 
 class C1 { } // expected-note{{class 'C1' does not conform to the 'Sendable' protocol}}
 class C2 { }
@@ -74,6 +78,7 @@ func f() {
   print(TestStatics.immutableExplicitSendable)
   print(TestStatics.immutableInferredSendable)
   print(TestStatics.mutable) // expected-error{{reference to static property 'mutable' is not concurrency-safe because it involves shared mutable state}}
+  print(Globals.actorInteger) // expected-error{{main actor-isolated static property 'actorInteger' can not be referenced from global actor 'TestGlobalActor'}}
 }
 
 func testLocalNonisolatedUnsafe() async {
@@ -83,6 +88,14 @@ func testLocalNonisolatedUnsafe() async {
     return value
   }
   print(await task.value)
+}
+
+func testCGlobals() { // expected-note{{add '@MainActor' to make global function 'testCGlobals()' part of global actor 'MainActor'}}
+  let _ = Globals.integerConstant
+  let _ = Globals.integerMutable // expected-warning{{reference to static property 'integerMutable' is not concurrency-safe because it involves shared mutable state}}
+  let _ = Globals.nonisolatedUnsafeIntegerConstant
+  let _ = Globals.nonisolatedUnsafeIntegerMutable
+  let _ = Globals.actorInteger // expected-error{{main actor-isolated static property 'actorInteger' can not be referenced from a non-isolated context}}
 }
 
 @MainActor
