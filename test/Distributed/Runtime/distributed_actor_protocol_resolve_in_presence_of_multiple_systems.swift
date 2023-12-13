@@ -42,7 +42,6 @@ distributed actor GreeterP_UnknownSystem_FakeRoundtripActorSystem_Stub: GreeterP
 }
 // end of @Proxy output =======
 
-
 // start of @Proxy output =======
 extension GreeterP_UnknownSystem where Self == GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub {
   static func resolve(
@@ -78,34 +77,16 @@ distributed actor DAL {
 @main struct Main {
   static func main() async throws {
     let fakeRoundtripSystem = FakeRoundtripActorSystem()
-    let localTestingSystem = LocalTestingDistributedActorSystem()
-
-//    /Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_protocol_resolve.swift:143:47: error: ambiguous use of 'resolve(id:using:)'
-//    let gu: any GreeterP_UnknownSystem = try .resolve(id: .init(parse: "one"), using: localTestingSystem)
-//      ^
-//      /Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_protocol_resolve.swift:78:15: note: found this candidate
-//    static func resolve(id: Self.ID,
-//    ^
-//    /Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_protocol_resolve.swift:90:15: note: found this candidate
-//    static func resolve(id: Self.ID,
-//    ^
-//    /Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_protocol_resolve.swift:144:47: error: ambiguous use of 'resolve(id:using:)'
-//    let gf: any GreeterP_UnknownSystem = try .resolve(id: .init(parse: "one"), using: localTestingSystem)
-//      ^
-//      /Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_protocol_resolve.swift:78:15: note: found this candidate
-//    static func resolve(id: Self.ID,
-//    ^
-//    /Users/ktoso/code/swift-project/swift/test/Distributed/Runtime/distributed_actor_protocol_resolve.swift:90:15: note: found this candidate
-//    static func resolve(id: Self.ID,
-//    ^
-
     let fid = fakeRoundtripSystem.assignID(DAF.self)
+
+    let localTestingSystem = LocalTestingDistributedActorSystem()
+    let gid = localTestingSystem.assignID(DAL.self)
+
     let gf: any GreeterP_UnknownSystem = try .resolve(id: fid, using: fakeRoundtripSystem)
     print("resolved on \(fakeRoundtripSystem): \(type(of: gf))")
     // CHECK: resolved on main.FakeRoundtripActorSystem: GreeterP_UnknownSystem_FakeRoundtripActorSystem_Stub
     print()
 
-    let gid = localTestingSystem.assignID(DAL.self)
     let gl: any GreeterP_UnknownSystem = try .resolve(id: gid, using: localTestingSystem)
     print("resolved on \(localTestingSystem): \(type(of: gl))")
     // CHECK: resolved on Distributed.LocalTestingDistributedActorSystem: GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub

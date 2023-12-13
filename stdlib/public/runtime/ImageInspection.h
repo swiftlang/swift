@@ -82,6 +82,12 @@ void addImageAccessibleFunctionsBlockCallback(const void *baseAddress,
 void addImageAccessibleFunctionsBlockCallbackUnsafe(const void *baseAddress,
                                                     const void *start,
                                                     uintptr_t size);
+void addImageDistributedAccessibleFunctionsBlockCallback(const void *baseAddress,
+                                              const void *dstart,
+                                              uintptr_t dsize);
+void addImageDistributedAccessibleFunctionsBlockCallbackUnsafe(const void *baseAddress,
+                                                    const void *dstart,
+                                                    uintptr_t dsize);
 
 } // end namespace swift
 

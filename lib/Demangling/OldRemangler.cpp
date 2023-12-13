@@ -2992,6 +2992,12 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleDistributedAccessibleFunctionRecord(Node *node,
+                                                                   unsigned depth) {
+  Buffer << "DF";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleBackDeploymentThunk(Node *node, unsigned depth) {
   Buffer << "Twb";
   return ManglingError::Success;

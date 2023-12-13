@@ -4414,6 +4414,17 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 void IRGenModule::addAccessibleFunction(SILFunction *func) {
   AccessibleFunctions.push_back(func);
 }
+void IRGenModule::addAccessibleFunctionDistributedAliased(
+    std::string mangledRecordName,
+    std::optional<std::string> mangledActorTypeName,
+    SILFunction *func) {
+  AliasedAccessibleFunctions.push_back(
+      DistributedAccessibleFunctionData(
+          func,
+          mangledRecordName,
+          mangledActorTypeName
+          ));
+}
 
 /// Emit the protocol conformance list and return it (if asContiguousArray is
 /// true, otherwise the records are emitted as individual globals and
@@ -4636,6 +4647,83 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   return nullptr;
 }
 
+void IRGenModule::emitAccessibleFunction(
+    StringRef sectionName, std::string mangledRecordName,
+    std::optional<std::string> mangledActorName,
+    std::string mangledFunctionName, SILFunction* func) {
+
+  auto recordTy = func->isDistributed() && mangledActorName.has_value()
+                        ? DistributedAccessibleFunctionRecordTy
+                        : AccessibleFunctionRecordTy;
+
+  auto var = new llvm::GlobalVariable(
+      Module, recordTy, /*isConstant=*/true,
+      llvm::GlobalValue::PrivateLinkage, /*initializer=*/nullptr,
+      mangledRecordName);
+
+  ConstantInitBuilder builder(*this);
+  ConstantStructBuilder fields =
+      builder.beginStruct(recordTy);
+
+  llvm::Constant *name = getAddrOfGlobalString(
+      // mangledFunctionName, /*willBeRelativelyAddressed=*/true);
+      mangledRecordName, /*willBeRelativelyAddressed=*/true);
+  fields.addRelativeAddress(name);
+
+  if (func->isDistributed()) {
+    fprintf(stderr, "[%s:%d](%s) STORE distributed actor name: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            mangledActorName->c_str());
+    if (mangledActorName) {
+      llvm::Constant *mangledActorNameAddr =
+          getAddrOfGlobalString(*mangledActorName, /*willBeRelativelyAddressed=*/true);
+      fields.addRelativeAddress(mangledActorNameAddr);
+    }
+  }
+
+  llvm::Constant *genericEnvironment = nullptr;
+
+  GenericSignature signature;
+  if (auto *env = func->getGenericEnvironment()) {
+    // Drop all of the marker protocols because they are effect-less
+    // at runtime.
+    signature = env->getGenericSignature().withoutMarkerProtocols();
+
+    genericEnvironment =
+        getAddrOfGenericEnvironment(signature.getCanonicalSignature());
+  }
+
+  fields.addRelativeAddressOrNull(genericEnvironment);
+
+  llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
+                                    MangledTypeRefRole::Metadata)
+                             .first;
+  fields.addRelativeAddress(type);
+
+  llvm::Constant *funcAddr = nullptr;
+  if (func->isDistributed()) {
+    fprintf(stderr, "[%s:%d](%s) EMIT FUNCTION: mangledRecordName: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            mangledRecordName.c_str());
+    funcAddr = getAddrOfAsyncFunctionPointer(
+        LinkEntity::forDistributedTargetAccessor(func));
+  } else if (func->isAsync()) {
+    funcAddr = getAddrOfAsyncFunctionPointer(func);
+  } else {
+    funcAddr = getAddrOfSILFunction(func, NotForDefinition);
+  }
+
+  fields.addRelativeAddress(funcAddr);
+
+  AccessibleFunctionFlags flags;
+  flags.setDistributed(func->isDistributed());
+  fields.addInt32(flags.getOpaqueValue());
+
+  fields.finishAndSetAsInitializer(var);
+  var->setSection(sectionName);
+  var->setAlignment(llvm::MaybeAlign(4));
+  disableAddressSanitizer(*this, var);
+  addUsedGlobal(var);
+}
+
 void IRGenModule::emitAccessibleFunctions() {
   if (AccessibleFunctions.empty())
     return;
@@ -4661,65 +4749,65 @@ void IRGenModule::emitAccessibleFunctions() {
     break;
   }
 
+  StringRef sectionName2;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
+  case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit accessible functions for "
+                     "the selected object format.");
+  case llvm::Triple::MachO:
+    sectionName2 = "__TEXT, __swift5_dacfuns, regular";
+    break;
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    sectionName2 = "swift5_distributed_accessible_functions";
+    break;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    sectionName2 = ".sw5dacfn$B";
+    break;
+  }
+
   for (auto *func : AccessibleFunctions) {
     auto mangledRecordName =
         LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
-
-    auto var = new llvm::GlobalVariable(
-        Module, AccessibleFunctionRecordTy, /*isConstant*/ true,
-        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
-        mangledRecordName);
-
-    ConstantInitBuilder builder(*this);
-    ConstantStructBuilder fields =
-        builder.beginStruct(AccessibleFunctionRecordTy);
-
     std::string mangledFunctionName =
         LinkEntity::forSILFunction(func).mangleAsString();
-    llvm::Constant *name = getAddrOfGlobalString(
-        mangledFunctionName, /*willBeRelativelyAddressed*/ true);
-    fields.addRelativeAddress(name);
 
-    llvm::Constant *genericEnvironment = nullptr;
+    emitAccessibleFunction(
+        sectionName, mangledRecordName,
+        /*mangledActorName=*/{}, mangledFunctionName, func);
+  }
 
-    GenericSignature signature;
-    if (auto *env = func->getGenericEnvironment()) {
-      // Drop all of the marker protocols because they are effect-less
-      // at runtime.
-      signature = env->getGenericSignature().withoutMarkerProtocols();
+  for (auto accessibleInfo : AliasedAccessibleFunctions) {
+    auto func = accessibleInfo.function;
 
-      genericEnvironment =
-          getAddrOfGenericEnvironment(signature.getCanonicalSignature());
-    }
+    std::string mangledRecordName =
+        accessibleInfo.mangledRecordName
+            ? (*accessibleInfo.mangledRecordName)
+            : LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
+//    std::string mangledFunctionName =
+//        accessibleInfo.specificMangledActorName
+//            LinkEntity::forSILFunction(func).mangleAsString();
+    std::string mangledFunctionName =
+        LinkEntity::forSILFunction(func).mangleAsString();
+    std::string mangledActorName =
+        accessibleInfo.specificMangledActorName
+          ? *accessibleInfo.specificMangledActorName
+          : "<none>";
 
-    fields.addRelativeAddressOrNull(genericEnvironment);
+    fprintf(stderr, "[%s:%d](%s) XXX: Store extra accessible;                    mangledRecordName:   %s \n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            mangledRecordName.c_str());
+    fprintf(stderr, "[%s:%d](%s) XXX:                                      ----> mangledFunctionName: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            mangledFunctionName.c_str());
+    fprintf(stderr, "[%s:%d](%s) XXX:                                      ----> mangledActorName:    %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            mangledActorName.c_str());
 
-    llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
-                                      MangledTypeRefRole::Metadata)
-                               .first;
-    fields.addRelativeAddress(type);
-
-    llvm::Constant *funcAddr = nullptr;
-    if (func->isDistributed()) {
-      funcAddr = getAddrOfAsyncFunctionPointer(
-          LinkEntity::forDistributedTargetAccessor(func));
-    } else if (func->isAsync()) {
-      funcAddr = getAddrOfAsyncFunctionPointer(func);
-    } else {
-      funcAddr = getAddrOfSILFunction(func, NotForDefinition);
-    }
-
-    fields.addRelativeAddress(funcAddr);
-
-    AccessibleFunctionFlags flags;
-    flags.setDistributed(func->isDistributed());
-    fields.addInt32(flags.getOpaqueValue());
-
-    fields.finishAndSetAsInitializer(var);
-    var->setSection(sectionName);
-    var->setAlignment(llvm::MaybeAlign(4));
-    disableAddressSanitizer(*this, var);
-    addUsedGlobal(var);
+    emitAccessibleFunction(
+        sectionName2, mangledRecordName,
+        mangledActorName, mangledFunctionName, func);
   }
 }
 

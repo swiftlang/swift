@@ -7527,6 +7527,15 @@ public:
            getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
 
+  /// Return a vector of distributed requirements that this distributed method
+  /// is implementing.
+  ///
+  /// If the method is witness to multiple requirements this is incorrect and
+  /// should be diagnosed during type-checking as it may make remoteCalls
+  /// ambiguous.
+  llvm::TinyPtrVector<ValueDecl *>
+  getDistributedMethodWitnessedProtocolRequirements() const;
+
   /// Determines whether this function is a 'remoteCall' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedActorSystem' protocol.

@@ -379,6 +379,21 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
       std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
+llvm::TinyPtrVector<ValueDecl *>
+AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const {
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+
+  // Only a 'distributed' decl can witness 'distributed' protocol requirements
+  if (!isDistributed()) {
+    assert(false);
+    return {};
+  }
+
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedMethodWitnessedProtocolRequirements(mutableThis), {});
+}
+
 /******************************************************************************/
 /********************* Ad-hoc protocol requirement checks *********************/
 /******************************************************************************/

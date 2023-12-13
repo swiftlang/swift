@@ -518,10 +518,42 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   {
     // --- Mangle the thunk name
     Mangle::ASTMangler mangler;
-    auto mangled =
-        C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
-    auto mangledTargetStringLiteral =
-        new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
+
+    // FIXME: cleanup
+    StringLiteralExpr *mangledTargetStringLiteral = nullptr;
+    auto witnessedDistributedRequirements =
+        func->getDistributedMethodWitnessedProtocolRequirements();
+
+    thunk->dump();
+    fprintf(stderr, "[%s:%d](%s) IS [%s] A WITNESS? result = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            thunk->getNameStr().str().c_str(),
+            witnessedDistributedRequirements.size());
+
+    if (witnessedDistributedRequirements.size() == 1) {
+      auto protocolFunc = witnessedDistributedRequirements.front();
+
+      // we expect to witness exactly one distributed requirement,
+      // otherwise we should have diagnosed errors about more than 1 already.
+      std::string mangledString =
+          mangler.mangleDistributedThunk(cast<FuncDecl>(protocolFunc));
+      fprintf(stderr, "[%s:%d](%s)            THE MANGLING: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+              mangledString.c_str());
+      fprintf(stderr, "[%s:%d](%s) REFERENCE THUNK EXAMPLE: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+              "$s4main28GreeterP_ConcreteSystem_StubC5greetSSyYaKFTE");
+      // FIXME: make it THUNK so the mangling is right
+      // MUST BE LIKE: s4main28GreeterP_ConcreteSystem_StubC5greetSSyYaKFTE
+
+      StringRef mangled = C.AllocateCopy(mangledString);
+      mangledTargetStringLiteral =
+          new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
+    } else {
+      // default mangling
+      auto mangled =
+          C.AllocateCopy(mangler.mangleDistributedThunk(cast<FuncDecl>(thunk)));
+      mangledTargetStringLiteral =
+          new (C) StringLiteralExpr(mangled, SourceRange(), implicit);
+    }
+    assert(mangledTargetStringLiteral && "must be initialized");
 
     // --- let target = RemoteCallTarget(<mangled name>)
     targetVar->setInterfaceType(remoteCallTargetTy);
@@ -719,6 +751,22 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
+
+//  auto witnessedDistributedReqs =
+//      func->getDistributedMethodWitnessedProtocolRequirements();
+//  if (witnessedDistributedReqs.size() == 1) {
+//    auto distributedRequirement = witnessedDistributedReqs.front();
+      fprintf(stderr, "[%s:%d](%s) THE FUNC [%s] WITNESS OF PROTOCOL FUNC:\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+              func->getNameStr().str().c_str());
+//      distributedRequirement->dump();
+      thunk->getAttrs().add(
+          new (C) DistributedThunkTargetAttr(func));
+//  }
+
+  for (auto a : thunk->getAttrs()) {
+    fprintf(stderr, "[%s:%d](%s) attributes after setting: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+              a->getAttrName().str().c_str());
+  }
 
   return thunk;
 }

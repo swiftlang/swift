@@ -925,3 +925,23 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
   assert(candidates.size() == 1);
   return candidates.front();
 }
+
+llvm::TinyPtrVector<ValueDecl *>
+GetDistributedMethodWitnessedProtocolRequirements::evaluate(
+    Evaluator &evaluator,
+    AbstractFunctionDecl *afd) const {
+  auto DC = afd->getDeclContext();
+
+  auto result = llvm::TinyPtrVector<ValueDecl *>();
+  for (auto witnessedRequirement : afd->getSatisfiedProtocolRequirements()) {
+    fprintf(stderr, "[%s:%d](%s) witnessed:\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    witnessedRequirement->dump();
+    if (witnessedRequirement->isDistributed()) {
+      result.push_back(witnessedRequirement);
+    }
+  }
+
+  fprintf(stderr, "[%s:%d](%s) results.count = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          result.size());
+  return result;
+}
