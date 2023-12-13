@@ -312,7 +312,6 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
 /******** Functions on DistributedActorSystem and friends *********************/
 /******************************************************************************/
 
-
 FuncDecl*
 ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
   if (!actor->isDistributedActor())
@@ -1257,11 +1256,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
 /********************** Distributed Functions *********************************/
 /******************************************************************************/
 
-bool AbstractFunctionDecl::isDistributed() const {
-  return getAttrs().hasAttribute<DistributedActorAttr>();
-}
-
-bool AbstractStorageDecl::isDistributed() const {
+bool ValueDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 

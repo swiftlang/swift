@@ -2772,6 +2772,12 @@ public:
     Bits.ValueDecl.Synthesized = value;
   }
 
+  /// Does this have a 'distributed' modifier?
+  ///
+  /// Only member methods and computed properties of a `distributed actor`
+  /// can be distributed.
+  bool isDistributed() const;
+
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
@@ -5868,9 +5874,6 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
-  /// Does this have a 'distributed' modifier?
-  bool isDistributed() const;
-
   /// Return a distributed thunk if this computed property is marked as
   /// 'distributed' and and nullptr otherwise.
   FuncDecl *getDistributedThunk() const;
@@ -7377,9 +7380,6 @@ public:
 
   /// Returns if the function is 'rethrows' or 'reasync'.
   bool hasPolymorphicEffect(EffectKind kind) const;
-
-  /// Returns 'true' if the function is distributed.
-  bool isDistributed() const;
 
   /// Is this a thunk function used to access a distributed method
   /// or computed property outside of its actor isolation context?
