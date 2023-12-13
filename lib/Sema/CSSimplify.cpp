@@ -13536,32 +13536,33 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
         auto argLoc =
             loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
 
-        if (type1->getAs<PackArchetypeType>() &&
-            type2->getAs<PackArchetypeType>())
+        if (type1->is<PackArchetypeType>() &&
+            type2->is<PackArchetypeType>())
           return recordShapeMismatchFix();
 
-        auto argPack = type1->getAs<PackType>();
-        auto paramPack = type2->getAs<PackType>();
-
-        if (!(argPack && paramPack))
-          return SolutionKind::Error;
+        auto numArgs = (shape1->is<PackType>()
+                        ? shape1->castTo<PackType>()->getNumElements()
+                        : 1);
+        auto numParams = (shape2->is<PackType>()
+                          ? shape2->castTo<PackType>()->getNumElements()
+                          : 1);
 
         // Tailed diagnostic to explode tuples.
         // FIXME: This is very similar to
         // 'cannot_convert_single_tuple_into_multiple_arguments'; can we emit
         // both of these in the same place?
-        if (argPack->getNumElements() == 1) {
-          if (argPack->getElementType(0)->is<TupleType>() &&
-              paramPack->getNumElements() >= 1) {
+        if (numArgs == 1) {
+          if (type1->is<TupleType>() &&
+              numParams >= 1) {
             return recordShapeFix(
                 DestructureTupleToMatchPackExpansionParameter::create(
-                    *this, paramPack, loc),
-                /*impact=*/2 * paramPack->getNumElements());
+                    *this,
+                    (type2->is<PackType>()
+                     ? type2->castTo<PackType>()
+                     : PackType::getSingletonPackExpansion(type2)), loc),
+                /*impact=*/2 * numParams);
           }
         }
-
-        auto numArgs = shape1->castTo<PackType>()->getNumElements();
-        auto numParams = shape2->castTo<PackType>()->getNumElements();
 
         // Drops `ApplyArgToParam` and left with `ApplyArgument`.
         path.pop_back();
