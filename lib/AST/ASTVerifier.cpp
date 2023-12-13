@@ -622,7 +622,7 @@ public:
         if (!(countType->is<PackType>() ||
               countType->is<PackArchetypeType>() ||
               countType->isRootParameterPack())) {
-          Out << "non-pack shape type" << countType->getString() << "\n";
+          Out << "non-pack shape type: " << countType->getString() << "\n";
           abort();
         }
       }
