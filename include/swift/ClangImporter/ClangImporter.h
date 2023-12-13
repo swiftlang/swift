@@ -176,14 +176,19 @@ public:
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
   static std::vector<std::string>
-  getClangArguments(ASTContext &ctx, bool ignoreClangTarget = false);
+  getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
+
+  static std::optional<std::vector<std::string>>
+  getClangCC1Arguments(ClangImporter *importer, ASTContext &ctx,
+                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+                       bool ignoreClangTarget = false);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        ArrayRef<std::string> invocationArgStrs,
-                        std::vector<std::string> *CC1Args = nullptr);
+                        std::vector<std::string> &CC1Args);
+
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
   ClangImporter &operator=(const ClangImporter &) = delete;

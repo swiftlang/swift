@@ -86,7 +86,7 @@ static void addSearchPathInvocationArguments(
 static std::vector<std::string> getClangDepScanningInvocationArguments(
     ASTContext &ctx, llvm::Optional<StringRef> sourceFileName = llvm::None) {
   std::vector<std::string> commandLineArgs =
-      ClangImporter::getClangArguments(ctx);
+      ClangImporter::getClangDriverArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
 
   auto sourceFilePos = std::find(
