@@ -571,6 +571,21 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   return false;
 }
 
+SourceRange ConditionalPatternBindingInfo::getSourceRange() const {
+  SourceLoc Start;
+  if (IntroducerLoc.isValid())
+    Start = IntroducerLoc;
+  else
+    Start = ThePattern->getStartLoc();
+
+  SourceLoc End = Initializer->getEndLoc();
+  if (Start.isValid() && End.isValid()) {
+    return SourceRange(Start, End);
+  } else {
+    return SourceRange();
+  }
+}
+
 PoundAvailableInfo *
 PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
                            SourceLoc LParenLoc,
@@ -603,18 +618,7 @@ SourceRange StmtConditionElement::getSourceRange() const {
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getSourceRange();
   case StmtConditionElement::CK_PatternBinding:
-    SourceLoc Start;
-    if (IntroducerLoc.isValid())
-      Start = IntroducerLoc;
-    else
-      Start = getPattern()->getStartLoc();
-    
-    SourceLoc End = getInitializer()->getEndLoc();
-    if (Start.isValid() && End.isValid()) {
-      return SourceRange(Start, End);
-    } else {
-      return SourceRange();
-    }
+    return getPatternBinding()->getSourceRange();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -636,7 +640,7 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().Start;
+    return getPatternBinding()->getStartLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getStartLoc();
   }
@@ -651,7 +655,7 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().End;
+    return getPatternBinding()->getEndLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getEndLoc();
   }

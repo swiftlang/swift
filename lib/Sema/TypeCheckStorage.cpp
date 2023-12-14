@@ -1644,7 +1644,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
     createPropertyLoadOrCallSuperclassGetter(Get, Storage,
                                              TargetImpl::Storage, Ctx);
   SmallVector<StmtConditionElement, 1> Cond;
-  Cond.emplace_back(SourceLoc(), Some, StoredValueExpr);
+  Cond.emplace_back(ConditionalPatternBindingInfo::create(
+      Ctx, SourceLoc(), Some, StoredValueExpr));
 
   // Build the early return inside the if.
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
