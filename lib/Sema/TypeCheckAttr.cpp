@@ -6858,14 +6858,11 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   auto dc = D->getDeclContext();
 
   if (auto var = dyn_cast<VarDecl>(D)) {
-    const bool isUnsafe =
-        attr->isUnsafe() && Ctx.LangOpts.hasFeature(Feature::GlobalConcurrency);
-
     // stored properties have limitations as to when they can be nonisolated.
     if (var->hasStorage()) {
       // 'nonisolated' can not be applied to mutable stored properties unless
       // qualified as 'unsafe'.
-      if (var->supportsMutation() && !isUnsafe) {
+      if (var->supportsMutation() && !attr->isUnsafe()) {
         diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
         return;
       }
@@ -6910,7 +6907,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
     // nonisolated can not be applied to local properties unless qualified as
     // 'unsafe'.
-    if (dc->isLocalContext() && !isUnsafe) {
+    if (dc->isLocalContext() && !attr->isUnsafe()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_local_var);
       return;
     }
