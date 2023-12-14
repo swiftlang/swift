@@ -5197,7 +5197,7 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
 
       // Gate the '~Escapable' type behind a specific flag for now.
       if (*kind == InvertibleProtocolKind::Escapable &&
-          !getASTContext().LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+          !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
         diagnoseInvalid(repr, repr->getLoc(),
                         diag::escapable_requires_feature_flag);
         return ErrorType::get(getASTContext());

@@ -2162,7 +2162,7 @@ ERROR(storage_restrictions_attr_expected_name,none,
 
 ERROR(requires_non_escapable_types, none,
       "'%0' %select{attribute|parameter specifier}1 is only valid when experimental "
-      "NonEscapableTypes is enabled",
+      "NonescapableTypes is enabled",
       (StringRef, bool))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

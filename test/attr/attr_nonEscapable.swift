@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonEscapableTypes
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 

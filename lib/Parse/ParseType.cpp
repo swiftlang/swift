@@ -162,7 +162,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
         Tok.getRawText().equals("__owned") ||
         Tok.getRawText().equals("consuming") ||
         Tok.getRawText().equals("borrowing") ||
-        (Context.LangOpts.hasFeature(Feature::NonEscapableTypes) &&
+        (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
          Tok.getRawText().equals("resultDependsOn"))))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.

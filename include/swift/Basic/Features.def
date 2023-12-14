@@ -257,7 +257,7 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
-EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
+EXPERIMENTAL_FEATURE(NonescapableTypes, false)
 
 /// Enable the `@_extern` attribute.
 EXPERIMENTAL_FEATURE(Extern, true)
