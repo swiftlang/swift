@@ -80,12 +80,10 @@ func asyncFunc() async {
 // CHECK-SIL-NEXT:  %12 = function_ref @swift_job_run : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
 // CHECK-SIL-NEXT:  %13 = builtin "convertTaskToJob"(%11 : $Builtin.NativeObject) : $Builtin.Job
 // CHECK-SIL-NEXT:  %14 = struct $UnownedJob (%13 : $Builtin.Job)
-// CHECK-SIL-NEXT:  // function_ref swift_task_getMainExecutor
-// CHECK-SIL-NEXT:  %15 = function_ref @swift_task_getMainExecutor : $@convention(thin) () -> Builtin.Executor
-// CHECK-SIL-NEXT:  %16 = apply %15() : $@convention(thin) () -> Builtin.Executor
-// CHECK-SIL-NEXT:  %17 = struct $UnownedSerialExecutor (%16 : $Builtin.Executor)
-// CHECK-SIL-NEXT:  %18 = apply %12(%14, %17) : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
+// CHECK-SIL-NEXT:  %15 = builtin "buildMainActorExecutorRef"() : $Builtin.Executor
+// CHECK-SIL-NEXT:  %16 = struct $UnownedSerialExecutor (%15 : $Builtin.Executor)
+// CHECK-SIL-NEXT:  %17 = apply %12(%14, %16) : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
 // CHECK-SIL-NEXT:  // function_ref swift_task_asyncMainDrainQueue
-// CHECK-SIL-NEXT:  %19 = function_ref @swift_task_asyncMainDrainQueue : $@convention(thin) () -> Never
-// CHECK-SIL-NEXT:  %20 = apply %19() : $@convention(thin) () -> Never
+// CHECK-SIL-NEXT:  %18 = function_ref @swift_task_asyncMainDrainQueue : $@convention(thin) () -> Never
+// CHECK-SIL-NEXT:  %19 = apply %18() : $@convention(thin) () -> Never
 // CHECK-SIL-NEXT:  unreachable
