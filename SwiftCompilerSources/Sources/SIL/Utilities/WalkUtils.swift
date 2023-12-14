@@ -38,6 +38,14 @@ public enum WalkResult {
   case abortWalk
 }
 
+extension Sequence {
+  public func walk(
+    _ predicate: (Element) throws -> WalkResult
+  ) rethrows -> WalkResult {
+    return try contains { try predicate($0) == .abortWalk } ? .abortWalk : .continueWalk
+  }
+}
+
 /// The path which is updated throughout a walk.
 ///
 /// Usually this is just a SmallProjectionPath, but clients can implement their own path, e.g.
