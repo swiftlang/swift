@@ -777,7 +777,9 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = bbi->getLoc();
     auto tanVal = materializeTangent(getTangentValue(bbi->getOperand()), loc);
-    auto tanValBorrow = diffBuilder.emitBeginBorrowOperation(loc, tanVal);
+    auto tanValBorrow = diffBuilder.emitBeginBorrowOperation(
+        loc, tanVal, bbi->isLexical(), bbi->hasPointerEscape(),
+        bbi->isFromVarDecl());
     setTangentValue(bbi->getParent(), bbi,
                     makeConcreteTangentValue(tanValBorrow));
   }
