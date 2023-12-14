@@ -87,11 +87,8 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
   /// The collection of categories used.
   llvm::DenseMap<const char *, unsigned> Categories;
 
-  using DiagFlagsTy =
-      llvm::DenseMap<const void *, std::pair<unsigned, StringRef>>;
-
-  /// Map for uniquing strings.
-  DiagFlagsTy DiagFlags;
+  /// The collection of flags used.
+  llvm::StringMap<unsigned> Flags;
 
   /// Whether we have already started emission of any DIAG blocks. Once
   /// this becomes \c true, we never close a DIAG block until we know that we're
@@ -197,6 +194,14 @@ private:
 
   // Record identifier for the category.
   unsigned getEmitCategory(StringRef Category);
+
+  /// Emit a flag record that contains a semi-colon separated
+  /// list of all of the educational notes associated with the
+  /// diagnostic or `0` if there are no notes.
+  ///
+  /// \returns a flag record identifier that could be embedded in
+  /// other records.
+  unsigned emitEducationalNotes(const DiagnosticInfo &info);
 
   /// Add a source location to a record.
   void addLocToRecord(SourceLoc Loc,
@@ -317,6 +322,34 @@ unsigned SerializedDiagnosticConsumer::getEmitCategory(StringRef Category) {
                                    Category.data());
 
   return entry;
+}
+
+unsigned
+SerializedDiagnosticConsumer::emitEducationalNotes(const DiagnosticInfo &Info) {
+  if (Info.EducationalNotePaths.empty())
+    return 0;
+
+  SmallString<32> scratch;
+  interleave(
+      Info.EducationalNotePaths,
+      [&scratch](const auto &notePath) { scratch += notePath; },
+      [&scratch] { scratch += ';'; });
+
+  StringRef paths = scratch.str();
+
+  unsigned &recordID = State->Flags[paths];
+  if (recordID)
+    return recordID;
+
+  recordID = State->Flags.size();
+
+  RecordData Record;
+  Record.push_back(RECORD_DIAG_FLAG);
+  Record.push_back(recordID);
+  Record.push_back(paths.size());
+  State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_DIAG_FLAG), Record,
+                                   paths.data());
+  return recordID;
 }
 
 void SerializedDiagnosticConsumer::addLocToRecord(SourceLoc Loc,
@@ -572,8 +605,10 @@ emitDiagnosticMessage(SourceManager &SM,
     Record.push_back(0);
   }
 
-  // FIXME: Swift diagnostics currently have no flags.
-  Record.push_back(0);
+  // Use "flags" slot to emit a semi-colon separated list of
+  // educational notes. If there are no notes associated with
+  // this diagnostic `0` placeholder would be emitted instead.
+  Record.push_back(emitEducationalNotes(Info));
 
   // Emit the message.
   Record.push_back(Text.size());
