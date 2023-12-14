@@ -956,6 +956,8 @@ final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {
 
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
+
+  public var isFromVarDecl: Bool { bridged.MoveValue_isFromVarDecl() }
 }
 
 final public class DropDeinitInst : SingleValueInstruction, UnaryInstruction {
