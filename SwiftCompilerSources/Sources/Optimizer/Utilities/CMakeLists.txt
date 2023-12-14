@@ -11,8 +11,9 @@ swift_compiler_sources(Optimizer
   DiagnosticEngine.swift
   Devirtualization.swift
   EscapeUtils.swift
-  OptUtils.swift
   ForwardingUtils.swift
+  OptUtils.swift
+  OwnershipLiveness.swift
   SSAUpdater.swift
   StaticInitCloner.swift
   Test.swift
