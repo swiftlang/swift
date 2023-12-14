@@ -126,7 +126,11 @@ getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   clang::IdentifierInfo *iteratorCategoryDeclName =
       &clangDecl->getASTContext().Idents.get("iterator_category");
   auto iteratorCategories = clangDecl->lookup(iteratorCategoryDeclName);
-  if (!iteratorCategories.isSingleResult())
+  // If this is a templated typedef, Clang might have instantiated several
+  // equivalent typedef decls. If they aren't equivalent, Clang has already
+  // complained about this. Let's assume that they are equivalent. (see
+  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
+  if (iteratorCategories.empty())
     return nullptr;
   auto iteratorCategory = iteratorCategories.front();
 
