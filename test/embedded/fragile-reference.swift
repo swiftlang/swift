@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -target arm64-apple-none-macho -module-name main -parse-as-library -Xcc -D__MACH__ -Xcc -D__arm64__ -Xcc -D__APPLE__ -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: CODEGENERATOR=ARM
+
 @main
 public struct Application {
     public static func main() {

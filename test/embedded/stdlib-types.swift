@@ -3,6 +3,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
+// REQUIRES: CODEGENERATOR=ARM
 
 class MyClass {}
 
