@@ -218,11 +218,12 @@ BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
   return {swift::SILUndef::get(type.unbridged(), *invocation->getFunction())};
 }
 
-bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) {
-  return swift::optimizeMemoryAccesses(f.getFunction());
+bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) const {
+  return swift::optimizeMemoryAccesses(f.getFunction(), this->getDomTree().di);
 }
-bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) {
-  return swift::eliminateDeadAllocations(f.getFunction());
+bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
+  return swift::eliminateDeadAllocations(f.getFunction(),
+                                         this->getDomTree().di);
 }
 
 BridgedBasicBlockSet BridgedPassContext::allocBasicBlockSet() const {

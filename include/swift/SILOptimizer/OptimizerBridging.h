@@ -216,8 +216,8 @@ struct BridgedPassContext {
                                                             bool isPrivate) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
-  BRIDGED_INLINE static bool optimizeMemoryAccesses(BridgedFunction f);
-  BRIDGED_INLINE static bool eliminateDeadAllocations(BridgedFunction f);
+  BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;
+  BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
 
   // IRGen
 
