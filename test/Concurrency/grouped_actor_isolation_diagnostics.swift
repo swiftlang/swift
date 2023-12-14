@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature GroupActorErrors
 // REQUIRES: concurrency
 
-
 @MainActor
 protocol P {
   func f()
@@ -14,7 +13,7 @@ struct S_P: P {
   func g() { }
 }
 
-func testP2(x: S_P, p: P) { // expected-error{{add '@MainActor' to make global function 'testP2(x:p:)' part of global actor 'MainActor'}}
+func testP(x: S_P, p: P) { // expected-error{{add '@MainActor' to make global function 'testP(x:p:)' part of global actor 'MainActor'}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p.f() // expected-note{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
@@ -71,7 +70,6 @@ struct HasWrapperOnActor {
   func testMA(){ }
 
   func testErrors() { // expected-error{{add '@MainActor' to make instance method 'testErrors()' part of global actor 'MainActor'}}
-    testMA() // expected-note{{call to main actor-isolated instance method 'testMA()' in a synchronous nonisolated context}}
-    testMA() // expected-note{{call to main actor-isolated instance method 'testMA()' in a synchronous nonisolated context}}
+    testMA() // expected-error{{call to main actor-isolated instance method 'testMA()' in a synchronous nonisolated context}}
   }
 }
