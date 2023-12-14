@@ -28,6 +28,8 @@ public class Argument : Value, Hashable {
   public var index: Int {
     return parentBlock.arguments.firstIndex(of: self)!
   }
+
+  public var isReborrow: Bool { bridged.isReborrow() }
   
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -107,6 +109,12 @@ public struct Phi {
 
   public var incomingValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
     incomingOperands.lazy.map { $0.value }
+  }
+
+  public var isReborrow: Bool { value.isReborrow }
+
+  public var endsLifetime: Bool {
+    value.ownership == .owned || value.isReborrow
   }
 
   public static func ==(lhs: Phi, rhs: Phi) -> Bool {

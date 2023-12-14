@@ -368,6 +368,10 @@ bool BridgedArgument::isSelf() const {
   return fArg->isSelf();
 }
 
+bool BridgedArgument::isReborrow() const {
+  return getArgument()->isReborrow();
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedSubstitutionMap
 //===----------------------------------------------------------------------===//
