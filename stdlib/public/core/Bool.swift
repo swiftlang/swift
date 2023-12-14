@@ -133,7 +133,6 @@ public struct Bool: Sendable {
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
   @inlinable
-  @_unavailableInEmbedded
   public static func random() -> Bool {
     var g = SystemRandomNumberGenerator()
     return Bool.random(using: &g)
