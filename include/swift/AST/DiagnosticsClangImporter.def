@@ -134,8 +134,9 @@ WARNING(api_pattern_attr_ignored, none,
 
 ERROR(objc_implementation_two_impls, none,
       "duplicate implementation of Objective-C %select{|category %0 on }0"
-      "class %1",
-      (Identifier, ValueDecl *))
+      "%kind1",
+      (Identifier, Decl *))
+
 NOTE(previous_objc_implementation, none,
      "previously implemented by extension here", ())
 

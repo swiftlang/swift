@@ -139,7 +139,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
 bool swift::objc_translation::
 isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
                 bool checkParent) {
-  if (!(VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()))
+  if (!(VD->isObjC() || !VD->getCDeclName().empty()))
     return false;
   if (VD->getFormalAccess() >= minRequiredAccess) {
     return true;

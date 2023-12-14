@@ -35,3 +35,6 @@ extension ObjCClass {
   // NEGATIVE-NOT: )privateMethod{{ }}
   @objc private func privateMethod() -> Any? { nil }
 }
+
+@_cdecl("CImplFunc") @_objcImplementation func CImplFunc() {}
+// NEGATIVE-NOT: CImplFunc(

@@ -941,6 +941,11 @@ public:
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
 
+  /// True if this declaration provides an implementation for an imported
+  /// Objective-C declaration. This implies various restrictions and special
+  /// behaviors for it and, if it's an extension, its members.
+  bool isObjCImplementation() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,
@@ -1835,11 +1840,6 @@ public:
   /// extension mangling, because an extension method implementation could be
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
-
-  /// True if this extension provides an implementation for an imported
-  /// Objective-C \c \@interface. This implies various restrictions and special
-  /// behaviors for its members.
-  bool isObjCImplementation() const;
 
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid. Do not call unless
@@ -2770,6 +2770,10 @@ public:
   DeclNameRef createNameRef() const {
     return DeclNameRef(Name);
   }
+
+  /// Retrieve the C declaration name that names this function, or empty
+  /// string if it has none.
+  StringRef getCDeclName() const;
 
   /// Retrieve the name to use for this declaration when interoperating
   /// with the Objective-C runtime.

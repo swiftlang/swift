@@ -5827,21 +5827,6 @@ findImplsGivenInterface(ClassDecl *classDecl, Identifier categoryName) {
       impls.push_back(ext);
   }
 
-  if (impls.size() > 1) {
-    llvm::sort(impls, OrderDecls());
-
-    auto &diags = classDecl->getASTContext().Diags;
-    for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
-      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
-      attr->setCategoryNameInvalid();
-
-      diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
-                     categoryName, classDecl)
-        .fixItRemove(attr->getRangeWithAt());
-      diags.diagnose(impls.front(), diag::previous_objc_implementation);
-    }
-  }
-
   return impls;
 }
 
@@ -5872,9 +5857,25 @@ findInterfaceGivenImpl(ClassDecl *classDecl, ExtensionDecl *ext) {
 }
 
 static ObjCInterfaceAndImplementation
-constructResult(Decl *interface, llvm::TinyPtrVector<Decl *> impls) {
-  if (impls.empty())
+constructResult(Decl *interface, llvm::TinyPtrVector<Decl *> &impls,
+                Decl *diagnoseOn, Identifier categoryName) {
+  if (!interface || impls.empty())
     return ObjCInterfaceAndImplementation();
+
+  if (impls.size() > 1) {
+    llvm::sort(impls, OrderDecls());
+
+    auto &diags = interface->getASTContext().Diags;
+    for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
+      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
+      attr->setCategoryNameInvalid();
+
+      diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
+                     categoryName, diagnoseOn)
+        .fixItRemove(attr->getRangeWithAt());
+      diags.diagnose(impls.front(), diag::previous_objc_implementation);
+    }
+  }
 
   return ObjCInterfaceAndImplementation(interface, impls.front());
 }
@@ -5924,31 +5925,103 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   // look for extensions implementing it.
 
   auto implDecls = findImplsGivenInterface(classDecl, categoryName);
-  return constructResult(interfaceDecl, implDecls);
+  return constructResult(interfaceDecl, implDecls, classDecl, categoryName);
+}
+
+static void lookupRelatedFuncs(AbstractFunctionDecl *func,
+                               SmallVectorImpl<ValueDecl *> &results) {
+  DeclName swiftName;
+  if (auto accessor = dyn_cast<AccessorDecl>(func))
+    swiftName = accessor->getStorage()->getName();
+  else
+    swiftName = func->getName();
+
+  if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
+    ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
+                        NL_QualifiedDefault | NL_IgnoreAccessControl, results);
+  }
+  else {
+    auto mod = func->getDeclContext()->getParentModule();
+    mod->lookupQualified(mod, DeclNameRef(swiftName), func->getLoc(),
+                         NL_RemoveOverridden | NL_IgnoreAccessControl, results);
+  }
+}
+
+static ObjCInterfaceAndImplementation
+findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
+  if (!func)
+    return {};
+
+  // If this isn't either a clang import or an implementation, there's no point
+  // doing any work here.
+  if (!func->hasClangNode() && !func->isObjCImplementation())
+    return {};
+
+  OptionalEnum<AccessorKind> accessorKind;
+  if (auto accessor = dyn_cast<AccessorDecl>(func))
+    accessorKind = accessor->getAccessorKind();
+
+  StringRef clangName = func->getCDeclName();
+  if (clangName.empty())
+    return {};
+
+  SmallVector<ValueDecl *, 4> results;
+  lookupRelatedFuncs(func, results);
+
+  // Classify the `results` as either the interface or an implementation.
+  // (Multiple implementations are invalid but utterable.)
+  Decl *interface = nullptr;
+  TinyPtrVector<Decl *> impls;
+
+  for (ValueDecl *result : results) {
+    AbstractFunctionDecl *resultFunc = nullptr;
+    if (accessorKind) {
+      if (auto resultStorage = dyn_cast<AbstractStorageDecl>(result))
+        resultFunc = resultStorage->getAccessor(*accessorKind);
+    }
+    else
+      resultFunc = dyn_cast<AbstractFunctionDecl>(result);
+
+    if (!resultFunc)
+      continue;
+
+    if (resultFunc->getCDeclName() != clangName)
+      continue;
+
+    if (resultFunc->hasClangNode()) {
+      if (interface) {
+        // This clang name is overloaded. That should only happen with C++
+        // functions/methods, which aren't currently supported.
+        return {};
+      }
+      interface = result;
+    } else if (resultFunc->isObjCImplementation()) {
+      impls.push_back(result);
+    }
+  }
+
+  // If we found enough decls to construct a result, `func` should be among them
+  // somewhere.
+  assert(interface == nullptr || impls.empty() ||
+         interface == func || llvm::is_contained(impls, func));
+
+  return constructResult(interface, impls, interface,
+                         /*categoryName=*/Identifier());
 }
 
 ObjCInterfaceAndImplementation ObjCInterfaceAndImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *decl) const {
-  // These have direct links to their counterparts through the
+  // Types and extensions have direct links to their counterparts through the
   // `@_objcImplementation` attribute. Let's resolve that.
   // (Also directing nulls here, where they'll early-return.)
   if (auto ty = dyn_cast_or_null<NominalTypeDecl>(decl))
     return findContextInterfaceAndImplementation(ty);
   else if (auto ext = dyn_cast<ExtensionDecl>(decl))
     return findContextInterfaceAndImplementation(ext);
+  // Abstract functions have to be matched through their @_cdecl attributes.
+  else if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    return findFunctionInterfaceAndImplementation(func);
 
-  // Anything else is resolved by first locating the context's interface and
-  // impl, then matching it to its counterpart. (Instead of calling
-  // `findContextInterfaceAndImplementation()` directly, we'll use the request
-  // recursively to take advantage of caching.)
-  auto contextDecl = decl->getDeclContext()->getAsDecl();
-  if (!contextDecl)
-    return {};
-
-  ObjCInterfaceAndImplementationRequest req(contextDecl);
-  /*auto contextPair =*/ evaluateOrDefault(evaluator, req, {});
-
-  // TODO: Implement member matching.
   return {};
 }
 

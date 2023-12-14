@@ -3580,7 +3580,10 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
       if (hasOrderNumber) {
         auto &fnList = Module.getFunctionList();
         fnList.remove(fn);
-        fnList.insert(llvm::Module::iterator(insertBefore), fn);
+        if (insertBefore)
+          fnList.insert(llvm::Module::iterator(insertBefore), fn);
+        else
+          fnList.push_back(fn);
 
         EmittedFunctionsByOrder.insert(orderNumber, fn);
       }
