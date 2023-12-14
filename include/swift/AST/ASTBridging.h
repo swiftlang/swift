@@ -735,6 +735,9 @@ BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl);
 // MARK: VarDecl
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME("BridgedVarDecl.getSourceLocation(self:)")
+BRIDGED_INLINE BridgedSourceLoc BridgedVarDecl_getSourceLocation(BridgedVarDecl decl);
+
 SWIFT_NAME("BridgedVarDecl.getUserFacingName(self:)")
 BRIDGED_INLINE
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
