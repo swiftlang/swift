@@ -358,6 +358,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
   endif()
 
+  if (SWIFT_CONCURRENCY_USES_DISPATCH)
+    list(APPEND result "-D" "SWIFT_CONCURRENCY_USES_DISPATCH")
+  endif()
+
   if(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE)
     list(APPEND result "-D" "SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE")
   endif()
