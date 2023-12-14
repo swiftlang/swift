@@ -75,7 +75,16 @@ public enum Ownership {
   /// points in the SSA graph, where more information about the value is
   /// statically available on some control flow paths.
   case none
-  
+
+  public var hasLifetime: Bool {
+    switch self {
+    case .owned, .guaranteed:
+      return true
+    case .unowned, .none:
+      return false
+    }
+  }
+
   public init(bridged: BridgedValue.Ownership) {
     switch bridged {
     case .Unowned:    self = .unowned
