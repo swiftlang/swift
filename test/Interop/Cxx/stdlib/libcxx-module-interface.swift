@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STD
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t -module-print-submodules | %FileCheck %s  -check-prefix=CHECK-STD-WITH-SUBMODULES
 // RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib.iosfwd -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-IOSFWD
 // RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib.string -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STRING
 
@@ -7,6 +8,10 @@
 
 // CHECK-STD: import CxxStdlib.iosfwd
 // CHECK-STD: import CxxStdlib.string
+
+// CHECK-STD-WITH-SUBMODULES: enum std {
+// CHECK-STD-WITH-SUBMODULES: enum __1 {
+// CHECK-STD-WITH-SUBMODULES-NOT: enum std
 
 // CHECK-IOSFWD: enum std {
 // CHECK-IOSFWD:   enum __1 {
@@ -20,6 +25,7 @@
 // CHECK-IOSFWD:     typealias wstring = std.__1.basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>>
 // CHECK-IOSFWD:   }
 // CHECK-IOSFWD: }
+// CHECK-IOSFWD-NOT: enum std
 
 // CHECK-STRING: enum std {
 // CHECK-STRING:   enum __1 {
@@ -27,3 +33,4 @@
 // CHECK-STRING:     static func to_wstring(_ __val: Int32) -> std.__1.wstring
 // CHECK-STRING:   }
 // CHECK-STRING: }
+// CHECK-STRING-NOT: enum std
