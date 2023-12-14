@@ -74,7 +74,11 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   @inline(__always)
   internal init(taggedPayload: UInt) {
+    #if !$Embedded
+    rawValue = _bridgeObject(taggingPayload: taggedPayload)
+    #else
     rawValue = Builtin.reinterpretCast(taggedPayload)
+    #endif
   }
 #endif
 
@@ -134,7 +138,11 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   internal var nativeInstance: Native {
     @inline(__always) get {
       _internalInvariant(isNative)
+      #if !$Embedded
+      return Builtin.castReferenceFromBridgeObject(rawValue)
+      #else
       return rawValue
+      #endif
     }
   }
 
@@ -145,7 +153,11 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
       #if !$Embedded
       _internalInvariant(_nonPointerBits(rawValue) == 0)
       #endif
+      #if !$Embedded
+      return Builtin.reinterpretCast(rawValue)
+      #else
       return rawValue
+      #endif
     }
   }
 
