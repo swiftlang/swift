@@ -1515,14 +1515,6 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
       LLVM_FALLTHROUGH;
 
     case SolutionResult::UndiagnosedError:
-      /// If we have a SolutionCallback, we are inspecting constraint system
-      /// solutions directly and thus also want to receive ambiguous solutions.
-      /// Hence always run the second (salvaging) stage.
-      if (shouldSuppressDiagnostics() && !Context.SolutionCallback) {
-        solution.markAsDiagnosed();
-        return llvm::None;
-      }
-
       if (stage == 1) {
         diagnoseFailureFor(target);
         reportSolutionsToSolutionCallback(solution);
