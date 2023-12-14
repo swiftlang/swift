@@ -2355,17 +2355,17 @@ CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 
 // Ignored terminators.
 CONSTANT_TRANSLATION(CondFailInst, Ignored)
-CONSTANT_TRANSLATION(SwitchEnumAddrInst, Ignored)
 // Switch value inst is ignored since we only switch over integers and
 // function_ref/class_method which are considered sendable.
 CONSTANT_TRANSLATION(SwitchValueInst, Ignored)
 CONSTANT_TRANSLATION(UnreachableInst, Ignored)
 CONSTANT_TRANSLATION(UnwindInst, Ignored)
-CONSTANT_TRANSLATION(YieldInst, Ignored)
 
 // Terminators that only need require.
 CONSTANT_TRANSLATION(ReturnInst, Require)
 CONSTANT_TRANSLATION(ThrowInst, Require)
+CONSTANT_TRANSLATION(SwitchEnumAddrInst, Require)
+CONSTANT_TRANSLATION(YieldInst, Require)
 
 // Unhandled instructions
 CONSTANT_TRANSLATION(AllocVectorInst, Unhandled)
