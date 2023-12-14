@@ -1,5 +1,5 @@
 /*
-    /*foo:unknown*/<base>foo</base>() is not /*foo:unknown*/<base>foo</base>(first:)
+    /*foo:unknown*/<base>foo</base>() is not /*foo:unknown*/foo(first:)
 */
 /// This describes /*foo:unknown*/<base>foo</base> and /*foo:unknown*/<base>foo</base>
 func /*foo:def*/<base>foo</base>() {
