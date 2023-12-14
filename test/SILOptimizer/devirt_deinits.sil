@@ -47,6 +47,11 @@ import SwiftShims
   deinit
 }
 
+@_moveOnly struct S5 {
+  @_hasStorage let a: Int
+  @_hasStorage let b: AnyObject
+}
+
 // CHECK-LABEL: sil [ossa] @test_simple_struct :
 // CHECK:         [[D:%.*]] = function_ref @s1_deinit
 // CHECK:         apply [[D]](%0) : $@convention(method) (@owned S1) -> ()
@@ -72,6 +77,17 @@ bb0(%0 : @owned $StrWithoutDeinit):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_no_deinit :
+// CHECK:         ({{%.*}}, [[S2:%.*]]) = destructure_struct %0
+// CHECK-NEXT:    destroy_value [[S2]]
+// CHECK-NEXT:    tuple ()
+// CHECK:       } // end sil function 'test_no_deinit'
+sil [ossa] @test_no_deinit : $@convention(thin) (@owned S5) -> () {
+bb0(%0 : @owned $S5):
+  destroy_value %0 : $S5
+  %r = tuple()
+  return %r : $()
+}
 // CHECK-LABEL: sil [ossa] @test_indirect_deinit_arg :
 // CHECK:         [[D:%.*]] = function_ref @s3_deinit
 // CHECK:         [[S:%.*]] = alloc_stack $S3<Int>

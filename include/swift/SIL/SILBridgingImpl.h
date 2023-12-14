@@ -88,12 +88,6 @@ bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
 
-bool BridgedType::selfOrAnyFieldHasValueDeinit(BridgedFunction f) const {
-  swift::SILType contextType = unbridged().hasTypeParameter() ? f.getFunction()->mapTypeIntoContext(unbridged())
-                                                              : unbridged();
-  return f.getFunction()->getTypeLowering(contextType).selfOrAnyFieldHasValueDeinit();
-}
-
 bool BridgedType::isUnownedStorageType() const {
   return unbridged().isUnownedStorageType();
 }
