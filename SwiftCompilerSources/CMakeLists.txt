@@ -272,7 +272,6 @@ else()
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
        "
 #define COMPILED_WITH_SWIFT
-#define SWIFT_TARGET
 
 #include \"Basic/BasicBridging.h\"
 #include \"SIL/SILBridging.h\"
