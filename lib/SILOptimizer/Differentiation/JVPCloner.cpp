@@ -807,6 +807,17 @@ public:
                     makeConcreteTangentValue(tanValCopy));
   }
 
+  CLONE_AND_EMIT_TANGENT(MoveValue, mvi) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto tan = getTangentValue(mvi->getOperand());
+    auto tanVal = materializeTangent(tan, mvi->getLoc());
+    auto tanValMove = diffBuilder.emitMoveValueOperation(
+        mvi->getLoc(), tanVal, mvi->isLexical(), mvi->hasPointerEscape(),
+        mvi->isFromVarDecl());
+    setTangentValue(mvi->getParent(), mvi,
+                    makeConcreteTangentValue(tanValMove));
+  }
+
   /// Handle `load` instruction.
   ///   Original: y = load x
   ///    Tangent: tan[y] = load tan[x]
