@@ -5,7 +5,7 @@
 import _Differentiation
 
 // Helps increase code coverage for DifferentiationInvoker.cpp:47-50
-// Copy of differentiation_diagnostics.swift:fragileFuncWithGradient, but 
+// Copy of differentiation_diagnostics.swift:fragileFuncWithGradient, with different names but same signature
 public func mirror(_ x: Float) -> Float { x }
 
 @inlinable
