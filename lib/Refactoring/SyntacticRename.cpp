@@ -74,18 +74,8 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
 
   assert(UnresolvedLocs.size() == RenameLocs.size());
 
-  std::vector<BridgedSourceLoc> BridgedUnresolvedLocs;
-  BridgedUnresolvedLocs.reserve(UnresolvedLocs.size());
-  for (SourceLoc Loc : UnresolvedLocs) {
-    BridgedUnresolvedLocs.push_back(BridgedSourceLoc(Loc));
-  }
-
-  BridgedResolvedLocVector bridgedResolvedLocs =
-      swift_SwiftIDEUtilsBridging_runNameMatcher(SF.getExportedSourceFile(),
-                                                 BridgedUnresolvedLocs.data(),
-                                                 BridgedUnresolvedLocs.size());
-  const std::vector<ResolvedLoc> &resolvedLocsInSourceOrder =
-      bridgedResolvedLocs.takeUnbridged();
+  std::vector<ResolvedLoc> resolvedLocsInSourceOrder =
+      runNameMatcher(SF, UnresolvedLocs);
 
   // Callers need to corrolate the `ResolvedLoc` with the `RenameLoc` that they
   // originated from. Match them.

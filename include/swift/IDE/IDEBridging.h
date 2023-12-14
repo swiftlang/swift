@@ -160,24 +160,4 @@ public:
   void *getOpaqueValue() const;
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/// Entry point to run the NameMatcher written in swift-syntax.
-/// 
-/// - Parameters:
-///   - sourceFilePtr: A pointer to an `ExportedSourceFile`, used to access the
-///     syntax tree
-///   - locations: Pointer to a buffer of `BridgedSourceLoc` that should be
-///     resolved by the name matcher.
-///   - locationsCount: Number of elements in `locations`.
-/// - Returns: The opaque value of a `BridgedResolvedLocVector`.
-void *swift_SwiftIDEUtilsBridging_runNameMatcher(const void *sourceFilePtr,
-                                                 BridgedSourceLoc *locations,
-                                                 size_t locationsCount);
-#ifdef __cplusplus
-}
-#endif
-
 #endif

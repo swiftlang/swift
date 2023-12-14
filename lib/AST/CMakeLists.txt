@@ -154,13 +154,6 @@ target_link_libraries(swiftAST INTERFACE
   clangAPINotes
   clangBasic)
 
-if(SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftAST
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-  )
-endif()
-
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftMarkup)

@@ -77,6 +77,7 @@ static SourceLoc getNewFuncInsertLoc(DeclContext *DC,
   return SourceLoc();
 }
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
 static std::vector<NoteRegion>
 getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name) {
   auto InputBuffer =
@@ -99,8 +100,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name) {
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
-  NameMatcher Matcher(*Instance->getPrimarySourceFile());
-  auto Resolved = Matcher.resolve(llvm::makeArrayRef(NameLoc), llvm::None);
+  auto Resolved = runNameMatcher(*Instance->getPrimarySourceFile(), NameLoc);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
   RenameLoc RenameConfig = {LineAndCol.first, LineAndCol.second,
@@ -122,6 +122,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name) {
 
   return NoteRegions;
 }
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 bool RefactoringActionExtractFunction::isApplicable(
     const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
@@ -142,6 +143,11 @@ bool RefactoringActionExtractFunction::isApplicable(
 }
 
 bool RefactoringActionExtractFunction::performChange() {
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  DiagEngine.diagnose(SourceLoc(),
+                      diag::extract_function_not_supported_swiftsyntax_missing);
+  return true;
+#else
   // Check if the new name is ok.
   if (!Lexer::isIdentifier(PreferredName)) {
     DiagEngine.diagnose(SourceLoc(), diag::invalid_name, PreferredName);
@@ -300,4 +306,5 @@ bool RefactoringActionExtractFunction::performChange() {
   EditConsumer.accept(SM, RangeInfo.ContentRange, CallStr, NotableCallRegions);
 
   return false;
+#endif
 }

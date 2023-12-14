@@ -16,6 +16,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDE/IDEBridging.h"
 #include "swift/Index/Index.h"
 
 using namespace swift::refactoring;
@@ -43,6 +44,28 @@ struct RenameRefInfo {
   SourceLoc Loc;   ///< The reference's source location.
   bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
 };
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// Returns `true` if the `RefInfo` points to a location that doesn't have any
+/// arguments. For example, returns `true` for `Foo.init` but `false` for
+/// `Foo.init()` or `Foo.init(a: 1)`.
+static bool
+isReferenceWithoutArguments(const llvm::Optional<RenameRefInfo> &refInfo) {
+  if (!refInfo) {
+    return false;
+  }
+  if (refInfo->IsArgLabel) {
+    return false;
+  }
+  std::vector<ResolvedLoc> resolvedLocs =
+      runNameMatcher(*refInfo->SF, refInfo->Loc);
+  if (!resolvedLocs.empty()) {
+    ResolvedLoc resolvedLoc = resolvedLocs.front();
+    return resolvedLoc.labelRanges.empty();
+  }
+  return false;
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 static llvm::Optional<RefactorAvailabilityInfo>
 renameAvailabilityInfo(const ValueDecl *VD,
@@ -88,12 +111,11 @@ renameAvailabilityInfo(const ValueDecl *VD,
       if (!CD->getParameters()->size())
         return llvm::None;
 
-      if (RefInfo && !RefInfo->IsArgLabel) {
-        NameMatcher Matcher(*(RefInfo->SF));
-        auto Resolved = Matcher.resolve({RefInfo->Loc});
-        if (Resolved.labelRanges.empty())
-          return llvm::None;
+#if SWIFT_BUILD_SWIFT_SYNTAX
+      if (isReferenceWithoutArguments(RefInfo)) {
+        return llvm::None;
       }
+#endif
     }
 
     // Disallow renaming 'callAsFunction' method with no arguments.
@@ -104,12 +126,11 @@ renameAvailabilityInfo(const ValueDecl *VD,
         if (!FD->getParameters()->size())
           return llvm::None;
 
-        if (RefInfo && !RefInfo->IsArgLabel) {
-          NameMatcher Matcher(*(RefInfo->SF));
-          auto Resolved = Matcher.resolve({RefInfo->Loc});
-          if (Resolved.labelRanges.empty())
-            return llvm::None;
+#if SWIFT_BUILD_SWIFT_SYNTAX
+        if (isReferenceWithoutArguments(RefInfo)) {
+          return llvm::None;
         }
+#endif
       }
     }
   }
