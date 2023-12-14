@@ -442,6 +442,16 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
           break;
       }
     }
+    if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
+      if (auto *callee = apply->getReferencedFunctionOrNull()) {
+        // Exclude `Swift._diagnoseUnexpectedEnumCaseValue<A, B>(type: A.Type, rawValue: B) -> Swift.Never`
+        // It's a fatal error function, used for imported C enums.
+        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF" &&
+            !mt->getModule().getOptions().EmbeddedSwift) {
+          continue;
+        }
+      }
+    }
     return false;
   }
   return true;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
 
@@ -478,5 +478,17 @@ public struct NonCopyable: ~Copyable {
 @_noAllocation
 public func testNonCopyable(_ foo: consuming NonCopyable) {
   let _ = foo.value
+}
+
+@_noAllocation
+func matchCEnum(_ variant: c_closed_enum_t) -> Int {
+  switch variant {
+  case .A:
+    return 1
+  case .B:
+    return 2
+  case .C:
+    return 5
+  }
 }
 
