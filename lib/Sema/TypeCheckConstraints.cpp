@@ -1670,6 +1670,9 @@ void ConstraintSystem::print(raw_ostream &out) const {
       case PotentialThrowSite::NonExhaustiveDoCatch:
         out << " - non-exhaustive do..catch @ ";
         break;
+      case PotentialThrowSite::PropertyAccess:
+        out << " - property access @ ";
+        break;
       }
 
       throwSite.second.locator->dump(&getASTContext().SourceMgr, out);

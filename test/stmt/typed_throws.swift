@@ -196,12 +196,24 @@ struct ThrowingMembers {
   subscript(i: Int) -> Int {
     get throws(MyError) { i }
   }
+
+  var intOrThrows: Int {
+    get throws(MyError) { 5 }
+  }
 }
 
 struct ThrowingStaticSubscript {
   static subscript(i: Int) -> Int {
     get throws(MyError) { i }
   }
+
+  static var intOrThrows: Int {
+    get throws(MyError) { 5 }
+  }
+}
+
+var globalIntOrThrows: Int {
+  get throws(MyError) { 5 }
 }
 
 func testDoCatchInClosure(cond: Bool, x: ThrowingMembers) {
@@ -258,6 +270,31 @@ func testDoCatchInClosure(cond: Bool, x: ThrowingMembers) {
   apply {
     do {
       _ = try ThrowingStaticSubscript[5]
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  // Property accesses as potential throw sites
+  apply {
+    do {
+      _ = try x.intOrThrows
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      _ = try ThrowingStaticSubscript.intOrThrows
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      _ = try globalIntOrThrows
     } catch {
       let _: MyError = error
     }

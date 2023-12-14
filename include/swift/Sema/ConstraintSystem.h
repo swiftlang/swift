@@ -1455,6 +1455,9 @@ struct PotentialThrowSite {
     /// A non-exhaustive do...catch, which rethrows whatever is thrown from
     /// inside it's `do` block.
     NonExhaustiveDoCatch,
+
+    /// A property access that can throw an error.
+    PropertyAccess,
   } kind;
 
   /// The type that describes the potential throw site, such as the type of the
@@ -2070,6 +2073,9 @@ struct DeclReferenceType {
   /// (e.g.) applying the base of a member access. This is the type of the
   /// expression used to form the declaration reference.
   Type adjustedReferenceType;
+
+  /// The type that could be thrown by accessing this declaration.
+  Type thrownErrorTypeOnAccess;
 };
 
 /// Describes a system of constraints on type variables, the
