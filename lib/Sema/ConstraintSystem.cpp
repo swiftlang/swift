@@ -5663,12 +5663,17 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::DeclViaBridge:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional:
+      case OverloadChoiceKind::DeclViaUnwrappedOptional: {
         // FIXME: show deduced types, etc, etc.
-        if (EmittedDecls.insert(choice.getDecl()).second)
-          DE.diagnose(choice.getDecl(), diag::found_candidate);
+        auto decl = choice.getDecl();
+        if (EmittedDecls.insert(decl).second) {
+          auto declModule = decl->getDeclContext()->getParentModule();
+          bool printModuleName = declModule != DC->getParentModule();
+          DE.diagnose(decl, diag::found_candidate_in_module,
+                      printModuleName, declModule);
+        }
         break;
-
+      }
       case OverloadChoiceKind::KeyPathApplication:
       case OverloadChoiceKind::DynamicMemberLookup:
       case OverloadChoiceKind::KeyPathDynamicMemberLookup:
