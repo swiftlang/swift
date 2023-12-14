@@ -66,3 +66,5 @@ public protocol TestAssocTypes {
 public typealias SomeAlias<G> = Hello<G>
 
 public typealias AliasWithInverse<G> = Hello<G> where G: ~Copyable, G: ~Escapable
+
+public struct RudePointer<T: ~Copyable>: Copyable {}

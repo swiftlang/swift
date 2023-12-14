@@ -647,11 +647,19 @@ public:
 
   /// Returns true if this type lacks conformance to Copyable in the context,
   /// if provided.
-  bool isNoncopyable(const DeclContext *dc = nullptr);
+  bool isNoncopyable(GenericEnvironment *env = nullptr);
+  bool isNoncopyable(const DeclContext *dc) {
+    assert(dc);
+    return isNoncopyable(dc->getGenericEnvironmentOfContext());
+  };
 
   /// Returns true if this type conforms to Escapable in the context,
   /// if provided.
-  bool isEscapable(const DeclContext *dc = nullptr);
+  bool isEscapable(GenericEnvironment *env = nullptr);
+  bool isEscapable(const DeclContext *dc) {
+    assert(dc);
+    return isEscapable(dc->getGenericEnvironmentOfContext());
+  };
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }

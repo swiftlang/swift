@@ -93,6 +93,9 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public typealias AliasWithInverse<G> = {{.*}}.Hello<G> where G : ~Copyable, G : ~Escapable
 
+// CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
+// CHECK-MISC-NEXT: public struct RudePointer<T> : Swift.Copyable where T : ~Copyable {
+
 ///////////////////////////////////////////////////////////////////////
 // Synthesized conditional conformances are next
 

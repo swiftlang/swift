@@ -177,15 +177,13 @@ static bool alwaysNoncopyable(Type ty) {
   return false; // otherwise, the conservative assumption is it's copyable.
 }
 
-static CanType preprocessType(const DeclContext *dc, Type orig) {
+static CanType preprocessType(GenericEnvironment *env, Type orig) {
   Type type = orig;
 
   // Turn any type parameters into archetypes.
-  if (dc) {
+  if (env)
     if (!type->hasArchetype() || type->hasOpenedExistential())
-      if (auto env = dc->getGenericEnvironmentOfContext())
-        type = GenericEnvironment::mapTypeIntoContext(env, type);
-  }
+      type = GenericEnvironment::mapTypeIntoContext(env, type);
 
   // Strip @lvalue and canonicalize.
   auto canType = type->getRValueType()->getCanonicalType();
@@ -193,8 +191,8 @@ static CanType preprocessType(const DeclContext *dc, Type orig) {
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
-bool TypeBase::isNoncopyable(const DeclContext *dc) {
-  auto canType = preprocessType(dc, this);
+bool TypeBase::isNoncopyable(GenericEnvironment *env) {
+  auto canType = preprocessType(env, this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
@@ -205,8 +203,8 @@ bool TypeBase::isNoncopyable(const DeclContext *dc) {
   return evaluateOrDefault(ctx.evaluator, request, /*default=*/true);
 }
 
-bool TypeBase::isEscapable(const DeclContext *dc) {
-  auto canType = preprocessType(dc, this);
+bool TypeBase::isEscapable(GenericEnvironment *env) {
+  auto canType = preprocessType(env, this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Escapable
