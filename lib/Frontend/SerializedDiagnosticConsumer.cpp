@@ -319,7 +319,7 @@ unsigned SerializedDiagnosticConsumer::getEmitCategory(StringRef Category) {
   Record.push_back(entry);
   Record.push_back(Category.size());
   State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_CATEGORY), Record,
-                                   Category.data());
+                                   Category);
 
   return entry;
 }
@@ -348,7 +348,7 @@ SerializedDiagnosticConsumer::emitEducationalNotes(const DiagnosticInfo &Info) {
   Record.push_back(recordID);
   Record.push_back(paths.size());
   State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_DIAG_FLAG), Record,
-                                   paths.data());
+                                   paths);
   return recordID;
 }
 
