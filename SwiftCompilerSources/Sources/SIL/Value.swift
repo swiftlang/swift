@@ -154,6 +154,12 @@ public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
   return !(lhs === rhs)
 }
 
+extension CollectionLikeSequence where Element == Value {
+  public func contains(_ element: Element) -> Bool {
+    return self.contains { $0 == element }
+  }
+}
+
 /// A projected value, which is defined by the original value and a projection path.
 ///
 /// For example, if the `value` is of type `struct S { var x: Int }` and `path` is `s0`,
