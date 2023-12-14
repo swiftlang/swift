@@ -53,6 +53,10 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
   
   public var hasSinglePredecessor: Bool { singlePredecessor != nil }
 
+  public var singleSuccessor: BasicBlock? {
+    successors.count == 1 ? successors[0] : nil
+  }
+
   /// The index of the basic block in its function.
   /// This has O(n) complexity. Only use it for debugging
   public var index: Int {
