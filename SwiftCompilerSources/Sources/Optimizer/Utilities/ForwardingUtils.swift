@@ -9,6 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// TODO: Once the hasPointerEscape flags are implemented for
+/// BeginBorrowInst, MoveValueInst, and Allocation,
+/// ForwardingUseDefWalker should be used to check whether any value
+/// is part of a forward-extended lifetime that has a pointer escape.
+//===----------------------------------------------------------------------===//
 
 import SIL
 
@@ -98,9 +104,9 @@ protocol ForwardingUseDefWalker {
 
 extension ForwardingUseDefWalker {
   mutating func walkUp(value: Value) -> WalkResult {
-    walkUpDefault(value: value)
+    walkUpDefault(forwarded: value)
   }
-  mutating func walkUpDefault(value: Value) -> WalkResult {
+  mutating func walkUpDefault(forwarded value: Value) -> WalkResult {
     if let inst = value.forwardingInstruction {
       return walkUp(instruction: inst)
     }
@@ -134,18 +140,30 @@ extension ForwardingUseDefWalker {
 // This conveniently gathers all forward introducers and deinitializes
 // visitedValues before the caller has a chance to recurse.
 func gatherLifetimeIntroducers(for value: Value, _ context: Context) -> [Value] {
-  var gather = GatherLifetimeIntroducers(context)
-  defer { gather.visitedValues.deinitialize() }
-  let result = gather.walkUp(value: value)
-  assert(result == .continueWalk)
-  return gather.introducers
+  var introducers: [Value] = []
+  var walker = VisitLifetimeIntroducers(context) {
+    introducers.append($0)
+    return .continueWalk
+  }
+  defer { walker.visitedValues.deinitialize() }
+  _ = walker.walkUp(value: value)
+  return introducers
 }
 
-private struct GatherLifetimeIntroducers : ForwardingUseDefWalker {
+// TODO: visitor can be nonescaping when we have borrowed properties.
+func visitLifetimeIntroducers(for value: Value, _ context: Context,
+  visitor: @escaping (Value) -> WalkResult) -> WalkResult {
+  var walker = VisitLifetimeIntroducers(context, visitor: visitor)
+  defer { walker.visitedValues.deinitialize() }
+  return walker.walkUp(value: value)
+}
+
+private struct VisitLifetimeIntroducers : ForwardingUseDefWalker {
+  var visitor: (Value) -> WalkResult
   var visitedValues: ValueSet
-  var introducers: [Value] = []
   
-  init(_ context: Context) {
+  init(_ context: Context, visitor: @escaping (Value) -> WalkResult) {
+    self.visitor = visitor
     self.visitedValues = ValueSet(context)
   }
   
@@ -154,8 +172,7 @@ private struct GatherLifetimeIntroducers : ForwardingUseDefWalker {
   }
   
   mutating func introducer(_ value: Value) -> WalkResult {
-    introducers.append(value)
-    return .continueWalk
+    visitor(value)
   }
 }
 
@@ -177,7 +194,16 @@ enum ForwardingUseResult: CustomStringConvertible {
   }
 }
 
-/// Visit all the uses in a forward-extended lifetime (LifetimeIntroducer -> Operand).
+/// Visit all the uses in a forward-extended lifetime
+/// (LifetimeIntroducer -> Operand).
+///
+/// Minimal requirements:
+///   needWalk(for value: Value) -> Bool
+///   leafUse(_ operand: Operand) -> WalkResult
+///   deadValue(_ value: Value, using operand: Operand?) -> WalkResult
+///
+/// Start walking:
+///   walkDown(root: Value)
 protocol ForwardingDefUseWalker {
   // Minimally, check a ValueSet. This walker may traverse chains of
   // aggregation and destructuring by default. Implementations may
@@ -194,24 +220,24 @@ protocol ForwardingDefUseWalker {
   // \p operand is nil if \p value is the root.
   mutating func deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 
-  mutating func walkDown(root: Value) -> WalkResult
-  
   mutating func walkDownUses(of: Value, using: Operand?) -> WalkResult
     
   mutating func walkDown(operand: Operand) -> WalkResult
 }
 
 extension ForwardingDefUseWalker {
+  /// Start walking
   mutating func walkDown(root: Value) -> WalkResult {
     walkDownUses(of: root, using: nil)
   }
 
   mutating func walkDownUses(of value: Value, using operand: Operand?)
   -> WalkResult {
-    return walkDownUsesDefault(of: value, using: operand)
+    return walkDownUsesDefault(forwarding: value, using: operand)
   }
 
-  mutating func walkDownUsesDefault(of value: Value, using operand: Operand?)
+  mutating func walkDownUsesDefault(forwarding value: Value,
+    using operand: Operand?)
   -> WalkResult {
     if !needWalk(for: value) { return .continueWalk }
 
@@ -229,33 +255,27 @@ extension ForwardingDefUseWalker {
   }
 
   mutating func walkDown(operand: Operand) -> WalkResult {
-    walkDownDefault(operand: operand)
+    walkDownDefault(forwarding: operand)
   }
 
-  mutating func walkDownDefault(operand: Operand) -> WalkResult {
+  mutating func walkDownDefault(forwarding operand: Operand) -> WalkResult {
     if let inst = operand.instruction as? ForwardingInstruction {
-      return walkDownAllResults(of: inst, using: operand)
+      return inst.forwardedResults.walk { walkDownUses(of: $0, using: operand) }
     }
     if let phi = Phi(using: operand) {
       return walkDownUses(of: phi.value, using: operand)
     }
     return leafUse(operand)
   }
-
-  private mutating func walkDownAllResults(of inst: ForwardingInstruction,
-    using operand: Operand?) -> WalkResult {
-    for result in inst.forwardedResults {
-      if walkDownUses(of: result, using: operand) == .abortWalk {
-        return .abortWalk
-      }
-    }
-    return .continueWalk
-  }
 }
 
-/// This conveniently allows a closure to be called for each leaf use of a forward-extended lifetime. It should be called on a forward introducer provided by ForwardingDefUseWalker.introducer() or gatherLifetimeIntroducers().
+/// This conveniently allows a closure to be called for each leaf use
+/// of a forward-extended lifetime. It should be called on a forward
+/// introducer provided by ForwardingDefUseWalker.introducer() or
+/// gatherLifetimeIntroducers().
 ///
-/// TODO: make the visitor non-escaping once Swift supports stored non-escaping closues.
+/// TODO: make the visitor non-escaping once Swift supports stored
+/// non-escaping closues.
 func visitForwardedUses(introducer: Value, _ context: Context,
   visitor: @escaping (ForwardingUseResult) -> WalkResult)
 -> WalkResult {
