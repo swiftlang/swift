@@ -3804,21 +3804,13 @@ filterProtocolRequirements(
 
 /// Prune the set of missing witnesses for the given conformance, eliminating
 /// any requirements that do not actually need to satisfied.
-static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not remove the missing witness note here!!!
+static ArrayRef<MissingWitness> pruneMissingWitnesses(
     ConformanceChecker &checker,
     ProtocolDecl *proto,
     NormalProtocolConformance *conformance,
     ArrayRef<MissingWitness> missingWitnesses,
     SmallVectorImpl<MissingWitness> &scratch) {
   if (missingWitnesses.empty()) {
-    return missingWitnesses;
-  }
-
-  // For an @objc protocol defined in Objective-C, the Clang importer might
-  // have imported the same underlying Objective-C declaration as more than
-  // one Swift declaration. If we aren't in an imported @objc protocol, there
-  // is nothing to do.
-  if (!proto->isObjC()) {
     return missingWitnesses;
   }
 
@@ -3857,8 +3849,35 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not r
       continue;
     }
 
+    // For an @objc protocol defined in Objective-C, the Clang importer might
+    // have imported the same underlying Objective-C declaration as more than
+    // one Swift declaration. Only one of those requirements should be witnessed
+    // so if the requirement sibling is witnessed then this requirement is not
+    // missing.
+
+    // Prune requirements that come from other protocols - we don't want to
+    // attempt to diagnose those here since we won't be able to find their
+    // siblings.
+    if (proto != missingWitness.requirement->getDeclContext()->getAsDecl()) {
+      skipWitness();
+      continue;
+    }
+
+    if (!proto->isObjC()) {
+      addWitness();
+      continue;
+    }
+
     auto fnRequirement = cast<AbstractFunctionDecl>(missingWitness.requirement);
     auto key = checker.getObjCMethodKey(fnRequirement);
+
+    if (checker.getObjCRequirementSibling(
+            fnRequirement, [conformance](AbstractFunctionDecl *candidate) {
+              return static_cast<bool>(conformance->getWitness(candidate));
+            })) {
+      skipWitness();
+      continue;
+    }
 
     // If we have already reported a function with this selector as missing,
     // don't do it again.
@@ -3867,20 +3886,9 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not r
       continue;
     }
 
-    auto sibling = checker.getObjCRequirementSibling(
-        fnRequirement, [conformance](AbstractFunctionDecl *candidate) {
-          return static_cast<bool>(conformance->getWitness(candidate));
-        });
-
-    if (!sibling) {
-      alreadyReportedAsMissing.insert(key);
-      addWitness();
-      continue;
-    }
-
-    // Otherwise, there is a witness for any of the *other* requirements with
-    // this same selector, so prune it out.
-    skipWitness();
+    // There is really a missing requirement for this witness.
+    alreadyReportedAsMissing.insert(key);
+    addWitness();
   }
 
   if (removedAny) {
@@ -5399,22 +5407,6 @@ void ConformanceChecker::resolveValueWitnesses() {
     // Make sure we've got an interface type.
     if (requirement->isInvalid()) {
       Conformance->setInvalid();
-      continue;
-    }
-
-    // If this requirement is part of a pair of imported async requirements,
-    // where one has already been witnessed, we can skip it.
-    //
-    // This situation primarily arises when the ClangImporter translates an
-    // async-looking ObjC protocol method requirement into two Swift protocol
-    // requirements: an async version and a sync version. Exactly one of the two
-    // must be witnessed by the conformer.
-    if (!requirement->isImplicit() && getObjCRequirementSibling(
-            requirement, [this](AbstractFunctionDecl *cand) {
-              return !cand->getAttrs().hasAttribute<OptionalAttr>() &&
-                     !cand->isImplicit() &&
-                     this->Conformance->hasWitness(cand);
-            })) {
       continue;
     }
 
