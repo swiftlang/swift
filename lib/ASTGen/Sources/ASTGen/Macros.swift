@@ -235,14 +235,14 @@ func checkMacroDefinition(
         // least for documentation purposes right now. Don't emit a warning for
         // them, but do fail operation.
         case "FileIDMacro",
-             "FilePathMacro",
-             "FileMacro",
-             "FunctionMacro",
-             "LineMacro",
-             "ColumnMacro",
-             "DSOHandleMacro",
-             "WarningMacro",
-             "ErrorMacro":
+          "FilePathMacro",
+          "FileMacro",
+          "FunctionMacro",
+          "LineMacro",
+          "ColumnMacro",
+          "DSOHandleMacro",
+          "WarningMacro",
+          "ErrorMacro":
           return -1
 
         default:
@@ -640,9 +640,9 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   // E.g. for 'foo.bar' we want the member ref expression instead of the
   // identifier expression.
   if wantOutermost {
-    while
-      let parentSyntax = currentSyntax.parent,
-      parentSyntax.position == resultSyntax.position {
+    while let parentSyntax = currentSyntax.parent,
+      parentSyntax.position == resultSyntax.position
+    {
       currentSyntax = parentSyntax
       if let typedParent = currentSyntax.as(type) {
         resultSyntax = typedParent

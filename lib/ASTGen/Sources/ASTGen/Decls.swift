@@ -399,7 +399,7 @@ extension ASTGenVisitor {
   func generate(operatorDecl node: OperatorDeclSyntax) -> BridgedOperatorDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
     let (precedenceGroupName, precedenceGroupLoc) =
-        self.generateIdentifierAndSourceLoc(node.operatorPrecedenceAndTypes?.precedenceGroup)
+      self.generateIdentifierAndSourceLoc(node.operatorPrecedenceAndTypes?.precedenceGroup)
 
     let fixity: BridgedOperatorFixity
     if let value = BridgedOperatorFixity(from: node.fixitySpecifier.keywordKind) {

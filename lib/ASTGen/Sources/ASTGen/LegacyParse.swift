@@ -12,8 +12,8 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftSyntax
 import ParseBridging
+import SwiftSyntax
 
 extension ASTGenVisitor {
 
@@ -40,10 +40,10 @@ extension ASTGenVisitor {
   }
 
   func generateMatchingPatternWithLegacy(_ node: some PatternSyntaxProtocol) {
-//    legacyParse.parseMatchingPattern(self.bridgedSourceLoc(syntax: node), self.declContext)
+    //    legacyParse.parseMatchingPattern(self.bridgedSourceLoc(syntax: node), self.declContext)
   }
 
   func generateBindingPatternWithLegacy(_ node: some PatternSyntaxProtocol) {
-//    legacyParse.parseBindingPattern(self.bridgedSourceLoc(syntax: node), self.declContext)
+    //    legacyParse.parseBindingPattern(self.bridgedSourceLoc(syntax: node), self.declContext)
   }
 }

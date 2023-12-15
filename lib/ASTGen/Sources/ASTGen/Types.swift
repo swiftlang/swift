@@ -32,18 +32,20 @@ func isTypeMigrated(_ node: TypeSyntax) -> Bool {
   }
   while true {
     switch current.kind {
-    case // Known implemented kinds.
-        .arrayType, .attributedType, .classRestrictionType, .compositionType,
-        .someOrAnyType, .dictionaryType, .functionType, .identifierType,
-        .implicitlyUnwrappedOptionalType, .memberType, .metatypeType,
-        .namedOpaqueReturnType, .optionalType, .packElementType,
-        .packExpansionType, .suppressedType, .tupleType:
+    // Known implemented kinds.
+    case .arrayType, .attributedType, .classRestrictionType, .compositionType,
+      .someOrAnyType, .dictionaryType, .functionType, .identifierType,
+      .implicitlyUnwrappedOptionalType, .memberType, .metatypeType,
+      .namedOpaqueReturnType, .optionalType, .packElementType,
+      .packExpansionType, .suppressedType, .tupleType:
       break
-    case // Known unimplemented kinds.
-        .missingType:
+
+    // Known unimplemented kinds.
+    case .missingType:
       return false;
-    case // Unknown type kinds
-      _ where current.is(TypeSyntax.self):
+
+    // Unknown type kinds
+    case _ where current.is(TypeSyntax.self):
       return false
     default:
       break
@@ -220,7 +222,9 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(implicitlyUnwrappedOptionalType node: ImplicitlyUnwrappedOptionalTypeSyntax) -> BridgedImplicitlyUnwrappedOptionalTypeRepr {
+  func generate(
+    implicitlyUnwrappedOptionalType node: ImplicitlyUnwrappedOptionalTypeSyntax
+  ) -> BridgedImplicitlyUnwrappedOptionalTypeRepr {
     let base = generate(type: node.wrappedType)
     let exclaimLoc = self.generateSourceLoc(node.exclamationMark)
     return .createParsed(
@@ -371,12 +375,13 @@ extension ASTGenVisitor {
     // Handle specifiers.
     if let specifier = node.specifier {
       if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
-        type = BridgedSpecifierTypeRepr.createParsed(
-          self.ctx,
-          base: type,
-          specifier: kind,
-          specifierLoc: self.generateSourceLoc(specifier)
-        ).asTypeRepr
+        type =
+          BridgedSpecifierTypeRepr.createParsed(
+            self.ctx,
+            base: type,
+            specifier: kind,
+            specifierLoc: self.generateSourceLoc(specifier)
+          ).asTypeRepr
       } else {
         self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
       }
@@ -428,11 +433,12 @@ extension ASTGenVisitor {
       }
 
       if (!typeAttributes.isEmpty) {
-        type = BridgedAttributedTypeRepr.createParsed(
-          self.ctx,
-          base: type,
-          consumingAttributes: typeAttributes
-        ).asTypeRepr
+        type =
+          BridgedAttributedTypeRepr.createParsed(
+            self.ctx,
+            base: type,
+            consumingAttributes: typeAttributes
+          ).asTypeRepr
       }
     }
 
@@ -444,15 +450,16 @@ extension ASTGenVisitor {
   func generate(tupleTypeElementList node: TupleTypeElementListSyntax) -> BridgedArrayRef {
     node.lazy.map { element in
       let (firstName, firstNameLoc) =
-          self.generateIdentifierAndSourceLoc(element.firstName)
-      let (secondName, secondNameLoc) =           self.generateIdentifierAndSourceLoc(element.secondName)
+        self.generateIdentifierAndSourceLoc(element.firstName)
+      let (secondName, secondNameLoc) = self.generateIdentifierAndSourceLoc(element.secondName)
       var type = generate(type: element.type)
       if let ellipsis = element.ellipsis {
-        type = BridgedVarargTypeRepr.createParsed(
-          self.ctx,
-          base: type,
-          ellipsisLoc: self.generateSourceLoc(ellipsis)
-        ).asTypeRepr
+        type =
+          BridgedVarargTypeRepr.createParsed(
+            self.ctx,
+            base: type,
+            ellipsisLoc: self.generateSourceLoc(ellipsis)
+          ).asTypeRepr
       }
 
       return BridgedTupleTypeElement(
@@ -468,4 +475,3 @@ extension ASTGenVisitor {
     }.bridgedArray(in: self)
   }
 }
-

@@ -171,7 +171,9 @@ extension ASTGenVisitor {
 
   /// Obtains a pair of bridged identifier and the bridged source location.
   @inline(__always)
-  func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc) {
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (
+    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+  ) {
     return (
       self.generateIdentifier(token),
       self.generateSourceLoc(token)
@@ -182,7 +184,9 @@ extension ASTGenVisitor {
   /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
   /// source location.
   @inline(__always)
-  func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc) {
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (
+    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+  ) {
     token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
   }
 
@@ -454,13 +458,15 @@ private func _build<Node: SyntaxProtocol, Result>(
   endLocPtr.pointee = sourceLoc.advanced(by: node.totalLength.utf8Length)
 
   // Convert the syntax node.
-  return generator(ASTGenVisitor(
-    diagnosticEngine: diagEngine,
-    sourceBuffer: sourceFile.pointee.buffer,
-    declContext: declContext,
-    astContext: astContext,
-    legacyParser: legacyParser
-  ))(node)
+  return generator(
+    ASTGenVisitor(
+      diagnosticEngine: diagEngine,
+      sourceBuffer: sourceFile.pointee.buffer,
+      declContext: declContext,
+      astContext: astContext,
+      legacyParser: legacyParser
+    )
+  )(node)
 }
 
 @_cdecl("swift_ASTGen_buildTypeRepr")

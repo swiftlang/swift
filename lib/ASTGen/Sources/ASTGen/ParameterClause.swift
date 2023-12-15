@@ -74,17 +74,18 @@ extension ASTGenVisitor {
     let specifierLoc: BridgedSourceLoc = nil
 
     let (firstName, firstNameLoc) =
-        self.generateIdentifierAndSourceLoc(node.optionalFirstName)
+      self.generateIdentifierAndSourceLoc(node.optionalFirstName)
     let (secondName, secondNameLoc) =
-        self.generateIdentifierAndSourceLoc(node.secondName)
+      self.generateIdentifierAndSourceLoc(node.secondName)
 
     var type = node.optionalType.map(generate(type:))
     if let ellipsis = node.ellipsis, let base = type {
-      type = BridgedVarargTypeRepr.createParsed(
-        self.ctx,
-        base: base,
-        ellipsisLoc: self.generateSourceLoc(ellipsis)
-      ).asTypeRepr
+      type =
+        BridgedVarargTypeRepr.createParsed(
+          self.ctx,
+          base: base,
+          ellipsisLoc: self.generateSourceLoc(ellipsis)
+        ).asTypeRepr
     }
 
     return .createParsed(
