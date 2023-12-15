@@ -563,6 +563,15 @@ static void setParsedMembers(IterableDeclContext *IDC,
   SmallVector<Decl *> members;
   for (auto *decl : bridgedMembers.unbridged<Decl *>()) {
     members.push_back(decl);
+
+    // Add any variables bound to the list of decls.
+    if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
+      for (auto idx : range(PBD->getNumPatternEntries())) {
+        PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
+          members.push_back(VD);
+        });
+      }
+    }
     // Each enum case element is also part of the members list according to the
     // legacy parser.
     if (auto *ECD = dyn_cast<EnumCaseDecl>(decl)) {
