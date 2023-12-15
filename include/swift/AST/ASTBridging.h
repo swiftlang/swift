@@ -1181,6 +1181,10 @@ BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
                                                      BridgedPattern cPattern,
                                                      BridgedTypeRepr cType);
 
+SWIFT_NAME("BridgedTypedPattern.createPropagated(_:pattern:type:)")
+BridgedTypedPattern BridgedTypedPattern_createPropagated(
+    BridgedASTContext cContext, BridgedPattern cPattern, BridgedTypeRepr cType);
+
 //===----------------------------------------------------------------------===//
 // MARK: Misc
 //===----------------------------------------------------------------------===//

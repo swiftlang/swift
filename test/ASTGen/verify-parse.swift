@@ -102,6 +102,22 @@ func test11() {
   var binding1 = 0, binding2 = ""
 }
 
+func testVars() {
+  var a = 0
+  var b: Int = 0
+  var c, d: Int
+  var e, f: Int, g, h, i: String
+  let j: Int = 0, k: String = ""
+}
+
+struct TestVars {
+  var a = 0
+  var b: Int = 0
+  var c, d: Int
+  var e, f: Int, g, h, i: String
+  let j: Int = 0, k: String = ""
+}
+
 protocol Proto1 {}
 protocol Proto2 {}
 

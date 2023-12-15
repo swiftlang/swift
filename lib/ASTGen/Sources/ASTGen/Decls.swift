@@ -313,6 +313,46 @@ extension ASTGenVisitor {
     )
   }
 
+  private func generateBindingEntries(for node: VariableDeclSyntax) -> BridgedArrayRef {
+    var propagatedType: BridgedTypeRepr?
+    var entries: [BridgedPatternBindingEntry] = []
+
+    // Generate the bindings in reverse, keeping track of the TypeRepr to
+    // propagate to earlier patterns if needed.
+    for binding in node.bindings.reversed() {
+      var entry = self.generate(patternBinding: binding)
+
+      // We can potentially propagate a type annotation back if we don't have an initializer, and are a bare NamedPattern.
+      let canPropagateType = binding.initializer == nil && binding.pattern.is(IdentifierPatternSyntax.self)
+      if !canPropagateType {
+        propagatedType = nil
+      }
+
+      // If we have a type annotation, wrap the pattern in it.
+      if let typeAnnotation = binding.typeAnnotation {
+        let typeRepr = self.generate(type: typeAnnotation.type)
+        if canPropagateType {
+          propagatedType = typeRepr
+        }
+        entry.pattern =
+          BridgedTypedPattern.createParsed(
+            self.ctx,
+            pattern: entry.pattern,
+            type: typeRepr
+          ).asPattern
+      } else if let propagatedType = propagatedType {
+        entry.pattern =
+          BridgedTypedPattern.createPropagated(
+            self.ctx,
+            pattern: entry.pattern,
+            type: propagatedType
+          ).asPattern
+      }
+      entries.append(entry)
+    }
+    return entries.reversed().bridgedArray(in: self)
+  }
+
   func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
     let isStatic = false  // TODO: compute this
     let isLet = node.bindingSpecifier.keywordKind == .let
@@ -321,7 +361,7 @@ extension ASTGenVisitor {
       self.ctx,
       declContext: self.declContext,
       bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      entries: node.bindings.lazy.map(self.generate).bridgedArray(in: self),
+      entries: self.generateBindingEntries(for: node),
       isStatic: isStatic,
       isLet: isLet
     )

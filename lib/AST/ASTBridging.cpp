@@ -1648,6 +1648,14 @@ BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
       TypedPattern(cPattern.unbridged(), cType.unbridged());
 }
 
+BridgedTypedPattern
+BridgedTypedPattern_createPropagated(BridgedASTContext cContext,
+                                     BridgedPattern cPattern,
+                                     BridgedTypeRepr cType) {
+  return TypedPattern::createPropagated(
+      cContext.unbridged(), cPattern.unbridged(), cType.unbridged());
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: Misc
 //===----------------------------------------------------------------------===//
