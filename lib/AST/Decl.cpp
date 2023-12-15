@@ -1919,26 +1919,26 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                                                       /*ClangNode*/false);
   auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
                                           PatternList.size(), Parent);
-
   // Set up the patterns.
-  auto entries = PBD->getMutablePatternList();
-  unsigned elt = 0U-1;
-  for (auto pe : PatternList) {
-    ++elt;
-    auto &newEntry = entries[elt];
-    newEntry = pe; // This should take care of initializer with flags
-    DeclContext *initContext = pe.getInitContext();
+  std::uninitialized_copy(PatternList.begin(), PatternList.end(),
+                          PBD->getTrailingObjects<PatternBindingEntry>());
+
+  for (auto idx : range(PBD->getNumPatternEntries())) {
+    auto *initContext =
+        cast_or_null<PatternBindingInitializer>(PBD->getInitContext(idx));
 
     // FIXME: We ought to reconsider this since it won't recontextualize any
     // closures/decls present in the initialization expr. This currently should
     // only affect implicit code though.
-    if (!initContext && !Parent->isLocalContext()) {
-      auto pbi = new (Ctx) PatternBindingInitializer(Parent);
-      pbi->setBinding(PBD, elt);
-      initContext = pbi;
-    }
+    if (!initContext && !Parent->isLocalContext())
+      initContext = new (Ctx) PatternBindingInitializer(Parent);
 
-    PBD->setPattern(elt, pe.getPattern(), initContext);
+    if (initContext)
+      initContext->setBinding(PBD, idx);
+
+    // We need to call setPattern to ensure the VarDecls in the pattern have
+    // the PatternBindingDecl set as their parent, and to setup the context.
+    PBD->setPattern(idx, PBD->getPattern(idx), initContext);
   }
   return PBD;
 }

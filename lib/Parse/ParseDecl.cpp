@@ -8364,12 +8364,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
                                            VarLoc, PBDEntries, BaseContext);
 
-    // Wire up any initializer contexts we needed.
-    for (unsigned i : indices(PBDEntries)) {
-      if (auto initContext = PBD->getInitContext(i))
-        cast<PatternBindingInitializer>(initContext)->setBinding(PBD, i);
-    }
-
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
     // up in Decls to be returned to caller.

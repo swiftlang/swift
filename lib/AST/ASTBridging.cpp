@@ -20,6 +20,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
@@ -325,35 +326,57 @@ void BridgedDiagnostic_finish(BridgedDiagnostic cDiag) {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: DeclContexts
+//===----------------------------------------------------------------------===//
+
+bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext) {
+  return cDeclContext.unbridged()->isLocalContext();
+}
+
+BridgedPatternBindingInitializer
+BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
+  auto *dc = cDeclContext.unbridged();
+  return new (dc->getASTContext()) PatternBindingInitializer(dc);
+}
+
+BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
+    BridgedPatternBindingInitializer cInit) {
+  return cInit.unbridged();
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: Decls
 //===----------------------------------------------------------------------===//
 
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedPattern cPattern,
-    BridgedExpr initExpr, bool isStatic, bool isLet) {
+    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
+    bool isStatic, bool isLet) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
-  Pattern *pattern = cPattern.unbridged();
+  auto introducer = isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
 
-  VarDecl::Introducer introducer =
-      isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
+  SmallVector<PatternBindingEntry, 4> entries;
+  for (auto &entry : cBindingEntries.unbridged<BridgedPatternBindingEntry>()) {
+    auto *pattern = entry.pattern.unbridged();
 
-  // Configure all vars.
-  pattern->forEachVariable([&](VarDecl *VD) {
-    VD->setStatic(isStatic);
-    VD->setIntroducer(introducer);
-  });
+    // Configure all vars.
+    pattern->forEachVariable([&](VarDecl *VD) {
+      VD->setStatic(isStatic);
+      VD->setIntroducer(introducer);
+    });
 
-  return PatternBindingDecl::create(context,
-                                    /*StaticLoc=*/SourceLoc(),
-                                    // FIXME: 'class' spelling kind.
-                                    isStatic ? StaticSpellingKind::KeywordStatic
-                                             : StaticSpellingKind::None,
-                                    cBindingKeywordLoc.unbridged(), pattern,
-                                    /*EqualLoc=*/SourceLoc(), // FIXME
-                                    initExpr.unbridged(), declContext);
+    entries.emplace_back(pattern, entry.equalLoc.unbridged(),
+                         entry.init.unbridged(), entry.initContext.unbridged());
+  }
+
+  return PatternBindingDecl::create(
+      context,
+      /*StaticLoc=*/SourceLoc(),
+      // FIXME: 'class' spelling kind.
+      isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
+      cBindingKeywordLoc.unbridged(), entries, declContext);
 }
 
 BridgedParamDecl BridgedParamDecl_createParsed(

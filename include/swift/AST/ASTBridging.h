@@ -265,6 +265,13 @@ namespace swift {
   BridgedPattern Bridged##Id##Pattern_asPattern(Bridged##Id##Pattern pattern);
 #include "swift/AST/PatternNodes.def"
 
+struct BridgedPatternBindingEntry {
+  BridgedPattern pattern;
+  BridgedSourceLoc equalLoc;
+  BridgedNullableExpr init;
+  BridgedNullablePatternBindingInitializer initContext;
+};
+
 //===----------------------------------------------------------------------===//
 // MARK: Diagnostic Engine
 //===----------------------------------------------------------------------===//
@@ -372,16 +379,31 @@ SWIFT_NAME("BridgedDiagnostic.finish(self:)")
 void BridgedDiagnostic_finish(BridgedDiagnostic cDiag);
 
 //===----------------------------------------------------------------------===//
+// MARK: DeclContexts
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("getter:BridgedDeclContext.isLocalContext(self:)")
+bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext);
+
+SWIFT_NAME("BridgedPatternBindingInitializer.create(declContext:)")
+BridgedPatternBindingInitializer
+BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext);
+
+SWIFT_NAME("getter:BridgedPatternBindingInitializer.asDeclContext(self:)")
+BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
+    BridgedPatternBindingInitializer cInit);
+
+//===----------------------------------------------------------------------===//
 // MARK: Decls
 //===----------------------------------------------------------------------===//
 
 SWIFT_NAME(
     "BridgedPatternBindingDecl.createParsed(_:declContext:bindingKeywordLoc:"
-    "pattern:initializer:isStatic:isLet:)")
+    "entries:isStatic:isLet:)")
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedPattern pattern,
-    BridgedExpr opaqueInitExpr, bool isStatic, bool isLet);
+    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
+    bool isStatic, bool isLet);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:firstName:"
            "firstNameLoc:secondName:secondNameLoc:type:defaultValue:)")

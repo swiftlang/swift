@@ -288,10 +288,32 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
-    let pattern = generate(pattern: node.bindings.first!.pattern)
-    let initializer = generate(initializerClause: node.bindings.first!.initializer!)
+  func generate(patternBinding binding: PatternBindingSyntax) -> BridgedPatternBindingEntry {
+    let pattern = generate(pattern: binding.pattern)
+    let equalLoc = generateSourceLoc(binding.initializer?.equal)
 
+    var initExpr: BridgedExpr?
+    var initContext: BridgedPatternBindingInitializer?
+    if let initializer = binding.initializer {
+      // Create a PatternBindingInitializer if we're not in a local context (this
+      // ensures that property initializers are correctly treated as being in a
+      // local context).
+      if !self.declContext.isLocalContext {
+        initContext = .create(declContext: self.declContext)
+      }
+      initExpr = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
+        generate(expr: initializer.value)
+      }
+    }
+    return BridgedPatternBindingEntry(
+      pattern: pattern,
+      equalLoc: equalLoc,
+      init: initExpr.asNullable,
+      initContext: initContext.asNullable
+    )
+  }
+
+  func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
     let isStatic = false  // TODO: compute this
     let isLet = node.bindingSpecifier.keywordKind == .let
 
@@ -299,8 +321,7 @@ extension ASTGenVisitor {
       self.ctx,
       declContext: self.declContext,
       bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      pattern: pattern,
-      initializer: initializer,
+      entries: node.bindings.lazy.map(self.generate).bridgedArray(in: self),
       isStatic: isStatic,
       isLet: isLet
     )

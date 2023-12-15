@@ -212,11 +212,13 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   /// Replaces the current declaration context with `declContext` for the duration of its execution, and calls `body`.
   @inline(__always)
-  func withDeclContext(_ declContext: BridgedDeclContext, _ body: () -> Void) {
+  func withDeclContext<T>(_ declContext: BridgedDeclContext, _ body: () -> T) -> T {
     let oldDeclContext = self.declContext
     self.declContext = declContext
-    body()
-    self.declContext = oldDeclContext
+    defer {
+      self.declContext = oldDeclContext
+    }
+    return body()
   }
 }
 
@@ -238,10 +240,6 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl {
     generate(decl: node.decl)
-  }
-
-  func generate(initializerClause node: InitializerClauseSyntax) -> BridgedExpr {
-    generate(expr: node.value)
   }
 
   func generate(conditionElement node: ConditionElementSyntax) -> ASTNode {

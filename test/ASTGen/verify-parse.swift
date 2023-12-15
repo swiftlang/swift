@@ -98,6 +98,10 @@ func test9(_ value: Any) { }
 
 func test10<T>(t: T) where T: Proto1 {}
 
+func test11() {
+  var binding1 = 0, binding2 = ""
+}
+
 protocol Proto1 {}
 protocol Proto2 {}
 
