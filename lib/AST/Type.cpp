@@ -299,7 +299,9 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
 
   hasExplicitAnyObject = false;
-  containsNonObjCProtocol = !isObjCProtocol(protoDecl);
+  containsObjCProtocol = protoDecl->isObjC();
+  containsSwiftProtocol = (!protoDecl->isObjC() &&
+                           !protoDecl->isMarkerProtocol());
   containsParameterized = false;
 
   protocols.push_back(protoDecl);
@@ -307,7 +309,8 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
-  containsNonObjCProtocol = false;
+  containsObjCProtocol = false;
+  containsSwiftProtocol = false;
   containsParameterized = false;
 
   auto members = type.getMembers();
@@ -327,7 +330,10 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
       protoDecl = parameterized->getProtocol();
       containsParameterized = true;
     }
-    containsNonObjCProtocol |= !isObjCProtocol(protoDecl);
+    if (protoDecl->isObjC())
+      containsObjCProtocol = true;
+    else if (!protoDecl->isMarkerProtocol())
+      containsSwiftProtocol = true;
     protocols.push_back(protoDecl);
   }
 }
@@ -336,10 +342,6 @@ ExistentialLayout::ExistentialLayout(CanParameterizedProtocolType type)
     : ExistentialLayout(type.getBaseType()) {
   sameTypeRequirements = type->getArgs();
   containsParameterized = true;
-}
-
-bool ExistentialLayout::isObjCProtocol(ProtocolDecl *P) {
-  return P->isObjC() || P->isSpecificProtocol(KnownProtocolKind::Sendable);
 }
 
 ExistentialLayout TypeBase::getExistentialLayout() {
