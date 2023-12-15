@@ -6814,7 +6814,6 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
 
   SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
-  SourceLoc EndLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
@@ -6873,13 +6872,7 @@ public:
   
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
-  
-  SourceLoc getStartLoc() const {
-    return getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
-  }
-  SourceLoc getEndLoc() const { return EndLoc; }
 
-  void setEndLoc(SourceLoc sl) { EndLoc = sl; }
   SourceRange getSourceRange() const;
   SourceRange getSignatureSourceRange() const;
 

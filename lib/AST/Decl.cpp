@@ -8860,7 +8860,29 @@ SubscriptDecl *SubscriptDecl::createImported(ASTContext &Context, DeclName Name,
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
-  return {getSubscriptLoc(), getEndLoc()};
+  auto Start = getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
+  if (Start.isInvalid())
+    return SourceRange();
+
+  if (auto End = getBracesRange().End)
+    return SourceRange(Start, End);
+
+  if (auto *Where = getTrailingWhereClause()) {
+    if (auto End = Where->getSourceRange().End)
+      return SourceRange(Start, End);
+  }
+  if (auto *ElementTy = getElementTypeRepr()) {
+    if (auto End = ElementTy->getEndLoc())
+      return SourceRange(Start, End);
+  }
+  if (ArrowLoc)
+    return SourceRange(Start, ArrowLoc);
+
+  if (auto *Indices = getIndices()) {
+    if (auto End = Indices->getEndLoc())
+      return SourceRange(Start, End);
+  }
+  return SourceRange(Start);
 }
 
 SourceRange SubscriptDecl::getSignatureSourceRange() const {

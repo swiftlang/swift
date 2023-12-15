@@ -9607,9 +9607,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
                           Subscript);
   }
 
-  // Now that it's been parsed, set the end location.
-  Subscript->setEndLoc(PreviousLoc);
-
   bool Invalid = false;
   // Reject 'subscript' functions outside of type decls
   if (!(Flags & PD_HasContainerType)) {

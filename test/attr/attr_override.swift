@@ -152,7 +152,7 @@ class B : A {
     }
   }
   
-  static subscript (i: String) -> String { // expected-error{{overriding declaration requires an 'override' keyword}} {{10-10=override }}
+  static subscript (i: String) -> String { // expected-error{{overriding declaration requires an 'override' keyword}} {{3-3=override }}
     get {
       return "hello"
     }
