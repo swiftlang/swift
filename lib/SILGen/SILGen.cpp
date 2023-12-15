@@ -503,11 +503,6 @@ FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
                                     "_asyncMainDrainQueue");
 }
 
-FuncDecl *SILGenModule::getGetMainExecutor() {
-  return lookupConcurrencyIntrinsic(getASTContext(), GetMainExecutor,
-                                    "_getMainExecutor");
-}
-
 FuncDecl *SILGenModule::getSwiftJobRun() {
   return lookupConcurrencyIntrinsic(getASTContext(), SwiftJobRun,
                                     "_swiftJobRun");
