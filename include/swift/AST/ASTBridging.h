@@ -426,13 +426,13 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
     bool isStatic, bool isLet);
 
-SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:firstName:"
-           "firstNameLoc:secondName:secondNameLoc:type:defaultValue:)")
+SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
+           "argNameLoc:paramName:paramNameLoc:type:defaultValue:)")
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
-    BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
-    BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr type,
+    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
+    BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
+    BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr type,
     BridgedNullableExpr defaultValue);
 
 SWIFT_NAME("BridgedConstructorDecl.setParsedBody(self:_:)")

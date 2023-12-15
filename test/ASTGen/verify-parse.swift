@@ -107,6 +107,8 @@ func test11() {
   var binding1 = 0, binding2 = ""
 }
 
+func test12(_: Int) {}
+
 func testVars() {
   var a = 0
   var b: Int = 0

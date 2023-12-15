@@ -398,21 +398,10 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
 
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
-    BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
-    BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr opaqueType,
+    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
+    BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
+    BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  auto firstName = cFirstName.unbridged();
-  auto firstNameLoc = cFirstNameLoc.unbridged();
-  auto secondName = cSecondName.unbridged();
-  auto secondNameLoc = cSecondNameLoc.unbridged();
-
-  assert(secondNameLoc.isValid() == secondName.nonempty());
-  if (secondName.empty()) {
-    secondName = firstName;
-    secondNameLoc = firstNameLoc;
-  }
-
   auto *declContext = cDeclContext.unbridged();
 
   auto *defaultValue = opaqueDefaultValue.unbridged();
@@ -426,9 +415,9 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     defaultArgumentKind = getDefaultArgKind(defaultValue);
   }
 
-  auto *paramDecl = new (cContext.unbridged())
-      ParamDecl(cSpecifierLoc.unbridged(), firstNameLoc, firstName,
-                secondNameLoc, secondName, declContext);
+  auto *paramDecl = new (cContext.unbridged()) ParamDecl(
+      cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(), cArgName.unbridged(),
+      cParamNameLoc.unbridged(), cParamName.unbridged(), declContext);
 
   if (auto type = opaqueType.unbridged()) {
     paramDecl->setTypeRepr(type);
