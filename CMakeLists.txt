@@ -401,9 +401,9 @@ set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
 
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" MATCHES "WINDOWS|ANDROID" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # On windows to workaround a build problem.
+    # On Windows and Android, to workaround a build problem.
     # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()
@@ -868,7 +868,7 @@ endif()
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
-  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
@@ -1199,6 +1199,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
+  message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
   message(STATUS "")
 else()
