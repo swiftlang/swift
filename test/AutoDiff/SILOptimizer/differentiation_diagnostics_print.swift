@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -verify -Xllvm --sil-print-after=differentiation -Xllvm --debug-only=differentiation %s 2>&1
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm --sil-print-after=differentiation %s 
 
-// Needed for '--debug-only'
 
 import _Differentiation
 
