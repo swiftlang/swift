@@ -3716,19 +3716,6 @@ private:
     Args.push_back(ManagedValue());
   }
 
-  void emitExpandedConsumed(Expr *arg, AbstractionPattern origParamType) {
-    CanType substArgType = arg->getType()->getCanonicalType();
-    auto count = getFlattenedValueCount(origParamType);
-    auto claimedParams = claimNextParameters(count);
-
-    SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
-    SILType loweredSubstParamType =
-        SGF.getLoweredType(origParamType, substArgType);
-
-    return emitConsumed(arg, loweredSubstArgType, loweredSubstParamType,
-                        origParamType, claimedParams);
-  }
-
   void
   emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
              AbstractionPattern origParamType, SILParameterInfo param,

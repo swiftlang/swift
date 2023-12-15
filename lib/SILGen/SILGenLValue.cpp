@@ -2009,6 +2009,25 @@ namespace {
   class AddressorComponent
       : public AccessorBasedComponent<PhysicalPathComponent> {
     SILType SubstFieldType;
+    
+    static SGFAccessKind getAccessKindForAddressor(SGFAccessKind accessKind) {
+      // Addressors cannot be consumed through.
+      switch (accessKind) {
+      case SGFAccessKind::IgnoredRead:
+      case SGFAccessKind::BorrowedAddressRead:
+      case SGFAccessKind::BorrowedObjectRead:
+      case SGFAccessKind::OwnedAddressRead:
+      case SGFAccessKind::OwnedObjectRead:
+      case SGFAccessKind::Write:
+      case SGFAccessKind::ReadWrite:
+        return accessKind;
+        
+      case SGFAccessKind::OwnedAddressConsume:
+      case SGFAccessKind::OwnedObjectConsume:
+        return SGFAccessKind::ReadWrite;
+      }
+      llvm_unreachable("uncovered switch");
+    }
   public:
      AddressorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
                         bool isSuper,
@@ -2048,8 +2067,20 @@ namespace {
 
       // Enter an unsafe access scope for the access.
       addr =
-          enterAccessScope(SGF, loc, base, addr, getTypeData(), getAccessKind(),
+          enterAccessScope(SGF, loc, base, addr, getTypeData(),
+                           getAccessKindForAddressor(getAccessKind()),
                            SILAccessEnforcement::Unsafe, ActorIso);
+
+      // Validate the use of the access if it's noncopyable.
+      if (addr.getType().isMoveOnly()) {
+        MarkUnresolvedNonCopyableValueInst::CheckKind kind
+          = getAccessorDecl()->getAccessorKind() == AccessorKind::MutableAddress
+              ? MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable
+              : MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign;
+        auto checkedAddr = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          loc, addr.getValue(), kind);
+        addr = std::move(addr).transform(checkedAddr);
+      }
 
       return addr;
     }
