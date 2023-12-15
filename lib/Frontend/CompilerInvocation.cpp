@@ -3243,8 +3243,13 @@ bool CompilerInvocation::parseArgs(
 serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
-  serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
+  serialization::ValidationInfo info =
+      serialization::validateSerializedAST(
+        data,
+        getSILOptions().EnableOSSAModules,
+        LangOpts.hasFeature(Feature::NoncopyableGenerics),
+        LangOpts.SDKName,
+        &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -3279,8 +3284,11 @@ CompilerInvocation::setUpInputForSILTool(
       InputFile(inputFilename, bePrimary, fileBufOrErr.get().get(), file_types::TY_SIL));
 
   auto result = serialization::validateSerializedAST(
-      fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      LangOpts.SDKName, &extendedInfo);
+      fileBufOrErr.get()->getBuffer(),
+      getSILOptions().EnableOSSAModules,
+      LangOpts.hasFeature(Feature::NoncopyableGenerics),
+      LangOpts.SDKName,
+      &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

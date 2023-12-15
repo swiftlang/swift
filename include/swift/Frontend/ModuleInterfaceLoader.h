@@ -487,6 +487,19 @@ struct RequireOSSAModules_t {
   explicit operator bool() const { return bool(value); }
 };
 
+/// Help prevent confusion between different bools being passed around.
+struct RequireNoncopyableGenerics_t {
+private:
+  bool value;
+public:
+  RequireNoncopyableGenerics_t(const ASTContext &ctx)
+    : RequireNoncopyableGenerics_t(ctx.LangOpts) {}
+  RequireNoncopyableGenerics_t(const LangOptions &opts)
+      : value(opts.hasFeature(Feature::NoncopyableGenerics)) {}
+
+  explicit operator bool() const { return value; }
+};
+
 class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   friend class ModuleInterfaceLoader;
   ASTContext &Ctx;
@@ -495,22 +508,26 @@ class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   std::string BackupInterfaceDir;
   ModuleInterfaceLoaderOptions Opts;
   RequireOSSAModules_t RequiresOSSAModules;
+  RequireNoncopyableGenerics_t RequireNCGenerics;
 
 public:
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
-                                      StringRef prebuiltCacheDir,
-                                      StringRef BackupInterfaceDir,
-                                      ModuleInterfaceLoaderOptions opts,
-                                      RequireOSSAModules_t requiresOSSAModules)
+                                StringRef prebuiltCacheDir,
+                                StringRef BackupInterfaceDir,
+                                ModuleInterfaceLoaderOptions opts,
+                                RequireOSSAModules_t requiresOSSAModules,
+                                RequireNoncopyableGenerics_t requireNCGenerics)
       : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
         BackupInterfaceDir(BackupInterfaceDir),
-        Opts(opts), RequiresOSSAModules(requiresOSSAModules) {}
+        Opts(opts), RequiresOSSAModules(requiresOSSAModules),
+        RequireNCGenerics(requireNCGenerics) {}
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
-                                      StringRef prebuiltCacheDir,
-                                      ModuleInterfaceLoaderOptions opts,
-                                      RequireOSSAModules_t requiresOSSAModules):
+                                StringRef prebuiltCacheDir,
+                                ModuleInterfaceLoaderOptions opts,
+                                RequireOSSAModules_t requiresOSSAModules,
+                                RequireNoncopyableGenerics_t requireNCGenerics):
     ModuleInterfaceCheckerImpl(Ctx, cacheDir, prebuiltCacheDir, StringRef(),
-                               opts, requiresOSSAModules) {}
+                               opts, requiresOSSAModules, requireNCGenerics) {}
   std::vector<std::string>
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) override;
@@ -586,6 +603,7 @@ public:
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules,
+      RequireNoncopyableGenerics_t RequireNCGenerics,
       bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
@@ -640,7 +658,8 @@ private:
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      bool suppressRemarks,
-                                     RequireOSSAModules_t requireOSSAModules);
+                                     RequireOSSAModules_t requireOSSAModules,
+                                     RequireNoncopyableGenerics_t requireNCGenerics);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
@@ -654,7 +673,8 @@ public:
       StringRef moduleCachePath, StringRef prebuiltCachePath,
       StringRef backupModuleInterfaceDir,
       bool serializeDependencyHashes, bool trackSystemDependencies,
-      RequireOSSAModules_t requireOSSAModules);
+      RequireOSSAModules_t requireOSSAModules,
+      RequireNoncopyableGenerics_t requireNCGenerics);
 
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(StringRef interfacePath,
