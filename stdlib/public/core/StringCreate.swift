@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -300,7 +300,7 @@ extension String {
   }
 
   @usableFromInline
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   internal static func _validate<Encoding: Unicode.Encoding>(
     _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
     as encoding: Encoding.Type

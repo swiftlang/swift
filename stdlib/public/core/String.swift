@@ -518,7 +518,7 @@ extension String {
   ///   - encoding: A conformer to `Unicode.Encoding` to be used
   ///               to decode `codeUnits`.
   @inlinable
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   public init?<Encoding: Unicode.Encoding>(
     validating codeUnits: some Sequence<Encoding.CodeUnit>,
     as encoding: Encoding.Type
@@ -578,7 +578,7 @@ extension String {
   ///   - encoding: A conformer to `Unicode.Encoding` that can decode
   ///               `codeUnits` as `UInt8`
   @inlinable
-  @available(SwiftStdlib 5.10, *)
+  @available(SwiftStdlib 5.11, *)
   public init?<Encoding>(
     validating codeUnits: some Sequence<Int8>,
     as encoding: Encoding.Type
