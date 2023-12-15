@@ -88,11 +88,11 @@ extension ASTGenVisitor {
     case let (argNameNode?, paramNameNode?):
       (argName, argNameLoc) = self.generateIdentifierAndSourceLoc(argNameNode)
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)
-    case let (nameNode?, nil):
+    case (let nameNode?, nil), (nil, let nameNode?):
+      // The (nil, nameNode?) case should never happen (since a single label
+      // should be the firstName), but treat it the same it to be defensive.
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(nameNode)
       (argName, argNameLoc) = argNameByDefault ? (paramName, paramNameLoc) : (nil, nil)
-    case (nil, _?):
-      preconditionFailure("If only one name is present, it should be the first")
     default:
       (argName, argNameLoc, paramName, paramNameLoc) = (nil, nil, nil, nil)
     }
