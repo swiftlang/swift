@@ -183,6 +183,11 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     return std::string(); // Ignore.
 
   auto interpretAsClangNode = [](const ValueDecl *D)->ClangNode {
+    // Subscript decls should not use their clang node, since the get/set accessors
+    // are separate nodes and might come from different contexts.
+    if (isa<SubscriptDecl>(D))
+      return ClangNode();
+
     ClangNode ClangN = D->getClangNode();
     if (auto ClangD = ClangN.getAsDecl()) {
       // NSErrorDomain causes the clang enum to be imported like this:
