@@ -49,6 +49,10 @@ extension BuiltinInst : OnoneSimplifyable {
         if context.options.enableEmbeddedSwift {
           optimizeArgumentToThinMetatype(argument: 1, context)
         }
+      case .ICMP_EQ:
+        constantFoldIntegerEquality(isEqual: true, context)
+      case .ICMP_NE:
+        constantFoldIntegerEquality(isEqual: false, context)
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -199,6 +203,51 @@ private extension BuiltinInst {
     let builder = Builder(before: self, context)
     let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
     operands[argument].set(to: newMetatype, context)
+  }
+
+  func constantFoldIntegerEquality(isEqual: Bool, _ context: SimplifyContext) {
+    if constantFoldStringNullPointerCheck(isEqual: isEqual, context) {
+      return
+    }
+    if let literal = constantFold(context) {
+      uses.replaceAll(with: literal, context)
+    }
+  }
+
+  func constantFoldStringNullPointerCheck(isEqual: Bool, _ context: SimplifyContext) -> Bool {
+    if operands[1].value.isZeroInteger &&
+       operands[0].value.lookThroughScalarCasts is StringLiteralInst
+    {
+      let builder = Builder(before: self, context)
+      let result = builder.createIntegerLiteral(isEqual ? 0 : 1, type: type)
+      uses.replaceAll(with: result, context)
+      context.erase(instruction: self)
+      return true
+    }
+    return false
+  }
+}
+
+private extension Value {
+  var isZeroInteger: Bool {
+    if let literal = self as? IntegerLiteralInst,
+       let value = literal.value
+    {
+      return value == 0
+    }
+    return false
+  }
+
+  var lookThroughScalarCasts: Value {
+    guard let bi = self as? BuiltinInst else {
+      return self
+    }
+    switch bi.id {
+    case .ZExt, .ZExtOrBitCast, .PtrToInt:
+      return bi.operands[0].value.lookThroughScalarCasts
+    default:
+      return self
+    }
   }
 }
 
