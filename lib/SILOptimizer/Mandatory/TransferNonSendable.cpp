@@ -199,6 +199,10 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
     temp = getUnderlyingObject(temp);
 
+    if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(temp)) {
+      temp = cvi->getOperand();
+    }
+
     if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
             temp->getDefiningInstruction())) {
       temp = dsi->getOperand();
@@ -2312,6 +2316,7 @@ CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
 CONSTANT_TRANSLATION(RefToBridgeObjectInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
+CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(EndCOWMutationInst, LookThrough)
 CONSTANT_TRANSLATION(ProjectBoxInst, LookThrough)
 CONSTANT_TRANSLATION(EndInitLetRefInst, LookThrough)
@@ -2385,7 +2390,6 @@ CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ValueToBridgeObjectInst, Unhandled)
-CONSTANT_TRANSLATION(ExplicitCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnownedCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)

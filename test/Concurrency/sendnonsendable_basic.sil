@@ -88,3 +88,20 @@ bb3:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @explicit_copy_value_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+  %2 = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  %1a = explicit_copy_value %1 : $NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1a) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  %3 = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  apply %3(%1) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  // expected-note @-1 {{access here could race}}
+  destroy_value %1a : $NonSendableKlass
+  destroy_value %1 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
