@@ -1,5 +1,14 @@
 // RUN: %target-sil-opt -transfer-non-sendable -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
 
+// PLEASE READ THIS!
+//
+// This test is specifically to test out individual instruction interactions,
+// not for crashers. The idea is to make it so that we have one test for every
+// SIL instruction, so please add a test here when you add a new instruction.
+//
+// For assign/lookthrough, just add a test that triggers an ownership error. If it is
+// a more complex instruction, talk with @gottesmm.
+
 sil_stage raw
 
 import Swift
