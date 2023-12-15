@@ -10077,6 +10077,92 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx, SourceLoc declLoc,
   return D;
 }
 
+AccessorDecl *AccessorDecl::createParsed(
+    ASTContext &ctx, AccessorKind accessorKind, AbstractStorageDecl *storage,
+    SourceLoc declLoc, SourceLoc accessorKeywordLoc, ParameterList *paramList,
+    SourceLoc asyncLoc, SourceLoc throwsLoc, TypeRepr *thrownType,
+    DeclContext *dc) {
+  auto *accessor = AccessorDecl::createImpl(
+      ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
+      /*async*/ asyncLoc.isValid(), asyncLoc,
+      /*throws*/ throwsLoc.isValid(), throwsLoc, thrownType, dc,
+      /*clangNode*/ ClangNode());
+
+  // Set up the parameter list. This is the "newValue" name (for setters),
+  // followed by the index list (for subscripts).  For non-subscript getters,
+  // this degenerates down to "()".
+  //
+  // We put the 'newValue' argument before the subscript index list as a
+  // micro-optimization for Objective-C thunk generation.
+  SmallVector<ParamDecl *, 2> newParams;
+  SourceLoc paramsStart, paramsEnd;
+  if (paramList) {
+    assert(paramList->size() == 1 &&
+           "Should only have a single parameter in the list");
+    newParams.push_back(paramList->get(0));
+    paramsStart = paramList->getStartLoc();
+    paramsEnd = paramList->getEndLoc();
+  } else {
+    // No parameter list, if we have an implicit parameter name, fill it in.
+    auto implicitName = AccessorDecl::implicitParameterNameFor(accessorKind);
+    if (!implicitName.empty()) {
+      auto *implicitParam = new (ctx)
+          ParamDecl(SourceLoc(), SourceLoc(), Identifier(), declLoc,
+                    ctx.getIdentifier(implicitName), /*declContext*/ accessor);
+      implicitParam->setImplicit();
+      newParams.push_back(implicitParam);
+    }
+  }
+
+  // If this is a subscript accessor, we need to splice in the subscript
+  // parameters into the accessor's parameter list.
+  if (auto *SD = dyn_cast<SubscriptDecl>(storage)) {
+    auto *indices = SD->getIndices();
+    if (paramsStart.isInvalid()) {
+      paramsStart = indices->getStartLoc();
+      paramsEnd = indices->getEndLoc();
+    }
+    for (auto *subscriptParam : *indices) {
+      // Clone the parameter.
+      auto *param = new (ctx) ParamDecl(
+          subscriptParam->getSpecifierLoc(),
+          subscriptParam->getArgumentNameLoc(),
+          subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
+          subscriptParam->getName(), /*declContext*/ accessor);
+      param->setAutoClosure(subscriptParam->isAutoClosure());
+
+      // The cloned parameter is implicit.
+      param->setImplicit();
+
+      // It has no default arguments; these will be always be taken
+      // from the subscript declaration.
+      param->setDefaultArgumentKind(DefaultArgumentKind::None);
+
+      newParams.push_back(param);
+    }
+  }
+  accessor->setParameters(
+      ParameterList::create(ctx, paramsStart, newParams, paramsEnd));
+  return accessor;
+}
+
+StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::Init:
+    return "newValue";
+  case AccessorKind::DidSet:
+    return "oldValue";
+  case AccessorKind::Get:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+    return StringRef();
+  }
+}
+
 bool AccessorDecl::isAssumedNonMutating() const {
   switch (getAccessorKind()) {
   case AccessorKind::Get:
