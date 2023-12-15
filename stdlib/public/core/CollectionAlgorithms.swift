@@ -233,6 +233,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @available(SwiftStdlib 5.11, *)
+  @inlinable
   public func indices(
     where predicate: (Element) throws -> Bool
   ) rethrows -> RangeSet<Index> {

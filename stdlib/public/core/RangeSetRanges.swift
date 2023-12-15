@@ -14,24 +14,55 @@
 extension RangeSet {
   /// A collection of the ranges that make up a range set.
   public struct Ranges {
-    internal var _storage: [Range<Bound>]
+    internal var _storage: ContiguousArray<Range<Bound>>
 
+    @usableFromInline
     internal init() {
       _storage = []
     }
     
+    @usableFromInline
     internal init(_range: Range<Bound>) {
       _storage = [_range]
     }
     
+    @usableFromInline
     internal init(_ranges: [Range<Bound>]) {
-      _storage = _ranges
+      _storage = ContiguousArray(_ranges)
+    }
+
+    @usableFromInline
+    internal init(_unorderedRanges: [Range<Bound>]) {
+      _storage = ContiguousArray(_unorderedRanges)
+      _storage.sort {
+        $0.lowerBound < $1.lowerBound
+      }
+      var i = 0
+      while i < _storage.count {
+        let current = _storage[i]
+        if i > 0 {
+          let previous = _storage[i - 1]
+          if previous.upperBound >= current.lowerBound {
+            let newUpper = Swift.max(previous.upperBound, current.upperBound)
+            _storage[i - 1] = previous.lowerBound ..< newUpper
+            _storage.remove(at: i)
+            continue
+          } 
+        }
+
+        if current.isEmpty {
+          _storage.remove(at: i)
+        } else {
+          i += 1
+        }
+      }
     }
   }
 }
 
 @available(SwiftStdlib 5.11, *)
 extension RangeSet.Ranges {
+  @usableFromInline
   internal func _contains(_ bound: Bound) -> Bool {
     let i = _storage._partitioningIndex { $0.upperBound > bound }
     return i == _storage.endIndex ? false : _storage[i].lowerBound <= bound
@@ -46,9 +77,10 @@ extension RangeSet.Ranges {
   /// - `_indicesOfRange(12..<19) == 1..<2`
   /// - `_indicesOfRange(17..<19) == 2..<2`
   /// - `_indicesOfRange(12..<22) == 1..<3`
+  @usableFromInline
   internal func _indicesOfRange(
     _ range: Range<Bound>,
-    in subranges: [Range<Bound>],
+    in subranges: ContiguousArray<Range<Bound>>,
     includeAdjacent: Bool = true
   ) -> Range<Int> {
     guard subranges.count > 1 else {
@@ -95,6 +127,7 @@ extension RangeSet.Ranges {
   }
 
   // Insert a non-empty range into the storage
+  @usableFromInline
   internal mutating func _insert(contentsOf range: Range<Bound>) {
     let indices = _indicesOfRange(range, in: _storage)
     if indices.isEmpty {
@@ -110,6 +143,7 @@ extension RangeSet.Ranges {
   }
 
   // Remove a non-empty range from the storage
+  @usableFromInline
   internal mutating func _remove(contentsOf range: Range<Bound>) {
     let indices = _indicesOfRange(range, in: _storage, includeAdjacent: false)
     guard !indices.isEmpty else {
@@ -142,6 +176,7 @@ extension RangeSet.Ranges {
 
   /// Returns a that represents the ranges of values within the
   /// given bounds that aren't represented by this range set.
+  @usableFromInline
   internal func _gaps(boundedBy bounds: Range<Bound>) -> Self {
     let indices = _indicesOfRange(bounds, in: _storage)
     guard !indices.isEmpty else {
@@ -165,6 +200,7 @@ extension RangeSet.Ranges {
     return resultVal
   }
 
+  @usableFromInline
   internal func _intersection(_ other: Self) -> Self {
     let left = self._storage
     let right = other._storage
@@ -267,7 +303,6 @@ extension RangeSet.Ranges: Equatable {
 @available(SwiftStdlib 5.11, *)
 extension RangeSet.Ranges: Hashable where Bound: Hashable {
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(_storage.count) // Discriminator
     hasher.combine(_storage)
   }
 }

@@ -24,6 +24,7 @@ public struct DiscontiguousSlice<Base: Collection> {
     return _base
   }
 
+  @usableFromInline
   internal init(_base: Base, subranges: RangeSet<Base.Index>) {
     self._base = _base
     self.subranges = subranges
@@ -198,6 +199,7 @@ extension DiscontiguousSlice: Collection {
     return DiscontiguousSlice<Base>(_base: base, subranges: subset)
   }
 
+  @usableFromInline
   internal func _index(of baseIndex: Base.Index) -> Index? {
     let rangeOffset = subranges.ranges
       ._partitioningIndex { $0.upperBound >= baseIndex }

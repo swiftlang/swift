@@ -28,6 +28,7 @@
 ///     // numbers == [-5, -3, -9, 10, 12, 14, 15]
 @available(SwiftStdlib 5.11, *)
 public struct RangeSet<Bound: Comparable> {
+  @usableFromInline
   internal var _ranges: Ranges
 
   /// A collection of the ranges that make up the range set.
@@ -63,12 +64,14 @@ public struct RangeSet<Bound: Comparable> {
   ///
   /// - Parameter ranges: The ranges to use for the new range set.
   public init(_ ranges: some Sequence<Range<Bound>>) {
-    self.init()
-    for range in ranges {
-      insert(contentsOf: range)
+    if let ranges = _specialize(ranges, for: Ranges.self) {
+      self.init(_ranges: ranges)
+      return
     }
+    self.init(_ranges: Ranges(_unorderedRanges: Array(ranges)))
   }
 
+  @usableFromInline
   internal init(_ranges: Ranges) {
     self._ranges = _ranges
   }
@@ -80,17 +83,21 @@ public struct RangeSet<Bound: Comparable> {
   /// or upper bounds. In addition to not overlapping, no two consecutive
   /// ranges share an upper and lower bound — `[0..<5, 5..<10]` is ill-formed,
   /// and would instead be represented as `[0..<10]`.
+  @usableFromInline
   internal func _checkInvariants() {
+#if INTERNAL_CHECKS_ENABLED
     for (a, b) in zip(_ranges, _ranges.dropFirst()) {
-      _debugPrecondition(!a.isEmpty && !b.isEmpty, "Empty range in range set")
-      _debugPrecondition(
+      _precondition(!a.isEmpty && !b.isEmpty, "Empty range in range set")
+      _precondition(
         a.upperBound < b.lowerBound,
         "Out of order/overlapping ranges in range set")
     }
+#endif
   }
   
   /// Creates a new range set from `ranges`, which satisfies the range set
   /// invariants.
+  @usableFromInline
   internal init(_orderedRanges ranges: [Range<Bound>]) {
     switch ranges.count {
     case 0: self._ranges = Ranges()
@@ -124,6 +131,7 @@ public struct RangeSet<Bound: Comparable> {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
+  @inlinable
   public mutating func insert(contentsOf range: Range<Bound>) {
     if range.isEmpty { return }
     _ranges._insert(contentsOf: range)
@@ -169,6 +177,7 @@ extension RangeSet {
   ///   - index: The index to include in the range set. `index` must be a
   ///     valid index of `collection` that isn't the collection's `endIndex`.
   ///   - collection: The collection that contains `index`.
+  @inlinable
   public init<S: Sequence, C: Collection>(
     _ indices: S, within collection: C
   ) where S.Element == C.Index, C.Index == Bound {
@@ -220,6 +229,7 @@ extension RangeSet {
   ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
+  @usableFromInline
   internal func _inverted<C: Collection>(
     within collection: C
   ) -> RangeSet where C: Collection, C.Index == Bound {
