@@ -531,16 +531,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
 
-  if (!P.getOptions().EnableOSSAModules) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    if (SILPrintFinalOSSAModule) {
-      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
-    }
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
-
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
     // Does not inline functions with defined semantics or effects.
@@ -554,34 +544,32 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
 
   // Clean up Semantic ARC before we perform additional post-inliner opts.
-  if (P.getOptions().EnableOSSAModules) {
-    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
-      P.addCopyPropagation();
+  if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+    P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-  }
 
-  // Promote stack allocations to values and eliminate redundant
-  // loads.
-  P.addMem2Reg();
-  P.addPerformanceConstantPropagation();
-  //  Do a round of CFG simplification, followed by peepholes, then
-  //  more CFG simplification.
+    // Promote stack allocations to values and eliminate redundant
+    // loads.
+    P.addMem2Reg();
+    P.addPerformanceConstantPropagation();
+    //  Do a round of CFG simplification, followed by peepholes, then
+    //  more CFG simplification.
 
-  // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
-  // cond_br).
-  P.addJumpThreadSimplifyCFG();
-  P.addPhiExpansion();
-  P.addSILCombine();
-  // SILCombine can expose further opportunities for SimplifyCFG.
-  P.addSimplifyCFG();
+    // Jump threading can expose opportunity for SILCombine (enum ->
+    // is_enum_tag-> cond_br).
+    P.addJumpThreadSimplifyCFG();
+    P.addPhiExpansion();
+    P.addSILCombine();
+    // SILCombine can expose further opportunities for SimplifyCFG.
+    P.addSimplifyCFG();
 
-  P.addCSE();
-  if (OpLevel == OptimizationLevelKind::HighLevel) {
-    // Early RLE does not touch loads from Arrays. This is important because
-    // later array optimizations, like ABCOpt, get confused if an array load in
-    // a loop is converted to a pattern with a phi argument.
-    P.addEarlyRedundantLoadElimination();
+    P.addCSE();
+    if (OpLevel == OptimizationLevelKind::HighLevel) {
+      // Early RLE does not touch loads from Arrays. This is important because
+      // later array optimizations, like ABCOpt, get confused if an array load
+      // in a loop is converted to a pattern with a phi argument.
+      P.addEarlyRedundantLoadElimination();
   } else {
     P.addRedundantLoadElimination();
   }
@@ -619,12 +607,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addARCSequenceOpts();
 
   // Run a final round of ARC opts when ownership is enabled.
-  if (P.getOptions().EnableOSSAModules) {
-    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
-      P.addCopyPropagation();
+  if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+    P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-  }
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
@@ -985,50 +971,48 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   // Run one last copy propagation/semantic arc opts run before serialization/us
   // lowering ownership.
-  if (P.getOptions().EnableOSSAModules) {
-    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
-      P.addCopyPropagation();
+  if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+    P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-  }
 
-  P.addCrossModuleOptimization();
+    P.addCrossModuleOptimization();
 
-  // It is important to serialize before any of the @_semantics
-  // functions are inlined, because otherwise the information about
-  // uses of such functions inside the module is lost,
-  // which reduces the ability of the compiler to optimize clients
-  // importing this module.
-  P.addSerializeSILPass();
+    // It is important to serialize before any of the @_semantics
+    // functions are inlined, because otherwise the information about
+    // uses of such functions inside the module is lost,
+    // which reduces the ability of the compiler to optimize clients
+    // importing this module.
+    P.addSerializeSILPass();
 
-  // Strip any transparent functions that still have ownership.
-  P.addOwnershipModelEliminator();
+    // Strip any transparent functions that still have ownership.
+    P.addOwnershipModelEliminator();
 
-  if (Options.StopOptimizationAfterSerialization)
-    return P;
+    if (Options.StopOptimizationAfterSerialization)
+      return P;
 
-  // After serialization run the function pass pipeline to iteratively lower
-  // high-level constructs like @_semantics calls.
-  addMidLevelFunctionPipeline(P);
+    // After serialization run the function pass pipeline to iteratively lower
+    // high-level constructs like @_semantics calls.
+    addMidLevelFunctionPipeline(P);
 
-  // Perform optimizations that specialize.
-  addClosureSpecializePassPipeline(P);
+    // Perform optimizations that specialize.
+    addClosureSpecializePassPipeline(P);
 
-  // Run another iteration of the SSA optimizations to optimize the
-  // devirtualized inline caches and constants propagated into closures
-  // (CapturePropagation).
-  addLowLevelPassPipeline(P);
+    // Run another iteration of the SSA optimizations to optimize the
+    // devirtualized inline caches and constants propagated into closures
+    // (CapturePropagation).
+    addLowLevelPassPipeline(P);
 
-  addLateLoopOptPassPipeline(P);
+    addLateLoopOptPassPipeline(P);
 
-  addLastChanceOptPassPipeline(P);
+    addLastChanceOptPassPipeline(P);
 
-  // Has only an effect if the -sil-based-debuginfo option is specified.
-  addSILDebugInfoGeneratorPipeline(P);
+    // Has only an effect if the -sil-based-debuginfo option is specified.
+    addSILDebugInfoGeneratorPipeline(P);
 
-  // Call the CFG viewer.
-  if (SILViewCFG) {
-    addCFGPrinterPipeline(P, "SIL Before IRGen View CFG");
+    // Call the CFG viewer.
+    if (SILViewCFG) {
+      addCFGPrinterPipeline(P, "SIL Before IRGen View CFG");
   }
 
   return P;
