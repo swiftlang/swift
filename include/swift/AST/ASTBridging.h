@@ -397,6 +397,12 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 // MARK: Decls
 //===----------------------------------------------------------------------===//
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
+  BridgedStaticSpellingNone,
+  BridgedStaticSpellingStatic,
+  BridgedStaticSpellingClass
+};
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessorKind {
 #define ACCESSOR(ID) BridgedAccessorKind##ID,
 #include "swift/AST/AccessorKinds.def"
@@ -631,6 +637,17 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedSourceLoc cImportKeywordLoc, BridgedImportKind cImportKind,
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements);
 
+SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
+           "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"
+           "arrowLoc:returnType:)")
+BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,
+    BridgedSourceLoc cSubscriptKeywordLoc,
+    BridgedNullableGenericParamList cGenericParamList,
+    BridgedParameterList cParamList, BridgedSourceLoc cArrowLoc,
+    BridgedTypeRepr returnType);
+
 SWIFT_NAME(
     "BridgedTopLevelCodeDecl.createParsed(_:declContext:startLoc:stmt:endLoc:)")
 BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createStmt(
@@ -690,6 +707,15 @@ bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl);
 SWIFT_NAME("BridgedNominalTypeDecl.setParsedMembers(self:_:)")
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
                                              BridgedArrayRef members);
+
+//===----------------------------------------------------------------------===//
+// MARK: SubscriptDecl
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("getter:BridgedSubscriptDecl.asAbstractStorageDecl(self:)")
+BRIDGED_INLINE
+BridgedAbstractStorageDecl
+BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl);
 
 //===----------------------------------------------------------------------===//
 // MARK: VarDecl

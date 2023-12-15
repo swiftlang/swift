@@ -62,8 +62,8 @@ extension ASTGenVisitor {
       return self.generate(protocolDecl: node).asDecl
     case .structDecl(let node):
       return self.generate(structDecl: node).asDecl
-    case .subscriptDecl:
-      break
+    case .subscriptDecl(let node):
+      return self.generate(subscriptDecl: node).asDecl
     case .typeAliasDecl(let node):
       return self.generate(typeAliasDecl: node).asDecl
     case .variableDecl(let node):
@@ -478,6 +478,29 @@ extension ASTGenVisitor {
       isStatic: isStatic,
       isLet: isLet
     )
+  }
+
+  func generate(subscriptDecl node: SubscriptDeclSyntax) -> BridgedSubscriptDecl {
+    // FIXME: Compute static
+    let staticLoc: BridgedSourceLoc = nil
+    let staticSpelling = BridgedStaticSpelling.none
+
+    let subscriptDecl = BridgedSubscriptDecl.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      staticLoc: staticLoc,
+      staticSpelling: staticSpelling,
+      subscriptKeywordLoc: self.generateSourceLoc(node.subscriptKeyword),
+      genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
+      parameterList: self.generate(functionParameterClause: node.parameterClause, forSubscript: true),
+      arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
+      returnType: self.generate(type: node.returnClause.type)
+    )
+    if let accessors = node.accessorBlock {
+      let storage = subscriptDecl.asAbstractStorageDecl
+      storage.setAccessors(generate(accessorBlock: accessors, for: storage))
+    }
+    return subscriptDecl
   }
 }
 

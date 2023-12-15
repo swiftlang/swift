@@ -191,6 +191,19 @@ extension TestVars {
   var inExt: Int { return 0 }
 }
 
+struct TestSubscripts {
+  subscript(x: Int) -> Int {
+    // FIXME: We don't yet handle single expression bodies.
+    return 0
+  }
+  subscript(y x: Int) -> Int {
+    get {
+      return 0
+    }
+    set(x) {}
+  }
+}
+
 protocol Proto1 {}
 protocol Proto2 {}
 

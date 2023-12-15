@@ -46,6 +46,15 @@ bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl) {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedSubscriptDecl
+//===----------------------------------------------------------------------===//
+
+BridgedAbstractStorageDecl
+BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl) {
+  return decl.unbridged();
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedVarDecl
 //===----------------------------------------------------------------------===//
 

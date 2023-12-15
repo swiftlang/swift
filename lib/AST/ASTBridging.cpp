@@ -48,6 +48,10 @@ static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
   }
 }
 
+static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
+  return static_cast<StaticSpellingKind>(kind);
+}
+
 static AccessorKind unbridged(BridgedAccessorKind kind) {
   return static_cast<AccessorKind>(kind);
 }
@@ -846,6 +850,20 @@ BridgedImportDecl BridgedImportDecl_createParsed(
       context, cDeclContext.unbridged(), cImportKeywordLoc.unbridged(),
       static_cast<ImportKind>(cImportKind), cImportKindLoc.unbridged(),
       std::move(builder).get());
+}
+
+BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,
+    BridgedSourceLoc cSubscriptKeywordLoc,
+    BridgedNullableGenericParamList cGenericParamList,
+    BridgedParameterList cParamList, BridgedSourceLoc cArrowLoc,
+    BridgedTypeRepr returnType) {
+  return SubscriptDecl::createParsed(
+      cContext.unbridged(), cStaticLoc.unbridged(), unbridged(cStaticSpelling),
+      cSubscriptKeywordLoc.unbridged(), cParamList.unbridged(),
+      cArrowLoc.unbridged(), returnType.unbridged(), cDeclContext.unbridged(),
+      cGenericParamList.unbridged());
 }
 
 BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createStmt(
