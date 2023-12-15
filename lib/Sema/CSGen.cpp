@@ -2464,6 +2464,13 @@ namespace {
             return explicitType;
         }
 
+        // Explicitly-specified 'throws' without a type is untyped throws.
+        // Use a NULL return here so that the inferred type is written with
+        // `throws` instead of `throws(any Error)`, although the two are
+        // semantically equivalent.
+        if (closure->getThrowsLoc().isValid())
+          return Type();
+
         // Thrown type inferred from context.
         if (auto contextualType = CS.getContextualType(
                 closure, /*forConstraint=*/false)) {
@@ -2474,7 +2481,7 @@ namespace {
         }
 
         // We do not try to infer a thrown error type if one isn't immediately
-        // available. We could attempt this in the future.
+        // available.
         return Type();
       }();
 

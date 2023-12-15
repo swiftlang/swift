@@ -1655,6 +1655,33 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out << "\n";
     }
   }
+
+  if (!potentialThrowSites.empty()) {
+    out.indent(indent) << "Potential throw sites:\n";
+    interleave(potentialThrowSites, [&](const auto &throwSite) {
+      out.indent(indent + 2);
+      switch (throwSite.second.kind) {
+      case PotentialThrowSite::Application:
+        out << "- application @ ";
+        break;
+      case PotentialThrowSite::ExplicitThrow:
+        out << " - explicit throw @ ";
+        break;
+      case PotentialThrowSite::NonExhaustiveDoCatch:
+        out << " - non-exhaustive do..catch @ ";
+        break;
+      case PotentialThrowSite::PropertyAccess:
+        out << " - property access @ ";
+        break;
+      }
+
+      throwSite.second.locator->dump(&getASTContext().SourceMgr, out);
+    }, [&] {
+      out << "\n";
+    });
+    out << "\n";
+
+  }
 }
 
 /// Determine the semantics of a checked cast operation.

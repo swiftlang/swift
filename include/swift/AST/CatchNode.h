@@ -36,7 +36,14 @@ public:
   ///
   /// Returns the thrown error type for a throwing context, or \c llvm::None
   /// if this is a non-throwing context.
-  llvm::Optional<Type> getThrownErrorTypeInContext(DeclContext *dc) const;
+  llvm::Optional<Type> getThrownErrorTypeInContext(ASTContext &ctx) const;
+
+  /// Determines the explicitly-specified type error that will be caught by
+  /// this catch node.
+  ///
+  /// Returns the explicitly-caught type, or a NULL type if the caught type
+  /// needs to be inferred.
+  Type getExplicitCaughtType(ASTContext &ctx) const;
 
   friend llvm::hash_code hash_value(CatchNode catchNode) {
     using llvm::hash_value;
@@ -45,6 +52,8 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, CatchNode catchNode);
+
+SourceLoc extractNearestSourceLoc(CatchNode catchNode);
 
 } // end namespace swift
 

@@ -2820,7 +2820,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     auto dc = CurContext.getDeclContext();
     auto module = dc->getParentModule();
     if (CatchNode catchNode = ASTScope::lookupCatchNode(module, loc)) {
-      if (auto caughtType = catchNode.getThrownErrorTypeInContext(dc))
+      if (auto caughtType = catchNode.getThrownErrorTypeInContext(Ctx))
         return *caughtType;
     }
 
@@ -2947,8 +2947,7 @@ private:
     // specialized diagnostic about non-exhaustive catches.
     if (!CurContext.handlesThrows(ConditionalEffectKind::Conditional)) {
       CurContext.setNonExhaustiveCatch(true);
-    } else if (Type rethrownErrorType =
-                   S->getCaughtErrorType(CurContext.getDeclContext())) {
+    } else if (Type rethrownErrorType = S->getCaughtErrorType()) {
       // We're implicitly rethrowing the error out of this do..catch, so make
       // sure that we can throw an error of this type out of this context.
       auto catches = S->getCatches();
@@ -3590,7 +3589,7 @@ Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
 
   // If the do..catch statement explicitly specifies that it throws, use
   // that type.
-  if (Type explicitError = stmt->getExplicitCaughtType(dc)) {
+  if (Type explicitError = stmt->getExplicitCaughtType()) {
     return explicitError;
   }
 

@@ -5667,9 +5667,9 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
 
 Type ExplicitCaughtTypeRequest::evaluate(
-    Evaluator &evaluator, DeclContext *dc, CatchNode catchNode
+    Evaluator &evaluator, ASTContext *ctxPtr, CatchNode catchNode
 ) const {
-  ASTContext &ctx = dc->getASTContext();
+  ASTContext &ctx = *ctxPtr;
 
   // try!/try? always catch 'any Error'.
   if (catchNode.is<AnyTryExpr *>()) {
@@ -5678,7 +5678,6 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
   // Functions
   if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>()) {
-    assert(dc == func && "Key mismatch for explicit caught type request");
     TypeRepr *thrownTypeRepr = func->getThrownTypeRepr();
 
     // If there is no explicit thrown type, check whether it throws at all.
@@ -5709,8 +5708,6 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
   // Closures
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
-    assert(dc == closure && "Key mismatch for explicit caught type request");
-
     // Explicit thrown error type.
     if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
       if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
@@ -5719,7 +5716,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
       }
 
       return TypeResolution::resolveContextualType(
-               thrownTypeRepr, dc,
+               thrownTypeRepr, closure,
                TypeResolutionOptions(TypeResolverContext::None),
                /*unboundTyOpener*/ nullptr, PlaceholderType::get,
                /*packElementOpener*/ nullptr);
@@ -5759,7 +5756,8 @@ Type ExplicitCaughtTypeRequest::evaluate(
     }
 
     return TypeResolution::resolveContextualType(
-        typeRepr, dc, TypeResolutionOptions(TypeResolverContext::None),
+        typeRepr, doCatch->getDeclContext(),
+        TypeResolutionOptions(TypeResolverContext::None),
         /*unboundTyOpener*/ nullptr, PlaceholderType::get,
         /*packElementOpener*/ nullptr);
   }

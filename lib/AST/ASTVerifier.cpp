@@ -1046,9 +1046,8 @@ public:
       SourceLoc loc = S->getThrowLoc();
       if (loc.isValid()) {
         auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
-        DeclContext *dc = getInnermostDC();
-        if (catchNode && dc) {
-          if (auto thrown = catchNode.getThrownErrorTypeInContext(dc)) {
+        if (catchNode) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(Ctx)) {
             thrownError = *thrown;
           } else {
             thrownError = Ctx.getNeverType();

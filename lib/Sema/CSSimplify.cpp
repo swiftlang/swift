@@ -12855,6 +12855,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // is not valid for operators though, where an inout parameter does not
   // have an explicit inout argument.
   if (type1.getPointer() == desugar2) {
+    // Note that this could throw.
+    recordPotentialThrowSite(
+        PotentialThrowSite::Application, Type(desugar2), outerLocator);
+
     if (!isOperator || !hasInOut()) {
       recordMatchCallArgumentResult(
           getConstraintLocator(
@@ -12905,6 +12909,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
   // For a function, bind the output and convert the argument to the input.
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
+    // Note that this could throw.
+    recordPotentialThrowSite(
+        PotentialThrowSite::Application, Type(desugar2), outerLocator);
+
     ConstraintKind subKind = (isOperator
                               ? ConstraintKind::OperatorArgumentConversion
                               : ConstraintKind::ArgumentConversion);

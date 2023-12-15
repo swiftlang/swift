@@ -921,19 +921,11 @@ private:
   void visitThrowStmt(ThrowStmt *throwStmt) {
     // Look up the catch node for this "throw" to determine the error type.
     auto dc = context.getAsDeclContext();
-    CatchNode catchNode = ASTScope::lookupCatchNode(
-        dc->getParentModule(), throwStmt->getThrowLoc());
+    auto module = dc->getParentModule();
+    auto throwLoc = throwStmt->getThrowLoc();
     Type errorType;
-    if (catchNode) {
-      // FIXME: Introduce something like getThrownErrorTypeInContext() for the
-      // constraint solver.
-      if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
-        errorType = cs.getClosureType(closure)->getThrownError();
-      }
-
-      if (!errorType)
-        errorType = catchNode.getThrownErrorTypeInContext(dc).value_or(Type());
-    }
+    if (auto catchNode = ASTScope::lookupCatchNode(module, throwLoc))
+      errorType = catchNode.getExplicitCaughtType(cs.getASTContext());
 
     if (!errorType) {
       if (!cs.getASTContext().getErrorDecl()) {
@@ -1068,10 +1060,15 @@ private:
         contextualTy = cs.getType(switchStmt->getSubjectExpr());
       } else if (auto doCatch =
                      dyn_cast_or_null<DoCatchStmt>(parent.dyn_cast<Stmt *>())) {
-        auto dc = context.getAsDeclContext();
-        contextualTy = doCatch->getExplicitCaughtType(dc);
-        if (!contextualTy)
-          contextualTy = cs.getASTContext().getErrorExistentialType();
+        contextualTy = cs.getCaughtErrorType(doCatch);
+
+        // A non-exhaustive do..catch statement is a potential throw site.
+        if (caseStmt == doCatch->getCatches().back() &&
+            !doCatch->isSyntacticallyExhaustive()) {
+          cs.recordPotentialThrowSite(
+              PotentialThrowSite::NonExhaustiveDoCatch, contextualTy,
+              cs.getConstraintLocator(doCatch));
+        }
       } else {
         hadError = true;
         return;
@@ -1636,6 +1633,13 @@ ConstraintSystem::simplifySyntacticElementConstraint(
 
     if (generateConstraints(target))
       return SolutionKind::Error;
+
+    // If this expression is the operand of a `throw` statement, record it as
+    // a potential throw site.
+    if (contextInfo.purpose == CTP_ThrowStmt) {
+      recordPotentialThrowSite(PotentialThrowSite::ExplicitThrow,
+                               getType(expr), getConstraintLocator(expr));
+    }
 
     setTargetFor(expr, target);
     return SolutionKind::Solved;

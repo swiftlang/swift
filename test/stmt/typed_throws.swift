@@ -191,3 +191,112 @@ func testDoCatchErrorTypedInClosure(cond: Bool) {
     }
   }
 }
+
+struct ThrowingMembers {
+  subscript(i: Int) -> Int {
+    get throws(MyError) { i }
+  }
+
+  var intOrThrows: Int {
+    get throws(MyError) { 5 }
+  }
+}
+
+struct ThrowingStaticSubscript {
+  static subscript(i: Int) -> Int {
+    get throws(MyError) { i }
+  }
+
+  static var intOrThrows: Int {
+    get throws(MyError) { 5 }
+  }
+}
+
+var globalIntOrThrows: Int {
+  get throws(MyError) { 5 }
+}
+
+func testDoCatchInClosure(cond: Bool, x: ThrowingMembers) {
+  apply {
+    do {
+      _ = try doSomething()
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      throw MyError.failed
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      if cond {
+        throw MyError.failed
+      }
+
+      try doHomework()
+    } catch {
+      let _: MyError = error
+      // expected-error@-1{{cannot convert value of type 'any Error' to specified type 'MyError'}}
+    }
+  }
+
+  apply {
+    do {
+      do {
+        _ = try doSomething()
+      } catch .failed {
+        // pick off one case, but this still rethrows
+      }
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  // Subscripts as potential throw sites
+  apply {
+    do {
+      _ = try x[5]
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      _ = try ThrowingStaticSubscript[5]
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  // Property accesses as potential throw sites
+  apply {
+    do {
+      _ = try x.intOrThrows
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      _ = try ThrowingStaticSubscript.intOrThrows
+    } catch {
+      let _: MyError = error
+    }
+  }
+
+  apply {
+    do {
+      _ = try globalIntOrThrows
+    } catch {
+      let _: MyError = error
+    }
+  }
+}

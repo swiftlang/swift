@@ -2294,7 +2294,7 @@ public:
 /// requires type inference.
 class ExplicitCaughtTypeRequest
     : public SimpleRequest<ExplicitCaughtTypeRequest,
-                           Type(DeclContext *, CatchNode),
+                           Type(ASTContext *, CatchNode),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2303,7 +2303,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, DeclContext *dc, CatchNode catchNode) const;
+  Type evaluate(Evaluator &evaluator, ASTContext *, CatchNode catchNode) const;
 
 public:
   // Separate caching.

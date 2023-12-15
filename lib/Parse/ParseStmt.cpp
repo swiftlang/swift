@@ -2256,8 +2256,8 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
     }
 
     return makeParserResult(status,
-      DoCatchStmt::create(Context, labelInfo, doLoc, throwsLoc, thrownType,
-                          body.get(), allClauses));
+      DoCatchStmt::create(CurDeclContext, labelInfo, doLoc, throwsLoc,
+                          thrownType, body.get(), allClauses));
   }
 
   if (throwsLoc.isValid()) {

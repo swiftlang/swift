@@ -368,6 +368,115 @@ bool ConstraintSystem::containsIDEInspectionTarget(
                                             Context.SourceMgr);
 }
 
+void ConstraintSystem::recordPotentialThrowSite(
+    PotentialThrowSite::Kind kind, Type type,
+    ConstraintLocatorBuilder locator) {
+  ASTContext &ctx = getASTContext();
+
+  // Only record potential throw sites when typed throws is enabled.
+  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
+    return;
+
+  // Catch node location is determined by the source location.
+  auto sourceLoc = locator.getAnchor().getStartLoc();
+  if (!sourceLoc)
+    return;
+
+  auto catchNode = ASTScope::lookupCatchNode(DC->getParentModule(), sourceLoc);
+  if (!catchNode)
+    return;
+
+  // If there is an explicit caught type for this node, we don't need to
+  // record a potential throw site.
+  if (Type explicitCaughtType = catchNode.getExplicitCaughtType(ctx))
+    return;
+
+  // do..catch statements without an explicit `throws` clause do infer
+  // thrown types.
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    potentialThrowSites.push_back(
+        {catchNode,
+         PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+    return;
+  }
+
+  // Closures without an explicit `throws` clause, and which syntactically
+  // appear that they can throw, do infer thrown types.
+  auto closure = catchNode.get<ClosureExpr *>();
+
+  // Check whether the closure syntactically throws. If not, there is no
+  // need to record a throw site.
+  if (!closureEffects(closure).isThrowing())
+    return;
+
+  potentialThrowSites.push_back(
+      {catchNode,
+       PotentialThrowSite{kind, type, getConstraintLocator(locator)}});
+}
+
+Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
+  ASTContext &ctx = getASTContext();
+
+  // If there is an explicit caught type for this node, use it.
+  if (Type explicitCaughtType = catchNode.getExplicitCaughtType(ctx)) {
+    if (explicitCaughtType->hasTypeParameter())
+      explicitCaughtType = DC->mapTypeIntoContext(explicitCaughtType);
+
+    return explicitCaughtType;
+  }
+
+  // Retrieve the thrown error type of a closure.
+  // FIXME: This will need to change when we do inference of thrown error
+  // types in closures.
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+    return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
+  }
+
+  // Handle inference of caught error types.
+
+  // Collect all of the potential throw sites for this catch node.
+  SmallVector<PotentialThrowSite, 2> throwSites;
+  for (const auto &potentialThrowSite : potentialThrowSites) {
+    if (potentialThrowSite.first == catchNode) {
+      throwSites.push_back(potentialThrowSite.second);
+    }
+  }
+
+  Type caughtErrorType = ctx.getNeverType();
+  for (const auto &throwSite : throwSites) {
+    Type type = simplifyType(throwSite.type);
+
+    Type thrownErrorType;
+    switch (throwSite.kind) {
+    case PotentialThrowSite::Application: {
+      auto fnType = type->castTo<AnyFunctionType>();
+      thrownErrorType = fnType->getEffectiveThrownErrorTypeOrNever();
+      break;
+    }
+
+    case PotentialThrowSite::ExplicitThrow:
+    case PotentialThrowSite::NonExhaustiveDoCatch:
+    case PotentialThrowSite::PropertyAccess:
+      thrownErrorType = type;
+      break;
+    }
+
+    // Perform the errorUnion() of the caught error type so far with the
+    // thrown error type of this potential throw site.
+    caughtErrorType = TypeChecker::errorUnion(
+        caughtErrorType, thrownErrorType,
+        [&](Type type) {
+      return simplifyType(type);
+    });
+
+    // If we ended up at 'any Error', we're done.
+    if (caughtErrorType->isErrorExistentialType())
+      break;
+  }
+
+  return caughtErrorType;
+}
+
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
     ASTNode anchor, ArrayRef<ConstraintLocator::PathElement> path) {
   auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
@@ -1701,7 +1810,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // The reference implicitly binds 'self'.
     return {origOpenedType, openedType,
-            origOpenedType->getResult(), openedType->getResult()};
+            origOpenedType->getResult(), openedType->getResult(), Type()};
   }
 
   // Unqualified reference to a local or global function.
@@ -1746,7 +1855,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
 
-    return { origOpenedType, openedType, origOpenedType, openedType };
+    return { origOpenedType, openedType, origOpenedType, openedType, Type() };
   }
 
   // Unqualified reference to a type.
@@ -1768,11 +1877,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
-      return { type, type, type, type };
+      return { type, type, type, type, Type() };
 
     // If it's a value reference, refer to the metatype.
     type = MetatypeType::get(type);
-    return { type, type, type, type };
+    return { type, type, type, type, Type() };
   }
 
   // Unqualified reference to a macro.
@@ -1790,7 +1899,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // FIXME: Should we use replaceParamErrorTypeByPlaceholder() here?
 
-    return { openedType, openedType, openedType, openedType };
+    return { openedType, openedType, openedType, openedType, Type() };
   }
 
   // Only remaining case: unqualified reference to a property.
@@ -1803,9 +1912,15 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       getUnopenedTypeOfReference(varDecl, Type(), useDC, /*base=*/nullptr,
                                  wantInterfaceType);
 
+  Type thrownErrorType;
+  if (auto accessor = varDecl->getEffectfulGetAccessor()) {
+    thrownErrorType =
+        accessor->getEffectiveThrownErrorType().value_or(Type());
+  }
+
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
-  return { valueType, valueType, valueType, valueType };
+  return { valueType, valueType, valueType, valueType, thrownErrorType };
 }
 
 /// Bind type variables for archetypes that are determined from
@@ -2532,13 +2647,13 @@ ConstraintSystem::getTypeOfMemberReference(
     memberTy = MetatypeType::get(memberTy);
 
     auto openedType = FunctionType::get({baseObjParam}, memberTy);
-    return { openedType, openedType, memberTy, memberTy };
+    return { openedType, openedType, memberTy, memberTy, Type() };
   }
 
   if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     if (value->getInterfaceType()->is<ErrorType>()) {
       auto genericErrorTy = ErrorType::get(getASTContext());
-      return { genericErrorTy, genericErrorTy, genericErrorTy, genericErrorTy };
+      return { genericErrorTy, genericErrorTy, genericErrorTy, genericErrorTy, Type() };
     }
   }
 
@@ -2557,6 +2672,7 @@ ConstraintSystem::getTypeOfMemberReference(
   if (genericSig)
     openGenericParameters(outerDC, genericSig, replacements, locator);
 
+  Type thrownErrorType;
   if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     // This is the easy case.
     openedType = value->getInterfaceType()->castTo<AnyFunctionType>();
@@ -2566,8 +2682,14 @@ ConstraintSystem::getTypeOfMemberReference(
           [&](Type type) { return openType(type, replacements, locator); });
     }
   } else {
+    // If the storage has a throwing getter, save the thrown error type..
+    auto storage = cast<AbstractStorageDecl>(value);
+    if (auto accessor = storage->getEffectfulGetAccessor()) {
+      thrownErrorType = accessor->getEffectiveThrownErrorType().value_or(Type());
+    }
+
     // For a property, build a type (Self) -> PropType.
-    // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
+    // For a subscript, build a type (Self) -> (Indices...) throws(?) -> ElementType.
     //
     // If the access is mutating, wrap the storage type in an lvalue type.
     Type refType;
@@ -2579,8 +2701,15 @@ ConstraintSystem::getTypeOfMemberReference(
 
       auto indices = subscript->getInterfaceType()
                               ->castTo<AnyFunctionType>()->getParams();
-      // FIXME: Verify ExtInfo state is correct, not working by accident.
+
+      // Transfer the thrown error type into the subscript reference type,
+      // which will be used in the application.
       FunctionType::ExtInfo info;
+      if (thrownErrorType) {
+        info = info.withThrows(true, thrownErrorType);
+        thrownErrorType = Type();
+      }
+
       refType = FunctionType::get(indices, elementTy, info);
     } else {
       // Delay the adjustment for preconcurrency until after we've formed
@@ -2609,10 +2738,12 @@ ConstraintSystem::getTypeOfMemberReference(
     if (genericSig) {
       selfTy = openType(selfTy, replacements, locator);
       refType = openType(refType, replacements, locator);
+
+      if (thrownErrorType)
+        thrownErrorType = openType(thrownErrorType, replacements, locator);
     }
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
 
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     openedType = FunctionType::get({selfParam}, refType, info);
   }
@@ -2746,7 +2877,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // If we opened up any type variables, record the replacements.
   recordOpenedTypes(locator, replacements);
 
-  return { origOpenedType, openedType, origType, type };
+  return { origOpenedType, openedType, origType, type, thrownErrorType };
 }
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
@@ -2973,7 +3104,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     auto refType = FunctionType::get({inputArg}, output, info);
-    return {refType, refType, refType, refType};
+    return {refType, refType, refType, refType, Type()};
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
     // Proceed with a "WithoutActuallyEscaping" operation. The body closure
@@ -3008,7 +3139,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                          .withAsync(true)
                                          .withThrows(true, /*FIXME:*/Type())
                                          .build());
-    return {refType, refType, refType, refType};
+    return {refType, refType, refType, refType, Type()};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
     // The body closure receives a freshly-opened archetype constrained by the
@@ -3041,7 +3172,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                          .withThrows(true, /*FIXME:*/Type())
                                          .withAsync(true)
                                          .build());
-    return {refType, refType, refType, refType};
+    return {refType, refType, refType, refType, Type()};
   }
   }
 
@@ -3634,6 +3765,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type adjustedOpenedType;
   Type refType;
   Type adjustedRefType;
+  Type thrownErrorTypeOnAccess;
 
   switch (auto kind = choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -3667,7 +3799,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     adjustedOpenedType = declRefType.adjustedOpenedType;
     refType = declRefType.referenceType;
     adjustedRefType = declRefType.adjustedReferenceType;
-
+    thrownErrorTypeOnAccess = declRefType.thrownErrorTypeOnAccess;
     break;
   }
 
@@ -3832,6 +3964,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         (void)recordFix(MacroMissingPound::create(*this, macro, locator));
       }
     }
+  }
+
+  // If accessing this declaration could throw an error, record this as a
+  // potential throw site.
+  if (thrownErrorTypeOnAccess) {
+    recordPotentialThrowSite(
+        PotentialThrowSite::PropertyAccess, thrownErrorTypeOnAccess, locator);
   }
 
   // Note that we have resolved this overload.
