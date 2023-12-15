@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NoncopyableGenerics -disable-availability-checking -module-name main %s | %FileCheck %s
 
+// REQUIRES: asserts
+
 struct NC: ~Copyable {}
 
 struct RudeStruct<T: ~Copyable>: Copyable {
