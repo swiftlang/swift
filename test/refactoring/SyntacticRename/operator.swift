@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %refactor -find-rename-ranges -source-filename %t/input.swift -pos="test" -old-name "+(x:y:)" -new-name "-(x:y:)" > %t/output.txt
-// RUN: diff -u %t/expected.swift %t/output.txt 
+// RUN: diff -u %t/expected.swift %t/output.txt
+
+// REQUIRES: swift_swift_parser
 
 //--- input.swift
 

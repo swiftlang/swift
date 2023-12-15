@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
+// REQUIRES: swift_swift_parser
+
 //--- a.swift
 
 struct Foo {}
@@ -11,7 +13,7 @@ Foo() + Foo()
 //--- dummy.swift
 
 // CHECK: START RANGES
-// CHECK: 8:6 - 1 - source.syntacticrename.definition
-// CHECK: 9:7 - 1 - source.syntacticrename.call
+// CHECK: [[# @LINE - 6 ]]:6 - 1 - source.syntacticrename.definition
+// CHECK: [[# @LINE - 6 ]]:7 - 1 - source.syntacticrename.call
 // CHECK: END RANGES
 // CHECK: NAME: +(_:_:)
