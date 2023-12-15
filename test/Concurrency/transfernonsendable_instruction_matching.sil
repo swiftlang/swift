@@ -298,3 +298,22 @@ bb0(%0 : $*NonSendableStruct):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @project_block_storage_test : $@convention(thin) @async (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>) -> () {
+bb0(%0 : @owned $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>):
+  %allocBlock = alloc_stack $@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %blockAddr = project_block_storage %allocBlock : $*@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  store %0 to [init] %blockAddr : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<() -> ()>(%blockAddr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+
+  %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %5<() -> ()>(%blockAddr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+  destroy_addr %allocBlock : $*@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  dealloc_stack %allocBlock : $*@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %9999 = tuple ()
+  return %9999 : $()
+}
+

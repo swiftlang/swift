@@ -142,6 +142,7 @@ struct UseDefChainVisitor
       switch (p.getKind()) {
       case ProjectionKind::Upcast:
       case ProjectionKind::RefCast:
+      case ProjectionKind::BlockStorageCast:
       case ProjectionKind::BitwiseCast:
       case ProjectionKind::TailElems:
       case ProjectionKind::Box:
@@ -2341,6 +2342,7 @@ CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
 // We identify destructured results with their operand's region.
 CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
+CONSTANT_TRANSLATION(ProjectBlockStorageInst, LookThrough)
 
 // These are treated as stores - meaning that they could write values into
 // memory. The beahvior of this depends on whether the tgt addr is aliased,
@@ -2429,7 +2431,6 @@ CONSTANT_TRANSLATION(PackLengthInst, Unhandled)
 CONSTANT_TRANSLATION(DynamicPackIndexInst, Unhandled)
 CONSTANT_TRANSLATION(PackPackIndexInst, Unhandled)
 CONSTANT_TRANSLATION(ScalarPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(ProjectBlockStorageInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiableFunctionInst, Unhandled)
 CONSTANT_TRANSLATION(LinearFunctionInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, Unhandled)
