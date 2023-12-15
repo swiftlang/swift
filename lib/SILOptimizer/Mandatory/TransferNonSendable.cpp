@@ -2639,9 +2639,6 @@ class BlockPartitionState {
   /// Set if this block in the next iteration needs to be visited.
   bool needsUpdate = false;
 
-  /// Set if we have ever visited this block at all.
-  bool reached = false;
-
   /// The partition of elements into regions at the top of the block.
   Partition entryPartition;
 
@@ -2698,8 +2695,12 @@ class BlockPartitionState {
       // will be suppressed
       eval.apply(partitionOp);
     }
+    LLVM_DEBUG(llvm::dbgs() << "    Working Partition: ";
+               workingPartition.print(llvm::dbgs()));
     bool exitUpdated = !Partition::equals(exitPartition, workingPartition);
     exitPartition = workingPartition;
+    LLVM_DEBUG(llvm::dbgs() << "    Exit Partition: ";
+               exitPartition.print(llvm::dbgs()));
     return exitUpdated;
   }
 
@@ -2713,8 +2714,8 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const {
-    os << SEP_STR << "BlockPartitionState[reached=" << reached
-       << ", needsUpdate=" << needsUpdate << "]\nid: ";
+    os << SEP_STR << "BlockPartitionState[needsUpdate=" << needsUpdate
+       << "]\nid: ";
 #ifndef NDEBUG
     auto printID = [&](SILBasicBlock *block) {
       block->printID(os);
@@ -2974,9 +2975,11 @@ class PartitionAnalysis {
                     }),
         allocator(), ptrSetFactory(allocator), function(fn), pofi(pofi),
         solved(false) {
-    // Initialize the entry block as needing an update, and having a partition
-    // that places all its non-sendable args in a single region
-    blockStates[fn->getEntryBlock()].needsUpdate = true;
+    // Mark all blocks as needing to be updated.
+    for (auto &block : *fn) {
+      blockStates[&block].needsUpdate = true;
+    }
+    // Set our entry partition to have the "entry partition".
     blockStates[fn->getEntryBlock()].entryPartition =
         translator.getEntryPartition();
   }
@@ -3001,35 +3004,21 @@ class PartitionAnalysis {
           continue;
         }
 
-        // mark this block as no longer needing an update
+        // Mark this block as no longer needing an update.
         blockState.needsUpdate = false;
 
-        // mark this block as reached by the analysis
-        blockState.reached = true;
-
-        // compute the new entry partition to this block
-        Partition newEntryPartition;
-        bool firstPred = true;
+        // Compute the new entry partition to this block.
+        Partition newEntryPartition = blockState.entryPartition;
 
         LLVM_DEBUG(llvm::dbgs() << "    Visiting Preds!\n");
 
-        // This loop computes the join of the exit partitions of all
+        // This loop computes the union of the exit partitions of all
         // predecessors of this block
         for (SILBasicBlock *predBlock : block->getPredecessorBlocks()) {
           BlockPartitionState &predState = blockStates[predBlock];
-          // ignore predecessors that haven't been reached by the analysis yet
-          if (!predState.reached)
-            continue;
 
-          if (firstPred) {
-            firstPred = false;
-            newEntryPartition = predState.exitPartition;
-            LLVM_DEBUG(llvm::dbgs() << "    First Pred. bb"
-                                    << predBlock->getDebugID() << ": ";
-                       newEntryPartition.print(llvm::dbgs()));
-            continue;
-          }
-
+          // Predecessors that have not been reached yet will have an empty pred
+          // state... so just merge them all. Also our initial value of
           LLVM_DEBUG(llvm::dbgs()
                          << "    Pred. bb" << predBlock->getDebugID() << ": ";
                      predState.exitPartition.print(llvm::dbgs()));
@@ -3037,21 +3026,10 @@ class PartitionAnalysis {
               Partition::join(newEntryPartition, predState.exitPartition);
         }
 
-        // If we found predecessor blocks, then attempt to use them to update
-        // the entry partition for this block, and abort this block's update if
-        // the entry partition was not updated.
-        if (!firstPred) {
-          // if the recomputed entry partition is the same as the current one,
-          // perform no update
-          if (Partition::equals(newEntryPartition, blockState.entryPartition)) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "    Entry partition is the same... skipping!\n");
-            continue;
-          }
-
-          // otherwise update the entry partition
-          blockState.entryPartition = newEntryPartition;
-        }
+        // Update the entry partition. We need to still try to
+        // recomputeExitFromEntry before we know if we made a difference to the
+        // exit partition after applying the instructions of the block.
+        blockState.entryPartition = newEntryPartition;
 
         // recompute this block's exit partition from its (updated) entry
         // partition, and if this changed the exit partition notify all
@@ -3169,6 +3147,8 @@ class PartitionAnalysis {
     LLVM_DEBUG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
     for (auto [block, blockState] : blockStates) {
       LLVM_DEBUG(llvm::dbgs() << "|--> Block bb" << block.getDebugID() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Entry Partition: ";
+                 blockState.getEntryPartition().print(llvm::dbgs()));
 
       // Grab its entry partition and setup an evaluator for the partition that
       // has callbacks that emit diagnsotics...
@@ -3180,6 +3160,9 @@ class PartitionAnalysis {
       for (auto &partitionOp : blockState.getPartitionOps()) {
         eval.apply(partitionOp);
       }
+
+      LLVM_DEBUG(llvm::dbgs() << "Exit Partition: ";
+                 workingPartition.print(llvm::dbgs()));
     }
 
     // Now that we have found all of our transferInsts/Requires emit errors.
