@@ -4841,6 +4841,10 @@ Address IRGenFunction::getCalleeTypedErrorResultSlot(SILType errorType) {
   return CalleeTypedErrorResultSlot;
 }
 
+void IRGenFunction::setCalleeTypedErrorResultSlot(Address addr) {
+  CalleeTypedErrorResultSlot = addr;
+}
+
 
 /// Fetch the error result slot received from the caller.
 Address IRGenFunction::getCallerErrorResultSlot() {
