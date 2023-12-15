@@ -6843,13 +6843,12 @@ public:
                                            Type ElementTy, DeclContext *Parent,
                                            GenericParamList *GenericParams);
 
-  static SubscriptDecl *create(ASTContext &Context, DeclName Name,
-                               SourceLoc StaticLoc,
-                               StaticSpellingKind StaticSpelling,
-                               SourceLoc SubscriptLoc, ParameterList *Indices,
-                               SourceLoc ArrowLoc, TypeRepr *ElementTyR,
-                               DeclContext *Parent,
-                               GenericParamList *GenericParams);
+  static SubscriptDecl *createParsed(ASTContext &Context, SourceLoc StaticLoc,
+                                     StaticSpellingKind StaticSpelling,
+                                     SourceLoc SubscriptLoc,
+                                     ParameterList *Indices, SourceLoc ArrowLoc,
+                                     TypeRepr *ElementTyR, DeclContext *Parent,
+                                     GenericParamList *GenericParams);
 
   static SubscriptDecl *create(ASTContext &Context, DeclName Name,
                                SourceLoc StaticLoc,

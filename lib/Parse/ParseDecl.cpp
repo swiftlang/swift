@@ -9508,10 +9508,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   // Parse the parameter list.
   DefaultArgumentInfo DefaultArgs;
-  SmallVector<Identifier, 4> argumentNames;
-  ParserResult<ParameterList> Indices
-    = parseSingleParameterClause(ParameterContextKind::Subscript,
-                                 &argumentNames, &DefaultArgs);
+  ParserResult<ParameterList> Indices =
+      parseSingleParameterClause(ParameterContextKind::Subscript,
+                                 /*argumentNamesOut*/ nullptr, &DefaultArgs);
   Status |= Indices;
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks)
     return Status;
@@ -9554,11 +9553,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   }
 
   // Build an AST for the subscript declaration.
-  DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
-                           argumentNames);
-  auto *const Subscript = SubscriptDecl::create(
-      Context, name, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(),
-      ArrowLoc, ElementTy.get(), CurDeclContext, GenericParams);
+  auto *const Subscript = SubscriptDecl::createParsed(
+      Context, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(), ArrowLoc,
+      ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.

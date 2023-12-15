@@ -8812,14 +8812,13 @@ SubscriptDecl::createDeserialized(ASTContext &Context, DeclName Name,
   return SD;
 }
 
-SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
-                                     SourceLoc StaticLoc,
-                                     StaticSpellingKind StaticSpelling,
-                                     SourceLoc SubscriptLoc,
-                                     ParameterList *Indices, SourceLoc ArrowLoc,
-                                     TypeRepr *ElementTyR, DeclContext *Parent,
-                                     GenericParamList *GenericParams) {
+SubscriptDecl *SubscriptDecl::createParsed(
+    ASTContext &Context, SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+    SourceLoc SubscriptLoc, ParameterList *Indices, SourceLoc ArrowLoc,
+    TypeRepr *ElementTyR, DeclContext *Parent,
+    GenericParamList *GenericParams) {
   assert(ElementTyR);
+  auto Name = DeclName(Context, DeclBaseName::createSubscript(), Indices);
   auto *const SD = new (Context)
       SubscriptDecl(Name, StaticLoc, StaticSpelling, SubscriptLoc, Indices,
                     ArrowLoc, ElementTyR, Parent, GenericParams);
