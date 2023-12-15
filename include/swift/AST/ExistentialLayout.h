@@ -31,7 +31,8 @@ struct ExistentialLayout {
 
   ExistentialLayout() {
     hasExplicitAnyObject = false;
-    containsNonObjCProtocol = false;
+    containsObjCProtocol = false;
+    containsSwiftProtocol = false;
     containsParameterized = false;
     representsAnyObject = false;
   }
@@ -46,8 +47,11 @@ struct ExistentialLayout {
   /// Whether the existential contains an explicit '& AnyObject' constraint.
   bool hasExplicitAnyObject : 1;
 
-  /// Whether any protocol members are non-@objc.
-  bool containsNonObjCProtocol : 1;
+  /// Whether any protocol members are @objc.
+  bool containsObjCProtocol : 1;
+
+  /// Whether any protocol members require a witness table.
+  bool containsSwiftProtocol : 1;
 
   /// Whether any protocol members are parameterized.s
   bool containsParameterized : 1;
@@ -74,8 +78,8 @@ struct ExistentialLayout {
     // FIXME: Does the superclass have to be @objc?
     return ((explicitSuperclass ||
              hasExplicitAnyObject ||
-             !getProtocols().empty()) &&
-            !containsNonObjCProtocol);
+             containsObjCProtocol) &&
+            !containsSwiftProtocol);
   }
 
   /// Whether the existential requires a class, either via an explicit
@@ -109,10 +113,6 @@ private:
   /// Zero or more primary associated type requirements from a
   /// ParameterizedProtocolType
   ArrayRef<Type> sameTypeRequirements;
-
-  /// Existentials allow a relaxed notion of \c ValueDecl::isObjC
-  /// that includes `Sendable` protocol.
-  static bool isObjCProtocol(ProtocolDecl *P);
 };
 
 }
