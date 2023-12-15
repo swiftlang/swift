@@ -7,6 +7,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_swift_parser
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts

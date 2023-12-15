@@ -17,3 +17,4 @@ func testThrowingClosure() throws {
 // RUN: diff -u %S/Outputs/throw_errors3/consumes_err.swift.expected %t.result/consumes_err.swift
 // RUN: %refactor -extract-function -source-filename %s -pos=10:1 -end-pos=12:51 >> %t.result/rethrows_err.swift
 // RUN: diff -u %S/Outputs/throw_errors3/rethrows_err.swift.expected %t.result/rethrows_err.swift
+// REQUIRES: swift_swift_parser
