@@ -28,6 +28,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -256,6 +257,13 @@ class Verifier : public ASTWalker {
       Out << "\n";
     }
     abort();
+  }
+
+  ModuleDecl *getModuleContext() const {
+    if (auto sourceFile = M.dyn_cast<SourceFile *>())
+      return sourceFile->getParentModule();
+
+    return M.get<ModuleDecl *>();
   }
 
 public:
@@ -693,8 +701,8 @@ public:
           auto interfaceType = archetype->getInterfaceType();
           auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
 
-          if (contextType.getPointer() != archetype) {
-            Out << "Archetype " << archetype->getString() << "does not appear"
+          if (!contextType->isEqual(archetype)) {
+            Out << "Archetype " << archetype->getString() << " does not appear"
                 << " inside its own generic environment\n";
             Out << "Interface type: " << interfaceType.getString() << "\n";
             Out << "Contextual type: " << contextType.getString() << "\n";
@@ -795,6 +803,13 @@ public:
       if (!shouldVerify(cast<Stmt>(S)))
         return false;
 
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+        if (!shouldVerify(expansion)) {
+          return false;
+        }
+      }
+
       if (!S->getElementExpr())
         return true;
 
@@ -804,6 +819,11 @@ public:
     }
 
     void cleanup(ForEachStmt *S) {
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+        cleanup(expansion);
+      }
+
       if (!S->getElementExpr())
         return;
 
@@ -1012,15 +1032,33 @@ public:
       return shouldVerifyChecked(S->getSubExpr());
     }
 
-    void verifyChecked(ThrowStmt *S) {
-      Type thrownError;
-      if (!Functions.empty()) {
-        if (auto fn = AnyFunctionRef::fromDeclContext(Functions.back()))
-          thrownError = fn->getThrownErrorType();
+    DeclContext *getInnermostDC() const {
+      for (auto scope : llvm::reverse(Scopes)) {
+        if (auto dc = scope.dyn_cast<DeclContext *>())
+          return dc;
       }
 
-      if (!thrownError)
-        thrownError = checkExceptionTypeExists("throw expression");
+      return nullptr;
+    }
+
+    void verifyChecked(ThrowStmt *S) {
+      Type thrownError;
+      SourceLoc loc = S->getThrowLoc();
+      if (loc.isValid()) {
+        auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
+        if (catchNode) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(Ctx)) {
+            thrownError = *thrown;
+          } else {
+            thrownError = Ctx.getNeverType();
+          }
+        } else {
+          thrownError = checkExceptionTypeExists("throw expression");
+        }
+      } else {
+        return;
+      }
+
       checkSameType(S->getSubExpr()->getType(), thrownError, "throw operand");
       verifyCheckedBase(S);
     }
@@ -2605,6 +2643,14 @@ public:
         abort();
       }
 
+      // Catch cases where there's a missing generic environment.
+      if (var->getTypeInContext()->is<ErrorType>()) {
+        Out << "VarDecl is missing a Generic Environment: ";
+        var->getInterfaceType().print(Out);
+        Out << "\n";
+        abort();
+      }
+
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>() !=
@@ -3813,7 +3859,17 @@ public:
       } else {
         llvm_unreachable("impossible parent node");
       }
-      
+
+      if (AltEnclosing.isInvalid()) {
+        // A preamble macro introduces child nodes directly into the tree.
+        auto *sourceFile =
+            getModuleContext()->getSourceFileContainingLocation(Current.Start);
+        if (sourceFile &&
+            sourceFile->getFulfilledMacroRole() == MacroRole::Preamble) {
+          AltEnclosing = Current;
+        }
+      }
+
       if (!Ctx.SourceMgr.rangeContains(Enclosing, Current) &&
           !(AltEnclosing.isValid() &&
             Ctx.SourceMgr.rangeContains(AltEnclosing, Current))) {

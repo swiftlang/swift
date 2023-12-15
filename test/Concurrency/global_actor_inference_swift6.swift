@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
+// RUN: %target-swift-frontend -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
 
 // RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
@@ -117,7 +117,7 @@ struct HasWrapperOnActor {
     synced = 17
   }
 
-  @WrapperActor var actorSynced: Int = 0
+  @WrapperActor var actorSynced: Int = 0 // expected-error{{'nonisolated' is not supported on properties with property wrappers}}
 
   func testActorSynced() {
     _ = actorSynced

@@ -26,9 +26,6 @@ The path to a directory that mimics a file system image root,
 under which "Library" and "Program Files" subdirectories will be created
 with the files installed by CMake.
 
-.PARAMETER BuildType
-The CMake build type to use, one of: Release, RelWithDebInfo, Debug.
-
 .PARAMETER CDebugFormat
 The debug information format for C/C++ code: dwarf or codeview.
 
@@ -62,6 +59,12 @@ If set, skips building the msi's and installer
 .PARAMETER DefaultsLLD
 If false, use `link.exe` as the default linker with the SDK (with SPM)
 
+.PARAMETER DebugInfo
+If set, debug information will be generated for the builds.
+
+.PARAMETER EnableCaching
+If true, use `sccache` to cache the build rules.
+
 .PARAMETER Test
 An array of names of projects to run tests for.
 '*' runs all tests
@@ -77,6 +80,9 @@ For example: -BuildTo ToolsSupportCore
 When set, runs the script in a special mode which outputs a listing of command invocations
 in batch file format instead of executing them.
 
+.PARAMETER PinnedLayout
+If "New", uses the new toolchain install layout. Otherwise, the old layout.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -88,7 +94,6 @@ param(
   [string] $SourceCache = "S:\SourceCache",
   [string] $BinaryCache = "S:\b",
   [string] $ImageRoot = "S:",
-  [string] $BuildType = "Release",
   [string] $CDebugFormat = "dwarf",
   [string] $SwiftDebugFormat = "dwarf",
   [string[]] $SDKs = @("X64","X86","Arm64"),
@@ -103,7 +108,10 @@ param(
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
-  [switch] $ToBatch
+  [switch] $DebugInfo,
+  [switch] $EnableCaching,
+  [switch] $ToBatch,
+  [string] $PinnedLayout = "old"
 )
 
 $ErrorActionPreference = "Stop"
@@ -460,10 +468,55 @@ function Ensure-SwiftToolchain($Arch) {
   New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains" | Out-Null
   Write-Output "Extracting Swift toolchain..."
   Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn extract "$BinaryCache\${PinnedToolchain}.exe" -out "$BinaryCache\toolchains\"
-  Invoke-Program -OutNull msiexec.exe /lvx! a0.log /qn /a "$BinaryCache\toolchains\a0" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-  Invoke-Program -OutNull msiexec.exe /lvx! a1.log /qn /a "$BinaryCache\toolchains\a1" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-  Invoke-Program -OutNull msiexec.exe /lvx! a2.log /qn /a "$BinaryCache\toolchains\a2" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-  Invoke-Program -OutNull msiexec.exe /lvx! a3.log /qn /a "$BinaryCache\toolchains\a3" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+  if ($PinnedLayout -eq "New") {
+    [string[]] $Packages = @("UNUSED",
+                             "rtl.msi","bld.msi","cli.msi","dbg.msi","ide.msi",
+                             "sdk.x86.msi","sdk.amd64.msi","sdk.arm64.msi",
+                             "rtl.cab","bld.cab","cli.cab","dbg.cab","ide.cab",
+                             "sdk.x86.cab","sdk.amd64.cab","sdk.arm64.cab")
+    for ($I = 1; $I -lt $Packages.length; $I += 1) {
+      Move-Item -Force "$BinaryCache\toolchains\a${I}" "$BinaryCache\toolchains\$($Packages[$I])"
+    }
+
+    # The runtime msi is built to expand files into the immediate directory. So, setup the installation location.
+    New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin" | Out-Null
+
+    Invoke-Program -OutNull msiexec.exe /lvx! bld.log /qn /a "$BinaryCache\toolchains\bld.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! cli.log /qn /a "$BinaryCache\toolchains\cli.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! sdk.x86.log /qn /a "$BinaryCache\toolchains\sdk.x86.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! sdk.amd64.log /qn /a "$BinaryCache\toolchains\sdk.amd64.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! sdk.arm64.log /qn /a "$BinaryCache\toolchains\sdk.arm64.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! rtl.log /qn /a "$BinaryCache\toolchains\rtl.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin"
+  } else {
+    Invoke-Program -OutNull msiexec.exe /lvx! a0.log /qn /a "$BinaryCache\toolchains\a0" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! a1.log /qn /a "$BinaryCache\toolchains\a1" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! a2.log /qn /a "$BinaryCache\toolchains\a2" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+    Invoke-Program -OutNull msiexec.exe /lvx! a3.log /qn /a "$BinaryCache\toolchains\a3" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+  }
+}
+
+function Get-PinnedToolchainTool() {
+  if ($PinnedLayout -eq "New") {
+    return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\0.0.0+Asserts\usr\bin"
+  } else {
+    return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin"
+  }
+}
+
+function Get-PinnedToolchainSDK() {
+  if ($PinnedLayout -eq "New") {
+    return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Platforms\0.0.0\Windows.platform\Developer\SDKs\Windows.sdk"
+  } else {
+    return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Platforms\Windows.platform\Developer\SDKs\Windows.sdk"
+  }
+}
+
+function Get-PinnedToolchainRuntime() {
+  if ($PinnedLayout -eq "New") {
+    return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin"
+  } else {
+    return "$BinaryCache\toolchains\${PinnedToolchain}\PFiles64\Swift\runtime-development\usr\bin"
+  }
 }
 
 function TryAdd-KeyValue([hashtable]$Hashtable, [string]$Key, [string]$Value) {
@@ -528,28 +581,37 @@ function Build-CMakeProject {
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
   
-    TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE $BuildType
+    TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
     TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
-    $GenerateDebugInfo = $Defines["CMAKE_BUILD_TYPE"] -ne "Release"
-
     $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
-    if ($GenerateDebugInfo) { $CFlags += "/Zi" }
+    if ($DebugInfo) { $CFlags += if ($EnableCaching) { "/Z7" } else { "/Zi" } }
     $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
+
+    if ($EnableCaching) {
+      $env:SCCACHE_DIRECT = "true"
+      $env:SCCACHE_DIR = "$BinaryCache\sccache"
+    }
 
     if ($UseMSVCCompilers.Contains("C")) {
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER cl
+      if ($EnableCaching) {
+        TryAdd-KeyValue $Defines CMAKE_C_COMPILER_LAUNCHER sccache
+      }
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UseMSVCCompilers.Contains("CXX")) {
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER cl
+      if ($EnableCaching) {
+        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
+      }
       Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
     }
     if ($UsePinnedCompilers.Contains("ASM") -Or $UseBuiltCompilers.Contains("ASM")) {
       if ($UseBuiltCompilers.Contains("ASM")) {
         TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER "$BinaryCache\1\bin\clang-cl.exe"
       } else {
-        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin\clang-cl.exe"
+        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "clang-cl.exe")
       }
       Append-FlagsDefine $Defines CMAKE_ASM_FLAGS "--target=$($Arch.LLVMTarget)"
       TryAdd-KeyValue $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
@@ -558,7 +620,7 @@ function Build-CMakeProject {
       if ($UseBuiltCompilers.Contains("C")) {
         TryAdd-KeyValue $Defines CMAKE_C_COMPILER "$BinaryCache\1\bin\clang-cl.exe"
       } else {
-        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin\clang-cl.exe"
+        TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "clang-cl.exe")
       }
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
 
@@ -567,7 +629,7 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
       }
 
-      if ($GenerateDebugInfo -and $CDebugFormat -eq "dwarf") {
+      if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_C_FLAGS "-gdwarf"
       }
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
@@ -576,7 +638,7 @@ function Build-CMakeProject {
       if ($UseBuiltCompilers.Contains("CXX")) {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER "$BinaryCache\1\bin\clang-cl.exe"
       } else {
-        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin\clang-cl.exe"
+        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "clang-cl.exe")
       }
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
 
@@ -585,7 +647,7 @@ function Build-CMakeProject {
         TryAdd-KeyValue $Defines CMAKE_CL_SHOWINCLUDES_PREFIX "Note: including file: "
       }
 
-      if ($GenerateDebugInfo -and $CDebugFormat -eq "dwarf") {
+      if ($DebugInfo -and $CDebugFormat -eq "dwarf") {
         Append-FlagsDefine $Defines CMAKE_CXX_FLAGS "-gdwarf"
       }
       Append-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
@@ -596,7 +658,7 @@ function Build-CMakeProject {
       if ($UseBuiltCompilers.Contains("Swift")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\1\bin\swiftc.exe"
       } else {
-        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin\swiftc.exe"
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath  "swiftc.exe")
       }
       TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget
       if ($UseBuiltCompilers.Contains("Swift")) {
@@ -608,14 +670,14 @@ function Build-CMakeProject {
 
           $SwiftArgs += @("-resource-dir", "$SwiftResourceDir")
           $SwiftArgs += @("-L", "$SwiftResourceDir\windows")
-          $SwiftArgs += @("-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml")
+          $SwiftArgs += @("-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml", "-strict-implicit-module-context", "-Xcc", "-Xclang", "-Xcc", "-fbuiltin-headers-in-system-modules")
         }
       } else {
-        $SwiftArgs += @("-sdk", "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Platforms\Windows.platform\Developer\SDKs\Windows.sdk")
+        $SwiftArgs += @("-sdk", (Get-PinnedToolchainSDK))
       }
 
       # Debug Information
-      if ($GenerateDebugInfo) {
+      if ($DebugInfo) {
         if ($SwiftDebugFormat -eq "dwarf") {
           $SwiftArgs += @("-g", "-Xlinker", "/DEBUG:DWARF", "-use-ld=lld-link")
         } else {
@@ -730,14 +792,14 @@ function Build-SPMProject {
         "-Xcc", "-I$SDKInstallRoot\usr\lib\swift",
         "-Xlinker", "-L$SDKInstallRoot\usr\lib\swift\windows"
     )
-    if ($BuildType -eq "Release") {
-      $Arguments += @("-debug-info-format", "none")
-    } else {
+    if ($DebugInfo) {
       if ($SwiftDebugFormat -eq "dwarf") {
         $Arguments += @("-debug-info-format", "dwarf")
       } else {
         $Arguments += @("-debug-info-format", "codeview")
       }
+    } else {
+      $Arguments += @("-debug-info-format", "none")
     }
 
     Invoke-Program "$ToolchainInstallRoot\usr\bin\swift.exe" "build" @Arguments @AdditionalArguments
@@ -798,6 +860,7 @@ function Build-BuildTools($Arch) {
     -Src $SourceCache\llvm-project\llvm `
     -Bin $BinaryCache\0 `
     -Arch $Arch `
+    -UseMSVCCompilers C,CXX `
     -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       LLDB_ENABLE_PYTHON = "NO";
@@ -812,10 +875,14 @@ function Build-BuildTools($Arch) {
       LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
       SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "NO";
       SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
+      SWIFT_BUILD_LIBEXEC = "NO";
       SWIFT_BUILD_REMOTE_MIRROR = "NO";
+      SWIFT_BUILD_SOURCEKIT = "NO";
       SWIFT_BUILD_STATIC_SDK_OVERLAY = "NO";
       SWIFT_BUILD_STATIC_STDLIB = "NO";
+      SWIFT_INCLUDE_APINOTES = "NO";
       SWIFT_INCLUDE_DOCS = "NO";
+      SWIFT_INCLUDE_TESTS = "NO";
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
       SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
     }
@@ -843,12 +910,7 @@ function Build-Compilers($Arch, [switch]$Test = $false) {
       }
     }
 
-    $env:Path = "$BinaryCache\toolchains\$PinnedToolchain\PFiles64\Swift\runtime-development\usr\bin;${env:Path}"
-
-    $LLVM_ENABLE_PDB = switch ($BuildType) {
-      "Release" { "NO" }
-      default { "YES" }
-    }
+    $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
 
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
@@ -860,26 +922,21 @@ function Build-Compilers($Arch, [switch]$Test = $false) {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = "$BinaryCache\0\bin\clang-tblgen.exe";
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = "$BinaryCache\0\bin\clang-tidy-confusable-chars-gen.exe";
-        # LLVM plays tricks with flags and prefers to use `LLVM_ENABLE_PDB` for
-        # debug information on Windows rather than the CMake handling.  This
-        # give us a sligtly faster build.
-        CMAKE_BUILD_TYPE = "Release";
         CMAKE_INSTALL_PREFIX = "$($Arch.ToolchainInstallRoot)\usr";
-        CMAKE_Swift_COMPILER = "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin\swiftc.exe";
-        CMAKE_Swift_FLAGS = @("-sdk", "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Platforms\Windows.platform\Developer\SDKs\Windows.sdk");
+        CMAKE_Swift_COMPILER = (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "swiftc.exe");
+        CMAKE_Swift_FLAGS = @("-sdk", (Get-PinnedToolchainSDK));
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
         LLDB_PYTHON_EXT_SUFFIX = ".pyd";
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
         LLDB_TABLEGEN = "$BinaryCache\0\bin\lldb-tblgen.exe";
         LLVM_CONFIG_PATH = "$BinaryCache\0\bin\llvm-config.exe";
-        LLVM_ENABLE_PDB = $LLVM_ENABLE_PDB;
         LLVM_EXTERNAL_CMARK_SOURCE_DIR = "$SourceCache\cmark";
         LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
         LLVM_NATIVE_TOOL_DIR = "$BinaryCache\0\bin";
         LLVM_TABLEGEN = "$BinaryCache\0\bin\llvm-tblgen.exe";
         LLVM_USE_HOST_TOOLS = "NO";
         SWIFT_BUILD_SWIFT_SYNTAX = "YES";
-        SWIFT_CLANG_LOCATION = "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin";
+        SWIFT_CLANG_LOCATION = (Get-PinnedToolchainTool);
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
@@ -889,7 +946,7 @@ function Build-Compilers($Arch, [switch]$Test = $false) {
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
         SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
-        SWIFT_PATH_TO_SWIFT_SDK = "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Platforms\Windows.platform\Developer\SDKs\Windows.sdk";
+        SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
       })
   }
 }
@@ -954,29 +1011,83 @@ function Build-CURL($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
-      CMAKE_INSTALL_BINDIR = "bin/$ArchName";
+      BUILD_TESTING = "NO";
       CMAKE_INSTALL_LIBDIR = "lib/$ArchName";
       BUILD_CURL_EXE = "NO";
-      CMAKE_USE_OPENSSL = "NO";
+      CURL_CA_BUNDLE = "none";
+      CURL_CA_FALLBACK = "NO";
       CURL_CA_PATH = "none";
-      CMAKE_USE_SCHANNEL = "YES";
-      CMAKE_USE_LIBSSH2 = "NO";
-      HAVE_POLL_FINE = "NO";
+      CURL_BROTLI = "NO";
+      CURL_DISABLE_ALTSVC = "NO";
+      CURL_DISABLE_AWS = "YES";
+      CURL_DISABLE_BASIC_AUTH = "NO";
+      CURL_DISABLE_BEARER_AUTH = "NO";
+      CURL_DISABLE_COOKIES = "NO";
+      CURL_DISABLE_DICT = "YES";
+      CURL_DISABLE_DIGEST_AUTH = "NO";
+      CURL_DISABLE_DOH = "NO";
+      CURL_DISABLE_FILE = "YES";
+      CURL_DISABLE_FORM_API = "NO";
+      CURL_DISABLE_FTP = "YES";
+      CURL_DISABLE_GETOPTIONS = "NO";
+      CURL_DISABLE_GOPHER = "YES";
+      CURL_DISABLE_HSTS = "NO";
+      CURL_DISABLE_HTTP = "NO";
+      CURL_DISABLE_HTTP_AUTH = "NO";
+      CURL_DISABLE_IMAP = "YES";
+      CURL_DISABLE_KERBEROS_AUTH = "NO";
       CURL_DISABLE_LDAP = "YES";
       CURL_DISABLE_LDAPS = "YES";
-      CURL_DISABLE_TELNET = "YES";
-      CURL_DISABLE_DICT = "YES";
-      CURL_DISABLE_FILE = "YES";
-      CURL_DISABLE_TFTP = "YES";
-      CURL_DISABLE_RTSP = "YES";
-      CURL_DISABLE_PROXY = "YES";
+      CURL_DISABLE_MIME = "NO";
+      CURL_DISABLE_MQTT = "YES";
+      CURL_DISABLE_NEGOTIATE_AUTH = "NO";
+      CURL_DISABLE_NETRC = "NO";
+      CURL_DISABLE_NTLM = "NO";
+      CURL_DISABLE_PARSEDATE = "NO";
       CURL_DISABLE_POP3 = "YES";
-      CURL_DISABLE_IMAP = "YES";
+      CURL_DISABLE_PROGRESS_METER = "YES";
+      CURL_DISABLE_PROXY = "NO";
+      CURL_DISABLE_RTSP = "YES";
+      CURL_DISABLE_SHUFFLE_DNS = "YES";
+      CURL_DISABLE_SMB = "YES";
       CURL_DISABLE_SMTP = "YES";
-      CURL_DISABLE_GOPHER = "YES";
+      CURL_DISABLE_SOCKETPAIR = "YES";
+      CURL_DISABLE_SRP = "NO";
+      CURL_DISABLE_TELNET = "YES";
+      CURL_DISABLE_TFTP = "YES";
+      CURL_DISABLE_VERBOSE_STRINGS = "NO";
+      CURL_LTO = "NO";
+      CURL_USE_BEARSSL = "NO";
+      CURL_USE_GNUTLS = "NO";
+      CURL_USE_GSSAPI = "NO";
+      CURL_USE_LIBPSL = "NO";
+      CURL_USE_LIBSSH = "NO";
+      CURL_USE_LIBSSH2 = "NO";
+      CURL_USE_MBEDTLS = "NO";
+      CURL_USE_OPENSSL = "NO";
+      CURL_USE_SCHANNEL = "YES";
+      CURL_USE_WOLFSSL = "NO";
+      CURL_WINDOWS_SSPI = "YES";
       CURL_ZLIB = "YES";
-      ENABLE_UNIX_SOCKETS = "NO";
+      CURL_ZSTD = "NO";
+      ENABLE_ARES = "NO";
+      ENABLE_CURLDEBUG = "NO";
+      ENABLE_DEBUG = "NO";
+      ENABLE_IPV6 = "YES";
+      ENABLE_MANUAL = "NO";
       ENABLE_THREADED_RESOLVER = "NO";
+      ENABLE_UNICODE = "YES";
+      ENABLE_UNIX_SOCKETS = "NO";
+      ENABLE_WEBSOCKETS = "NO";
+      HAVE_POLL_FINE = "NO";
+      USE_IDN2 = "NO";
+      USE_MSH3 = "NO";
+      USE_NGHTTP2 = "NO";
+      USE_NGTCP2 = "NO";
+      USE_QUICHE = "NO";
+      USE_WIN32_IDN = "YES";
+      USE_WIN32_LARGE_FILES = "YES";
+      USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$LibraryRoot\zlib-1.3\usr";
       ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$ArchName\zlibstatic.lib";
     }
@@ -1019,7 +1130,7 @@ function Build-Runtime($Arch) {
   $LLVMBinaryCache = Get-ProjectBinaryCache $Arch 0
 
   Isolate-EnvVars {
-    $env:Path = "$BinaryCache\toolchains\$PinnedToolchain\PFiles64\Swift\runtime-development\usr\bin;${env:Path}"
+    $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
 
     Build-CMakeProject `
       -Src $SourceCache\swift `
@@ -1581,10 +1692,10 @@ function Build-Installer($Arch) {
 
   Isolate-EnvVars {
     Invoke-VsDevShell $Arch
-    $VCRedistInstallerPath = "${env:VCToolsRedistDir}\vc_redist.$($Arch.ShortName).exe"
-    if (Test-Path $VCRedistInstallerPath) {
-      $Properties["VCRedistInstaller"] = $VCRedistInstallerPath
-      $Properties["VSVersion"] = $env:VSCMD_VER
+    # Avoid hard-coding the VC tools version number
+    $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
+    if ($VCRedistDir) {
+      $Properties["VCRedistDir"] = "$VCRedistDir\"
     }
   }
 

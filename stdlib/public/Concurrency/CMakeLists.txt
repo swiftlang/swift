@@ -111,8 +111,10 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PartialAsyncTask.swift
   SourceCompatibilityShims.swift
   Task.swift
+  Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
+  TaskGroup+TaskExecutor.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift
@@ -189,6 +191,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
   set(SWIFT_STDLIB_STABLE_ABI OFF)
   set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
+  set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
   set(SWIFT_STDLIB_CONCURRENCY_TRACING FALSE)
 
@@ -260,7 +263,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       SDK "embedded"
       ARCHITECTURE "${mod}"
       DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT "never_install"
+      INSTALL_IN_COMPONENT stdlib
+      )
+    swift_install_in_component(
+      TARGETS embedded-concurrency-${mod}
+      DESTINATION "lib/swift/embedded/${mod}"
+      COMPONENT "stdlib"
       )
     set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
 

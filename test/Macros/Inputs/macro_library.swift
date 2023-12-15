@@ -42,3 +42,14 @@ public macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition
 
 @attached(peer, names: named(value))
 public macro declareVarValuePeer() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+@propertyWrapper
+public struct declareVarValuePeerShadowed {
+  public var wrappedValue: Int
+  public init(wrappedValue: Int) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+@attached(peer, names: named(value))
+public macro declareVarValuePeerShadowed() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")

@@ -24,6 +24,8 @@
 
 @end
 
+extern void implFunc(int param);
+
 
 @interface NoImplClass
 

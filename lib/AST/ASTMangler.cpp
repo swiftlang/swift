@@ -1179,6 +1179,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::TypeVariable:
       llvm_unreachable("mangling type variable");
 
+    case TypeKind::ErrorUnion:
+      llvm_unreachable("Error unions should not persist to mangling");
+
     case TypeKind::Module:
       llvm_unreachable("Cannot mangle module type yet");
 
@@ -1400,9 +1403,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     }
     case TypeKind::LValue:
       llvm_unreachable("@lvalue types should not occur in function interfaces");
-
-    case TypeKind::Inverse:
-      llvm_unreachable("inverse types should not appear in interfaces");
 
     case TypeKind::InOut:
       appendType(cast<InOutType>(tybase)->getObjectType(), sig, forDecl);
@@ -3803,6 +3803,12 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
     else
       appendOperatorParam("M", Index(layout->getTrivialSizeInBits()),
                           Index(layout->getAlignmentInBits()));
+    break;
+  case LayoutConstraintKind::BridgeObject:
+    appendOperatorParam("B");
+    break;
+  case LayoutConstraintKind::TrivialStride:
+    appendOperatorParam("S", Index(layout->getTrivialSizeInBits()));
     break;
   }
 }

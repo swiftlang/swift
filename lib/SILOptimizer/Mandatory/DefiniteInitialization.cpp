@@ -3028,7 +3028,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 ///
 ///    %box = alloc_box
 ///    %mark_uninit = mark_uninitialized %box
-///    %lifetime = begin_borrow [lexical] %mark_uninit
+///    %lifetime = begin_borrow [var_decl] %mark_uninit
 ///    %proj_box = project_box %lifetime
 ///
 /// We are replacing a
@@ -3048,7 +3048,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 /// Consequently, it's not sufficient to just replace the destroy_value
 /// %mark_uninit with a destroy_addr %proj_box (or to replace it with a diamond
 /// where one branch has that destroy_addr) because the destroy_addr is a use
-/// of %proj_box which must be within the lexical lifetime of the box.
+/// of %proj_box which must be within the var_decl lifetime of the box.
 ///
 /// On the other side, we are hemmed in by the fact that the end_borrow must
 /// precede the dealloc_box which will be created in the diamond.  So we
@@ -3084,12 +3084,12 @@ static bool adjustAllocBoxEndBorrow(SILInstruction *previous,
   if (!pbi)
     return false;
 
-  // This fixup only applies if we're destroying a project_box of the lexical
+  // This fixup only applies if we're destroying a project_box of the var_decl
   // lifetime of an alloc_box.
   auto *lifetime = dyn_cast<BeginBorrowInst>(pbi->getOperand());
   if (!lifetime)
     return false;
-  assert(lifetime->isLexical());
+  assert(lifetime->isFromVarDecl());
   assert(isa<AllocBoxInst>(
       cast<MarkUninitializedInst>(lifetime->getOperand())->getOperand()));
 

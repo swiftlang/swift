@@ -2775,12 +2775,12 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   return anyDiagnosed;
 }
 
-void TypeChecker::checkObjCImplementation(ExtensionDecl *ED) {
-  if (!ED->getImplementedObjCDecl())
+void TypeChecker::checkObjCImplementation(Decl *D) {
+  if (!D->getImplementedObjCDecl())
     return;
 
-  evaluateOrDefault(ED->getASTContext().evaluator,
-                    TypeCheckObjCImplementationRequest{ED},
+  evaluateOrDefault(D->getASTContext().evaluator,
+                    TypeCheckObjCImplementationRequest{D},
                     evaluator::SideEffect());
 }
 
@@ -2901,10 +2901,20 @@ class ObjCImplementationChecker {
   llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
 
 public:
-  ObjCImplementationChecker(ExtensionDecl *ext)
-      : diags(ext->getASTContext().Diags)
+  ObjCImplementationChecker(Decl *D)
+      : diags(D->getASTContext().Diags)
   {
-    assert(!ext->hasClangNode() && "passed interface, not impl, to checker");
+    assert(!D->hasClangNode() && "passed interface, not impl, to checker");
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+      addCandidate(D);
+      addRequirement(D->getImplementedObjCDecl());
+
+      return;
+    }
+
+    // Otherwise this must be an extension.
+    auto ext = cast<ExtensionDecl>(D);
 
     // Conformances are declared exclusively in the interface, so diagnose any
     // in the implementation right away.
@@ -3011,66 +3021,93 @@ private:
     diagnose(afd, diag::objc_implementation_member_requires_vtable, afd);
   }
 
+  void addRequirement(Decl *D) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      return;
+
+    ASTContext &ctx = VD->getASTContext();
+
+    // Also skip overrides, unless they override an unavailable decl, which
+    // makes them not formally overrides anymore.
+    if (VD->getOverriddenDecl() &&
+          !VD->getOverriddenDecl()->getAttrs().isUnavailable(ctx))
+      return;
+
+    // Skip alternate Swift names for other language modes.
+    if (VD->getAttrs().isUnavailable(ctx))
+      return;
+
+    // Skip async versions of members. We'll match against the completion
+    // handler versions, hopping over to `getAsyncAlternative()` if needed.
+    if (hasAsync(VD))
+      return;
+
+    auto inserted = unmatchedRequirements.insert(VD);
+    assert(inserted && "objc interface member added twice?");
+  }
+
+  void addCandidate(Decl *D) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD || isa<DestructorDecl>(VD))
+      return;
+
+    // `getExplicitObjCName()` is O(N) and would otherwise be used repeatedly
+    // in `matchRequirementsAtThreshold()`, so just precompute it.
+    auto inserted =
+        unmatchedCandidates.insert({ VD, getExplicitObjCName(VD) });
+    assert(inserted.second && "member implementation added twice?");
+  }
+
   void addRequirements(IterableDeclContext *idc) {
     assert(idc->getDecl()->hasClangNode());
-    for (Decl *_member : idc->getMembers()) {
+    for (Decl *member : idc->getMembers()) {
       // Skip accessors; we'll match their storage instead.
-      auto member = dyn_cast<ValueDecl>(_member);
-      if (!member || isa<AccessorDecl>(member))
+      if (isa<AccessorDecl>(member))
         continue;
 
-      ASTContext &ctx = member->getASTContext();
-
-      // Also skip overrides, unless they override an unavailable decl, which
-      // makes them not formally overrides anymore.
-      if (member->getOverriddenDecl() &&
-          !member->getOverriddenDecl()->getAttrs().isUnavailable(ctx))
-        continue;
-
-      // Skip alternate Swift names for other language modes.
-      if (member->getAttrs().isUnavailable(ctx))
-        continue;
-
-      // Skip async versions of members. We'll match against the completion
-      // handler versions, hopping over to `getAsyncAlternative()` if needed.
-      if (hasAsync(member))
-        continue;
-
-      auto inserted = unmatchedRequirements.insert(member);
-      assert(inserted && "objc interface member added twice?");
+      addRequirement(member);
     }
   }
 
   void addCandidates(ExtensionDecl *ext) {
     assert(ext->isObjCImplementation());
-    for (Decl *_member : ext->getMembers()) {
+    for (Decl *member : ext->getMembers()) {
       // Skip accessors; we'll match their storage instead.
-      auto member = dyn_cast<ValueDecl>(_member);
-      if (!member || isa<AccessorDecl>(member) || isa<DestructorDecl>(member))
+      if (isa<AccessorDecl>(member))
         continue;
 
-      // Skip non-member implementations.
-      // FIXME: Should we consider them if they were only rejected for privacy?
-      if (!member->isObjCMemberImplementation()) {
-        // No member of an `@_objcImplementation` extension should need a vtable
-        // entry.
-        diagnoseVTableUse(member);
-        continue;
+      if (auto VD = dyn_cast<ValueDecl>(member)) {
+        // Skip non-member implementations.
+        // FIXME: Should we consider them if only rejected for access level?
+        if (!VD->isObjCMemberImplementation()) {
+          // No member of an `@_objcImplementation` extension should need a
+          // vtable entry.
+          diagnoseVTableUse(VD);
+          continue;
+        }
       }
 
-      // `getExplicitObjCName()` is O(N) and would otherwise be used repeatedly
-      // in `matchRequirementsAtThreshold()`, so just precompute it.
-      auto inserted =
-          unmatchedCandidates.insert({ member, getExplicitObjCName(member) });
-      assert(inserted.second && "member implementation added twice?");
-
+      addCandidate(member);
     }
   }
 
   static ObjCSelector getExplicitObjCName(ValueDecl *VD) {
-    if (auto attr = VD->getAttrs().getAttribute<ObjCAttr>())
-      return attr->getName().value_or(ObjCSelector());
+    if (auto cdeclAttr = VD->getAttrs().getAttribute<CDeclAttr>()) {
+      auto ident = VD->getASTContext().getIdentifier(cdeclAttr->Name);
+      return ObjCSelector(VD->getASTContext(), 0, { ident });
+    }
+    if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>())
+      return objcAttr->getName().value_or(ObjCSelector());
     return ObjCSelector();
+  }
+
+  static llvm::Optional<ObjCSelector> getObjCName(ValueDecl *VD) {
+    if (!VD->getCDeclName().empty()) {
+      auto ident = VD->getASTContext().getIdentifier(VD->getCDeclName());
+      return ObjCSelector(VD->getASTContext(), 0, { ident });
+    }
+    return VD->getObjCRuntimeName();
   }
 
 public:
@@ -3215,12 +3252,11 @@ private:
       for (auto req : matchedRequirements.matches) {
         auto diag =
             diagnose(cand, diag::objc_implementation_one_matched_requirement,
-                           req, *req->getObjCRuntimeName(), shouldOfferFix,
-                           req->getObjCRuntimeName()->getString(scratch));
+                           req, *getObjCName(req), shouldOfferFix,
+                           getObjCName(req)->getString(scratch));
         if (shouldOfferFix) {
-          fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
-                                 req->getObjCRuntimeName(),
-                                 /*ignoreImpliedName=*/true);
+          fixDeclarationObjCName(diag, cand, getObjCName(cand),
+                                 getObjCName(req), /*ignoreImpliedName=*/true);
         }
       }
 
@@ -3257,19 +3293,18 @@ private:
       auto ext =
           cast<ExtensionDecl>(reqIDC->getImplementationContext());
       diagnose(ext, diag::objc_implementation_multiple_matching_candidates,
-                    req, *req->getObjCRuntimeName());
+                    req, *getObjCName(req));
 
       for (auto cand : cands.matches) {
         bool shouldOfferFix = !unmatchedCandidates[cand];
         auto diag =
             diagnose(cand, diag::objc_implementation_candidate_impl_here,
                            cand, shouldOfferFix,
-                           req->getObjCRuntimeName()->getString(scratch));
+                           getObjCName(req)->getString(scratch));
 
         if (shouldOfferFix) {
-          fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
-                                 req->getObjCRuntimeName(),
-                                 /*ignoreImpliedName=*/true);
+          fixDeclarationObjCName(diag, cand, getObjCName(cand),
+                                 getObjCName(req), /*ignoreImpliedName=*/true);
         }
       }
 
@@ -3354,16 +3389,16 @@ private:
   }
 
   static Type getMemberType(ValueDecl *decl) {
-    if (isa<AbstractFunctionDecl>(decl))
-      // Strip off the uncurried `self` parameter.
-      return decl->getInterfaceType()->getAs<AnyFunctionType>()->getResult();
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(decl))
+      if (fn->hasImplicitSelfDecl())
+        // Strip off the uncurried `self` parameter.
+        return fn->getMethodInterfaceType();
     return decl->getInterfaceType();
   }
 
   MatchOutcome matchesImpl(ValueDecl *req, ValueDecl *cand,
                            ObjCSelector explicitObjCName) const {
-    bool hasObjCNameMatch =
-        req->getObjCRuntimeName() == cand->getObjCRuntimeName();
+    bool hasObjCNameMatch = getObjCName(req) == getObjCName(cand);
     bool hasSwiftNameMatch = areSwiftNamesEqual(req->getName(), cand->getName());
 
     // If neither the ObjC nor Swift names match, there's absolutely no reason
@@ -3373,8 +3408,7 @@ private:
 
     // There's at least some reason to treat these as matches.
 
-    if (explicitObjCName
-          && req->getObjCRuntimeName() != explicitObjCName)
+    if (explicitObjCName && getObjCName(req) != explicitObjCName)
       return MatchOutcome::WrongExplicitObjCName;
 
     if (!hasSwiftNameMatch)
@@ -3386,8 +3420,11 @@ private:
     if (req->isInstanceMember() != cand->isInstanceMember())
       return MatchOutcome::WrongStaticness;
 
-    if (cand->getDeclContext()->getImplementedObjCContext()
-          != req->getDeclContext())
+    // Check only applies to members of implementations, not implementations in
+    // their own right.
+    if (!cand->isObjCImplementation()
+          && cand->getDeclContext()->getImplementedObjCContext()
+                 != req->getDeclContext())
       return MatchOutcome::WrongCategory;
 
     if (cand->getKind() != req->getKind())
@@ -3430,7 +3467,7 @@ private:
 
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
-    auto reqObjCName = *req->getObjCRuntimeName();
+    auto reqObjCName = *getObjCName(req);
 
     switch (outcome) {
     case MatchOutcome::NoRelationship:
@@ -3447,7 +3484,7 @@ private:
     case MatchOutcome::WrongImplicitObjCName:
     case MatchOutcome::WrongExplicitObjCName: {
       auto diag = diagnose(cand, diag::objc_implementation_wrong_objc_name,
-                           *cand->getObjCRuntimeName(), cand, reqObjCName);
+                           *getObjCName(cand), cand, reqObjCName);
       fixDeclarationObjCName(diag, cand, explicitObjCName, reqObjCName);
       return;
     }
@@ -3459,8 +3496,8 @@ private:
       if (!explicitObjCName) {
         // Changing the Swift name will probably change the implicitly-computed
         // ObjC name, so let's make that explicit.
-        fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
-                               reqObjCName, /*ignoreImpliedName=*/true);
+        fixDeclarationObjCName(diag, cand, getObjCName(cand), reqObjCName,
+                               /*ignoreImpliedName=*/true);
       }
       return;
     }
@@ -3633,8 +3670,8 @@ public:
 }
 
 evaluator::SideEffect TypeCheckObjCImplementationRequest::
-evaluate(Evaluator &evaluator, ExtensionDecl *ED) const {
-  PrettyStackTraceDecl trace("checking member implementations of", ED);
+evaluate(Evaluator &evaluator, Decl *D) const {
+  PrettyStackTraceDecl trace("checking member implementations of", D);
 
   // FIXME: Because we check extension-by-extension, candidates and requirements
   // from different extensions are never compared, so we never get an
@@ -3643,7 +3680,7 @@ evaluate(Evaluator &evaluator, ExtensionDecl *ED) const {
   // candidates we considered to all unmatched requirements in the module, and
   // vice versa. The tricky bit is making sure we only diagnose for candidates
   // and requirements in our primary files!
-  ObjCImplementationChecker checker(ED);
+  ObjCImplementationChecker checker(D);
 
   checker.matchRequirements();
   checker.diagnoseUnmatchedCandidates();

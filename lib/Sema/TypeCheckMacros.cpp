@@ -278,6 +278,9 @@ initializeExecutablePlugin(ASTContext &ctx,
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
     }
+
+    ctx.getPluginLoader().recordDependency(resolvedLibraryPath);
+
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 
@@ -512,6 +515,10 @@ ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   if (decl->isImplicit())
     return { };
 
+  // Member attribute macros do not apply to accessors.
+  if (isa<AccessorDecl>(decl))
+    return { };
+
   // Member attribute macros do not apply to macro-expanded members.
   if (decl->isInMacroExpansionInContext())
     return { };
@@ -600,6 +607,14 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
   case MacroRole::Extension:
     // Only primary declarations of nominal types
     if (isa<NominalTypeDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Preamble:
+  case MacroRole::Body:
+    // Only function declarations.
+    if (isa<AbstractFunctionDecl>(attachedTo))
       return false;
 
     break;
@@ -697,7 +712,9 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
   for (auto item : expansionBuffer->getTopLevelItems()) {
     auto *decl = item.dyn_cast<Decl *>();
     if (!decl) {
-      if (role != MacroRole::CodeItem) {
+      if (role != MacroRole::CodeItem &&
+          role != MacroRole::Preamble &&
+          role != MacroRole::Body) {
         auto &ctx = expansionBuffer->getASTContext();
         ctx.Diags.diagnose(item.getStartLoc(),
                            diag::expected_macro_expansion_decls);
@@ -824,6 +841,29 @@ getExplicitInitializerRange(AbstractStorageDecl *storage) {
   return SourceRange(equalLoc, initRange.End);
 }
 
+/// Compute the original source range for expanding a preamble macro.
+static CharSourceRange getPreambleMacroOriginalRange(AbstractFunctionDecl *fn) {
+  ASTContext &ctx = fn->getASTContext();
+
+  SourceLoc insertionLoc;
+
+  // If there is a body macro, start at the beginning of it.
+  if (auto bodyBufferID = evaluateOrDefault(
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+    insertionLoc = ctx.SourceMgr.getRangeForBuffer(*bodyBufferID).getStart();
+  } else {
+    // If there is a parsed body, start at the beginning of it.
+    SourceRange range = fn->getBodySourceRange();
+    if (range.isValid()) {
+      insertionLoc = range.Start;
+    } else {
+      insertionLoc = fn->getEndLoc();
+    }
+  }
+
+  return CharSourceRange(insertionLoc, 0);
+}
+
 static CharSourceRange getExpansionInsertionRange(MacroRole role,
                                                   ASTNode target,
                                                   SourceManager &sourceMgr) {
@@ -896,6 +936,20 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     return CharSourceRange(afterDeclLoc, 0);
   }
 
+  case MacroRole::Preamble: {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(target.get<Decl *>())) {
+      return getPreambleMacroOriginalRange(fn);
+    }
+
+    return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc()), 0);
+  }
+
+  case MacroRole::Body: {
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+    return CharSourceRange(afterDeclLoc, 0);
+  }
+
   case MacroRole::Expression:
   case MacroRole::Declaration:
   case MacroRole::CodeItem:
@@ -959,6 +1013,8 @@ static uint8_t getRawMacroRole(MacroRole role) {
   // in ASTGen.
   case MacroRole::Conformance:
   case MacroRole::Extension: return 8;
+  case MacroRole::Preamble: return 9;
+  case MacroRole::Body: return 10;
   }
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
@@ -1537,6 +1593,44 @@ ArrayRef<unsigned> ExpandAccessorMacros::evaluate(
   return storage->getASTContext().AllocateCopy(bufferIDs);
 }
 
+ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *fn) const {
+  llvm::SmallVector<unsigned, 1> bufferIDs;
+  fn->forEachAttachedMacro(MacroRole::Preamble,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        auto macroSourceFile = ::evaluateAttachedMacro(
+            macro, fn, customAttr, false, MacroRole::Preamble);
+        if (!macroSourceFile)
+          return;
+
+        if (auto bufferID = macroSourceFile->getBufferID())
+          bufferIDs.push_back(*bufferID);
+      });
+
+  std::reverse(bufferIDs.begin(), bufferIDs.end());
+  return fn->getASTContext().AllocateCopy(bufferIDs);
+}
+
+llvm::Optional<unsigned> ExpandBodyMacroRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *fn) const {
+  llvm::Optional<unsigned> bufferID;
+  fn->forEachAttachedMacro(MacroRole::Body,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        // FIXME: Should we complain if we already expanded a body macro?
+        if (bufferID)
+          return;
+
+        auto macroSourceFile = ::evaluateAttachedMacro(
+            macro, fn, customAttr, false, MacroRole::Body);
+        if (!macroSourceFile)
+          return;
+
+        bufferID = macroSourceFile->getBufferID();
+      });
+
+  return bufferID;
+}
+
 llvm::Optional<unsigned>
 swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
@@ -1817,8 +1911,8 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // When a macro is not found for a custom attribute, it may be a non-macro.
   // So bail out to prevent diagnostics from the contraint system.
   if (macroRef.getAttr()) {
-    auto foundMacros = namelookup::lookupMacros(
-        dc, macroRef.getMacroName(), roles);
+    auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),
+                                                macroRef.getMacroName(), roles);
     if (foundMacros.empty())
       return ConcreteDeclRef();
   }

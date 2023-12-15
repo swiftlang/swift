@@ -64,6 +64,7 @@ class ModuleDecl;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
+class IdentTypeRepr;
 
 class alignas(1 << AttrAlignInBits) AttributeBase
     : public ASTAllocated<AttributeBase> {
@@ -1768,6 +1769,15 @@ public:
   TypeExpr *getTypeExpr() const { return typeExpr; }
   TypeRepr *getTypeRepr() const;
   Type getType() const;
+
+  /// Destructure an attribute's type repr for a macro reference.
+  ///
+  /// For a 1-level member type repr whose base and member are both identifier
+  /// types, e.g. `Foo.Bar`, return a pair of the base and the member.
+  ///
+  /// For an identifier type repr, return a pair of `nullptr` and the
+  /// identifier.
+  std::pair<IdentTypeRepr *, IdentTypeRepr *> destructureMacroRef();
 
   /// Whether the attribute has any arguments.
   bool hasArgs() const { return argList != nullptr; }

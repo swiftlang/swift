@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %swift-build-cxx-plugin -o %t/mock-plugin %t/plugin.c
+// RUN: %swift-build-c-plugin -o %t/mock-plugin %t/plugin.c
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \

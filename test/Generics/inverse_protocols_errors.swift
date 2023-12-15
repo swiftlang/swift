@@ -3,8 +3,8 @@
 // REQUIRES: asserts
 
 protocol RegularProto {}
-protocol NCProto: ~Copyable, RegularProto {
-  // expected-warning@-1 {{protocol 'NCProto' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
+protocol NCProto: RegularProto
+  where Self: ~Copyable { // expected-error{{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
   func checkIfCopyableSelf(_ s: Self)
 }
 

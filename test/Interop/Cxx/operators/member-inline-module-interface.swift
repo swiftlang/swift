@@ -8,6 +8,10 @@
 // CHECK:   mutating func callAsFunction(_ x: Int32) -> Int32
 // CHECK:   mutating func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK: }
+// CHECK: func == (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> Bool
+// CHECK: func -= (lhs: inout LoadableIntWrapper, rhs: LoadableIntWrapper)
+
+// CHECK: func == (lhs: NS.IntWrapperInNamespace, rhs: NS.IntWrapperInNamespace) -> Bool
 
 // CHECK: struct LoadableBoolWrapper
 // CHECK:   prefix static func ! (lhs: inout LoadableBoolWrapper) -> LoadableBoolWrapper
@@ -151,7 +155,7 @@
 // CHECK-NEXT: }
 
 // CHECK: struct TemplatedOperatorArrayByVal {
-// CHECK:   subscript(i: T) -> T { mutating get }
+// CHECK:   subscript<T>(i: T) -> T { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst<T>(_ i: T) -> T
 // CHECK-NOT: mutating func __operatorPlus<T>(_ i: T) -> UnsafeMutablePointer<T>
@@ -264,4 +268,16 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromLoadableIntWrapperWithUsingDecl {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   static func - (lhs: inout DerivedFromLoadableIntWrapperWithUsingDecl, rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT:   @available(*, unavailable, message: "use - instead")
+// CHECK-NEXT:   mutating func __operatorMinus(_ rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT:   static func += (lhs: inout DerivedFromLoadableIntWrapperWithUsingDecl, rhs: LoadableIntWrapper)
+// CHECK-NEXT:   @available(*, unavailable, message: "use += instead")
+// CHECK-NEXT:   mutating func __operatorPlusEqual(_ rhs: LoadableIntWrapper)
+// CHECK-NEXT:   func getValue() -> Int32
+// CHECK-NEXT:   mutating func setValue(_ v: Int32)
 // CHECK-NEXT: }

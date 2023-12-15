@@ -676,7 +676,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
   SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
   SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftTaskOptionRecordTy = createStructType(*this, "swift.task_option", {
+  SwiftTaskOptionRecordTy = createStructType(
+      *this, "swift.task_option", {
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
   });
@@ -699,6 +700,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
+  });
+  SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy =
+      createStructType(*this, "swift.task_executor_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    SwiftExecutorTy,         // Executor
   });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
@@ -877,6 +883,14 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
     auto featureAvailability = context.getConcurrencyAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability TaskExecutorAvailability(ASTContext &context) {
+    auto featureAvailability = context.getTaskExecutorAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -1445,6 +1459,12 @@ void IRGenModule::constructInitialFnAttributes(
   if (stackProtector == StackProtectorMode::StackProtector) {
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
+  }
+
+  // Mark as 'nounwind' to avoid referencing exception personality symbols, this
+  // is okay even with C++ interop on because the landinpads are trapping.
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    Attrs.addAttribute(llvm::Attribute::NoUnwind);
   }
 }
 
@@ -2020,13 +2040,6 @@ bool IRGenModule::canUseObjCSymbolicReferences() {
 }
 
 bool IRGenModule::canMakeStaticObjectsReadOnly() {
-  // Unconditionally disable this until we can fix the metadata.
-  // The trick of using the Empty array metadata for static arrays
-  // breaks Obj-C interop quite badly.
-  // rdar://101126543
-  return false;
-
-#if 0
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -2036,8 +2049,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
     return false;
 
   return getAvailabilityContext().isContainedIn(
-          Context.getImmortalRefCountSymbolsAvailability());
-#endif
+          Context.getStaticReadOnlyArraysAvailability());
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

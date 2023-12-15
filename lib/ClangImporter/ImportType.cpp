@@ -1823,8 +1823,10 @@ private:
   /// \return \c true if the composition should include \c AnyObject, \c false
   ///         otherwise.
   bool getAsComposition(ProtocolCompositionType *ty,
-                        SmallVectorImpl<Type> &members) {
+                        SmallVectorImpl<Type> &members,
+                        InvertibleProtocolSet &inverses) {
     llvm::append_range(members, ty->getMembers());
+    inverses.insertAll(ty->getInverses());
     return ty->hasExplicitAnyObject();
   }
 
@@ -1835,7 +1837,9 @@ private:
   /// \param members The types to include in the composition.
   /// \return \c true if the composition should include \c AnyObject, \c false
   ///         otherwise.
-  bool getAsComposition(TypeBase *ty, SmallVectorImpl<Type> &members) {
+  bool getAsComposition(TypeBase *ty,
+                        SmallVectorImpl<Type> &members,
+                        InvertibleProtocolSet &inverses) {
     members.push_back(ty);
     return false;
   }
@@ -1846,13 +1850,16 @@ private:
   /// includes \c Sendable.
   template <typename Ty> Result compose(Ty *ty) {
     SmallVector<Type, 8> members;
-    bool explicitAnyObject = getAsComposition(ty, members);
+    InvertibleProtocolSet inverses;
+    bool explicitAnyObject = getAsComposition(ty, members, inverses);
 
     auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
     members.push_back(proto->getDeclaredInterfaceType());
 
-    return {
-      ProtocolCompositionType::get(ctx, members, explicitAnyObject), true };
+    auto composition =
+        ProtocolCompositionType::get(ctx, members, inverses, explicitAnyObject);
+
+    return { composition, true };
   }
 
   /// Visitor action: Recurse into the children of this type and try to add
@@ -1909,7 +1916,6 @@ private:
   VISIT(StructType, pass)
   VISIT(ClassType, compose)
   VISIT(ProtocolType, compose)
-  VISIT(InverseType, compose)
 
   Result visitBoundGenericType(BoundGenericType *ty) {
     assert(!isa<BoundGenericClassType>(ty) && "classes handled elsewhere");
@@ -1968,6 +1974,7 @@ private:
   NEVER_VISIT(PackExpansionType)
   NEVER_VISIT(PackElementType)
   NEVER_VISIT(TypeVariableType)
+  NEVER_VISIT(ErrorUnionType)
 
   VISIT(SugarType, recurse)
 
@@ -2461,8 +2468,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
                                    const bool isParamTypeImplicitlyUnwrapped) {
   // Figure out the name for this parameter.
   Identifier bodyName = impl->importFullName(param, impl->CurrentVersion)
-                            .getDeclName()
-                            .getBaseIdentifier();
+                            .getBaseIdentifier(impl->SwiftContext);
 
   // It doesn't actually matter which DeclContext we use, so just use the
   // imported header unit.
@@ -3277,7 +3283,7 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
     ImportedName fullBodyName = importFullName(param, CurrentVersion);
-    Identifier bodyName = fullBodyName.getDeclName().getBaseIdentifier();
+    Identifier bodyName = fullBodyName.getBaseIdentifier(SwiftContext);
     SourceLoc nameLoc = importSourceLoc(param->getLocation());
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo

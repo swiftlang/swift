@@ -439,29 +439,38 @@ GlobalActorAttributeRequest::evaluate(
             .warnUntilSwiftVersion(6)
             .fixItRemove(globalActorAttr->getRangeWithAt());
 
+        auto &ctx = decl->getASTContext();
         auto *storage = accessor->getStorage();
         // Let's suggest to move the attribute to the storage if
         // this is an accessor/addressor of a property of subscript.
         if (storage->getDeclContext()->isTypeContext()) {
-          // If enclosing declaration has a global actor,
-          // skip the suggestion.
-          if (storage->getGlobalActorAttr())
-            return llvm::None;
+          auto canMoveAttr = [&]() {
+            // If enclosing declaration has a global actor,
+            // skip the suggestion.
+            if (storage->getGlobalActorAttr())
+              return false;
 
-          // Global actor attribute cannot be applied to
-          // an instance stored property of a struct.
-          if (auto *var = dyn_cast<VarDecl>(storage)) {
-            if (isStoredInstancePropertyOfStruct(var))
-              return llvm::None;
+            // Global actor attribute cannot be applied to
+            // an instance stored property of a struct.
+            if (auto *var = dyn_cast<VarDecl>(storage)) {
+              return !isStoredInstancePropertyOfStruct(var);
+            }
+
+            return true;
+          };
+
+          if (canMoveAttr()) {
+            decl->diagnose(diag::move_global_actor_attr_to_storage_decl,
+                           storage)
+                .fixItInsert(
+                    storage->getAttributeInsertionLoc(/*forModifier=*/false),
+                    llvm::Twine("@", result->second->getNameStr()).str());
           }
-
-          decl->diagnose(diag::move_global_actor_attr_to_storage_decl, storage)
-              .fixItInsert(
-                  storage->getAttributeInsertionLoc(/*forModifier=*/false),
-                  llvm::Twine("@", result->second->getNameStr()).str());
         }
 
-        return llvm::None;
+        // In Swift 6, once the diag above is an error, it is disallowed.
+        if (ctx.isSwiftVersionAtLeast(6))
+          return llvm::None;
       }
     }
     // Functions are okay.
@@ -538,10 +547,16 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 }
 
 bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
-                                    VarDecl *let) {
+                                    VarDecl *let,
+                                    ActorReferenceResult::Options &options) {
   auto isolation = getActorIsolation(let);
-  ActorReferenceResult::Options options = llvm::None;
   return varIsSafeAcrossActors(fromModule, let, isolation, options);
+}
+
+bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
+                                    VarDecl *let) {
+  ActorReferenceResult::Options options = llvm::None;
+  return isLetAccessibleAnywhere(fromModule, let, options);
 }
 
 namespace {
@@ -1351,7 +1366,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
                                            ProtocolDecl *proto) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Executor) ||
          proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor) ||
-         proto->isSpecificProtocol(KnownProtocolKind::TaskExecutor));
+         proto->isSpecificProtocol(KnownProtocolKind::_TaskExecutor));
 
   auto &diags = C.Diags;
   auto module = nominal->getParentModule();
@@ -2329,9 +2344,14 @@ namespace {
         if (closure && closure->isImplicit()) {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
-            diagnoseNonSendableTypes(
-                type, getDeclContext(), capture.getLoc(),
-                diag::implicit_async_let_non_sendable_capture, decl->getName());
+            // Defer diagnosing checking of non-Sendable types that are passed
+            // into async let to SIL level region based isolation.
+            if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
+              diagnoseNonSendableTypes(
+                  type, getDeclContext(), capture.getLoc(),
+                  diag::implicit_async_let_non_sendable_capture,
+                  decl->getName());
+            }
           } else {
             // Fallback to a generic implicit capture missing sendable
             // conformance diagnostic.
@@ -2813,6 +2833,11 @@ namespace {
       if (getActorIsolation(value).isActorIsolated())
         return false;
 
+      if (auto attr = value->getAttrs().getAttribute<NonisolatedAttr>();
+          attr && attr->isUnsafe()) {
+        return false;
+      }
+
       ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       return true;
@@ -3207,8 +3232,8 @@ namespace {
             unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
-      // check if language features ask us to defer sendable diagnostics
-      // if so, don't check for sendability of arguments here
+      // Check if language features ask us to defer sendable diagnostics if so,
+      // don't check for sendability of arguments here.
       if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
         diagnoseApplyArgSendability(apply, getDeclContext());
       }
@@ -3279,6 +3304,11 @@ namespace {
           }
         }
 
+        if (auto attr = var->getAttrs().getAttribute<NonisolatedAttr>();
+            attr && attr->isUnsafe()) {
+          return false;
+        }
+
         // Otherwise, we have concurrent access. Complain.
         bool preconcurrencyContext =
             getActorIsolationOfContext(
@@ -3323,8 +3353,8 @@ namespace {
       for (const auto &component : keyPath->getComponents()) {
         // The decl referred to by the path component cannot be within an actor.
         if (component.hasDeclRef()) {
-          auto concDecl = component.getDeclRef();
-          auto decl = concDecl.getDecl();
+          auto declRef = component.getDeclRef();
+          auto decl = declRef.getDecl();
           auto isolation = getActorIsolationForReference(
               decl, getDeclContext());
           switch (isolation) {
@@ -3334,13 +3364,16 @@ namespace {
             break;
 
           case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe:
-            // Disable global actor checking for now.
-            if (isolation.isGlobalActor() &&
-                !ctx.LangOpts.isSwiftVersionAtLeast(6))
+          case ActorIsolation::GlobalActorUnsafe: {
+            auto result = ActorReferenceResult::forReference(
+                declRef, component.getLoc(), getDeclContext(),
+                kindOfUsage(decl, keyPath));
+
+            if (result == ActorReferenceResult::SameConcurrencyDomain)
               break;
 
             LLVM_FALLTHROUGH;
+          }
 
           case ActorIsolation::ActorInstance:
             // If this entity is always accessible across actors, just check
@@ -3356,27 +3389,36 @@ namespace {
               break;
             }
 
-            ctx.Diags.diagnose(component.getLoc(),
-                               diag::actor_isolated_keypath_component,
-                               isolation.isDistributedActor(),
-                               decl);
-            diagnosed = true;
+            {
+              auto diagnostic = ctx.Diags.diagnose(
+                  component.getLoc(), diag::actor_isolated_keypath_component,
+                  isolation, decl);
+
+              if (isolation == ActorIsolation::ActorInstance)
+                diagnosed = true;
+              else
+                diagnostic.warnUntilSwiftVersion(6);
+            }
+
             break;
           }
         }
 
-        // Captured values in a path component must conform to Sendable.
-        // These captured values appear in Subscript, such as \Type.dict[k]
-        // where k is a captured dictionary key.
-        if (auto *args = component.getSubscriptArgs()) {
-          for (auto arg : *args) {
-            auto type = getType(arg.getExpr());
-            if (type &&
-                shouldDiagnoseExistingDataRaces(getDeclContext()) &&
-                diagnoseNonSendableTypes(
-                    type, getDeclContext(), component.getLoc(),
-                    diag::non_sendable_keypath_capture))
-              diagnosed = true;
+        // With `InferSendableFromCaptures` feature enabled the solver is
+        // responsible for inferring `& Sendable` for sendable key paths.
+        if (!ctx.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+          // Captured values in a path component must conform to Sendable.
+          // These captured values appear in Subscript, such as \Type.dict[k]
+          // where k is a captured dictionary key.
+          if (auto *args = component.getSubscriptArgs()) {
+            for (auto arg : *args) {
+              auto type = getType(arg.getExpr());
+              if (type && shouldDiagnoseExistingDataRaces(getDeclContext()) &&
+                  diagnoseNonSendableTypes(type, getDeclContext(),
+                                           component.getLoc(),
+                                           diag::non_sendable_keypath_capture))
+                diagnosed = true;
+            }
           }
         }
       }
@@ -4912,6 +4954,14 @@ bool swift::contextRequiresStrictConcurrencyChecking(
       if (hasExplicitIsolationAttribute(decl))
         return true;
 
+      // Extensions of explicitly isolated types are using concurrency
+      // features.
+      if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+        auto *nominal = extension->getExtendedNominal();
+        if (nominal && hasExplicitIsolationAttribute(nominal))
+          return true;
+      }
+
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         // Async and concurrent functions use concurrency features.
         if (func->hasAsync() || func->isSendable())
@@ -5104,8 +5154,9 @@ bool swift::checkSendableConformance(
   auto conformanceDecl = conformanceDC->getAsDecl();
   auto behavior = SendableCheckContext(conformanceDC, check)
       .defaultDiagnosticBehavior();
-  if (conformanceDC->getParentSourceFile() &&
-      conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
+  if (conformanceDC->getOutermostParentSourceFile() &&
+      conformanceDC->getOutermostParentSourceFile() !=
+      nominal->getOutermostParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
                               nominal)
       .limitBehavior(behavior);

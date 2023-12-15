@@ -30,13 +30,13 @@ func devirtualizeDeinits(of destroy: DestroyAddrInst, _ context: some MutatingCo
 
 private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some MutatingContext) -> Bool {
   let type = destroy.type
-  guard type.isMoveOnly && type.selfOrAnyFieldHasValueDeinit(in: destroy.parentFunction) else {
+  if !type.isMoveOnly {
     return true
   }
   precondition(type.isNominal, "non-copyable non-nominal types not supported, yet")
 
   let result: Bool
-  if type.nominal.hasValueDeinit && !destroy.hasDropDeinit {
+  if type.nominal.hasValueDeinit && !destroy.shouldDropDeinit {
     guard let deinitFunc = context.lookupDeinit(ofNominal: type.nominal) else {
       return false
     }
@@ -47,9 +47,12 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     // the struct fields or enum cases.
     if type.isStruct {
       result = destroy.devirtualizeStructFields(context)
-    } else {
-      precondition(type.isEnum, "unknown nominal value type")
+    } else if type.isEnum {
       result = destroy.devirtualizeEnumPayloads(context)
+    } else {
+      precondition(type.isClass, "unknown non-copyable type")
+      // A class reference cannot be further de-composed.
+      return true
     }
   }
   context.erase(instruction: destroy)
@@ -58,6 +61,7 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
 
 // Used to dispatch devirtualization tasks to `destroy_value` and `destroy_addr`.
 private protocol DevirtualizableDestroy : UnaryInstruction {
+  var shouldDropDeinit: Bool { get }
   func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext)
   func devirtualizeStructFields(_ context: some MutatingContext) -> Bool
   func devirtualizeEnumPayload(enumCase: EnumCase, in block: BasicBlock, _ context: some MutatingContext) -> Bool
@@ -66,8 +70,6 @@ private protocol DevirtualizableDestroy : UnaryInstruction {
 
 private extension DevirtualizableDestroy {
   var type: Type { operand.value.type }
-
-  var hasDropDeinit: Bool { operand.value.lookThoughOwnershipInstructions is DropDeinitInst }
 
   func devirtualizeEnumPayloads(_ context: some MutatingContext) -> Bool {
     guard let cases = type.getEnumCases(in: parentFunction) else {
@@ -99,6 +101,8 @@ private extension DevirtualizableDestroy {
 }
 
 extension DestroyValueInst : DevirtualizableDestroy {
+  fileprivate var shouldDropDeinit: Bool { operand.value.lookThoughOwnershipInstructions is DropDeinitInst }
+
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
     let subs = context.getContextSubstitutionMap(for: type)
@@ -162,6 +166,11 @@ extension DestroyValueInst : DevirtualizableDestroy {
 }
 
 extension DestroyAddrInst : DevirtualizableDestroy {
+  fileprivate var shouldDropDeinit: Bool {
+    // The deinit is always called by a destroy_addr. There must not be a `drop_deinit` as operand.
+    false
+  }
+
   fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
     let builder = Builder(before: self, context)
     let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)

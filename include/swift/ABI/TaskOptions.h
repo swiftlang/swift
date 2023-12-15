@@ -75,26 +75,25 @@ class TaskGroupTaskOptionRecord : public TaskOptionRecord {
   }
 };
 
-
 /// Task option to specify on what executor the task should be executed.
 ///
-/// Not passing this option implies that a "best guess" or good default
-/// executor should be used instead, most often this may mean the global
-/// concurrent executor, or the enclosing actor's executor.
-class ExecutorTaskOptionRecord : public TaskOptionRecord {
-  const SerialExecutorRef Executor;
+/// Not passing this option implies that an inferred (e.g. surrounding actor
+/// when we inherit execution context) or the default executor should be used.
+///
+/// Lack of this option usually means that the global concurrent executor, or
+/// the executor of the enclosing actor will be used.
+class InitialTaskExecutorPreferenceTaskOptionRecord : public TaskOptionRecord {
+  const TaskExecutorRef Executor;
 
 public:
-  ExecutorTaskOptionRecord(SerialExecutorRef executor)
-    : TaskOptionRecord(TaskOptionRecordKind::Executor),
-      Executor(executor) {}
+  InitialTaskExecutorPreferenceTaskOptionRecord(TaskExecutorRef executor)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutor),
+        Executor(executor) {}
 
-  SerialExecutorRef getExecutor() const {
-    return Executor;
-  }
+  TaskExecutorRef getExecutorRef() const { return Executor; }
 
   static bool classof(const TaskOptionRecord *record) {
-    return record->getKind() == TaskOptionRecordKind::Executor;
+    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutor;
   }
 };
 

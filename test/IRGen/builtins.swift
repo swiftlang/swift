@@ -827,5 +827,19 @@ func convertTaskToJob(_ task: Builtin.NativeObject) -> Builtin.Job {
   return Builtin.convertTaskToJob(task)
 }
 
+// CHECK-LABEL: define {{.*}} swiftcc i32 @"$s8builtins10getEnumTagys6UInt32VxlF"(ptr {{.*}} %0, ptr %T)
+// CHECK: %GetEnumTag = load ptr, ptr {{%.*}}
+// CHECK: [[TAG:%.*]] = call i32 %GetEnumTag(ptr {{.*}} %0, ptr %T)
+// CHECK: ret i32 [[TAG]]
+func getEnumTag<T>(_ x: T) -> UInt32 {
+  UInt32(Builtin.getEnumTag(x))
+}
+
+// CHECK-LABEL: define {{.*}} swiftcc void @"$s8builtins13injectEnumTag_3tagyxz_s6UInt32VtlF"(ptr %0, i32 %1, ptr %T)
+// CHECK: %DestructiveInjectEnumTag = load ptr, ptr {{%.*}}
+// CHECK: call void %DestructiveInjectEnumTag(ptr {{.*}} %0, i32 %1, ptr %T)
+func injectEnumTag<T>(_ x: inout T, tag: UInt32) {
+  Builtin.injectEnumTag(&x, tag._value)
+}
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

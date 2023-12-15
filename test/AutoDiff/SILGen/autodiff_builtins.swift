@@ -97,7 +97,7 @@ func test_context_builtins_with_type<T>(t: T) {
 // CHECK-LABEL: sil{{.*}}@test_context_builtins_with_type : $@convention(thin) <T> (@in_guaranteed T) -> () {
 // CHECK: bb0({{%.*}} : $*T):
 // CHECK:   [[CTX:%.*]] = builtin "autoDiffCreateLinearMapContextWithType"<T>({{%.*}} : $@thick T.Type) : $Builtin.NativeObject // users: {{.*}}
-// CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [lexical] [[CTX]] : $Builtin.NativeObject // users: {{.*}}
+// CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [lexical] [var_decl] [[CTX]] : $Builtin.NativeObject // users: {{.*}}
 // CHECK:   [[BUF:%.*]] = builtin "autoDiffProjectTopLevelSubcontext"([[BORROWED_CTX]] : $Builtin.NativeObject) : $Builtin.RawPointer // users: {{.*}}
 // CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontextWithType"<T>([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $@thick T.Type) : $Builtin.RawPointer // users: {{.*}}
 // CHECK:   destroy_value [[CTX]]

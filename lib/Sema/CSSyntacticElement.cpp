@@ -919,16 +919,21 @@ private:
   }
 
   void visitThrowStmt(ThrowStmt *throwStmt) {
+    // Look up the catch node for this "throw" to determine the error type.
+    auto dc = context.getAsDeclContext();
+    auto module = dc->getParentModule();
+    auto throwLoc = throwStmt->getThrowLoc();
+    Type errorType;
+    if (auto catchNode = ASTScope::lookupCatchNode(module, throwLoc))
+      errorType = catchNode.getExplicitCaughtType(cs.getASTContext());
 
-    // Find the thrown type of our current context.
-    Type errType = getContextualThrownErrorType();
-    if (!errType) {
+    if (!errorType) {
       if (!cs.getASTContext().getErrorDecl()) {
         hadError = true;
         return;
       }
 
-      errType = cs.getASTContext().getErrorExistentialType();
+      errorType = cs.getASTContext().getErrorExistentialType();
     }
 
     auto *errorExpr = throwStmt->getSubExpr();
@@ -937,7 +942,7 @@ private:
         {makeElement(errorExpr,
                      cs.getConstraintLocator(
                          locator, LocatorPathElt::SyntacticElement(errorExpr)),
-                     {errType, CTP_ThrowStmt})},
+                     {errorType, CTP_ThrowStmt})},
         locator);
   }
 
@@ -1053,8 +1058,17 @@ private:
       if (parent.isStmt(StmtKind::Switch)) {
         auto *switchStmt = cast<SwitchStmt>(parent.get<Stmt *>());
         contextualTy = cs.getType(switchStmt->getSubjectExpr());
-      } else if (parent.isStmt(StmtKind::DoCatch)) {
-        contextualTy = cs.getASTContext().getErrorExistentialType();
+      } else if (auto doCatch =
+                     dyn_cast_or_null<DoCatchStmt>(parent.dyn_cast<Stmt *>())) {
+        contextualTy = cs.getCaughtErrorType(doCatch);
+
+        // A non-exhaustive do..catch statement is a potential throw site.
+        if (caseStmt == doCatch->getCatches().back() &&
+            !doCatch->isSyntacticallyExhaustive()) {
+          cs.recordPotentialThrowSite(
+              PotentialThrowSite::NonExhaustiveDoCatch, contextualTy,
+              cs.getConstraintLocator(doCatch));
+        }
       } else {
         hadError = true;
         return;
@@ -1330,18 +1344,6 @@ private:
       return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult};
 
     return {funcRef->getBodyResultType(), CTP_ReturnStmt};
-  }
-
-  Type getContextualThrownErrorType() const {
-    auto funcRef = AnyFunctionRef::fromDeclContext(context.getAsDeclContext());
-    if (!funcRef)
-      return Type();
-
-    if (auto *closure =
-            getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
-      return cs.getClosureType(closure)->getThrownError();
-
-    return funcRef->getThrownErrorType();
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
@@ -1632,6 +1634,13 @@ ConstraintSystem::simplifySyntacticElementConstraint(
     if (generateConstraints(target))
       return SolutionKind::Error;
 
+    // If this expression is the operand of a `throw` statement, record it as
+    // a potential throw site.
+    if (contextInfo.purpose == CTP_ThrowStmt) {
+      recordPotentialThrowSite(PotentialThrowSite::ExplicitThrow,
+                               getType(expr), getConstraintLocator(expr));
+    }
+
     setTargetFor(expr, target);
     return SolutionKind::Solved;
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
@@ -1803,7 +1812,7 @@ private:
     else
       hadError = true;
 
-    ifStmt->setThenStmt(visit(ifStmt->getThenStmt()).get<Stmt *>());
+    ifStmt->setThenStmt(castToStmt<BraceStmt>(visit(ifStmt->getThenStmt())));
 
     if (auto elseStmt = ifStmt->getElseStmt()) {
       ifStmt->setElseStmt(visit(elseStmt).get<Stmt *>());
@@ -2563,11 +2572,6 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
     if (llvm::is_contained(solution.preconcurrencyClosures, closure))
       closure->setIsolatedByPreconcurrency();
-
-    // Coerce the thrown type, if it was written explicitly.
-    if (closure->getExplicitThrownType()) {
-      closure->setExplicitThrownType(closureFnType->getThrownError());
-    }
 
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {

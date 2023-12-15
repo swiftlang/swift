@@ -409,8 +409,7 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr,
-      /* OptimizeArgs */ true);
+      /* SharedFS */ nullptr);
   SharedFilesystemCache.emplace();
 }
 
@@ -460,7 +459,7 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
     std::error_code EC;
     for (auto &Arch : AllSupportedArches) {
       SmallString<256> LayoutFile(RuntimeLibPath);
-      llvm::sys::path::append(LayoutFile, "layout-" + Arch + ".yaml");
+      llvm::sys::path::append(LayoutFile, "layouts-" + Arch + ".yaml");
       FS->status(LayoutFile);
     }
   }
@@ -568,8 +567,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       ClangScanningFormat,
       Instance.getInvocation().getFrontendOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS,
-      /* ReuseFileManager */ false, /* OptimizeArgs */ false);
+      UseClangIncludeTree ? nullptr : CacheFS);
 
   return false;
 }

@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -46,6 +47,7 @@ class ContextualPattern;
 class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
+class DoCatchStmt;
 struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
@@ -427,10 +429,12 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine the kind of noncopyable marking present for this declaration.
-class NoncopyableAnnotationRequest
-    : public SimpleRequest<NoncopyableAnnotationRequest,
-                           InverseMarking(TypeDecl *),
+/// Determine the kind of invertible protocol markings for this declaration,
+/// for example, if a conformance to IP or ~IP was written on it in the
+/// inheritance clause and/or where clause.
+class InvertibleAnnotationRequest
+    : public SimpleRequest<InvertibleAnnotationRequest,
+                           InverseMarking(TypeDecl *, InvertibleProtocolKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -439,17 +443,18 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  InverseMarking evaluate(Evaluator &evaluator, TypeDecl *decl) const;
+  InverseMarking evaluate(Evaluator &evaluator,
+                          TypeDecl *decl, InvertibleProtocolKind ip) const;
 
 public:
   // Caching.
   bool isCached() const { return true; }
 };
 
-/// Determine whether the given declaration is escapable.
+/// Determine whether the given type is Escapable.
 class IsEscapableRequest
-    : public SimpleRequest<IsEscapableRequest, bool(ValueDecl *),
-                           RequestFlags::SeparatelyCached> {
+    : public SimpleRequest<IsEscapableRequest, bool(CanType),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -457,13 +462,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, CanType) const;
 
 public:
-  // Separate caching.
+  // Caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
 };
 
 /// Determine whether the given type is noncopyable. Assumes type parameters
@@ -2282,10 +2285,16 @@ public:
   void cacheResult(ParamSpecifier value) const;
 };
 
-/// Determines the explicitly-written thrown result type of a function.
-class ThrownTypeRequest
-    : public SimpleRequest<ThrownTypeRequest,
-                           Type(AbstractFunctionDecl *),
+/// Determines the explicitly-written caught result type for any catch node,
+/// including functions/closures and do..catch statements.
+///
+/// Returns the caught result type for the catch node, which will be
+/// `Never` if no error can be thrown from within the context (e.g., a
+/// non-throwing function). Returns a NULL type if the caught error type
+/// requires type inference.
+class ExplicitCaughtTypeRequest
+    : public SimpleRequest<ExplicitCaughtTypeRequest,
+                           Type(ASTContext *, CatchNode),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2294,11 +2303,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  Type evaluate(Evaluator &evaluator, ASTContext *, CatchNode catchNode) const;
 
 public:
   // Separate caching.
-  bool isCached() const { return true; }
+  bool isCached() const;
   llvm::Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
@@ -3436,6 +3445,8 @@ public:
   }
 
   SourceLoc getSigilLoc() const;
+  DeclNameRef getModuleName() const;
+  DeclNameLoc getModuleNameLoc() const;
   DeclNameRef getMacroName() const;
   DeclNameLoc getMacroNameLoc() const;
   SourceRange getGenericArgsRange() const;
@@ -4397,6 +4408,44 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+class ExpandPreambleMacroRequest
+    : public SimpleRequest<ExpandPreambleMacroRequest,
+                           ArrayRef<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+class ExpandBodyMacroRequest
+    : public SimpleRequest<ExpandBodyMacroRequest,
+                           llvm::Optional<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Optional<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,
@@ -4484,7 +4533,7 @@ public:
 /// This is done on all of a class's implementations at once to improve diagnostics.
 class TypeCheckObjCImplementationRequest
     : public SimpleRequest<TypeCheckObjCImplementationRequest,
-                           evaluator::SideEffect(ExtensionDecl *),
+                           evaluator::SideEffect(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4494,7 +4543,7 @@ private:
 
   // Evaluation.
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, ExtensionDecl *ED) const;
+  evaluate(Evaluator &evaluator, Decl *D) const;
 
 public:
   // Separate caching.

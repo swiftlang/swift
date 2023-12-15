@@ -9,7 +9,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DTEST_DIAGNOSTICS
 
 // Check with the imported macro library vs. the local declaration of the macro.
-// RUN: %target-swift-frontend -enable-experimental-feature ExtensionMacros -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t -DTEST_DIAGNOSTICS
 
@@ -39,10 +39,17 @@ macro declareVarValuePeer() = #externalMacro(module: "MacroDefinition", type: "V
 macro addCompletionHandlerArbitrarily(_: Int) = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
 
 struct S {
+#if IMPORT_MACRO_LIBRARY
+  @macro_library.addCompletionHandler // test module qualified macro lookup
+  func f(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+#else
   @addCompletionHandler
   func f(a: Int, for b: String, _ value: Double) async -> String {
     return b
   }
+#endif
 
   // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_.swift
   // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {

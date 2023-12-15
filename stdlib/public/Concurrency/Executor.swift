@@ -76,35 +76,52 @@ public protocol SerialExecutor: Executor {
   /// executor references.
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
 
-  /// If this executor has complex equality semantics, and the runtime needs to compare
-  /// two executors, it will first attempt the usual pointer-based equality check,
-  /// and if it fails it will compare the types of both executors, if they are the same,
-  /// it will finally invoke this method, in an attempt to let the executor itself decide
-  /// if this and the `other` executor represent the same serial, exclusive, isolation context.
+  /// If this executor has complex equality semantics, and the runtime needs to
+  /// compare two executors, it will first attempt the usual pointer-based
+  /// equality / check, / and if it fails it will compare the types of both
+  /// executors, if they are the same, / it will finally invoke this method,
+  ///  in an
+  /// attempt to let the executor itself decide / if this and the `other`
+  /// executor represent the same serial, exclusive, isolation context.
   ///
-  /// This method must be implemented with great care, as wrongly returning `true` would allow
-  /// code from a different execution context (e.g. thread) to execute code which was intended
-  /// to be isolated by another actor.
+  /// This method must be implemented with great care, as wrongly returning
+  /// `true` would allow / code from a different execution context (e.g. thread)
+  /// to execute code which was intended to be isolated by another actor.
   ///
   /// This check is not used when performing executor switching.
   ///
-  /// This check is used when performing ``Actor/assertIsolated()``, ``Actor/preconditionIsolated()``,
-  /// ``Actor/assumeIsolated()`` and similar APIs which assert about the same "exclusive serial execution context".
+  /// This check is used when performing ``Actor/assertIsolated()``,
+  /// ``Actor/preconditionIsolated()``, ``Actor/assumeIsolated()`` and similar
+  /// APIs which assert about the same "exclusive serial execution context".
   ///
   /// - Parameter other: the executor to compare with.
-  /// - Returns: true, if `self` and the `other` executor actually are mutually exclusive
-  ///            and it is safe–from a concurrency perspective–to execute code assuming one on the other.
+  /// - Returns: `true`, if `self` and the `other` executor actually are
+  ///            mutually exclusive and it is safe–from a concurrency
+  ///            perspective–to execute code assuming one on the other.
   @available(SwiftStdlib 5.9, *)
   func isSameExclusiveExecutionContext(other: Self) -> Bool
 }
 
 /// An executor that may be used as preferred executor by a task.
 ///
-/// A task with executor preference will execute nonisolated functions on this executor,
-/// rather than using the default global executor. Default actors also are able to run
-/// on a task's preferred executor.
+/// ### Impact of setting a task executor preference
+/// By default, without setting a task executor preference, nonisolated
+/// asynchronous functions, as well as methods declared on default actors --
+/// that is actors which do not require a specific executor -- execute on
+/// Swift's default global concurrent executor. This is an executor shared by
+/// the entire runtime to execute any work which does not have strict executor
+/// requirements.
+///
+/// By setting a task executor preference, either with a
+/// ``_withTaskExecutor(_:operation:)``, creating a task with a preference
+/// (`Task(_on:)`, or `group.addTask(on:)`), the task and all of its child
+/// tasks (unless a new preference is set) will be preferring to execute on
+/// the provided task executor.
+///
+/// Unstructured tasks do not inherit the task executor.
+@_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
-public protocol TaskExecutor: Executor {
+public protocol _TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
   // get a redundant witness-table entry for it.  This allows us to
   // avoid drilling down to the base conformance just for the basic
@@ -131,7 +148,15 @@ public protocol TaskExecutor: Executor {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  // TODO: Implement: func asUnownedTaskExecutor() -> UnownedTaskExecutor
+  func asUnownedTaskExecutor() -> UnownedTaskExecutor
+}
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+extension _TaskExecutor {
+  public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
+    UnownedTaskExecutor(ordinary: self)
+  }
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -243,6 +268,49 @@ public struct UnownedSerialExecutor: Sendable {
 
 }
 
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@frozen
+public struct UnownedTaskExecutor: Sendable {
+  #if $BuiltinExecutor
+  @usableFromInline
+  internal var executor: Builtin.Executor
+
+  /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
+  /// which needs to reach for this from an @_transparent function which prevents @_spi use.
+  @available(SwiftStdlib 9999, *)
+  public var _executor: Builtin.Executor {
+    self.executor
+  }
+  #endif
+
+  @inlinable
+  public init(_ executor: Builtin.Executor) {
+    #if $BuiltinExecutor
+    self.executor = executor
+    #endif
+  }
+
+  @inlinable
+  public init<E: _TaskExecutor>(ordinary executor: __shared E) {
+    #if $BuiltinBuildTaskExecutor
+    self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
+  }
+}
+
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+extension UnownedTaskExecutor: Equatable {
+  @inlinable
+  public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
+    unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
+  }
+}
+
 /// Checks if the current task is running on the expected executor.
 ///
 /// Generally, Swift programs should be constructed such that it is statically
@@ -302,6 +370,16 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
   return executor.asUnownedSerialExecutor().executor
 }
 
+/// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
+/// The obtained executor ref will have all the user-defined flags set on the executor.
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@_silgen_name("_task_executor_getTaskExecutorRef")
+internal func _task_executor_getTaskExecutorRef<E>(_ executor: E) -> Builtin.Executor
+    where E: _TaskExecutor {
+  return executor.asUnownedTaskExecutor().executor
+}
+
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")
@@ -318,7 +396,22 @@ where E: SerialExecutor {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@_unavailableInEmbedded
+@available(SwiftStdlib 9999, *)
+@_silgen_name("_swift_task_enqueueOnTaskExecutor")
+internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: _TaskExecutor {
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  if #available(SwiftStdlib 9999, *) {
+    executor.enqueue(ExecutorJob(context: unownedJob._context))
+  } else {
+    executor.enqueue(unownedJob)
+  }
+  #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  executor.enqueue(unownedJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+}
+
+#if SWIFT_CONCURRENCY_USES_DISPATCH
 // This must take a DispatchQueueShim, not something like AnyObject,
 // or else SILGen will emit a retain/release in unoptimized builds,
 // which won't work because DispatchQueues aren't actually
@@ -345,4 +438,4 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
     return UnownedSerialExecutor(ordinary: self)
   }
 }
-#endif // SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#endif // SWIFT_CONCURRENCY_USES_DISPATCH

@@ -63,6 +63,19 @@ add_pure_swift_host_library(swiftASTGen STATIC
     ${ASTGen_Swift_dependencies}
 )
 
+add_pure_swift_host_library(swiftIDEUtilsBridging
+  Sources/SwiftIDEUtilsBridging/NameMatcherBridging.swift
+  
+  DEPENDENCIES
+    swiftAST
+    swiftASTGen
+
+  SWIFT_DEPENDENCIES
+    SwiftIDEUtils
+    SwiftSyntax
+)
+
+
 set(c_include_paths
   # LLVM modules and headers.
   "${LLVM_MAIN_INCLUDE_DIR}"
@@ -89,17 +102,19 @@ endif()
 set(compile_options
   ${c_include_paths_args}
   "SHELL: ${cxx_interop_flag}"
-  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
+  "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT -Xcc -DSWIFT_TARGET"
 
   # FIXME: Needed to work around an availability issue with CxxStdlib
   "SHELL: -Xfrontend -disable-target-os-checking"
 
   # Necessary to avoid treating IBOutlet and IBAction as keywords
   "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
+
+  "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
 )
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
-  foreach(target swiftASTGen swiftLLVMJSON)
+  foreach(target swiftASTGen swiftLLVMJSON swiftIDEUtilsBridging)
     target_compile_options(${target} PRIVATE ${compile_options})
   endforeach()
 endif()

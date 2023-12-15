@@ -12,29 +12,21 @@ struct ConcreteMyProtocol : MyProtocol {
 
 // MARK: 'some' keyword.
 
-// BEGINNING_WITH_SOME-DAG: Keyword/None:                       some[#some#]; name=some
+// BEGINNING_WITH_SOME-DAG: Keyword/None:                       some; name=some
 // BEGINNING_WITH_SOME-DAG: Keyword/None:                       Any[#Any#]; name=Any
 // BEGINNING_WITH_SOME-DAG: Decl[Enum]/CurrModule:              MyEnum[#MyEnum#]; name=MyEnum
 // BEGINNING_WITH_SOME-DAG: Decl[Class]/CurrModule:             MyClass[#MyClass#]; name=MyClass
 // BEGINNING_WITH_SOME-DAG: Decl[Protocol]/CurrModule:          MyProtocol[#MyProtocol#]; name=MyProtocol
 // BEGINNING_WITH_SOME-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 
-// BEGINNING_WITHOUT_SOME-NOT: Keyword/None: some
-// BEGINNING_WITHOUT_SOME-DAG: Keyword/None:                       Any[#Any#]; name=Any
-// BEGINNING_WITHOUT_SOME-DAG: Decl[Enum]/CurrModule:              MyEnum[#MyEnum#]; name=MyEnum
-// BEGINNING_WITHOUT_SOME-DAG: Decl[Class]/CurrModule:             MyClass[#MyClass#]; name=MyClass
-// BEGINNING_WITHOUT_SOME-DAG: Decl[Protocol]/CurrModule:          MyProtocol[#MyProtocol#]; name=MyProtocol
-// BEGINNING_WITHOUT_SOME-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// BEGINNING_WITHOUT_SOME-NOT: Keyword/None: some
-
 func gloabalFunc() -> #^GLOBAL_FUNC?check=BEGINNING_WITH_SOME^#
-var globalVar: #^GLOBAL_VAR?check=BEGINNING_WITHOUT_SOME^#
+var globalVar: #^GLOBAL_VAR?check=BEGINNING_WITH_SOME^#
 
 protocol SomeProto {
-  associatedtype protoAssocTy: #^PROTOCOL_ASSOCIATEDTYPE?check=BEGINNING_WITHOUT_SOME^#
-  func protoMethodReq() -> #^PROTOCOL_METHOD_REQUIREMENT?check=BEGINNING_WITHOUT_SOME^#
-  var protoVarReq: #^PROTOCOL_VAR_REQUIREMENT?check=BEGINNING_WITHOUT_SOME^#
-  subscript(req: Int) -> #^PROTOCOL_SUBSCRIPT_REQUIREMENT?check=BEGINNING_WITHOUT_SOME^#
+  associatedtype protoAssocTy: #^PROTOCOL_ASSOCIATEDTYPE?check=BEGINNING_WITH_SOME^#
+  func protoMethodReq() -> #^PROTOCOL_METHOD_REQUIREMENT?check=BEGINNING_WITH_SOME^#
+  var protoVarReq: #^PROTOCOL_VAR_REQUIREMENT?check=BEGINNING_WITH_SOME^#
+  subscript(req: Int) -> #^PROTOCOL_SUBSCRIPT_REQUIREMENT?check=BEGINNING_WITH_SOME^#
 }
 
 extension SomeProto {
@@ -44,7 +36,7 @@ extension SomeProto {
 }
 
 struct SomeStruct {
-  typealias TyAlias = #^STRUCT_TYPEALIAS_RHS?check=BEGINNING_WITHOUT_SOME^#
+  typealias TyAlias = #^STRUCT_TYPEALIAS_RHS?check=BEGINNING_WITH_SOME^#
   func structMethodExt() -> #^STRUCT_METHOD?check=BEGINNING_WITH_SOME^#
   var structVarExt: #^STRUCT_VAR?check=BEGINNING_WITH_SOME^#
   subscript(struct: Int) -> #^STRUCT_SUBSCRIPT?check=BEGINNING_WITH_SOME^#

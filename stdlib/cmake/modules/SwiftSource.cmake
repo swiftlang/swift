@@ -358,6 +358,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
   endif()
 
+  if (SWIFT_CONCURRENCY_USES_DISPATCH)
+    list(APPEND result "-D" "SWIFT_CONCURRENCY_USES_DISPATCH")
+  endif()
+
   if(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE)
     list(APPEND result "-D" "SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE")
   endif()
@@ -615,6 +619,8 @@ function(_compile_swift_files
   if(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES)
     list(APPEND swift_flags "-Xfrontend" "-disable-preallocated-instantiation-caches")
   endif()
+
+  list(APPEND swift_flags "-Xfrontend" "-enable-experimental-associated-type-inference")
 
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 

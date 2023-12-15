@@ -131,6 +131,9 @@ SIMPLE_LOCATOR_PATH_ELT(KeyPathType)
 /// The value of a key path.
 SIMPLE_LOCATOR_PATH_ELT(KeyPathValue)
 
+/// The index parameter of a special `subscript(keyPath: KeyPath<...>)`.
+SIMPLE_LOCATOR_PATH_ELT(KeyPathSubscriptIndex)
+
 /// An implicit @lvalue-to-inout conversion; only valid for operator
 /// arguments.
 SIMPLE_LOCATOR_PATH_ELT(LValueConversion)

@@ -28,7 +28,7 @@ class AStruct {
         return {a in a};
     }
 
-    static func /*infix-operator:def*/<base>+</base> (<arglabel index=0>left</arglabel><param index=0></param>: AStruct, <arglabel index=1>right</arglabel><param index=1></param>: AStruct) -> AStruct {
+    static func /*infix-operator:def*/<base>+</base> (left: AStruct, right: AStruct) -> AStruct {
         return AStruct()
     }
 

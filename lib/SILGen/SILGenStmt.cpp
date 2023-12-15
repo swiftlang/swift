@@ -1248,10 +1248,44 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
-  {
-    SGF.emitPatternBinding(S->getIteratorVar(),
-                           /*index=*/0, /*debuginfo*/ true);
+
+  if (auto *expansion =
+          dyn_cast<PackExpansionExpr>(S->getTypeCheckedSequence())) {
+    auto formalPackType = dyn_cast<PackType>(
+        PackType::get(SGF.getASTContext(), expansion->getType())
+            ->getCanonicalType());
+
+    JumpDest loopDest = createJumpDest(S->getBody());
+
+    // Set the destinations for 'break' and 'continue'.
+    JumpDest endDest = createJumpDest(S->getBody());
+
+    SGF.emitDynamicPackLoop(
+        SILLocation(expansion), formalPackType, 0,
+        expansion->getGenericEnvironment(),
+        [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
+            SILValue packIndex) {
+          Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
+          auto letValueInit =
+              SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
+
+          SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
+
+          SGF.BreakContinueDestStack.push_back({S, endDest, loopDest});
+          visit(S->getBody());
+          SGF.BreakContinueDestStack.pop_back();
+
+          return;
+        },
+        loopDest.getBlock());
+
+    emitOrDeleteBlock(SGF, endDest, S);
+
+    return;
   }
+
+  SGF.emitPatternBinding(S->getIteratorVar(),
+                         /*index=*/0, /*debuginfo*/ true);
 
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -1569,7 +1603,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   // If the thrown error type differs from what the throw destination expects,
   // perform the conversion.
   // FIXME: Can the AST tell us what to do here?
-  if (exnType != destErrorType && !shouldDiscard) {
+  if (exnType != destErrorType) {
     assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
     ProtocolConformanceRef conformances[1] = {

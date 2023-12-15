@@ -304,6 +304,10 @@ public:
     return llvm::None;
   }
 
+  /// Retrieve the base name as an identifier, including mapping special
+  /// names like 'init' or 'subscript' to identifiers.
+  Identifier getBaseIdentifier(ASTContext &ctx) const;
+
   /// Whether this name was explicitly specified via a Clang
   /// swift_name attribute.
   bool hasCustomName() const { return info.hasCustomName; }

@@ -216,6 +216,10 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
 SourceManager::~SourceManager() {
   for (auto &generated : GeneratedSourceInfos) {
     free((void*)generated.second.onDiskBufferCopyFileName.data());
+
+    if (generated.second.ancestors.size() > 0) {
+      delete [] generated.second.ancestors.data();
+    }
   }
 }
 
@@ -716,4 +720,109 @@ SourceManager::getLocForForeignLoc(SourceLoc otherLoc,
   }
 
   return SourceLoc();
+}
+
+/// Populate the ancestors list for this buffer, with the root source buffer
+/// at the beginning and the given source buffer at the end.
+static void populateAncestors(
+    const SourceManager &sourceMgr, unsigned bufferID,
+    SmallVectorImpl<unsigned> &ancestors) {
+  if (auto info = sourceMgr.getGeneratedSourceInfo(bufferID)) {
+    auto ancestorLoc = info->originalSourceRange.getStart();
+    if (ancestorLoc.isValid()) {
+      auto ancestorBufferID = sourceMgr.findBufferContainingLoc(ancestorLoc);
+      populateAncestors(sourceMgr, ancestorBufferID, ancestors);
+    }
+  }
+
+  ancestors.push_back(bufferID);
+}
+
+ArrayRef<unsigned> SourceManager::getAncestors(
+    unsigned bufferID, unsigned &scratch
+) const {
+  // If there is no generated source information for this buffer, then this is
+  // the only buffer here. Avoid memory allocation by using the scratch space
+  // we were given.
+  auto knownInfo = GeneratedSourceInfos.find(bufferID);
+  if (knownInfo == GeneratedSourceInfos.end()) {
+    scratch = bufferID;
+    return ArrayRef<unsigned>(&scratch, 1);
+  }
+
+  // If we already have the ancestors cached, use them.
+  if (!knownInfo->second.ancestors.empty())
+    return knownInfo->second.ancestors;
+
+  // Compute all of the ancestors. We only do this once for a given buffer.
+  SmallVector<unsigned, 4> ancestors;
+  populateAncestors(*this, bufferID, ancestors);
+
+  // Cache the ancestors in the generated source info record.
+  unsigned *ancestorsPtr = new unsigned [ancestors.size()];
+  std::copy(ancestors.begin(), ancestors.end(), ancestorsPtr);
+  knownInfo->second.ancestors = llvm::makeArrayRef(ancestorsPtr, ancestors.size());
+  return knownInfo->second.ancestors;
+}
+
+
+/// Determine whether the first source location precedes the second, accounting
+/// for macro expansions.
+static bool isBeforeInSource(
+    const SourceManager &sourceMgr, SourceLoc firstLoc, SourceLoc secondLoc,
+    bool allowEqual) {
+  // If the two locations are in the same source buffer, compare their pointers.
+  unsigned firstBufferID = sourceMgr.findBufferContainingLoc(firstLoc);
+  unsigned secondBufferID = sourceMgr.findBufferContainingLoc(secondLoc);
+  if (firstBufferID == secondBufferID) {
+    return sourceMgr.isBeforeInBuffer(firstLoc, secondLoc) ||
+        (allowEqual && firstLoc == secondLoc);
+  }
+
+  // If the two locations are in different source buffers, we need to compute
+  // the least common ancestor.
+  unsigned firstScratch, secondScratch;
+  auto firstAncestors = sourceMgr.getAncestors(firstBufferID, firstScratch);
+  auto secondAncestors = sourceMgr.getAncestors(secondBufferID, secondScratch);
+
+  // Find the first mismatch between the two ancestor lists; this is the
+  // point of divergence.
+  auto [firstMismatch, secondMismatch] = std::mismatch(
+      firstAncestors.begin(), firstAncestors.end(),
+      secondAncestors.begin(), secondAncestors.end());
+  assert(firstMismatch != firstAncestors.begin() &&
+         secondMismatch != secondAncestors.begin() &&
+         "Ancestors don't have the same root source file");
+
+  SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
+      ? firstLoc
+      : sourceMgr.getGeneratedSourceInfo(*firstMismatch)
+          ->originalSourceRange.getStart();
+  SourceLoc secondLocInLCA = secondMismatch == secondAncestors.end()
+      ? secondLoc
+      : sourceMgr.getGeneratedSourceInfo(*secondMismatch)
+          ->originalSourceRange.getStart();
+  return sourceMgr.isBeforeInBuffer(firstLocInLCA, secondLocInLCA) ||
+    (allowEqual && firstLocInLCA == secondLocInLCA);
+}
+
+bool SourceManager::isBefore(SourceLoc first, SourceLoc second) const {
+  return isBeforeInSource(*this, first, second, /*allowEqual=*/false);
+}
+
+bool SourceManager::isAtOrBefore(SourceLoc first, SourceLoc second) const {
+  return isBeforeInSource(*this, first, second, /*allowEqual=*/true);
+}
+
+bool SourceManager::containsTokenLoc(SourceRange range, SourceLoc loc) const {
+  return isAtOrBefore(range.Start, loc) && isAtOrBefore(loc, range.End);
+}
+
+bool SourceManager::containsLoc(SourceRange range, SourceLoc loc) const {
+  return isAtOrBefore(range.Start, loc) && isBefore(loc, range.End);
+}
+
+bool SourceManager::encloses(SourceRange enclosing, SourceRange inner) const {
+  return containsLoc(enclosing, inner.Start) &&
+      isAtOrBefore(inner.End, enclosing.End);
 }

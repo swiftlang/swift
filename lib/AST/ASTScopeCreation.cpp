@@ -100,8 +100,8 @@ public:
     ASTScopeAssert(expr,
                  "If looking for closures, must have an expression to search.");
 
-    /// AST walker that finds nested scopes in expressions. This handles both
-    /// closures and if/switch expressions.
+    /// AST walker that finds nested scopes in expressions. This handles
+    /// closures, if/switch expressions, and try/try!/try? expressions.
     class NestedExprScopeFinder : public ASTWalker {
       ScopeCreator &scopeCreator;
       ASTScopeImpl *parent;
@@ -130,6 +130,13 @@ public:
           scopeCreator.addToScopeTree(SVE->getStmt(), parent);
           return Action::SkipChildren(E);
         }
+
+        // If we have a try/try!/try?, we need to add a scope for it
+        if (auto anyTry = dyn_cast<AnyTryExpr>(E)) {
+          scopeCreator.constructExpandAndInsert<TryScope>(parent, anyTry);
+          return Action::SkipChildren(E);
+        }
+
         return Action::Continue(E);
       }
       PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -259,13 +266,15 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
-    : SF(SF), scopeCreator(scopeCreator) {
+    : ASTScopeImpl(ScopeKind::ASTSourceFile), SF(SF),
+      scopeCreator(scopeCreator) {
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
     SourceLoc parentLoc;
     auto macroRole = SF->getFulfilledMacroRole();
     auto expansion = SF->getMacroExpansion();
 
     // Determine the parent source location based on the macro role.
+    AbstractFunctionDecl *bodyForDecl = nullptr;
     switch (*macroRole) {
     case MacroRole::Expression:
     case MacroRole::Declaration:
@@ -275,6 +284,16 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::Conformance:
     case MacroRole::Extension:
       parentLoc = expansion.getStartLoc();
+      break;
+    case MacroRole::Preamble: {
+      // Preamble macro roles start at the beginning of the macro body.
+      auto func = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+      parentLoc = func->getMacroExpandedBody()->getStartLoc();
+      break;
+    }
+    case MacroRole::Body:
+      parentLoc = expansion.getEndLoc();
+      bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
       break;
     case MacroRole::Peer: {
       ASTContext &ctx = SF->getASTContext();
@@ -297,6 +316,12 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     }
 
     if (auto parentScope = findStartingScopeForLookup(enclosingSF, parentLoc)) {
+      if (bodyForDecl) {
+        auto bodyScope = new (bodyForDecl->getASTContext()) FunctionBodyScope(bodyForDecl);
+        bodyScope->parentAndWasExpanded.setPointer(const_cast<ASTScopeImpl *>(parentScope));
+        parentScope = bodyScope;
+      }
+
       parentAndWasExpanded.setPointer(const_cast<ASTScopeImpl *>(parentScope));
     }
   }
@@ -744,6 +769,7 @@ NO_NEW_INSERTION_POINT(MacroDefinitionScope)
 NO_NEW_INSERTION_POINT(MacroExpansionDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
+NO_NEW_INSERTION_POINT(TryScope)
 
 NO_EXPANSION(GenericParamScope)
 NO_EXPANSION(SpecializeAttributeScope)
@@ -986,7 +1012,7 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // Create scope for the body.
   // We create body scopes when there is no body for source kit to complete
   // erroneous code in bodies.
-  if (decl->getBodySourceRange().isValid()) {
+  if (decl->getOriginalBodySourceRange().isValid()) {
     scopeCreator.constructExpandAndInsert<FunctionBodyScope>(leaf, decl);
   }
 }
@@ -1297,8 +1323,8 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
 }
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
-    PatternBindingDecl *declBeingScoped, unsigned entryIndex)
-    : decl(declBeingScoped), patternEntryIndex(entryIndex) {
+    ScopeKind kind, PatternBindingDecl *declBeingScoped, unsigned entryIndex)
+    : ASTScopeImpl(kind), decl(declBeingScoped), patternEntryIndex(entryIndex) {
   ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
                  "out of bounds");
 }
@@ -1306,7 +1332,7 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
 #pragma mark - expandBody
 
 void FunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
-  scopeCreator.addToScopeTree(decl->getBody(), this);
+  scopeCreator.addToScopeTree(decl->getMacroExpandedBody(), this);
 }
 
 void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
@@ -1352,6 +1378,11 @@ NullablePtr<ASTScopeImpl>
 IterableTypeBodyPortion::insertionPointForDeferredExpansion(
     IterableTypeScope *s) const {
   return s->getParent().get();
+}
+
+void TryScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  scopeCreator.addToScopeTree(expr->getSubExpr(), this);
 }
 
 #pragma mark verification

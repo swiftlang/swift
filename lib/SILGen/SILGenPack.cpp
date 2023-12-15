@@ -662,28 +662,27 @@ void SILGenFunction::projectTupleElementsToPack(SILLocation loc,
   });
 }
 
-void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
-                                         CanPackType formalPackType,
-                                         unsigned componentIndex,
-                                         GenericEnvironment *openedElementEnv,
-                      llvm::function_ref<void(SILValue indexWithinComponent,
-                                              SILValue packExpansionIndex,
-                                              SILValue packIndex)> emitBody) {
+void SILGenFunction::emitDynamicPackLoop(
+    SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+    GenericEnvironment *openedElementEnv,
+    llvm::function_ref<void(SILValue indexWithinComponent,
+                            SILValue packExpansionIndex, SILValue packIndex)>
+        emitBody,
+    SILBasicBlock *loopLatch) {
   return emitDynamicPackLoop(loc, formalPackType, componentIndex,
                              /*startAfter*/ SILValue(), /*limit*/ SILValue(),
-                             openedElementEnv, /*reverse*/false, emitBody);
+                             openedElementEnv, /*reverse*/ false, emitBody,
+                             loopLatch);
 }
 
-void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
-                                         CanPackType formalPackType,
-                                         unsigned componentIndex,
-                                         SILValue startingAfterIndexInComponent,
-                                         SILValue limitWithinComponent,
-                                         GenericEnvironment *openedElementEnv,
-                                         bool reverse,
-                      llvm::function_ref<void(SILValue indexWithinComponent,
-                                              SILValue packExpansionIndex,
-                                              SILValue packIndex)> emitBody) {
+void SILGenFunction::emitDynamicPackLoop(
+    SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+    SILValue startingAfterIndexInComponent, SILValue limitWithinComponent,
+    GenericEnvironment *openedElementEnv, bool reverse,
+    llvm::function_ref<void(SILValue indexWithinComponent,
+                            SILValue packExpansionIndex, SILValue packIndex)>
+        emitBody,
+    SILBasicBlock *loopLatch) {
   assert(isa<PackExpansionType>(formalPackType.getElementType(componentIndex)));
   assert((!startingAfterIndexInComponent || !reverse) &&
          "cannot reverse with a starting index");
@@ -764,6 +763,7 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
   // the incoming index - 1 if reverse)
   SILValue curIndex = incomingIndex;
   if (reverse) {
+    assert(!loopLatch && "Only forward iteration supported with loop latch");
     curIndex = B.createBuiltinBinaryFunction(loc, "sub", wordTy, wordTy,
                                              { incomingIndex, one });
   }
@@ -791,6 +791,13 @@ void SILGenFunction::emitDynamicPackLoop(SILLocation loc,
   {
     FullExpr scope(Cleanups, CleanupLocation(loc));
     emitBody(curIndex, packExpansionIndex, packIndex);
+    if (loopLatch) {
+      B.createBranch(loc, loopLatch);
+    }
+  }
+
+  if (loopLatch) {
+    B.emitBlock(loopLatch);
   }
 
   // The index to pass to the loop condition block (the current index + 1

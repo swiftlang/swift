@@ -275,24 +275,6 @@ public:
                         const swift::DiagnosticInfo &Info) override;
 };
 
-class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
-                                   public swift::DiagnosticConsumer {
-  CategorizedRenameRangesReceiver Receiver;
-  std::string ErrBuffer;
-  llvm::raw_string_ostream OS;
-  std::vector<CategorizedRenameRanges> CategorizedRanges;
-
-  swift::PrintingDiagnosticConsumer DiagConsumer;
-
-public:
-  RequestRenameRangeConsumer(CategorizedRenameRangesReceiver Receiver);
-  ~RequestRenameRangeConsumer();
-  void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
-              ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
-  void handleDiagnostic(swift::SourceManager &SM,
-                        const swift::DiagnosticInfo &Info) override;
-};
-
 namespace compile {
 class Session {
   swift::ide::CompileInstance Compiler;
@@ -700,9 +682,9 @@ public:
 
   void findRelatedIdentifiersInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver)
       override;
 
   void findActiveRegionsInFile(
@@ -711,10 +693,10 @@ public:
       std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver)
       override;
 
-  void findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                        ArrayRef<RenameLocations> RenameLocations,
-                        ArrayRef<const char *> Args,
-                        CategorizedRenameRangesReceiver Receiver) override;
+  CancellableResult<std::vector<CategorizedRenameRanges>>
+  findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                   ArrayRef<RenameLoc> RenameLocations,
+                   ArrayRef<const char *> Args) override;
 
   void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                              unsigned Length, ArrayRef<const char *> Args,

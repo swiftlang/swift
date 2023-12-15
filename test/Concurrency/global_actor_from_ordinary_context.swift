@@ -154,7 +154,7 @@ class Sub: Super {
 
   func g2() {
     Task.detached {
-      self.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
+      self.f() // expected-warning{{expression is 'async' but is not marked with 'await'}}
       // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     }
   }

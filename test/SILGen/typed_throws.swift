@@ -130,6 +130,74 @@ open class MyClass {
   func f() throws { }
 }
 
+
+struct Foo: Error { }
+struct Bar: Error { }
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B22DifferentFromEnclosingyyAA3FooVYKF : $@convention(thin) () -> @error Foo
+func throwsDifferentFromEnclosing() throws(Foo) {
+  do {
+    throw Bar()
+  } catch {
+    print("Bar was barred")
+  }
+
+  // CHECK: throw [[ERROR:%.*]] : $Foo
+  throw Foo()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws17forceTryDifferentyyAA7MyErrorOYKF
+func forceTryDifferent() throws(MyError) {
+  // CHECK: try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK: [[NORMAL_BB]]([[RESULT:%.*]] : $()):
+  // CHECK: return
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : $MyBigError):
+  // CHECK-NEXT: unreachable
+  try! throwsMyBigError()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws20optionalTryDifferentyyAA7MyErrorOYKF
+func optionalTryDifferent() throws(MyError) {
+  // CHECK: try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK: [[NORMAL_BB]]([[RESULT:%.*]] : $()):
+  // CHECK: br
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : $MyBigError):
+  // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
+  try? throwsMyBigError()
+}
+
+func throwsMyBigErrorOrReturnsInt() throws(MyBigError) -> Int { 5 }
+
+func mightThrowAny(arg: Int) throws { }
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws14forceTryErasedyyF : $@convention(thin) () -> () {
+func forceTryErased() {
+  // CHECK: try_apply {{.*}} @error MyBigError
+  // CHECK: try_apply {{.*}} @error any Error
+  try! mightThrowAny(arg: throwsMyBigErrorOrReturnsInt())
+}
+
+func takesClosureThrowingConcrete(_ body: () throws(MyError) -> ()) throws(MyError) {
+}
+
+// CHECK-LABEL: sil private [ossa] @$s12typed_throws30passesClosureWithReabstraction5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError
+// CHECK: bb0:
+// CHECK-NEXT: debug_value undef : $MyError, var, name "$error", argno 1
+func passesClosureWithReabstraction(count: Int) {
+    try! takesClosureThrowingConcrete { }
+}
+
+func takesClosureThrowingConcreteAndRethrows(_ body: () throws(MyError) -> ()) rethrows {
+}
+
+// CHECK-LABEL: sil private [ossa] @$s12typed_throws42passesClosureWithReabstractionToRethrowing5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError {
+// CHECK: bb0:
+// CHECK-NEXT:  debug_value undef : $MyError, var, name "$error", argno 1
+func passesClosureWithReabstractionToRethrowing(count: Int) {
+    try! takesClosureThrowingConcrete { }
+}
+
+
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
 // CHECK-NEXT:  #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKFAA0C5ClassCADyyKFTV [override]

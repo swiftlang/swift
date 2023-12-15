@@ -67,6 +67,7 @@ func /*mixed:def*/withAllOfTheAbove(x: Int = 2, _: Int..., z: Int = 2, c: () -> 
 // false positives
 /*mixed:call*/withAllOfTheAbove(z: 1, 2, c: {return 1})
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="defaults" -is-function-like -old-name "withDefaults(_:y:x:)" -new-name "betterName(x:y:z:)" >> %t.result/callsites_defaults.swift
 // RUN: diff -u %S/Outputs/callsites/defaults.swift.expected %t.result/callsites_defaults.swift

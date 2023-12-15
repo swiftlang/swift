@@ -4028,6 +4028,8 @@ NodePointer Demangler::demangleGenericRequirement() {
       name = "D";
     } else if (c == 'T') {
       name = "T";
+    } else if (c == 'B') {
+      name = "B";
     } else if (c == 'E') {
       size = demangleIndexAsNode();
       if (!size)
@@ -4050,6 +4052,11 @@ NodePointer Demangler::demangleGenericRequirement() {
       if (!size)
         return nullptr;
       name = "m";
+    } else if (c == 'S') {
+      size = demangleIndexAsNode();
+      if (!size)
+        return nullptr;
+      name = "S";
     } else {
       // Unknown layout constraint.
       return nullptr;

@@ -872,6 +872,10 @@ def save_optimization_record_passes :
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
+def no_allocations : Flag<["-"], "no-allocations">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Diagnose any code that needs to heap allocate (classes, closures, etc.)">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -1954,5 +1958,10 @@ def load_plugin_executable:
   HelpText<"Path to a compiler plugin executable and a comma-separated list "
            "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
+
+def disable_sandbox:
+  Flag<["-"], "disable-sandbox">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable using the sandbox when executing subprocesses">;
 
 include "FrontendOptions.td"

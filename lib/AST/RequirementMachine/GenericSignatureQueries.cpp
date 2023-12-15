@@ -346,7 +346,8 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
   auto substBaseType = substPrefixType(memberType->getBase(), suffixLength - 1,
                                        prefixType, sig);
   return memberType->substBaseType(substBaseType,
-                                   LookUpConformanceInSignature(sig.getPointer()));
+                                   LookUpConformanceInSignature(sig.getPointer()),
+                                   llvm::None);
 }
 
 /// Unlike most other queries, the input type can be any type, not just a

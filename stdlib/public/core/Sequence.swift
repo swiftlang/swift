@@ -988,7 +988,10 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = (i + 1) % maxLength
+        i += 1
+        if i >= maxLength {
+          i = 0
+        }
       }
     }
 
@@ -1067,7 +1070,10 @@ extension Sequence {
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i = (i + 1) % k
+        i += 1
+        if i >= k {
+          i = 0
+        }
       }
     }
     return Array(result)
@@ -1241,6 +1247,11 @@ public struct IteratorSequence<Base: IteratorProtocol> {
 }
 
 extension IteratorSequence: IteratorProtocol, Sequence {
+
+  #if $NoncopyableGenerics
+    public typealias Element = Base.Element
+  #endif
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///

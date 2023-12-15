@@ -105,8 +105,16 @@ void GenericSignatureImpl::forEachParam(
 
   for (auto req : getRequirements()) {
     GenericTypeParamType *gp;
+    bool isCanonical = false;
     switch (req.getKind()) {
     case RequirementKind::SameType: {
+      if (req.getSecondType()->isParameterPack() != 
+          req.getFirstType()->isParameterPack()) {
+        // This is a same-element requirement, which does not make
+        // type parameters non-canonical.
+        isCanonical = true;
+      }
+
       if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
         // If two generic parameters are same-typed, then the right-hand one
         // is non-canonical.
@@ -136,7 +144,7 @@ void GenericSignatureImpl::forEachParam(
     }
 
     unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
-    genericParamsAreCanonical[index] = false;
+    genericParamsAreCanonical[index] = isCanonical;
   }
 
   // Call the callback with each parameter and the result of the above analysis.
@@ -494,7 +502,8 @@ CanType GenericSignature::getReducedType(Type type) const {
 
 GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) const {
   bool changedSignature = false;
-  llvm::SmallVector<Requirement, 4> requirementsErased;
+  llvm::SmallVector<Requirement, 2> requirementsErased;
+  auto &C = Ptr->getASTContext();
 
   for (auto req : getRequirements()) {
     bool found = std::any_of(typeErasedParams.begin(),
@@ -503,10 +512,29 @@ GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) c
       auto other = req.getFirstType();
       return t->isEqual(other);
     });
-    if (found) {
-      requirementsErased.push_back(Requirement(RequirementKind::SameType,
-                                               req.getFirstType(),
-                                               Ptr->getASTContext().getAnyObjectType()));
+    if (found && req.getKind() == RequirementKind::Layout) {
+      auto layout = req.getLayoutConstraint();
+      if (layout->isClass()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.getAnyObjectType()));
+      } else if (layout->isBridgeObject()) {
+        requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                                 req.getFirstType(),
+                                                 C.TheBridgeObjectType));
+      } else if (layout->isFixedSizeTrivial()) {
+        unsigned bitWidth = layout->getTrivialSizeInBits();
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        CanType(BuiltinIntegerType::get(bitWidth, C))));
+      } else if (layout->isTrivialStride()) {
+        unsigned bitWidth = layout->getTrivialStrideInBits();
+        requirementsErased.push_back(
+            Requirement(RequirementKind::SameType, req.getFirstType(),
+                        CanType(BuiltinIntegerType::get(bitWidth, C))));
+      } else {
+        requirementsErased.push_back(req);
+      }
     } else {
       requirementsErased.push_back(req);
     }
@@ -514,8 +542,10 @@ GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) c
   }
 
   if (changedSignature) {
-    return GenericSignature::get(getGenericParams(),
-                                 requirementsErased, false);
+    return buildGenericSignature(
+        Ptr->getASTContext(), GenericSignature(),
+        SmallVector<GenericTypeParamType *>(getGenericParams()),
+        requirementsErased);
   }
 
   return *this;
@@ -635,26 +665,23 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
-Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
-  return getUpperBound(type);
-}
-
-Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
-  return getUpperBound(type, /*wantDependentBound=*/true);
-}
-
-Type GenericSignatureImpl::getUpperBound(Type type,
-                                         bool wantDependentBound) const {
+Type GenericSignatureImpl::getUpperBound(Type type) const {
   assert(type->isTypeParameter());
 
-  bool hasExplicitAnyObject = requiresClass(type);
-
   llvm::SmallVector<Type, 2> types;
+  unsigned rootDepth = type->getRootGenericParam()->getDepth();
+
+  bool hasExplicitAnyObject = requiresClass(type);
 
   if (Type superclass = getSuperclassBound(type)) {
     do {
       superclass = getReducedType(superclass);
-      if (wantDependentBound || !superclass->hasTypeParameter()) {
+
+      if (!superclass.findIf([&](Type t) {
+            if (auto *paramTy = t->getAs<GenericTypeParamType>())
+              return (paramTy->getDepth() == rootDepth);
+            return false;
+          })) {
         break;
       }
     } while ((superclass = superclass->getSuperclass()));
@@ -684,31 +711,13 @@ Type GenericSignatureImpl::getUpperBound(Type type,
 
         // If the reduced type is at a lower depth than the root generic
         // parameter of T, then it's constrained.
-        bool hasOuterGenericParam = false;
-        bool hasInnerGenericParam = false;
-        reducedType.visit([&](Type t) {
-          if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-            unsigned rootDepth = type->getRootGenericParam()->getDepth();
-            if (paramTy->getDepth() == rootDepth)
-              hasInnerGenericParam = true;
-            else {
-              assert(paramTy->getDepth() < rootDepth);
-              hasOuterGenericParam = true;
-            }
-          }
-        });
-
-        if (hasInnerGenericParam && hasOuterGenericParam) {
-          llvm::errs() << "Weird same-type requirements?\n";
-          llvm::errs() << "Interface type: " << type << "\n";
-          llvm::errs() << "Member type: " << memberType << "\n";
-          llvm::errs() << "Reduced member type: " << reducedType << "\n";
-          llvm::errs() << GenericSignature(this) << "\n";
-          abort();
-        }
-
-        if (!hasInnerGenericParam && (wantDependentBound || !hasOuterGenericParam))
+        if (!reducedType.findIf([&](Type t) {
+            if (auto *paramTy = t->getAs<GenericTypeParamType>())
+              return (paramTy->getDepth() == rootDepth);
+            return false;
+          })) {
           argTypes.push_back(reducedType);
+        }
       }
 
       // If we have constrained all primary associated types, create a
@@ -721,7 +730,8 @@ Type GenericSignatureImpl::getUpperBound(Type type,
       //
       // In that case just add the base type in the default branch below.
       if (argTypes.size() == primaryAssocTypes.size()) {
-        types.push_back(ParameterizedProtocolType::get(getASTContext(), baseType, argTypes));
+        types.push_back(ParameterizedProtocolType::get(
+            getASTContext(), baseType, argTypes));
         continue;
       }
     }

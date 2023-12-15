@@ -704,6 +704,10 @@ ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
+ERROR(cannot_convert_type_to_keypath_subscript_index,none,
+      "cannot use value of type %0 as a key path subscript index; argument must be"
+      " a key path",
+      (Type))
 WARNING(expr_deprecated_writable_keypath,Deprecation,
         "forming a writable keypath to property %0 that is read-only in this context "
         "is deprecated and will be removed in a future release",
@@ -1736,9 +1740,17 @@ ERROR(attr_objc_implementation_category_not_found,none,
       "could not find category %0 on Objective-C class %1; make sure your "
       "umbrella or bridging header imports the header that declares it",
       (Identifier, ValueDecl*))
+ERROR(attr_objc_implementation_func_not_found,none,
+      "could not find imported function '%0' matching %kind1; make sure your "
+      "umbrella or bridging header imports the header that declares it",
+      (StringRef, ValueDecl*))
 NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
      ())
+ERROR(attr_objc_implementation_no_category_for_func,none,
+      "%kind0 does not belong to an Objective-C category; remove the category "
+      "name from this attribute",
+      (ValueDecl*))
 ERROR(attr_objc_implementation_no_conformance,none,
       "'@_objcImplementation' extension cannot add conformance to %0; "
       "add this conformance %select{with an ordinary extension|"
@@ -1930,6 +1942,10 @@ ERROR(attr_static_exclusive_only_let_only_param,none,
       "parameter of type %0 must be declared as either 'borrowing' or 'consuming'", (Type))
 ERROR(attr_static_exclusive_only_mutating,none,
       "type %0 cannot have mutating function %1", (Type, ValueDecl *))
+
+// @extractConstantsFromMembers
+ERROR(attr_extractConstantsFromMembers_experimental,none,
+      "@extractConstantsFromMembers requires '-enable-experimental-feature ExtractConstantsFromMembers'", ())
 
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
@@ -3150,11 +3166,11 @@ ERROR(requires_not_suitable_archetype,none,
       (Type))
 
 ERROR(requires_not_suitable_inverse_subject,none,
-      "cannot apply inverse %1 to type %0 in conformance requirement",
-      (Type, Type))
+      "cannot apply inverse '~%1' to type %0 in conformance requirement",
+      (Type, StringRef))
 
 ERROR(requires_not_suitable_inverse_outer_subject,none,
-      "cannot add inverse constraint '%0: %1' "
+      "cannot add inverse constraint '%0: ~%1' "
       "on generic parameter '%0' defined in outer scope",
       (StringRef, StringRef))
 
@@ -4263,6 +4279,9 @@ WARNING(warn_use_async_alternative,none,
 
 NOTE(found_candidate,none,
      "found this candidate", ())
+NOTE(found_candidate_in_module,none,
+     "found this candidate %select{|in module %1}0",
+     (bool, const ModuleDecl *))
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
 
@@ -5344,9 +5363,6 @@ ERROR(broken_distributed_actor_requirement,none,
 ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,
       "%kind0 is missing witness for protocol requirement %1",
       (const ValueDecl *, DeclName))
-NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
-      "protocol %0 requires function %1 with signature:\n%2",
-     (DeclName, DeclName, StringRef))
 
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
@@ -5405,8 +5421,8 @@ ERROR(concurrent_access_local,none,
         "use of local %kind0 in concurrently-executing code",
         (const ValueDecl *))
 ERROR(actor_isolated_keypath_component,none,
-      "cannot form key path to%select{| distributed}0 actor-isolated %kind1",
-      (bool, const ValueDecl *))
+      "cannot form key path to %0 %kind1",
+      (ActorIsolation, const ValueDecl *))
 ERROR(effectful_keypath_component,none,
       "cannot form key path to %0 with 'throws' or 'async'",
       (DescriptiveDeclKind))
@@ -5854,8 +5870,8 @@ ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
       "tuple element, or generic argument of a variadic type", (Type))
 ERROR(expansion_expr_not_allowed,none,
-      "value pack expansion can only appear inside a function argument list "
-      "or tuple element", ())
+      "value pack expansion can only appear inside a function argument list, "
+      "tuple element, or as the expression of a for-in loop", ())
 ERROR(invalid_expansion_argument,none,
       "cannot pass value pack expansion to non-pack parameter of type %0",
       (Type))
@@ -7364,16 +7380,6 @@ WARNING(backdeployed_opaque_result_not_supported,none,
 // MARK: Implicit opening of existential types
 //------------------------------------------------------------------------------
 
-ERROR(result_requires_explicit_coercion,none,
-      "inferred result type %0 requires explicit coercion due to "
-      "loss of generic requirements",
-      (Type))
-
-NOTE(candidate_result_requires_explicit_coercion,none,
-     "inferred result type %0 requires explicit coercion due to "
-     "loss of generic requirements",
-     (Type))
-
 ERROR(concurrency_task_to_thread_model_custom_executor,none,
       "custom executors are not permitted within %0", (StringRef))
 ERROR(concurrency_task_to_thread_model_async_main,none,
@@ -7560,22 +7566,27 @@ ERROR(accessor_macro_not_single_var, none,
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
-ERROR(noncopyable_but_copyable, none,
-      "%kind0 required to be 'Copyable' but is marked with '~Copyable'",
-      (const ValueDecl *))
-ERROR(noncopyable_class, none,
-      "classes cannot be noncopyable",
-      ())
+ERROR(inverse_but_also_conforms, none,
+      "%kind0 required to be '%1' but is marked with '~%1'",
+      (const ValueDecl *, StringRef))
+ERROR(inverse_generic_but_also_conforms, none,
+      "%0 required to be '%1' but is marked with '~%1'",
+      (Type, StringRef))
+WARNING(redundant_inverse_constraint,none,
+        "redundant constraint %0 : '~%1'", (Type, StringRef))
+ERROR(inverse_on_class, none,
+      "classes cannot be '~%0'",
+      (StringRef))
 ERROR(inverse_extension, none,
       "cannot apply inverse %0 to extension",
       (Type))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
       (const ValueDecl *))
-ERROR(noncopyable_type_member_in_copyable,none,
+ERROR(inverse_type_member_in_conforming_type,none,
       "%select{stored property %2|associated value %2}1 of "
-      "'Copyable'-conforming %kind3 has noncopyable type %0",
-      (Type, bool, DeclName, const ValueDecl *))
+      "'%4'-conforming %kind3 has non-%4 type %0",
+      (Type, bool, DeclName, const ValueDecl *, StringRef))
 NOTE(add_inverse,none,
      "consider adding '~%1' to %kind0",
      (const ValueDecl *, StringRef))
@@ -7592,6 +7603,9 @@ NOTE(note_inverse_preventing_conformance_explicit,none,
 NOTE(add_explicit_protocol_for_conformance,none,
      "consider making %kind0 explicitly conform to the '%1' protocol",
      (const ValueDecl *, StringRef))
+ERROR(escapable_requires_feature_flag,none,
+      "type '~Escapable' requires -enable-experimental-feature NonescapableTypes",
+      ())
 
 // -- older ones below --
 
@@ -7685,7 +7699,7 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       (unsigned))
 
 ERROR(nonescapable_types_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature NonEscapableTypes'", ())
+      "attribute requires '-enable-experimental-feature NonescapableTypes'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
@@ -7734,6 +7748,13 @@ ERROR(referencebindings_binding_must_be_to_lvalue,none,
 
 ERROR(result_depends_on_no_result,none,
       "Incorrect use of %0 with no result", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Pack Iteration Diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(pack_iteration_where_clause_not_supported, none,
+      "'where' clause in pack iteration is not supported", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

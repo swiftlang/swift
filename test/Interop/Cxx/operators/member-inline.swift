@@ -83,6 +83,15 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(42, wrapper.value)
 }
 
+OperatorsTestSuite.test("IntWrapperInNamespace.equal (inline)") {
+  let lhs = NS.IntWrapperInNamespace(value: 42)
+  let rhs = NS.IntWrapperInNamespace(value: 42)
+
+  let result = lhs == rhs
+
+  expectTrue(result)
+}
+
 OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
   let lhs = TemplatedWithFriendOperatorSpec()
   let rhs = TemplatedWithFriendOperatorSpec()
@@ -393,6 +402,15 @@ OperatorsTestSuite.test("DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl.
   let stars = DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl()
   let res = stars.pointee
   expectEqual(567, res)
+}
+
+OperatorsTestSuite.test("DerivedFromLoadableIntWrapperWithUsingDecl") {
+  var d = DerivedFromLoadableIntWrapperWithUsingDecl()
+  d.setValue(123)
+  var d1 = LoadableIntWrapper()
+  d1.value = 543
+  d += d1
+  expectEqual(666, d.getValue())
 }
 
 runAllTests()

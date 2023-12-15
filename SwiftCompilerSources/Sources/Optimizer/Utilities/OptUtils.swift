@@ -131,6 +131,37 @@ extension Value {
     }
     return builder.createCopyValue(operand: self)
   }
+
+  /// True if this value is a valid in a static initializer, including all its operands.
+  var isValidGlobalInitValue: Bool {
+    guard let svi = self as? SingleValueInstruction else {
+      return false
+    }
+    if let beginAccess = svi as? BeginAccessInst {
+      return beginAccess.address.isValidGlobalInitValue
+    }
+    if !svi.isValidInStaticInitializerOfGlobal {
+      return false
+    }
+    for op in svi.operands {
+      if !op.value.isValidGlobalInitValue {
+        return false
+      }
+    }
+    return true
+  }
+}
+
+extension FullApplySite {
+  func isSemanticCall(_ name: StaticString, withArgumentCount: Int) -> Bool {
+    if arguments.count == withArgumentCount,
+       let callee = referencedFunction,
+       callee.hasSemanticsAttribute(name)
+    {
+      return true
+    }
+    return false
+  }
 }
 
 extension Builder {
@@ -318,22 +349,6 @@ extension LoadInst {
       return self.loadOwnership
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
-    }
-  }
-}
-
-extension SmallProjectionPath {
-  /// Returns true if the path only contains projections which can be materialized as
-  /// SIL struct or tuple projection instructions - for values or addresses.
-  var isMaterializable: Bool {
-    let (kind, _, subPath) = pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField, .tupleField:
-      return subPath.isMaterializable
-    default:
-      return false
     }
   }
 }

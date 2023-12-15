@@ -654,7 +654,11 @@ def disable_experimental_string_processing :
 
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference via type witness systems">;
+  HelpText<"Enable experimental associated type inference improvements">;
+
+def disable_experimental_associated_type_inference :
+  Flag<["-"], "disable-experimental-associated-type-inference">,
+  HelpText<"Disable experimental associated type inference improvements">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -1130,6 +1134,11 @@ def experimental_skip_all_function_bodies:
   Flag<["-"], "experimental-skip-all-function-bodies">,
   HelpText<"Skip type-checking function bodies and all SIL generation">;
 
+def experimental_skip_non_inlinable_function_bodies_is_lazy
+  : Flag<["-"], "experimental-skip-non-inlinable-function-bodies-is-lazy">,
+  HelpText<"Infer lazy typechecking for "
+           "-experimental-skip-non-inlinable-function-bodies">;
+
 def experimental_allow_module_with_compiler_errors:
   Flag<["-"], "experimental-allow-module-with-compiler-errors">,
   Flags<[HelpHidden]>,
@@ -1159,9 +1168,11 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
            "disabled. NOTE: Can not be used if enable-ast-verifier is used "
            "as well">;
 
-def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
-  HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
-           "when optimizing ownership will be lowered before serializing SIL">;
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
+    HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
+            "when optimizing ownership will be lowered before serializing SIL">;
+}
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
@@ -1303,4 +1314,9 @@ def platform_c_calling_convention :
 def platform_c_calling_convention_EQ :
     Joined<["-"], "experimental-platform-c-calling-convention=">,
     Alias<platform_c_calling_convention>;
+
+def disable_experimental_parser_round_trip : Flag<["-"],
+  "disable-experimental-parser-round-trip">,
+  HelpText<"Disable round trip through the new swift parser">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

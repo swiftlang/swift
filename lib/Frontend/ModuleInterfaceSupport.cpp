@@ -704,6 +704,13 @@ public:
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
           return TypeWalker::Action::SkipChildren;
 
+        // Do not synthesize an extension to print a conformance to an
+        // invertible protocol, as their conformances are always re-inferred
+        // using the interface itself.
+        if (auto kp = inherited->getKnownProtocolKind())
+          if (getInvertibleProtocolKind(*kp))
+            return TypeWalker::Action::SkipChildren;
+
         if (inherited->isSPI() && printOptions.printPublicInterface())
           return TypeWalker::Action::Continue;
 

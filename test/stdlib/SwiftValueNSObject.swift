@@ -22,6 +22,9 @@
 
 // REQUIRES: objc_interop
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Foundation
 
 struct C: CustomDebugStringConvertible {

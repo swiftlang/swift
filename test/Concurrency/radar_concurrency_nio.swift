@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -enable-experimental-move-only -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-experimental-move-only -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -enable-experimental-move-only -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -enable-experimental-move-only -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: asserts
 
@@ -57,7 +57,6 @@ extension NIODefaultSerialEventLoopExecutor: SerialExecutor {
   @inlinable
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(complexEquality: self)
-
   }
 
   @inlinable

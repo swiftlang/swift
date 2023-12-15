@@ -424,6 +424,8 @@ namespace sil_block {
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
+    ActorIsolationField, // Caller Isolation if we have one. Unspecified otherwise.
+    ActorIsolationField, // Callee Isolation if we have one. Unspecified otherwise.
     BCArray<ValueIDField> // a list of arguments
   >;
 
@@ -435,7 +437,7 @@ namespace sil_block {
   // SIL instructions with one typed valueref. (dealloc_stack, return)
   using SILOneOperandLayout =
       BCRecordLayout<SIL_ONE_OPERAND, SILInstOpCodeField,
-                     BCFixed<3>, // Optional attributes
+                     BCFixed<4>, // Optional attributes
                      TypeIDField, SILTypeCategoryField, ValueIDField>;
 
   using SILOneOperandExtraAttributeLayout = BCRecordLayout<

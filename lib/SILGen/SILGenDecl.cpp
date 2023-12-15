@@ -566,9 +566,9 @@ public:
       //
       // Only add a lexical lifetime to the box if the the variable it stores
       // requires one.
-      if (lifetime.isLexical()) {
-        Box = SGF.B.createBeginBorrow(decl, Box, /*isLexical=*/true);
-      }
+      Box = SGF.B.createBeginBorrow(
+          decl, Box, /*isLexical=*/lifetime.isLexical(),
+          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
@@ -835,16 +835,17 @@ public:
     // Otherwise, if we do not have a no implicit copy variable, just follow
     // the "normal path": perform a lexical borrow if the lifetime is lexical.
     if (!vd->isNoImplicitCopy()) {
-      if (SGF.F.getLifetime(vd, value->getType()).isLexical())
-        return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
-      else
-        return value;
+      return SGF.B.createBeginBorrow(
+          PrologueLoc, value,
+          /*isLexical=*/SGF.F.getLifetime(vd, value->getType()).isLexical(),
+          /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
     }
 
     // If we have a no implicit copy lexical, emit the instruction stream so
     // that the move checker knows to check this variable.
-    value = SGF.B.createBeginBorrow(PrologueLoc, value,
-                                    /*isLexical*/ true);
+    value = SGF.B.createBeginBorrow(
+        PrologueLoc, value,
+        /*isLexical*/ true, /*hasPointerEscape=*/false, /*fromVarDecl=*/true);
     value = SGF.B.createCopyValue(PrologueLoc, value);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
     return SGF.B.createMarkUnresolvedNonCopyableValueInst(
@@ -2163,11 +2164,6 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   }
 
   if (Val->getOwnershipKind() == OwnershipKind::None) {
-    return;
-  }
-
-  if (!F.getLifetime(vd, Val->getType()).isLexical()) {
-    B.emitDestroyValueOperation(silLoc, Val);
     return;
   }
 

@@ -1965,6 +1965,10 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       isa<clang::ObjCCategoryDecl>(named)) {
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
+      if (auto friendDecl = dyn_cast<clang::FriendDecl>(member))
+        if (auto underlyingDecl = friendDecl->getFriendDecl())
+          member = underlyingDecl;
+
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
         addEntryToLookupTable(table, namedMember, nameImporter);
     }

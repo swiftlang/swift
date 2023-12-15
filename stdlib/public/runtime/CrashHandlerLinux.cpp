@@ -243,7 +243,11 @@ handle_fatal_signal(int signum,
 #elif defined(__arm64__) || defined(__aarch64__)
   pc = (void *)(ctx->uc_mcontext.pc);
 #elif defined(__arm__)
+#if defined(__ANDROID__)
+  pc = (void *)(ctx->uc_mcontext.arm_pc);
+#else
   pc = (void *)(ctx->uc_mcontext.gprs[15]);
+#endif
 #endif
 
   _swift_displayCrashMessage(signum, pc);
@@ -527,9 +531,10 @@ suspend_other_threads(struct thread *self)
           tgkill(our_pid, tid, sig_to_use);
           ++pending;
         } else {
-          warn("swift-runtime: unable to suspend thread ");
+          warn("swift-runtime: failed to suspend thread ");
           warn(dp->d_name);
-          warn("\n");
+          warn(" while processing a crash; backtraces will be missing "
+               "information\n");
         }
       }
     }

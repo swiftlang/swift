@@ -14,7 +14,7 @@
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \
-// RUN:   -swift-version 5 -enable-experimental-feature ExtensionMacros \
+// RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -module-name MyApp \
 // RUN:   %s \

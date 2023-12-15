@@ -6571,12 +6571,14 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator:
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
-  case KnownProtocolKind::TaskExecutor:
+  case KnownProtocolKind::_TaskExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
   case KnownProtocolKind::GlobalActor:
   case KnownProtocolKind::Copyable:
+  case KnownProtocolKind::Escapable:
+  case KnownProtocolKind::BitwiseCopyable:
     return SpecialProtocol::None;
   }
 

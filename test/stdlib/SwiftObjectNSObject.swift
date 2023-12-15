@@ -25,6 +25,9 @@
 // rdar://problem/56959761
 // UNSUPPORTED: OS=watchos
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Foundation
 
 class C { 

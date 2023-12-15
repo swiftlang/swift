@@ -120,14 +120,14 @@ public:
   ARCState &DataflowState;
   bool FreezeOwnedArgEpilogueReleases;
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
-  ImmutablePointerSetFactory<SILInstruction> &SetFactory;
+  ImmutablePointerSetFactory<SILInstruction *> &SetFactory;
 
 public:
   BottomUpDataflowRCStateVisitor(
       RCIdentityFunctionInfo *RCFI, EpilogueARCFunctionInfo *EAFI,
       ARCState &DataflowState, bool FreezeOwnedArgEpilogueReleases,
       IncToDecStateMapTy &IncToDecStateMap,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+      ImmutablePointerSetFactory<SILInstruction *> &SetFactory);
   DataflowResult visitAutoreleasePoolCall(SILNode *N);
   DataflowResult visitStrongDecrement(SILNode *N);
   DataflowResult visitStrongIncrement(SILNode *N);
@@ -156,13 +156,13 @@ class TopDownDataflowRCStateVisitor
   RCIdentityFunctionInfo *RCFI;
   ARCState &DataflowState;
   DecToIncStateMapTy &DecToIncStateMap;
-  ImmutablePointerSetFactory<SILInstruction> &SetFactory;
+  ImmutablePointerSetFactory<SILInstruction *> &SetFactory;
 
 public:
   TopDownDataflowRCStateVisitor(
       RCIdentityFunctionInfo *RCFI, ARCState &State,
       DecToIncStateMapTy &DecToIncStateMap,
-      ImmutablePointerSetFactory<SILInstruction> &SetFactory);
+      ImmutablePointerSetFactory<SILInstruction *> &SetFactory);
   DataflowResult visitAutoreleasePoolCall(SILNode *N);
   DataflowResult visitStrongDecrement(SILNode *N);
   DataflowResult visitStrongIncrement(SILNode *N);

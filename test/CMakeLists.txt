@@ -311,6 +311,10 @@ foreach(SDK ${SWIFT_SDKS})
         endif()
       endif()
 
+      if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET "embedded-stdlib")
+        list(APPEND test_dependencies "embedded-stdlib")
+      endif()
+
       if(NOT "${COVERAGE_DB}" STREQUAL "")
         list(APPEND test_dependencies "touch-covering-tests")
       endif()

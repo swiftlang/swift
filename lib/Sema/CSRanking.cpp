@@ -88,15 +88,23 @@ static bool shouldIgnoreScoreIncreaseForCodeCompletion(
     return true;
   }
 
-  // The sibling argument is the code completion expression, this allows e.g.
-  // non-default literal values in sibling arguments.
-  // E.g. we allow a 1 to be a double in
-  // foo(1, #^COMPLETE^#)
   if (auto parent = cs.getParentExpr(expr)) {
+    // The sibling argument is the code completion expression, this allows e.g.
+    // non-default literal values in sibling arguments.
+    // E.g. we allow a 1 to be a double in
+    // foo(1, #^COMPLETE^#)
     if (exprHasCodeCompletionAsArgument(parent, cs)) {
       return true;
     }
+    // If we are completing a member of a literal, consider completion results
+    // for all possible literal types. E.g. show completion results for `let a:
+    // Double = 1.#^COMPLETE^#
+    if (isa_and_nonnull<CodeCompletionExpr>(parent) &&
+        kind == SK_NonDefaultLiteral) {
+      return true;
+    }
   }
+
   return false;
 }
 

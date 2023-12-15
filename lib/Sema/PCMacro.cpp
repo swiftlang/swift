@@ -142,10 +142,10 @@ public:
     transformStmtCondition(SC, IS->getStartLoc());
     IS->setCond(SC); // FIXME: is setting required?..
 
-    if (Stmt *TS = IS->getThenStmt()) {
-      Stmt *NTS = transformStmt(TS);
+    if (auto *TS = IS->getThenStmt()) {
+      auto *NTS = transformStmt(TS);
       if (NTS != TS) {
-        IS->setThenStmt(NTS);
+        IS->setThenStmt(cast<BraceStmt>(NTS));
       }
     }
 

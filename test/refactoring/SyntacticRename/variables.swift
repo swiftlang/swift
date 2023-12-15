@@ -38,6 +38,7 @@ struct S {
 	}()
 }
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="var-y" -old-name "y" -new-name "yack" >> %t.result/variables_var-y.swift
 // RUN: diff -u %S/Outputs/variables/var-y.swift.expected %t.result/variables_var-y.swift

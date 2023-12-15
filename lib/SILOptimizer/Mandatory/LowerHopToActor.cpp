@@ -1,4 +1,4 @@
-//===------- LowerHopToExecutor.cpp - Lower hop_to_executor on actors -----===//
+//===------- LowerHopToActor.cpp - Lower hop_to_executor on actors --------===//
 //
 // This source file is part of the Swift.org open source project
 //

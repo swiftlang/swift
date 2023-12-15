@@ -15,18 +15,6 @@
 import Foundation
 import SymbolicationShims
 
-enum Std {
-  struct File: TextOutputStream {
-    var underlying: UnsafeMutablePointer<FILE>
-
-    mutating func write(_ string: String) {
-      fputs(string, underlying)
-    }
-  }
-
-  static var err = File(underlying: stderr)
-}
-
 private let symbolicationPath =
   "/System/Library/PrivateFrameworks/Symbolication.framework/Symbolication"
 private let symbolicationHandle = dlopen(symbolicationPath, RTLD_LAZY)!
@@ -45,6 +33,8 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
 enum Sym {
   static let pidFromHint: @convention(c) (AnyObject) -> pid_t =
     symbol(symbolicationHandle, "pidFromHint")
+  static let CSRelease: @convention(c) (CSTypeRef) -> Void =
+    symbol(coreSymbolicationHandle, "CSRelease")
   static let CSSymbolicatorCreateWithTask: @convention(c) (task_t) -> CSTypeRef =
     symbol(coreSymbolicationHandle, "CSSymbolicatorCreateWithTask")
   static let CSSymbolicatorGetSymbolOwnerWithNameAtTime:
@@ -112,6 +102,10 @@ func pidFromHint(_ hint: String) -> pid_t? {
   return result == 0 ? nil : result
 }
 
+func CSRelease(_ sym: CSTypeRef) -> Void {
+  Sym.CSRelease(sym)
+}
+
 func CSSymbolicatorCreateWithTask(_ task: task_t) -> CSTypeRef {
   Sym.CSSymbolicatorCreateWithTask(task)
 }
@@ -133,7 +127,7 @@ func CSSymbolOwnerForeachSymbol(
 }
 
 func CSSymbolOwnerGetSymbolWithMangledName(
-  _ owner: CSTypeRef, 
+  _ owner: CSTypeRef,
   _ name: String
 ) -> CSTypeRef {
   Sym.CSSymbolOwnerGetSymbolWithMangledName(owner, name)
@@ -196,7 +190,7 @@ func task_start_peeking(_ task: task_t) -> Bool {
   if result == KERN_SUCCESS {
     return true
   }
-  
+
   print("task_start_peeking failed: \(machErrStr(result))", to: &Std.err)
   return false
 }

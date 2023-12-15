@@ -59,8 +59,7 @@ using namespace constraints;
 
 static Type
 getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
-                                   ConcreteDeclRef &referencedDecl,
-                                 FreeTypeVariableBinding allowFreeTypeVariables) {
+                                   ConcreteDeclRef &referencedDecl) {
   if (isa<AbstractClosureExpr>(dc)) {
     // If the expression is embedded in a closure, the constraint system tries
     // to retrieve that closure's type, which will fail since we won't have
@@ -95,15 +94,18 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
     expr->setType(Type());
   SyntacticElementTarget target(expr, dc, CTP_Unused, Type(),
                                 /*isDiscarded=*/false);
-  auto viable = cs.solve(target, allowFreeTypeVariables);
-  if (!viable) {
+
+  SmallVector<Solution, 2> viable;
+  cs.solveForCodeCompletion(target, viable);
+
+  if (viable.empty()) {
     recoverOriginalType();
     return Type();
   }
 
   // Get the expression's simplified type.
   expr = target.getAsExpr();
-  auto &solution = (*viable)[0];
+  auto &solution = viable.front();
   auto &solutionCS = solution.getConstraintSystem();
   Type exprType = solution.simplifyType(solutionCS.getType(expr));
 
@@ -332,8 +334,8 @@ getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
   }
 
   Type originalType = parsedExpr->getType();
-  if (auto T = getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                 referencedDecl, FreeTypeVariableBinding::UnresolvedType))
+  if (auto T =
+          getTypeOfExpressionWithoutApplying(parsedExpr, DC, referencedDecl))
     return T;
 
   // Try to recover if we've made any progress.

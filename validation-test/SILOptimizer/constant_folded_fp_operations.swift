@@ -3,6 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-sil -O -suppress-warnings -verify %t/constant_folded_fp_operation_validation.swift 2>&1 | %FileCheck --check-prefix=CHECK-SIL %t/constant_folded_fp_operation_validation.swift
 // RUN: %target-build-swift -O -suppress-warnings %t/constant_folded_fp_operation_validation.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test,optimized_stdlib

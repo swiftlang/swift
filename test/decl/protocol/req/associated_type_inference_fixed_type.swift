@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
 
 protocol P1 where A == Never {
   associatedtype A

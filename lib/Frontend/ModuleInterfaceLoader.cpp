@@ -211,10 +211,10 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    StringRef requiredSDK,
-                                    bool requiresRevisionMatch) {
-  auto VI = serialization::validateSerializedAST(
-      buf.getBuffer(), requiresOSSAModules, requiredSDK, requiresRevisionMatch);
+                                    StringRef requiredSDK) {
+  auto VI = serialization::validateSerializedAST(buf.getBuffer(),
+                                                 requiresOSSAModules,
+                                                 requiredSDK);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -462,7 +462,6 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
-        !ctx.LangOpts.DebuggerSupport,
         /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
@@ -621,8 +620,7 @@ class ModuleInterfaceLoaderImpl {
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get(), requiresOSSAModules,
-                                            ctx.LangOpts.SDKName,
-                                            !ctx.LangOpts.DebuggerSupport))
+                                                           ctx.LangOpts.SDKName))
       return false;
 
     // Next, check the dependencies in the forwarding file.
@@ -1756,17 +1754,32 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     clangImporterOpts.DetailedPreprocessingRecord;
   subClangImporterOpts.CASOpts = clangImporterOpts.CASOpts;
 
-  // If the compiler has been asked to be strict with ensuring downstream dependencies
-  // get the parent invocation's context, or this is an Explicit build, inherit the
-  // extra Clang arguments also.
-  if (LoaderOpts.strictImplicitModuleContext || LoaderOpts.disableImplicitSwiftModule ||
-      LoaderOpts.requestedAction == FrontendOptions::ActionType::ScanDependencies) {
-    // Inherit any clang-specific state of the compilation (macros, clang flags, etc.)
-    subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
-    for (auto arg : subClangImporterOpts.ExtraArgs) {
-      GenericArgs.push_back("-Xcc");
-      GenericArgs.push_back(ArgSaver.save(arg));
-    }
+  std::vector<std::string> inheritedParentContextClangArgs;
+  if (LoaderOpts.requestedAction ==
+      FrontendOptions::ActionType::ScanDependencies) {
+    // For a dependency scanning action, interface build command generation must
+    // inherit
+    // `-Xcc` flags used for configuration of the building instance's
+    // `ClangImporter`. However, we can ignore Clang search path flags because
+    // explicit Swift module build tasks will not rely on them and they may be
+    // source-target-context-specific and hinder module sharing across
+    // compilation source targets.
+    // Clang module dependecies of this Swift dependency will be distinguished by
+    // their context hash for different variants, so would still cause a difference
+    // in the Swift compile commands, when different.
+    inheritedParentContextClangArgs =
+        clangImporterOpts.getReducedExtraArgsForSwiftModuleDependency();
+  } else if (LoaderOpts.strictImplicitModuleContext) {
+    // If the compiler has been asked to be strict with ensuring downstream
+    // dependencies get the parent invocation's context, inherit the extra Clang
+    // arguments also. Inherit any clang-specific state of the compilation
+    // (macros, clang flags, etc.)
+    inheritedParentContextClangArgs = clangImporterOpts.ExtraArgs;
+  }
+  subClangImporterOpts.ExtraArgs = inheritedParentContextClangArgs;
+  for (auto arg : subClangImporterOpts.ExtraArgs) {
+    GenericArgs.push_back("-Xcc");
+    GenericArgs.push_back(ArgSaver.save(arg));
   }
 
   subClangImporterOpts.EnableClangSPI = clangImporterOpts.EnableClangSPI;
@@ -2007,8 +2020,13 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 
   ForwardingDiagnosticConsumer FDC(*Diags);
-  if (!silenceErrors)
+  NullDiagnosticConsumer noopConsumer;
+  if (!silenceErrors) {
     subInstance.addDiagnosticConsumer(&FDC);
+  } else {
+    subInstance.addDiagnosticConsumer(&noopConsumer);
+  }
+
   std::string InstanceSetupError;
   if (subInstance.setup(subInvocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
@@ -2226,9 +2244,24 @@ bool ExplicitSwiftModuleLoader::canImportModule(
                        it->second.modulePath);
     return false;
   }
+
+  // If it's a forwarding module, load the YAML file from disk and get the path
+  // to the actual module for the version check.
+  if (!serialization::isSerializedAST((*moduleBuf)->getBuffer())) {
+    if (auto forwardingModule = ForwardingModule::load(**moduleBuf)) {
+      moduleBuf = fs.getBufferForFile(forwardingModule->underlyingModulePath);
+      if (!moduleBuf) {
+        Ctx.Diags.diagnose(SourceLoc(),
+                           diag::error_opening_explicit_module_file,
+                           forwardingModule->underlyingModulePath);
+        return false;
+      }
+    }
+  }
+
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName, !Ctx.LangOpts.DebuggerSupport);
+      Ctx.LangOpts.SDKName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;
@@ -2559,7 +2592,7 @@ bool ExplicitCASModuleLoader::canImportModule(
   }
   auto metaData = serialization::validateSerializedAST(
       (*moduleBuf)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName, !Ctx.LangOpts.DebuggerSupport);
+      Ctx.LangOpts.SDKName);
   versionInfo->setVersion(metaData.userModuleVersion,
                           ModuleVersionSourceKind::SwiftBinaryModule);
   return true;

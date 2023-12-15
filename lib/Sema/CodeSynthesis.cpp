@@ -826,6 +826,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 static void diagnoseMissingRequiredInitializer(
               ClassDecl *classDecl,
               ConstructorDecl *superInitializer,
+              bool downgradeToWarning,
               ASTContext &ctx) {
   // Find the location at which we should insert the new initializer.
   SourceLoc insertionLoc;
@@ -906,6 +907,7 @@ static void diagnoseMissingRequiredInitializer(
   ctx.Diags.diagnose(insertionLoc, diag::required_initializer_missing,
                      superInitializer->getName(),
                      superInitializer->getDeclContext()->getDeclaredInterfaceType())
+    .warnUntilSwiftVersionIf(downgradeToWarning, 6)
     .fixItInsert(insertionLoc, initializerText);
 
   ctx.Diags.diagnose(findNonImplicitRequiredInit(superInitializer),
@@ -1172,10 +1174,11 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   bool defaultInitable =
       areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
 
-  // We can't define these overrides if we have any uninitialized
-  // stored properties.
-  if (!defaultInitable && !foundDesignatedInit)
-    return;
+  // In cases where we can't define any overrides, we used to suppress
+  // diagnostics about missing required initializers. Now we emit diagnostics,
+  // but downgrade them to warnings prior to Swift 6.
+  bool downgradeRequiredInitsToWarning =
+      !defaultInitable && !foundDesignatedInit;
 
   SmallVector<ConstructorDecl *, 4> nonOverriddenSuperclassCtors;
   collectNonOveriddenSuperclassInits(decl, nonOverriddenSuperclassCtors);
@@ -1187,8 +1190,10 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
       if (superclassCtor->isRequired()) {
         assert(superclassCtor->isInheritable() &&
                "factory initializers cannot be 'required'");
-        if (!decl->inheritsSuperclassInitializers())
-          diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
+        if (!decl->inheritsSuperclassInitializers()) {
+          diagnoseMissingRequiredInitializer(
+              decl, superclassCtor, downgradeRequiredInitsToWarning, ctx);
+        }
       }
       continue;
     }
@@ -1204,11 +1209,17 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 
     // Diagnose a missing override of a required initializer.
     if (superclassCtor->isRequired() && !inheritDesignatedInits) {
-      diagnoseMissingRequiredInitializer(decl, superclassCtor, ctx);
+      diagnoseMissingRequiredInitializer(
+          decl, superclassCtor, downgradeRequiredInitsToWarning, ctx);
       continue;
     }
 
     // A designated or required initializer has not been overridden.
+
+    // We can't define any overrides if we have any uninitialized
+    // stored properties.
+    if (!defaultInitable && !foundDesignatedInit)
+      continue;
 
     bool alreadyDeclared = false;
 

@@ -365,6 +365,22 @@ public:
     return decomposeFunction(fn);
   }
 
+  bool isPreconcurrency() const {
+    switch (getKind()) {
+    case Kind::Closure: {
+      auto *closure = dyn_cast<ClosureExpr>(getClosure());
+      return closure && closure->isIsolatedByPreconcurrency();
+    }
+
+    case Kind::Function:
+      return getActorIsolation(getFunction()).preconcurrency();
+
+    case Kind::Opaque:
+    case Kind::Parameter:
+      return false;
+    }
+  }
+
   static AbstractFunction decomposeFunction(Expr *fn) {
     assert(fn->getValueProvidingExpr() == fn);
 
@@ -718,6 +734,8 @@ static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
 class Classification {
   bool IsInvalid = false;  // The AST is malformed.  Don't diagnose.
 
+  bool downgradeToWarning = false;
+
   // Throwing
   ConditionalEffectKind ThrowKind = ConditionalEffectKind::None;
   llvm::Optional<PotentialEffectReason> ThrowReason;
@@ -937,8 +955,10 @@ public:
     }
 
     if (ThrowKind != ConditionalEffectKind::None ||
-        other.ThrowKind != ConditionalEffectKind::None)
-      ThrownError = TypeChecker::errorUnion(ThrownError, other.ThrownError);
+        other.ThrowKind != ConditionalEffectKind::None) {
+      ThrownError =
+          TypeChecker::errorUnion(ThrownError, other.ThrownError, nullptr);
+      }
 
     if (other.ThrowKind > ThrowKind) {
       ThrowKind = other.ThrowKind;
@@ -967,6 +987,13 @@ public:
 
   bool isInvalid() const { return IsInvalid; }
   void makeInvalid() { IsInvalid = true; }
+
+  bool shouldDowngradeToWarning() const {
+    return downgradeToWarning;
+  }
+  void setDowngradeToWarning(bool downgrade) {
+    downgradeToWarning = downgrade;
+  }
 
   ConditionalEffectKind getConditionalKind(EffectKind kind) const {
     switch (kind) {
@@ -1044,6 +1071,30 @@ public:
     return Classification();
   }
 
+  /// Whether a missing 'await' error on accessing an async var should be
+  /// downgraded to a warning.
+  ///
+  /// Missing 'await' errors are downgraded for synchronous access to isolated
+  /// global or static 'let' variables, which was previously accepted in
+  /// compiler versions before 5.10, or for declarations marked preconcurrency.
+  bool downgradeAsyncAccessToWarning(Decl *decl) {
+    if (decl->preconcurrency()) {
+      return true;
+    }
+
+    if (auto *var = dyn_cast<VarDecl>(decl)) {
+      ActorReferenceResult::Options options = llvm::None;
+      // The newly-diagnosed cases are invalid regardless of the module context
+      // of the caller, i.e. isolated static and global 'let' variables.
+      auto *module = var->getDeclContext()->getParentModule();
+      if (!isLetAccessibleAnywhere(module, var, options)) {
+        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+      }
+    }
+
+    return false;
+  }
+
   Classification classifyLookup(LookupExpr *E) {
     auto member = E->getMember();
     if (!member)
@@ -1059,6 +1110,9 @@ public:
     } else if (isa<SubscriptExpr>(E) || isa<DynamicSubscriptExpr>(E)) {
       reason = PotentialEffectReason::forSubscriptAccess();
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(member.getDecl()));
 
     classification.mergeImplicitEffects(
         member.getDecl()->getASTContext(),
@@ -1085,6 +1139,9 @@ public:
       classification = Classification::forDeclRef(
           declRef, ConditionalEffectKind::Always, reason);
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(E->getDecl()));
 
     classification.mergeImplicitEffects(
         E->getDeclRef().getDecl()->getASTContext(),
@@ -1159,6 +1216,10 @@ public:
     result.mergeImplicitEffects(
         ctx, E->isImplicitlyAsync().has_value(), E->implicitlyThrows(),
         PotentialEffectReason::forApply());
+
+    // Downgrade missing 'await' errors for preconcurrency references.
+    result.setDowngradeToWarning(
+        result.hasAsync() && fnRef.isPreconcurrency());
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
@@ -2548,15 +2609,20 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
-                   PotentialEffectReason reason) :
+                   PotentialEffectReason reason,
+                   bool downgradeToWarning) :
       reason(reason),
-      expr(failingExpr) {}
+      expr(failingExpr),
+      downgradeToWarning(downgradeToWarning) {}
 
     /// Reason for throwing
     PotentialEffectReason reason;
 
     /// Failing expression
     Expr &expr;
+
+    /// Whether the error should be downgraded to a warning.
+    bool downgradeToWarning;
   };
 
   SmallVector<Expr *, 4> errorOrder;
@@ -2751,7 +2817,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// Retrieve the type of the error that can be caught when an error is
   /// thrown from the given location.
   Type getCaughtErrorTypeAt(SourceLoc loc) {
-    auto module = CurContext.getDeclContext()->getParentModule();
+    auto dc = CurContext.getDeclContext();
+    auto module = dc->getParentModule();
     if (CatchNode catchNode = ASTScope::lookupCatchNode(module, loc)) {
       if (auto caughtType = catchNode.getThrownErrorTypeInContext(Ctx))
         return *caughtType;
@@ -3113,8 +3180,9 @@ private:
                                     CurContext.isWithinInterpolatedString());
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
-        uncoveredAsync[anchor].emplace_back(*expr,
-                                            classification.getAsyncReason());
+        uncoveredAsync[anchor].emplace_back(
+            *expr, classification.getAsyncReason(),
+            classification.shouldDowngradeToWarning());
       }
     }
 
@@ -3335,7 +3403,13 @@ private:
         awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
     }
 
+    bool downgradeToWarning = llvm::all_of(errors,
+        [&](DiagnosticInfo diag) -> bool {
+          return diag.downgradeToWarning;
+        });
+
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
+      .warnUntilSwiftVersionIf(downgradeToWarning, 6)
       .fixItInsert(awaitInsertLoc, "await ")
       .highlight(anchor->getSourceRange());
 
@@ -3510,15 +3584,16 @@ llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   return classification.getThrownError();
 }
 
-Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
-  // When typed throws is disabled, this is always "any Error".
-  // FIXME: When we distinguish "precise" typed throws from normal typed
-  // throws, we'll be able to compute a more narrow catch error type in some
-  // case, e.g., from a `try` but not a `throws`.
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
-    return ctx.getErrorExistentialType();
+Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
+  ASTContext &ctx = dc->getASTContext();
 
-  // Classify the throwing behavior of the "do" body.
+  // If the do..catch statement explicitly specifies that it throws, use
+  // that type.
+  if (Type explicitError = stmt->getExplicitCaughtType()) {
+    return explicitError;
+  }
+
+  // Otherwise, infer the thrown error type from the "do" body.
   ApplyClassifier classifier(ctx);
   Classification classification = classifier.classifyStmt(
       stmt->getBody(), EffectKind::Throws);
@@ -3530,27 +3605,83 @@ Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
   return classification.getThrownError();
 }
 
-Type TypeChecker::errorUnion(Type type1, Type type2) {
+/// Explode the given type into the set of error unions.
+///
+/// \returns \c true if any of the types is the error existential type, which
+/// means the entire error union is any Error.
+static bool expandErrorUnions(Type type,
+                              llvm::function_ref<Type(Type)> simplifyType,
+                              SmallVectorImpl<Type> &terms) {
+  // If we have a type variable in the type and a type simplification function,
+  // apply it first.
+  if (type->hasTypeVariable() && simplifyType)
+    type = simplifyType(type);
+
+  // If we have an error union type, handle it's terms individually.
+  if (auto errorUnionType = type->getAs<ErrorUnionType>()) {
+    for (auto term : errorUnionType->getTerms())
+      if (expandErrorUnions(term, simplifyType, terms))
+        return true;
+
+    return false;
+  }
+
+  // If we have 'any Error', we're done.
+  if (type->isErrorExistentialType())
+    return true;
+
+  // If we have anything other than 'Never', record it.
+  if (!isNeverThrownError(type))
+    terms.push_back(type);
+
+  return false;
+}
+
+Type TypeChecker::errorUnion(Type type1, Type type2,
+                             llvm::function_ref<Type(Type)> simplifyType) {
   // If one type is NULL, return the other.
   if (!type1)
     return type2;
   if (!type2)
     return type1;
 
-  // If the two types are the same, the union is trivial.
-  if (type1->isEqual(type2))
-    return type1;
+  // Expand the error types we're given.
+  //   - If any term is 'any Error', early return 'any Error'
+  //   - Every 'Never' term is dropped.
+  SmallVector<Type, 2> terms;
+  if (expandErrorUnions(type1, simplifyType, terms))
+    return type1->getASTContext().getErrorExistentialType();
+  if (expandErrorUnions(type2, simplifyType, terms))
+    return type1->getASTContext().getErrorExistentialType();
 
-  // If either type is Never, return the other.
-  if (isNeverThrownError(type1))
-    return type2;
-  if (isNeverThrownError(type2))
-    return type1;
+  // If we have more than one term, filter out duplicates and look to see if
+  // we have obviously-different types.
+  if (terms.size() > 1) {
+    llvm::SmallDenseMap<CanType, Type> knownTypes;
+    unsigned distinctConcreteTypes = 0;
+    auto newEnd = std::remove_if(terms.begin(), terms.end(),
+                                 [&](Type type) -> bool {
+      // If we have already seen this type, remove it from the list of terms.
+      if (!knownTypes.insert({type->getCanonicalType(), type}).second)
+        return true;
 
-  // The union of two different error types is "any Error".
-  // FIXME: When either or both contain type variables, we'll need to form an
-  // actual union type here.
-  return type1->getASTContext().getErrorExistentialType();
+      // We have not seen this type before. If it doesn't involve any
+      // type variables, note that we've seen another concrete type.
+      if (!type->hasTypeVariable())
+        ++distinctConcreteTypes;
+
+      return false;
+    });
+
+    // If we saw more than one distinct concrete type, return 'any Error'.
+    if (distinctConcreteTypes > 1)
+      return type1->getASTContext().getErrorExistentialType();
+
+    // Remove any duplicated terms.
+    terms.erase(newEnd, terms.end());
+  }
+
+  return ErrorUnionType::get(type1->getASTContext(), terms);
 }
 
 namespace {

@@ -4547,13 +4547,12 @@ llvm::Value *irgen::addEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
   return taskOptions;
 }
 
-llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
-                                   llvm::Value *taskGroup,
-                                   llvm::Value *futureResultType,
-                                   llvm::Value *taskFunction,
-                                   llvm::Value *localContextInfo,
-                                   SubstitutionMap subs) {
-  // Start with empty task options.
+llvm::Value *
+irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+                      llvm::Value *taskGroup, llvm::Value *executorIdentity,
+                      llvm::Value *executorImpl, llvm::Value *futureResultType,
+                      llvm::Value *taskFunction, llvm::Value *localContextInfo,
+                      SubstitutionMap subs) {
   llvm::Value *taskOptions =
       llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
 
@@ -4573,12 +4572,43 @@ llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
     IGF.Builder.CreateStore(
         optionsFlagsVal,
         IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
+
     // Parent
     IGF.Builder.CreateStore(
         taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
+
     // TaskGroup
     IGF.Builder.CreateStore(
         taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+
+    taskOptions = IGF.Builder.CreateBitOrPointerCast(
+        optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
+  }
+
+  // If there is an executor, emit an executor option to contain it.
+  if (executorIdentity) {
+    assert(executorImpl &&
+           "second executor field must be present when first was");
+    TaskOptionRecordFlags optionsFlags(
+        TaskOptionRecordKind::InitialTaskExecutor);
+    llvm::Value *optionsFlagsVal =
+        llvm::ConstantInt::get(IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
+
+    auto optionsRecord = IGF.createAlloca(
+        IGF.IGM.SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy,
+        Alignment(), "executor_options");
+    auto optionsBaseRecord =
+        IGF.Builder.CreateStructGEP(optionsRecord, 0, Size());
+    IGF.Builder.CreateStore(optionsFlagsVal, IGF.Builder.CreateStructGEP(
+                                                 optionsBaseRecord, 0, Size()));
+    IGF.Builder.CreateStore(
+        taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
+
+    auto executorRecord = IGF.Builder.CreateStructGEP(optionsRecord, 1, Size());
+    IGF.Builder.CreateStore(executorIdentity, IGF.Builder.CreateStructGEP(
+                                                  executorRecord, 0, Size()));
+    IGF.Builder.CreateStore(
+        executorImpl, IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
 
     taskOptions = IGF.Builder.CreateBitOrPointerCast(
         optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
@@ -4750,6 +4780,13 @@ Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync,
     cast<FixedTypeInfo>(getTypeInfo(errorType)).getStorageType();
   auto errorAlignment  = isTypedError ? IGM.getPointerAlignment() :
     cast<FixedTypeInfo>(getTypeInfo(errorType)).getFixedAlignment();
+
+  // Pass an address for zero sized types.
+  if (!isTypedError && !setSwiftErrorFlag &&
+      cast<FixedTypeInfo>(getTypeInfo(errorType)).getFixedSize() == Size(0)) {
+    errorStorageType = IGM.Int8PtrTy;
+    errorAlignment = IGM.getPointerAlignment();
+  }
 
   // Create the alloca.  We don't use allocateStack because we're
   // not allocating this in stack order.

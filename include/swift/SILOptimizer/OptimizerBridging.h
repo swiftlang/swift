@@ -17,6 +17,9 @@
 // Function implementations should be placed into OptimizerBridgingImpl.h or PassManager.cpp
 // (under OptimizerBridging) andrequired header files should be added there.
 //
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+//
 #include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
 
@@ -26,6 +29,8 @@
 
 #else // USED_IN_CPP_SOURCE
 
+// Pure bridging mode does not permit including any C++/llvm/swift headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 #ifdef SWIFT_SIL_SILVALUE_H
 #error "should not include swift headers into bridging header"
 #endif
@@ -168,6 +173,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedChangeNotificationHandler asNotificationHandler() const;
   BRIDGED_INLINE SILStage getSILStage() const;
   BRIDGED_INLINE bool hadError() const;
+  BRIDGED_INLINE bool moduleIsSerialized() const;
 
   // Analysis
 
@@ -195,6 +201,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock createBlockAfter(BridgedBasicBlock bridgedBlock) const;
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
+  static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   bool tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const;
   bool tryDeleteDeadClosure(BridgedInstruction closure, bool needKeepArgsAlive) const;
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
@@ -270,6 +277,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
 
   // Passmanager housekeeping
 
@@ -293,7 +301,7 @@ struct BridgedPassContext {
   };
 
   BRIDGED_INLINE bool enableStackProtection() const;
-  BRIDGED_INLINE bool enableEmbeddedSwift() const;
+  BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;

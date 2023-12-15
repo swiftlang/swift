@@ -37,7 +37,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ClassBound> { var τ_0_0 } <T>
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -54,7 +54,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ClassBound, τ_0_0 : NotClassBound> { var τ_0_0 } <T>
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -69,7 +69,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $any ClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box ${ var any ClassBound }
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -85,7 +85,7 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $any ClassBound & NotClassBound):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box ${ var any ClassBound & NotClassBound }
-  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_ADDR]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X_ADDR]]
   // CHECK:   [[PB:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
@@ -131,7 +131,7 @@ func class_bound_method(x: ClassBound) {
   var x = x
   x.classBoundMethod()
   // CHECK: [[XBOX:%.*]] = alloc_box ${ var any ClassBound }, var, name "x"
-  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[XBOX]]
   // CHECK: [[XBOX_PB:%.*]] = project_box [[XLIFETIME]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[XBOX_PB]]

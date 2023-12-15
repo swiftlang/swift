@@ -63,6 +63,7 @@ class DecodableSuper : Decodable {
 
 // expected-note@+1 {{did you mean to override 'init(from:)'?}}{{+1:1-1=\noverride init(from decoder: Decoder) throws {\n    <#code#>\n\}}}
 class DecodableSubWithoutInitialValue : DecodableSuper { // expected-error {{class 'DecodableSubWithoutInitialValue' has no initializers}}
+// expected-warning{{'required' initializer 'init(from:)' must be provided by subclass of 'DecodableSuper'}}
   var value2: Int // expected-note {{stored property 'value2' without initial value prevents synthesized initializers}}
 }
 
@@ -78,6 +79,7 @@ class CodableSuper : Codable {
 
 // expected-note@+1 {{did you mean to override 'init(from:)' and 'encode(to:)'?}}{{+1:1-1=\noverride init(from decoder: Decoder) throws {\n    <#code#>\n\}\n\noverride func encode(to encoder: Encoder) throws {\n    <#code#>\n\}}}
 class CodableSubWithoutInitialValue : CodableSuper { // expected-error {{class 'CodableSubWithoutInitialValue' has no initializers}}
+  // expected-warning{{'required' initializer 'init(from:)' must be provided by subclass of 'CodableSuper'; this is an error in Swift 6}}
   var value2: Int // expected-note {{stored property 'value2' without initial value prevents synthesized initializers}}
 }
 
@@ -86,6 +88,7 @@ class CodableSubWithoutInitialValue : CodableSuper { // expected-error {{class '
 //
 // expected-note@+1 {{did you mean to override 'init(from:)'?}}{{+1:1-1=\noverride init(from decoder: Decoder) throws {\n    <#code#>\n\}}}
 class EncodableSubWithoutInitialValue : CodableSuper { // expected-error {{class 'EncodableSubWithoutInitialValue' has no initializers}}
+  // expected-warning{{'required' initializer 'init(from:)' must be provided by subclass of 'CodableSuper'; this is an error in Swift 6}}
   var value2: Int // expected-note {{stored property 'value2' without initial value prevents synthesized initializers}}
 
   override func encode(to: Encoder) throws {}

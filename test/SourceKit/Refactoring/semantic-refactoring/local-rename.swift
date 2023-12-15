@@ -11,6 +11,7 @@ func foo() {
   return 1
 }
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=find-local-rename-ranges -pos=2:8 %s -- %s | %FileCheck %s --check-prefix CHECK-aa
 

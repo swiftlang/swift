@@ -415,6 +415,9 @@ public:
   /// are present at LTO time.
   bool HermeticSealAtLink = false;
 
+  /// Disable using the sandbox when executing subprocesses.
+  bool DisableSandbox = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-async-top-level -warn-concurrency -typecheck -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-async-top-level -strict-concurrency=complete -typecheck -verify %s
 
 var a = 10 // expected-note{{var declared here}}
 

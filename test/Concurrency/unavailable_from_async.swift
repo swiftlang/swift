@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/UnavailableFunction.swiftmodule -module-name UnavailableFunction -warn-concurrency %S/Inputs/UnavailableFunction.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/UnavailableFunction.swiftmodule -module-name UnavailableFunction -strict-concurrency=complete %S/Inputs/UnavailableFunction.swift
 // RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null
 // RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=targeted
 // RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=complete

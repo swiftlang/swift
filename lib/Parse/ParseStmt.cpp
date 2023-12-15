@@ -1862,7 +1862,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
                                 ErrorExpr(ThePattern.get()->getEndLoc()));
   }
 
-  result.push_back({IntroducerLoc, ThePattern.get(), Init.get()});
+  result.push_back(ConditionalPatternBindingInfo::create(
+      Context, IntroducerLoc, ThePattern.get(), Init.get()));
   return Status;
 }
 
@@ -2191,8 +2192,8 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 
 /// 
 ///   stmt-do:
-///     (identifier ':')? 'do' stmt-brace
-///     (identifier ':')? 'do' stmt-brace stmt-catch+
+///     (identifier ':')? 'do' throws-clause? stmt-brace
+///     (identifier ':')? 'do' throws-clause? stmt-brace stmt-catch+
 ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
                                        bool shouldSkipDoTokenConsume) {
   SourceLoc doLoc;
@@ -2204,6 +2205,25 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
   }
 
   ParserStatus status;
+
+  // Parse the optional 'throws' clause.
+  SourceLoc throwsLoc;
+  TypeRepr *thrownType = nullptr;
+  if (consumeIf(tok::kw_throws, throwsLoc)) {
+    // Parse the thrown error type.
+    SourceLoc lParenLoc;
+    if (consumeIf(tok::l_paren, lParenLoc)) {
+      ParserResult<TypeRepr> parsedThrownTy =
+          parseType(diag::expected_thrown_error_type);
+      thrownType = parsedThrownTy.getPtrOrNull();
+      status |= parsedThrownTy;
+
+      SourceLoc rParenLoc;
+      parseMatchingToken(
+          tok::r_paren, rParenLoc,
+          diag::expected_rparen_after_thrown_error_type, lParenLoc);
+    }
+  }
 
   ParserResult<BraceStmt> body =
       parseBraceItemList(diag::expected_lbrace_after_do);
@@ -2236,7 +2256,12 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo,
     }
 
     return makeParserResult(status,
-      DoCatchStmt::create(Context, labelInfo, doLoc, body.get(), allClauses));
+      DoCatchStmt::create(CurDeclContext, labelInfo, doLoc, throwsLoc,
+                          thrownType, body.get(), allClauses));
+  }
+
+  if (throwsLoc.isValid()) {
+    diagnose(throwsLoc, diag::do_throws_without_catch);
   }
 
   // If we dont see a 'while' or see a 'while' that starts

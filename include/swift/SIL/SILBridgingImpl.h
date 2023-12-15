@@ -88,12 +88,6 @@ bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
 
-bool BridgedType::selfOrAnyFieldHasValueDeinit(BridgedFunction f) const {
-  swift::SILType contextType = unbridged().hasTypeParameter() ? f.getFunction()->mapTypeIntoContext(unbridged())
-                                                              : unbridged();
-  return f.getFunction()->getTypeLowering(contextType).selfOrAnyFieldHasValueDeinit();
-}
-
 bool BridgedType::isUnownedStorageType() const {
   return unbridged().isUnownedStorageType();
 }
@@ -1262,6 +1256,10 @@ BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
                                        isLexical, wasMoved)};
 }
 
+BridgedInstruction BridgedBuilder::createAllocVector(BridgedValue capacity, BridgedType type) const {
+  return {unbridged().createAllocVector(regularLoc(), capacity.getSILValue(), type.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {
   return {unbridged().createDeallocStack(regularLoc(), operand.getSILValue())};
 }
@@ -1269,6 +1267,12 @@ BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) cons
 BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) const {
   return {
       unbridged().createDeallocStackRef(regularLoc(), operand.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createAddressToPointer(BridgedValue address, BridgedType pointerTy,
+                                                          bool needsStackProtection) const {
+  return {unbridged().createAddressToPointer(regularLoc(), address.getSILValue(), pointerTy.unbridged(),
+                                             needsStackProtection)};
 }
 
 BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, BridgedType type) const {
@@ -1284,6 +1288,10 @@ BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType typ
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {
   return {unbridged().createLoad(regularLoc(), op.getSILValue(),
                                  (swift::LoadOwnershipQualifier)ownership)};
+}
+
+BridgedInstruction BridgedBuilder::createLoadBorrow(BridgedValue op) const {
+  return {unbridged().createLoadBorrow(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createBeginDeallocRef(BridgedValue reference, BridgedValue allocation) const {
@@ -1411,6 +1419,11 @@ BridgedInstruction BridgedBuilder::createObject(BridgedType type,
   return {unbridged().createObject(
       swift::ArtificialUnreachableLocation(), type.unbridged(),
       arguments.getValues(argValues), numBaseElements)};
+}
+
+BridgedInstruction BridgedBuilder::createVector(BridgedValueArray arguments) const {
+  llvm::SmallVector<swift::SILValue, 16> argValues;
+  return {unbridged().createVector(swift::ArtificialUnreachableLocation(), arguments.getValues(argValues))};
 }
 
 BridgedInstruction BridgedBuilder::createGlobalAddr(BridgedGlobalVar global) const {

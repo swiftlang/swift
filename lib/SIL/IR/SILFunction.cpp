@@ -146,6 +146,7 @@ static BridgedFunction::ParseFn parseFunction = nullptr;
 static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
+static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
 
 SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
@@ -248,6 +249,8 @@ SILFunction::~SILFunction() {
          "Not all BasicBlockBitfields deleted at function destruction");
   assert(!newestAliveNodeBitfield &&
          "Not all NodeBitfields deleted at function destruction");
+  assert(!newestAliveOperandBitfield &&
+         "Not all OperandBitfields deleted at function destruction");
 
   if (destroyFunction)
     destroyFunction({this}, &libswiftSpecificData, sizeof(libswiftSpecificData));
@@ -1008,7 +1011,8 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
             WriteFn writeFn, ParseFn parseFn,
             CopyEffectsFn copyEffectsFn,
             GetEffectInfoFn effectInfoFn,
-            GetMemBehaviorFn memBehaviorFn) {
+            GetMemBehaviorFn memBehaviorFn,
+            ArgumentMayReadFn argumentMayReadFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -1017,6 +1021,7 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
   copyEffectsFunction = copyEffectsFn;
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
+  argumentMayReadFunction = argumentMayReadFn;
 }
 
 std::pair<const char *, int>  SILFunction::
@@ -1108,4 +1113,12 @@ MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
 
   auto b = getMemBehvaiorFunction({this}, observeRetains);
   return (MemoryBehavior)b;
+}
+
+// Used by the MemoryLifetimeVerifier
+bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
+  if (!argumentMayReadFunction)
+    return true;
+
+  return argumentMayReadFunction({this}, {argOp}, {addr});
 }

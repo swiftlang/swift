@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_CATCHNODE_H
 #define SWIFT_AST_CATCHNODE_H
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/Decl.h"
@@ -24,7 +25,7 @@ namespace swift {
 /// An AST node that represents a point where a thrown error can be caught and
 /// or rethrown, which includes functions do...catch statements.
 class CatchNode: public llvm::PointerUnion<
-    AbstractFunctionDecl *, AbstractClosureExpr *, DoCatchStmt *
+    AbstractFunctionDecl *, ClosureExpr *, DoCatchStmt *, AnyTryExpr *
   > {
 public:
   using PointerUnion::PointerUnion;
@@ -36,7 +37,23 @@ public:
   /// Returns the thrown error type for a throwing context, or \c llvm::None
   /// if this is a non-throwing context.
   llvm::Optional<Type> getThrownErrorTypeInContext(ASTContext &ctx) const;
+
+  /// Determines the explicitly-specified type error that will be caught by
+  /// this catch node.
+  ///
+  /// Returns the explicitly-caught type, or a NULL type if the caught type
+  /// needs to be inferred.
+  Type getExplicitCaughtType(ASTContext &ctx) const;
+
+  friend llvm::hash_code hash_value(CatchNode catchNode) {
+    using llvm::hash_value;
+    return hash_value(catchNode.getOpaqueValue());
+  }
 };
+
+void simple_display(llvm::raw_ostream &out, CatchNode catchNode);
+
+SourceLoc extractNearestSourceLoc(CatchNode catchNode);
 
 } // end namespace swift
 

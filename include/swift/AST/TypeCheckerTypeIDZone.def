@@ -210,14 +210,15 @@ SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, NoncopyableAnnotationRequest,
-              InverseMarking(TypeDecl *),
+SWIFT_REQUEST(TypeChecker, InvertibleAnnotationRequest,
+              InverseMarking(TypeDecl *, InvertibleProtocolKind),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsNoncopyableRequest,
               bool (CanType),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsEscapableRequest, bool(ValueDecl *),
-              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsEscapableRequest,
+              bool (CanType),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsGetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsImplicitlyUnwrappedOptionalRequest,
@@ -358,8 +359,8 @@ SWIFT_REQUEST(TypeChecker, NeedsNewVTableEntryRequest,
               bool(AbstractFunctionDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ParamSpecifierRequest,
               ParamDecl::Specifier(ParamDecl *), SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ThrownTypeRequest,
-              Type(AbstractFunctionDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExplicitCaughtTypeRequest,
+              Type(ASTContext *, CatchNode), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
@@ -492,6 +493,12 @@ SWIFT_REQUEST(TypeChecker, ExpandSynthesizedMemberMacroRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandPeerMacroRequest,
               ArrayRef<unsigned>(Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExpandPreambleMacroRequest,
+              ArrayRef<unsigned>(AbstractFunctionDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExpandBodyMacroRequest,
+              llvm::Optional<unsigned>(AbstractFunctionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),

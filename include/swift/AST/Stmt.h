@@ -24,6 +24,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/AST/ThrownErrorDestination.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
@@ -385,7 +386,47 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
 };
 
-  
+/// Represent `let`/`var` optional binding, or `case` pattern matching in
+/// conditional statements (i.e. `if`, `guard`, `while`).
+class alignas(8) ConditionalPatternBindingInfo
+    : public ASTAllocated<ConditionalPatternBindingInfo> {
+public:
+  /// Location of the var/let/case keyword.
+  SourceLoc IntroducerLoc;
+
+  /// Pattern being matched. In the case of an "implicit optional" pattern, the
+  /// OptionalSome pattern is explicitly added to this as an 'implicit' pattern.
+  Pattern *ThePattern;
+
+  /// The value for matching.
+  Expr *Initializer;
+
+  ConditionalPatternBindingInfo(SourceLoc IntroducerLoc, Pattern *ThePattern,
+                                Expr *Initializer)
+      : IntroducerLoc(IntroducerLoc), ThePattern(ThePattern),
+        Initializer(Initializer) {}
+
+public:
+  static ConditionalPatternBindingInfo *create(ASTContext &ctx,
+                                               SourceLoc IntroducerLoc,
+                                               Pattern *ThePattern,
+                                               Expr *Initializer) {
+    return new (ctx)
+        ConditionalPatternBindingInfo(IntroducerLoc, ThePattern, Initializer);
+  }
+
+  SourceLoc getIntroducerLoc() const { return IntroducerLoc; }
+  void setIntroducerLoc(SourceLoc Loc) { IntroducerLoc = Loc; }
+  Pattern *getPattern() const { return ThePattern; }
+  void setPattern(Pattern *P) { ThePattern = P; }
+  Expr *getInitializer() const { return Initializer; }
+  void setInitializer(Expr *E) { Initializer = E; }
+
+  SourceRange getSourceRange() const;
+  SourceLoc getStartLoc() const { return getSourceRange().Start; };
+  SourceLoc getEndLoc() const { return getSourceRange().End; };
+};
+
 /// An expression that guards execution based on whether the run-time
 /// configuration supports a given API, e.g.,
 /// #available(OSX >= 10.9, iOS >= 7.0).
@@ -504,46 +545,39 @@ public:
   }
 };
 
-/// This represents an entry in an "if" or "while" condition.  Pattern bindings
-/// can bind any number of names in the pattern binding decl, and may have an
-/// associated where clause.  When "if let" is involved, an arbitrary number of
-/// pattern bindings and conditional expressions are permitted, e.g.:
+/// This represents an entry in an "if" or "while" condition.
+/// Either a boolean expression, optional binding, pattern matching,
+/// `#available`, or `#_hasSymbol`.
 ///
-///   if let x = ..., y = ... where x > y,
-///      let z = ...
-/// which would be represented as four StmtConditionElement entries, one for
-/// the "x" binding, one for the "y" binding, one for the where clause, one for
-/// "z"'s binding.  A simple "if" statement is represented as a single binding.
+/// E.g. this 'if' statement has 5 'StmtConditionElement'.
+///   if
+///     list.count == 1,                          // CK_Boolean
+///     let firstElem = list.first,               // CK_PatternBinding
+///     case .foo(let value?, "int") = firstElem, // CK_PatternBinding
+///     #available(myOS 13),                      // CK_Availability
+///     #_hasSymbol(MyStruct.peform(operation:))  // CK_HasSymbol
+///   { ... }
 ///
 class alignas(1 << PatternAlignInBits) StmtConditionElement {
-  /// If this is a pattern binding, it may be the first one in a declaration, in
-  /// which case this is the location of the var/let/case keyword.  If this is
-  /// the second pattern (e.g. for 'y' in "var x = ..., y = ...") then this
-  /// location is invalid.
-  SourceLoc IntroducerLoc;
-
-  /// In a pattern binding, this is pattern being matched.  In the case of an
-  /// "implicit optional" pattern, the OptionalSome pattern is explicitly added
-  /// to this as an 'implicit' pattern.
-  Pattern *ThePattern = nullptr;
-
-  /// This is either the boolean condition, the #available information, or
-  /// the #_hasSymbol information.
-  llvm::PointerUnion<Expr *, PoundAvailableInfo *, PoundHasSymbolInfo *>
+private:
+  llvm::PointerUnion<Expr *, ConditionalPatternBindingInfo *,
+                     PoundAvailableInfo *, PoundHasSymbolInfo *>
       Condition;
 
 public:
-  StmtConditionElement() {}
-  StmtConditionElement(SourceLoc IntroducerLoc, Pattern *ThePattern, Expr *Init)
-      : IntroducerLoc(IntroducerLoc), ThePattern(ThePattern), Condition(Init) {}
+  StmtConditionElement() : Condition(nullptr) {}
   StmtConditionElement(Expr *cond) : Condition(cond) {}
-
+  StmtConditionElement(ConditionalPatternBindingInfo *Info) : Condition(Info) {}
   StmtConditionElement(PoundAvailableInfo *Info) : Condition(Info) {}
-
   StmtConditionElement(PoundHasSymbolInfo *Info) : Condition(Info) {}
 
-  SourceLoc getIntroducerLoc() const { return IntroducerLoc; }
-  void setIntroducerLoc(SourceLoc loc) { IntroducerLoc = loc; }
+  static StmtConditionElement fromOpaqueValue(void *opaque) {
+    StmtConditionElement val;
+    val.Condition = decltype(Condition)::getFromOpaqueValue(opaque);
+    return val;
+  }
+
+  void *getOpaqueValue() const { return Condition.getOpaqueValue(); }
 
   /// ConditionKind - This indicates the sort of condition this is.
   enum ConditionKind {
@@ -554,20 +588,19 @@ public:
   };
 
   ConditionKind getKind() const {
-    if (ThePattern)
-      return CK_PatternBinding;
     if (Condition.is<Expr *>())
       return CK_Boolean;
+    if (Condition.is<ConditionalPatternBindingInfo *>())
+      return CK_PatternBinding;
     if (Condition.is<PoundAvailableInfo *>())
       return CK_Availability;
-    assert(Condition.is<PoundHasSymbolInfo *>());
-    return CK_HasSymbol;
+    if (Condition.is<PoundHasSymbolInfo *>())
+      return CK_HasSymbol;
+    return CK_Boolean;
   }
 
   /// Boolean Condition Accessors.
-  Expr *getBooleanOrNull() const {
-    return getKind() == CK_Boolean ? Condition.get<Expr *>() : nullptr;
-  }
+  Expr *getBooleanOrNull() const { return Condition.dyn_cast<Expr *>(); }
 
   Expr *getBoolean() const {
     assert(getKind() == CK_Boolean && "Not a condition");
@@ -579,35 +612,43 @@ public:
   }
 
   /// Pattern Binding Accessors.
+  ConditionalPatternBindingInfo *getPatternBindingOrNull() const {
+    return Condition.dyn_cast<ConditionalPatternBindingInfo *>();
+  }
+
+  ConditionalPatternBindingInfo *getPatternBinding() const {
+    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
+    return Condition.get<ConditionalPatternBindingInfo *>();
+  }
+
+  SourceLoc getIntroducerLoc() const {
+    return getPatternBinding()->getIntroducerLoc();
+  }
+
+  void setIntroducerLoc(SourceLoc loc) {
+    getPatternBinding()->setIntroducerLoc(loc);
+  }
+
   Pattern *getPatternOrNull() const {
-    return ThePattern;
+    if (auto *binding = getPatternBindingOrNull())
+      return binding->getPattern();
+    return nullptr;
   }
 
-  Pattern *getPattern() const {
-    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    return ThePattern;
-  }
+  Pattern *getPattern() const { return getPatternBinding()->getPattern(); }
 
-  void setPattern(Pattern *P) {
-    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    ThePattern = P;
-  }
-  
-  /// Pattern Binding Accessors.
+  void setPattern(Pattern *P) { getPatternBinding()->setPattern(P); }
+
   Expr *getInitializerOrNull() const {
-    return getKind() == CK_PatternBinding ? Condition.get<Expr *>() : nullptr;
+    if (auto *binding = getPatternBindingOrNull())
+      return binding->getInitializer();
+    return nullptr;
   }
 
-  Expr *getInitializer() const {
-    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    return Condition.get<Expr *>();
-  }
-  
-  void setInitializer(Expr *E) {
-    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    Condition = E;
-  }
-  
+  Expr *getInitializer() const { return getPatternBinding()->getInitializer(); }
+
+  void setInitializer(Expr *E) { getPatternBinding()->setInitializer(E); }
+
   // Availability Accessors
   PoundAvailableInfo *getAvailability() const {
     assert(getKind() == CK_Availability && "Not an #available condition");
@@ -756,20 +797,25 @@ public:
 class IfStmt : public LabeledConditionalStmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
-  Stmt *Then;
+  BraceStmt *Then;
   Stmt *Else;
   
 public:
   IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
-         Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
+         BraceStmt *Then, SourceLoc ElseLoc, Stmt *Else,
          llvm::Optional<bool> implicit = llvm::None)
       : LabeledConditionalStmt(StmtKind::If,
                                getDefaultImplicitFlag(implicit, IfLoc),
                                LabelInfo, Cond),
-        IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {}
+        IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {
+    assert(Then && "Must have non-null 'then' statement");
+    assert(!Else || isa<BraceStmt>(Else) ||
+           isa<IfStmt>(Else) &&
+               "Else statement must either be BraceStmt or IfStmt");
+  }
 
-  IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
-         llvm::Optional<bool> implicit, ASTContext &Ctx);
+  IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
+         Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx);
 
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
@@ -781,8 +827,8 @@ public:
     return (Else ? Else->getEndLoc() : Then->getEndLoc());
   }
 
-  Stmt *getThenStmt() const { return Then; }
-  void setThenStmt(Stmt *s) { Then = s; }
+  BraceStmt *getThenStmt() const { return Then; }
+  void setThenStmt(BraceStmt *s) { Then = s; }
 
   Stmt *getElseStmt() const { return Else; }
   void setElseStmt(Stmt *s) { Else = s; }
@@ -1381,16 +1427,28 @@ class DoCatchStmt final
     : public LabeledStmt,
       private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
   friend TrailingObjects;
+  friend class ExplicitCaughtTypeRequest;
+
+  DeclContext *DC;
 
   SourceLoc DoLoc;
+
+  /// Location of the 'throws' token.
+  SourceLoc ThrowsLoc;
+
+  /// The error type that is being thrown.
+  TypeLoc ThrownType;
+
   Stmt *Body;
   ThrownErrorDestination RethrowDest;
 
-  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
+  DoCatchStmt(DeclContext *dc,LabeledStmtInfo labelInfo, SourceLoc doLoc,
+              SourceLoc throwsLoc, TypeLoc thrownType, Stmt *body,
               ArrayRef<CaseStmt *> catches, llvm::Optional<bool> implicit)
       : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
                     labelInfo),
-        DoLoc(doLoc), Body(body) {
+        DC(dc), DoLoc(doLoc), ThrowsLoc(throwsLoc), ThrownType(thrownType),
+        Body(body) {
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
                             getTrailingObjects<CaseStmt *>());
@@ -1399,15 +1457,31 @@ class DoCatchStmt final
   }
 
 public:
-  static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                             SourceLoc doLoc, Stmt *body,
+  static DoCatchStmt *create(DeclContext *dc,
+                             LabeledStmtInfo labelInfo,
+                             SourceLoc doLoc,
+                             SourceLoc throwsLoc, TypeLoc thrownType,
+                             Stmt *body,
                              ArrayRef<CaseStmt *> catches,
                              llvm::Optional<bool> implicit = llvm::None);
 
+  DeclContext *getDeclContext() const { return DC; }
+
   SourceLoc getDoLoc() const { return DoLoc; }
+
+  /// Retrieve the location of the 'throws' keyword, if present.
+  SourceLoc getThrowsLoc() const { return ThrowsLoc; }
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
   SourceLoc getEndLoc() const { return getCatches().back()->getEndLoc(); }
+
+  /// Retrieves the type representation for the caught type.
+  TypeRepr *getCaughtTypeRepr() const {
+    return ThrownType.getTypeRepr();
+  }
+
+  // Get the explicitly-specified caught error type.
+  Type getExplicitCaughtType() const;
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }

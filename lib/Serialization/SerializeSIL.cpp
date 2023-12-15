@@ -913,6 +913,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)OI->getType().getCategory(), Args);
     break;
   }
+  case SILInstructionKind::VectorInst: {
+    auto *vi = cast<VectorInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Elt : vi->getElements()) {
+      ListOfValues.push_back(addValueRef(Elt));
+    }
+
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
+        (unsigned)SI.getKind(),
+        S.addTypeRef(vi->getType().getRawASTType()),
+        (unsigned)vi->getType().getCategory(),
+        ListOfValues);
+    break;
+  }
 
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugStepInst:
@@ -1141,14 +1156,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(S.addTypeRef(Arg->getType().getRawASTType()));
       Args.push_back((unsigned)Arg->getType().getCategory());
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-                             SILAbbrCodes[SILInstApplyLayout::Code],
-                             SIL_BUILTIN, 0,
-                             S.addSubstitutionMapRef(BI->getSubstitutions()),
-                             S.addTypeRef(BI->getType().getRawASTType()),
-                             (unsigned)BI->getType().getCategory(),
-                             S.addDeclBaseNameRef(BI->getName()),
-                             Args);
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_BUILTIN,
+        0, S.addSubstitutionMapRef(BI->getSubstitutions()),
+        S.addTypeRef(BI->getType().getRawASTType()),
+        (unsigned)BI->getType().getCategory(),
+        S.addDeclBaseNameRef(BI->getName()),
+        unsigned(swift::ActorIsolation::Unspecified),
+        unsigned(swift::ActorIsolation::Unspecified), Args);
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -1162,15 +1177,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: AI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code],
-        SIL_APPLY,
+
+    auto callerIsolation = swift::ActorIsolation::Unspecified;
+    auto calleeIsolation = swift::ActorIsolation::Unspecified;
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      callerIsolation = isolationCrossing->getCallerIsolation();
+      calleeIsolation = isolationCrossing->getCalleeIsolation();
+    }
+
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code], SIL_APPLY,
         unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
-        S.addTypeRef(AI->getSubstCalleeType()),
-        addValueRef(AI->getCallee()),
-        Args);
+        S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
+        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -1184,14 +1205,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: AI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], SIL_BEGIN_APPLY,
-        unsigned(AI->getApplyOptions().toRaw()),
+
+    auto callerIsolation = swift::ActorIsolation::Unspecified;
+    auto calleeIsolation = swift::ActorIsolation::Unspecified;
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      callerIsolation = isolationCrossing->getCallerIsolation();
+      calleeIsolation = isolationCrossing->getCalleeIsolation();
+    }
+
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
+        SIL_BEGIN_APPLY, unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
-        S.addTypeRef(AI->getSubstCalleeType()),
-        addValueRef(AI->getCallee()),
-        Args);
+        S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
+        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -1208,14 +1236,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     Args.push_back(BasicBlockMap[AI->getNormalBB()]);
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], SIL_TRY_APPLY,
-        unsigned(AI->getApplyOptions().toRaw()),
+
+    auto callerIsolation = swift::ActorIsolation::Unspecified;
+    auto calleeIsolation = swift::ActorIsolation::Unspecified;
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      callerIsolation = isolationCrossing->getCallerIsolation();
+      calleeIsolation = isolationCrossing->getCalleeIsolation();
+    }
+
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
+        SIL_TRY_APPLY, unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getRawASTType()),
-        S.addTypeRef(AI->getSubstCalleeType()),
-        addValueRef(AI->getCallee()),
-        Args);
+        S.addTypeRef(AI->getSubstCalleeType()), addValueRef(AI->getCallee()),
+        unsigned(callerIsolation), unsigned(calleeIsolation), Args);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1224,14 +1259,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     for (auto Arg: PAI->getArguments()) {
       Args.push_back(addValueRef(Arg));
     }
-    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], SIL_PARTIAL_APPLY,
-        0,
+    SILInstApplyLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstApplyLayout::Code],
+        SIL_PARTIAL_APPLY, 0,
         S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
         S.addTypeRef(PAI->getCallee()->getType().getRawASTType()),
         S.addTypeRef(PAI->getType().getRawASTType()),
         addValueRef(PAI->getCallee()),
-        Args);
+        unsigned(swift::ActorIsolation::Unspecified),
+        unsigned(swift::ActorIsolation::Unspecified), Args);
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {
@@ -1525,12 +1561,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
       Attr = ECMI->doKeepUnique();
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
-      Attr =
-          unsigned(BBI->isLexical()) | unsigned(BBI->hasPointerEscape() << 1);
+      Attr = unsigned(BBI->isLexical()) |
+             (unsigned(BBI->hasPointerEscape() << 1)) |
+             (unsigned(BBI->isFromVarDecl() << 2));
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
       Attr = unsigned(MVI->getAllowDiagnostics()) |
              (unsigned(MVI->isLexical() << 1)) |
-             (unsigned(MVI->hasPointerEscape() << 2));
+             (unsigned(MVI->hasPointerEscape() << 2)) |
+             (unsigned(MVI->isFromVarDecl() << 3));
     } else if (auto *I = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
     } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {
@@ -1843,6 +1881,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                          ? 0 : 1;
     writeOneTypeOneOperandLayout(open.getKind(), attrs, open.getType(),
                                  open.getOperand());
+    break;
+  }
+  case SILInstructionKind::AllocVectorInst: {
+    auto &avi = cast<AllocVectorInst>(SI);
+    assert(avi.getNumOperands() - avi.getTypeDependentOperands().size() == 1);
+    writeOneTypeOneOperandLayout(avi.getKind(), /*attrs*/ 0, avi.getType(),
+                                 avi.getOperand());
     break;
   }
   case SILInstructionKind::DynamicPackIndexInst: {

@@ -3,6 +3,19 @@
 > **Note**\
 > This is in reverse chronological order, so newer entries are added to the top.
 
+* [#70065][]:
+
+  With the implementation of [SE-0110][], a closure parameter syntax consisting
+  of only a parameter type — and no parameter name — was accidentally made legal
+  for certain unambiguous type syntaxes in Swift 4. For example:
+
+  ```swift
+  let closure = { ([Int]) in }
+  ```
+
+  Having been [gated](https://github.com/apple/swift/pull/28171) behind a
+  compiler warning since at least Swift 5.2, this syntax is now rejected.
+
 ## Swift 5.9.2
 
 * [SE-0407][]:
@@ -9889,4 +9902,5 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#57081]: <https://github.com/apple/swift/issues/57081>
 [#57225]: <https://github.com/apple/swift/issues/57225>
 [#56139]: <https://github.com/apple/swift/issues/56139>
+[#70065]: <https://github.com/apple/swift/pull/70065>
 [swift-syntax]: https://github.com/apple/swift-syntax

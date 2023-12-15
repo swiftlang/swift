@@ -89,6 +89,9 @@ class LoadedExecutablePlugin {
   /// Callbacks to be called when the connection is restored.
   llvm::SmallVector<std::function<void(void)> *, 0> onReconnect;
 
+  /// Disable sandbox.
+  bool disableSandbox = false;
+
   /// Flag to dump plugin messagings.
   bool dumpMessaging = false;
 
@@ -99,9 +102,11 @@ class LoadedExecutablePlugin {
 
 public:
   LoadedExecutablePlugin(llvm::StringRef ExecutablePath,
-                         llvm::sys::TimePoint<> LastModificationTime)
+                         llvm::sys::TimePoint<> LastModificationTime,
+                         bool disableSandbox)
       : ExecutablePath(ExecutablePath),
-        LastModificationTime(LastModificationTime){};
+        LastModificationTime(LastModificationTime),
+        disableSandbox(disableSandbox){};
   ~LoadedExecutablePlugin();
 
   /// The last modification time of 'ExecutablePath' when this object is
@@ -181,7 +186,7 @@ public:
   /// Load an executable plugin specified by \p path .
   /// If \p path plugin is already loaded, this returns the cached object.
   llvm::Expected<LoadedExecutablePlugin *>
-  loadExecutablePlugin(llvm::StringRef path);
+  loadExecutablePlugin(llvm::StringRef path, bool disableSandbox);
 };
 
 } // namespace swift

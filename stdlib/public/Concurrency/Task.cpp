@@ -627,13 +627,12 @@ static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
 
 /// Implementation of task creation.
 SWIFT_CC(swift)
-static AsyncTaskAndContext swift_task_create_commonImpl(
-    size_t rawTaskCreateFlags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultTypeMetadata,
-    TaskContinuationFunction *function, void *closureContext,
-    size_t initialContextSize) {
-
+static AsyncTaskAndContext
+swift_task_create_commonImpl(size_t rawTaskCreateFlags,
+                             TaskOptionRecord *options,
+                             const Metadata *futureResultTypeMetadata,
+                             TaskContinuationFunction *function,
+                             void *closureContext, size_t initialContextSize) {
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
   JobFlags jobFlags(JobKind::Task, JobPriority::Unspecified);
 
@@ -646,15 +645,18 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   #endif
 
   // Collect the options we know about.
-  SerialExecutorRef executor = SerialExecutorRef::generic();
+  SerialExecutorRef serialExecutor = SerialExecutorRef::generic();
+  TaskExecutorRef taskExecutor = TaskExecutorRef::undefined();
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
   bool hasAsyncLetResultBuffer = false;
   RunInlineTaskOptionRecord *runInlineOption = nullptr;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
-    case TaskOptionRecordKind::Executor:
-      executor = cast<ExecutorTaskOptionRecord>(option)->getExecutor();
+    case TaskOptionRecordKind::InitialTaskExecutor:
+      taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)
+                         ->getExecutorRef();
+      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
     case TaskOptionRecordKind::TaskGroup:
@@ -885,6 +887,20 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     assert(sizeof(FutureAsyncContextPrefix) == 4 * sizeof(void *));
   }
 
+  // Only attempt to inherit parent's executor preference if we didn't set one
+  // explicitly, which we've recorded in the flag by noticing a task create
+  // option higher up in this func.
+  if (!jobFlags.task_hasInitialTaskExecutorPreference()) {
+    // do we have a parent we can inherit the task executor from?
+    if (parent) {
+      auto parentTaskExecutor = parent->getPreferredTaskExecutor();
+      if (parentTaskExecutor.isDefined()) {
+        jobFlags.task_setHasInitialTaskExecutorPreference(true);
+        taskExecutor = parentTaskExecutor;
+      }
+    }
+  }
+
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task = nullptr;
@@ -974,6 +990,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   initialContext->Parent = nullptr;
 
   // FIXME: add discarding flag
+  // FIXME: add task executor
   concurrency::trace::task_create(
       task, parent, group, asyncLet,
       static_cast<uint8_t>(task->Flags.getPriority()),
@@ -1004,13 +1021,26 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     asyncLet_addImpl(task, asyncLet, !hasAsyncLetResultBuffer);
   }
 
+  // Task executor preference
+  // If the task does not have a specific executor set already via create
+  // options, and there is a task executor preference set in the parent, we
+  // inherit it by deep-copying the preference record. if
+  // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
+  if (jobFlags.task_hasInitialTaskExecutorPreference()) {
+    // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
+    // because the group takes a fast-path when attaching the child record.
+    assert(jobFlags.task_hasInitialTaskExecutorPreference());
+    task->pushInitialTaskExecutorPreference(taskExecutor);
+  }
+
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
     assert(false && "Should not be enqueuing tasks in task-to-thread model");
 #endif
     swift_retain(task);
-    task->flagAsAndEnqueueOnExecutor(executor);
+    task->flagAsAndEnqueueOnExecutor(
+        serialExecutor); // FIXME: pass the task executor explicitly?
   }
 
   return {task, initialContext};
@@ -1264,9 +1294,9 @@ static AsyncTask *swift_task_suspendImpl() {
 }
 
 SWIFT_CC(swift)
-static void
-swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task, SerialExecutorRef executor)
-{
+static void swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task,
+                                                 SerialExecutorRef executor) {
+  // TODO: is 'swift_task_enqueueTaskOnExecutorImpl' used at all, outside tests?
   task->flagAsAndEnqueueOnExecutor(executor);
 }
 

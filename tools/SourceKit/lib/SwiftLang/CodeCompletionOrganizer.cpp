@@ -176,6 +176,8 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
       }
       break;
     case CompletionKind::TypeDeclResultBeginning:
+    case CompletionKind::TypeBeginning:
+    case CompletionKind::TypeSimpleOrComposition:
     case CompletionKind::TypeSimpleBeginning:
       if (custom.Contexts.contains(CustomCompletionInfo::Type)) {
         changed = true;
@@ -451,6 +453,8 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     bool hideLowPriority =
         options.hideLowPriority &&
         completionKind != CompletionKind::TypeDeclResultBeginning &&
+        completionKind != CompletionKind::TypeBeginning &&
+        completionKind != CompletionKind::TypeSimpleOrComposition &&
         completionKind != CompletionKind::TypeSimpleBeginning &&
         completionKind != CompletionKind::PostfixExpr;
     for (Completion *completion : completions) {

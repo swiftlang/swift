@@ -1184,6 +1184,8 @@ getActualLayoutConstraintKind(uint64_t rawKind) {
   CASE(Class)
   CASE(NativeClass)
   CASE(UnknownLayout)
+  CASE(BridgeObject)
+  CASE(TrivialStride)
   }
 #undef CASE
 
@@ -1243,7 +1245,8 @@ llvm::Error ModuleFile::deserializeGenericRequirementsChecked(
       ASTContext &ctx = getContext();
       LayoutConstraint layout;
       if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
-          kind != LayoutConstraintKind::TrivialOfExactSize)
+          kind != LayoutConstraintKind::TrivialOfExactSize &&
+          kind != LayoutConstraintKind::TrivialStride)
         layout = LayoutConstraint::getLayoutConstraint(kind, ctx);
       else
         layout =
@@ -2837,8 +2840,6 @@ getActualSelfAccessKind(uint8_t raw) {
     return swift::SelfAccessKind::Consuming;
   case serialization::SelfAccessKind::Borrowing:
     return swift::SelfAccessKind::Borrowing;
-  case serialization::SelfAccessKind::ResultDependsOnSelf:
-    return swift::SelfAccessKind::ResultDependsOnSelf;
   }
   return llvm::None;
 }
@@ -4045,9 +4046,9 @@ public:
                                         async, throws, thrownType,
                                         genericParams, resultType, DC);
     } else {
-      auto *accessor = AccessorDecl::createDeserialized(
-          ctx, accessorKind, storage, staticSpelling.value(), async, throws,
-          thrownType, resultType, DC);
+      auto *accessor =
+          AccessorDecl::createDeserialized(ctx, accessorKind, storage, async,
+                                           throws, thrownType, resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -6919,11 +6920,16 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
 
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  bool hasExplicitAnyObject;
+  bool hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable;
   ArrayRef<uint64_t> rawProtocolIDs;
 
   decls_block::ProtocolCompositionTypeLayout::readRecord(
-      scratch, hasExplicitAnyObject, rawProtocolIDs);
+      scratch,
+      hasExplicitAnyObject,
+      hasInverseCopyable,
+      hasInverseEscapable,
+      rawProtocolIDs);
+
   SmallVector<Type, 4> protocols;
   for (TypeID protoID : rawProtocolIDs) {
     auto protoTy = MF.getTypeChecked(protoID);
@@ -6932,7 +6938,13 @@ Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     protocols.push_back(protoTy.get());
   }
 
-  return ProtocolCompositionType::get(MF.getContext(), protocols,
+  InvertibleProtocolSet inverses;
+  if (hasInverseCopyable)
+    inverses.insert(InvertibleProtocolKind::Copyable);
+  if (hasInverseEscapable)
+    inverses.insert(InvertibleProtocolKind::Escapable);
+
+  return ProtocolCompositionType::get(MF.getContext(), protocols, inverses,
                                       hasExplicitAnyObject);
 }
 

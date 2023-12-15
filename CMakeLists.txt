@@ -872,6 +872,7 @@ if(SWIFT_BUILD_SWIFT_SYNTAX)
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
+  add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
@@ -1387,9 +1388,6 @@ if(SWIFT_INCLUDE_TOOLS)
 
   add_subdirectory(lib)
 
-  # SwiftCompilerSources must come before "tools".
-  # It adds swift module names to the global property "swift_compiler_modules"
-  # which is used in add_swift_host_tool for the lldb workaround.
   add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!

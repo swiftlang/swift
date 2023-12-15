@@ -260,7 +260,7 @@ public protocol DistributedActor: AnyActor, Identifiable, Hashable
   /// be introduced when not strictly required.  Visible side effects
   /// are therefore strongly discouraged within this property.
   @available(SwiftStdlib 5.9, *)
-  nonisolated var unownedExecutor: UnownedSerialExecutor{ get }
+  nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 
   /// Resolves the passed in `id` against the `system`, returning
   /// either a local or remote actor reference.

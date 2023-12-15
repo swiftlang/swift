@@ -407,6 +407,9 @@ Entities
   macro-expansion-operator ::= decl-name identifier 'fMm' // attached member macro
   macro-expansion-operator ::= decl-name identifier 'fMp' // attached peer macro
   macro-expansion-operator ::= decl-name identifier 'fMc' // attached conformance macro
+  macro-expansion-operator ::= decl-name identifier 'fMe' // attached extension macro
+  macro-expansion-operator ::= decl-name identifier 'fMq' // attached preamble macro
+  macro-expansion-operator ::= decl-name identifier 'fMb' // attached body macro
   macro-expansion-operator ::= decl-name identifier 'fMu' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
@@ -944,6 +947,8 @@ now codified into the ABI; the index 0 is therefore reserved.
   LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
+  LAYOUT-CONSTRAINT ::= 'B' // BridgeObject
+  LAYOUT-CONSTRAINT ::= 'S' // TrivialStride
 
   LAYOUT-SIZE ::= INDEX // Size only
   LAYOUT-SIZE-AND-ALIGNMENT ::= INDEX INDEX // Size followed by alignment

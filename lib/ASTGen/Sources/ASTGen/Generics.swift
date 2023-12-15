@@ -17,15 +17,15 @@ extension ASTGenVisitor {
   func generate(genericParameterClause node: GenericParameterClauseSyntax) -> BridgedGenericParamList {
     .createParsed(
       self.ctx,
-      leftAngleLoc: node.leftAngle.bridgedSourceLoc(in: self),
+      leftAngleLoc: self.generateSourceLoc(node.leftAngle),
       parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      rightAngleLoc: node.rightAngle.bridgedSourceLoc(in: self)
+      rightAngleLoc: self.generateSourceLoc(node.rightAngle)
     )
   }
 
   func generate(genericParameter node: GenericParameterSyntax) -> BridgedGenericTypeParamDecl {
-    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
+    let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     var genericParameterIndex: Int?
     for (index, sibling) in (node.parent?.as(GenericParameterListSyntax.self) ?? []).enumerated() {
@@ -41,7 +41,7 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
-      eachKeywordLoc: node.eachKeyword.bridgedSourceLoc(in: self),
+      eachKeywordLoc: self.generateSourceLoc(node.eachKeyword),
       name: name,
       nameLoc: nameLoc,
       inheritedType: self.generate(type: node.inheritedType),
@@ -54,14 +54,14 @@ extension ASTGenVisitor {
       switch $0.requirement {
       case .conformanceRequirement(let conformance):
         return BridgedRequirementRepr(
-          SeparatorLoc: conformance.colon.bridgedSourceLoc(in: self),
+          SeparatorLoc: self.generateSourceLoc(conformance.colon),
           Kind: .typeConstraint,
           FirstType: self.generate(type: conformance.leftType),
           SecondType: self.generate(type: conformance.rightType)
         )
       case .sameTypeRequirement(let sameType):
         return BridgedRequirementRepr(
-          SeparatorLoc: sameType.equal.bridgedSourceLoc(in: self),
+          SeparatorLoc: self.generateSourceLoc(sameType.equal),
           Kind: .sameType,
           FirstType: self.generate(type: sameType.leftType),
           SecondType: self.generate(type: sameType.rightType)
@@ -74,7 +74,7 @@ extension ASTGenVisitor {
 
     return BridgedTrailingWhereClause.createParsed(
       self.ctx,
-      whereKeywordLoc: node.whereKeyword.bridgedSourceLoc(in: self),
+      whereKeywordLoc: self.generateSourceLoc(node.whereKeyword),
       requirements: requirements.bridgedArray(in: self)
     )
   }

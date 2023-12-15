@@ -540,7 +540,7 @@ public:
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLayoutStringValueWitnesses(false),
         EnableLayoutStringValueWitnessesInstantiation(false),
-        EnableObjectiveCProtocolSymbolicReferences(false),
+        EnableObjectiveCProtocolSymbolicReferences(true),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),

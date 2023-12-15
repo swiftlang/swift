@@ -117,7 +117,7 @@ endif()
 option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
        "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
        "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
- 
+
 option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
        "Should stdlib be built with full unicode support"
        TRUE)
@@ -198,12 +198,6 @@ option(SWIFT_ENABLE_REFLECTION
 set(SWIFT_STDLIB_REFLECTION_METADATA "enabled" CACHE STRING
     "Build stdlib with runtime metadata (valid options are 'enabled', 'disabled' and 'debugger-only').")
 
-if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple" AND NOT SWIFT_FREESTANDING_IS_DARWIN)
-  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default TRUE)
-else()
-  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default FALSE)
-endif()
-
 option(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
        "Should concurrency use the task-to-thread model."
        "${SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default}")
@@ -220,13 +214,28 @@ option(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
 
-if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "none")
-elseif(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
-else()
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
-endif()
+# Use dispatch as the system scheduler by default.
+# For convenience, we set this to false when concurrency is disabled.
+set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
+if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+
+   if (SWIFT_ENABLE_DISPATCH)
+     set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
+     if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
+       message(SEND_ERROR "Concurrency requires libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+     endif()
+   endif()
+
+  if(SWIFT_CONCURRENCY_USES_DISPATCH)
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
+  elseif(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "none")
+  elseif(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
+  else()
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "hooked")
+  endif()
+endif() # SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
@@ -283,16 +292,3 @@ set(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH "" CACHE STRING
   "If set, provides a fixed path to the swift-backtrace binary.  This
    will disable dynamic determination of the path and will also disable
    the setting in SWIFT_BACKTRACE.")
-
-# Use dispatch as the system scheduler by default.
-# For convenience, we set this to false when concurrency is disabled.
-set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
-if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY AND "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
-  set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
-endif()
-
-if(SWIFT_CONCURRENCY_USES_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-    message(SEND_ERROR "Concurrency requires libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
-  endif()
-endif()

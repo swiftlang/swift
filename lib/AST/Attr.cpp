@@ -1261,7 +1261,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                       Printer << "@_noMetadata ";
                   }
                   auto OptionsCopy = Options;
-                  OptionsCopy.PrintClassLayoutName = typeErased;
+                  OptionsCopy.PrintInternalLayoutName = typeErased;
                   req.print(Printer, OptionsCopy);
                 },
                 [&] { Printer << ", "; });
@@ -2585,6 +2585,21 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
 
   return new (ctx)
       CustomAttr(atLoc, range, type, initContext, argList, implicit);
+}
+
+std::pair<IdentTypeRepr *, IdentTypeRepr *> CustomAttr::destructureMacroRef() {
+  TypeRepr *typeRepr = getTypeRepr();
+  if (!typeRepr)
+    return {nullptr, nullptr};
+  if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
+    return {nullptr, identType};
+  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr))
+    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getBaseComponent()))
+      if (memType->getMemberComponents().size() == 1)
+        if (auto first =
+                dyn_cast<IdentTypeRepr>(memType->getMemberComponents().front()))
+          return {base, first};
+  return {nullptr, nullptr};
 }
 
 TypeRepr *CustomAttr::getTypeRepr() const { return typeExpr->getTypeRepr(); }

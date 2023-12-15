@@ -110,7 +110,7 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/Foo.swiftmodule -disable-implicit-swift-modules -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid -Rmodule-loading -Xcc -Rmodule-import %s -cache-compile-job -cas-path %t/cas -allow-unstable-cache-key-for-testing 2>&1 | %FileCheck %s
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/Foo.swiftinterface -disable-implicit-swift-modules -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid %s -cache-compile-job -cas-path %t/cas -allow-unstable-cache-key-for-testing -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/Foo.swiftinterface -disable-implicit-swift-modules -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid %s -cache-compile-job -cas-path %t/cas -allow-unstable-cache-key-for-testing -swift-version 5 -enable-library-evolution -o %t/Foo.swiftmodule
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend -typecheck -emit-module-interface-path %t/Foo.swiftinterface -disable-implicit-swift-modules \
 // RUN:   -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid %s -cache-compile-job \

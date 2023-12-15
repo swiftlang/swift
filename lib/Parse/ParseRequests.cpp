@@ -181,9 +181,25 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       break;
 
     case GeneratedSourceInfo::ExpressionMacroExpansion:
+    case GeneratedSourceInfo::PreambleMacroExpansion:
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::PrettyPrinted: {
       parser.parseTopLevelItems(items);
+      break;
+    }
+
+    case GeneratedSourceInfo::BodyMacroExpansion: {
+      // Prime the lexer.
+      if (parser.Tok.is(tok::NUM_TOKENS))
+        parser.consumeTokenWithoutFeedingReceiver();
+
+      if (parser.Tok.is(tok::l_brace)) {
+        if (auto body =
+                parser.parseBraceItemList(diag::invalid_diagnostic)
+                  .getPtrOrNull())
+          items.push_back(body);
+      }
+
       break;
     }
 
