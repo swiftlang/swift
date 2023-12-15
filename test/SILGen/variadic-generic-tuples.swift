@@ -240,7 +240,8 @@ struct TupleHolder<each T> {
 // CHECK:       [[T0:%.*]] = copy_value %0 :
 // CHECK:       [[T1:%.*]] = begin_borrow [[T0]]
 // CHECK:       [[RESULT:%.*]] = apply [[T1]]() :
-// CHECK:       destroy_value [[RESULT]]
+// CHECK:       [[MOVE:%.*]] = move_value [var_decl] [[RESULT]]
+// CHECK:       destroy_value [[MOVE]]
 func takesConcreteTupleHolderFactory(factory: () -> TupleHolder<Int, String>) {
   let holder = factory()
 }

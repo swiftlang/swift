@@ -723,8 +723,9 @@ func testRedundantRetains() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10properties20testRedundantRetainsyyF : $@convention(thin) () -> () {
 // CHECK: [[A:%[0-9]+]] = apply
+// CHECK: [[MOVED_A:%[0-9]+]] = move_value [lexical] [var_decl] [[A]]
 // CHECK-NOT: copy_value
-// CHECK: destroy_value [[A]] : $RedundantRetains
+// CHECK: destroy_value [[MOVED_A]] : $RedundantRetains
 // CHECK-NOT: copy_value
 // CHECK-NOT: destroy_value
 // CHECK: return

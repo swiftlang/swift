@@ -555,18 +555,22 @@ func genericCollectionContinueBreak<T : Collection>(_ xx: T) {
 func tupleElements(_ xx: [(C, C)]) {
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
-  // CHECK: destroy_value [[B]]
-  // CHECK: destroy_value [[A]]
+  // CHECK: [[MOVED_A:%.*]] = move_value [lexical] [var_decl] [[A]]
+  // CHECK: [[MOVED_B:%.*]] = move_value [lexical] [var_decl] [[B]]
+  // CHECK: destroy_value [[MOVED_B]]
+  // CHECK: destroy_value [[MOVED_A]]
   for (a, b) in xx {}
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: [[MOVED_A:%.*]] = move_value [lexical] [var_decl] [[A]]
   // CHECK: destroy_value [[B]]
-  // CHECK: destroy_value [[A]]
+  // CHECK: destroy_value [[MOVED_A]]
   for (a, _) in xx {}
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: [[MOVED_B:%.*]] = move_value [lexical] [var_decl] [[B]]
   // CHECK: destroy_value [[A]]
-  // CHECK: destroy_value [[B]]
+  // CHECK: destroy_value [[MOVED_B]]
   for (_, b) in xx {}
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
   // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]

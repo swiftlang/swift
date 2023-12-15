@@ -107,11 +107,12 @@ func dont_return<T>(_ argument: T) throws -> T {
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [lexical] [var_decl] [[T0]]
-// CHECK-NEXT: debug_value [[BORROWED_T0]] : $Cat
+// CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
+// CHECK-NEXT: debug_value [[MOVED_T0]] : $Cat
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[MOVED_T0]]
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -314,10 +315,9 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH_ATE]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: [[T0_BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[T0]]
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0_BORROW]]
-// CHECK-NEXT: end_borrow [[T0_BORROW]]
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[MOVED_T0]]
+// CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -326,10 +326,9 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 //   Catch HomeworkError.CatHidIt.
 // CHECK:    [[MATCH_HID]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: [[T0_BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[T0]]
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0_BORROW]]
-// CHECK-NEXT: end_borrow [[T0_BORROW]]
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[MOVED_T0]]
+// CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]

@@ -337,9 +337,8 @@ func callClosureIntOwned() {
 // NOTE: MOW expands to MOVEONLYWRAPPED
 //
 // CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy10printKlassyyF : $@convention(thin) () -> () {
-// CHECK:   [[X:%.*]] = begin_borrow [lexical] [var_decl] {{%[0-9]+}} : $Klass
-// CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
-// CHECK:   [[X_MOVEONLYWRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[X_COPY]]
+// CHECK:   [[X:%.*]] = move_value [lexical] [var_decl] {{%[0-9]+}} : $Klass
+// CHECK:   [[X_MOVEONLYWRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[X]]
 // CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X_MOVEONLYWRAPPED]]
 // CHECK:   [[BORROWED_X_MOVEONLYWRAPPED_MARKED:%.*]] = begin_borrow [[X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[FUNC:%.*]] = class_method [[BORROWED_X_MOVEONLYWRAPPED_MARKED]]

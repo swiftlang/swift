@@ -494,14 +494,15 @@ class SuperSub : SuperBase {
   // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_1:\$s8closures8SuperSubC1c[_0-9a-zA-Z]*]] : $@convention(thin) (@guaranteed SuperSub) -> ()
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[SELF_COPY]])
-  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [lexical] [var_decl] [[PA]]
-  // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
-  // CHECK:   [[B:%.*]] = begin_borrow [[PA_COPY]]
-  // CHECK:   apply [[B]]()
+  // CHECK:   [[MOVED_PA:%.*]] = move_value [lexical] [var_decl] [[PA]]
+  // CHECK:   [[B:%.*]] = begin_borrow [[MOVED_PA]]
+  // CHECK:   [[B_COPY:%.*]] = copy_value [[B]]
+  // CHECK:   [[B2:%.*]] = begin_borrow [[B_COPY]]
+  // CHECK:   apply [[B2]]()
+	// CHECK:   end_borrow [[B2]]
+  // CHECK:   destroy_value [[B_COPY]]
 	// CHECK:   end_borrow [[B]]
-  // CHECK:   destroy_value [[PA_COPY]]
-  // CHECK:   end_borrow [[BORROWED_PA]]
-  // CHECK:   destroy_value [[PA]]
+  // CHECK:   destroy_value [[MOVED_PA]]
   // CHECK: } // end sil function '$s8closures8SuperSubC1cyyF'
   func c() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> ()
@@ -526,14 +527,15 @@ class SuperSub : SuperBase {
   // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_1:\$s8closures8SuperSubC1d[_0-9a-zA-Z]*]] : $@convention(thin) (@guaranteed SuperSub) -> ()
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[SELF_COPY]])
-  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [lexical] [var_decl] [[PA]]
-  // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
-  // CHECK:   [[B:%.*]] = begin_borrow [[PA_COPY]]
-  // CHECK:   apply [[B]]()
-  // CHECK:   end_borrow [[B]]
-  // CHECK:   destroy_value [[PA_COPY]]
-  // CHECK:   end_borrow [[BORROWED_PA]]
-  // CHECK:   destroy_value [[PA]]
+  // CHECK:   [[MOVED_PA:%.*]] = move_value [lexical] [var_decl] [[PA]]
+  // CHECK:   [[B:%.*]] = begin_borrow [[MOVED_PA]]
+  // CHECK:   [[PA_COPY:%.*]] = copy_value [[B]]
+  // CHECK:   [[B2:%.*]] = begin_borrow [[PA_COPY]]
+  // CHECK:   apply [[B2]]()
+	// CHECK:   end_borrow [[B2]]
+  // CHECK:   destroy_value [[B_COPY]]
+	// CHECK:   end_borrow [[B]]
+  // CHECK:   destroy_value [[MOVED_PA]]
   // CHECK: } // end sil function '$s8closures8SuperSubC1dyyF'
   func d() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> () {
@@ -569,14 +571,15 @@ class SuperSub : SuperBase {
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_NAME2:\$s8closures8SuperSubC1e.*]] : $@convention(thin)
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [lexical] [var_decl] [[PA]]
-    // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
-    // CHECK:   [[B:%.*]] = begin_borrow [[PA_COPY]]
-    // CHECK:   apply [[B]]() : $@callee_guaranteed () -> ()
-    // CHECK:   end_borrow [[B]]
-    // CHECK:   destroy_value [[PA_COPY]]
-    // CHECK:   end_borrow [[BORROWED_PA]]
-    // CHECK:   destroy_value [[PA]]
+    // CHECK:   [[MOVED_PA:%.*]] = move_value [lexical] [var_decl] [[PA]]
+    // CHECK:   [[B:%.*]] = begin_borrow [[MOVED_PA]]
+    // CHECK:   [[PA_COPY:%.*]] = copy_value [[B]]
+    // CHECK:   [[B2:%.*]] = begin_borrow [[PA_COPY]]
+    // CHECK:   apply [[B2]]()
+  	// CHECK:   end_borrow [[B2]]
+    // CHECK:   destroy_value [[B_COPY]]
+  	// CHECK:   end_borrow [[B]]
+    // CHECK:   destroy_value [[MOVED_PA]]
     // CHECK: } // end sil function '[[INNER_FUNC_NAME1]]'
     func e1() {
       // CHECK: sil private [ossa] @[[INNER_FUNC_NAME2]] : $@convention(thin)
@@ -601,7 +604,8 @@ class SuperSub : SuperBase {
   // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_1:\$s8closures8SuperSubC1fyyFyycfU_]] : $@convention(thin) (@guaranteed SuperSub) -> ()
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[SELF_COPY]])
-  // CHECK:   destroy_value [[PA]]
+  // CHECK:   [[MOVED_PA:%.*]] = move_value [lexical] [var_decl] [[PA]]
+  // CHECK:   destroy_value [[MOVED_PA]]
   // CHECK: } // end sil function '$s8closures8SuperSubC1fyyF'
   func f() {
     // CHECK: sil private [ossa] @[[INNER_FUNC_1]] : $@convention(thin) (@guaranteed SuperSub) -> () {

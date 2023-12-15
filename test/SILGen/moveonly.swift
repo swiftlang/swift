@@ -731,7 +731,7 @@ var booleanGuard2: Bool { false }
 // This case is copyable
 // CHECK: [[BB_E_3]]([[BBARG:%.*]] : @guaranteed
 // CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   begin_borrow [lexical] [var_decl] [[BBARG_COPY]]
+// CHECK:   move_value [lexical] [var_decl] [[BBARG_COPY]]
 // CHECK:   end_borrow [[BORROWED_VALUE]]
 // CHECK:   br [[BB_CONT]]
 //
@@ -749,7 +749,7 @@ var booleanGuard2: Bool { false }
 // Copyable case
 // CHECK: [[BB_E2_LHS]]([[BBARG:%.*]] : @guaranteed
 // CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   begin_borrow [lexical] [var_decl] [[BBARG_COPY]]
+// CHECK:   move_value [lexical] [var_decl] [[BBARG_COPY]]
 // CHECK:   end_borrow [[BORROWED_VALUE]]
 // CHECK:   br [[BB_CONT]]
 //

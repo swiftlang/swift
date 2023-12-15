@@ -68,15 +68,16 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
 
-  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [var_decl] [[STR]]
+  // CHECK-NEXT: [[STR_MOV:%.*]] = move_value [var_decl] [[STR]]
   // CHECK-NEXT: debug_value
   // CHECK-NOT: destroy_value
 
+  // CHECK: [[STR_BORROW:%.*]] = begin_borrow [[STR_MOV]]
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)
   
-  // CHECK: destroy_value [[STR]]
+  // CHECK: destroy_value [[STR_MOV]]
 }
 // CHECK: } // end sil function '{{.*}}test3{{.*}}'
 

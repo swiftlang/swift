@@ -23,11 +23,12 @@ func if_no_else() {
   // CHECK:  br [[CONT:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : @owned $String):
-  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [var_decl] [[VAL]]
+  // CHECK:   [[MOVED_VAL:%.*]] = move_value [var_decl] [[VAL]]
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[MOVED_VAL]]
   // CHECK:   [[A:%.*]] = function_ref @$s16if_while_binding1a
   // CHECK:   apply [[A]]([[BORROWED_VAL]])
   // CHECK:   end_borrow [[BORROWED_VAL]]
-  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   destroy_value [[MOVED_VAL]]
   // CHECK:   br [[CONT]]
     a(x)
   }
@@ -43,12 +44,13 @@ func if_else_chain() {
   // CHECK-NEXT:   switch_enum [[OPT_RES]] : $Optional<String>, case #Optional.some!enumelt: [[YESX:bb[0-9]+]], case #Optional.none!enumelt: [[NOX:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : @owned $String):
-  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [var_decl] [[VAL]]
-  // CHECK:   debug_value [[BORROWED_VAL]] : $String, let, name "x"
+  // CHECK:   [[MOVED_VAL:%.*]] = move_value [var_decl] [[VAL]]
+  // CHECK:   debug_value [[MOVED_VAL]] : $String, let, name "x"
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[MOVED_VAL]]
   // CHECK:   [[A:%.*]] = function_ref @$s16if_while_binding1a
   // CHECK:   apply [[A]]([[BORROWED_VAL]])
   // CHECK:   end_borrow [[BORROWED_VAL]]
-  // CHECK:   destroy_value [[VAL]]
+  // CHECK:   destroy_value [[MOVED_VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
   //
@@ -83,17 +85,19 @@ func while_loop() {
   // CHECK:   br [[LOOP_EXIT:bb[0-9]+]]
   while let x = foo() {
   // CHECK: [[LOOP_BODY]]([[X:%[0-9]+]] : @owned $String):
+  // CHECK:   [[MOVED_X:%.*]] = move_value [var_decl] [[X]]
   // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.some!enumelt: [[YES:bb[0-9]+]], case #Optional.none!enumelt: [[FAILURE_DEST_2:bb[0-9]+]]
     if let y = bar() {
   // CHECK: [[YES]]([[Y:%[0-9]+]] : @owned $String):
+  // CHECK:   [[MOVED_Y:%.*]] = move_value [var_decl] [[Y]]
       a(y)
       break
-      // CHECK: destroy_value [[Y]]
-      // CHECK: destroy_value [[X]]
+      // CHECK: destroy_value [[MOVED_Y]]
+      // CHECK: destroy_value [[MOVED_X]]
       // CHECK:     br [[LOOP_EXIT]]
     }
   // CHECK: [[FAILURE_DEST_2]]:
-  // CHECK:   destroy_value [[X]]
+  // CHECK:   destroy_value [[MOVED_X]]
   // CHECK:   br [[LOOP_ENTRY]]
   }
   // CHECK: [[LOOP_EXIT]]:
@@ -136,25 +140,26 @@ func while_loop_multi() {
   // CHECK:   br [[LOOP_EXIT0:bb[0-9]+]]
 
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : @owned $String):
-  // CHECK:   [[AL:%.*]] = begin_borrow [var_decl] [[A]]
-  // CHECK:   debug_value [[AL]] : $String, let, name "a"
+  // CHECK:   [[MOVED_A:%.*]] = move_value [var_decl] [[A]]
+  // CHECK:   debug_value [[MOVED_A]] : $String, let, name "a"
 
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[LOOP_BODY:bb.*]], case #Optional.none!enumelt: [[LOOP_EXIT2a:bb[0-9]+]]
 
   // CHECK: [[LOOP_EXIT2a]]:
-  // CHECK: destroy_value [[A]]
+  // CHECK: destroy_value [[MOVED_A]]
   // CHECK: br [[LOOP_EXIT0]]
 
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : @owned $String):
+  // CHECK:   [[MOVED_B:%.*]] = move_value [var_decl] [[B]]
+  // CHECK:   debug_value [[MOVED_B]] : $String, let, name "b"
     while let a = foo(), let b = bar() {
-  // CHECK:     [[BL:%.*]] = begin_borrow [var_decl] [[B]]
-    // CHECK:   debug_value [[BL]] : $String, let, name "b"
+    // CHECK:   [[AL:%.*]] = begin_borrow [[MOVED_A]]
     // CHECK:   [[A_COPY:%.*]] = copy_value [[AL]]
-    // CHECK:   [[BORROWED_A:%.*]] = begin_borrow [var_decl] [[A_COPY]]
-    // CHECK:   debug_value [[BORROWED_A]] : $String, let, name "c"
-    // CHECK:   destroy_value [[A_COPY]]
-    // CHECK:   destroy_value [[B]]
-    // CHECK:   destroy_value [[A]]
+    // CHECK:   [[MOVED_C:%.*]] = move_value [var_decl] [[A_COPY]]
+    // CHECK:   debug_value [[MOVED_C]] : $String, let, name "c"
+    // CHECK:   destroy_value [[MOVED_C]]
+    // CHECK:   destroy_value [[MOVED_B]]
+    // CHECK:   destroy_value [[MOVED_A]]
     // CHECK:   br [[LOOP_ENTRY]]
     let c = a
   }
@@ -171,8 +176,8 @@ func if_multi() {
   // CHECK:   br [[IF_DONE:bb[0-9]+]]
 
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : @owned $String):
-  // CHECK:   [[AL:%.*]] = begin_borrow [var_decl] [[A]]
-  // CHECK:   debug_value [[AL]] : $String, let, name "a"
+  // CHECK:   [[MOVED_A:%.*]] = move_value [var_decl] [[A]]
+  // CHECK:   debug_value [[MOVED_A]] : $String, let, name "a"
   // CHECK:   [[B:%[0-9]+]] = alloc_box ${ var String }, var, name "b"
   // CHECK:   [[BL:%[0-9]+]] = begin_borrow [var_decl] [[B]]
   // CHECK:   [[PB:%[0-9]+]] = project_box [[BL]]
@@ -180,7 +185,7 @@ func if_multi() {
 
   // CHECK: [[IF_EXIT1a]]:
   // CHECK:   dealloc_box {{.*}} ${ var String }
-  // CHECK:   destroy_value [[A]]
+  // CHECK:   destroy_value [[MOVED_A]]
   // CHECK:   br [[IF_DONE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : @owned $String):
@@ -188,7 +193,7 @@ func if_multi() {
     // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
     // CHECK:   destroy_value [[B]]
-    // CHECK:   destroy_value [[A]]
+    // CHECK:   destroy_value [[MOVED_A]]
     // CHECK:   br [[IF_DONE]]
     let c = a
   }
@@ -204,8 +209,8 @@ func if_multi_else() {
   // CHECK: [[NONE_TRAMPOLINE]]:
   // CHECK:   br [[ELSE:bb[0-9]+]]
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : @owned $String):
-  // CHECK:   [[AL:%.*]] = begin_borrow [var_decl] [[A]]
-  // CHECK:   debug_value [[AL]] : $String, let, name "a"
+  // CHECK:   [[MOVED_A:%.*]] = move_value [var_decl] [[A]]
+  // CHECK:   debug_value [[MOVED_A]] : $String, let, name "a"
   // CHECK:   [[B:%[0-9]+]] = alloc_box ${ var String }, var, name "b"
   // CHECK:   [[BL:%[0-9]+]] = begin_borrow [var_decl] [[B]]
   // CHECK:   [[PB:%[0-9]+]] = project_box [[BL]]
@@ -213,7 +218,7 @@ func if_multi_else() {
   
     // CHECK: [[IF_EXIT1a]]:
     // CHECK:   dealloc_box {{.*}} ${ var String }
-    // CHECK:   destroy_value [[A]]
+    // CHECK:   destroy_value [[MOVED_A]]
     // CHECK:   br [[ELSE]]
 
   // CHECK: [[IF_BODY]]([[BVAL:%[0-9]+]] : @owned $String):
@@ -221,7 +226,7 @@ func if_multi_else() {
     // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
     // CHECK:   destroy_value [[B]]
-    // CHECK:   destroy_value [[A]]
+    // CHECK:   destroy_value [[MOVED_A]]
     // CHECK:   br [[IF_DONE:bb[0-9]+]]
     let c = a
   } else {
@@ -242,15 +247,15 @@ func if_multi_where() {
   // CHECK: [[NONE_TRAMPOLINE]]:
   // CHECK:   br [[DONE:bb[0-9]+]]
   // CHECK: [[CHECKBUF2]]([[A:%[0-9]+]] : @owned $String):
-  // CHECK:   [[AL:%.*]] = begin_borrow [var_decl] [[A]]
-  // CHECK:   debug_value [[AL]] : $String, let, name "a"
+  // CHECK:   [[MOVED_A:%.*]] = move_value [var_decl] [[A]]
+  // CHECK:   debug_value [[MOVED_A]] : $String, let, name "a"
   // CHECK:   [[BBOX:%[0-9]+]] = alloc_box ${ var String }, var, name "b"
   // CHECK:   [[PL:%[0-9]+]] = begin_borrow [var_decl] [[BBOX]]
   // CHECK:   [[PB:%[0-9]+]] = project_box [[PL]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[CHECK_WHERE:bb.*]], case #Optional.none!enumelt: [[IF_EXIT1a:bb[0-9]+]]
   // CHECK: [[IF_EXIT1a]]:
   // CHECK:   dealloc_box {{.*}} ${ var String }
-  // CHECK:   destroy_value [[A]]
+  // CHECK:   destroy_value [[MOVED_A]]
   // CHECK:   br [[DONE]]
 
   // CHECK: [[CHECK_WHERE]]([[B:%[0-9]+]] : @owned $String):
@@ -259,13 +264,13 @@ func if_multi_where() {
   if let a = foo(), var b = bar(), a == b {
     // CHECK: [[IF_BODY]]:
     // CHECK:   destroy_value [[BBOX]]
-    // CHECK:   destroy_value [[A]]
+    // CHECK:   destroy_value [[MOVED_A]]
     // CHECK:   br [[DONE]]
     let c = a
   }
   // CHECK: [[IF_EXIT3]]:
   // CHECK:   destroy_value [[BBOX]]
-  // CHECK:   destroy_value [[A]]
+  // CHECK:   destroy_value [[MOVED_A]]
   // CHECK:   br [[DONE]]
   // CHECK: [[DONE]]:
   // CHECK-NEXT:   tuple ()
@@ -291,13 +296,14 @@ func if_leading_boolean(_ a : Int) {
   // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.some!enumelt: [[SUCCESS:bb.*]], case #Optional.none!enumelt: [[IFDONE:bb[0-9]+]]
 
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : @owned $String):
-  // CHECK:   [[BL:%.*]] = begin_borrow [var_decl] [[B]]
-  // CHECK:   debug_value [[BL]] : $String, let, name "b"
-  // CHECK:   [[C:%.*]] = copy_value [[BL]]
-  // CHECK:   [[CL:%.*]] = begin_borrow [var_decl] [[C]]
-  // CHECK:   debug_value [[CL]] : $String, let, name "c"
-  // CHECK:   destroy_value [[C]]
-  // CHECK:   destroy_value [[B]]
+  // CHECK:   [[MOVED_B:%.*]] = move_value [var_decl] [[B]]
+  // CHECK:   debug_value [[MOVED_B]] : $String, let, name "b"
+  // CHECK:   [[BB:%.*]] = begin_borrow [[MOVED_B]]
+  // CHECK:   [[C:%.*]] = copy_value [[BB]]
+  // CHECK:   [[MOVED_C:%.*]] = move_value [var_decl] [[C]]
+  // CHECK:   debug_value [[MOVED_C]] : $String, let, name "c"
+  // CHECK:   destroy_value [[MOVED_C]]
+  // CHECK:   destroy_value [[MOVED_B]]
   // CHECK:   br [[IFDONE:bb[0-9]+]]
   if a == a, let b = foo() {
     let c = b
@@ -340,10 +346,10 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK:    switch_enum [[OPTVAL]] : $Optional<DerivedClass>, case #Optional.some!enumelt: [[ISDERIVEDBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
 
   // CHECK: [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : @owned $DerivedClass):
-  // CHECK:   [[BORROWED_DERIVED_VAL:%.*]] = begin_borrow [lexical] [var_decl] [[DERIVEDVAL]]
-  // CHECK:   debug_value [[BORROWED_DERIVED_VAL]] : $DerivedClass
+  // CHECK:   [[MOVED_DERIVED_VAL:%.*]] = move_value [lexical] [var_decl] [[DERIVEDVAL]]
+  // CHECK:   debug_value [[MOVED_DERIVED_VAL]] : $DerivedClass
   // => SEMANTIC SIL TODO: This is benign, but scoping wise, this end borrow should be after derived val.
-  // CHECK:   destroy_value [[DERIVEDVAL]] : $DerivedClass
+  // CHECK:   destroy_value [[MOVED_DERIVED_VAL]] : $DerivedClass
   // CHECK:   br [[EXITBB]]
   
   // CHECK: [[EXITBB]]:

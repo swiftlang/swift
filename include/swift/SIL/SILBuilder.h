@@ -841,11 +841,14 @@ public:
     return createLoadBorrow(loc, v);
   }
 
-  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v) {
+  SILValue emitBeginBorrowOperation(SILLocation loc, SILValue v,
+                                    bool isLexical = false,
+                                    bool hasPointerEscape = false,
+                                    bool fromVarDecl = false) {
     if (!hasOwnership() ||
         v->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
       return v;
-    return createBeginBorrow(loc, v);
+    return createBeginBorrow(loc, v, isLexical, hasPointerEscape, fromVarDecl);
   }
 
   void emitEndBorrowOperation(SILLocation loc, SILValue v) {
@@ -2834,13 +2837,16 @@ public:
 
   /// Convenience function that is a no-op for trivial values and inserts a
   /// move_value on non-trivial instructions.
-  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v) {
+  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v,
+                                  bool isLexical = false,
+                                  bool hasPointerEscape = false,
+                                  bool fromVarDecl = false) {
     assert(!v->getType().isAddress());
     if (v->getType().isTrivial(*getInsertionBB()->getParent()))
       return v;
     assert(v->getOwnershipKind() == OwnershipKind::Owned &&
            "move_value consumes its argument");
-    return createMoveValue(Loc, v);
+    return createMoveValue(Loc, v, isLexical, hasPointerEscape, fromVarDecl);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,

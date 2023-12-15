@@ -46,11 +46,12 @@ public func useClass(d: Double, opts: SomeClass.Options) {
   // CHECK: [[OBJ:%[0-9]+]] = apply [[CTOR]]([[D]])
   let o = SomeClass(value: d)
 
-  // CHECK: [[BORROWED_OBJ:%.*]] = begin_borrow [lexical] [var_decl] [[OBJ]]
+  // CHECK: [[MOVED_OBJ:%.*]] = move_value [lexical] [var_decl] [[OBJ]]
+  // CHECK: [[BORROWED_OBJ:%.*]] = begin_borrow [[MOVED_OBJ]]
   // CHECK: [[APPLY_FN:%[0-9]+]] = function_ref @IAMSomeClassApplyOptions : $@convention(c) (SomeClass, SomeClass.Options) -> ()
   // CHECK: apply [[APPLY_FN]]([[BORROWED_OBJ]], [[OPTS]])
   // CHECK: end_borrow [[BORROWED_OBJ]]
-  // CHECK: destroy_value [[OBJ]]
+  // CHECK: destroy_value [[MOVED_OBJ]]
   o.applyOptions(opts)
 }
 

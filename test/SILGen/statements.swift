@@ -361,6 +361,7 @@ func test_do() {
   do {
     // CHECK: [[CTOR:%.*]] = function_ref @$s10statements7MyClassC{{[_0-9a-zA-Z]*}}fC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
+    // CHECK: [[OBJMOVE:%.*]] = move_value [lexical] [var_decl] [[OBJ]]
     let obj = MyClass()
     _ = obj
     
@@ -370,7 +371,7 @@ func test_do() {
     bar(1)
 
     // CHECK-NOT: br bb
-    // CHECK: destroy_value [[OBJ]]
+    // CHECK: destroy_value [[OBJMOVE]]
     // CHECK-NOT: br bb
   }
 
@@ -391,6 +392,7 @@ func test_do_labeled() {
   lbl: do {
     // CHECK: [[CTOR:%.*]] = function_ref @$s10statements7MyClassC{{[_0-9a-zA-Z]*}}fC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
+    // CHECK: [[OBJMOVE:%.*]] = move_value [lexical] [var_decl] [[OBJ]]
     let obj = MyClass()
     _ = obj
 
@@ -403,7 +405,7 @@ func test_do_labeled() {
     // CHECK: cond_br {{%.*}}, bb2, bb3
     if (global_cond) {
       // CHECK: bb2:
-      // CHECK: destroy_value [[OBJ]]
+      // CHECK: destroy_value [[OBJMOVE]]
       // CHECK: br bb1
       continue lbl
     }
@@ -418,7 +420,7 @@ func test_do_labeled() {
     // CHECK: cond_br {{%.*}}, bb4, bb5
     if (global_cond) {
       // CHECK: bb4:
-      // CHECK: destroy_value [[OBJ]]
+      // CHECK: destroy_value [[OBJMOVE]]
       // CHECK: br bb6
       break lbl
     }
@@ -429,7 +431,7 @@ func test_do_labeled() {
     // CHECK: apply [[BAR]](
     bar(3)
 
-    // CHECK: destroy_value [[OBJ]]
+    // CHECK: destroy_value [[OBJMOVE]]
     // CHECK: br bb6
   }
 
@@ -604,11 +606,12 @@ func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
-  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [var_decl] [[STR]]
-  // CHECK-NEXT:   debug_value [[BORROWED_STR]] : $String, let, name "t"
+  // CHECK: [[STRMOVE:%.*]] = move_value [var_decl] [[STR]]
+  // CHECK-NEXT:   debug_value [[STRMOVE]] : $String, let, name "t"
+  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STRMOVE]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
-  // CHECK-NEXT:   destroy_value [[STR]] : $String
+  // CHECK-NEXT:   destroy_value [[STRMOVE]] : $String
   // CHECK-NEXT:   return [[RETURN]] : $String
 
   // CHECK: [[NONE_BB]]:
@@ -648,11 +651,12 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : @owned $DerivedClass):
-  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [lexical] [var_decl] [[PTR]]
-  // CHECK-NEXT: debug_value [[BORROWED_PTR]] : $DerivedClass, let, name "result"
+  // CHECK-NEXT: [[MOVED_PTR:%.*]] = move_value [lexical] [var_decl] [[PTR]]
+  // CHECK-NEXT: debug_value [[MOVED_PTR]] : $DerivedClass, let, name "result"
+  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[MOVED_PTR]]
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
   // CHECK-NEXT: end_borrow [[BORROWED_PTR]]
-  // CHECK-NEXT: destroy_value [[PTR]] : $DerivedClass
+  // CHECK-NEXT: destroy_value [[MOVED_PTR]] : $DerivedClass
   // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result
 }

@@ -613,6 +613,16 @@ public:
   /// Return the array of mutable type dependent operands for this instruction.
   MutableArrayRef<Operand> getTypeDependentOperands();
 
+private:
+  struct FilterOperandToRealOperand;
+
+public:
+  using RealOperandRange =
+      OptionalTransformRange<ArrayRef<Operand>, FilterOperandToRealOperand>;
+
+  /// The array of real (i.e. not type-dependent) operands.
+  RealOperandRange getRealOperands() const;
+
   unsigned getNumOperands() const { return getAllOperands().size(); }
 
   unsigned getNumTypeDependentOperands() const {
@@ -1006,6 +1016,18 @@ struct SILInstruction::OperandRefToValue {
   }
 };
 
+struct SILInstruction::FilterOperandToRealOperand {
+  const SILInstruction &i;
+
+  FilterOperandToRealOperand(const SILInstruction &i) : i(i) {}
+
+  llvm::Optional<Operand *> operator()(const Operand &use) const {
+    if (i.isTypeDependentOperand(use))
+      return llvm::None;
+    return {const_cast<Operand *>(&use)};
+  }
+};
+
 struct SILInstruction::NonTypeDependentOperandToValue {
   const SILInstruction &i;
 
@@ -1036,6 +1058,11 @@ struct SILInstruction::OperandToTransformedValue {
     return transformFn(&use);
   }
 };
+
+inline SILInstruction::RealOperandRange
+SILInstruction::getRealOperands() const {
+  return RealOperandRange(getAllOperands(), FilterOperandToRealOperand(*this));
+}
 
 inline SILInstruction::OperandValueRange
 SILInstruction::getOperandValues(ArrayRef<Operand*> operands) {
