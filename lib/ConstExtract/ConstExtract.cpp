@@ -61,14 +61,21 @@ public:
       if (!isa<ProtocolDecl>(NTD) && CheckedDecls.insert(NTD).second) {
         if (NTD->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>()) {
           ConformanceTypeDecls.push_back(NTD);
-          return Action::Continue();
+          goto visitAuxiliaryDecls;
         }
 
         for (auto &Protocol : NTD->getAllProtocols())
-          if (Protocol->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>() ||
-              Protocols.count(Protocol->getName().str().str()) != 0)
+          if (Protocol->getAttrs()
+                  .hasAttribute<ExtractConstantsFromMembersAttr>() ||
+              Protocols.count(Protocol->getName().str().str()) != 0) {
             ConformanceTypeDecls.push_back(NTD);
+            goto visitAuxiliaryDecls;
+          }
       }
+  visitAuxiliaryDecls:
+    // Visit peers expanded from macros
+    D->visitAuxiliaryDecls([&](Decl *decl) { decl->walk(*this); },
+                           /*visitFreestandingExpanded=*/false);
     return Action::Continue();
   }
 
@@ -490,33 +497,36 @@ ConstValueTypeInfo ConstantValueInfoRequest::evaluate(
   std::vector<ConstValueTypePropertyInfo> Properties;
   llvm::Optional<std::vector<EnumElementDeclValue>> EnumCases;
 
-  if (shouldExtract(Decl)) {
-    // Use 'getStoredProperties' to get lowered lazy and wrapped properties
-    auto StoredProperties = Decl->getStoredProperties();
-    std::unordered_set<VarDecl *> StoredPropertiesSet(StoredProperties.begin(),
-                                                      StoredProperties.end());
-    for (auto Property : StoredProperties) {
+  // Use 'getStoredProperties' to get lowered lazy and wrapped properties.
+  // @_objcImplementation extensions might contain stored properties.
+  auto StoredProperties = Decl->getStoredProperties();
+  std::unordered_set<VarDecl *> StoredPropertiesSet(StoredProperties.begin(),
+                                                    StoredProperties.end());
+  for (auto Property : StoredProperties) {
+    if (shouldExtract(Property->getDeclContext())) {
       Properties.push_back(extractTypePropertyInfo(Property));
     }
+  }
 
-    for (auto Member : Decl->getMembers()) {
-      auto *VD = dyn_cast<VarDecl>(Member);
-      // Ignore plain stored properties collected above,
-      // instead gather up remaining static and computed properties.
-      if (!VD || StoredPropertiesSet.count(VD))
-        continue;
-      Properties.push_back(extractTypePropertyInfo(VD));
+  auto extract = [&](class Decl *Member) {
+    // Ignore plain stored properties collected above,
+    // instead gather up remaining static and computed properties.
+    if (auto *VD = dyn_cast<VarDecl>(Member))
+      if (!StoredPropertiesSet.count(VD))
+        Properties.push_back(extractTypePropertyInfo(VD));
+  };
+
+  if (shouldExtract(Decl)) {
+    for (auto Member : Decl->getAllMembers()) {
+      extract(Member);
     }
-
     EnumCases = extractEnumCases(Decl);
   }
 
   for (auto Extension: Decl->getExtensions()) {
     if (shouldExtract(Extension)) {
-      for (auto Member : Extension->getMembers()) {
-        if (auto *VD = dyn_cast<VarDecl>(Member)) {
-          Properties.push_back(extractTypePropertyInfo(VD));
-        }
+      for (auto Member : Extension->getAllMembers()) {
+        extract(Member);
       }
     }
   }
