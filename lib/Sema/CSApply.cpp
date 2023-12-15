@@ -1827,19 +1827,13 @@ namespace {
                                                  dc);
             capture->setImplicit();
             capture->setInterfaceType(base->getType()->mapTypeOutOfContext());
-            
-            NamedPattern *capturePat = new (context) NamedPattern(capture);
-            capturePat->setImplicit();
-            capturePat->setType(base->getType());
-            
-            auto capturePBE = PatternBindingEntry(capturePat,
-                                                  SourceLoc(), base, dc);
-            auto captureDecl = PatternBindingDecl::create(context, SourceLoc(),
-                                                          {}, SourceLoc(),
-                                                          capturePBE,
-                                                          dc);
-            captureDecl->setImplicit();
-            
+
+            auto *capturePat =
+                NamedPattern::createImplicit(context, capture, base->getType());
+
+            auto *captureDecl = PatternBindingDecl::createImplicit(
+                context, StaticSpellingKind::None, capturePat, base, dc);
+
             // Write the closure in terms of the capture.
             auto baseRef = new (context)
               DeclRefExpr(capture, DeclNameLoc(base->getLoc()), /*implicit*/ true);
@@ -5221,19 +5215,14 @@ namespace {
                                           dc);
       outerParam->setImplicit();
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
-      
-      NamedPattern *outerParamPat = new (ctx) NamedPattern(outerParam);
-      outerParamPat->setImplicit();
-      outerParamPat->setType(keyPathTy);
-      
-      auto outerParamPBE = PatternBindingEntry(outerParamPat,
-                                               SourceLoc(), E, dc);
+
+      auto *outerParamPat =
+          NamedPattern::createImplicit(ctx, outerParam, keyPathTy);
+
       solution.setExprTypes(E);
-      auto outerParamDecl = PatternBindingDecl::create(ctx, SourceLoc(),
-                                                       {}, SourceLoc(),
-                                                       outerParamPBE,
-                                                       dc);
-      outerParamDecl->setImplicit();
+      auto *outerParamDecl = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, outerParamPat, E, dc);
+
       auto outerParamCapture = CaptureListEntry(outerParamDecl);
       auto captureExpr = CaptureListExpr::create(ctx, outerParamCapture,
                                                  closure);

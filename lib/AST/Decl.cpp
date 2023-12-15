@@ -1882,27 +1882,18 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling, SourceLoc VarLoc,
                            Pattern *Pat, SourceLoc EqualLoc, Expr *E,
                            DeclContext *Parent) {
-  DeclContext *BindingInitContext = nullptr;
-  if (!Parent->isLocalContext())
-    BindingInitContext = new (Ctx) PatternBindingInitializer(Parent);
-
-  auto PBE = PatternBindingEntry(Pat, EqualLoc, E, BindingInitContext);
-  auto *Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
-
-  if (BindingInitContext)
-    cast<PatternBindingInitializer>(BindingInitContext)->setBinding(Result, 0);
-
-  return Result;
+  // We can provide a null context, 'create' will fill it in for us.
+  // FIXME: This seems dubious, see the comment in 'create'.
+  auto PBE = PatternBindingEntry(Pat, EqualLoc, E, /*InitContext*/ nullptr);
+  return create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
 }
 
 PatternBindingDecl *PatternBindingDecl::createImplicit(
     ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
     DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
-                        Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
+                        Pat, /*EqualLoc*/ SourceLoc(), E, Parent);
   Result->setImplicit();
-  Result->setInit(0, E);
-  Result->setOriginalInit(0, E);
   return Result;
 }
 
@@ -1937,6 +1928,10 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
     auto &newEntry = entries[elt];
     newEntry = pe; // This should take care of initializer with flags
     DeclContext *initContext = pe.getInitContext();
+
+    // FIXME: We ought to reconsider this since it won't recontextualize any
+    // closures/decls present in the initialization expr. This currently should
+    // only affect implicit code though.
     if (!initContext && !Parent->isLocalContext()) {
       auto pbi = new (Ctx) PatternBindingInitializer(Parent);
       pbi->setBinding(PBD, elt);
