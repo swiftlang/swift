@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -36,18 +37,18 @@ public:
 private:
   /// Retrieve the module dependencies for the module with the given name.
   ModuleDependencyVector
-  scanFilesystemForModuleDependency(StringRef moduleName,
+  scanFilesystemForModuleDependency(Identifier moduleName,
                                     const ModuleDependenciesCache &cache,
                                     bool isTestableImport = false);
 
   /// Retrieve the module dependencies for the Clang module with the given name.
   ModuleDependencyVector
-  scanFilesystemForClangModuleDependency(StringRef moduleName,
+  scanFilesystemForClangModuleDependency(Identifier moduleName,
                                          const ModuleDependenciesCache &cache);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   ModuleDependencyVector
-  scanFilesystemForSwiftModuleDependency(StringRef moduleName,
+  scanFilesystemForSwiftModuleDependency(Identifier moduleName,
                                          const ModuleDependenciesCache &cache);
 
   // An AST delegate for interface scanning.
@@ -134,6 +135,8 @@ private:
   /// available to this scanner.
   template <typename Function, typename... Args>
   auto withDependencyScanningWorker(Function &&F, Args &&...ArgList);
+
+  Identifier getModuleImportIdentifier(StringRef moduleName);
 
 private:
   const CompilerInvocation &ScanCompilerInvocation;

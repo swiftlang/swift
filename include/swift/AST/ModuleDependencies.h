@@ -915,10 +915,6 @@ public:
     return Mapper->mapToString(Path);
   }
 
-  /// Wrap the filesystem on the specified `CompilerInstance` with a
-  /// caching `DependencyScanningWorkerFilesystem`
-  void overlaySharedFilesystemCacheForCompilation(CompilerInstance &Instance);
-
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
 private:

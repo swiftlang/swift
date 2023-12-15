@@ -407,7 +407,7 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
 }
 
 ModuleDependencyVector
-ClangImporter::getModuleDependencies(StringRef moduleName,
+ClangImporter::getModuleDependencies(Identifier moduleName,
                                      StringRef moduleOutputPath,
                                      llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                                      const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
@@ -435,14 +435,14 @@ ClangImporter::getModuleDependencies(StringRef moduleName,
 
   auto clangModuleDependencies =
       clangScanningTool.getModuleDependencies(
-          moduleName, commandLineArgs, workingDir,
+          moduleName.str(), commandLineArgs, workingDir,
           alreadySeenClangModules, lookupModuleOutput);
   if (!clangModuleDependencies) {
     auto errorStr = toString(clangModuleDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
     // scanner will report such an error only if all of the module loaders
     // fail as well.
-    if (errorStr.find("fatal error: module '" + moduleName.str() +
+    if (errorStr.find("fatal error: module '" + moduleName.str().str() +
                       "' not found") == std::string::npos)
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          errorStr);

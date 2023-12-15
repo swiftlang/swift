@@ -440,7 +440,7 @@ public:
       StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(StringRef moduleName, StringRef moduleOutputPath,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
                         llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
