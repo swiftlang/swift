@@ -99,7 +99,7 @@ extension MainActor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension MainActor {
   /// A safe way to synchronously assume that the current execution context belongs to the MainActor.
   ///
@@ -114,7 +114,8 @@ extension MainActor {
   /// if another actor uses the same serial executor--by using ``MainActor/sharedUnownedExecutor``
   /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
   /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
   public static func assumeIsolated<T>(
       _ operation: @MainActor () throws -> T,
