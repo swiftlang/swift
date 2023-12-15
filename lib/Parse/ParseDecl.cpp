@@ -8536,9 +8536,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
             Status.setIsParseError();
           }
 
-          TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
-                                                           TP->getTypeRepr());
-          NewTP->setPropagatedType();
+          auto *NewTP = TypedPattern::createPropagated(Context, PrevPat,
+                                                       TP->getTypeRepr());
           PBDEntries[i-1].setPattern(NewTP);
         }
       }
