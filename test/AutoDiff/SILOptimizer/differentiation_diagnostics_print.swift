@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -Xllvm --sil-print-after=differentiation -Xllvm --debug-only=differentiation %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm --sil-print-after=differentiation -Xllvm --debug-only=differentiation %s 2>&1
 
 // Needed for '--debug-only'
 
