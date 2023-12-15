@@ -2304,6 +2304,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::CaughtError:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2665,6 +2666,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::CaughtError:
     return true;
   }
 
@@ -3186,6 +3188,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ExplicitGenericArguments:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::CaughtError:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -6965,6 +6968,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ExplicitGenericArguments:
     case ConstraintKind::SameShape:
     case ConstraintKind::MaterializePackExpansion:
+    case ConstraintKind::CaughtError:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -13648,6 +13652,17 @@ ConstraintSystem::simplifyMaterializePackExpansionConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyCaughtErrorConstraint(
+    Type type,
+    CatchNode catchNode,
+    TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  Type caughtErrorType = inferCaughtErrorType(catchNode);
+  addConstraint(ConstraintKind::Bind, type, caughtErrorType, locator);
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
@@ -15293,6 +15308,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::FallbackType:
   case ConstraintKind::SyntacticElement:
+  case ConstraintKind::CaughtError:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -15878,6 +15894,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::MaterializePackExpansion:
     return simplifyMaterializePackExpansionConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ llvm::None, constraint.getLocator());
+
+  case ConstraintKind::CaughtError:
+    return simplifyCaughtErrorConstraint(
+        constraint.getFirstType(), constraint.getCatchNode(),
         /*flags*/ llvm::None, constraint.getLocator());
   }
 

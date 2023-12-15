@@ -1680,7 +1680,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out << "\n";
     });
     out << "\n";
-
   }
 }
 
