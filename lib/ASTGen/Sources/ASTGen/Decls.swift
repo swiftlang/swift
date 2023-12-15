@@ -288,7 +288,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  private func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind {
+  private func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
     switch specifier.keywordKind {
     case .get:
       return .get
@@ -300,15 +300,7 @@ extension ASTGenVisitor {
       return .willSet
     case .unsafeAddress:
       return .address
-    case .addressWithOwner:
-      return .address
-    case .addressWithNativeOwner:
-      return .address
     case .unsafeMutableAddress:
-      return .mutableAddress
-    case .mutableAddressWithOwner:
-      return .mutableAddress
-    case .mutableAddressWithNativeOwner:
       return .mutableAddress
     case ._read:
       return .read
@@ -317,18 +309,24 @@ extension ASTGenVisitor {
     case .`init`:
       return .`init`
     default:
-      fatalError("Should have diagnosed this")
+      self.diagnose(Diagnostic(node: specifier, message: UnknownAccessorSpecifierError(specifier)))
+      return nil
     }
   }
 
   private func generate(
     accessorDecl node: AccessorDeclSyntax,
     for storage: BridgedAbstractStorageDecl
-  ) -> BridgedAccessorDecl {
+  ) -> BridgedAccessorDecl? {
+    guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier) else {
+      // TODO: We could potentially recover if this is the first accessor by treating
+      // it as an implicit getter.
+      return nil
+    }
     let accessor = BridgedAccessorDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
-      kind: self.generate(accessorSpecifier: node.accessorSpecifier),
+      kind: kind,
       storage: storage,
       declLoc: self.generateSourceLoc(node.accessorSpecifier),
       accessorKeywordLoc: self.generateSourceLoc(node.accessorSpecifier),
@@ -358,7 +356,9 @@ extension ASTGenVisitor {
     case .accessors(let accessors):
       return BridgedAccessorRecord(
         lBraceLoc: leftBrace,
-        accessors: accessors.lazy.map { self.generate(accessorDecl: $0, for: storage) }.bridgedArray(in: self),
+        accessors: accessors.lazy.compactMap {
+          self.generate(accessorDecl: $0, for: storage)
+        }.bridgedArray(in: self),
         rBraceLoc: rightBrace
       )
     case .getter(let codeBlock):

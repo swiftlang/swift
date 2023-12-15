@@ -101,3 +101,14 @@ struct NonTrivialPatternForAccessorError: ASTGenError {
     "getter/setter can only be defined for a single variable"
   }
 }
+
+struct UnknownAccessorSpecifierError: ASTGenError {
+  var specifier: TokenSyntax
+  init(_ specifier: TokenSyntax) {
+    self.specifier = specifier
+  }
+
+  var message: String {
+    "unknown accessor specifier '\(specifier.text)'"
+  }
+}
