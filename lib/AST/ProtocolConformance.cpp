@@ -71,7 +71,8 @@ void Witness::dump() const { dump(llvm::errs()); }
 void Witness::dump(llvm::raw_ostream &out) const {
   out << "Witness: ";
   if (auto decl = this->getDecl()) {
-    decl->print(out);
+    decl->dumpRef(out);
+    out << "\n";
   } else {
     out << "<no decl>\n";
   }
