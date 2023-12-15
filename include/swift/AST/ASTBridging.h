@@ -397,6 +397,27 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 // MARK: Decls
 //===----------------------------------------------------------------------===//
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessorKind {
+#define ACCESSOR(ID) BridgedAccessorKind##ID,
+#include "swift/AST/AccessorKinds.def"
+};
+
+struct BridgedAccessorRecord {
+  BridgedSourceLoc lBraceLoc;
+  BridgedArrayRef accessors;
+  BridgedSourceLoc rBraceLoc;
+};
+
+SWIFT_NAME("BridgedAccessorDecl.createParsed(_:declContext:kind:storage:"
+           "declLoc:accessorKeywordLoc:parameterList:asyncSpecifierLoc:"
+           "throwsSpecifierLoc:thrownType:)")
+BridgedAccessorDecl BridgedAccessorDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
+    BridgedSourceLoc cDeclLoc, BridgedSourceLoc cAccessorKeywordLoc,
+    BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType);
+
 SWIFT_NAME(
     "BridgedPatternBindingDecl.createParsed(_:declContext:bindingKeywordLoc:"
     "entries:isStatic:isLet:)")
@@ -631,6 +652,22 @@ SWIFT_NAME("BridgedDecl.dump(self:)")
 void BridgedDecl_dump(BridgedDecl decl);
 
 //===----------------------------------------------------------------------===//
+// MARK: AbstractStorageDecl
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("BridgedAbstractStorageDecl.setAccessors(self:_:)")
+void BridgedAbstractStorageDecl_setAccessors(
+    BridgedAbstractStorageDecl cStorage, BridgedAccessorRecord accessors);
+
+//===----------------------------------------------------------------------===//
+// MARK: AccessorDecl
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("BridgedAccessorDecl.setParsedBody(self:_:)")
+void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
+                                       BridgedBraceStmt body);
+
+//===----------------------------------------------------------------------===//
 // MARK: NominalTypeDecl
 //===----------------------------------------------------------------------===//
 
@@ -661,6 +698,11 @@ void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
 SWIFT_NAME("BridgedVarDecl.getUserFacingName(self:)")
 BRIDGED_INLINE
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
+
+SWIFT_NAME("getter:BridgedVarDecl.asAbstractStorageDecl(self:)")
+BRIDGED_INLINE
+BridgedAbstractStorageDecl
+BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl);
 
 //===----------------------------------------------------------------------===//
 // MARK: Exprs
@@ -1132,6 +1174,9 @@ void BridgedTypeRepr_dump(BridgedTypeRepr type);
 //===----------------------------------------------------------------------===//
 // MARK: Patterns
 //===----------------------------------------------------------------------===//
+
+SWIFT_NAME("getter:BridgedPattern.singleVar(self:)")
+BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern);
 
 SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,

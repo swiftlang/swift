@@ -122,6 +122,27 @@ extension ASTGenVisitor {
       rightParenLoc: self.generateSourceLoc(node.rightParen)
     )
   }
+
+  func generate(accessorParameters node: AccessorParametersSyntax) -> BridgedParameterList {
+    let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    let param = BridgedParamDecl.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      specifierLoc: nil,
+      firstName: nil,
+      firstNameLoc: nil,
+      secondName: name,
+      secondNameLoc: nameLoc,
+      type: nil,
+      defaultValue: nil
+    )
+    return .createParsed(
+      self.ctx,
+      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      parameters: CollectionOfOne(param).bridgedArray(in: self),
+      rightParenLoc: self.generateSourceLoc(node.rightParen)
+    )
+  }
 }
 
 extension ASTGenVisitor {

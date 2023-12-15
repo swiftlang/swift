@@ -95,3 +95,9 @@ struct DuplicateSyntaxError: ASTGenError {
     """
   }
 }
+
+struct NonTrivialPatternForAccessorError: ASTGenError {
+  var message: String {
+    "getter/setter can only be defined for a single variable"
+  }
+}

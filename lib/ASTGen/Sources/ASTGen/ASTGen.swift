@@ -307,6 +307,11 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
+  func generate(accessorParameters node: AccessorParametersSyntax?) -> BridgedNullableParameterList {
+    node.map(generate(accessorParameters:)).asNullable
+  }
+
+  @inline(__always)
   func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
     node.map(generate(inheritedTypeList:)) ?? .init()
   }
@@ -343,6 +348,15 @@ extension Collection {
     }
 
     return .init(data: baseAddress, count: self.count)
+  }
+}
+
+extension CollectionOfOne {
+  /// Returns a single element as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+    let buffer = astgen.allocator.allocate(Element.self, count: 1)
+    _ = buffer.initialize(from: self)
+    return .init(data: buffer.baseAddress, count: 1)
   }
 }
 

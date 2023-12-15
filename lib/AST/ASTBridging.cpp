@@ -48,6 +48,10 @@ static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
   }
 }
 
+static AccessorKind unbridged(BridgedAccessorKind kind) {
+  return static_cast<AccessorKind>(kind);
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: Identifier
 //===----------------------------------------------------------------------===//
@@ -347,6 +351,19 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 //===----------------------------------------------------------------------===//
 // MARK: Decls
 //===----------------------------------------------------------------------===//
+
+BridgedAccessorDecl BridgedAccessorDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
+    BridgedSourceLoc cDeclLoc, BridgedSourceLoc cAccessorKeywordLoc,
+    BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType) {
+  return AccessorDecl::createParsed(
+      cContext.unbridged(), unbridged(cKind), cStorage.unbridged(),
+      cDeclLoc.unbridged(), cAccessorKeywordLoc.unbridged(),
+      cParamList.unbridged(), cAsyncLoc.unbridged(), cThrowsLoc.unbridged(),
+      cThrownType.unbridged(), cDeclContext.unbridged());
+}
 
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
@@ -868,6 +885,28 @@ BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createExpr(
                                  cEndLoc.unbridged(),
                                  /*Implicit=*/true);
   return new (context) TopLevelCodeDecl(declContext, Brace);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: AbstractStorageDecl
+//===----------------------------------------------------------------------===//
+
+void BridgedAbstractStorageDecl_setAccessors(
+    BridgedAbstractStorageDecl cStorage, BridgedAccessorRecord accessors) {
+  cStorage.unbridged()->setAccessors(
+      accessors.lBraceLoc.unbridged(),
+      accessors.accessors.unbridged<AccessorDecl *>(),
+      accessors.rBraceLoc.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: AccessorDecl
+//===----------------------------------------------------------------------===//
+
+void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
+                                       BridgedBraceStmt body) {
+  decl.unbridged()->setBody(body.unbridged(),
+                            AbstractFunctionDecl::BodyKind::Parsed);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1569,6 +1608,10 @@ BridgedExistentialTypeRepr_createParsed(BridgedASTContext cContext,
 //===----------------------------------------------------------------------===//
 // MARK: Patterns
 //===----------------------------------------------------------------------===//
+
+BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern) {
+  return cPattern.unbridged()->getSingleVar();
+}
 
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc) {

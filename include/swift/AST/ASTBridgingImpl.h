@@ -53,6 +53,11 @@ BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl) {
   return decl.unbridged()->getBaseName().userFacingName();
 }
 
+BridgedAbstractStorageDecl
+BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl) {
+  return decl.unbridged();
+}
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // SWIFT_AST_ASTBRIDGINGIMPL_H

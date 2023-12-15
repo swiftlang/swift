@@ -21,7 +21,7 @@ extension ASTGenVisitor {
   func generate(decl node: DeclSyntax) -> BridgedDecl {
     switch node.as(DeclSyntaxEnum.self) {
     case .accessorDecl:
-      break
+      fatalError("Should be generated as a part of another decl")
     case .actorDecl(let node):
       return self.generate(actorDecl: node).asDecl
     case .associatedTypeDecl(let node):
@@ -288,6 +288,109 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
+  private func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind {
+    switch specifier.keywordKind {
+    case .get:
+      return .get
+    case .set:
+      return .set
+    case .didSet:
+      return .didSet
+    case .willSet:
+      return .willSet
+    case .unsafeAddress:
+      return .address
+    case .addressWithOwner:
+      return .address
+    case .addressWithNativeOwner:
+      return .address
+    case .unsafeMutableAddress:
+      return .mutableAddress
+    case .mutableAddressWithOwner:
+      return .mutableAddress
+    case .mutableAddressWithNativeOwner:
+      return .mutableAddress
+    case ._read:
+      return .read
+    case ._modify:
+      return .modify
+    case .`init`:
+      return .`init`
+    default:
+      fatalError("Should have diagnosed this")
+    }
+  }
+
+  private func generate(
+    accessorDecl node: AccessorDeclSyntax,
+    for storage: BridgedAbstractStorageDecl
+  ) -> BridgedAccessorDecl {
+    let accessor = BridgedAccessorDecl.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      kind: self.generate(accessorSpecifier: node.accessorSpecifier),
+      storage: storage,
+      declLoc: self.generateSourceLoc(node.accessorSpecifier),
+      accessorKeywordLoc: self.generateSourceLoc(node.accessorSpecifier),
+      parameterList: self.generate(accessorParameters: node.parameters),
+      asyncSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.asyncSpecifier),
+      throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
+      thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
+    )
+    if let body = node.body {
+      self.withDeclContext(accessor.asDeclContext) {
+        accessor.setParsedBody(self.generate(codeBlock: body))
+      }
+    }
+    return accessor
+  }
+
+  private func generate(
+    accessorBlock: AccessorBlockSyntax,
+    for storage: BridgedAbstractStorageDecl
+  ) -> BridgedAccessorRecord {
+    let leftBrace = self.generateSourceLoc(accessorBlock.leftBrace)
+    let rightBrace = self.generateSourceLoc(accessorBlock.rightBrace)
+
+    // FIXME: We need to handle the diagnostics in ParsedAccessors::classify,
+    // or defer them to the type-checker.
+    switch accessorBlock.accessors {
+    case .accessors(let accessors):
+      return BridgedAccessorRecord(
+        lBraceLoc: leftBrace,
+        accessors: accessors.lazy.map { self.generate(accessorDecl: $0, for: storage) }.bridgedArray(in: self),
+        rBraceLoc: rightBrace
+      )
+    case .getter(let codeBlock):
+      let accessor = BridgedAccessorDecl.createParsed(
+        self.ctx,
+        declContext: self.declContext,
+        kind: .get,
+        storage: storage,
+        declLoc: leftBrace,
+        accessorKeywordLoc: nil,
+        parameterList: nil,
+        asyncSpecifierLoc: nil,
+        throwsSpecifierLoc: nil,
+        thrownType: nil
+      )
+      self.withDeclContext(accessor.asDeclContext) {
+        let brace = BridgedBraceStmt.createParsed(
+          self.ctx,
+          lBraceLoc: leftBrace,
+          elements: self.generate(codeBlockItemList: codeBlock),
+          rBraceLoc: rightBrace
+        )
+        accessor.setParsedBody(brace)
+      }
+      return BridgedAccessorRecord(
+        lBraceLoc: leftBrace,
+        accessors: CollectionOfOne(accessor).bridgedArray(in: self),
+        rBraceLoc: rightBrace
+      )
+    }
+  }
+
   func generate(patternBinding binding: PatternBindingSyntax) -> BridgedPatternBindingEntry {
     let pattern = generate(pattern: binding.pattern)
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
@@ -303,6 +406,16 @@ extension ASTGenVisitor {
       }
       initExpr = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
         generate(expr: initializer.value)
+      }
+    }
+    if let accessors = binding.accessorBlock {
+      // FIXME: We ought to have a better way of converting from the Nullable
+      // wrapper back to Optional.
+      if let primaryVar = pattern.singleVar.raw.map(BridgedVarDecl.init) {
+        let storage = primaryVar.asAbstractStorageDecl
+        storage.setAccessors(generate(accessorBlock: accessors, for: storage))
+      } else {
+        self.diagnose(Diagnostic(node: binding.pattern, message: NonTrivialPatternForAccessorError()))
       }
     }
     return BridgedPatternBindingEntry(
