@@ -18,7 +18,7 @@ extension BeginBorrowInst : OnoneSimplifyable {
        // We need to keep lexical lifetimes in place.
        !isLexical,
        // The same for borrow-scopes which encapsulated pointer escapes.
-       !hasPointerEscape
+       !findPointerEscapingUse(of: borrowedValue)
     {
       tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context)
     }

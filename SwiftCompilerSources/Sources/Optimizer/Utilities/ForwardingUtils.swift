@@ -12,6 +12,20 @@
 
 import SIL
 
+/// Return true if any use in `value`s forward-extend lifetime has
+/// .pointerEscape operand ownership.
+///
+/// TODO: the C++ implementation does not yet gather all
+/// forward-extended lifetime introducers.
+///
+/// TODO: Add [pointer_escape] flags to MoveValue, BeginBorrow, and
+/// Allocation. Then add a `Value.hasPointerEscapingUse` property that
+/// performs the use-def walk to pickup the flags. Then only call into
+/// this def-use walk to initially set the flags.
+func findPointerEscapingUse(of value: Value) -> Bool {
+  value.bridged.findPointerEscape()
+}
+
 // Visit the introducers of a forwarded lifetime (Value -> LifetimeIntroducer).
 //
 // A lifetime introducer produces an initial OSSA lifetime which may be extended by forwarding instructions. The introducer is never itself the result of a ForwardingInstruction. Example:
