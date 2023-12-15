@@ -253,7 +253,9 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             // Required modules.
             auto adjacentBinaryModuleRequiredImports = getImportsOfModule(
                 *adjacentBinaryModule, ModuleLoadingBehavior::Required,
-                isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+                isFramework, isRequiredOSSAModules(),
+                isRequiredNoncopyableGenerics(),
+                Ctx.LangOpts.SDKName,
                 Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
                 Ctx.SearchPathOpts.DeserializedPathRecoverer);
             if (!adjacentBinaryModuleRequiredImports)
@@ -281,7 +283,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             // Optional modules. Will be looked-up on a best-effort basis
             auto adjacentBinaryModuleOptionalImports = getImportsOfModule(
                 *adjacentBinaryModule, ModuleLoadingBehavior::Optional,
-                isFramework, isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+                isFramework, isRequiredOSSAModules(),
+                isRequiredNoncopyableGenerics(), Ctx.LangOpts.SDKName,
                 Ctx.LangOpts.PackageName, Ctx.SourceMgr.getFileSystem().get(),
                 Ctx.SearchPathOpts.DeserializedPathRecoverer);
             if (!adjacentBinaryModuleOptionalImports)

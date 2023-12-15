@@ -109,7 +109,8 @@ protected:
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
         prebuiltCacheDir, ModuleInterfaceLoaderOptions(),
-        swift::RequireOSSAModules_t(silOpts)));
+        swift::RequireOSSAModules_t(silOpts),
+        swift::RequireNoncopyableGenerics_t(langOpts)));
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, *static_cast<ModuleInterfaceCheckerImpl*>(
@@ -149,7 +150,9 @@ protected:
 
     auto bufData = (*bufOrErr)->getBuffer();
     auto validationInfo = serialization::validateSerializedAST(
-        bufData, silOpts.EnableOSSAModules, /*requiredSDK*/StringRef());
+        bufData, silOpts.EnableOSSAModules,
+        langOpts.hasFeature(Feature::NoncopyableGenerics),
+        /*requiredSDK*/StringRef());
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());
   }
