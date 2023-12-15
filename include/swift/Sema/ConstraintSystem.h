@@ -3428,6 +3428,14 @@ public:
   /// Determine the caught error type for the given catch node.
   Type getCaughtErrorType(CatchNode node);
 
+  /// Infer the caught error type for this catch node, once we have all of
+  /// the potential throw sites.
+  Type inferCaughtErrorType(CatchNode node);
+
+  /// Return the type variable that represents the inferred thrown error
+  /// type for this closure, or NULL if the thrown error type is not inferred.
+  TypeVariableType *getInferredThrownError(ClosureExpr *closure);
+
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *
@@ -5205,6 +5213,12 @@ private:
   simplifyMaterializePackExpansionConstraint(Type type1, Type type2,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
+
+  /// Compute the caught error type for a given catch node.
+  SolutionKind
+  simplifyCaughtErrorConstraint(Type caughtError, CatchNode catchNode,
+                                TypeMatchOptions flags,
+                                ConstraintLocatorBuilder locator);
 
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.

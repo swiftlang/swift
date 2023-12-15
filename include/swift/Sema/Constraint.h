@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CONSTRAINT_H
 
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -221,6 +222,10 @@ enum class ConstraintKind : char {
   /// The first type is a tuple containing a single unlabeled element that is a
   /// pack expansion. The second type is its pattern type.
   MaterializePackExpansion,
+  /// The first type is the thrown error type, and the second entry is a
+  /// CatchNode whose potential throw sites will be collected to determine
+  /// the thrown error type.
+  CaughtError,
 };
 
 /// Classification of the different kinds of constraints.
@@ -444,6 +449,14 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     } Overload;
 
     struct {
+      /// The first type, which represents the thrown error type.
+      Type First;
+
+      /// The catch node, for which the potential throw sites
+      CatchNode Node;
+    } CaughtError;
+
+    struct {
       /// The node itself.
       ASTNode Element;
       /// Contextual information associated with the element (if any).
@@ -507,6 +520,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
+  /// Construct a caught error constraint.
+  Constraint(Type type, CatchNode catchNode,
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+      
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
     return { getTrailingObjects<TypeVariableType *>(), NumTypeVariables };
@@ -602,6 +620,13 @@ public:
                                               ConstraintLocator *locator,
                                               bool isDiscarded = false);
 
+  /// Construct a caught error constraint.
+  static Constraint *createCaughtError(
+      ConstraintSystem &cs,
+      Type type, CatchNode catchNode,
+      ConstraintLocator *locator,
+      ArrayRef<TypeVariableType *> referencedVars);
+
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
 
@@ -691,6 +716,7 @@ public:
     case ConstraintKind::PackElementOf:
     case ConstraintKind::SameShape:
     case ConstraintKind::MaterializePackExpansion:
+    case ConstraintKind::CaughtError:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
@@ -743,6 +769,9 @@ public:
     case ConstraintKind::SyntacticElement:
       llvm_unreachable("closure body element constraint has no type operands");
 
+    case ConstraintKind::CaughtError:
+      return CaughtError.First;
+
     default:
       return Types.First;
     }
@@ -755,6 +784,7 @@ public:
     case ConstraintKind::Conjunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::SyntacticElement:
+    case ConstraintKind::CaughtError:
       llvm_unreachable("constraint has no second type");
 
     case ConstraintKind::ValueMember:
@@ -876,6 +906,11 @@ public:
   bool isDiscardedElement() const {
     assert(Kind == ConstraintKind::SyntacticElement);
     return SyntacticElement.IsDiscarded;
+  }
+
+  CatchNode getCatchNode() const {
+    assert(Kind == ConstraintKind::CaughtError);
+    return CaughtError.Node;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure
