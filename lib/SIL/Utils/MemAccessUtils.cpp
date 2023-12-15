@@ -775,11 +775,11 @@ LLVM_ATTRIBUTE_USED void AccessBase::dump() const { print(llvm::dbgs()); }
 
 bool swift::isIdentityPreservingRefCast(SingleValueInstruction *svi) {
   // Ignore both copies and other identity and ownership preserving casts
-  return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi)
-         || isa<EndInitLetRefInst>(svi)
-         || isa<BeginDeallocRefInst>(svi)
-         || isa<EndCOWMutationInst>(svi)
-         || isIdentityAndOwnershipPreservingRefCast(svi);
+  return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi) ||
+         isa<EndInitLetRefInst>(svi) || isa<BeginDeallocRefInst>(svi) ||
+         isa<EndCOWMutationInst>(svi) ||
+         isa<MarkUnresolvedReferenceBindingInst>(svi) ||
+         isIdentityAndOwnershipPreservingRefCast(svi);
 }
 
 // On some platforms, casting from a metatype to a reference type dynamically

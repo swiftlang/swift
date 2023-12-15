@@ -199,6 +199,14 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
     temp = getUnderlyingObject(temp);
 
+    if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
+      if (isa<ExplicitCopyValueInst, CopyableToMoveOnlyWrapperValueInst,
+              MoveOnlyWrapperToCopyableValueInst,
+              MoveOnlyWrapperToCopyableBoxInst>(svi)) {
+        temp = svi->getOperand(0);
+      }
+    }
+
     if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
             temp->getDefiningInstruction())) {
       temp = dsi->getOperand();
@@ -241,6 +249,56 @@ struct TermArgSources {
   void addValues(ValueRangeTy valueRange, SILBasicBlock *destBlock) {
     for (auto pair : llvm::enumerate(valueRange))
       argSources.insert(destBlock->getArgument(pair.index()), pair.value());
+  }
+
+  TermArgSources() {}
+
+  void init(SILInstruction *inst) {
+    switch (cast<TermInst>(inst)->getTermKind()) {
+    case TermKind::UnreachableInst:
+    case TermKind::ReturnInst:
+    case TermKind::ThrowInst:
+    case TermKind::ThrowAddrInst:
+    case TermKind::YieldInst:
+    case TermKind::UnwindInst:
+    case TermKind::TryApplyInst:
+    case TermKind::SwitchValueInst:
+    case TermKind::SwitchEnumInst:
+    case TermKind::SwitchEnumAddrInst:
+    case TermKind::AwaitAsyncContinuationInst:
+    case TermKind::CheckedCastAddrBranchInst:
+      llvm_unreachable("Unsupported?!");
+
+    case TermKind::BranchInst:
+      return init(cast<BranchInst>(inst));
+
+    case TermKind::CondBranchInst:
+      return init(cast<CondBranchInst>(inst));
+
+    case TermKind::DynamicMethodBranchInst:
+      return init(cast<DynamicMethodBranchInst>(inst));
+
+    case TermKind::CheckedCastBranchInst:
+      return init(cast<CheckedCastBranchInst>(inst));
+    }
+
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+private:
+  void init(BranchInst *bi) { addValues(bi->getArgs(), bi->getDestBB()); }
+
+  void init(CondBranchInst *cbi) {
+    addValues(cbi->getTrueArgs(), cbi->getTrueBB());
+    addValues(cbi->getFalseArgs(), cbi->getFalseBB());
+  }
+
+  void init(DynamicMethodBranchInst *dmBranchInst) {
+    addValues({dmBranchInst->getOperand()}, dmBranchInst->getHasMethodBB());
+  }
+
+  void init(CheckedCastBranchInst *ccbi) {
+    addValues({ccbi->getOperand()}, ccbi->getSuccessBB());
   }
 };
 
@@ -979,6 +1037,10 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
+//===----------------------------------------------------------------------===//
+//                          MARK: PartitionOpBuilder
+//===----------------------------------------------------------------------===//
+
 class PartitionOpTranslator;
 
 struct PartitionOpBuilder {
@@ -1077,6 +1139,124 @@ struct PartitionOpBuilder {
 
   void print(llvm::raw_ostream &os) const;
 };
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
+//                     MARK: Top Level Translator Struct
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+enum class TranslationSemantics {
+  /// An instruction that does not affect region based state or if it does we
+  /// would like to error on some other use. An example would be something
+  /// like end_borrow, inject_enum_addr, or alloc_global. We do not produce
+  /// any partition op.
+  Ignored,
+
+  /// An instruction whose result produces a completely new region. E.x.:
+  /// alloc_box, alloc_pack, key_path. This results in the translator
+  /// producing a partition op that introduces the new region.
+  AssignFresh,
+
+  /// An instruction that merges together all of its operands regions and
+  /// assigns all of its results to be that new merged region. If the
+  /// instruction does not have any non-Sendable operands, we produce a new
+  /// singular region that all of the results are assigned to.
+  ///
+  /// From a partition op perspective, we emit require partition ops for each
+  /// of the operands of the instruction, then merge the operand partition
+  /// ops. If we do not have any non-Sendable operands, we then create an
+  /// assign fresh op for the first result. If we do, we assign the first
+  /// result to that merged region. Regardless of the case, we then assign all
+  /// of the rest of the results to the region of the first operand.
+  Assign,
+
+  /// An instruction that getUnderlyingTrackedValue looks through and thus we
+  /// look through from a region translation perspective. The result of this
+  /// is we do not produce a new partition op and just assert that
+  /// getUnderlyingTrackedValue can look through the instruction.
+  LookThrough,
+
+  /// Emit require partition ops for each operand of the instruction.
+  Require,
+
+  /// A "CopyLikeInstruction" with a Dest and Src operand value. If the store
+  /// is considered to be to unaliased store (computed through a combination
+  /// of AccessStorage's isUniquelyIdentified check and a custom search for
+  /// captures by partial apply), then we treat this like an assignment of src
+  /// to dest and emit assign partition ops. Otherwise, we emit merge
+  /// partition ops so that we merge the old region of dest into the new src
+  /// region. This ensures in the case of our value being captured by a
+  /// closure, we do not lose that the closure could affect the memory
+  /// location.
+  Store,
+
+  /// An instruction that is not handled in a standardized way. Examples:
+  ///
+  /// 1. Select insts.
+  /// 2. Instructions without a constant way of being handled that change
+  ///    their behavior depending on some state on the instruction itself.
+  Special,
+
+  /// An instruction that is a full apply site. Can cause transfering or
+  /// untransferring of regions.
+  Apply,
+
+  /// A terminator instruction that acts like a phi in terms of its region.
+  TerminatorPhi,
+
+  /// An instruction that we do not handle yet. Just for now during bring
+  /// up. Will be removed.
+  Unhandled,
+};
+
+} // namespace
+
+namespace llvm {
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              TranslationSemantics semantics) {
+  switch (semantics) {
+  case TranslationSemantics::Ignored:
+    os << "ignored";
+    return os;
+  case TranslationSemantics::AssignFresh:
+    os << "assign_fresh";
+    return os;
+  case TranslationSemantics::Assign:
+    os << "assign";
+    return os;
+  case TranslationSemantics::LookThrough:
+    os << "look_through";
+    return os;
+  case TranslationSemantics::Require:
+    os << "require";
+    return os;
+  case TranslationSemantics::Store:
+    os << "store";
+    return os;
+  case TranslationSemantics::Special:
+    os << "special";
+    return os;
+  case TranslationSemantics::Apply:
+    os << "apply";
+    return os;
+  case TranslationSemantics::TerminatorPhi:
+    os << "terminator_phi";
+    return os;
+  case TranslationSemantics::Unhandled:
+    os << "unhandled";
+    return os;
+  }
+
+  llvm_unreachable("Covered switch isn't covered?!");
+}
+
+} // namespace llvm
+
+namespace {
 
 /// PartitionOpTranslator is responsible for performing the translation from
 /// SILInstructions to PartitionOps. Not all SILInstructions have an effect on
@@ -1895,322 +2075,6 @@ public:
     }
   }
 
-  /// Top level switch that translates SIL instructions.
-  void translateSILInstruction(SILInstruction *inst) {
-    builder.reset(inst);
-    SWIFT_DEFER { LLVM_DEBUG(builder.print(llvm::dbgs())); };
-
-    switch (inst->getKind()) {
-    // The following instructions are treated as assigning their result to a
-    // fresh region.
-    case SILInstructionKind::AllocBoxInst:
-    case SILInstructionKind::AllocPackInst:
-    case SILInstructionKind::AllocRefDynamicInst:
-    case SILInstructionKind::AllocRefInst:
-    case SILInstructionKind::AllocStackInst:
-    case SILInstructionKind::KeyPathInst:
-    case SILInstructionKind::FunctionRefInst:
-    case SILInstructionKind::DynamicFunctionRefInst:
-    case SILInstructionKind::PreviousDynamicFunctionRefInst:
-    case SILInstructionKind::GlobalAddrInst:
-    case SILInstructionKind::GlobalValueInst:
-    case SILInstructionKind::IntegerLiteralInst:
-    case SILInstructionKind::FloatLiteralInst:
-    case SILInstructionKind::StringLiteralInst:
-    case SILInstructionKind::HasSymbolInst:
-    case SILInstructionKind::ObjCProtocolInst:
-    case SILInstructionKind::WitnessMethodInst:
-      return translateSILAssignFresh(inst->getResult(0));
-
-    case SILInstructionKind::SelectEnumAddrInst:
-    case SILInstructionKind::SelectEnumInst:
-      return translateSILSelectEnum(inst);
-
-    // These are instructions that we treat as true assigns since we want to
-    // error semantically upon them if there is a use of one of these. For
-    // example, a cast would be inappropriate here. This is implemented by
-    // propagating the operand's region into the result's region and by
-    // requiring all operands.
-    case SILInstructionKind::LoadInst:
-    case SILInstructionKind::LoadBorrowInst:
-    case SILInstructionKind::LoadWeakInst:
-    case SILInstructionKind::StrongCopyUnownedValueInst:
-    case SILInstructionKind::ClassMethodInst:
-    case SILInstructionKind::ObjCMethodInst:
-    case SILInstructionKind::SuperMethodInst:
-    case SILInstructionKind::ObjCSuperMethodInst:
-      return translateSILAssign(inst->getResult(0), inst->getOperand(0));
-
-    // Instructions that getUnderlyingTrackedValue is guaranteed to look through
-    // and whose operand and result are guaranteed to be mapped to the same
-    // underlying region.
-    //
-    // NOTE: translateSILLookThrough asserts that this property is true.
-    case SILInstructionKind::BeginAccessInst:
-    case SILInstructionKind::BeginBorrowInst:
-    case SILInstructionKind::BeginDeallocRefInst:
-    case SILInstructionKind::RefToBridgeObjectInst:
-    case SILInstructionKind::BridgeObjectToRefInst:
-    case SILInstructionKind::CopyValueInst:
-    case SILInstructionKind::EndCOWMutationInst:
-    case SILInstructionKind::ProjectBoxInst:
-    case SILInstructionKind::EndInitLetRefInst:
-    case SILInstructionKind::InitEnumDataAddrInst:
-    case SILInstructionKind::OpenExistentialAddrInst:
-    case SILInstructionKind::UncheckedRefCastInst:
-    case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-    case SILInstructionKind::UpcastInst:
-      return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
-
-    case SILInstructionKind::TupleElementAddrInst:
-    case SILInstructionKind::StructElementAddrInst: {
-      auto *svi = cast<SingleValueInstruction>(inst);
-
-      // If our result is non-Sendable, just treat this as a lookthrough.
-      if (isNonSendableType(svi->getType()))
-        return translateSILLookThrough(svi->getResult(0), svi->getOperand(0));
-
-      // Otherwise, we are extracting a sendable field from a non-Sendable base
-      // type. We need to track this as an assignment so that if we transferred
-      // the value we emit an error. Since we do not track uses of Sendable
-      // values this is the best place to emit the error since we do not look
-      // further to find the actual use site.
-      //
-      // TODO: We could do a better job here and attempt to find the actual use
-      // of the Sendable addr. That would require adding more logic though.
-      return translateSILRequire(svi->getOperand(0));
-    }
-
-    // We identify tuple results with their operand's id.
-    case SILInstructionKind::DestructureTupleInst:
-    case SILInstructionKind::DestructureStructInst:
-      return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
-
-    case SILInstructionKind::UnconditionalCheckedCastInst:
-      if (SILDynamicCastInst(inst).isRCIdentityPreserving())
-        return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
-      return translateSILAssign(inst);
-
-    case SILInstructionKind::PointerToAddressInst: {
-      auto *atpi = cast<PointerToAddressInst>(inst);
-
-      // A raw pointer is considered to be a non-Sendable type. If we cast it to
-      // a Sendable type, treat it as a require. We can assume that if the user
-      // casted it to a Sendable type, if the type were not actually sendable,
-      // it would be undefined behavior.
-      if (!isNonSendableType(atpi->getType())) {
-        return translateSILRequire(atpi->getOperand());
-      }
-
-      // Otherwise, if we have a non-Sendable type, look through it.
-      return translateSILAssign(atpi);
-    }
-
-    // Just make the result part of the operand's region without requiring.
-    //
-    // This is appropriate for things like object casts and object
-    // geps.
-    case SILInstructionKind::AddressToPointerInst:
-    case SILInstructionKind::BaseAddrForOffsetInst:
-    case SILInstructionKind::ConvertEscapeToNoEscapeInst:
-    case SILInstructionKind::ConvertFunctionInst:
-    case SILInstructionKind::CopyBlockInst:
-    case SILInstructionKind::CopyBlockWithoutEscapingInst:
-    case SILInstructionKind::IndexAddrInst:
-    case SILInstructionKind::InitBlockStorageHeaderInst:
-    case SILInstructionKind::InitExistentialAddrInst:
-    case SILInstructionKind::InitExistentialRefInst:
-    case SILInstructionKind::OpenExistentialBoxInst:
-    case SILInstructionKind::OpenExistentialRefInst:
-    case SILInstructionKind::RefToUnmanagedInst:
-    case SILInstructionKind::TailAddrInst:
-    case SILInstructionKind::ThickToObjCMetatypeInst:
-    case SILInstructionKind::ThinToThickFunctionInst:
-    case SILInstructionKind::UncheckedAddrCastInst:
-    case SILInstructionKind::UncheckedEnumDataInst:
-    case SILInstructionKind::UncheckedOwnershipConversionInst:
-    case SILInstructionKind::UnmanagedToRefInst:
-      return translateSILAssign(inst);
-
-    // RefElementAddrInst is not considered to be a lookThrough since we want to
-    // consider the address projected from the class to be a separate value that
-    // is in the same region as the parent operand. The reason that we want to
-    // do this is to ensure that if we assign into the ref_element_addr memory,
-    // we do not consider writes into the struct that contains the
-    // ref_element_addr to be merged into.
-    case SILInstructionKind::RefElementAddrInst: {
-      auto *reai = cast<RefElementAddrInst>(inst);
-      // If we are accessing a let of a Sendable type, do not treat the
-      // ref_element_addr as a require use.
-      if (reai->getField()->isLet() && !isNonSendableType(reai->getType())) {
-        LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
-        return;
-      }
-      return translateSILAssign(inst);
-    }
-
-    case SILInstructionKind::TupleExtractInst:
-    case SILInstructionKind::StructExtractInst: {
-      auto *svi = cast<SingleValueInstruction>(inst);
-      // If our result is a Sendable type regardless of if it is a let or a var,
-      // we do not need to track it.
-      if (!isNonSendableType(svi->getType())) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "    Found a sendable field... Not Tracking!\n");
-        return;
-      }
-      return translateSILAssign(inst);
-    }
-
-    /// Enum inst is handled specially since if it does not have an argument,
-    /// we must assign fresh. Otherwise, we must propagate.
-    case SILInstructionKind::EnumInst: {
-      auto *ei = cast<EnumInst>(inst);
-      if (ei->getNumOperands() == 0)
-        return translateSILAssignFresh(ei);
-      return translateSILAssign(ei);
-    }
-
-    // These are treated as stores - meaning that they could write values into
-    // memory. The beahvior of this depends on whether the tgt addr is aliased,
-    // but conservative behavior is to treat these as merges of the regions of
-    // the src value and tgt addr
-    case SILInstructionKind::CopyAddrInst:
-    case SILInstructionKind::ExplicitCopyAddrInst:
-    case SILInstructionKind::StoreInst:
-    case SILInstructionKind::StoreBorrowInst:
-    case SILInstructionKind::StoreWeakInst:
-      return translateSILStore(inst->getOperand(1), inst->getOperand(0));
-
-    case SILInstructionKind::TupleAddrConstructorInst:
-      return translateSILTupleAddrConstructor(
-          cast<TupleAddrConstructorInst>(inst));
-
-    case SILInstructionKind::PartialApplyInst:
-      return translateSILPartialApply(cast<PartialApplyInst>(inst));
-
-    // Applies are handled specially since we need to merge their results.
-    case SILInstructionKind::ApplyInst:
-    case SILInstructionKind::BeginApplyInst:
-    case SILInstructionKind::BuiltinInst:
-    case SILInstructionKind::TryApplyInst:
-      return translateSILApply(inst);
-
-    // These are used by SIL to aggregate values together in a gep like way. We
-    // want to look at uses of structs, not the struct uses itself. So just
-    // propagate.
-    case SILInstructionKind::ObjectInst:
-    case SILInstructionKind::StructInst:
-    case SILInstructionKind::TupleInst:
-      return translateSILAssign(inst);
-
-    // Handle returns and throws - require the operand to be non-transferred
-    case SILInstructionKind::ReturnInst:
-    case SILInstructionKind::ThrowInst:
-      return translateSILRequire(inst->getOperand(0));
-
-    // Handle branching terminators.
-    case SILInstructionKind::BranchInst: {
-      auto *branchInst = cast<BranchInst>(inst);
-      assert(branchInst->getNumArgs() ==
-             branchInst->getDestBB()->getNumArguments());
-      TermArgSources argSources;
-      argSources.addValues(branchInst->getArgs(), branchInst->getDestBB());
-      return translateSILPhi(argSources);
-    }
-
-    case SILInstructionKind::CondBranchInst: {
-      auto *condBranchInst = cast<CondBranchInst>(inst);
-      assert(condBranchInst->getNumTrueArgs() ==
-             condBranchInst->getTrueBB()->getNumArguments());
-      assert(condBranchInst->getNumFalseArgs() ==
-             condBranchInst->getFalseBB()->getNumArguments());
-      TermArgSources argSources;
-      argSources.addValues(condBranchInst->getTrueArgs(),
-                           condBranchInst->getTrueBB());
-      argSources.addValues(condBranchInst->getFalseArgs(),
-                           condBranchInst->getFalseBB());
-      return translateSILPhi(argSources);
-    }
-
-    case SILInstructionKind::SwitchEnumInst:
-      return translateSILSwitchEnum(cast<SwitchEnumInst>(inst));
-
-    case SILInstructionKind::DynamicMethodBranchInst: {
-      auto *dmBranchInst = cast<DynamicMethodBranchInst>(inst);
-      assert(dmBranchInst->getHasMethodBB()->getNumArguments() <= 1);
-      TermArgSources argSources;
-      argSources.addValues({dmBranchInst->getOperand()},
-                           dmBranchInst->getHasMethodBB());
-      return translateSILPhi(argSources);
-    }
-
-    case SILInstructionKind::CheckedCastBranchInst: {
-      auto *ccBranchInst = cast<CheckedCastBranchInst>(inst);
-      assert(ccBranchInst->getSuccessBB()->getNumArguments() <= 1);
-      TermArgSources argSources;
-      argSources.addValues({ccBranchInst->getOperand()},
-                           ccBranchInst->getSuccessBB());
-      return translateSILPhi(argSources);
-    }
-
-    case SILInstructionKind::CheckedCastAddrBranchInst: {
-      auto *ccAddrBranchInst = cast<CheckedCastAddrBranchInst>(inst);
-      assert(ccAddrBranchInst->getSuccessBB()->getNumArguments() <= 1);
-
-      // checked_cast_addr_br does not have any arguments in its resulting
-      // block. We should just use a multi-assign on its operands.
-      //
-      // TODO: We should be smarter and treat the success/fail branches
-      // differently depending on what the result of checked_cast_addr_br
-      // is. For now just keep the current behavior. It is more conservative,
-      // but still correct.
-      return translateSILMultiAssign(ArrayRef<SILValue>(),
-                                     ccAddrBranchInst->getOperandValues());
-    }
-
-    // These instructions are ignored because they cannot affect the partition
-    // state - they do not manipulate what region non-sendable values lie in
-    case SILInstructionKind::AllocGlobalInst:
-    case SILInstructionKind::DeallocBoxInst:
-    case SILInstructionKind::DeallocStackInst:
-    case SILInstructionKind::DebugValueInst:
-    case SILInstructionKind::DestroyAddrInst:
-    case SILInstructionKind::DestroyValueInst:
-    case SILInstructionKind::EndAccessInst:
-    case SILInstructionKind::EndBorrowInst:
-    case SILInstructionKind::EndLifetimeInst:
-    case SILInstructionKind::HopToExecutorInst:
-    case SILInstructionKind::InjectEnumAddrInst:
-    case SILInstructionKind::IsEscapingClosureInst: // ignored because result is
-                                                    // always in
-    case SILInstructionKind::MarkDependenceInst:
-    case SILInstructionKind::MetatypeInst:
-    case SILInstructionKind::EndApplyInst:
-    case SILInstructionKind::AbortApplyInst:
-
-    // Ignored terminators.
-    case SILInstructionKind::CondFailInst:
-    case SILInstructionKind::SwitchEnumAddrInst: // ignored as long as
-                                                 // destinations can take no arg
-    case SILInstructionKind::SwitchValueInst: // ignored as long as destinations
-                                              // can take no args
-    case SILInstructionKind::UnreachableInst:
-    case SILInstructionKind::UnwindInst:
-    case SILInstructionKind::YieldInst: // TODO: yield should be handled
-      return;
-
-    default:
-      break;
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "warning: ";
-               llvm::dbgs() << "unhandled instruction kind "
-                            << getSILInstructionName(inst->getKind()) << "\n";);
-
-    return;
-  }
-
   /// Translate the instruction's in \p basicBlock to a vector of PartitionOps
   /// that define the block's dataflow.
   void translateSILBasicBlock(SILBasicBlock *basicBlock,
@@ -2228,6 +2092,71 @@ public:
       copy(builder.currentInstPartitionOps,
            std::back_inserter(foundPartitionOps));
     }
+  }
+
+#define INST(INST, PARENT) TranslationSemantics visit##INST(INST *inst);
+#include "swift/SIL/SILNodes.def"
+
+  /// Top level switch that translates SIL instructions.
+  void translateSILInstruction(SILInstruction *inst) {
+    builder.reset(inst);
+    SWIFT_DEFER { LLVM_DEBUG(builder.print(llvm::dbgs())); };
+
+    auto computeOpKind = [&]() -> TranslationSemantics {
+      switch (inst->getKind()) {
+#define INST(ID, PARENT)                                                       \
+  case SILInstructionKind::ID:                                                 \
+    return visit##ID(cast<ID>(inst));
+#include "swift/SIL/SILNodes.def"
+      }
+    };
+
+    auto kind = computeOpKind();
+    LLVM_DEBUG(llvm::dbgs() << "    Semantics: " << kind << '\n');
+    switch (kind) {
+    case TranslationSemantics::Ignored:
+      return;
+
+    case TranslationSemantics::AssignFresh:
+      for (auto result : inst->getResults())
+        translateSILAssignFresh(result);
+      return;
+
+    case TranslationSemantics::Assign:
+      return translateSILMultiAssign(inst->getResults(),
+                                     inst->getOperandValues());
+
+    case TranslationSemantics::Require:
+      for (auto op : inst->getOperandValues())
+        translateSILRequire(op);
+      return;
+
+    case TranslationSemantics::LookThrough:
+      assert(inst->getNumOperands() == 1);
+      return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
+
+    case TranslationSemantics::Store:
+      return translateSILStore(inst->getOperand(CopyLikeInstruction::Dest),
+                               inst->getOperand(CopyLikeInstruction::Src));
+
+    case TranslationSemantics::Special:
+      return;
+
+    case TranslationSemantics::Apply:
+      return translateSILApply(inst);
+
+    case TranslationSemantics::TerminatorPhi: {
+      TermArgSources sources;
+      sources.init(inst);
+      return translateSILPhi(sources);
+    }
+
+    case TranslationSemantics::Unhandled:
+      LLVM_DEBUG(llvm::dbgs() << "Unhandled inst: " << *inst);
+      return;
+    }
+
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 };
 
@@ -2295,6 +2224,407 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 }
 
 } // namespace
+
+//===----------------------------------------------------------------------===//
+//                 MARK: Translator - Instruction To Op Kind
+//===----------------------------------------------------------------------===//
+
+#ifdef CONSTANT_TRANSLATION
+#error "CONSTANT_TRANSLATION already defined?!"
+#endif
+
+#define CONSTANT_TRANSLATION(INST, Kind)                                       \
+  TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    return TranslationSemantics::Kind;                                         \
+  }
+
+//===---
+// Assign Fresh
+//
+
+CONSTANT_TRANSLATION(AllocBoxInst, AssignFresh)
+CONSTANT_TRANSLATION(AllocPackInst, AssignFresh)
+CONSTANT_TRANSLATION(AllocRefDynamicInst, AssignFresh)
+CONSTANT_TRANSLATION(AllocRefInst, AssignFresh)
+CONSTANT_TRANSLATION(AllocStackInst, AssignFresh)
+CONSTANT_TRANSLATION(KeyPathInst, AssignFresh)
+CONSTANT_TRANSLATION(FunctionRefInst, AssignFresh)
+CONSTANT_TRANSLATION(DynamicFunctionRefInst, AssignFresh)
+CONSTANT_TRANSLATION(PreviousDynamicFunctionRefInst, AssignFresh)
+CONSTANT_TRANSLATION(GlobalAddrInst, AssignFresh)
+CONSTANT_TRANSLATION(GlobalValueInst, AssignFresh)
+CONSTANT_TRANSLATION(HasSymbolInst, AssignFresh)
+CONSTANT_TRANSLATION(ObjCProtocolInst, AssignFresh)
+CONSTANT_TRANSLATION(WitnessMethodInst, AssignFresh)
+// TODO: These should always be sendable.
+CONSTANT_TRANSLATION(IntegerLiteralInst, AssignFresh)
+CONSTANT_TRANSLATION(FloatLiteralInst, AssignFresh)
+CONSTANT_TRANSLATION(StringLiteralInst, AssignFresh)
+
+//===---
+// Assign
+//
+
+// These are instructions that we treat as true assigns since we want to
+// error semantically upon them if there is a use of one of these. For
+// example, a cast would be inappropriate here. This is implemented by
+// propagating the operand's region into the result's region and by
+// requiring all operands.
+CONSTANT_TRANSLATION(LoadInst, Assign)
+CONSTANT_TRANSLATION(LoadBorrowInst, Assign)
+CONSTANT_TRANSLATION(LoadWeakInst, Assign)
+CONSTANT_TRANSLATION(StrongCopyUnownedValueInst, Assign)
+CONSTANT_TRANSLATION(ClassMethodInst, Assign)
+CONSTANT_TRANSLATION(ObjCMethodInst, Assign)
+CONSTANT_TRANSLATION(SuperMethodInst, Assign)
+CONSTANT_TRANSLATION(ObjCSuperMethodInst, Assign)
+
+// These instructions are in between look through and a true assign. We should
+// probably eventually treat them as look through but we haven't done the work
+// yet of validating that everything fits together in terms of
+// getUnderlyingTrackedObject.
+CONSTANT_TRANSLATION(AddressToPointerInst, Assign)
+CONSTANT_TRANSLATION(BaseAddrForOffsetInst, Assign)
+CONSTANT_TRANSLATION(ConvertEscapeToNoEscapeInst, Assign)
+CONSTANT_TRANSLATION(ConvertFunctionInst, Assign)
+CONSTANT_TRANSLATION(CopyBlockInst, Assign)
+CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
+CONSTANT_TRANSLATION(IndexAddrInst, Assign)
+CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, Assign)
+CONSTANT_TRANSLATION(InitExistentialAddrInst, Assign)
+CONSTANT_TRANSLATION(InitExistentialRefInst, Assign)
+CONSTANT_TRANSLATION(OpenExistentialBoxInst, Assign)
+CONSTANT_TRANSLATION(OpenExistentialRefInst, Assign)
+CONSTANT_TRANSLATION(RefToUnmanagedInst, Assign)
+CONSTANT_TRANSLATION(TailAddrInst, Assign)
+CONSTANT_TRANSLATION(ThickToObjCMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ThinToThickFunctionInst, Assign)
+CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
+CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
+CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
+CONSTANT_TRANSLATION(UnmanagedToRefInst, Assign)
+
+// These are used by SIL to aggregate values together in a gep like way. We
+// want to look at uses of structs, not the struct uses itself. So just
+// propagate.
+CONSTANT_TRANSLATION(ObjectInst, Assign)
+CONSTANT_TRANSLATION(StructInst, Assign)
+CONSTANT_TRANSLATION(TupleInst, Assign)
+
+// Instructions that getUnderlyingTrackedValue is guaranteed to look through
+// and whose operand and result are guaranteed to be mapped to the same
+// underlying region.
+CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
+CONSTANT_TRANSLATION(BeginBorrowInst, LookThrough)
+CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
+CONSTANT_TRANSLATION(RefToBridgeObjectInst, LookThrough)
+CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
+CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
+CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
+CONSTANT_TRANSLATION(EndCOWMutationInst, LookThrough)
+CONSTANT_TRANSLATION(ProjectBoxInst, LookThrough)
+CONSTANT_TRANSLATION(EndInitLetRefInst, LookThrough)
+CONSTANT_TRANSLATION(InitEnumDataAddrInst, LookThrough)
+CONSTANT_TRANSLATION(OpenExistentialAddrInst, LookThrough)
+CONSTANT_TRANSLATION(UncheckedRefCastInst, LookThrough)
+CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
+CONSTANT_TRANSLATION(UpcastInst, LookThrough)
+CONSTANT_TRANSLATION(MoveValueInst, LookThrough)
+CONSTANT_TRANSLATION(MarkUnresolvedNonCopyableValueInst, LookThrough)
+CONSTANT_TRANSLATION(MarkUnresolvedReferenceBindingInst, LookThrough)
+CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperValueInst, LookThrough)
+CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableValueInst, LookThrough)
+CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableBoxInst, LookThrough)
+CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableAddrInst, LookThrough)
+CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperAddrInst, LookThrough)
+CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
+// We identify destructured results with their operand's region.
+CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
+CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
+
+// These are treated as stores - meaning that they could write values into
+// memory. The beahvior of this depends on whether the tgt addr is aliased,
+// but conservative behavior is to treat these as merges of the regions of
+// the src value and tgt addr
+CONSTANT_TRANSLATION(CopyAddrInst, Store)
+CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
+CONSTANT_TRANSLATION(StoreInst, Store)
+CONSTANT_TRANSLATION(StoreBorrowInst, Store)
+CONSTANT_TRANSLATION(StoreWeakInst, Store)
+
+// These instructions are ignored because they cannot affect the partition
+// state - they do not manipulate what region non-sendable values lie in
+CONSTANT_TRANSLATION(AllocGlobalInst, Ignored)
+CONSTANT_TRANSLATION(DeallocBoxInst, Ignored)
+CONSTANT_TRANSLATION(DeallocStackInst, Ignored)
+CONSTANT_TRANSLATION(DebugValueInst, Ignored)
+CONSTANT_TRANSLATION(DestroyAddrInst, Ignored)
+CONSTANT_TRANSLATION(DestroyValueInst, Ignored)
+CONSTANT_TRANSLATION(EndAccessInst, Ignored)
+CONSTANT_TRANSLATION(EndBorrowInst, Ignored)
+CONSTANT_TRANSLATION(EndLifetimeInst, Ignored)
+CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
+CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
+CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
+CONSTANT_TRANSLATION(MarkDependenceInst, Ignored)
+CONSTANT_TRANSLATION(MetatypeInst, Ignored)
+CONSTANT_TRANSLATION(EndApplyInst, Ignored)
+CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
+
+// Ignored terminators.
+CONSTANT_TRANSLATION(CondFailInst, Ignored)
+// Switch value inst is ignored since we only switch over integers and
+// function_ref/class_method which are considered sendable.
+CONSTANT_TRANSLATION(SwitchValueInst, Ignored)
+CONSTANT_TRANSLATION(UnreachableInst, Ignored)
+CONSTANT_TRANSLATION(UnwindInst, Ignored)
+
+// Terminators that only need require.
+CONSTANT_TRANSLATION(ReturnInst, Require)
+CONSTANT_TRANSLATION(ThrowInst, Require)
+CONSTANT_TRANSLATION(SwitchEnumAddrInst, Require)
+CONSTANT_TRANSLATION(YieldInst, Require)
+
+// Unhandled instructions
+CONSTANT_TRANSLATION(AllocVectorInst, Unhandled)
+CONSTANT_TRANSLATION(AllocPackMetadataInst, Unhandled)
+CONSTANT_TRANSLATION(AllocExistentialBoxInst, Unhandled)
+CONSTANT_TRANSLATION(IndexRawPointerInst, Unhandled)
+CONSTANT_TRANSLATION(UncheckedTrivialBitCastInst, Unhandled)
+CONSTANT_TRANSLATION(UncheckedBitwiseCastInst, Unhandled)
+CONSTANT_TRANSLATION(UncheckedValueCastInst, Unhandled)
+CONSTANT_TRANSLATION(RefToRawPointerInst, Unhandled)
+CONSTANT_TRANSLATION(RawPointerToRefInst, Unhandled)
+CONSTANT_TRANSLATION(RefToUnownedInst, Unhandled)
+CONSTANT_TRANSLATION(UnownedToRefInst, Unhandled)
+CONSTANT_TRANSLATION(BridgeObjectToWordInst, Unhandled)
+CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Unhandled)
+CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
+CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
+CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Unhandled)
+CONSTANT_TRANSLATION(ValueToBridgeObjectInst, Unhandled)
+CONSTANT_TRANSLATION(UnownedCopyValueInst, Unhandled)
+CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
+CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
+CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
+CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
+CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Unhandled)
+CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
+CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
+CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Unhandled)
+CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
+CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
+CONSTANT_TRANSLATION(VectorInst, Unhandled)
+CONSTANT_TRANSLATION(TuplePackElementAddrInst, Unhandled)
+CONSTANT_TRANSLATION(TuplePackExtractInst, Unhandled)
+CONSTANT_TRANSLATION(PackElementGetInst, Unhandled)
+CONSTANT_TRANSLATION(RefTailAddrInst, Unhandled)
+CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
+CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
+CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
+CONSTANT_TRANSLATION(OpenExistentialValueInst, Unhandled)
+CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Unhandled)
+CONSTANT_TRANSLATION(OpenPackElementInst, Unhandled)
+CONSTANT_TRANSLATION(PackLengthInst, Unhandled)
+CONSTANT_TRANSLATION(DynamicPackIndexInst, Unhandled)
+CONSTANT_TRANSLATION(PackPackIndexInst, Unhandled)
+CONSTANT_TRANSLATION(ScalarPackIndexInst, Unhandled)
+CONSTANT_TRANSLATION(ProjectBlockStorageInst, Unhandled)
+CONSTANT_TRANSLATION(DifferentiableFunctionInst, Unhandled)
+CONSTANT_TRANSLATION(LinearFunctionInst, Unhandled)
+CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, Unhandled)
+CONSTANT_TRANSLATION(LinearFunctionExtractInst, Unhandled)
+CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, Unhandled)
+CONSTANT_TRANSLATION(GetAsyncContinuationInst, Unhandled)
+CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Unhandled)
+CONSTANT_TRANSLATION(ExtractExecutorInst, Unhandled)
+CONSTANT_TRANSLATION(BindMemoryInst, Unhandled)
+CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
+CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
+CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, Unhandled)
+CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
+CONSTANT_TRANSLATION(DeallocPackMetadataInst, Unhandled)
+CONSTANT_TRANSLATION(DeallocStackRefInst, Unhandled)
+CONSTANT_TRANSLATION(DeallocRefInst, Unhandled)
+CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
+CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Unhandled)
+CONSTANT_TRANSLATION(StrongRetainInst, Unhandled)
+CONSTANT_TRANSLATION(StrongReleaseInst, Unhandled)
+CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
+CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
+CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
+CONSTANT_TRANSLATION(StrongRetainUnownedInst, Unhandled)
+CONSTANT_TRANSLATION(UnownedRetainInst, Unhandled)
+CONSTANT_TRANSLATION(UnownedReleaseInst, Unhandled)
+CONSTANT_TRANSLATION(RetainValueInst, Unhandled)
+CONSTANT_TRANSLATION(RetainValueAddrInst, Unhandled)
+CONSTANT_TRANSLATION(ReleaseValueInst, Unhandled)
+CONSTANT_TRANSLATION(ReleaseValueAddrInst, Unhandled)
+CONSTANT_TRANSLATION(AutoreleaseValueInst, Unhandled)
+CONSTANT_TRANSLATION(FixLifetimeInst, Unhandled)
+CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
+CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
+CONSTANT_TRANSLATION(AssignInst, Unhandled)
+CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
+CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
+CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
+CONSTANT_TRANSLATION(DebugStepInst, Unhandled)
+CONSTANT_TRANSLATION(TestSpecificationInst, Unhandled)
+CONSTANT_TRANSLATION(StoreUnownedInst, Unhandled)
+CONSTANT_TRANSLATION(DeinitExistentialAddrInst, Unhandled)
+CONSTANT_TRANSLATION(DeinitExistentialValueInst, Unhandled)
+CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Unhandled)
+CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Unhandled)
+CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
+CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Unhandled)
+CONSTANT_TRANSLATION(BeginCOWMutationInst, Unhandled)
+
+// Apply instructions
+CONSTANT_TRANSLATION(ApplyInst, Apply)
+CONSTANT_TRANSLATION(BeginApplyInst, Apply)
+CONSTANT_TRANSLATION(BuiltinInst, Apply)
+CONSTANT_TRANSLATION(TryApplyInst, Apply)
+
+CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+
+#undef CONSTANT_TRANSLATION
+
+#ifdef LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE
+#error "LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE already defined?!"
+#endif
+
+// If our result is non-Sendable, treat this as a lookthrough.
+// Otherwise, we are extracting a sendable field from a non-Sendable base
+// type. We need to track this as an assignment so that if we transferred
+//
+// the value we emit an error. Since we do not track uses of Sendable
+// values this is the best place to emit the error since we do not look
+// further to find the actual use site.
+//
+// TODO: We could do a better job here and attempt to find the actual
+// use
+// of the Sendable addr. That would require adding more logic though.
+#define LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(INST)              \
+  TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    if (isNonSendableType(inst->getType())) {                                  \
+      return TranslationSemantics::LookThrough;                                \
+    }                                                                          \
+    return TranslationSemantics::Require;                                      \
+  }
+
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(TupleElementAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(StructElementAddrInst)
+
+#undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE
+
+#ifdef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
+#error IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE already defined
+#endif
+
+#define IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(INST)                       \
+  TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    if (!isNonSendableType(inst->getType())) {                                 \
+      return TranslationSemantics::Ignored;                                    \
+    }                                                                          \
+    return TranslationSemantics::Assign;                                       \
+  }
+
+IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(TupleExtractInst)
+IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
+
+#undef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
+
+//===---
+// Custom Handling
+//
+
+TranslationSemantics
+PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
+  if (!isNonSendableType(ptai->getType())) {
+    return TranslationSemantics::Require;
+  }
+  return TranslationSemantics::Assign;
+}
+
+TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
+    UnconditionalCheckedCastInst *ucci) {
+  if (SILDynamicCastInst(ucci).isRCIdentityPreserving())
+    return TranslationSemantics::LookThrough;
+  return TranslationSemantics::Assign;
+}
+
+// RefElementAddrInst is not considered to be a lookThrough since we want to
+// consider the address projected from the class to be a separate value that
+// is in the same region as the parent operand. The reason that we want to
+// do this is to ensure that if we assign into the ref_element_addr memory,
+// we do not consider writes into the struct that contains the
+// ref_element_addr to be merged into.
+TranslationSemantics
+PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
+  // If we are accessing a let of a Sendable type, do not treat the
+  // ref_element_addr as a require use.
+  if (reai->getField()->isLet() && !isNonSendableType(reai->getType())) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
+    return TranslationSemantics::Ignored;
+  }
+  return TranslationSemantics::Assign;
+}
+
+/// Enum inst is handled specially since if it does not have an argument,
+/// we must assign fresh. Otherwise, we must propagate.
+TranslationSemantics PartitionOpTranslator::visitEnumInst(EnumInst *ei) {
+  if (ei->getNumOperands() == 0)
+    return TranslationSemantics::AssignFresh;
+  return TranslationSemantics::Assign;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
+  translateSILSelectEnum(inst);
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitSelectEnumInst(SelectEnumInst *inst) {
+  translateSILSelectEnum(inst);
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitSwitchEnumInst(SwitchEnumInst *inst) {
+  translateSILSwitchEnum(inst);
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics PartitionOpTranslator::visitTupleAddrConstructorInst(
+    TupleAddrConstructorInst *inst) {
+  translateSILTupleAddrConstructor(inst);
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
+  translateSILPartialApply(pai);
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
+    CheckedCastAddrBranchInst *ccabi) {
+  assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
+
+  // checked_cast_addr_br does not have any arguments in its resulting
+  // block. We should just use a multi-assign on its operands.
+  //
+  // TODO: We should be smarter and treat the success/fail branches
+  // differently depending on what the result of checked_cast_addr_br
+  // is. For now just keep the current behavior. It is more conservative,
+  // but still correct.
+  translateSILMultiAssign(ArrayRef<SILValue>(), ccabi->getOperandValues());
+  return TranslationSemantics::Special;
+}
 
 //===----------------------------------------------------------------------===//
 //                          MARK: Block Level Model
