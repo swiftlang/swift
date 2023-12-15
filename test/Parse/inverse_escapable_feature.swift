@@ -2,4 +2,4 @@
 
 // REQUIRES: asserts
 
-struct S: ~Escapable {} // expected-error {{type '~Escapable' requires -enable-experimental-feature NonEscapableTypes}}
+struct S: ~Escapable {} // expected-error {{type '~Escapable' requires -enable-experimental-feature NonescapableTypes}}

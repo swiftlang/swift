@@ -7604,7 +7604,7 @@ NOTE(add_explicit_protocol_for_conformance,none,
      "consider making %kind0 explicitly conform to the '%1' protocol",
      (const ValueDecl *, StringRef))
 ERROR(escapable_requires_feature_flag,none,
-      "type '~Escapable' requires -enable-experimental-feature NonEscapableTypes",
+      "type '~Escapable' requires -enable-experimental-feature NonescapableTypes",
       ())
 
 // -- older ones below --
@@ -7699,7 +7699,7 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       (unsigned))
 
 ERROR(nonescapable_types_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature NonEscapableTypes'", ())
+      "attribute requires '-enable-experimental-feature NonescapableTypes'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors

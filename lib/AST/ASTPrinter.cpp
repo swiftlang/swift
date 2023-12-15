@@ -3752,7 +3752,7 @@ static bool usesFeatureStructLetDestructuring(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureNonEscapableTypes(Decl *decl) {
+static bool usesFeatureNonescapableTypes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<NonEscapableAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return true;

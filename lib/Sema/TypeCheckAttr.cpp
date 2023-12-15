@@ -7288,14 +7288,14 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
 }
 
 void AttributeChecker::visitNonEscapableAttr(NonEscapableAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+  if (!Ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
     diagnoseAndRemoveAttr(attr, diag::nonescapable_types_attr_disabled);
   }
 }
 
 void AttributeChecker::visitUnsafeNonEscapableResultAttr(
   UnsafeNonEscapableResultAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+  if (!Ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
     diagnoseAndRemoveAttr(attr, diag::nonescapable_types_attr_disabled);
   }
 }

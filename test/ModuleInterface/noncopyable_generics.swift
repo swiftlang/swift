@@ -2,14 +2,14 @@
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
-// RUN:     -enable-experimental-feature NonEscapableTypes \
+// RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/NoncopyableGenerics_Misc.swiftmodule \
 // RUN:     -emit-module-interface-path %t/NoncopyableGenerics_Misc.swiftinterface \
 // RUN:     %S/Inputs/NoncopyableGenerics_Misc.swift
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature NoncopyableGenerics \
-// RUN:     -enable-experimental-feature NonEscapableTypes \
+// RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:     -o %t/Swiftskell.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Swiftskell.swiftinterface \
 // RUN:     %S/Inputs/Swiftskell.swift
@@ -23,17 +23,17 @@
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
 // RUN:    -enable-experimental-feature NoncopyableGenerics \
-// RUN:     -enable-experimental-feature NonEscapableTypes \
+// RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/NoncopyableGenerics_Misc.swiftinterface -o %t/NoncopyableGenerics_Misc.swiftmodule
 
 // RUN: %target-swift-frontend -compile-module-from-interface \
 // RUN:    -enable-experimental-feature NoncopyableGenerics \
-// RUN:     -enable-experimental-feature NonEscapableTypes \
+// RUN:     -enable-experimental-feature NonescapableTypes \
 // RUN:    %t/Swiftskell.swiftinterface -o %t/Swiftskell.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck -I %t %s \
 // RUN:    -enable-experimental-feature NoncopyableGenerics \
-// RUN:    -enable-experimental-feature NonEscapableTypes
+// RUN:    -enable-experimental-feature NonescapableTypes
 
 // REQUIRES: asserts
 

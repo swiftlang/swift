@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -enable-builtin-module -enable-experimental-feature NonEscapableTypes
+// RUN: %target-typecheck-verify-swift  -enable-builtin-module -enable-experimental-feature NonescapableTypes
 // REQUIRES: asserts
 
 import Builtin

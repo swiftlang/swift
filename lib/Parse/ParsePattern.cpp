@@ -140,7 +140,7 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("__owned") &&
         !Tok.isContextualKeyword("borrowing") &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
-        (!Context.LangOpts.hasFeature(Feature::NonEscapableTypes) ||
+        (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
          !Tok.isContextualKeyword("_resultDependsOn")))
       return true;
 
@@ -235,7 +235,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                Tok.isContextualKeyword("consuming") ||
                Tok.isContextualKeyword("isolated") ||
                Tok.isContextualKeyword("_const") ||
-               (Context.LangOpts.hasFeature(Feature::NonEscapableTypes) &&
+               (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
                 Tok.isContextualKeyword("_resultDependsOn"))))) {
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
