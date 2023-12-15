@@ -199,8 +199,12 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
     temp = getUnderlyingObject(temp);
 
-    if (auto *cvi = dyn_cast<ExplicitCopyValueInst>(temp)) {
-      temp = cvi->getOperand();
+    if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
+      if (isa<ExplicitCopyValueInst, CopyableToMoveOnlyWrapperValueInst,
+              MoveOnlyWrapperToCopyableValueInst,
+              MoveOnlyWrapperToCopyableBoxInst>(svi)) {
+        temp = svi->getOperand(0);
+      }
     }
 
     if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
@@ -2325,6 +2329,15 @@ CONSTANT_TRANSLATION(OpenExistentialAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedRefCastInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UpcastInst, LookThrough)
+CONSTANT_TRANSLATION(MoveValueInst, LookThrough)
+CONSTANT_TRANSLATION(MarkUnresolvedNonCopyableValueInst, LookThrough)
+CONSTANT_TRANSLATION(MarkUnresolvedReferenceBindingInst, LookThrough)
+CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperValueInst, LookThrough)
+CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableValueInst, LookThrough)
+CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableBoxInst, LookThrough)
+CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableAddrInst, LookThrough)
+CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperAddrInst, LookThrough)
+CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
 // We identify destructured results with their operand's region.
 CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
@@ -2394,19 +2407,10 @@ CONSTANT_TRANSLATION(UnownedCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
-CONSTANT_TRANSLATION(MoveValueInst, Unhandled)
 CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
-CONSTANT_TRANSLATION(MarkUnresolvedNonCopyableValueInst, Unhandled)
-CONSTANT_TRANSLATION(MarkUnresolvedReferenceBindingInst, Unhandled)
-CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperValueInst, Unhandled)
-CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableValueInst, Unhandled)
-CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableBoxInst, Unhandled)
-CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableAddrInst, Unhandled)
-CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperAddrInst, Unhandled)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Unhandled)
 CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(MarkUninitializedInst, Unhandled)
 CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
