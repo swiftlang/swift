@@ -2644,7 +2644,7 @@ public:
       }
 
       // Catch cases where there's a missing generic environment.
-      if (var->getTypeInContext()->is<ErrorType>()) {
+      if (var->getTypeInContext()->hasError()) {
         Out << "VarDecl is missing a Generic Environment: ";
         var->getInterfaceType().print(Out);
         Out << "\n";

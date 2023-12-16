@@ -3819,10 +3819,20 @@ public:
                                        RememberChoice_t rememberChoice,
                                        ConstraintLocatorBuilder locator,
                                        ConstraintFix *compatFix = nullptr);
-  
-  /// Add a materialize constraint for a pack expansion.
+
+  /// Given a tuple with a single unlabeled element that represents a pack
+  /// expansion (either directly via \c PackExpansionType or through a type
+  /// variable constrained to a pack expansion), materialize the pack expansion
+  /// and return its pattern type as a result. The result is a type variable
+  /// because element of the tuple is not required to be resolved at the time of
+  /// the call and operation is delayed until the element is sufficiently
+  /// resolved (see \c simplifyMaterializePackExpansionConstraint)
+  ///
+  /// \param tupleType A tuple with a single unlabeled element that represents a
+  /// pack expansion. 
+  /// \param locator The locator.
   TypeVariableType *
-  addMaterializePackExpansionConstraint(Type patternType,
+  addMaterializePackExpansionConstraint(Type tupleType,
                                         ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.

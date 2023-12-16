@@ -15648,11 +15648,11 @@ void ConstraintSystem::addExplicitConversionConstraint(
 }
 
 TypeVariableType *ConstraintSystem::addMaterializePackExpansionConstraint(
-    Type patternType, ConstraintLocatorBuilder locator) {
-  assert(isSingleUnlabeledPackExpansionTuple(patternType));
+    Type tupleType, ConstraintLocatorBuilder locator) {
+  assert(isSingleUnlabeledPackExpansionTuple(tupleType));
   TypeVariableType *packVar =
       createTypeVariable(getConstraintLocator(locator), TVO_CanBindToPack);
-  addConstraint(ConstraintKind::MaterializePackExpansion, patternType, packVar,
+  addConstraint(ConstraintKind::MaterializePackExpansion, tupleType, packVar,
                 getConstraintLocator(locator, {ConstraintLocator::Member}));
   return packVar;
 }

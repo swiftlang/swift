@@ -5861,6 +5861,9 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 class VarDecl : public AbstractStorageDecl {
   friend class NamingPatternRequest;
   NamedPattern *NamingPattern = nullptr;
+  /// When the variable is declared in context of a for-in loop over the elements of 
+  /// a parameter pack, this is the opened element environment of the pack expansion
+  /// to use as the variable's context generic environment.
   GenericEnvironment *OpenedElementEnvironment = nullptr;
 
 public:
