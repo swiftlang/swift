@@ -136,6 +136,7 @@ public:
 
   Address getCallerTypedErrorResultSlot();
   Address getCalleeTypedErrorResultSlot(SILType errorType);
+  void setCalleeTypedErrorResultSlot(Address addr);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
