@@ -60,7 +60,7 @@ static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
 }
 
 static bool isAnyObjectOrAny(Type type) {
-  return type->isAnyObject() || type->isAny();
+  return type->isAnyObject() || type->isMarkerExistential();
 }
 
 // For a given Decl and Type, if the type is not an optional return
@@ -2377,7 +2377,7 @@ private:
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
-    if (ty->isAny()) {
+    if (ty->isMarkerExistential()) {
       ty = ctx.getAnyObjectType();
     } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {
       ty = ctx.getBridgedToObjC(&owningPrinter.M, ty);
