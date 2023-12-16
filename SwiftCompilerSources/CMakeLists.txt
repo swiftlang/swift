@@ -103,6 +103,7 @@ function(add_swift_compiler_modules_library name)
       "-Xfrontend" "-validate-tbd-against-ir=none"
       "-Xfrontend" "-enable-experimental-cxx-interop"
       "-Xfrontend" "-disable-target-os-checking"
+      "-Xfrontend" "-enable-ossa-modules"
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
