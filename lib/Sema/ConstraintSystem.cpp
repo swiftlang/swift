@@ -2284,6 +2284,20 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
         }
       }
 
+      // Parameterized protocol types whose arguments involve this type
+      // parameter are erased to the base type.
+      if (auto parameterized = dyn_cast<ParameterizedProtocolType>(t)) {
+        for (auto argType : parameterized->getArgs()) {
+          auto erasedArgType =
+              typeEraseExistentialSelfReferences(
+                argType, baseTy, TypePosition::Covariant,
+                existentialSig, containsFn, predicateFn, projectionFn,
+                force, metatypeDepth);
+          if (erasedArgType.getPointer() != argType.getPointer())
+            return parameterized->getBaseType();
+        }
+      }
+
       if (auto lvalue = dyn_cast<LValueType>(t)) {
         auto objTy = lvalue->getObjectType();
         auto erasedTy =
