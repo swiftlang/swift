@@ -33,6 +33,7 @@ extension BridgedNullablePattern: BridgedNullable {}
 extension BridgedNullableGenericParamList: BridgedNullable {}
 extension BridgedNullableTrailingWhereClause: BridgedNullable {}
 extension BridgedNullableParameterList: BridgedNullable {}
+extension BridgedNullablePatternBindingInitializer: BridgedNullable {}
 
 /// Protocol that declares that there's a "Nullable" variation of the type.
 ///
@@ -65,6 +66,9 @@ extension BridgedTrailingWhereClause: BridgedHasNullable {
 }
 extension BridgedParameterList: BridgedHasNullable {
   typealias Nullable = BridgedNullableParameterList
+}
+extension BridgedPatternBindingInitializer: BridgedHasNullable {
+  typealias Nullable = BridgedNullablePatternBindingInitializer
 }
 
 public extension BridgedSourceLoc {

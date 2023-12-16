@@ -1882,27 +1882,18 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling, SourceLoc VarLoc,
                            Pattern *Pat, SourceLoc EqualLoc, Expr *E,
                            DeclContext *Parent) {
-  DeclContext *BindingInitContext = nullptr;
-  if (!Parent->isLocalContext())
-    BindingInitContext = new (Ctx) PatternBindingInitializer(Parent);
-
-  auto PBE = PatternBindingEntry(Pat, EqualLoc, E, BindingInitContext);
-  auto *Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
-
-  if (BindingInitContext)
-    cast<PatternBindingInitializer>(BindingInitContext)->setBinding(Result, 0);
-
-  return Result;
+  // We can provide a null context, 'create' will fill it in for us.
+  // FIXME: This seems dubious, see the comment in 'create'.
+  auto PBE = PatternBindingEntry(Pat, EqualLoc, E, /*InitContext*/ nullptr);
+  return create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
 }
 
 PatternBindingDecl *PatternBindingDecl::createImplicit(
     ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
     DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
-                        Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
+                        Pat, /*EqualLoc*/ SourceLoc(), E, Parent);
   Result->setImplicit();
-  Result->setInit(0, E);
-  Result->setOriginalInit(0, E);
   return Result;
 }
 
@@ -1928,22 +1919,26 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                                                       /*ClangNode*/false);
   auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
                                           PatternList.size(), Parent);
-
   // Set up the patterns.
-  auto entries = PBD->getMutablePatternList();
-  unsigned elt = 0U-1;
-  for (auto pe : PatternList) {
-    ++elt;
-    auto &newEntry = entries[elt];
-    newEntry = pe; // This should take care of initializer with flags
-    DeclContext *initContext = pe.getInitContext();
-    if (!initContext && !Parent->isLocalContext()) {
-      auto pbi = new (Ctx) PatternBindingInitializer(Parent);
-      pbi->setBinding(PBD, elt);
-      initContext = pbi;
-    }
+  std::uninitialized_copy(PatternList.begin(), PatternList.end(),
+                          PBD->getTrailingObjects<PatternBindingEntry>());
 
-    PBD->setPattern(elt, pe.getPattern(), initContext);
+  for (auto idx : range(PBD->getNumPatternEntries())) {
+    auto *initContext =
+        cast_or_null<PatternBindingInitializer>(PBD->getInitContext(idx));
+
+    // FIXME: We ought to reconsider this since it won't recontextualize any
+    // closures/decls present in the initialization expr. This currently should
+    // only affect implicit code though.
+    if (!initContext && !Parent->isLocalContext())
+      initContext = new (Ctx) PatternBindingInitializer(Parent);
+
+    if (initContext)
+      initContext->setBinding(PBD, idx);
+
+    // We need to call setPattern to ensure the VarDecls in the pattern have
+    // the PatternBindingDecl set as their parent, and to setup the context.
+    PBD->setPattern(idx, PBD->getPattern(idx), initContext);
   }
   return PBD;
 }
@@ -8817,14 +8812,13 @@ SubscriptDecl::createDeserialized(ASTContext &Context, DeclName Name,
   return SD;
 }
 
-SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
-                                     SourceLoc StaticLoc,
-                                     StaticSpellingKind StaticSpelling,
-                                     SourceLoc SubscriptLoc,
-                                     ParameterList *Indices, SourceLoc ArrowLoc,
-                                     TypeRepr *ElementTyR, DeclContext *Parent,
-                                     GenericParamList *GenericParams) {
+SubscriptDecl *SubscriptDecl::createParsed(
+    ASTContext &Context, SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+    SourceLoc SubscriptLoc, ParameterList *Indices, SourceLoc ArrowLoc,
+    TypeRepr *ElementTyR, DeclContext *Parent,
+    GenericParamList *GenericParams) {
   assert(ElementTyR);
+  auto Name = DeclName(Context, DeclBaseName::createSubscript(), Indices);
   auto *const SD = new (Context)
       SubscriptDecl(Name, StaticLoc, StaticSpelling, SubscriptLoc, Indices,
                     ArrowLoc, ElementTyR, Parent, GenericParams);
@@ -8866,7 +8860,29 @@ SubscriptDecl *SubscriptDecl::createImported(ASTContext &Context, DeclName Name,
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
-  return {getSubscriptLoc(), getEndLoc()};
+  auto Start = getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
+  if (Start.isInvalid())
+    return SourceRange();
+
+  if (auto End = getBracesRange().End)
+    return SourceRange(Start, End);
+
+  if (auto *Where = getTrailingWhereClause()) {
+    if (auto End = Where->getSourceRange().End)
+      return SourceRange(Start, End);
+  }
+  if (auto *ElementTy = getElementTypeRepr()) {
+    if (auto End = ElementTy->getEndLoc())
+      return SourceRange(Start, End);
+  }
+  if (ArrowLoc)
+    return SourceRange(Start, ArrowLoc);
+
+  if (auto *Indices = getIndices()) {
+    if (auto End = Indices->getEndLoc())
+      return SourceRange(Start, End);
+  }
+  return SourceRange(Start);
 }
 
 SourceRange SubscriptDecl::getSignatureSourceRange() const {
@@ -10080,6 +10096,92 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx, SourceLoc declLoc,
   D->setParameters(bodyParams);
   D->setResultInterfaceType(fnRetType);
   return D;
+}
+
+AccessorDecl *AccessorDecl::createParsed(
+    ASTContext &ctx, AccessorKind accessorKind, AbstractStorageDecl *storage,
+    SourceLoc declLoc, SourceLoc accessorKeywordLoc, ParameterList *paramList,
+    SourceLoc asyncLoc, SourceLoc throwsLoc, TypeRepr *thrownType,
+    DeclContext *dc) {
+  auto *accessor = AccessorDecl::createImpl(
+      ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
+      /*async*/ asyncLoc.isValid(), asyncLoc,
+      /*throws*/ throwsLoc.isValid(), throwsLoc, thrownType, dc,
+      /*clangNode*/ ClangNode());
+
+  // Set up the parameter list. This is the "newValue" name (for setters),
+  // followed by the index list (for subscripts).  For non-subscript getters,
+  // this degenerates down to "()".
+  //
+  // We put the 'newValue' argument before the subscript index list as a
+  // micro-optimization for Objective-C thunk generation.
+  SmallVector<ParamDecl *, 2> newParams;
+  SourceLoc paramsStart, paramsEnd;
+  if (paramList) {
+    assert(paramList->size() == 1 &&
+           "Should only have a single parameter in the list");
+    newParams.push_back(paramList->get(0));
+    paramsStart = paramList->getStartLoc();
+    paramsEnd = paramList->getEndLoc();
+  } else {
+    // No parameter list, if we have an implicit parameter name, fill it in.
+    auto implicitName = AccessorDecl::implicitParameterNameFor(accessorKind);
+    if (!implicitName.empty()) {
+      auto *implicitParam = new (ctx)
+          ParamDecl(SourceLoc(), SourceLoc(), Identifier(), declLoc,
+                    ctx.getIdentifier(implicitName), /*declContext*/ accessor);
+      implicitParam->setImplicit();
+      newParams.push_back(implicitParam);
+    }
+  }
+
+  // If this is a subscript accessor, we need to splice in the subscript
+  // parameters into the accessor's parameter list.
+  if (auto *SD = dyn_cast<SubscriptDecl>(storage)) {
+    auto *indices = SD->getIndices();
+    if (paramsStart.isInvalid()) {
+      paramsStart = indices->getStartLoc();
+      paramsEnd = indices->getEndLoc();
+    }
+    for (auto *subscriptParam : *indices) {
+      // Clone the parameter.
+      auto *param = new (ctx) ParamDecl(
+          subscriptParam->getSpecifierLoc(),
+          subscriptParam->getArgumentNameLoc(),
+          subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
+          subscriptParam->getName(), /*declContext*/ accessor);
+      param->setAutoClosure(subscriptParam->isAutoClosure());
+
+      // The cloned parameter is implicit.
+      param->setImplicit();
+
+      // It has no default arguments; these will be always be taken
+      // from the subscript declaration.
+      param->setDefaultArgumentKind(DefaultArgumentKind::None);
+
+      newParams.push_back(param);
+    }
+  }
+  accessor->setParameters(
+      ParameterList::create(ctx, paramsStart, newParams, paramsEnd));
+  return accessor;
+}
+
+StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::Init:
+    return "newValue";
+  case AccessorKind::DidSet:
+    return "oldValue";
+  case AccessorKind::Get:
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+    return StringRef();
+  }
 }
 
 bool AccessorDecl::isAssumedNonMutating() const {

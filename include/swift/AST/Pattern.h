@@ -447,6 +447,13 @@ public:
     return tp;
   }
 
+  static TypedPattern *createPropagated(ASTContext &ctx, Pattern *pattern,
+                                        TypeRepr *typeRepr) {
+    auto *TP = new (ctx) TypedPattern(pattern, typeRepr);
+    TP->setPropagatedType();
+    return TP;
+  }
+
   /// True if the type in this \c TypedPattern was propagated from a different
   /// \c TypedPattern.
   ///

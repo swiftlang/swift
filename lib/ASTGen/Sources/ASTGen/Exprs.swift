@@ -39,15 +39,15 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
   }
   while true {
     switch current.kind {
-    case // Known implemented kinds.
-        .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
-        .booleanLiteralExpr, .borrowExpr, .closureExpr, .consumeExpr, .copyExpr,
-        .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr,
-        .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
-        .nilLiteralExpr, .packElementExpr, .packExpansionExpr,
-        .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
-        .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr,  .unresolvedAsExpr,
-        .unresolvedIsExpr, .unresolvedTernaryExpr:
+    // Known implemented kinds.
+    case .arrayExpr, .arrowExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
+      .booleanLiteralExpr, .borrowExpr, .closureExpr, .consumeExpr, .copyExpr,
+      .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr,
+      .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
+      .nilLiteralExpr, .packElementExpr, .packExpansionExpr,
+      .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
+      .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr,
+      .unresolvedIsExpr, .unresolvedTernaryExpr:
 
       // `generate(stringLiteralExpr:)` doesn't support interpolations.
       if let str = current.as(StringLiteralExprSyntax.self) {
@@ -58,17 +58,19 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       }
 
       break
-    case // Known unimplemented kinds.
-        .asExpr, .canImportExpr, .canImportVersionInfo,
-        .doExpr, .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr,
-        .inOutExpr, .infixOperatorExpr,  .isExpr, .keyPathExpr,
-        .macroExpansionExpr,  .optionalChainingExpr,
-        .postfixIfConfigExpr, .regexLiteralExpr, .genericSpecializationExpr,
-        .simpleStringLiteralExpr, .subscriptCallExpr, .superExpr, .switchExpr,
-        .ternaryExpr, .patternExpr:
+
+    // Known unimplemented kinds.
+    case .asExpr, .canImportExpr, .canImportVersionInfo,
+      .doExpr, .editorPlaceholderExpr, .floatLiteralExpr, .forceUnwrapExpr,
+      .inOutExpr, .infixOperatorExpr, .isExpr, .keyPathExpr,
+      .macroExpansionExpr, .optionalChainingExpr,
+      .postfixIfConfigExpr, .regexLiteralExpr, .genericSpecializationExpr,
+      .simpleStringLiteralExpr, .subscriptCallExpr, .superExpr, .switchExpr,
+      .ternaryExpr, .patternExpr:
       return false
-    case // Unknown expr kinds.
-      _ where current.is(ExprSyntax.self):
+
+    // Unknown expr kinds.
+    case _ where current.is(ExprSyntax.self):
       return false
     default:
       break
@@ -322,7 +324,9 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, fn: callee, args: argumentTuple)
   }
 
-  private func createDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc) {
+  private func createDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
+    name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
+  ) {
     let baseName: BridgedDeclBaseName
     switch node.baseName.keywordKind {
     case .`init`:
@@ -428,7 +432,7 @@ extension ASTGenVisitor {
       patternExpr: self.generate(expr: node.repetitionPattern)
     )
   }
-  
+
   func generate(ifExpr node: IfExprSyntax) -> BridgedSingleValueStmtExpr {
     let stmt = makeIfStmt(node).asStmt
 
@@ -611,7 +615,10 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  fileprivate func createOperatorRefExpr(token node: TokenSyntax, kind: BridgedDeclRefKind) -> BridgedUnresolvedDeclRefExpr {
+  fileprivate func createOperatorRefExpr(
+    token node: TokenSyntax,
+    kind: BridgedDeclRefKind
+  ) -> BridgedUnresolvedDeclRefExpr {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node)
 
     return .createParsed(
@@ -622,9 +629,12 @@ extension ASTGenVisitor {
     );
   }
 
-
   /// Generate a tuple expression from a ``LabeledExprListSyntax`` and parentheses.
-  func generate(labeledExprList node: LabeledExprListSyntax, leftParen: TokenSyntax?, rightParen: TokenSyntax?) -> BridgedTupleExpr {
+  func generate(
+    labeledExprList node: LabeledExprListSyntax,
+    leftParen: TokenSyntax?,
+    rightParen: TokenSyntax?
+  ) -> BridgedTupleExpr {
     let expressions = node.lazy.map {
       self.generate(expr: $0.expression)
     }

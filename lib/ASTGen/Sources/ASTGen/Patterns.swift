@@ -45,7 +45,8 @@ extension ASTGenVisitor {
   func generate(identifierPattern node: IdentifierPatternSyntax) -> BridgedNamedPattern {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.identifier)
     return .createParsed(
-      ctx, declContext: declContext,
+      ctx,
+      declContext: declContext,
       name: name,
       loc: nameLoc
     )
@@ -105,5 +106,3 @@ extension ASTGenVisitor {
     )
   }
 }
-
-

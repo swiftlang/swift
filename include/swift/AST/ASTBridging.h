@@ -265,6 +265,13 @@ namespace swift {
   BridgedPattern Bridged##Id##Pattern_asPattern(Bridged##Id##Pattern pattern);
 #include "swift/AST/PatternNodes.def"
 
+struct BridgedPatternBindingEntry {
+  BridgedPattern pattern;
+  BridgedSourceLoc equalLoc;
+  BridgedNullableExpr init;
+  BridgedNullablePatternBindingInitializer initContext;
+};
+
 //===----------------------------------------------------------------------===//
 // MARK: Diagnostic Engine
 //===----------------------------------------------------------------------===//
@@ -372,24 +379,66 @@ SWIFT_NAME("BridgedDiagnostic.finish(self:)")
 void BridgedDiagnostic_finish(BridgedDiagnostic cDiag);
 
 //===----------------------------------------------------------------------===//
+// MARK: DeclContexts
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("getter:BridgedDeclContext.isLocalContext(self:)")
+bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext);
+
+SWIFT_NAME("BridgedPatternBindingInitializer.create(declContext:)")
+BridgedPatternBindingInitializer
+BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext);
+
+SWIFT_NAME("getter:BridgedPatternBindingInitializer.asDeclContext(self:)")
+BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
+    BridgedPatternBindingInitializer cInit);
+
+//===----------------------------------------------------------------------===//
 // MARK: Decls
 //===----------------------------------------------------------------------===//
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
+  BridgedStaticSpellingNone,
+  BridgedStaticSpellingStatic,
+  BridgedStaticSpellingClass
+};
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessorKind {
+#define ACCESSOR(ID) BridgedAccessorKind##ID,
+#include "swift/AST/AccessorKinds.def"
+};
+
+struct BridgedAccessorRecord {
+  BridgedSourceLoc lBraceLoc;
+  BridgedArrayRef accessors;
+  BridgedSourceLoc rBraceLoc;
+};
+
+SWIFT_NAME("BridgedAccessorDecl.createParsed(_:declContext:kind:storage:"
+           "declLoc:accessorKeywordLoc:parameterList:asyncSpecifierLoc:"
+           "throwsSpecifierLoc:thrownType:)")
+BridgedAccessorDecl BridgedAccessorDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
+    BridgedSourceLoc cDeclLoc, BridgedSourceLoc cAccessorKeywordLoc,
+    BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType);
+
 SWIFT_NAME(
     "BridgedPatternBindingDecl.createParsed(_:declContext:bindingKeywordLoc:"
-    "pattern:initializer:isStatic:isLet:)")
+    "entries:isStatic:isLet:)")
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedPattern pattern,
-    BridgedExpr opaqueInitExpr, bool isStatic, bool isLet);
+    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
+    bool isStatic, bool isLet);
 
-SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:firstName:"
-           "firstNameLoc:secondName:secondNameLoc:type:defaultValue:)")
+SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
+           "argNameLoc:paramName:paramNameLoc:type:defaultValue:)")
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
-    BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
-    BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr type,
+    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
+    BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
+    BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr type,
     BridgedNullableExpr defaultValue);
 
 SWIFT_NAME("BridgedConstructorDecl.setParsedBody(self:_:)")
@@ -588,6 +637,17 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedSourceLoc cImportKeywordLoc, BridgedImportKind cImportKind,
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements);
 
+SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
+           "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"
+           "arrowLoc:returnType:)")
+BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,
+    BridgedSourceLoc cSubscriptKeywordLoc,
+    BridgedNullableGenericParamList cGenericParamList,
+    BridgedParameterList cParamList, BridgedSourceLoc cArrowLoc,
+    BridgedTypeRepr returnType);
+
 SWIFT_NAME(
     "BridgedTopLevelCodeDecl.createParsed(_:declContext:startLoc:stmt:endLoc:)")
 BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createStmt(
@@ -607,6 +667,22 @@ void BridgedTopLevelCodeDecl_dump(BridgedTopLevelCodeDecl decl);
 
 SWIFT_NAME("BridgedDecl.dump(self:)")
 void BridgedDecl_dump(BridgedDecl decl);
+
+//===----------------------------------------------------------------------===//
+// MARK: AbstractStorageDecl
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("BridgedAbstractStorageDecl.setAccessors(self:_:)")
+void BridgedAbstractStorageDecl_setAccessors(
+    BridgedAbstractStorageDecl cStorage, BridgedAccessorRecord accessors);
+
+//===----------------------------------------------------------------------===//
+// MARK: AccessorDecl
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("BridgedAccessorDecl.setParsedBody(self:_:)")
+void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
+                                       BridgedBraceStmt body);
 
 //===----------------------------------------------------------------------===//
 // MARK: NominalTypeDecl
@@ -633,12 +709,26 @@ void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
                                              BridgedArrayRef members);
 
 //===----------------------------------------------------------------------===//
+// MARK: SubscriptDecl
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("getter:BridgedSubscriptDecl.asAbstractStorageDecl(self:)")
+BRIDGED_INLINE
+BridgedAbstractStorageDecl
+BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl);
+
+//===----------------------------------------------------------------------===//
 // MARK: VarDecl
 //===----------------------------------------------------------------------===//
 
 SWIFT_NAME("BridgedVarDecl.getUserFacingName(self:)")
 BRIDGED_INLINE
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
+
+SWIFT_NAME("getter:BridgedVarDecl.asAbstractStorageDecl(self:)")
+BRIDGED_INLINE
+BridgedAbstractStorageDecl
+BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl);
 
 //===----------------------------------------------------------------------===//
 // MARK: Exprs
@@ -1111,6 +1201,9 @@ void BridgedTypeRepr_dump(BridgedTypeRepr type);
 // MARK: Patterns
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME("getter:BridgedPattern.singleVar(self:)")
+BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern);
+
 SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc);
@@ -1158,6 +1251,10 @@ SWIFT_NAME("BridgedTypedPattern.createParsed(_:pattern:type:)")
 BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
                                                      BridgedPattern cPattern,
                                                      BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedTypedPattern.createPropagated(_:pattern:type:)")
+BridgedTypedPattern BridgedTypedPattern_createPropagated(
+    BridgedASTContext cContext, BridgedPattern cPattern, BridgedTypeRepr cType);
 
 //===----------------------------------------------------------------------===//
 // MARK: Misc

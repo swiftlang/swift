@@ -46,11 +46,25 @@ bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl) {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedSubscriptDecl
+//===----------------------------------------------------------------------===//
+
+BridgedAbstractStorageDecl
+BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl) {
+  return decl.unbridged();
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedVarDecl
 //===----------------------------------------------------------------------===//
 
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl) {
   return decl.unbridged()->getBaseName().userFacingName();
+}
+
+BridgedAbstractStorageDecl
+BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl) {
+  return decl.unbridged();
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

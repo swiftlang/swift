@@ -171,7 +171,9 @@ extension ASTGenVisitor {
 
   /// Obtains a pair of bridged identifier and the bridged source location.
   @inline(__always)
-  func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc) {
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (
+    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+  ) {
     return (
       self.generateIdentifier(token),
       self.generateSourceLoc(token)
@@ -182,7 +184,9 @@ extension ASTGenVisitor {
   /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
   /// source location.
   @inline(__always)
-  func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc) {
+  func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (
+    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+  ) {
     token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
   }
 
@@ -208,11 +212,13 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   /// Replaces the current declaration context with `declContext` for the duration of its execution, and calls `body`.
   @inline(__always)
-  func withDeclContext(_ declContext: BridgedDeclContext, _ body: () -> Void) {
+  func withDeclContext<T>(_ declContext: BridgedDeclContext, _ body: () -> T) -> T {
     let oldDeclContext = self.declContext
     self.declContext = declContext
-    body()
-    self.declContext = oldDeclContext
+    defer {
+      self.declContext = oldDeclContext
+    }
+    return body()
   }
 }
 
@@ -234,10 +240,6 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl {
     generate(decl: node.decl)
-  }
-
-  func generate(initializerClause node: InitializerClauseSyntax) -> BridgedExpr {
-    generate(expr: node.value)
   }
 
   func generate(conditionElement node: ConditionElementSyntax) -> ASTNode {
@@ -305,6 +307,11 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
+  func generate(accessorParameters node: AccessorParametersSyntax?) -> BridgedNullableParameterList {
+    node.map(generate(accessorParameters:)).asNullable
+  }
+
+  @inline(__always)
   func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
     node.map(generate(inheritedTypeList:)) ?? .init()
   }
@@ -341,6 +348,15 @@ extension Collection {
     }
 
     return .init(data: baseAddress, count: self.count)
+  }
+}
+
+extension CollectionOfOne {
+  /// Returns a single element as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
+  func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
+    let buffer = astgen.allocator.allocate(Element.self, count: 1)
+    _ = buffer.initialize(from: self)
+    return .init(data: buffer.baseAddress, count: 1)
   }
 }
 
@@ -454,13 +470,15 @@ private func _build<Node: SyntaxProtocol, Result>(
   endLocPtr.pointee = sourceLoc.advanced(by: node.totalLength.utf8Length)
 
   // Convert the syntax node.
-  return generator(ASTGenVisitor(
-    diagnosticEngine: diagEngine,
-    sourceBuffer: sourceFile.pointee.buffer,
-    declContext: declContext,
-    astContext: astContext,
-    legacyParser: legacyParser
-  ))(node)
+  return generator(
+    ASTGenVisitor(
+      diagnosticEngine: diagEngine,
+      sourceBuffer: sourceFile.pointee.buffer,
+      declContext: declContext,
+      astContext: astContext,
+      legacyParser: legacyParser
+    )
+  )(node)
 }
 
 @_cdecl("swift_ASTGen_buildTypeRepr")

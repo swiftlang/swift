@@ -1270,7 +1270,7 @@ public:
 
   bool parseAccessorAfterIntroducer(
       SourceLoc Loc, AccessorKind Kind, ParsedAccessors &accessors,
-      bool &hasEffectfulGet, ParameterList *Indices, bool &parsingLimitedSyntax,
+      bool &hasEffectfulGet, bool &parsingLimitedSyntax,
       DeclAttributes &Attributes, ParseDeclOptions Flags,
       AbstractStorageDecl *storage, ParserStatus &Status);
 

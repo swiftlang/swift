@@ -20,6 +20,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
@@ -45,6 +46,14 @@ static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
   case BridgedTypeAttrKind_Count:
     return TAK_Count;
   }
+}
+
+static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
+  return static_cast<StaticSpellingKind>(kind);
+}
+
+static AccessorKind unbridged(BridgedAccessorKind kind) {
+  return static_cast<AccessorKind>(kind);
 }
 
 //===----------------------------------------------------------------------===//
@@ -325,54 +334,78 @@ void BridgedDiagnostic_finish(BridgedDiagnostic cDiag) {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: DeclContexts
+//===----------------------------------------------------------------------===//
+
+bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext) {
+  return cDeclContext.unbridged()->isLocalContext();
+}
+
+BridgedPatternBindingInitializer
+BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
+  auto *dc = cDeclContext.unbridged();
+  return new (dc->getASTContext()) PatternBindingInitializer(dc);
+}
+
+BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
+    BridgedPatternBindingInitializer cInit) {
+  return cInit.unbridged();
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: Decls
 //===----------------------------------------------------------------------===//
 
+BridgedAccessorDecl BridgedAccessorDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
+    BridgedSourceLoc cDeclLoc, BridgedSourceLoc cAccessorKeywordLoc,
+    BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType) {
+  return AccessorDecl::createParsed(
+      cContext.unbridged(), unbridged(cKind), cStorage.unbridged(),
+      cDeclLoc.unbridged(), cAccessorKeywordLoc.unbridged(),
+      cParamList.unbridged(), cAsyncLoc.unbridged(), cThrowsLoc.unbridged(),
+      cThrownType.unbridged(), cDeclContext.unbridged());
+}
+
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedPattern cPattern,
-    BridgedExpr initExpr, bool isStatic, bool isLet) {
+    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
+    bool isStatic, bool isLet) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
-  Pattern *pattern = cPattern.unbridged();
+  auto introducer = isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
 
-  VarDecl::Introducer introducer =
-      isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
+  SmallVector<PatternBindingEntry, 4> entries;
+  for (auto &entry : cBindingEntries.unbridged<BridgedPatternBindingEntry>()) {
+    auto *pattern = entry.pattern.unbridged();
 
-  // Configure all vars.
-  pattern->forEachVariable([&](VarDecl *VD) {
-    VD->setStatic(isStatic);
-    VD->setIntroducer(introducer);
-  });
+    // Configure all vars.
+    pattern->forEachVariable([&](VarDecl *VD) {
+      VD->setStatic(isStatic);
+      VD->setIntroducer(introducer);
+    });
 
-  return PatternBindingDecl::create(context,
-                                    /*StaticLoc=*/SourceLoc(),
-                                    // FIXME: 'class' spelling kind.
-                                    isStatic ? StaticSpellingKind::KeywordStatic
-                                             : StaticSpellingKind::None,
-                                    cBindingKeywordLoc.unbridged(), pattern,
-                                    /*EqualLoc=*/SourceLoc(), // FIXME
-                                    initExpr.unbridged(), declContext);
+    entries.emplace_back(pattern, entry.equalLoc.unbridged(),
+                         entry.init.unbridged(), entry.initContext.unbridged());
+  }
+
+  return PatternBindingDecl::create(
+      context,
+      /*StaticLoc=*/SourceLoc(),
+      // FIXME: 'class' spelling kind.
+      isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
+      cBindingKeywordLoc.unbridged(), entries, declContext);
 }
 
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
-    BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
-    BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr opaqueType,
+    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
+    BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
+    BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  auto firstName = cFirstName.unbridged();
-  auto firstNameLoc = cFirstNameLoc.unbridged();
-  auto secondName = cSecondName.unbridged();
-  auto secondNameLoc = cSecondNameLoc.unbridged();
-
-  assert(secondNameLoc.isValid() == secondName.nonempty());
-  if (secondName.empty()) {
-    secondName = firstName;
-    secondNameLoc = firstNameLoc;
-  }
-
   auto *declContext = cDeclContext.unbridged();
 
   auto *defaultValue = opaqueDefaultValue.unbridged();
@@ -386,9 +419,9 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     defaultArgumentKind = getDefaultArgKind(defaultValue);
   }
 
-  auto *paramDecl = new (cContext.unbridged())
-      ParamDecl(cSpecifierLoc.unbridged(), firstNameLoc, firstName,
-                secondNameLoc, secondName, declContext);
+  auto *paramDecl = new (cContext.unbridged()) ParamDecl(
+      cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(), cArgName.unbridged(),
+      cParamNameLoc.unbridged(), cParamName.unbridged(), declContext);
 
   if (auto type = opaqueType.unbridged()) {
     paramDecl->setTypeRepr(type);
@@ -540,6 +573,15 @@ static void setParsedMembers(IterableDeclContext *IDC,
   SmallVector<Decl *> members;
   for (auto *decl : bridgedMembers.unbridged<Decl *>()) {
     members.push_back(decl);
+
+    // Add any variables bound to the list of decls.
+    if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
+      for (auto idx : range(PBD->getNumPatternEntries())) {
+        PBD->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
+          members.push_back(VD);
+        });
+      }
+    }
     // Each enum case element is also part of the members list according to the
     // legacy parser.
     if (auto *ECD = dyn_cast<EnumCaseDecl>(decl)) {
@@ -810,6 +852,20 @@ BridgedImportDecl BridgedImportDecl_createParsed(
       std::move(builder).get());
 }
 
+BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,
+    BridgedSourceLoc cSubscriptKeywordLoc,
+    BridgedNullableGenericParamList cGenericParamList,
+    BridgedParameterList cParamList, BridgedSourceLoc cArrowLoc,
+    BridgedTypeRepr returnType) {
+  return SubscriptDecl::createParsed(
+      cContext.unbridged(), cStaticLoc.unbridged(), unbridged(cStaticSpelling),
+      cSubscriptKeywordLoc.unbridged(), cParamList.unbridged(),
+      cArrowLoc.unbridged(), returnType.unbridged(), cDeclContext.unbridged(),
+      cGenericParamList.unbridged());
+}
+
 BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createStmt(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStartLoc, BridgedStmt statement,
@@ -836,6 +892,28 @@ BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createExpr(
                                  cEndLoc.unbridged(),
                                  /*Implicit=*/true);
   return new (context) TopLevelCodeDecl(declContext, Brace);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: AbstractStorageDecl
+//===----------------------------------------------------------------------===//
+
+void BridgedAbstractStorageDecl_setAccessors(
+    BridgedAbstractStorageDecl cStorage, BridgedAccessorRecord accessors) {
+  cStorage.unbridged()->setAccessors(
+      accessors.lBraceLoc.unbridged(),
+      accessors.accessors.unbridged<AccessorDecl *>(),
+      accessors.rBraceLoc.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: AccessorDecl
+//===----------------------------------------------------------------------===//
+
+void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
+                                       BridgedBraceStmt body) {
+  decl.unbridged()->setBody(body.unbridged(),
+                            AbstractFunctionDecl::BodyKind::Parsed);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1538,6 +1616,10 @@ BridgedExistentialTypeRepr_createParsed(BridgedASTContext cContext,
 // MARK: Patterns
 //===----------------------------------------------------------------------===//
 
+BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern) {
+  return cPattern.unbridged()->getSingleVar();
+}
+
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc) {
   return new (cContext.unbridged()) AnyPattern(cLoc.unbridged());
@@ -1614,6 +1696,14 @@ BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
                                                      BridgedTypeRepr cType) {
   return new (cContext.unbridged())
       TypedPattern(cPattern.unbridged(), cType.unbridged());
+}
+
+BridgedTypedPattern
+BridgedTypedPattern_createPropagated(BridgedASTContext cContext,
+                                     BridgedPattern cPattern,
+                                     BridgedTypeRepr cType) {
+  return TypedPattern::createPropagated(
+      cContext.unbridged(), cPattern.unbridged(), cType.unbridged());
 }
 
 //===----------------------------------------------------------------------===//

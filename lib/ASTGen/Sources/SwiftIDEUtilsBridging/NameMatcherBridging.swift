@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+import IDEBridging
 @_spi(Compiler) import SwiftIDEUtils
 import SwiftSyntax
 import swiftASTGen
-import IDEBridging
 
 // MARK: - Bridged type initializers
 
@@ -66,18 +66,18 @@ extension BridgedResolvedLoc {
     }
     let arguments: [DeclNameLocation.Argument]
     switch resolvedLoc.arguments {
-      case .noArguments: arguments = []
-      case .call(let arguments2, _): arguments = arguments2
-      case .parameters(let arguments2): arguments = arguments2
-      case .noncollapsibleParameters(let arguments2): arguments = arguments2
-      case .selector(let arguments2): arguments = arguments2
+    case .noArguments: arguments = []
+    case .call(let arguments2, _): arguments = arguments2
+    case .parameters(let arguments2): arguments = arguments2
+    case .noncollapsibleParameters(let arguments2): arguments = arguments2
+    case .selector(let arguments2): arguments = arguments2
     }
     self.init(
-      range: BridgedCharSourceRange(from: resolvedLoc.baseNameRange, in: sourceFile), 
+      range: BridgedCharSourceRange(from: resolvedLoc.baseNameRange, in: sourceFile),
       labelRanges: BridgedCharSourceRangeVector(from: arguments.map { $0.range }, in: sourceFile),
       firstTrailingLabel: firstTrailingClosureIndex,
-      labelType: LabelRangeType(resolvedLoc.arguments), 
-      isActive: resolvedLoc.isActive, 
+      labelType: LabelRangeType(resolvedLoc.arguments),
+      isActive: resolvedLoc.isActive,
       context: IDEBridging.ResolvedLocContext(resolvedLoc.context)
     )
   }
@@ -104,7 +104,7 @@ public func runNameMatcher(
 ) -> UnsafeMutableRawPointer? {
   let sourceFile = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1).pointee
   let locations = UnsafeBufferPointer(start: locations, count: Int(locationsCount))
-  let positions: [AbsolutePosition] =  locations.compactMap { sourceFile.position(of: $0) }
+  let positions: [AbsolutePosition] = locations.compactMap { sourceFile.position(of: $0) }
   let resolvedLocs = NameMatcher.resolve(baseNamePositions: positions, in: sourceFile.syntax)
   let bridged = BridgedResolvedLocVector(from: resolvedLocs, in: sourceFile)
   return bridged.getOpaqueValue()

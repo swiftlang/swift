@@ -7347,100 +7347,6 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   return makeParserResult(Status, assocType);
 }
 
-/// This function creates an accessor function (with no body) for a computed
-/// property or subscript.
-static AccessorDecl *
-createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
-                   ParameterList *Indices, Parser::ParseDeclOptions Flags,
-                   AccessorKind Kind, AbstractStorageDecl *storage, Parser *P,
-                   SourceLoc AccessorKeywordLoc, SourceLoc asyncLoc,
-                   SourceLoc throwsLoc, TypeRepr *thrownTy) {
-  // First task, set up the value argument list.  This is the "newValue" name
-  // (for setters) followed by the index list (for subscripts).  For
-  // non-subscript getters, this degenerates down to "()".
-  //
-  // We put the 'newValue' argument before the subscript index list as a
-  // micro-optimization for Objective-C thunk generation.
-  ParameterList *ValueArg;
-  {
-    SmallVector<ParamDecl*, 2> ValueArgElements;
-    SourceLoc StartLoc, EndLoc;
-    if (param) {
-      assert(param->size() == 1 &&
-             "Should only have a single parameter in the list");
-      ValueArgElements.push_back(param->get(0));
-      StartLoc = param->getStartLoc();
-      EndLoc = param->getEndLoc();
-    }
-
-    if (Indices) {
-      // Create parameter declarations corresponding to each of the
-      // parameter declarations from the subscript declaration.
-      for (ParamDecl *storageParam : *Indices) {
-        // Clone the parameter.  Do not clone the parameter type;
-        // this will be filled in by the type-checker.
-        auto accessorParam =
-          new (P->Context) ParamDecl(storageParam->getSpecifierLoc(),
-                                     storageParam->getArgumentNameLoc(),
-                                     storageParam->getArgumentName(),
-                                     storageParam->getNameLoc(),
-                                     storageParam->getName(),
-                                     P->CurDeclContext);
-        accessorParam->setAutoClosure(storageParam->isAutoClosure());
-
-        // The cloned parameter is implicit.
-        accessorParam->setImplicit();
-
-        // It has no default arguments; these will be always be taken
-        // from the subscript declaration.
-        accessorParam->setDefaultArgumentKind(DefaultArgumentKind::None);
-
-        ValueArgElements.push_back(accessorParam);
-      }
-
-      if (StartLoc.isInvalid()) {
-        StartLoc = Indices->getStartLoc();
-        EndLoc = Indices->getEndLoc();
-      }
-    }
-
-    ValueArg = ParameterList::create(P->Context, StartLoc, ValueArgElements,
-                                     EndLoc);
-  }
-
-  // Start the function.
-  auto *D = AccessorDecl::create(P->Context,
-                                 /*FIXME FuncLoc=*/DeclLoc, AccessorKeywordLoc,
-                                 Kind, storage, asyncLoc.isValid(), asyncLoc,
-                                 throwsLoc.isValid(), throwsLoc, thrownTy,
-                                 ValueArg, Type(), P->CurDeclContext);
-
-  return D;
-}
-
-static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
-                                               Identifier name,
-                                               AccessorKind accessorKind,
-                                               Parser &P) {
-  // Add the parameter. If no name was specified, the name defaults to
-  // 'value'.
-  bool isNameImplicit = name.empty();
-  if (isNameImplicit) {
-    const char *implName =
-      accessorKind == AccessorKind::DidSet ? "oldValue" : "newValue";
-    name = P.Context.getIdentifier(implName);
-  }
-
-  auto result = new (P.Context)
-      ParamDecl(SourceLoc(), SourceLoc(),
-                Identifier(), nameLoc, name, P.CurDeclContext);
-
-  if (isNameImplicit)
-    result->setImplicit();
-
-  return result;
-}
-
 /// Parse a "(value)" specifier for "set" or "willSet" if present.  Create a
 /// parameter list to represent the spelled argument or return null if none is
 /// present.
@@ -7482,9 +7388,12 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
       P.parseMatchingToken(tok::r_paren, EndLoc, DiagID, StartLoc);
     }
   }
+  if (Name.empty())
+    return nullptr;
 
-  if (Name.empty()) NameLoc = SpecifierLoc;
-  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P);
+  auto *param = new (P.Context) ParamDecl(
+      SourceLoc(), SourceLoc(), Identifier(), NameLoc, Name, P.CurDeclContext);
+
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
@@ -7740,10 +7649,10 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
 
 bool Parser::parseAccessorAfterIntroducer(
     SourceLoc Loc, AccessorKind Kind, ParsedAccessors &accessors,
-    bool &hasEffectfulGet, ParameterList *Indices, bool &parsingLimitedSyntax,
+    bool &hasEffectfulGet, bool &parsingLimitedSyntax,
     DeclAttributes &Attributes, ParseDeclOptions Flags,
     AbstractStorageDecl *storage, ParserStatus &Status) {
-  auto *ValueNamePattern = parseOptionalAccessorArgument(Loc, *this, Kind);
+  auto *param = parseOptionalAccessorArgument(Loc, *this, Kind);
 
   // Next, parse effects specifiers. While it's only valid to have them
   // on 'get' accessors, we also emit diagnostics if they show up on others.
@@ -7754,15 +7663,14 @@ bool Parser::parseAccessorAfterIntroducer(
                                     hasEffectfulGet, Kind, Loc);
 
   // Set up a function declaration.
-  auto accessor =
-      createAccessorFunc(Loc, ValueNamePattern, Indices, Flags, Kind, storage,
-                         this, Loc, asyncLoc, throwsLoc, thrownTy);
+  auto *accessor = AccessorDecl::createParsed(
+      Context, Kind, storage, /*declLoc*/ Loc, /*accessorKeywordLoc*/ Loc,
+      param, asyncLoc, throwsLoc, thrownTy, CurDeclContext);
   accessor->getAttrs() = Attributes;
 
   // Collect this accessor and detect conflicts.
   if (auto existingAccessor = accessors.add(accessor)) {
-    diagnoseRedundantAccessors(*this, Loc, Kind,
-                               /*subscript*/Indices != nullptr,
+    diagnoseRedundantAccessors(*this, Loc, Kind, isa<SubscriptDecl>(storage),
                                existingAccessor);
   }
 
@@ -7841,12 +7749,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
   auto parseImplicitGetter = [&]() {
     assert(Tok.is(tok::l_brace));
     accessors.LBLoc = Tok.getLoc();
-    auto getter =
-        createAccessorFunc(Tok.getLoc(), /*ValueNamePattern*/ nullptr, Indices,
-                           Flags, AccessorKind::Get, storage, this,
-                           /*AccessorKeywordLoc*/ SourceLoc(),
-                           /*asyncLoc*/ SourceLoc(), /*throwsLoc*/ SourceLoc(),
-                           /*thrownTy*/ nullptr);
+    auto *getter = AccessorDecl::createParsed(
+        Context, AccessorKind::Get, storage, /*declLoc*/ Tok.getLoc(),
+        /*accessorKeywordLoc*/ SourceLoc(), /*paramList*/ nullptr,
+        /*asyncLoc*/ SourceLoc(), /*throwsLoc*/ SourceLoc(),
+        /*thrownTy*/ nullptr, CurDeclContext);
     accessors.add(getter);
     parseAbstractFunctionBody(getter);
     accessors.RBLoc = getter->getEndLoc();
@@ -7932,8 +7839,8 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     }
 
     if (parseAccessorAfterIntroducer(Loc, Kind, accessors, hasEffectfulGet,
-                                     Indices, parsingLimitedSyntax, Attributes,
-                                     Flags, storage, Status))
+                                     parsingLimitedSyntax, Attributes, Flags,
+                                     storage, Status))
       break;
   }
   backtrack->cancelBacktrack();
@@ -7955,10 +7862,6 @@ void Parser::parseTopLevelAccessors(
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
-
-  ParameterList *indices = nullptr;
-  if (auto subscript = dyn_cast<SubscriptDecl>(storage))
-    indices = subscript->getIndices();
 
   bool hadLBrace = consumeIf(tok::l_brace);
 
@@ -7982,8 +7885,8 @@ void Parser::parseTopLevelAccessors(
       break;
 
     (void)parseAccessorAfterIntroducer(loc, kind, accessors, hasEffectfulGet,
-                                       indices, parsingLimitedSyntax,
-                                       attributes, PD_Default, storage, status);
+                                       parsingLimitedSyntax, attributes,
+                                       PD_Default, storage, status);
   }
 
   if (hadLBrace && Tok.is(tok::r_brace)) {
@@ -8364,12 +8267,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
                                            VarLoc, PBDEntries, BaseContext);
 
-    // Wire up any initializer contexts we needed.
-    for (unsigned i : indices(PBDEntries)) {
-      if (auto initContext = PBD->getInitContext(i))
-        cast<PatternBindingInitializer>(initContext)->setBinding(PBD, i);
-    }
-
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
     // up in Decls to be returned to caller.
@@ -8542,9 +8439,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
             Status.setIsParseError();
           }
 
-          TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
-                                                           TP->getTypeRepr());
-          NewTP->setPropagatedType();
+          auto *NewTP = TypedPattern::createPropagated(Context, PrevPat,
+                                                       TP->getTypeRepr());
           PBDEntries[i-1].setPattern(NewTP);
         }
       }
@@ -9612,10 +9508,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   // Parse the parameter list.
   DefaultArgumentInfo DefaultArgs;
-  SmallVector<Identifier, 4> argumentNames;
-  ParserResult<ParameterList> Indices
-    = parseSingleParameterClause(ParameterContextKind::Subscript,
-                                 &argumentNames, &DefaultArgs);
+  ParserResult<ParameterList> Indices =
+      parseSingleParameterClause(ParameterContextKind::Subscript,
+                                 /*argumentNamesOut*/ nullptr, &DefaultArgs);
   Status |= Indices;
   if (Status.hasCodeCompletion() && !CodeCompletionCallbacks)
     return Status;
@@ -9658,11 +9553,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   }
 
   // Build an AST for the subscript declaration.
-  DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
-                           argumentNames);
-  auto *const Subscript = SubscriptDecl::create(
-      Context, name, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(),
-      ArrowLoc, ElementTy.get(), CurDeclContext, GenericParams);
+  auto *const Subscript = SubscriptDecl::createParsed(
+      Context, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(), ArrowLoc,
+      ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.
@@ -9713,9 +9606,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     Status |= parseGetSet(Flags, Indices.get(), ElementTy.get(), accessors,
                           Subscript);
   }
-
-  // Now that it's been parsed, set the end location.
-  Subscript->setEndLoc(PreviousLoc);
 
   bool Invalid = false;
   // Reject 'subscript' functions outside of type decls

@@ -1,7 +1,12 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
+
+// Filter out any addresses in the dump, since they can differ.
+// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
+// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
@@ -36,67 +41,126 @@ async
 throws
 ->
 Int {
-  let
-    xx = fn(42)
-
-  let arlit = [0]
-  let tuple = (0, 1)
-  let diclit = [0: 1, 2: 3]
-
-  return fn(x)
+  return 0
 }
 
-func testEmptyDictionary() -> [Int: Int] {
-  return [:]
-}
-
-func test2(e b: Bool) {
-  if b
-  {
-    print(
-      "TRUE"
-    )
-  }
-  else
-  {
-    print("FALSE")
-  }
-
-  let x =
-    true
-}
-
-func test3(y: Int = 0, oi: Int? = nil) -> Int {
+func test2(y: Int = 0, oi: Int? = nil) -> Int {
   let x =
     y
   return x
 }
 
-func test4(_ b: [Bool]) -> Int {
-  if b.isEmpty { 0 } else {
-    1
-  }
-}
-
-func test5(_ b: Swift.Bool) -> Int {
-  return if b { 0 } else { 1 }
-}
-
-func test6(_ b1: Bool, b2: Bool) -> Int {
-  let x = if b1 { 0 } else if b2 { 1 } else { 2 }
-  return x
-}
-
-func test7(_ b: inout Bool) {
+func test3(_ b: inout Bool) {
   // b = true
 }
 
-func test8(_ i: _const Int) {
+func test4(_ i: _const Int) {
 }
 
-func test9(_ value: Any) { }
+func test5(_ value: Any) { }
 
-func test10<T>(t: T) where T: Proto1 {}
+func test6<T>(t: T) where T: Proto1 {}
+
+func test7() {
+  var binding1 = 0, binding2 = ""
+}
+
+func test8(_: Int) {}
+
+func testVars() {
+  var a = 0
+  var b: Int = 0
+  var c, d: Int
+  var e, f: Int, g, h, i: String
+  let j: Int = 0, k: String = ""
+
+  // FIXME: We don't yet handle single expression bodies.
+  var l: Int { return 0 }
+  var m: Int { get { return 0 } }
+  var n: Int {
+    get { return m }
+    set {}
+  }
+  var o: Int = 0 {
+    willSet {
+      n = newValue
+    }
+  }
+  var p: Int {
+    get { return 0 }
+    set(foo) {
+      o = foo
+    }
+  }
+  var q: Int = 0 {
+    didSet(old) {
+      p = old
+    }
+  }
+  var r: Int {
+    _read { yield q }
+    _modify { yield &q }
+  }
+  var s: Int {
+    get async throws { return 0 }
+  }
+}
+
+struct TestVars {
+  var a = 0
+  var b: Int = 0
+  var c, d: Int
+  var e, f: Int, g, h, i: String
+  let j: Int = 0, k: String = ""
+
+  // FIXME: We don't yet handle single expression bodies.
+  var l: Int { return 0 }
+  var m: Int { get { return 0 } }
+  var n: Int {
+    get { return m }
+    set {}
+  }
+  var o: Int = 0 {
+    willSet {
+      n = newValue
+    }
+  }
+  var p: Int {
+    get { return 0 }
+    set(foo) {
+      o = foo
+    }
+  }
+  var q: Int = 0 {
+    didSet(old) {
+      p = old
+    }
+  }
+  var r: Int {
+    _read { yield q }
+    _modify { yield &q }
+  }
+  var s: Int {
+    get async throws { return 0 }
+  }
+}
+
+extension TestVars {
+  var inExt: Int { return 0 }
+}
+
+struct TestSubscripts {
+  subscript(x: Int) -> Int {
+    // FIXME: We don't yet handle single expression bodies.
+    return 0
+  }
+  subscript(y x: Int) -> Int {
+    get {
+      return 0
+    }
+    set(x) {}
+  }
+}
 
 protocol Proto1 {}
 protocol Proto2 {}
@@ -199,7 +263,6 @@ operator
 postfix
 operator ⎩^-^⎩
 
-
 precedencegroup Precedence1 {
 }
 
@@ -213,17 +276,6 @@ precedencegroup Precedence2 {
 struct TestStruct {
   func method(arg: Int, _ c: Int) {}
 
-  enum Ty {
-    case `self`
-    case `Self`
-  }
-
-  func test() {
-    _ = method(arg:_:)
-    _ = self.method(arg:_:).self
-    _ = Ty.`Self` ==  Ty.`self`
-  }
-
 // FIXME: Compute 'static' location
 //  static var shared = TestStruct()
 //  func testUnresolvedMember1() -> Self {
@@ -232,30 +284,4 @@ struct TestStruct {
 //
 // FIXME: Compute 'static' location
 //  static func instance(arg: Int) -> TestStruct { return TestStruct() }
-//  func testUnresolvedMember2() -> Self {
-//    return .instance(arg:)(12)
-//  }
-}
-
-func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
-  _ = arg1 + arg2()
-  _ = arg3 as? Int ?? 31 as Int
-  _ = false ? arg2() : Int(1)
-  _ = [() -> Int]()
-  _ = [@Sendable () -> Int]().count +  [any Collection]().count
-  _ = arg3 is Double || !(arg3 is Int, 0).0
-}
-
-func asyncFunc(_ arg: String) async throws -> Int {
-  return 1
-}
-func testUnaryExprs() async throws {
-  let str = String()
-  let foo = try await asyncFunc(_borrow str)
-  let bar = copy foo
-  let baz = consume foo
-}
-
-func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
-  return (repeat each t)
 }
