@@ -62,13 +62,12 @@ func test(snc: borrowing SNC) {
   take(snc.data) // expected-error{{'snc.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 
-// FIXME: get the actual variable name instead of 'unknown' in these cases.
 func test<T: P>(t: T) {
   borrow(t.data)
-  take(t.data) // expected-error{{'unknown.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(t.data) // expected-error{{'t.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 func test(p: P) {
   borrow(p.data)
-  take(p.data) // expected-error{{'unknown.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(p.data) // expected-error{{'p.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 
