@@ -26,7 +26,7 @@ func throwsConcrete() throws(MyError) {
 func rethrowConcrete() throws(MyError) {
   // CHECK: try_apply [[FN:%[0-9]+]]() : $@convention(thin) () -> @error MyError, normal [[NORMALBB:bb[0-9]+]], error [[ERRORBB:bb[0-9]+]]
   // CHECK: [[ERRORBB]]([[ERROR:%[0-9]+]] : $MyError)
-  // CHECK-NEXT: throw [[ERROR]] : $MyError 
+  // CHECK-NEXT: throw [[ERROR]] : $MyError
   try throwsConcrete()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws29rethrowConcreteAndExistentialyyKF
@@ -152,6 +152,11 @@ func forceTryDifferent() throws(MyError) {
   // CHECK: [[NORMAL_BB]]([[RESULT:%.*]] : $()):
   // CHECK: return
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : $MyBigError):
+  // CHECK: [[MATERIALIZED_ERROR:%.*]] = alloc_stack $MyBigError
+  // CHECK: store [[ERROR]] to [trivial] [[MATERIALIZED_ERROR]] : $*MyBigError
+  // CHECK: [[UNEXPECTED_FN:%.*]] = function_ref @swift_unexpectedErrorTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in τ_0_0, Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word) -> ()
+  // CHECK-NEXT: apply [[UNEXPECTED_FN]]<MyBigError>([[MATERIALIZED_ERROR]], {{[^)]*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in τ_0_0, Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word) -> ()
+  // CHECK-NEXT: dealloc_stack [[MATERIALIZED_ERROR]]
   // CHECK-NEXT: unreachable
   try! throwsMyBigError()
 }
