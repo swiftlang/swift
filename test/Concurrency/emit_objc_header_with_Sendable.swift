@@ -20,7 +20,7 @@ import Foundation
 @objc public protocol Q {
   // CHECK: - (NSArray<NSDictionary<NSString *, id> *> * _Nonnull)data1 SWIFT_WARN_UNUSED_RESULT;
   func data1() -> [[String: any Sendable]]
-  // CHECK: - (NSArray<id> * _Nullable)data2 SWIFT_WARN_UNUSED_RESULT;
+  // CHECK: - (NSArray * _Nullable)data2 SWIFT_WARN_UNUSED_RESULT;
   func data2() -> [any Sendable]?
   // CHECK: - (void)data3:(id _Nonnull)_;
   func data3(_: any Sendable)
