@@ -25,6 +25,8 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SwiftSyntaxMacros
     SwiftSyntaxMacroExpansion
     SwiftCompilerPluginMessageHandling
+    # Support for LSP
+    SwiftIDEUtils
   )
 
   # Install shared runtime libraries
@@ -56,6 +58,9 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
                                COMPONENT swift-syntax-lib)
   endif()
 
+  add_dependencies(swift-syntax-lib
+    ${SWIFT_SYNTAX_MODULES})
+
   # Install Swift module interface files.
   foreach(module ${SWIFT_SYNTAX_MODULES})
     set(module_dir "${module}.swiftmodule")
@@ -64,6 +69,11 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/${module_dir}"
                                COMPONENT swift-syntax-lib)
   endforeach()
+
+  export(TARGETS ${SWIFT_SYNTAX_MODULES}
+         NAMESPACE SwiftSyntax::
+         FILE ${CMAKE_BINARY_DIR}/cmake/modules/SwiftSyntaxConfig.cmake
+         EXPORT_LINK_INTERFACE_LIBRARIES)
 endif()
 
 add_subdirectory(APIDigester)
