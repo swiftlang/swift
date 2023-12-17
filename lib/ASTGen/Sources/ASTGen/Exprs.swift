@@ -44,7 +44,7 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .booleanLiteralExpr, .borrowExpr, .closureExpr, .consumeExpr, .copyExpr,
       .discardAssignmentExpr, .declReferenceExpr, .dictionaryExpr,
       .functionCallExpr, .ifExpr, .integerLiteralExpr, .memberAccessExpr,
-      .nilLiteralExpr, .packElementExpr, .packExpansionExpr,
+      .nilLiteralExpr, .packElementExpr, .packExpansionExpr, .patternExpr,
       .postfixOperatorExpr, .prefixOperatorExpr, .sequenceExpr,
       .stringLiteralExpr, .tryExpr, .tupleExpr, .typeExpr, .unresolvedAsExpr,
       .unresolvedIsExpr, .unresolvedTernaryExpr:
@@ -66,7 +66,7 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
       .macroExpansionExpr, .optionalChainingExpr,
       .postfixIfConfigExpr, .regexLiteralExpr, .genericSpecializationExpr,
       .simpleStringLiteralExpr, .subscriptCallExpr, .superExpr, .switchExpr,
-      .ternaryExpr, .patternExpr:
+      .ternaryExpr:
       return false
 
     // Unknown expr kinds.
@@ -161,8 +161,8 @@ extension ASTGenVisitor {
       return self.generate(packElementExpr: node).asExpr
     case .packExpansionExpr(let node):
       return self.generate(packExpansionExpr: node).asExpr
-    case .patternExpr:
-      break
+    case .patternExpr(let node):
+      return self.generate(patternExpr: node).asExpr
     case .postfixIfConfigExpr:
       break
     case .postfixOperatorExpr(let node):
@@ -324,7 +324,7 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, fn: callee, args: argumentTuple)
   }
 
-  private func createDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
+  func createDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
     name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
   ) {
     let baseName: BridgedDeclBaseName
@@ -433,8 +433,15 @@ extension ASTGenVisitor {
     )
   }
 
+  func generate(patternExpr node: PatternExprSyntax) -> BridgedUnresolvedPatternExpr {
+    return .createParsed(
+      self.ctx,
+      pattern: self.generate(pattern: node.pattern)
+    )
+  }
+
   func generate(ifExpr node: IfExprSyntax) -> BridgedSingleValueStmtExpr {
-    let stmt = makeIfStmt(node).asStmt
+    let stmt = generateIfStmt(ifExpr: node).asStmt
 
     // Wrap in a SingleValueStmtExpr to embed as an expression.
     return .createWithWrappedBranches(

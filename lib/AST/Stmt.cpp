@@ -385,6 +385,28 @@ SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
 SourceLoc DiscardStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
+DeferStmt *DeferStmt::create(DeclContext *dc, SourceLoc deferLoc) {
+  ASTContext &ctx = dc->getASTContext();
+
+  auto params = ParameterList::createEmpty(ctx);
+  DeclName name(ctx, ctx.getIdentifier("$defer"), params);
+  auto *const funcDecl = FuncDecl::createImplicit(
+      ctx, StaticSpellingKind::None, name, /*NameLoc=*/deferLoc,
+      /*Async=*/false,
+      /*Throws=*/false,
+      /*ThrownType=*/Type(),
+      /*GenericParams=*/nullptr, params, TupleType::getEmpty(ctx), dc);
+
+  // Form the call, which will be emitted on any path that needs to run the
+  // code.
+  auto DRE = new (ctx)
+      DeclRefExpr(funcDecl, DeclNameLoc(deferLoc),
+                  /*Implicit*/ true, AccessSemantics::DirectToStorage);
+  auto call = CallExpr::createImplicitEmpty(ctx, DRE);
+
+  return new (ctx) DeferStmt(deferLoc, funcDecl, call);
+}
+
 SourceLoc DeferStmt::getEndLoc() const {
   return tempDecl->getBody()->getEndLoc();
 }
@@ -762,6 +784,87 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
     vd->setParentPatternStmt(this);
   }
+}
+
+namespace {
+static MutableArrayRef<VarDecl *>
+getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems) {
+  // Grab the first case label item pattern and use it to initialize the case
+  // body var decls.
+  SmallVector<VarDecl *, 4> tmp;
+  labelItems.front().getPattern()->collectVariables(tmp);
+  return ctx.AllocateTransform<VarDecl *>(
+      llvm::makeArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
+        auto *vNew = new (ctx) VarDecl(
+            /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
+            vOld->getName(), vOld->getDeclContext());
+        vNew->setImplicit();
+        return vNew;
+      });
+}
+
+struct FallthroughFinder : ASTWalker {
+  FallthroughStmt *result;
+
+  FallthroughFinder() : result(nullptr) {}
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
+
+  // We walk through statements.  If we find a fallthrough, then we got what
+  // we came for.
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *s) override {
+    if (auto *f = dyn_cast<FallthroughStmt>(s)) {
+      result = f;
+    }
+
+    return Action::Continue(s);
+  }
+
+  // Expressions, patterns and decls cannot contain fallthrough statements, so
+  // there is no reason to walk into them.
+  PreWalkResult<Expr *> walkToExprPre(Expr *e) override {
+    return Action::SkipChildren(e);
+  }
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *p) override {
+    return Action::SkipChildren(p);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *d) override {
+    return Action::SkipChildren();
+  }
+  PreWalkAction walkToTypeReprPre(TypeRepr *t) override {
+    return Action::SkipChildren();
+  }
+
+  static FallthroughStmt *findFallthrough(Stmt *s) {
+    FallthroughFinder finder;
+    s->walk(finder);
+    return finder.result;
+  }
+};
+} // namespace
+
+CaseStmt *
+CaseStmt::createParsedSwitchCase(ASTContext &ctx, SourceLoc introducerLoc,
+                                 ArrayRef<CaseLabelItem> caseLabelItems,
+                                 SourceLoc unknownAttrLoc, SourceLoc colonLoc,
+                                 BraceStmt *body) {
+  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  auto fallthroughStmt = FallthroughFinder().findFallthrough(body);
+  return create(ctx, CaseParentKind::Switch, introducerLoc, caseLabelItems,
+                unknownAttrLoc, colonLoc, body, caseVarDecls,
+                /*implicit=*/false, fallthroughStmt);
+}
+
+CaseStmt *CaseStmt::createParsedDoCatch(ASTContext &ctx, SourceLoc catchLoc,
+                                        ArrayRef<CaseLabelItem> caseLabelItems,
+                                        BraceStmt *body) {
+  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  return create(ctx, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
+                /*unknownAttrLoc=*/SourceLoc(), body->getStartLoc(), body,
+                caseVarDecls, /*implicit=*/false, /*fallthroughStmt=*/nullptr);
 }
 
 CaseStmt *

@@ -24,6 +24,7 @@
 #ifdef USED_IN_CPP_SOURCE
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Stmt.h"
 #endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
@@ -198,6 +199,19 @@ struct BridgedASTNode {
 
   SWIFT_NAME("kind")
   ASTNodeKind Kind;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::ASTNode unbridged() const {
+    switch (Kind) {
+    case ASTNodeKindExpr:
+      return swift::ASTNode(static_cast<swift::Expr *>(Raw));
+    case ASTNodeKindStmt:
+      return swift::ASTNode(static_cast<swift::Stmt *>(Raw));
+    case ASTNodeKindDecl:
+      return swift::ASTNode(static_cast<swift::Decl *>(Raw));
+    }
+  }
+#endif
 };
 
 // Forward declare the underlying AST node type for each wrapper.
@@ -938,6 +952,14 @@ BridgedUnresolvedMemberExpr BridgedUnresolvedMemberExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cDotLoc,
     BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc);
 
+SWIFT_NAME("BridgedUnresolvedPatternExpr.createParsed(_:pattern:)")
+BridgedUnresolvedPatternExpr
+BridgedUnresolvedPatternExpr_createParsed(BridgedASTContext cContext,
+                                          BridgedPattern cPattern);
+
+SWIFT_NAME("BridgedExpr.setImplicit(self:)")
+void BridgedExpr_setImplicit(BridgedExpr cExpr);
+
 SWIFT_NAME("BridgedExpr.dump(self:)")
 void BridgedExpr_dump(BridgedExpr expr);
 
@@ -945,25 +967,180 @@ void BridgedExpr_dump(BridgedExpr expr);
 // MARK: Stmts
 //===----------------------------------------------------------------------===//
 
+struct BridgedLabeledStmtInfo {
+  SWIFT_NAME("name")
+  BridgedIdentifier Name;
+  SWIFT_NAME("loc")
+  BridgedSourceLoc Loc;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::LabeledStmtInfo unbridged() const {
+    return {Name.unbridged(), Loc.unbridged()};
+  }
+#endif
+};
+
+class BridgedStmtConditionElement {
+  void *_Nonnull Raw;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedStmtConditionElement(swift::StmtConditionElement elem)
+      : Raw(elem.getOpaqueValue()) {}
+
+  swift::StmtConditionElement unbridged() const {
+    return swift::StmtConditionElement::fromOpaqueValue(Raw);
+  }
+#endif
+};
+
+SWIFT_NAME("BridgedStmtConditionElement.createBoolean(expr:)")
+BridgedStmtConditionElement
+BridgedStmtConditionElement_createBoolean(BridgedExpr expr);
+
+SWIFT_NAME("BridgedStmtConditionElement.createPatternBinding(_:introducerLoc:"
+           "pattern:initializer:)")
+BridgedStmtConditionElement BridgedStmtConditionElement_createPatternBinding(
+    BridgedASTContext cContext, BridgedSourceLoc cIntroducerLoc,
+    BridgedPattern cPattern, BridgedExpr cInitializer);
+
+struct BridgedCaseLabelItemInfo {
+  SWIFT_NAME("isDefault")
+  bool IsDefault;
+  SWIFT_NAME("pattern")
+  BridgedPattern ThePattern;
+  SWIFT_NAME("whereLoc")
+  BridgedSourceLoc WhereLoc;
+  SWIFT_NAME("guardExpr")
+  BridgedNullableExpr GuardExpr;
+};
+
 SWIFT_NAME("BridgedBraceStmt.createParsed(_:lBraceLoc:elements:rBraceLoc:)")
 BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLBLoc,
                                                BridgedArrayRef elements,
                                                BridgedSourceLoc cRBLoc);
 
-SWIFT_NAME("BridgedIfStmt.createParsed(_:ifKeywordLoc:condition:thenStmt:"
-           "elseLoc:elseStmt:)")
-BridgedIfStmt BridgedIfStmt_createParsed(BridgedASTContext cContext,
-                                         BridgedSourceLoc cIfLoc,
-                                         BridgedExpr cond,
-                                         BridgedBraceStmt then,
-                                         BridgedSourceLoc cElseLoc,
-                                         BridgedNullableStmt elseStmt);
+SWIFT_NAME("BridgedBreakStmt.createParsed(_:loc:targetName:targetLoc:)")
+BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc cLoc,
+                                               BridgedIdentifier cTargetName,
+                                               BridgedSourceLoc cTargetLoc);
 
-SWIFT_NAME("BridgedReturnStmt.createParsed(_:returnKeywordLoc:expr:)")
+SWIFT_NAME("BridgedCaseStmt.createParsedSwitchCase(_:introducerLoc:"
+           "caseLabelItems:unknownAttrLoc:terminatorLoc:body:)")
+BridgedCaseStmt BridgedCaseStmt_createParsedSwitchCase(
+    BridgedASTContext cContext, BridgedSourceLoc cIntroducerLoc,
+    BridgedArrayRef cCaseLabelItems, BridgedSourceLoc cUnknownAttrLoc,
+    BridgedSourceLoc cTerminatorLoc, BridgedBraceStmt cBody);
+
+SWIFT_NAME(
+    "BridgedCaseStmt.createParsedDoCatch(_:catchLoc:caseLabelItems:body:)")
+BridgedCaseStmt BridgedCaseStmt_createParsedDoCatch(
+    BridgedASTContext cContext, BridgedSourceLoc cCatchLoc,
+    BridgedArrayRef cCaseLabelItems, BridgedBraceStmt cBody);
+
+SWIFT_NAME("BridgedContinueStmt.createParsed(_:loc:targetName:targetLoc:)")
+BridgedContinueStmt BridgedContinueStmt_createParsed(
+    BridgedDeclContext cDeclContext, BridgedSourceLoc cLoc,
+    BridgedIdentifier cTargetName, BridgedSourceLoc cTargetLoc);
+
+SWIFT_NAME("BridgedDeferStmt.createParsed(_:deferLoc:)")
+BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc cDeferLoc);
+
+SWIFT_NAME("getter:BridgedDeferStmt.tempDecl(self:)")
+BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged);
+
+SWIFT_NAME("BridgedDiscardStmt.createParsed(_:discardLoc:subExpr:)")
+BridgedDiscardStmt BridgedDiscardStmt_createParsed(BridgedASTContext cContext,
+                                                   BridgedSourceLoc cDiscardLoc,
+                                                   BridgedExpr cSubExpr);
+
+SWIFT_NAME("BridgedDoStmt.createParsed(_:labelInfo:doLoc:body:)")
+BridgedDoStmt BridgedDoStmt_createParsed(BridgedASTContext cContext,
+                                         BridgedLabeledStmtInfo cLabelInfo,
+                                         BridgedSourceLoc cDoLoc,
+                                         BridgedBraceStmt cBody);
+
+SWIFT_NAME(
+    "BridgedDoCatchStmt.createParsed(_:labelInfo:doLoc:throwsLoc:thrownType:"
+    "body:catches:)")
+BridgedDoCatchStmt BridgedDoCatchStmt_createParsed(
+    BridgedDeclContext cDeclContext, BridgedLabeledStmtInfo cLabelInfo,
+    BridgedSourceLoc cDoLoc, BridgedSourceLoc cThrowsLoc,
+    BridgedNullableTypeRepr cThrownType, BridgedStmt cBody,
+    BridgedArrayRef cCatches);
+
+SWIFT_NAME("BridgedFallthroughStmt.createParsed(_:loc:)")
+BridgedFallthroughStmt
+BridgedFallthroughStmt_createParsed(BridgedASTContext cContext,
+                                    BridgedSourceLoc cLoc);
+
+SWIFT_NAME("BridgedForEachStmt.createParsed(_:labelInfo:forLoc:tryLoc:awaitLoc:"
+           "pattern:inLoc:sequence:whereLoc:whereExpr:body:)")
+BridgedForEachStmt BridgedForEachStmt_createParsed(
+    BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
+    BridgedSourceLoc cForLoc, BridgedSourceLoc cTryLoc,
+    BridgedSourceLoc cAwaitLoc, BridgedPattern cPat, BridgedSourceLoc cInLoc,
+    BridgedExpr cSequence, BridgedSourceLoc cWhereLoc,
+    BridgedNullableExpr cWhereExpr, BridgedBraceStmt cBody);
+
+SWIFT_NAME("BridgedGuardStmt.createParsed(_:guardLoc:conds:body:)")
+BridgedGuardStmt BridgedGuardStmt_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cGuardLoc,
+                                               BridgedArrayRef cConds,
+                                               BridgedBraceStmt cBody);
+
+SWIFT_NAME("BridgedIfStmt.createParsed(_:labelInfo:ifLoc:conditions:then:"
+           "elseLoc:else:)")
+BridgedIfStmt BridgedIfStmt_createParsed(
+    BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
+    BridgedSourceLoc cIfLoc, BridgedArrayRef cConds, BridgedBraceStmt cThen,
+    BridgedSourceLoc cElseLoc, BridgedNullableStmt cElse);
+
+SWIFT_NAME("BridgedRepeatWhileStmt.createParsed(_:labelInfo:repeatLoc:cond:"
+           "whileLoc:body:)")
+BridgedRepeatWhileStmt BridgedRepeatWhileStmt_createParsed(
+    BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
+    BridgedSourceLoc cRepeatLoc, BridgedExpr cCond, BridgedSourceLoc cWhileLoc,
+    BridgedStmt cBody);
+
+SWIFT_NAME("BridgedReturnStmt.createParsed(_:loc:expr:)")
 BridgedReturnStmt BridgedReturnStmt_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc,
                                                  BridgedNullableExpr expr);
+
+SWIFT_NAME("BridgedSwitchStmt.createParsed(_:labelInfo:switchLoc:subjectExpr:"
+           "lBraceLoc:cases:rBraceLoc:)")
+BridgedSwitchStmt BridgedSwitchStmt_createParsed(
+    BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
+    BridgedSourceLoc cSwitchLoc, BridgedExpr cSubjectExpr,
+    BridgedSourceLoc cLBraceLoc, BridgedArrayRef cCases,
+    BridgedSourceLoc cRBraceLoc);
+
+SWIFT_NAME("BridgedThenStmt.createParsed(_:thenLoc:result:)")
+BridgedThenStmt BridgedThenStmt_createParsed(BridgedASTContext cContext,
+                                             BridgedSourceLoc cThenLoc,
+                                             BridgedExpr cResult);
+
+SWIFT_NAME("BridgedThrowStmt.createParsed(_:throwLoc:subExpr:)")
+BridgedThrowStmt BridgedThrowStmt_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cThrowLoc,
+                                               BridgedExpr cSubExpr);
+
+SWIFT_NAME("BridgedWhileStmt.createParsed(_:labelInfo:whileLoc:cond:body:)")
+BridgedWhileStmt BridgedWhileStmt_createParsed(
+    BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
+    BridgedSourceLoc cWhileLoc, BridgedArrayRef cCond, BridgedStmt cBody);
+
+SWIFT_NAME(
+    "BridgedYieldStmt.createParsed(_:yieldLoc:lParenLoc:yields:rParenLoc:)")
+BridgedYieldStmt BridgedYieldStmt_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cYieldLoc,
+                                               BridgedSourceLoc cLParenLoc,
+                                               BridgedArrayRef cYields,
+                                               BridgedSourceLoc cRParenLoc);
 
 SWIFT_NAME("BridgedStmt.dump(self:)")
 void BridgedStmt_dump(BridgedStmt statement);
@@ -1214,6 +1391,11 @@ BridgedBindingPattern_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cKeywordLoc, bool isLet,
                                    BridgedPattern cSubPattern);
 
+SWIFT_NAME("BridgedBindingPattern.createImplicitCatch(_:loc:)")
+BridgedBindingPattern
+BridgedBindingPattern_createImplicitCatch(BridgedDeclContext cDeclContext,
+                                          BridgedSourceLoc cLoc);
+
 SWIFT_NAME("BridgedExprPattern.createParsed(_:expr:)")
 BridgedExprPattern
 BridgedExprPattern_createParsed(BridgedDeclContext cDeclContext,
@@ -1255,6 +1437,12 @@ BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedTypedPattern.createPropagated(_:pattern:type:)")
 BridgedTypedPattern BridgedTypedPattern_createPropagated(
     BridgedASTContext cContext, BridgedPattern cPattern, BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedPattern.setImplicit(self:)")
+void BridgedPattern_setImplicit(BridgedPattern cPattern);
+
+SWIFT_NAME("getter:BridgedPattern.boundName(self:)")
+BridgedIdentifier BridgedPattern_getBoundName(BridgedPattern cPattern);
 
 //===----------------------------------------------------------------------===//
 // MARK: Misc

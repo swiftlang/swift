@@ -522,7 +522,7 @@ public:
   }
 
   template <typename Output, typename Range>
-  ArrayRef<Output> AllocateTransform(
+  MutableArrayRef<Output> AllocateTransform(
       Range &&input,
       llvm::function_ref<Output(typename Range::const_reference)> transform,
       AllocationArena arena = AllocationArena::Permanent) {

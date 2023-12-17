@@ -363,14 +363,19 @@ class DeferStmt : public Stmt {
   /// This is the invocation of the closure, which is to be emitted on any error
   /// paths.
   Expr *callExpr;
-  
-public:
+
   DeferStmt(SourceLoc DeferLoc,
             FuncDecl *tempDecl, Expr *callExpr)
     : Stmt(StmtKind::Defer, /*implicit*/false),
       DeferLoc(DeferLoc), tempDecl(tempDecl),
       callExpr(callExpr) {}
-  
+
+public:
+  /// Create a 'defer' statement. This automatically creates the "temp decl" and
+  /// the call expression. It's the caller's responsibility to populate the
+  /// body of the func decl.
+  static DeferStmt *create(DeclContext *dc, SourceLoc deferLoc);
+
   SourceLoc getDeferLoc() const { return DeferLoc; }
   
   SourceLoc getStartLoc() const { return DeferLoc; }
@@ -390,7 +395,6 @@ public:
 /// conditional statements (i.e. `if`, `guard`, `while`).
 class alignas(8) ConditionalPatternBindingInfo
     : public ASTAllocated<ConditionalPatternBindingInfo> {
-public:
   /// Location of the var/let/case keyword.
   SourceLoc IntroducerLoc;
 
@@ -1186,6 +1190,18 @@ class CaseStmt final
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
+  /// Create a parsed 'case'/'default' for 'switch' statement.
+  static CaseStmt *
+  createParsedSwitchCase(ASTContext &C, SourceLoc ItemIntroducerLoc,
+                         ArrayRef<CaseLabelItem> CaseLabelItems,
+                         SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
+                         BraceStmt *Body);
+
+  /// Create a parsed 'catch' for 'do' statement.
+  static CaseStmt *createParsedDoCatch(ASTContext &C, SourceLoc CatchLoc,
+                                       ArrayRef<CaseLabelItem> CaseLabelItems,
+                                       BraceStmt *Body);
+
   static CaseStmt *
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,

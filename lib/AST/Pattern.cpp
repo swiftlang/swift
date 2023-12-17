@@ -331,6 +331,27 @@ bool Pattern::hasAnyMutableBindings() const {
   return HasMutable;
 }
 
+BindingPattern *BindingPattern::createParsed(ASTContext &ctx, SourceLoc loc,
+                                             VarDecl::Introducer introducer,
+                                             Pattern *sub) {
+  // Reset the introducer of the all variables in the pattern.
+  sub->forEachVariable([&](VarDecl *vd) { vd->setIntroducer(introducer); });
+  return new (ctx) BindingPattern(loc, introducer, sub);
+}
+
+BindingPattern *BindingPattern::createImplicitCatch(DeclContext *dc,
+                                                    SourceLoc loc) {
+  auto &ctx = dc->getASTContext();
+  auto var = new (ctx) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Let,
+                               loc, ctx.Id_error, dc);
+  var->setImplicit();
+  auto namePattern = new (ctx) NamedPattern(var);
+  auto varPattern =
+      new (ctx) BindingPattern(loc, VarDecl::Introducer::Let, namePattern);
+  varPattern->setImplicit();
+  return varPattern;
+}
+
 OptionalSomePattern *OptionalSomePattern::create(ASTContext &ctx,
                                                  Pattern *subPattern,
                                                  SourceLoc questionLoc) {
