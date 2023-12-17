@@ -1148,21 +1148,27 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
 
+  SILValue indirectError;
   auto &errorTL = SGF.getTypeLowering(loc->getThrownError());
   if (!errorTL.isAddressOnly()) {
     (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
                                       OwnershipKind::Owned);
+  } else {
+    indirectError = SGF.B.createAllocStack(loc, errorTL.getLoweredType());
+    SGF.enterDeallocStackCleanup(indirectError);
+
   }
 
   SGF.ThrowDest = JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(),
                            CleanupLocation(loc),
-                           ThrownErrorInfo::forDiscard());
+                           ThrownErrorInfo(indirectError, /*discard=*/true));
 }
 
 void SILGenFunction::ForceTryEmission::finish() {
   assert(Loc && "emission already finished");
 
   auto catchBB = SGF.ThrowDest.getBlock();
+  auto indirectError = SGF.ThrowDest.getThrownError().IndirectErrorResult;
   SGF.ThrowDest = OldThrowDest;
 
   // If there are no uses of the catch block, just drop it.
@@ -1175,29 +1181,64 @@ void SILGenFunction::ForceTryEmission::finish() {
     ASTContext &ctx = SGF.getASTContext();
 
     // Consume the thrown error.
+    ManagedValue error;
     if (catchBB->getNumArguments() == 1) {
-      auto error = ManagedValue::forForwardedRValue(SGF, catchBB->getArgument(0));
+      error = ManagedValue::forForwardedRValue(SGF, catchBB->getArgument(0));
+    } else {
+      error = ManagedValue::forForwardedRValue(SGF, indirectError);
+    }
 
-      // FIXME: for typed throws, we need a new version of this entry point that
-      // takes a generic rather than an existential.
-      if (error.getType() == SILType::getExceptionType(ctx)) {
-        if (auto diagnoseError = ctx.getDiagnoseUnexpectedError()) {
-          auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
+    // If we have 'any Error', use the older entrypoint that takes an
+    // existential error directly. Otherwise, use the newer generic entrypoint.
+    auto diagnoseError = error.getType().getASTType()->isErrorExistentialType()
+      ? ctx.getDiagnoseUnexpectedError()
+      : ctx.getDiagnoseUnexpectedErrorTyped();
+    if (diagnoseError) {
+      SILValue tmpBuffer;
+      auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
 
-          SGF.emitApplyOfLibraryIntrinsic(
-                  Loc,
-                  diagnoseError,
-                  SubstitutionMap(),
-                  {
-                    error,
-                    args.filenameStartPointer,
-                    args.filenameLength,
-                    args.filenameIsAscii,
-                    args.line
-                  },
-                  SGFContext());
+      SubstitutionMap subMap;
+      if (auto genericSig = diagnoseError->getGenericSignature()) {
+        // FIXME: The conformance of the thrown error type to the Error
+        // protocol should be provided to us by the type checker.
+        subMap = SubstitutionMap::get(
+            genericSig, [&](SubstitutableType *dependentType) {
+              return error.getType().getObjectType().getASTType();
+            }, LookUpConformanceInModule(SGF.getModule().getSwiftModule()));
+
+        // Generic errors are passed indirectly.
+        #if true
+        if (!error.getType().isAddress()) {
+          auto *tmp = SGF.B.createAllocStack(Loc,
+                                             error.getType().getObjectType(),
+                                             llvm::None);
+          error.forwardInto(SGF, Loc, tmp);
+          error = ManagedValue::forForwardedRValue(SGF, tmp);
+
+          tmpBuffer = tmp;
         }
+        #else
+        error = SGF.emitSubstToOrigValue(Loc, error,
+                                         AbstractionPattern::getOpaque(),
+                                         error.getType().getASTType());
+        #endif
       }
+
+      SGF.emitApplyOfLibraryIntrinsic(
+              Loc,
+              diagnoseError,
+              subMap,
+              {
+                error,
+                args.filenameStartPointer,
+                args.filenameLength,
+                args.filenameIsAscii,
+                args.line
+              },
+              SGFContext());
+
+      if (tmpBuffer)
+        SGF.B.createDeallocStack(Loc, tmpBuffer);
     }
 
     SGF.B.createUnreachable(Loc);

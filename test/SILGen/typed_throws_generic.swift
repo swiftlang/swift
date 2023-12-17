@@ -78,9 +78,10 @@ public func genericForceTry<E>(fn: () throws(E) -> ()) {
 
 // CHECK-LABEL: sil [ossa] @$s20typed_throws_generic0C8ForceTry2fnyyyxYKXE_ts5ErrorRzlF : $@convention(thin) <E where E : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>) -> () {
 // CHECK: bb0(%0 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>):
+// CHECK: [[OUTER_ERROR:%.*]] = alloc_stack $E
 // CHECK: [[FN:%.*]] = copy_value %0 : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>
 // CHECK: [[ERROR:%.*]] = alloc_stack $E
-// CHECK: [[FN_BORROW:%.*]] = begin_borrow %2 : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>
+// CHECK: [[FN_BORROW:%.*]] = begin_borrow [[FN]] : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>
 // CHECK: try_apply [[FN_BORROW]]([[ERROR]]) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>, normal bb1, error bb2
 
 // CHECK: bb1({{.*}} : $()):
@@ -90,11 +91,13 @@ public func genericForceTry<E>(fn: () throws(E) -> ()) {
 // CHECK: return [[RESULT]] : $()
 
 // CHECK: bb2:
-// CHECK: destroy_addr [[ERROR]] : $*E
+// CHECK: copy_addr [take] [[ERROR]] to [init] [[OUTER_ERROR]] : $*E
 // CHECK: end_borrow [[FN_BORROW]] : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>
 // CHECK: dealloc_stack [[ERROR]] : $*E
 // CHECK: destroy_value [[FN]] : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>
-// CHECK: unreachable
+  // CHECK: [[UNEXPECTED_FN:%.*]] = function_ref @swift_unexpectedErrorTyped : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in τ_0_0, Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word) -> ()
+  // CHECK-NEXT: apply [[UNEXPECTED_FN]]<E>([[OUTER_ERROR]], {{[^)]*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in τ_0_0, Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word) -> ()
+// CHECK-NEXT: unreachable
 
 enum MyError: Error {
 case fail
