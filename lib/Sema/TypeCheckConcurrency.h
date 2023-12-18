@@ -248,6 +248,17 @@ public:
   operator Kind() const { return kind; }
 };
 
+struct IsolationError {
+
+  SourceLoc loc;
+
+  Diagnostic diag;
+
+public:
+  IsolationError(SourceLoc loc, Diagnostic diag) : loc(loc), diag(diag) {}
+
+};
+
 /// Individual options used with \c FunctionCheckOptions
 enum class FunctionCheckKind {
   /// Check params
@@ -579,5 +590,50 @@ bool diagnoseApplyArgSendability(
     swift::ApplyExpr *apply, const DeclContext *declContext);
 
 } // end namespace swift
+
+namespace llvm {
+
+template <>
+struct DenseMapInfo<swift::ReferencedActor::Kind> {
+  using RefActorKind = swift::ReferencedActor::Kind;
+
+  static RefActorKind getEmptyKey() {
+   return RefActorKind::NonIsolatedContext;
+  }
+
+  static RefActorKind getTombstoneKey() {
+   return RefActorKind::NonIsolatedContext;
+  }
+
+  static unsigned getHashValue(RefActorKind Val) {
+   return static_cast<unsigned>(Val);
+  }
+
+  static bool isEqual(const RefActorKind &LHS, const RefActorKind &RHS) {
+   return LHS == RHS;
+  }
+ };
+
+  template <>
+  struct DenseMapInfo<swift::ActorIsolation> {
+    using RefActor = swift::ActorIsolation;
+
+    static RefActor getEmptyKey() {
+      return RefActor(swift::ActorIsolation::Kind::Unspecified);
+    }
+
+    static RefActor getTombstoneKey() {
+     return RefActor(swift::ActorIsolation::Kind::Unspecified);
+    }
+
+    static unsigned getHashValue(RefActor Val) {
+     return static_cast<unsigned>(Val.getKind());
+    }
+
+    static bool isEqual(const RefActor &LHS, const RefActor &RHS) {
+     return LHS == RHS;
+    }
+  };
+} // end namespace llvm
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

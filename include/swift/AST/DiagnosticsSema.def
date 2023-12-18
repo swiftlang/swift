@@ -5269,11 +5269,10 @@ NOTE(note_add_async_and_throws_to_decl,none,
 NOTE(note_add_distributed_to_decl,none,
      "add 'distributed' to %0 to make this %kindonly0 satisfy the protocol requirement",
      (const ValueDecl *))
-NOTE(note_add_globalactor_to_function,none,
+ERROR(add_globalactor_to_function,none,
      "add '@%0' to make %kind1 part of global actor %2",
      (StringRef, const ValueDecl *, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
-
 ERROR(main_function_must_be_mainActor,none,
       "main() must be '@MainActor'", ())
 

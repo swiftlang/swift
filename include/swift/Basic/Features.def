@@ -278,6 +278,9 @@ EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
 /// Enables the FixedArray data type.
 EXPERIMENTAL_FEATURE(FixedArrays, true)
 
+// Group Main Actor Isolation Errors by Scope
+EXPERIMENTAL_FEATURE(GroupActorErrors, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
