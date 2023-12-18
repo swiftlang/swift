@@ -2370,8 +2370,9 @@ CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 
-// These instructions are ignored because they cannot affect the partition
-// state - they do not manipulate what region non-sendable values lie in
+// These instructions are ignored because they cannot affect the region that a
+// value is within or because even though they are technically a use we would
+// rather emit an error on a better instruction.
 CONSTANT_TRANSLATION(AllocGlobalInst, Ignored)
 CONSTANT_TRANSLATION(DeallocBoxInst, Ignored)
 CONSTANT_TRANSLATION(DeallocStackInst, Ignored)
@@ -2388,6 +2389,9 @@ CONSTANT_TRANSLATION(MarkDependenceInst, Ignored)
 CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
+
+// Instructions that only require that the region of the value be live:
+CONSTANT_TRANSLATION(FixLifetimeInst, Require)
 
 // Ignored terminators.
 CONSTANT_TRANSLATION(CondFailInst, Ignored)
@@ -2469,7 +2473,6 @@ CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(AutoreleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(FixLifetimeInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(AssignInst, Unhandled)
