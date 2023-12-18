@@ -5,7 +5,8 @@
 // RUN:   -module-name test \
 // RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics
+// RUN:   -Xllvm -enable-lifetime-dependence-diagnostics \
+// RUN:   -enable-experimental-lifetime-dependence-inference
 
 // REQUIRES: swift_in_compiler
 

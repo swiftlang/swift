@@ -33,5 +33,5 @@ public struct PView: P {
 public func pview_ret_concrete(pview: consuming PView) -> _consume(pview) View {
   return pview.getDefault() // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1 {{it depends on this scoped access to variable 'pview'}}
-  // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
+  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
 }
