@@ -205,8 +205,8 @@ public func _unexpectedError(
 @_silgen_name("swift_unexpectedErrorTyped")
 @_alwaysEmitIntoClient
 @inlinable
-public func _unexpectedErrorTyped(
-  _ error: __owned some Error,
+public func _unexpectedErrorTyped<E: Error>(
+  _ error: __owned E,
   filenameStart: Builtin.RawPointer,
   filenameLength: Builtin.Word,
   filenameIsASCII: Builtin.Int1,
