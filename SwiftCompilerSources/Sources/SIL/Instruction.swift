@@ -841,8 +841,7 @@ final public class RefToBridgeObjectInst : SingleValueInstruction, ForwardingIns
 final public class BridgeObjectToRefInst : SingleValueInstruction,
                                            ConversionInstruction {}
 
-final public class BridgeObjectToWordInst : SingleValueInstruction,
-                                           ConversionInstruction {}
+final public class BridgeObjectToWordInst : SingleValueInstruction {}
 
 public typealias AccessKind = BridgedInstruction.AccessKind
 

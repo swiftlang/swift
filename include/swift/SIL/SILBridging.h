@@ -46,6 +46,7 @@ struct OptionalBridgedBasicBlock;
 namespace swift {
 class ValueBase;
 class Operand;
+class ForwardingInstruction;
 class SILFunction;
 class SILBasicBlock;
 class SILSuccessor;
@@ -564,6 +565,7 @@ struct BridgedInstruction {
   //                         Instruction protocols
   // =========================================================================//
 
+  BRIDGED_INLINE swift::ForwardingInstruction * _Nonnull getAsForwardingInstruction() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedOperand ForwardingInst_singleForwardedOperand() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandArray ForwardingInst_forwardedOperands() const;
   BRIDGED_INLINE BridgedValue::Ownership ForwardingInst_forwardingOwnership() const;

@@ -702,6 +702,12 @@ BridgedSuccessorArray BridgedInstruction::TermInst_getSuccessors() const {
   return {{successors.data()}, (SwiftInt)successors.size()};
 }
 
+swift::ForwardingInstruction * _Nonnull BridgedInstruction::getAsForwardingInstruction() const {
+  auto *forwardingInst = swift::ForwardingInstruction::get(unbridged());
+  assert(forwardingInst && "instruction is not defined as ForwardingInstruction");
+  return forwardingInst;
+}
+
 OptionalBridgedOperand BridgedInstruction::ForwardingInst_singleForwardedOperand() const {
   return {swift::ForwardingOperation(unbridged()).getSingleForwardingOperand()};
 }
@@ -713,17 +719,15 @@ BridgedOperandArray BridgedInstruction::ForwardingInst_forwardedOperands() const
 }
 
 BridgedValue::Ownership BridgedInstruction::ForwardingInst_forwardingOwnership() const {
-  auto *forwardingInst = swift::ForwardingInstruction::get(unbridged());
-  return castOwnership(forwardingInst->getForwardingOwnershipKind());
+  return castOwnership(getAsForwardingInstruction()->getForwardingOwnershipKind());
 }
 
 void BridgedInstruction::ForwardingInst_setForwardingOwnership(BridgedValue::Ownership ownership) const {
-  auto *forwardingInst = swift::ForwardingInstruction::get(unbridged());
-  return forwardingInst->setForwardingOwnershipKind(BridgedValue::castToOwnership(ownership));
+  return getAsForwardingInstruction()->setForwardingOwnershipKind(BridgedValue::castToOwnership(ownership));
 }
 
 bool BridgedInstruction::ForwardingInst_preservesOwnership() const {
-  return swift::ForwardingInstruction::get(unbridged())->preservesOwnership();
+  return getAsForwardingInstruction()->preservesOwnership();
 }
 
 BridgedStringRef BridgedInstruction::CondFailInst_getMessage() const {
