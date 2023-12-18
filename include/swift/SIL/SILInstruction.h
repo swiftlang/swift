@@ -4494,6 +4494,7 @@ public:
   /// doesn't have a lexical bit, do not do anything.
   void removeIsLexical() { sharedUInt8().BeginBorrowInst.lexical = false; }
 
+  /// WARNING: this flag is not yet implemented!
   bool hasPointerEscape() const {
     return sharedUInt8().BeginBorrowInst.pointerEscape;
   }

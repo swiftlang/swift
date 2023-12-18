@@ -20,6 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -273,6 +274,9 @@ ArrayRef<SILValue> BridgedValueArray::getValues(SmallVectorImpl<SILValue> &stora
   return storage;
 }
 
+bool BridgedValue::findPointerEscape() const {
+  return swift::findPointerEscape(getSILValue());
+}
 
 //===----------------------------------------------------------------------===//
 //                                SILArgument
