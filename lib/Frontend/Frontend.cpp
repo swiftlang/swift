@@ -869,7 +869,7 @@ bool CompilerInstance::setUpInputs() {
   // There is no input file when building PCM using ClangIncludeTree.
   if (Invocation.getFrontendOptions().RequestedAction ==
           FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getClangImporterOptions().UseClangIncludeTree)
+      Invocation.getClangImporterOptions().HasClangIncludeTreeRoot)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the

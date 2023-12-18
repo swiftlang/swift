@@ -1687,6 +1687,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     // Only set UseClangIncludeTree when caching is enabled since it is not
     // useful in non-caching context.
     Opts.UseClangIncludeTree = !Args.hasArg(OPT_no_clang_include_tree);
+    Opts.HasClangIncludeTreeRoot = Args.hasArg(OPT_clang_include_tree_root);
   }
 
   return false;
