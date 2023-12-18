@@ -93,6 +93,19 @@ static void getVariableNameForValue(SILValue value2,
       value2->getFunction());
   while (true) {
     if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
+      // If the instruction itself doesn't carry any variable info, see whether
+      // it's copied from another place that does.
+      if (!allocInst->getDecl()) {
+        if (auto copy = allocInst->getSingleUserOfType<CopyAddrInst>()) {
+          if (copy->getDest() == allocInst
+              && !copy->isTakeOfSrc()
+              && copy->isInitializationOfDest()) {
+            searchValue = copy->getSrc();
+            continue;
+          }
+        }
+      }
+    
       variableNamePath.push_back(allocInst);
       break;
     }
@@ -100,6 +113,11 @@ static void getVariableNameForValue(SILValue value2,
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
       variableNamePath.push_back(globalAddrInst);
       break;
+    }
+
+    if (auto *oeInst = dyn_cast<OpenExistentialAddrInst>(searchValue)) {
+      searchValue = oeInst->getOperand();
+      continue;
     }
 
     if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {

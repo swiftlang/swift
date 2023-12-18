@@ -80,7 +80,7 @@ func test(m_snc snc: inout SNC) {
 
 func test<T: P>(t: T) {
   borrow(t.data)
-  take(t.data) // expected-error{{'unknown.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(t.data) // expected-error{{'t.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 func test<T: P>(m_t t: inout T) {
   borrow(t.data)
@@ -88,14 +88,13 @@ func test<T: P>(m_t t: inout T) {
   mod(&t.data)
 }
 
-// FIXME: get the actual variable name instead of 'unknown' in these cases.
 func test(p: P) {
   borrow(p.data)
-  take(p.data) // expected-error{{'unknown.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(p.data) // expected-error{{'p.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 func test(m_p p: inout P) {
   borrow(p.data)
-  take(p.data) // expected-error{{missing reinitialization of inout parameter 'unknown' after consume}} expected-note{{consumed here}}
+  take(p.data) // expected-error{{missing reinitialization of inout parameter 'p.data' after consume}} expected-note{{consumed here}}
   mod(&p.data)
 }
 
