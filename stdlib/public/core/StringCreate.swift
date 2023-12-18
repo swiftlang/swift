@@ -305,20 +305,15 @@ extension String {
     _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
     as encoding: Encoding.Type
   ) -> String? {
-  fast: // fast-path
     if encoding.CodeUnit.self == UInt8.self {
       let bytes = _identityCast(input, to: UnsafeBufferPointer<UInt8>.self)
-      let isASCII: Bool
       if encoding.self == UTF8.self {
         guard case .success(let info) = validateUTF8(bytes) else { return nil }
-        isASCII = info.isASCII
+        return String._uncheckedFromUTF8(bytes, asciiPreScanResult: info.isASCII)
       } else if encoding.self == Unicode.ASCII.self {
         guard _allASCII(bytes) else { return nil }
-        isASCII = true
-      } else {
-        break fast
+        return String._uncheckedFromASCII(bytes)
       }
-      return String._uncheckedFromUTF8(bytes, asciiPreScanResult: isASCII)
     }
 
     // slow-path
