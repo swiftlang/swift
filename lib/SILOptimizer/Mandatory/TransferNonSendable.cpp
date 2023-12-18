@@ -1180,7 +1180,8 @@ enum class TranslationSemantics {
   /// getUnderlyingTrackedValue can look through the instruction.
   LookThrough,
 
-  /// Emit require partition ops for each operand of the instruction.
+  /// Require that the region associated with a value not be consumed at this
+  /// program point.
   Require,
 
   /// A "CopyLikeInstruction" with a Dest and Src operand value. If the store
@@ -1207,6 +1208,13 @@ enum class TranslationSemantics {
 
   /// A terminator instruction that acts like a phi in terms of its region.
   TerminatorPhi,
+
+  /// An instruction that we should never see and if we do see, we should assert
+  /// upon. This is generally used for non-Ownership SSA instructions and
+  /// instructions that can only appear in Lowered SIL. Even if we should never
+  /// see one of these instructions, we would still like to ensure that we
+  /// handle every instruction to ensure we cover the IR.
+  Asserting,
 
   /// An instruction that we do not handle yet. Just for now during bring
   /// up. Will be removed.
@@ -1246,6 +1254,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     return os;
   case TranslationSemantics::TerminatorPhi:
     os << "terminator_phi";
+    return os;
+  case TranslationSemantics::Asserting:
+    os << "asserting";
     return os;
   case TranslationSemantics::Unhandled:
     os << "unhandled";
@@ -2152,6 +2163,11 @@ public:
       return translateSILPhi(sources);
     }
 
+    case TranslationSemantics::Asserting:
+      llvm::report_fatal_error(
+          "transfer-non-sendable: Found banned instruction?!");
+      return;
+
     case TranslationSemantics::Unhandled:
       LLVM_DEBUG(llvm::dbgs() << "Unhandled inst: " << *inst);
       return;
@@ -2449,18 +2465,9 @@ CONSTANT_TRANSLATION(DeallocStackRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Unhandled)
-CONSTANT_TRANSLATION(StrongRetainInst, Unhandled)
-CONSTANT_TRANSLATION(StrongReleaseInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(StrongRetainUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedRetainInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedReleaseInst, Unhandled)
-CONSTANT_TRANSLATION(RetainValueInst, Unhandled)
-CONSTANT_TRANSLATION(RetainValueAddrInst, Unhandled)
-CONSTANT_TRANSLATION(ReleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(ReleaseValueAddrInst, Unhandled)
 CONSTANT_TRANSLATION(AutoreleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(FixLifetimeInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
@@ -2490,6 +2497,18 @@ CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+
+// Non-OSSA instructions that we should never see since we bail on non-OSSA
+// functions early.
+CONSTANT_TRANSLATION(ReleaseValueAddrInst, Asserting)
+CONSTANT_TRANSLATION(ReleaseValueInst, Asserting)
+CONSTANT_TRANSLATION(RetainValueAddrInst, Asserting)
+CONSTANT_TRANSLATION(RetainValueInst, Asserting)
+CONSTANT_TRANSLATION(StrongReleaseInst, Asserting)
+CONSTANT_TRANSLATION(StrongRetainInst, Asserting)
+CONSTANT_TRANSLATION(StrongRetainUnownedInst, Asserting)
+CONSTANT_TRANSLATION(UnownedReleaseInst, Asserting)
+CONSTANT_TRANSLATION(UnownedRetainInst, Asserting)
 
 #undef CONSTANT_TRANSLATION
 
@@ -3290,6 +3309,11 @@ class TransferNonSendable : public SILFunctionTransform {
     // type is sendable.
     if (!function->getDeclContext() && !function->getParentModule()) {
       LLVM_DEBUG(llvm::dbgs() << "No Decl Context! Skipping!\n");
+      return;
+    }
+
+    if (!function->hasOwnership()) {
+      LLVM_DEBUG(llvm::dbgs() << "Only runs on Ownership SSA, skipping!\n");
       return;
     }
 
