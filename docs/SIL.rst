@@ -3844,6 +3844,8 @@ Notionally, ``alloc_pack_metadata`` is a stack allocation instruction.  See the
 section above on stack discipline.  The corresponding stack deallocation
 instruction is ``dealloc_pack_metadata``.
 
+Only valid in Lowered SIL.
+
 alloc_ref
 `````````
 ::
@@ -4123,6 +4125,8 @@ instruction after its operand) must be cleaned up here.
 ``dealloc_pack_metadata`` is a stack deallocation instruction.  See the section
 on Stack Discipline above.  The operand must be an ``alloc_pack_metadata``
 instruction.
+
+Only valid in Lowered SIL.
 
 dealloc_box
 ```````````

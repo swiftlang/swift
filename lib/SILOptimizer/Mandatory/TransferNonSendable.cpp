@@ -2409,7 +2409,6 @@ CONSTANT_TRANSLATION(YieldInst, Require)
 
 // Unhandled instructions
 CONSTANT_TRANSLATION(AllocVectorInst, Unhandled)
-CONSTANT_TRANSLATION(AllocPackMetadataInst, Unhandled)
 CONSTANT_TRANSLATION(AllocExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedTrivialBitCastInst, Unhandled)
@@ -2464,7 +2463,6 @@ CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocPackMetadataInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocStackRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
@@ -2512,6 +2510,11 @@ CONSTANT_TRANSLATION(StrongRetainInst, Asserting)
 CONSTANT_TRANSLATION(StrongRetainUnownedInst, Asserting)
 CONSTANT_TRANSLATION(UnownedReleaseInst, Asserting)
 CONSTANT_TRANSLATION(UnownedRetainInst, Asserting)
+
+// Instructions only valid in lowered SIL. Please only add instructions here
+// after adding an assert into the SILVerifier that this property is true.
+CONSTANT_TRANSLATION(AllocPackMetadataInst, Asserting)
+CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 
 #undef CONSTANT_TRANSLATION
 
