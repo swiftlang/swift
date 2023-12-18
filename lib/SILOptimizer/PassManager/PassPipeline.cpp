@@ -301,6 +301,9 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   if (EnableLifetimeDependenceDiagnostics || EnableLifetimeDependenceInsertion) {
     P.addLifetimeDependenceInsertion();
   }
+  if (EnableLifetimeDependenceDiagnostics) {
+    P.addLifetimeDependenceScopeFixup();
+  }
   if (SILViewSILGenCFG) {
     addCFGPrinterPipeline(P, "SIL View SILGen CFG");
   }
