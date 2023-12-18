@@ -2359,7 +2359,7 @@ bool TypeVarBindingProducer::computeNext() {
           auto supertype = *simplifiedSuper;
           // A key path type cannot be bound to type-erased key path variants.
           if (TypeVar->getImpl().isKeyPathType() &&
-              (supertype->isPartialKeyPath() || supertype->isAnyKeyPath()))
+              isTypeErasedKeyPathType(supertype))
             continue;
 
           addNewBinding(binding.withType(supertype));

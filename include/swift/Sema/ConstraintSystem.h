@@ -6389,6 +6389,11 @@ public:
 /// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathType(Type type);
 
+/// Determine whether the given type is a PartialKeyPath and
+/// AnyKeyPath or existential type thererof, for example,
+/// `PartialKeyPath<...> & Sendable`.
+bool isTypeErasedKeyPathType(Type type);
+
 /// Determine whether given declaration is one for a key path
 /// `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);

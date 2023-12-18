@@ -6676,6 +6676,19 @@ bool constraints::isKnownKeyPathType(Type type) {
          type->isAnyKeyPath();
 }
 
+bool constraints::isTypeErasedKeyPathType(Type type) {
+  assert(type);
+
+  if (type->isPartialKeyPath() || type->isAnyKeyPath())
+    return true;
+
+  if (!type->isExistentialType())
+    return false;
+
+  auto superclass = type->getSuperclass();
+  return superclass ? isTypeErasedKeyPathType(superclass) : false;
+}
+
 bool constraints::hasExplicitResult(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
