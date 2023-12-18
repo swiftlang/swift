@@ -1398,6 +1398,10 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
+def sanitize_stable_abi_EQ : Flag<["-"], "sanitize-stable-abi">,
+    Flags<[FrontendOption, NoInteractiveOption]>,
+    HelpText<"Link against the Sanitizers stable ABI.">;
+
 def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

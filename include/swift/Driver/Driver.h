@@ -153,6 +153,8 @@ public:
 
   OptionSet<SanitizerKind> SelectedSanitizers;
 
+  unsigned SanitizerUseStableABI = 0;
+
   /// Might this sort of compile have explicit primary inputs?
   /// When running a single compile for the whole module (in other words
   /// "whole-module-optimization" mode) there must be no -primary-input's and

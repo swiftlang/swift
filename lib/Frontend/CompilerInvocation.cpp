@@ -2409,6 +2409,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
         parseSanitizerAddressUseODRIndicator(A, Opts.Sanitizers, Diags);
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_stable_abi_EQ)) {
+    IRGenOpts.SanitizerUseStableABI =
+        parseSanitizerUseStableABI(A, Opts.Sanitizers, Diags);
+  }
+
   if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
                                OPT_disable_verify_exclusivity)) {
     Opts.VerifyExclusivity
