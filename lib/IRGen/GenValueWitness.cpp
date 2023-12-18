@@ -923,15 +923,15 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
     auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
     auto tzCount = mask.countTrailingZeros();
     auto shiftedMask = mask.lshr(tzCount);
-    auto toCount = shiftedMask.countTrailingOnes();
-    if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-        (mask.popcount() > 64 ||
-         toCount != mask.popcount() ||
-         (tzCount % toCount != 0))) {
+    // auto toCount = shiftedMask.countTrailingOnes();
+    // if (payloadTI.mayHaveExtraInhabitants(IGM) &&
+    //     (mask.popcount() > 64 ||
+    //      toCount != mask.popcount() ||
+    //      (tzCount % toCount != 0))) {
       return IGM.getEnumFnGetEnumTagFn();
-    } else {
-      return IGM.getEnumSimpleGetEnumTagFn();
-    }
+    // } else {
+    //   return IGM.getEnumSimpleGetEnumTagFn();
+    // }
   }
 }
 
@@ -960,14 +960,14 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
     auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
     auto tzCount = mask.countTrailingZeros();
     auto shiftedMask = mask.lshr(tzCount);
-    auto toCount = shiftedMask.countTrailingOnes();
-    if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-        (mask.popcount() > 64 || toCount != mask.popcount() ||
-         (tzCount % toCount != 0))) {
+    // auto toCount = shiftedMask.countTrailingOnes();
+    // if (payloadTI.mayHaveExtraInhabitants(IGM) &&
+    //     (mask.popcount() > 64 || toCount != mask.popcount() ||
+    //      (tzCount % toCount != 0))) {
       return nullptr;
-    } else {
-      return IGM.getEnumSimpleDestructiveInjectEnumTagFn();
-    }
+    // } else {
+    //   return IGM.getEnumSimpleDestructiveInjectEnumTagFn();
+    // }
   }
 }
 
