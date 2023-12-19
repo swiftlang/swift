@@ -45,47 +45,61 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 //                             BridgedResultInfo
 //===----------------------------------------------------------------------===//
 
-BridgedResultConvention
-BridgedResultInfo::castToResultConvention(swift::ResultConvention convention) {
-  return static_cast<BridgedResultConvention>(convention);
-}
-
 SwiftInt BridgedResultInfoArray::count() const {
   return unbridged().size();
 }
 
-BridgedResultInfo BridgedResultInfoArray::at(SwiftInt argumentIndex) const {
-  return BridgedResultInfo(unbridged()[argumentIndex]);
+BridgedResultInfo BridgedResultInfoArray::at(SwiftInt resultIndex) const {
+  return BridgedResultInfo(unbridged()[resultIndex]);
+}
+
+//===----------------------------------------------------------------------===//
+//                            BridgedParameterInfo
+//===----------------------------------------------------------------------===//
+
+SwiftInt BridgedParameterInfoArray::count() const {
+  return unbridged().size();
+}
+
+BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) const {
+  return BridgedParameterInfo(unbridged()[parameterIndex]);
 }
 
 //===----------------------------------------------------------------------===//
 //                               BridgedASTType
 //===----------------------------------------------------------------------===//
 
+BridgedOwnedString BridgedASTType::getDebugDescription() const {
+  return BridgedOwnedString(unbridged().getString());
+}
+
 bool BridgedASTType::isOpenedExistentialWithError() const {
   return unbridged()->isOpenedExistentialWithError();
 }
 
-BridgedResultInfoArray BridgedASTType::SILFunctionType_getResults() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->getResults();
+BridgedResultInfoArray
+BridgedASTType::SILFunctionType_getResultsWithError() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError();
 }
 
-SwiftUInt BridgedASTType::SILFunctionType_getNumIndirectFormalResults() const {
-  return unbridged()->castTo<swift::SILFunctionType>()
-    ->getNumIndirectFormalResults();
+SwiftInt BridgedASTType::SILFunctionType_getNumIndirectFormalResultsWithError() const {
+  auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
+  return fnTy->getNumIndirectFormalResults()
+    + (fnTy->hasIndirectErrorResult() ? 1 : 0);
 }
 
-SwiftUInt BridgedASTType::SILFunctionType_getNumPackResults() const {
+SwiftInt BridgedASTType::SILFunctionType_getNumPackResults() const {
   return unbridged()->castTo<swift::SILFunctionType>()
     ->getNumPackResults();
 }
 
-bool BridgedASTType::SILFunctionType_hasErrorResult() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->hasErrorResult();
+OptionalBridgedResultInfo BridgedASTType::SILFunctionType_getErrorResult() const {
+  auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
+  return OptionalBridgedResultInfo(fnTy->getOptionalErrorResult());
 }
 
-SwiftUInt BridgedASTType::SILFunctionType_getNumParameters() const {
-  return unbridged()->castTo<swift::SILFunctionType>()->getNumParameters();
+BridgedParameterInfoArray BridgedASTType::SILFunctionType_getParameters() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->getParameters();
 }
 
 bool BridgedASTType::SILFunctionType_hasSelfParam() const {
@@ -493,6 +507,12 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
 
+BridgedASTType BridgedFunction::getLoweredFunctionTypeInContext() const {
+  auto expansion = getFunction()->getTypeExpansionContext();
+  return
+    {getFunction()->getLoweredFunctionTypeInContext(expansion).getPointer()};
+}
+
 OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {
   return {getFunction()->empty() ? nullptr : getFunction()->getEntryBlock()};
 }
@@ -528,11 +548,6 @@ SwiftInt BridgedFunction::getNumSILArguments() const {
 BridgedType BridgedFunction::getSILArgumentType(SwiftInt idx) const {
   swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
   return conv.getSILArgumentType(idx, getFunction()->getTypeExpansionContext());
-}
-
-BridgedArgumentConvention BridgedFunction::getSILArgumentConvention(SwiftInt idx) const {
-  swift::SILFunctionConventions conv(getFunction()->getConventionsInContext());
-  return castToArgumentConvention(conv.getSILArgumentConvention(idx));
 }
 
 BridgedType BridgedFunction::getSILResultType() const {
@@ -1120,10 +1135,9 @@ BridgedSubstitutionMap BridgedInstruction::ApplySite_getSubstitutionMap() const 
   return as.getSubstitutionMap();
 }
 
-BridgedArgumentConvention BridgedInstruction::ApplySite_getArgumentConvention(SwiftInt calleeArgIdx) const {
+BridgedASTType BridgedInstruction::ApplySite_getSubstitutedCalleeType() const {
   auto as = swift::ApplySite(unbridged());
-  auto conv = as.getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
-  return castToArgumentConvention(conv.Value);
+  return {as.getSubstCalleeType().getPointer()};
 }
 
 SwiftInt BridgedInstruction::ApplySite_getNumArguments() const {

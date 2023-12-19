@@ -4700,6 +4700,10 @@ private:
     return {getTrailingObjects<SILResultInfo>(), getNumResults()};
   }
 
+  MutableArrayRef<SILResultInfo> getMutableResultsWithError() {
+    return {getTrailingObjects<SILResultInfo>(), getNumResultsWithError()};
+  }
+
   MutableArrayRef<SILYieldInfo> getMutableYields() {
     return {getTrailingObjects<SILYieldInfo>(), getNumYields()};
   }
@@ -4818,6 +4822,13 @@ public:
     return const_cast<SILFunctionType *>(this)->getMutableResults();
   }
   unsigned getNumResults() const { return isCoroutine() ? 0 : NumAnyResults; }
+
+  ArrayRef<SILResultInfo> getResultsWithError() const {
+    return const_cast<SILFunctionType *>(this)->getMutableResultsWithError();
+  }
+  unsigned getNumResultsWithError() const {
+    return getNumResults() + (hasErrorResult() ? 1 : 0);
+  }
 
   /// Given that this function type has exactly one result, return it.
   /// This is a common situation when working with a function with a known

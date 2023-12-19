@@ -188,10 +188,8 @@ private struct SideEffectsVisitor : EscapeVisitorWithResult {
       return .ignore
     }
     if user == apply {
-      if let argIdx = apply.argumentIndex(of: operand) {
-        let e = calleeAnalysis.getSideEffects(of: apply, forArgument: argIdx, path: path.projectionPath)
-        result.merge(with: e)
-      }
+      let e = calleeAnalysis.getSideEffects(of: apply, operand: operand, path: path.projectionPath)
+      result.merge(with: e)
     }
     return .continueWalk
   }
@@ -246,7 +244,7 @@ private struct IsIndirectResultWalker: AddressDefUseWalker {
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     if address.instruction == apply,
-       let argIdx = apply.argumentIndex(of: address),
+       let argIdx = apply.calleeArgumentIndex(of: address),
        argIdx < apply.numIndirectResultArguments {
       return .abortWalk
     }

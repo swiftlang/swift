@@ -491,7 +491,7 @@ extension Operand {
 
 extension Instruction {
   func setOperand(at index : Int, to value: Value, _ context: some MutatingContext) {
-    if self is FullApplySite && index == ApplyOperands.calleeOperandIndex {
+    if let apply = self as? FullApplySite, apply.isCallee(operand: operands[index]) {
       context.notifyCallsChanged()
     }
     context.notifyInstructionsChanged()
