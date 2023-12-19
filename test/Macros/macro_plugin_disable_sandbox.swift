@@ -21,7 +21,7 @@
 
 //== Nested sandbox. Expected to fail because sandbox-exec doesn't support nested sandboxing.
 // RUN: not sandbox-exec -p '(version 1)(allow default)' \
-// RUN:   %swift-target-frontend \
+// RUN:   %target-swift-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
@@ -31,7 +31,7 @@
 
 //== Avoid nested sandbox by -disable-sandbox
 // RUN: sandbox-exec -p '(version 1)(allow default)' \
-// RUN:   %swift-target-frontend \
+// RUN:   %target-swift-frontend \
 // RUN:   -disable-sandbox \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 \

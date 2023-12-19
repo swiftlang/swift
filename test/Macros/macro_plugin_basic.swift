@@ -5,7 +5,7 @@
 
 // RUN: %swift-build-c-plugin -o %t/mock-plugin %t/plugin.c
 
-// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
@@ -15,7 +15,7 @@
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
-// RUN: not %swift-target-frontend \
+// RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
 // RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
