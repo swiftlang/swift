@@ -159,8 +159,10 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
 /// MARK: conformance queries
 
 static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
-  assert(!type->hasTypeParameter() && "forgot to mapTypeIntoContext first");
   auto &ctx = type->getASTContext();
+
+  auto *invertible = ctx.getProtocol(getKnownProtocolKind(ip));
+  assert(invertible);
 
   // Pack expansions such as `repeat T` themselves do not have conformances,
   // so check its pattern type for conformance.
@@ -168,8 +170,17 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
     type = pet->getPatternType()->getCanonicalType();
   }
 
-  auto *invertible = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(invertible);
+  // Must either not have a type parameter, or in the case of a
+  // BoundGenericXType, have a nominal available.
+  assert(!type->hasTypeParameter() || type.getAnyNominal()
+          && "caller forgot to mapTypeIntoContext!");
+
+  // The SIL types in the AST do not have real conformances, and should have
+  // been handled earlier.
+  assert(!(type->is<SILBoxType,
+                    SILMoveOnlyWrappedType,
+                    SILPackType,
+                    SILTokenType>()));
 
   const bool conforms =
       (bool)TypeChecker::conformsToProtocol(type,

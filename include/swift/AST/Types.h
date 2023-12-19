@@ -614,6 +614,11 @@ public:
     static_assert(!isSugaredType<T>(), "isa desugars types");
     return isa<T>(getDesugaredType());
   }
+
+  template <typename First, typename Second, typename... Rest>
+  bool is() {
+    return is<First>() || is<Second, Rest...>();
+  }
   
   template <typename T>
   T *castTo() {

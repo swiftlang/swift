@@ -1671,8 +1671,10 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     if (auto nominal = type->getAnyNominal()) {
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
-          getASTContext().evaluator.hasActiveRequest(request))
+          getASTContext().evaluator.hasActiveRequest(request)) {
+        assert(!getInvertibleProtocolKind(*kp));
         return ProtocolConformanceRef::forInvalid();
+      }
     }
   }
 
@@ -1731,13 +1733,35 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+using EitherFunctionType =
+    llvm::PointerUnion<const SILFunctionType *, const FunctionType *>;
+
 /// Whether the given function type conforms to Sendable.
-static bool isSendableFunctionType(const FunctionType *functionType) {
-  if (functionType->isSendable())
-    return true;
+static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
+  FunctionTypeRepresentation representation;
+
+  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+    if (silFnTy->isSendable())
+      return true;
+
+    // convert SILFunctionTypeRepresentation -> FunctionTypeRepresentation
+    auto converted = convertRepresentation(silFnTy->getRepresentation());
+    if (!converted)
+      return false;
+
+    representation = *converted;
+
+  } else {
+    auto functionType = eitherFnTy.get<const FunctionType *>();
+
+    if (functionType->isSendable())
+      return true;
+
+    representation = functionType->getExtInfo().getRepresentation();
+  }
 
   // C and thin function types have no captures, so they are Sendable.
-  switch (functionType->getExtInfo().getRepresentation()) {
+  switch (representation) {
   case FunctionTypeRepresentation::Block:
   case FunctionTypeRepresentation::Swift:
     return false;
@@ -1749,41 +1773,47 @@ static bool isSendableFunctionType(const FunctionType *functionType) {
 }
 
 /// Whether the given function type conforms to Escapable.
-static bool isEscapableFunctionType(const FunctionType *functionType) {
-  if (functionType->isNoEscape())
-    return false;
+static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
+  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+    return !silFnTy->isNoEscape();
+  }
 
-  // FIXME: do we need to also include autoclosures??
+  auto functionType = eitherFnTy.get<const FunctionType *>();
 
-  return true;
+  // TODO: what about autoclosures?
+  return !functionType->isNoEscape();
 }
 
 /// Synthesize a builtin function type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
-    Type type, const FunctionType *functionType, ProtocolDecl *protocol) {
+    Type type, EitherFunctionType functionType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
-  // @Sendable function types are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
-      isSendableFunctionType(functionType)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
-  }
 
-  // Functions cannot permanently destroy a move-only var/let
-  // that they capture, so it's safe to copy functions, like classes.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+  auto synthesizeConformance = [&]() -> ProtocolConformanceRef {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
-  }
+  };
 
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Escapable) &&
-      isEscapableFunctionType(functionType)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    switch (*kp) {
+    case KnownProtocolKind::Escapable:
+      if (isEscapableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
+    case KnownProtocolKind::Sendable:
+      // @Sendable function types are Sendable.
+      if (isSendableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
+    case KnownProtocolKind::Copyable:
+      // Functions cannot permanently destroy a move-only var/let
+      // that they capture, so it's safe to copy functions, like classes.
+      return synthesizeConformance();
+    default:
+      break;
+    }
   }
 
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
@@ -1959,6 +1989,11 @@ LookupConformanceInModuleRequest::evaluate(
     return getBuiltinFunctionTypeConformance(type, functionType, protocol);
   }
 
+  // SIL function types in the AST can conform to protocols
+  if (auto silFn = type->getAs<SILFunctionType>()) {
+    return getBuiltinFunctionTypeConformance(type, silFn, protocol);
+  }
+
   // Metatypes can conform to protocols.
   if (auto metatypeType = type->getAs<AnyMetatypeType>()) {
     return getBuiltinMetaTypeTypeConformance(type, metatypeType, protocol);
@@ -1968,6 +2003,18 @@ LookupConformanceInModuleRequest::evaluate(
   if (auto builtinType = type->getAs<BuiltinType>()) {
     return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
   }
+
+#ifndef NDEBUG
+  // Ensure we haven't missed queries for the specialty SIL types
+  // in the AST in conformance to one of the invertible protocols.
+  if (auto kp = protocol->getKnownProtocolKind())
+    if (getInvertibleProtocolKind(*kp))
+      assert(!(type->is<SILFunctionType,
+                        SILBoxType,
+                        SILMoveOnlyWrappedType,
+                        SILPackType,
+                        SILTokenType>()));
+#endif
 
   auto nominal = type->getAnyNominal();
 
