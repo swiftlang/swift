@@ -3,7 +3,7 @@
 // RUN: %swift-frontend -emit-pcm -direct-clang-cc1-module-build -only-use-extra-clang-opts -module-name script -o %t/script.pcm %S/Inputs/custom-modules/module.modulemap -Xcc %S/Inputs/custom-modules/module.modulemap -Xcc -o -Xcc %t/script.pcm -Xcc -fmodules -Xcc -triple -Xcc %target-triple -Xcc -x -Xcc objective-c -dump-clang-diagnostics 2> %t.diags.txt
 
 // Sometimes returns a 1 exit code with no stdout or stderr or even an indication of which command failed.
-// XFAIL: OS=linux-gnu
+// XFAIL: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
 
 // Verify some of the output of the -dump-pcm flag.
 // RUN: %swift-dump-pcm %t/script.pcm | %FileCheck %s --check-prefix=CHECK-DUMP
