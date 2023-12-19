@@ -585,7 +585,12 @@ function Build-CMakeProject {
     TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
     $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
-    if ($DebugInfo) { $CFlags += if ($EnableCaching) { "/Z7" } else { "/Zi" } }
+    if ($DebugInfo) {
+      $CFlags += if ($EnableCaching) { "/Z7" } else { "/Zi" }
+      # Add additional linker flags for generating the debug info.
+      Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
+      Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+    }
     $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
 
     if ($EnableCaching) {
