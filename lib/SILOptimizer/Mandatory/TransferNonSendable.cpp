@@ -215,7 +215,7 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
-      if (isa<UncheckedTrivialBitCastInst>(svi)) {
+      if (isa<UncheckedTrivialBitCastInst, UncheckedBitwiseCastInst>(svi)) {
         if (isNonSendableType(svi->getType(), fn) &&
             isNonSendableType(svi->getOperand(0)->getType(), fn)) {
           temp = svi->getOperand(0);
@@ -2481,7 +2481,6 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(UncheckedBitwiseCastInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedValueCastInst, Unhandled)
 CONSTANT_TRANSLATION(RefToUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(UnownedToRefInst, Unhandled)
@@ -2628,6 +2627,36 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 
 #undef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
 
+#ifdef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
+#error "CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT already defined"
+#endif
+
+#define CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(INST)               \
+                                                                               \
+  TranslationSemantics PartitionOpTranslator::visit##INST(INST *cast) {        \
+    bool isOperandNonSendable =                                                \
+        isNonSendableType(cast->getOperand()->getType());                      \
+    bool isResultNonSendable = isNonSendableType(cast->getType());             \
+                                                                               \
+    if (isOperandNonSendable) {                                                \
+      if (isResultNonSendable) {                                               \
+        return TranslationSemantics::LookThrough;                              \
+      }                                                                        \
+                                                                               \
+      return TranslationSemantics::Require;                                    \
+    }                                                                          \
+                                                                               \
+    if (isResultNonSendable)                                                   \
+      return TranslationSemantics::AssignFresh;                                \
+                                                                               \
+    return TranslationSemantics::Ignored;                                      \
+  }
+
+CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedTrivialBitCastInst)
+CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedBitwiseCastInst)
+
+#undef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
+
 //===---
 // Custom Handling
 //
@@ -2651,34 +2680,6 @@ PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
   // Otherwise to be conservative, we need to treat the raw pointer as a fresh
   // sendable value.
   return TranslationSemantics::AssignFresh;
-}
-
-TranslationSemantics PartitionOpTranslator::visitUncheckedTrivialBitCastInst(
-    UncheckedTrivialBitCastInst *cast) {
-  bool isOperandNonSendable = isNonSendableType(cast->getOperand()->getType());
-  bool isResultNonSendable = isNonSendableType(cast->getType());
-
-  // If our operand is non sendable...
-  if (isOperandNonSendable) {
-    // ... and our result is non-Sendable, look through.
-    if (isResultNonSendable) {
-      return TranslationSemantics::LookThrough;
-    }
-
-    // Otherwise, if our result is Sendable, just treat this instruction as a
-    // require of the operand. It would be undefined behavior for the user to
-    // convert something from non-Sendable to Sendable if it was not actually
-    // Sendable behind the scenes.
-    return TranslationSemantics::Require;
-  }
-
-  // If our operand is sendable and our result is non-Sendable, treat this as
-  // assign fresh.
-  if (isResultNonSendable)
-    return TranslationSemantics::AssignFresh;
-
-  // Otherwise, both our operand and result are sendable, so just return ignore.
-  return TranslationSemantics::Ignored;
 }
 
 TranslationSemantics
