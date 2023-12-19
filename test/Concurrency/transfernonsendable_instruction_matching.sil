@@ -1,8 +1,18 @@
 // RUN: %target-sil-opt -transfer-non-sendable -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
 
+// PLEASE READ THIS!
+//
+// This test is specifically to test out individual instruction interactions,
+// not for crashers. The idea is to make it so that we have one test for every
+// SIL instruction, so please add a test here when you add a new instruction.
+//
+// For assign/lookthrough, just add a test that triggers an ownership error. If it is
+// a more complex instruction, talk with @gottesmm.
+
 sil_stage raw
 
 import Swift
+import Builtin
 
 class NonSendableKlass {}
 
@@ -286,6 +296,150 @@ bb0(%0 : $*NonSendableStruct):
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableStruct>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @project_block_storage_test : $@convention(thin) @async (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>) -> () {
+bb0(%0 : @owned $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>):
+  %allocBlock = alloc_stack $@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %blockAddr = project_block_storage %allocBlock : $*@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  store %0 to [init] %blockAddr : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<() -> ()>(%blockAddr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+
+  %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %5<() -> ()>(%blockAddr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+  destroy_addr %allocBlock : $*@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  dealloc_stack %allocBlock : $*@block_storage @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @fix_lifetime_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+  %2 = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  fix_lifetime %1 : $NonSendableKlass
+  // expected-note @-1 {{access here could race}}
+  destroy_value %1 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @alloc_vector_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+  %2 = integer_literal $Builtin.Word, 5
+  %3 = alloc_vector $NonSendableKlass, %2 : $Builtin.Word
+  store %1 to [init] %3 : $*NonSendableKlass
+
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %5<NonSendableKlass>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-note @-1 {{access here could race}}
+
+  destroy_addr %3 : $*NonSendableKlass
+  dealloc_stack %3 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @mark_unresolved_move_addr_test : $@convention(thin) @async (@in NonSendableKlass) -> () {
+bb0(%0 : $*NonSendableKlass):
+  %1 = alloc_stack $NonSendableKlass
+  mark_unresolved_move_addr %0 to %1 : $*NonSendableKlass
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%1) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // expected-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  destroy_addr %0 : $*NonSendableKlass
+  destroy_addr %1 : $*NonSendableKlass
+  dealloc_stack %1 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Make sure that we error when we transfer the result of the mark_dependence.
+sil [ossa] @mark_dependence_test_result_assigns_from_value : $@convention(thin) @async () -> () {
+bb0:
+  %0 = alloc_ref $NonSendableKlass
+  %1 = alloc_ref $NonSendableKlass
+
+  %1a = begin_borrow %1 : $NonSendableKlass
+  %2 = mark_dependence %1a : $NonSendableKlass on %0 : $NonSendableKlass
+
+  %transferKlass = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferKlass(%2) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  // No error here since just a requires on the first.
+  %useKlass = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  apply %useKlass(%0) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+
+  // But we have an error here since we store through the value.c
+  apply %useKlass(%1) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  // expected-note @-1 {{access here could race}}
+
+  end_borrow %1a : $NonSendableKlass
+  destroy_value %0 : $NonSendableKlass
+  destroy_value %1 : $NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @mark_dependence_test_base_has_a_require : $@convention(thin) @async () -> () {
+  %0 = alloc_ref $NonSendableKlass
+  %1 = alloc_ref $NonSendableKlass
+
+  %1a = begin_borrow %1 : $NonSendableKlass
+  %2 = mark_dependence %1a : $NonSendableKlass on %0 : $NonSendableKlass
+
+  %transferKlass = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferKlass(%2) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  // No error here since just a requires on the first.
+  %useKlass = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  apply %useKlass(%0) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+
+  // But we have an error here since we store through the value.c
+  apply %useKlass(%1) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  // expected-note @-1 {{access here could race}}
+
+  end_borrow %1a : $NonSendableKlass
+  destroy_value %0 : $NonSendableKlass
+  destroy_value %1 : $NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @mark_dependence_test_base_is_a_require : $@convention(thin) @async () -> () {
+  %0 = alloc_ref $NonSendableKlass
+  %1 = alloc_ref $NonSendableKlass
+
+  %transferKlass = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferKlass(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  %1a = begin_borrow %1 : $NonSendableKlass
+  %2 = mark_dependence %1a : $NonSendableKlass on %0 : $NonSendableKlass
+  // expected-note @-1 {{access here could race}}
+
+  end_borrow %1a : $NonSendableKlass
+  destroy_value %0 : $NonSendableKlass
+  destroy_value %1 : $NonSendableKlass
+
   %9999 = tuple ()
   return %9999 : $()
 }

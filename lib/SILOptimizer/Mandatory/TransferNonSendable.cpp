@@ -142,6 +142,7 @@ struct UseDefChainVisitor
       switch (p.getKind()) {
       case ProjectionKind::Upcast:
       case ProjectionKind::RefCast:
+      case ProjectionKind::BlockStorageCast:
       case ProjectionKind::BitwiseCast:
       case ProjectionKind::TailElems:
       case ProjectionKind::Box:
@@ -1179,7 +1180,8 @@ enum class TranslationSemantics {
   /// getUnderlyingTrackedValue can look through the instruction.
   LookThrough,
 
-  /// Emit require partition ops for each operand of the instruction.
+  /// Require that the region associated with a value not be consumed at this
+  /// program point.
   Require,
 
   /// A "CopyLikeInstruction" with a Dest and Src operand value. If the store
@@ -1206,6 +1208,13 @@ enum class TranslationSemantics {
 
   /// A terminator instruction that acts like a phi in terms of its region.
   TerminatorPhi,
+
+  /// An instruction that we should never see and if we do see, we should assert
+  /// upon. This is generally used for non-Ownership SSA instructions and
+  /// instructions that can only appear in Lowered SIL. Even if we should never
+  /// see one of these instructions, we would still like to ensure that we
+  /// handle every instruction to ensure we cover the IR.
+  Asserting,
 
   /// An instruction that we do not handle yet. Just for now during bring
   /// up. Will be removed.
@@ -1245,6 +1254,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     return os;
   case TranslationSemantics::TerminatorPhi:
     os << "terminator_phi";
+    return os;
+  case TranslationSemantics::Asserting:
+    os << "asserting";
     return os;
   case TranslationSemantics::Unhandled:
     os << "unhandled";
@@ -2151,6 +2163,11 @@ public:
       return translateSILPhi(sources);
     }
 
+    case TranslationSemantics::Asserting:
+      llvm::report_fatal_error(
+          "transfer-non-sendable: Found banned instruction?!");
+      return;
+
     case TranslationSemantics::Unhandled:
       LLVM_DEBUG(llvm::dbgs() << "Unhandled inst: " << *inst);
       return;
@@ -2247,6 +2264,7 @@ CONSTANT_TRANSLATION(AllocPackInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefDynamicInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocStackInst, AssignFresh)
+CONSTANT_TRANSLATION(AllocVectorInst, AssignFresh)
 CONSTANT_TRANSLATION(KeyPathInst, AssignFresh)
 CONSTANT_TRANSLATION(FunctionRefInst, AssignFresh)
 CONSTANT_TRANSLATION(DynamicFunctionRefInst, AssignFresh)
@@ -2311,6 +2329,10 @@ CONSTANT_TRANSLATION(ObjectInst, Assign)
 CONSTANT_TRANSLATION(StructInst, Assign)
 CONSTANT_TRANSLATION(TupleInst, Assign)
 
+//===---
+// Look Through
+//
+
 // Instructions that getUnderlyingTrackedValue is guaranteed to look through
 // and whose operand and result are guaranteed to be mapped to the same
 // underlying region.
@@ -2341,6 +2363,11 @@ CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
 // We identify destructured results with their operand's region.
 CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
+CONSTANT_TRANSLATION(ProjectBlockStorageInst, LookThrough)
+
+//===---
+// Store
+//
 
 // These are treated as stores - meaning that they could write values into
 // memory. The beahvior of this depends on whether the tgt addr is aliased,
@@ -2351,9 +2378,15 @@ CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
 CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
+CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 
-// These instructions are ignored because they cannot affect the partition
-// state - they do not manipulate what region non-sendable values lie in
+//===---
+// Ignored
+//
+
+// These instructions are ignored because they cannot affect the region that a
+// value is within or because even though they are technically a use we would
+// rather emit an error on a better instruction.
 CONSTANT_TRANSLATION(AllocGlobalInst, Ignored)
 CONSTANT_TRANSLATION(DeallocBoxInst, Ignored)
 CONSTANT_TRANSLATION(DeallocStackInst, Ignored)
@@ -2366,10 +2399,20 @@ CONSTANT_TRANSLATION(EndLifetimeInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
-CONSTANT_TRANSLATION(MarkDependenceInst, Ignored)
 CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
+
+//===---
+// Require
+//
+
+// Instructions that only require that the region of the value be live:
+CONSTANT_TRANSLATION(FixLifetimeInst, Require)
+
+//===---
+// Terminators
+//
 
 // Ignored terminators.
 CONSTANT_TRANSLATION(CondFailInst, Ignored)
@@ -2385,9 +2428,16 @@ CONSTANT_TRANSLATION(ThrowInst, Require)
 CONSTANT_TRANSLATION(SwitchEnumAddrInst, Require)
 CONSTANT_TRANSLATION(YieldInst, Require)
 
-// Unhandled instructions
-CONSTANT_TRANSLATION(AllocVectorInst, Unhandled)
-CONSTANT_TRANSLATION(AllocPackMetadataInst, Unhandled)
+// Terminators that act as phis.
+CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+
+//===---
+// Unhandled Instructions
+//
+
 CONSTANT_TRANSLATION(AllocExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedTrivialBitCastInst, Unhandled)
@@ -2408,7 +2458,6 @@ CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
 CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
-CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Unhandled)
 CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Unhandled)
@@ -2429,7 +2478,6 @@ CONSTANT_TRANSLATION(PackLengthInst, Unhandled)
 CONSTANT_TRANSLATION(DynamicPackIndexInst, Unhandled)
 CONSTANT_TRANSLATION(PackPackIndexInst, Unhandled)
 CONSTANT_TRANSLATION(ScalarPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(ProjectBlockStorageInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiableFunctionInst, Unhandled)
 CONSTANT_TRANSLATION(LinearFunctionInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, Unhandled)
@@ -2443,25 +2491,14 @@ CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocPackMetadataInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocStackRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Unhandled)
-CONSTANT_TRANSLATION(StrongRetainInst, Unhandled)
-CONSTANT_TRANSLATION(StrongReleaseInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(StrongRetainUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedRetainInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedReleaseInst, Unhandled)
-CONSTANT_TRANSLATION(RetainValueInst, Unhandled)
-CONSTANT_TRANSLATION(RetainValueAddrInst, Unhandled)
-CONSTANT_TRANSLATION(ReleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(ReleaseValueAddrInst, Unhandled)
 CONSTANT_TRANSLATION(AutoreleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(FixLifetimeInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(AssignInst, Unhandled)
@@ -2479,16 +2516,35 @@ CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Unhandled)
 CONSTANT_TRANSLATION(BeginCOWMutationInst, Unhandled)
 
-// Apply instructions
+//===---
+// Apply
+//
+
 CONSTANT_TRANSLATION(ApplyInst, Apply)
 CONSTANT_TRANSLATION(BeginApplyInst, Apply)
 CONSTANT_TRANSLATION(BuiltinInst, Apply)
 CONSTANT_TRANSLATION(TryApplyInst, Apply)
 
-CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+//===---
+// Asserting
+//
+
+// Non-OSSA instructions that we should never see since we bail on non-OSSA
+// functions early.
+CONSTANT_TRANSLATION(ReleaseValueAddrInst, Asserting)
+CONSTANT_TRANSLATION(ReleaseValueInst, Asserting)
+CONSTANT_TRANSLATION(RetainValueAddrInst, Asserting)
+CONSTANT_TRANSLATION(RetainValueInst, Asserting)
+CONSTANT_TRANSLATION(StrongReleaseInst, Asserting)
+CONSTANT_TRANSLATION(StrongRetainInst, Asserting)
+CONSTANT_TRANSLATION(StrongRetainUnownedInst, Asserting)
+CONSTANT_TRANSLATION(UnownedReleaseInst, Asserting)
+CONSTANT_TRANSLATION(UnownedRetainInst, Asserting)
+
+// Instructions only valid in lowered SIL. Please only add instructions here
+// after adding an assert into the SILVerifier that this property is true.
+CONSTANT_TRANSLATION(AllocPackMetadataInst, Asserting)
+CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 
 #undef CONSTANT_TRANSLATION
 
@@ -2540,6 +2596,13 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
+  translateSILAssign(mdi, mdi->getValue());
+  translateSILRequire(mdi->getBase());
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
@@ -2639,9 +2702,6 @@ class BlockPartitionState {
   /// Set if this block in the next iteration needs to be visited.
   bool needsUpdate = false;
 
-  /// Set if we have ever visited this block at all.
-  bool reached = false;
-
   /// The partition of elements into regions at the top of the block.
   Partition entryPartition;
 
@@ -2698,8 +2758,12 @@ class BlockPartitionState {
       // will be suppressed
       eval.apply(partitionOp);
     }
+    LLVM_DEBUG(llvm::dbgs() << "    Working Partition: ";
+               workingPartition.print(llvm::dbgs()));
     bool exitUpdated = !Partition::equals(exitPartition, workingPartition);
     exitPartition = workingPartition;
+    LLVM_DEBUG(llvm::dbgs() << "    Exit Partition: ";
+               exitPartition.print(llvm::dbgs()));
     return exitUpdated;
   }
 
@@ -2713,8 +2777,8 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const {
-    os << SEP_STR << "BlockPartitionState[reached=" << reached
-       << ", needsUpdate=" << needsUpdate << "]\nid: ";
+    os << SEP_STR << "BlockPartitionState[needsUpdate=" << needsUpdate
+       << "]\nid: ";
 #ifndef NDEBUG
     auto printID = [&](SILBasicBlock *block) {
       block->printID(os);
@@ -2974,9 +3038,11 @@ class PartitionAnalysis {
                     }),
         allocator(), ptrSetFactory(allocator), function(fn), pofi(pofi),
         solved(false) {
-    // Initialize the entry block as needing an update, and having a partition
-    // that places all its non-sendable args in a single region
-    blockStates[fn->getEntryBlock()].needsUpdate = true;
+    // Mark all blocks as needing to be updated.
+    for (auto &block : *fn) {
+      blockStates[&block].needsUpdate = true;
+    }
+    // Set our entry partition to have the "entry partition".
     blockStates[fn->getEntryBlock()].entryPartition =
         translator.getEntryPartition();
   }
@@ -3001,35 +3067,21 @@ class PartitionAnalysis {
           continue;
         }
 
-        // mark this block as no longer needing an update
+        // Mark this block as no longer needing an update.
         blockState.needsUpdate = false;
 
-        // mark this block as reached by the analysis
-        blockState.reached = true;
-
-        // compute the new entry partition to this block
-        Partition newEntryPartition;
-        bool firstPred = true;
+        // Compute the new entry partition to this block.
+        Partition newEntryPartition = blockState.entryPartition;
 
         LLVM_DEBUG(llvm::dbgs() << "    Visiting Preds!\n");
 
-        // This loop computes the join of the exit partitions of all
+        // This loop computes the union of the exit partitions of all
         // predecessors of this block
         for (SILBasicBlock *predBlock : block->getPredecessorBlocks()) {
           BlockPartitionState &predState = blockStates[predBlock];
-          // ignore predecessors that haven't been reached by the analysis yet
-          if (!predState.reached)
-            continue;
 
-          if (firstPred) {
-            firstPred = false;
-            newEntryPartition = predState.exitPartition;
-            LLVM_DEBUG(llvm::dbgs() << "    First Pred. bb"
-                                    << predBlock->getDebugID() << ": ";
-                       newEntryPartition.print(llvm::dbgs()));
-            continue;
-          }
-
+          // Predecessors that have not been reached yet will have an empty pred
+          // state... so just merge them all. Also our initial value of
           LLVM_DEBUG(llvm::dbgs()
                          << "    Pred. bb" << predBlock->getDebugID() << ": ";
                      predState.exitPartition.print(llvm::dbgs()));
@@ -3037,21 +3089,10 @@ class PartitionAnalysis {
               Partition::join(newEntryPartition, predState.exitPartition);
         }
 
-        // If we found predecessor blocks, then attempt to use them to update
-        // the entry partition for this block, and abort this block's update if
-        // the entry partition was not updated.
-        if (!firstPred) {
-          // if the recomputed entry partition is the same as the current one,
-          // perform no update
-          if (Partition::equals(newEntryPartition, blockState.entryPartition)) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "    Entry partition is the same... skipping!\n");
-            continue;
-          }
-
-          // otherwise update the entry partition
-          blockState.entryPartition = newEntryPartition;
-        }
+        // Update the entry partition. We need to still try to
+        // recomputeExitFromEntry before we know if we made a difference to the
+        // exit partition after applying the instructions of the block.
+        blockState.entryPartition = newEntryPartition;
 
         // recompute this block's exit partition from its (updated) entry
         // partition, and if this changed the exit partition notify all
@@ -3169,6 +3210,8 @@ class PartitionAnalysis {
     LLVM_DEBUG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
     for (auto [block, blockState] : blockStates) {
       LLVM_DEBUG(llvm::dbgs() << "|--> Block bb" << block.getDebugID() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Entry Partition: ";
+                 blockState.getEntryPartition().print(llvm::dbgs()));
 
       // Grab its entry partition and setup an evaluator for the partition that
       // has callbacks that emit diagnsotics...
@@ -3180,6 +3223,9 @@ class PartitionAnalysis {
       for (auto &partitionOp : blockState.getPartitionOps()) {
         eval.apply(partitionOp);
       }
+
+      LLVM_DEBUG(llvm::dbgs() << "Exit Partition: ";
+                 workingPartition.print(llvm::dbgs()));
     }
 
     // Now that we have found all of our transferInsts/Requires emit errors.
@@ -3306,6 +3352,11 @@ class TransferNonSendable : public SILFunctionTransform {
     // type is sendable.
     if (!function->getDeclContext() && !function->getParentModule()) {
       LLVM_DEBUG(llvm::dbgs() << "No Decl Context! Skipping!\n");
+      return;
+    }
+
+    if (!function->hasOwnership()) {
+      LLVM_DEBUG(llvm::dbgs() << "Only runs on Ownership SSA, skipping!\n");
       return;
     }
 
