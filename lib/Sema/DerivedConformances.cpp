@@ -495,7 +495,7 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
 
 CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
     ASTContext &ctx) {
-  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReached();
+  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReachedDecl();
   auto diagnoseDeclRefExpr =
       new (ctx) DeclRefExpr(diagnoseDecl, DeclNameLoc(), true);
   diagnoseDeclRefExpr->setType(diagnoseDecl->getInterfaceType());

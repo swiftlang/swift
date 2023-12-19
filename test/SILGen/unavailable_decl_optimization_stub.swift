@@ -3,7 +3,7 @@
 public struct S {}
 
 // CHECK-LABEL: sil{{.*}}@$s4Test15unavailableFuncAA1SVyF
-// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:ss31_diagnoseUnavailableCodeReacheds5NeverOy(FTwb|F)]] : $@convention(thin) () -> Never
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyF)]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         function_ref @$s4Test1SVACycfC
 // CHECK:       } // end sil function '$s4Test15unavailableFuncAA1SVyF'
