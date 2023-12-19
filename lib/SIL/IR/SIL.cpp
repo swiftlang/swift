@@ -296,14 +296,14 @@ bool SILModule::isTypeMetadataForLayoutAccessible(SILType type) {
   return ::isTypeMetadataForLayoutAccessible(*this, type);
 }
 
-static bool isUnsupportedKeyPathValueType(Type ty, GenericEnvironment *env) {
+static bool isUnsupportedKeyPathValueType(Type ty) {
   // Visit lowered positions.
   if (auto tupleTy = ty->getAs<TupleType>()) {
     for (auto eltTy : tupleTy->getElementTypes()) {
       if (eltTy->is<PackExpansionType>())
         return true;
 
-      if (isUnsupportedKeyPathValueType(eltTy, env))
+      if (isUnsupportedKeyPathValueType(eltTy))
         return true;
     }
 
@@ -321,11 +321,11 @@ static bool isUnsupportedKeyPathValueType(Type ty, GenericEnvironment *env) {
       if (paramTy->is<PackExpansionType>())
         return true;
 
-      if (isUnsupportedKeyPathValueType(paramTy, env))
+      if (isUnsupportedKeyPathValueType(paramTy))
         return true;
     }
 
-    if (isUnsupportedKeyPathValueType(funcTy->getResult(), env))
+    if (isUnsupportedKeyPathValueType(funcTy->getResult()))
       return true;
   }
 
@@ -333,7 +333,7 @@ static bool isUnsupportedKeyPathValueType(Type ty, GenericEnvironment *env) {
   // They would also need a new ABI that's yet to be implemented in order to
   // be properly supported, so let's suppress the descriptor for now if either
   // the container or storage type of the declaration is non-copyable.
-  if (ty->isNoncopyable(env))
+  if (ty->isNoncopyable())
     return true;
 
   return false;
@@ -398,8 +398,9 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
     llvm_unreachable("should be definition linkage?");
   }
 
-  auto *env = getDeclContext()->getGenericEnvironmentOfContext();
-  if (isUnsupportedKeyPathValueType(getValueInterfaceType(), env)) {
+  auto typeInContext = getInnermostDeclContext()->mapTypeIntoContext(
+      getValueInterfaceType());
+  if (isUnsupportedKeyPathValueType(typeInContext)) {
     return false;
   }
 
