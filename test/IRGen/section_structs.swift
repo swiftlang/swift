@@ -2,6 +2,9 @@
 
 // REQUIRES: swift_in_compiler
 
+// The `StaticString("hello").utf8Start` test fails on 32 bit
+// UNSUPPORTED: PTRSIZE=32
+
 struct MyStruct1 {
     var a, b: Int
 }
