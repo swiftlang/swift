@@ -2329,6 +2329,10 @@ CONSTANT_TRANSLATION(ObjectInst, Assign)
 CONSTANT_TRANSLATION(StructInst, Assign)
 CONSTANT_TRANSLATION(TupleInst, Assign)
 
+//===---
+// Look Through
+//
+
 // Instructions that getUnderlyingTrackedValue is guaranteed to look through
 // and whose operand and result are guaranteed to be mapped to the same
 // underlying region.
@@ -2361,6 +2365,10 @@ CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
 CONSTANT_TRANSLATION(ProjectBlockStorageInst, LookThrough)
 
+//===---
+// Store
+//
+
 // These are treated as stores - meaning that they could write values into
 // memory. The beahvior of this depends on whether the tgt addr is aliased,
 // but conservative behavior is to treat these as merges of the regions of
@@ -2371,6 +2379,10 @@ CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
+
+//===---
+// Ignored
+//
 
 // These instructions are ignored because they cannot affect the region that a
 // value is within or because even though they are technically a use we would
@@ -2392,8 +2404,16 @@ CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 
+//===---
+// Require
+//
+
 // Instructions that only require that the region of the value be live:
 CONSTANT_TRANSLATION(FixLifetimeInst, Require)
+
+//===---
+// Terminators
+//
 
 // Ignored terminators.
 CONSTANT_TRANSLATION(CondFailInst, Ignored)
@@ -2409,7 +2429,16 @@ CONSTANT_TRANSLATION(ThrowInst, Require)
 CONSTANT_TRANSLATION(SwitchEnumAddrInst, Require)
 CONSTANT_TRANSLATION(YieldInst, Require)
 
-// Unhandled instructions
+// Terminators that act as phis.
+CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+
+//===---
+// Unhandled Instructions
+//
+
 CONSTANT_TRANSLATION(AllocExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedTrivialBitCastInst, Unhandled)
@@ -2488,16 +2517,18 @@ CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Unhandled)
 CONSTANT_TRANSLATION(BeginCOWMutationInst, Unhandled)
 
-// Apply instructions
+//===---
+// Apply
+//
+
 CONSTANT_TRANSLATION(ApplyInst, Apply)
 CONSTANT_TRANSLATION(BeginApplyInst, Apply)
 CONSTANT_TRANSLATION(BuiltinInst, Apply)
 CONSTANT_TRANSLATION(TryApplyInst, Apply)
 
-CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
+//===---
+// Asserting
+//
 
 // Non-OSSA instructions that we should never see since we bail on non-OSSA
 // functions early.
