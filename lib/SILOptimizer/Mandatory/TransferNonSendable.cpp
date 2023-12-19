@@ -194,6 +194,7 @@ struct UseDefChainVisitor
 } // namespace
 
 static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
+  auto *fn = value->getFunction();
   SILValue result = value;
   while (true) {
     SILValue temp = result;
@@ -205,6 +206,21 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
               MoveOnlyWrapperToCopyableValueInst,
               MoveOnlyWrapperToCopyableBoxInst>(svi)) {
         temp = svi->getOperand(0);
+      }
+    }
+
+    if (auto *r = dyn_cast<RefToRawPointerInst>(temp)) {
+      // If our operand is a non-Sendable type, look through this instruction.
+      if (isNonSendableType(r->getOperand()->getType(), fn)) {
+        temp = r->getOperand();
+      }
+    }
+
+    if (auto *r = dyn_cast<RawPointerToRefInst>(temp)) {
+      // If our result is a non-Sendable type, look through this
+      // instruction. Builtin.RawPointer is always non-Sendable.
+      if (isNonSendableType(r->getType(), fn)) {
+        temp = r->getOperand();
       }
     }
 
@@ -2321,6 +2337,7 @@ CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, Assign)
+CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
 
 // These are used by SIL to aggregate values together in a gep like way. We
 // want to look at uses of structs, not the struct uses itself. So just
@@ -2450,12 +2467,9 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(IndexRawPointerInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedTrivialBitCastInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedBitwiseCastInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedValueCastInst, Unhandled)
-CONSTANT_TRANSLATION(RefToRawPointerInst, Unhandled)
-CONSTANT_TRANSLATION(RawPointerToRefInst, Unhandled)
 CONSTANT_TRANSLATION(RefToUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(UnownedToRefInst, Unhandled)
 CONSTANT_TRANSLATION(BridgeObjectToWordInst, Unhandled)
@@ -2604,6 +2618,27 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
+  // If our result is non sendable, perform a look through.
+  if (isNonSendableType(r->getType()))
+    return TranslationSemantics::LookThrough;
+
+  // Otherwise to be conservative, we need to treat this as a require.
+  return TranslationSemantics::Require;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
+  // If our source ref is non sendable, perform a look through.
+  if (isNonSendableType(r->getOperand()->getType()))
+    return TranslationSemantics::LookThrough;
+
+  // Otherwise to be conservative, we need to treat the raw pointer as a fresh
+  // sendable value.
+  return TranslationSemantics::AssignFresh;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
