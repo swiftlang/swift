@@ -1523,7 +1523,8 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         SubstitutionMap subs,
                                         ArrayRef<ManagedValue> args,
                                         SGFContext C, BuiltinValueKind kind,
-                                        bool inGroup, bool withExecutor) {
+                                        bool inGroup, bool withExecutor,
+                                        bool isDiscarding) {
   ASTContext &ctx = SGF.getASTContext();
 
   SmallVector<SILValue, 4> builtinArgs;
@@ -1537,14 +1538,22 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     builtinArgs.push_back(args[nextArgIdx++].forward(SGF)); // executor
   }
 
+  CanType futureResultType;
   // Form the metatype of the result type.
-  CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(
-                                 /*isParameterPack*/ false,
-                                 /*depth*/ 0, /*index*/ 0, SGF.getASTContext()),
-                             MetatypeRepresentation::Thick))
-          .subst(subs)
-          ->getCanonicalType();
+  if (isDiscarding) {
+    futureResultType =
+        Type(MetatypeType::get(TupleType::getEmpty(ctx)->getCanonicalType(),
+                               MetatypeRepresentation::Thick))
+            ->getCanonicalType();
+  } else {
+    futureResultType = Type(MetatypeType::get(GenericTypeParamType::get(
+                                                  /*isParameterPack*/ false,
+                                                  /*depth*/ 0, /*index*/ 0,
+                                                  SGF.getASTContext()),
+                                              MetatypeRepresentation::Thick))
+                           .subst(subs)
+                           ->getCanonicalType();
+  }
   CanType anyTypeType =
       ExistentialMetatypeType::get(ctx.TheAnyType)->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
@@ -1568,21 +1577,27 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
           .withThrows()
           .withRepresentation(GenericFunctionType::Representation::Swift)
           .build();
-  auto genericSig = subs.getGenericSignature().getCanonicalSignature();
-  auto genericResult =
-      GenericTypeParamType::get(/*isParameterPack*/ false,
-                                /*depth*/ 0, /*index*/ 0, SGF.getASTContext());
-  // <T> () async throws -> T
-  CanType functionTy =
-      GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
-          ->getCanonicalType();
-  AbstractionPattern origParam(genericSig, functionTy);
-  CanType substParamType = functionTy.subst(subs)->getCanonicalType();
-  auto reabstractedFun = SGF.emitSubstToOrigValue(loc, args[nextArgIdx],
-                                                  origParam, substParamType);
+
+  ManagedValue entryPointFun;
+  if (isDiscarding) {
+    entryPointFun = args[nextArgIdx];
+  } else {
+    auto genericSig = subs.getGenericSignature().getCanonicalSignature();
+    auto genericResult = GenericTypeParamType::get(/*isParameterPack*/ false,
+                                                   /*depth*/ 0, /*index*/ 0,
+                                                   SGF.getASTContext());
+    // <T> () async throws -> T
+    CanType functionTy =
+        GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
+            ->getCanonicalType();
+    AbstractionPattern origParam(genericSig, functionTy);
+    CanType substParamType = functionTy.subst(subs)->getCanonicalType();
+    entryPointFun = SGF.emitSubstToOrigValue(loc, args[nextArgIdx], origParam,
+                                             substParamType);
+  }
 
   auto function = emitFunctionArgumentForAsyncTaskEntryPoint(
-      SGF, loc, reabstractedFun, futureResultType);
+      SGF, loc, entryPointFun, futureResultType);
   builtinArgs.push_back(function.forward(SGF));
 
   auto apply = SGF.B.createBuiltin(
@@ -1595,9 +1610,19 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
-  return emitBuiltinCreateAsyncTask(SGF, loc, subs, args, C,
-                                    BuiltinValueKind::CreateAsyncTaskInGroup,
-                                    /*inGroup=*/true, /*withExecutor=*/false);
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C, BuiltinValueKind::CreateAsyncTaskInGroup,
+      /*inGroup=*/true, /*withExecutor=*/false, /*isDiscarding=*/false);
+}
+
+// Emit SIL for the named builtin: createAsyncDiscardingTaskInGroup.
+static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroup(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncDiscardingTaskInGroup,
+      /*inGroup=*/true, /*withExecutor=*/false, /*isDiscarding=*/true);
 }
 
 // Emit SIL for the named builtin: createAsyncTaskWithExecutor.
@@ -1606,7 +1631,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskWithExecutor(
     ArrayRef<ManagedValue> args, SGFContext C) {
   return emitBuiltinCreateAsyncTask(
       SGF, loc, subs, args, C, BuiltinValueKind::CreateAsyncTaskWithExecutor,
-      /*inGroup=*/false, /*withExecutor=*/true);
+      /*inGroup=*/false, /*withExecutor=*/true, /*isDiscarding=*/false);
 }
 // Emit SIL for the named builtin: createAsyncTaskInGroupWithExecutor.
 static ManagedValue emitBuiltinCreateAsyncTaskInGroupWithExecutor(
@@ -1615,7 +1640,17 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroupWithExecutor(
   return emitBuiltinCreateAsyncTask(
       SGF, loc, subs, args, C,
       BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor,
-      /*inGroup=*/true, /*withExecutor=*/true);
+      /*inGroup=*/true, /*withExecutor=*/true, /*isDiscarding=*/false);
+}
+
+// Emit SIL for the named builtin: createAsyncTaskInGroupWithExecutor.
+static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroupWithExecutor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor,
+      /*inGroup=*/true, /*withExecutor=*/true, /*isDiscarding=*/true);
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
@@ -1623,9 +1658,9 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         SubstitutionMap subs,
                                         ArrayRef<ManagedValue> args,
                                         SGFContext C) {
-  return emitBuiltinCreateAsyncTask(SGF, loc, subs, args, C,
-                                    BuiltinValueKind::CreateAsyncTask,
-                                    /*inGroup=*/false, /*withExecutor=*/false);
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C, BuiltinValueKind::CreateAsyncTask,
+      /*inGroup=*/false, /*withExecutor=*/false, /*isDiscarding=*/false);
 }
 
 // Shared implementation of withUnsafeContinuation and

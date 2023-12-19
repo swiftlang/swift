@@ -1466,9 +1466,10 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 }
 
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
-                                     bool inGroup, bool withTaskExecutor) {
-  BuiltinFunctionBuilder builder(ctx);
-  auto genericParam = makeGenericParam().build(builder); // <T>
+                                     bool inGroup, bool withTaskExecutor,
+                                     bool isDiscarding) {
+  unsigned numGenericParams = isDiscarding ? 0 : 1;
+  BuiltinFunctionBuilder builder(ctx, numGenericParams);
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
   if (inGroup) {
     builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // group
@@ -1477,8 +1478,14 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
     builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  builder.addParameter(
-      makeConcrete(FunctionType::get({}, genericParam, extInfo))); // operation
+  Type operationResultType;
+  if (isDiscarding) {
+    operationResultType = TupleType::getEmpty(ctx); // ()
+  } else {
+    operationResultType = makeGenericParam().build(builder); // <T>
+  }
+  builder.addParameter(makeConcrete(
+      FunctionType::get({}, operationResultType, extInfo))); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
   return builder.build(id);
 }
@@ -2928,16 +2935,22 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTask:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
-                              /*withExecutor=*/false);
+                              /*withExecutor=*/false, /*isDiscarding=*/false);
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
-                              /*withExecutor=*/false);
+                              /*withExecutor=*/false, /*isDiscarding=*/false);
+  case BuiltinValueKind::CreateAsyncDiscardingTaskInGroup:
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/false, /*isDiscarding=*/true);
   case BuiltinValueKind::CreateAsyncTaskWithExecutor:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
-                              /*withExecutor=*/true);
+                              /*withExecutor=*/true, /*isDiscarding=*/false);
   case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
-                              /*withExecutor=*/true);
+                              /*withExecutor=*/true, /*isDiscarding=*/false);
+  case BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor:
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/true, /*isDiscarding=*/true);
 
   case BuiltinValueKind::TaskRunInline:
     return getTaskRunInline(Context, Id);

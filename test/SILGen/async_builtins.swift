@@ -32,6 +32,16 @@ public struct X {
     }
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV26launchDiscardingGroupChild5groupyBp_tF : $@convention(method) (Builtin.RawPointer, X) -> () {
+  func launchDiscardingGroupChild(group: Builtin.RawPointer) {
+    // CHECK: [[VOID:%.*]] = metatype $@thick ().Type
+    // CHECK: [[VOID_THICK:%.*]] = init_existential_metatype [[VOID]] : $@thick ().Type, $@thick any Any.Type
+    // CHECK: builtin "createAsyncDiscardingTaskInGroup"([[ZERO:%.*]] : $Int, [[GROUP:%.*]] : $Builtin.RawPointer, [[VOID_THICK]] : $@thick any Any.Type, [[FN:%.*]] : $@async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+    _ = Builtin.createAsyncDiscardingTaskInGroup(0, group) { () async throws in
+      return
+    }
+  }
+
   public func launchRocker<T>(closure: @escaping () async throws -> T) {
     _ = Builtin.createAsyncTask(0, closure)
   }
@@ -45,6 +55,15 @@ public struct X {
     }
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV34launchDiscardingFutureWithExecutor5group8executoryBp_BetF : $@convention(method) (Builtin.RawPointer, Builtin.Executor, X) -> () {
+  func launchDiscardingFutureWithExecutor(group: Builtin.RawPointer, executor: Builtin.Executor) {
+    // CHECK: [[VOID:%.*]] = metatype $@thick ().Type
+    // CHECK: [[VOID_THICK:%.*]] = init_existential_metatype [[VOID]] : $@thick ().Type, $@thick any Any.Type
+    // CHECK: builtin "createAsyncTaskInGroupWithExecutor"([[ZERO:%.*]] : $Int, [[GROUP:%.*]] : $Builtin.RawPointer, [[EXECUTOR:%[0-9]+]] : $Builtin.Executor, [[VOID_THICK]] : $@thick any Any.Type, [[FN:%.*]] : $@async @callee_guaranteed () -> @error any Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(0, group, executor) { () async throws in
+      return
+    }
+  }
 }
 
 // CHECK-LABEL: sil [ossa] @$s4test26usesWithUnsafeContinuationyyYaF : $@convention(thin) @async () -> () {

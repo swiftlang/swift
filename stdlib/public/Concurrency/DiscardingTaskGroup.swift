@@ -190,7 +190,7 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -231,7 +231,7 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
 
     return true
   }
@@ -247,7 +247,7 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -278,7 +278,7 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
 
     return true
 #else
@@ -564,7 +564,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -593,7 +593,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
 
     return true
 #else

@@ -986,6 +986,17 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
     "createAsyncTaskInGroup", "", Special)
 
+/// createAsyncDiscardingTaskInGroup(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous discarding task, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroup,
+    "createAsyncDiscardingTaskInGroup", "", Special)
+
 /// createAsyncTaskWithExecutor(): (
 ///     Int,                            // flags
 ///     Builtin.Executor,               // executor
@@ -1008,6 +1019,18 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
 /// task group and a function to execute.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
     "createAsyncTaskInGroupWithExecutor", "", Special)
+
+/// createAsyncDiscardingTaskInGroupWithExecutor(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     Builtin.Executor,                  // executor
+///     @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous discarding task, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroupWithExecutor,
+    "createAsyncDiscardingTaskInGroupWithExecutor", "", Special)
 
 /// Build a Builtin.Executor value from an "ordinary" task executor
 /// reference.
