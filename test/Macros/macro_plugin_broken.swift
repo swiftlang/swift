@@ -8,7 +8,7 @@
 // RUN:   -module-name=TestPlugin \
 // RUN:   %t/broken_plugin.swift
 
-// RUN: not %swift-target-frontend \
+// RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
 // RUN:   -load-plugin-executable %t/broken-plugin#TestPlugin \

@@ -7,7 +7,7 @@
 
 // RUN: touch %t/plugins/libTestPlugin.dylib
 
-// RUN: not %swift-target-frontend \
+// RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
 // RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
@@ -23,7 +23,7 @@
 // SERVER: test.swift:1:33: note: 'fooMacro' declared here
 // SERVER-NOT: {{error|warning}}
 
-// RUN: not %swift-target-frontend \
+// RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
 // RUN:   -swift-version 5 \
 // RUN:   -plugin-path %t/plugins \
