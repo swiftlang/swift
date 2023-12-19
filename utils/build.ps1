@@ -80,9 +80,6 @@ For example: -BuildTo ToolsSupportCore
 When set, runs the script in a special mode which outputs a listing of command invocations
 in batch file format instead of executing them.
 
-.PARAMETER PinnedLayout
-If "New", uses the new toolchain install layout. Otherwise, the old layout.
-
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -110,8 +107,7 @@ param(
   [string] $BuildTo = "",
   [switch] $DebugInfo,
   [switch] $EnableCaching,
-  [switch] $ToBatch,
-  [string] $PinnedLayout = "old"
+  [switch] $ToBatch
 )
 
 $ErrorActionPreference = "Stop"
@@ -273,8 +269,13 @@ function Copy-File($Src, $Dst) {
 }
 
 function Copy-Directory($Src, $Dst) {
-  New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
-  Copy-Item -Force -Recurse $Src $Dst
+  if ($Tobatch) {
+    Write-Output "md `"$Dst`""
+    Write-Output "copy /Y `"$Src`" `"$Dst`""
+  } else {
+    New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
+    Copy-Item -Force -Recurse $Src $Dst
+  }
 }
 
 function Invoke-Program() {
@@ -402,121 +403,103 @@ function Invoke-VsDevShell($Arch) {
   }
 }
 
-function Ensure-WindowsSDK {
-  # Assume we always have a default Windows SDK version available
-  if (-not $WinSDKVersion) { return }
+function Fetch-Dependencies {
+  $ProgressPreference = "SilentlyContinue"
 
-  # Check whether VsDevShell can already resolve the requested Windows SDK version
-  try {
-    Isolate-EnvVars { Invoke-VsDevShell $HostArch }
-    return
-  } catch {}
+  $WebClient = New-Object Net.WebClient
+  $WiXVersion = "4.0.3"
+  $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
+  $WiXHash = "33B3F28556F2499D10E0E0382ED481BD71BCB6178A20E7AF15A6879571B6BD41"
 
-  Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget..."
-
-  # Assume the requested Windows SDK is not available and we need to download it
-  # Install the base nuget package that contains header files
-  $WinSDKBasePackageName = "Microsoft.Windows.SDK.CPP"
-  Invoke-Program nuget install $WinSDKBasePackageName -Version $WinSDKVersion -OutputDirectory $NugetRoot
-
-  # Export to script scope so Invoke-VsDevShell can read it
-  $script:CustomWinSDKRoot = "$NugetRoot\$WinSDKBasePackageName.$WinSDKVersion\c"
-
-  # Install each required arch-specific package and move the files under the base /lib directory
-  $WinSDKArchs = $SDKArchs.Clone()
-  if (-not ($HostArch -in $WinSDKArchs)) {
-    $WinSDKArchs += $HostArch
-  }
-
-  foreach ($Arch in $WinSDKArchs) {
-    $WinSDKArchPackageName = "$WinSDKBasePackageName.$($Arch.ShortName)"
-    Invoke-Program nuget install $WinSDKArchPackageName -Version $WinSDKVersion -OutputDirectory $NugetRoot
-    Copy-Directory "$NugetRoot\$WinSDKArchPackageName.$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
-  }
-}
-
-function Ensure-SwiftToolchain($Arch) {
-  if (-not (Test-Path $BinaryCache\wix-4.0.3.zip)) {
-    Write-Output "WiX not found. Downloading from nuget.org..."
-    Invoke-Program curl.exe -sL https://www.nuget.org/api/v2/package/wix/4.0.3 --output $BinaryCache\wix-4.0.3.zip --create-dirs
-  }
-
-  if (-not $ToBatch) {
-    $SHA256 = Get-FileHash -Path "$BinaryCache\wix-4.0.3.zip" -Algorithm SHA256
-    if ($SHA256.Hash -ne "33B3F28556F2499D10E0E0382ED481BD71BCB6178A20E7AF15A6879571B6BD41") {
-      throw "WiX SHA256 mismatch ($($SHA256.Hash) vs 33B3F28556F2499D10E0E0382ED481BD71BCB6178A20E7AF15A6879571B6BD41)"
+  if (-not (Test-Path $BinaryCache\WiX-$WiXVersion.zip)) {
+    Write-Output "WiX not found. Downloading from nuget.org ..."
+    if ($ToBatch) {
+      Write-Output "curl.exe -sL $WiXURL -o $BinaryCache\WiX-$WiXVersion.zip"
+    } else {
+      $WebClient.DownloadFile($WiXURL, "$BinaryCache\WiX-$WiXVersion.zip")
+      $SHA256 = Get-FileHash -Path "$BinaryCache\WiX-$WiXVersion.zip" -Algorithm SHA256
+      if ($SHA256.Hash -ne $WiXHash) {
+        throw "WiX SHA256 mismatch ($($SHA256.Hash) vs $WiXHash)"
+      }
     }
   }
 
-  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\wix-4.0.3 | Out-Null
-  Write-Output "Extracting WiX..."
-  Expand-Archive -Path $BinaryCache\wix-4.0.3.zip -Destination $BinaryCache\wix-4.0.3 -Force
+  # TODO(compnerd) stamp/validate that we need to re-extract
+  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\WiX-$WiXVersion | Out-Null
+  Write-Output "Extracting WiX ..."
+  Expand-Archive -Path $BinaryCache\WiX-$WiXVersion.zip -Destination $BinaryCache\WiX-$WiXVersion -Force
 
-  if (-not (Test-Path "$BinaryCache\${PinnedToolchain}.exe")) {
+  if (-not (Test-Path $BinaryCache\$PinnedToolchain.exe)) {
     Write-Output "Swift toolchain not found. Downloading from swift.org..."
-    (New-Object Net.WebClient).DownloadFile($PinnedBuild, "$BinaryCache\${PinnedToolchain}.exe")
-    # Invoke-Program curl.exe -sL $PinnedBuild --output $BinaryCache\${PinnedToolchain}.exe --create-dirs
-  }
-
-  if (-not $ToBatch) {
-    $SHA256 = Get-FileHash -Path "$BinaryCache\${PinnedToolchain}.exe" -Algorithm SHA256
-    if ($SHA256.Hash -ne $PinnedSHA256) {
-      throw "SHA256 mismatch ($($SHA256.Hash) vs ${PinnedSHA256})"
+    if ($ToBatch) {
+      Write-Output "curl.exe -sL $PinnedBuild -o $BinaryCache\$PinnedToolchain.exe"
+    } else {
+      $WebClient.DownloadFile("$PinnedBuild", "$BinaryCache\$PinnedToolchain.exe")
+      $SHA256 = Get-FileHash -Path "$BinaryCache\$PinnedToolchain.exe" -Algorithm SHA256
+      if ($SHA256.Hash -ne $PinnedSHA256) {
+        throw "$PinnedToolchain SHA256 mismatch ($($SHA256.Hash) vs $PinnedSHA256)"
+      }
     }
   }
 
-  New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains" | Out-Null
-  Write-Output "Extracting Swift toolchain..."
-  Invoke-Program "$BinaryCache\wix-4.0.3\tools\net6.0\any\wix.exe" -- burn extract "$BinaryCache\${PinnedToolchain}.exe" -out "$BinaryCache\toolchains\"
-  if ($PinnedLayout -eq "New") {
-    [string[]] $Packages = @("UNUSED",
-                             "rtl.msi","bld.msi","cli.msi","dbg.msi","ide.msi",
-                             "sdk.x86.msi","sdk.amd64.msi","sdk.arm64.msi",
-                             "rtl.cab","bld.cab","cli.cab","dbg.cab","ide.cab",
-                             "sdk.x86.cab","sdk.amd64.cab","sdk.arm64.cab")
-    for ($I = 1; $I -lt $Packages.length; $I += 1) {
-      Move-Item -Force "$BinaryCache\toolchains\a${I}" "$BinaryCache\toolchains\$($Packages[$I])"
+  # TODO(compnerd) stamp/validate that we need to re-extract
+  Write-Output "Extracting $PinnedToolchain ..."
+  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
+  # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
+  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin | Out-Null
+  Invoke-Program $BinaryCache\WiX-$WiXVersion\tools\net6.0\any\wix.exe -- burn extract $BinaryCache\$PinnedToolchain.exe -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+  Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" | % {
+    $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
+    $TARGETDIR = if ($_.Name -eq "rti.msi") { "$BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin" } else { "$BinaryCache\toolchains\$PinnedToolchain" }
+    Invoke-Program -OutNull msiexec.exe /lvx! $LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$_ ALLUSERS=0 TARGETDIR=$TARGETDIR
+  }
+
+  if ($WinSDKVersion) {
+    try {
+      # Check whether VsDevShell can already resolve the requested Windows SDK Version
+      Isolate-EnvVars { Invoke-VsDevShell $HostArch }
+    } catch {
+      $Package = Microsoft.Windows.SDK.CPP
+
+      Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget.org ..."
+      Invoke-Program nuget install $Package -Version $WinSDKVersion -OutputDirectory $NugetRoot
+
+      # Set to script scope so Invoke-VsDevShell can read it.
+      $script:CustomWinSDKRoot = "$NugetRoot\$Package.$WinSDKVersion\c"
+
+      # Install each required architecture package and move files under the base /lib directory.
+      $WinSDKArchs = $SDKArchs.Clone()
+      if (-not ($HostArch -in $WinSDKArchs)) {
+        $WinSDKArch += $HostArch
+      }
+
+      foreach ($Arch in $WinSDKArchs) {
+        Invoke-Program nuget install $Package.$($Arch.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+        Copy-Directory "$NugetRoot\$Package.$($Arch.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
+      }
     }
-
-    # The runtime msi is built to expand files into the immediate directory. So, setup the installation location.
-    New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin" | Out-Null
-
-    Invoke-Program -OutNull msiexec.exe /lvx! bld.log /qn /a "$BinaryCache\toolchains\bld.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! cli.log /qn /a "$BinaryCache\toolchains\cli.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! sdk.x86.log /qn /a "$BinaryCache\toolchains\sdk.x86.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! sdk.amd64.log /qn /a "$BinaryCache\toolchains\sdk.amd64.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! sdk.arm64.log /qn /a "$BinaryCache\toolchains\sdk.arm64.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! rtl.log /qn /a "$BinaryCache\toolchains\rtl.msi" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin"
-  } else {
-    Invoke-Program -OutNull msiexec.exe /lvx! a0.log /qn /a "$BinaryCache\toolchains\a0" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! a1.log /qn /a "$BinaryCache\toolchains\a1" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! a2.log /qn /a "$BinaryCache\toolchains\a2" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-    Invoke-Program -OutNull msiexec.exe /lvx! a3.log /qn /a "$BinaryCache\toolchains\a3" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
   }
 }
 
 function Get-PinnedToolchainTool() {
-  if ($PinnedLayout -eq "New") {
+  if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\0.0.0+Asserts\usr\bin") {
     return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\0.0.0+Asserts\usr\bin"
-  } else {
-    return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin"
   }
+  return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin"
 }
 
 function Get-PinnedToolchainSDK() {
-  if ($PinnedLayout -eq "New") {
+  if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Platforms\0.0.0\Windows.platform\Developer\SDKs\Windows.sdk") {
     return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Platforms\0.0.0\Windows.platform\Developer\SDKs\Windows.sdk"
-  } else {
-    return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Platforms\Windows.platform\Developer\SDKs\Windows.sdk"
   }
+  return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Platforms\Windows.platform\Developer\SDKs\Windows.sdk"
 }
 
 function Get-PinnedToolchainRuntime() {
-  if ($PinnedLayout -eq "New") {
+  if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin\swiftCore.dll") {
     return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin"
-  } else {
-    return "$BinaryCache\toolchains\${PinnedToolchain}\PFiles64\Swift\runtime-development\usr\bin"
   }
+  return "$BinaryCache\toolchains\${PinnedToolchain}\PFiles64\Swift\runtime-development\usr\bin"
 }
 
 function TryAdd-KeyValue([hashtable]$Hashtable, [string]$Key, [string]$Value) {
@@ -1757,11 +1740,10 @@ function Stage-BuildArtifacts($Arch) {
 #-------------------------------------------------------------------
 
 if (-not $SkipBuild) {
-  Ensure-WindowsSDK
+  Fetch-Dependencies
 }
 
 if (-not $SkipBuild) {
-  Ensure-SwiftToolchain $HostArch
   Invoke-BuildStep Build-BuildTools $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
 }
