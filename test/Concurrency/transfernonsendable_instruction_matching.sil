@@ -580,3 +580,79 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @unchecked_trivial_bitcast_test_nonsendable_to_nonsendable : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %rawPointer = unchecked_trivial_bit_cast %value : $NonSendableKlass to $Builtin.RawPointer
+
+  %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  fix_lifetime %value : $NonSendableKlass
+  // expected-note @-1 {{access here could race}}
+
+  destroy_value %value : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @unchecked_trivial_bitcast_test_sendable_to_nonsendable : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructSendableKlass : $@convention(thin) () -> @owned SendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned SendableKlass
+
+  %rawPointer = unchecked_trivial_bit_cast %value : $SendableKlass to $Builtin.RawPointer
+
+  %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  fix_lifetime %value : $SendableKlass
+
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-note @-2 {{access here could race}}
+
+  fix_lifetime %rawPointer : $Builtin.RawPointer
+  // expected-note @-1 {{access here could race}}
+
+  destroy_value %value : $SendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @unchecked_trivial_bitcast_test_nonsendable_to_sendable : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  %word = unchecked_trivial_bit_cast %value : $NonSendableKlass to $Builtin.Word
+  // expected-note @-1 {{access here could race}}
+
+  destroy_value %value : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @unchecked_trivial_bitcast_test_sendable_to_sendable : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructSendableKlass : $@convention(thin) () -> @owned SendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned SendableKlass
+
+  %transferSendableKlass = function_ref @transferSendableKlass : $@convention(thin) @async (@guaranteed SendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferSendableKlass(%value) : $@convention(thin) @async (@guaranteed SendableKlass) -> ()
+
+  %word = unchecked_trivial_bit_cast %value : $SendableKlass to $Builtin.Word
+
+  destroy_value %value : $SendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
