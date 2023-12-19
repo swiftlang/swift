@@ -346,15 +346,14 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     }
     else {
       #if !$Embedded
-      _storage = Builtin.allocWithTailElems_1(
-         getContiguousArrayStorageType(for: Element.self), realMinimumCapacity._builtinWordValue, Element.self)
-      #else
-      
       let total = _mallocGoodSize(for: MemoryLayout<_ContiguousArrayStorage<Element>>.stride + (MemoryLayout<Element>.stride * realMinimumCapacity))
       let tailSize = total - MemoryLayout<_ContiguousArrayStorage<Element>>.stride
       
       _storage = Builtin.allocWithTailElems_1(
-         _ContiguousArrayStorage<Element>.self, tailSize._builtinWordValue, UInt8.self)
+         getContiguousArrayStorageType(for: Element.self), tailSize._builtinWordValue, UInt8.self)
+      #else
+      _storage = Builtin.allocWithTailElems_1(
+        _ContiguousArrayStorage<Element>.self, realMinimumCapacity._builtinWordValue, Element.self)
       #endif
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
