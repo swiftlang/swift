@@ -2370,6 +2370,7 @@ CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
 CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
+CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 
 // These instructions are ignored because they cannot affect the region that a
 // value is within or because even though they are technically a use we would
@@ -2429,7 +2430,6 @@ CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
 CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
-CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Unhandled)
 CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Unhandled)
