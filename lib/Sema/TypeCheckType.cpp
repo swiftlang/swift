@@ -3482,6 +3482,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool isolated = false;
     bool compileTimeConst = false;
+    bool hasResultDependsOn = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
@@ -3495,6 +3496,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeConst:
           compileTimeConst = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::ResultDependsOn:
+          hasResultDependsOn = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3593,7 +3598,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst);
+        isolated, noDerivative, compileTimeConst, hasResultDependsOn);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 

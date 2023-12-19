@@ -1158,8 +1158,8 @@ bool SILParser::parseSILType(SILType &Result,
   
   // Apply attributes to the type.
   auto *attrRepr =
-      P.applyAttributeToType(
-        TyR.get(), attrs, specifier, specifierLoc, isolatedLoc, constLoc);
+      P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc,
+                             isolatedLoc, constLoc, resultDependsOnLoc);
   auto Ty = performTypeResolution(attrRepr, /*IsSILType=*/true, OuterGenericSig,
                                   OuterGenericParams);
   if (OuterGenericSig) {

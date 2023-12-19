@@ -1092,7 +1092,8 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
-           T->getKind() == TypeReprKind::CompileTimeConst;
+           T->getKind() == TypeReprKind::CompileTimeConst ||
+           T->getKind() == TypeReprKind::ResultDependsOn;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   

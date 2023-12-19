@@ -8364,9 +8364,9 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto label = getArgumentName();
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
-      type, isVariadic(), isAutoClosure(), isNonEphemeral(),
-      getSpecifier(), isIsolated(), /*isNoDerivative*/ false,
-      isCompileTimeConst());
+      type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
+      isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
+      hasResultDependsOn());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

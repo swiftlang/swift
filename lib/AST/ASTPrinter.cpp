@@ -4529,7 +4529,7 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("isolated", options, " ");
 
   if (flags.hasResultDependsOn())
-    printer.printKeyword("resultDependsOn", options, " ");
+    printer.printKeyword("_resultDependsOn", options, " ");
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
