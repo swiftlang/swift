@@ -102,7 +102,10 @@ static inline int _swift_stdlib_ioctlPtr(int fd, unsigned long int request, void
 #if defined(_WIN32) && !defined(__CYGWIN__)
 // Windows
 static inline int _swift_stdlib_open(const char *path, int oflag, mode_t mode) {
-  return _open(path, oflag, (int)mode);
+  int fh;
+  errno_t err = _sopen_s(&fh, path, oflag, _SH_DENYNO, mode);
+  __assume(err == 0 || fh == -1);
+  return fh;
 }
 
 #else

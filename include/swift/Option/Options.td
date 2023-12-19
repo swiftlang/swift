@@ -872,6 +872,10 @@ def save_optimization_record_passes :
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
+def no_allocations : Flag<["-"], "no-allocations">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Diagnose any code that needs to heap allocate (classes, closures, etc.)">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -1393,6 +1397,10 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   MetaVarName<"<type>">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
+
+def sanitize_stable_abi_EQ : Flag<["-"], "sanitize-stable-abi">,
+    Flags<[FrontendOption, NoInteractiveOption]>,
+    HelpText<"Link against the Sanitizers stable ABI.">;
 
 def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,

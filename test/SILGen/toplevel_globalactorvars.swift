@@ -5,9 +5,7 @@
 
 // CHECK-LABEL: sil private [ossa] @async_Main
 // CHECK: bb0:
-// CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[GET_MAIN:%.*]] = function_ref @swift_task_getMainExecutor
-// CHECK-NEXT: [[MAIN:%.*]] = apply [[GET_MAIN]]()
+// CHECK-NEXT: [[MAIN:%.*]] = builtin "buildMainActorExecutorRef"() : $Builtin.Executor
 // CHECK-NEXT: [[MAIN_OPTIONAL:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[MAIN]]
 
 actor MyActorImpl {}

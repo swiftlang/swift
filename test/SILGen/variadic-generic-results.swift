@@ -126,7 +126,7 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    debug_value [[A]] : $Int
 // CHECK-NEXT:    [[B:%.*]] = load [take] [[R1]] : $*String
 // CHECK-NEXT:    [[C:%.*]] = load [take] [[R2]] : $*String
-// CHECK-NEXT:    [[C_LIFETIME:%.*]] = begin_borrow [var_decl] [[C]]
+// CHECK-NEXT:    [[C_LIFETIME:%.*]] = move_value [var_decl] [[C]]
 // CHECK-NEXT:    debug_value [[C_LIFETIME]] : $String
 // CHECK-NEXT:    destroy_value [[B]] : $String
 //   End of statement.
@@ -139,8 +139,7 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
 // CHECK-NEXT:    apply [[SEQUENCE_FN]]()
 //   Leave the function.
-// CHECK-NEXT:    end_borrow [[C_LIFETIME]] : $String
-// CHECK-NEXT:    destroy_value [[C]] : $String
+// CHECK-NEXT:    destroy_value [[C_LIFETIME]] : $String
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func callCopyAndDestructure(a: Int, b: String, c: String) {

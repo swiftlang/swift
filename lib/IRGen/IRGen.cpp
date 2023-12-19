@@ -278,6 +278,11 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                             SanitizerKind::Address);
       ASOpts.UseAfterScope = false;
       ASOpts.UseAfterReturn = llvm::AsanDetectStackUseAfterReturnMode::Runtime;
+      if (Opts.SanitizerUseStableABI) {
+        ASOpts.MaxInlinePoisoningSize = 0;
+        ASOpts.InstrumentationWithCallsThreshold = 0;
+        ASOpts.InsertVersionCheck = false;
+      }
       MPM.addPass(AddressSanitizerPass(
           ASOpts, /*UseGlobalGC=*/true, Opts.SanitizeAddressUseODRIndicator,
           /*DestructorKind=*/llvm::AsanDtorKind::Global));

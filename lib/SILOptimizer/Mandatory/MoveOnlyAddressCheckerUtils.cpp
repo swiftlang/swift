@@ -379,10 +379,12 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(
     MarkUnresolvedNonCopyableValueInst *markedAddr) {
   SILValue operand = markedAddr->getOperand();
 
-  // Check for inout types of arguments that are marked with consumable and
-  // assignable.
   if (markedAddr->getCheckKind() ==
       MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable) {
+    // TODO: This should really be a property of the marker instruction.
+    
+    // Check for inout types of arguments that are marked with consumable and
+    // assignable.
     if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
       switch (fArg->getArgumentConvention()) {
       case SILArgumentConvention::Indirect_In:
@@ -401,6 +403,14 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(
         LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
         return true;
       }
+    }
+    // Check for yields from a modify coroutine.
+    if (auto bai = dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
+      return true;
+    }
+    // Check for modify accesses.
+    if (auto access = dyn_cast<BeginAccessInst>(operand)) {
+      return access->getAccessKind() == SILAccessKind::Modify;
     }
   }
 
@@ -950,6 +960,9 @@ void UseState::initializeLiveness(
                              reinitInstAndValue.second);
     }
   }
+  
+  // FIXME: Whether the initial use is an initialization ought to be entirely
+  // derivable from the CheckKind of the mark instruction.
 
   // Then check if our markedValue is from an argument that is in,
   // in_guaranteed, inout, or inout_aliasable, consider the marked address to be
@@ -1045,6 +1058,12 @@ void UseState::initializeLiveness(
     LLVM_DEBUG(llvm::dbgs()
                << "Found pointer to address use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
+    recordInitUse(address, address, liveness.getTopLevelSpan());
+    liveness.initializeDef(address, liveness.getTopLevelSpan());
+  }
+  
+  if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
+        stripAccessMarkers(address->getOperand())->getDefiningInstruction())) {
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
@@ -2169,8 +2188,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (moveChecker.canonicalizer.foundAnyConsumingUses()) {
         LLVM_DEBUG(llvm::dbgs()
                    << "Found mark must check [nocopy] error: " << *user);
-        auto *fArg = dyn_cast<SILFunctionArgument>(
-            stripAccessMarkers(markedValue->getOperand()));
+        auto operand = stripAccessMarkers(markedValue->getOperand());
+        auto *fArg = dyn_cast<SILFunctionArgument>(operand);
+        auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand);
+            
         // If we have a closure captured that we specialized, we should have a
         // no consume or assign and should emit a normal guaranteed diagnostic.
         if (fArg && fArg->isClosureCapture() &&
@@ -2186,7 +2207,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         // If we have a function argument that is no_consume_or_assign and we do
         // not have any partial apply uses, then we know that we have a use of
         // an address only borrowed parameter that we need to
-        if (fArg &&
+        if ((fArg || ptrToAddr) &&
             checkKind == MarkUnresolvedNonCopyableValueInst::CheckKind::
                              NoConsumeOrAssign &&
             !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {

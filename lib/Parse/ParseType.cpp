@@ -156,12 +156,14 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (Tok.is(tok::kw_inout)
-      || (canHaveParameterSpecifierContextualKeyword()
-          && (Tok.getRawText().equals("__shared")
-              || Tok.getRawText().equals("__owned")
-              || Tok.getRawText().equals("consuming")
-              || Tok.getRawText().equals("borrowing")))) {
+  if (Tok.is(tok::kw_inout) ||
+      (canHaveParameterSpecifierContextualKeyword() &&
+       (Tok.getRawText().equals("__shared") ||
+        Tok.getRawText().equals("__owned") ||
+        Tok.getRawText().equals("consuming") ||
+        Tok.getRawText().equals("borrowing") ||
+        (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+         Tok.getRawText().equals("resultDependsOn"))))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
@@ -408,9 +410,10 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   SourceLoc specifierLoc;
   SourceLoc isolatedLoc;
   SourceLoc constLoc;
+  SourceLoc resultDependsOnLoc;
   TypeAttributes attrs;
-  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc,
-                                   attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc,
+                                   constLoc, resultDependsOnLoc, attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -632,6 +635,12 @@ Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
 
     return makeParserResult(ty,
         new (Context) PackExpansionTypeRepr(repeatLoc, ty.get()));
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeTypeBeginning();
+    }
+    return makeParserCodeCompletionResult<TypeRepr>(
+        ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
   }
 
   ty = parseTypeScalar(MessageID, reason);
@@ -954,6 +963,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
 
     auto *typeRepr = new (Context) PackElementTypeRepr(eachLoc, packElt.get());
     return makeParserResult(ParserStatus(packElt), typeRepr);
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeTypeSimpleOrComposition();
+    }
+    return makeParserCodeCompletionResult<TypeRepr>(
+        ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {

@@ -42,7 +42,7 @@ void error(const char *prefix, const char *msg, const char *file = nullptr, unsi
 
 #if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", buffer);
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) && !defined(__TERMUX__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", buffer);
 #elif defined(_WIN32)
 #define STDERR_FILENO 2

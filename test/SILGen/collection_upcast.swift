@@ -47,7 +47,8 @@ func testArrayUpcast(_ array: [BridgedObjC]) {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
   // CHECK: [[UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCast{{.*}}F : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
   // CHECK: [[RESULT:%.*]] = apply [[UPCAST_FN]]<BridgedObjC, AnyObject>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-  // CHECK: destroy_value [[RESULT]]
+  // CHECK: [[RESULT_LIFETIME:%.*]] = move_value [var_decl] [[RESULT]]
+  // CHECK: destroy_value [[RESULT_LIFETIME]]
   // CHECK-NOT: destroy_value [[ARRAY]]
   let anyObjectArr: [AnyObject] = array
 }
@@ -59,7 +60,8 @@ func testArrayUpcastBridged(_ array: [BridgedSwift]) {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCast{{.*}}F : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
   // CHECK: [[RESULT:%.*]] = apply [[BRIDGE_FN]]<BridgedSwift, AnyObject>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-  // CHECK: destroy_value [[RESULT]]
+  // CHECK: [[RESULT_LIFETIME:%.*]] = move_value [var_decl] [[RESULT]]
+  // CHECK: destroy_value [[RESULT_LIFETIME]]
   // CHECK-NOT: destroy_value [[ARRAY]]
   let anyObjectArr = array as [AnyObject]
 }
@@ -71,7 +73,8 @@ func testDictionaryUpcast(_ dict: Dictionary<BridgedObjC, BridgedObjC>) {
   // CHECK: [[DICT_COPY:%.*]] = copy_value [[DICT]]
   // CHECK: [[UPCAST_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCast{{.*}}F : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK: [[RESULT:%.*]] = apply [[UPCAST_FN]]<BridgedObjC, BridgedObjC, NSObject, AnyObject>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
-  // CHECK: destroy_value [[RESULT]]
+  // CHECK: [[RESULT_LIFETIME:%.*]] = move_value [var_decl] [[RESULT]]
+  // CHECK: destroy_value [[RESULT_LIFETIME]]
   // CHECK-NOT: destroy_value [[DICT]]
   let anyObjectDict: Dictionary<NSObject, AnyObject> = dict
 }
@@ -82,7 +85,8 @@ func testDictionaryUpcastBridged(_ dict: Dictionary<BridgedSwift, BridgedSwift>)
   // CHECK: [[DICT_COPY:%.*]] = copy_value [[DICT]]
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @$ss17_dictionaryUpCast{{.*}}F
   // CHECK: [[RESULT:%.*]] = apply [[BRIDGE_FN]]<BridgedSwift, BridgedSwift, NSObject, AnyObject>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
-  // CHECK: destroy_value [[RESULT]]
+  // CHECK: [[RESULT_LIFETIME:%.*]] = move_value [var_decl] [[RESULT]]
+  // CHECK: destroy_value [[RESULT_LIFETIME]]
   // CHECK-NOT: destroy_value [[DICT]]
   let anyObjectDict = dict as Dictionary<NSObject, AnyObject>
 }
@@ -93,7 +97,8 @@ func testSetUpcast(_ dict: Set<BridgedObjC>) {
   // CHECK: [[SET_COPY:%.*]] = copy_value [[SET]]
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @$ss10_setUpCast{{.*}}F : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
   // CHECK: [[RESULT:%.*]] = apply [[BRIDGE_FN]]<BridgedObjC, NSObject>([[SET_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
-  // CHECK: destroy_value [[RESULT]]
+  // CHECK: [[RESULT_LIFETIME:%.*]] = move_value [var_decl] [[RESULT]]
+  // CHECK: destroy_value [[RESULT_LIFETIME]]
   // CHECK-NOT: destroy_value [[SET]]
   let anyObjectSet: Set<NSObject> = dict
 }
@@ -104,7 +109,8 @@ func testSetUpcastBridged(_ set: Set<BridgedSwift>) {
   // CHECK: [[SET_COPY:%.*]] = copy_value [[SET]]
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @$ss10_setUpCast{{.*}}F
   // CHECK: [[RESULT:%.*]] = apply [[BRIDGE_FN]]<BridgedSwift, NSObject>([[SET_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@guaranteed Set<τ_0_0>) -> @owned Set<τ_0_1>
-  // CHECK: destroy_value [[RESULT]]
+  // CHECK: [[RESULT_LIFETIME:%.*]] = move_value [var_decl] [[RESULT]]
+  // CHECK: destroy_value [[RESULT_LIFETIME]]
   // CHECK-NOT: destroy_value [[SET]]
   let anyObjectSet = set as Set<NSObject>
 }

@@ -1197,6 +1197,7 @@ public:
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
                                       SourceLoc &ConstLoc,
+                                      SourceLoc &ResultDependsOnLoc,
                                       TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (canHaveParameterSpecifierContextualKeyword() &&
@@ -1205,9 +1206,11 @@ public:
           Tok.getRawText().equals("consuming") ||
           Tok.getRawText().equals("borrowing") ||
           Tok.isContextualKeyword("isolated") ||
-          Tok.isContextualKeyword("_const"))))
-      return parseTypeAttributeListPresent(
-          Specifier, SpecifierLoc, IsolatedLoc, ConstLoc, Attributes);
+          Tok.isContextualKeyword("_const") ||
+          Tok.getRawText().equals("_resultDependsOn"))))
+      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, IsolatedLoc,
+                                           ConstLoc, ResultDependsOnLoc,
+                                           Attributes);
     return makeParserSuccess();
   }
 
@@ -1215,6 +1218,7 @@ public:
                                              SourceLoc &SpecifierLoc,
                                              SourceLoc &IsolatedLoc,
                                              SourceLoc &ConstLoc,
+                                             SourceLoc &ResultDependsOnLoc,
                                              TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
@@ -1266,14 +1270,13 @@ public:
 
   bool parseAccessorAfterIntroducer(
       SourceLoc Loc, AccessorKind Kind, ParsedAccessors &accessors,
-      bool &hasEffectfulGet, ParameterList *Indices, bool &parsingLimitedSyntax,
+      bool &hasEffectfulGet, bool &parsingLimitedSyntax,
       DeclAttributes &Attributes, ParseDeclOptions Flags,
-      AbstractStorageDecl *storage, SourceLoc StaticLoc, ParserStatus &Status
-  );
+      AbstractStorageDecl *storage, ParserStatus &Status);
 
   ParserStatus parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
                            TypeRepr *ResultType, ParsedAccessors &accessors,
-                           AbstractStorageDecl *storage, SourceLoc StaticLoc);
+                           AbstractStorageDecl *storage);
   ParserResult<VarDecl> parseDeclVarGetSet(PatternBindingEntry &entry,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
@@ -1510,6 +1513,9 @@ public:
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;
 
+    /// The location of the '_resultDependsOn' keyword, if present.
+    SourceLoc ResultDependsOnLoc;
+
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
 
@@ -1698,8 +1704,7 @@ public:
   ParserResult<Expr> parseExprBasic(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/true);
   }
-  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic,
-                                   bool fromASTGen = false);
+  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprArrow();

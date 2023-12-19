@@ -1,5 +1,14 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
 
 import VirtualMethods
 
-VirtualNonAbstractBase().nonAbstractMethod() // expected-error {{'nonAbstractMethod()' is unavailable: virtual functions are not yet available in Swift}}
+let _ = Base() // expected-error {{'init()' is unavailable: constructors of abstract C++ classes are unavailable in Swift}}
+let _ = Base2() // expected-error {{'init()' is unavailable: constructors of abstract C++ classes are unavailable in Swift}}
+
+let _ = DerivedInt()
+let _ = Derived2()
+let _ = Derived3()
+let _ = Derived4()
+let _ = DerivedFromDerived2()
+
+VirtualNonAbstractBase().nonAbstractMethod()

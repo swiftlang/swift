@@ -17,6 +17,9 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool> LinkEmbeddedRuntime("link-embedded-runtime",
+                                               llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -39,7 +42,7 @@ public:
 
     // In embedded Swift, the stdlib contains all the runtime functions needed
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
-    if (M.getOptions().EmbeddedSwift) {
+    if (M.getOptions().EmbeddedSwift && LinkEmbeddedRuntime) {
       linkEmbeddedRuntimeFromStdlib();
     }
   }

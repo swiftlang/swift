@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 821; // extractConstantsFromMembers
+const uint16_t SWIFTMODULE_VERSION_MINOR = 828; // ~Copyable / ~Escapable
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -429,7 +429,6 @@ enum class SelfAccessKind : uint8_t {
   LegacyConsuming,
   Consuming,
   Borrowing,
-  ResultDependsOnSelf,
 };
 using SelfAccessKindField = BCFixed<3>;
   
@@ -483,9 +482,11 @@ enum LayoutRequirementKind : uint8_t {
   RefCountedObject = 4,
   NativeRefCountedObject = 5,
   Class = 6,
-  NativeClass = 7
+  NativeClass = 7,
+  BridgeObject = 8,
+  TrivialStride = 9,
 };
-using LayoutRequirementKindField = BCFixed<3>;
+using LayoutRequirementKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1270,6 +1271,8 @@ namespace decls_block {
   TYPE_LAYOUT(ProtocolCompositionTypeLayout,
     PROTOCOL_COMPOSITION_TYPE,
     BCFixed<1>,          // has AnyObject constraint
+    BCFixed<1>,          // has ~Copyable constraint
+    BCFixed<1>,          // has ~Escapable constraint
     BCArray<TypeIDField> // protocols
   );
 

@@ -257,8 +257,12 @@ public:
   // ForwardingInstruction.swift mirrors this implementation.
   Operand *getSingleForwardingOperand() const {
     switch (forwardingInst->getKind()) {
-    case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
+    case SILInstructionKind::StructInst: {
+      if (forwardingInst->getNumRealOperands() != 1)
+        return nullptr;
+      return *forwardingInst->getRealOperands().begin();
+    }
     case SILInstructionKind::LinearFunctionInst:
     case SILInstructionKind::DifferentiableFunctionInst:
       return nullptr;

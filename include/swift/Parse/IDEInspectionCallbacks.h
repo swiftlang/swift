@@ -185,6 +185,13 @@ public:
   /// Complete the beginning of the type of result of func/var/let/subscript.
   virtual void completeTypeDeclResultBeginning() {};
 
+  /// Same as `completeTypeSimpleOrComposition` but also allows `repeat`.
+  virtual void completeTypeBeginning(){};
+
+  /// Same as `completeTypeSimpleBeginning` but also allows `any`, `some` and
+  /// `each`.
+  virtual void completeTypeSimpleOrComposition(){};
+
   /// Complete the beginning of type-simple -- no tokens provided
   /// by user.
   virtual void completeTypeSimpleBeginning() {};

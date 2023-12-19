@@ -654,7 +654,11 @@ def disable_experimental_string_processing :
 
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference via type witness systems">;
+  HelpText<"Enable experimental associated type inference improvements">;
+
+def disable_experimental_associated_type_inference :
+  Flag<["-"], "disable-experimental-associated-type-inference">,
+  HelpText<"Disable experimental associated type inference improvements">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -1310,4 +1314,9 @@ def platform_c_calling_convention :
 def platform_c_calling_convention_EQ :
     Joined<["-"], "experimental-platform-c-calling-convention=">,
     Alias<platform_c_calling_convention>;
+
+def disable_experimental_parser_round_trip : Flag<["-"],
+  "disable-experimental-parser-round-trip">,
+  HelpText<"Disable round trip through the new swift parser">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

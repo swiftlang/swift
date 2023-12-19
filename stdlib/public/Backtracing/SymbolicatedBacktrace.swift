@@ -23,6 +23,11 @@ import Swift
 
 @_implementationOnly import OS.Libc
 @_implementationOnly import Runtime
+// Because we've turned off the OS/SDK modules, and we don't have a module for
+// stddef.h, and we sometimes build with -fbuiltin-headers-in-system-modules for
+// vfs reasons, stddef.h can be absorbed into a random module. Sometimes it's
+// SwiftOverlayShims.
+@_implementationOnly import SwiftOverlayShims
 
 /// A symbolicated backtrace
 public struct SymbolicatedBacktrace: CustomStringConvertible {

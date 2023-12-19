@@ -57,6 +57,10 @@ function(_add_host_swift_compile_options name)
 
   target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
   _add_host_variant_swift_sanitizer_flags(${name})
+
+  target_compile_options(${name} PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
+  )
 endfunction()
 
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)
@@ -229,6 +233,20 @@ function(add_pure_swift_host_library name)
         -emit-module-source-info-path;${module_sourceinfo_file};
         -emit-module-interface-path;${module_interface_file}
         >)
+  else()
+    # Emit a swiftmodule in the current directory.
+    set_target_properties(${name} PROPERTIES
+        Swift_MODULE_NAME ${name}
+        Swift_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set(module_file "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule")
+  endif()
+
+  # Downstream linking should include the swiftmodule in debug builds to allow lldb to
+  # work correctly. Only do this on Darwin since neither gold (currently used by default
+  # on Linux), nor the default Windows linker 'link' support '-add_ast_path'.
+  is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debuginfo)
+  if(debuginfo AND SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    target_link_options(${name} PUBLIC "SHELL:-Xlinker -add_ast_path -Xlinker ${module_file}")
   endif()
 
   if(LLVM_USE_LINKER)

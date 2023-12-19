@@ -19,6 +19,7 @@
 #include "swift/AST/Type.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/CodeCompletionResult.h"
+#include "swift/Refactoring/RenameLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -37,6 +38,7 @@ namespace llvm {
 namespace SourceKit {
 class GlobalConfig;
 using swift::ide::CancellableResult;
+using swift::ide::RenameLoc;
 
 struct EntityInfo {
   UIdent Kind;
@@ -781,9 +783,22 @@ struct SemanticRefactoringInfo {
   StringRef PreferredName;
 };
 
-struct RelatedIdentsInfo {
-  /// (Offset,Length) pairs.
-  ArrayRef<std::pair<unsigned, unsigned>> Ranges;
+struct RelatedIdentInfo {
+  unsigned Offset;
+  unsigned Length;
+  swift::ide::RenameLocUsage Usage;
+};
+
+/// Result of `findRelatedIdentifiersInFile`.
+struct RelatedIdentsResult {
+  SmallVector<RelatedIdentInfo, 8> RelatedIdents;
+  std::string OldName;
+
+  RelatedIdentsResult(SmallVector<RelatedIdentInfo, 8> RelatedIdents,
+                      std::string OldName)
+      : RelatedIdents(RelatedIdents), OldName(OldName) {}
+
+  static RelatedIdentsResult empty() { return RelatedIdentsResult({}, ""); }
 };
 
 /// Represent one branch of an if config.
@@ -891,25 +906,6 @@ struct RenameRangeDetail {
 struct CategorizedRenameRanges {
   UIdent Category;
   std::vector<RenameRangeDetail> Ranges;
-};
-
-enum class RenameType {
-  Unknown,
-  Definition,
-  Reference,
-  Call
-};
-
-struct RenameLocation {
-  unsigned Line;
-  unsigned Column;
-  RenameType Type;
-};
-
-struct RenameLocations {
-  StringRef OldName;
-  const bool IsFunctionLike;
-  std::vector<RenameLocation> LineColumnLocs;
 };
 
 struct IndexStoreOptions {
@@ -1166,11 +1162,20 @@ public:
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
+  /// - Parameters:
+  ///   - IncludeNonEditableBaseNames: If `true` also return results if the
+  ///     referenced declaration is an initializer or subscript. This is
+  ///     intended if the related identifiers response is used for rename, which
+  ///     allows renaming parameter labels of these declaration.
+  ///     If the function's base name should be highlighted, this should be
+  ///     `false` because e.g. highlighting a subscript with
+  ///     `IncludeNonEditableBaseNames = true` would return the locations of all
+  ///     `[` that call that subscript.
   virtual void findRelatedIdentifiersInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)>
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<RelatedIdentsResult> &)>
           Receiver) = 0;
 
   virtual void findActiveRegionsInFile(
@@ -1192,7 +1197,7 @@ public:
 
   virtual CancellableResult<std::vector<CategorizedRenameRanges>>
   findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                   ArrayRef<RenameLocations> RenameLocations,
+                   ArrayRef<RenameLoc> RenameLocations,
                    ArrayRef<const char *> Args) = 0;
   virtual void
   findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,

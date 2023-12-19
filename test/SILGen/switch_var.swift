@@ -417,46 +417,50 @@ func test_let() {
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
   // CHECK: [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK: [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK: [[VAL_LIFETIME:%.*]] = begin_borrow [var_decl] [[VAL_COPY]]
+  // CHECK: [[VAL_MOVE:%.*]] = move_value [var_decl] [[VAL_COPY]]
   // CHECK: function_ref @$s10switch_var6runcedSbyF
   // CHECK: cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   switch foos() {
   case let x where runced():
   // CHECK: [[CASE1]]:
+  // CHECK:   [[VAL_BORROW:%.*]] = begin_borrow [[VAL_MOVE]]
   // CHECK:   [[A:%.*]] = function_ref @$s10switch_var1a1xySS_tF
-  // CHECK:   apply [[A]]([[VAL_LIFETIME]])
-  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   apply [[A]]([[VAL_BORROW]])
+  // CHECK:   end_borrow [[VAL_BORROW]]
+  // CHECK:   destroy_value [[VAL_MOVE]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL_MOVE]]
   // CHECK:   [[BORROWED_VAL_2:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[BORROWED_VAL_2]]
-  // CHECK:   [[BORROWED_VAL_COPY_2:%.*]] = begin_borrow [var_decl] [[VAL_COPY_2]]
+  // CHECK:   [[VAL_MOVE_2:%.*]] = move_value [var_decl] [[VAL_COPY_2]]
   // CHECK:   function_ref @$s10switch_var6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case let y where funged():
   // CHECK: [[CASE2]]:
+  // CHECK:   [[BORROWED_VAL_MOVE_2:%.*]] = begin_borrow [[VAL_MOVE_2]]
   // CHECK:   [[B:%.*]] = function_ref @$s10switch_var1b1xySS_tF
-  // CHECK:   apply [[B]]([[BORROWED_VAL_COPY_2]])
-  // CHECK:   destroy_value [[VAL_COPY_2]]
+  // CHECK:   apply [[B]]([[BORROWED_VAL_MOVE_2]])
+  // CHECK:   destroy_value [[VAL_MOVE_2]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     b(x: y)
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   destroy_value [[VAL_COPY_2]]
+  // CHECK:   destroy_value [[VAL_MOVE_2]]
   // CHECK:   [[BORROWED_VAL_3:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[BORROWED_VAL_3]]
-  // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [var_decl] [[VAL_COPY_3]]
+  // CHECK:   [[VAL_MOVE_3:%.*]] = move_value [var_decl] [[VAL_COPY_3]]
   // CHECK:   function_ref @$s10switch_var4barsSSyF
-  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
+  // CHECK:   [[BORROWED_VAL_MOVE_3:%.*]] = begin_borrow [[VAL_MOVE_3]]
+  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_MOVE_3]] to [[IN_ARG:%.*]] :
   // CHECK:   apply {{%.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   // ExprPatterns implicitly contain a 'let' binding.
   case bars():
   // CHECK: [[YES_CASE3]]:
-  // CHECK:   destroy_value [[VAL_COPY_3]]
+  // CHECK:   destroy_value [[VAL_MOVE_3]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s10switch_var1cyyF
   // CHECK-NEXT: apply [[FUNC]](
   // CHECK:   destroy_value [[VAL]]
@@ -465,7 +469,7 @@ func test_let() {
 
   case _:
     // CHECK: [[NO_CASE3]]:
-    // CHECK:   destroy_value [[VAL_COPY_3]]
+    // CHECK:   destroy_value [[VAL_MOVE_3]]
     // CHECK:   function_ref @$s10switch_var1dyyF
     // CHECK:   destroy_value [[VAL]]
     // CHECK:   br [[CONT]]
@@ -506,31 +510,33 @@ func test_mixed_let_var() {
   // CHECK:   destroy_value [[BOX]]
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [var_decl] [[VAL_COPY]]
+  // CHECK:   [[VAL_MOVE:%.*]] = move_value [var_decl] [[VAL_COPY]]
   // CHECK:   cond_br {{.*}}, [[CASE2:bb[0-9]+]], [[NOCASE2:bb[0-9]+]]
   case let y where funged():
 
   // CHECK: [[CASE2]]:
+  // CHECK:   [[BORROWED_VAL_MOVE:%.*]] = begin_borrow [[VAL_MOVE]]
   // CHECK:   [[B:%.*]] = function_ref @$s10switch_var1b1xySS_tF
-  // CHECK:   apply [[B]]([[BORROWED_VAL_COPY]])
-  // CHECK:   end_borrow [[BORROWED_VAL_COPY]]
-  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   apply [[B]]([[BORROWED_VAL_MOVE]])
+  // CHECK:   end_borrow [[BORROWED_VAL_MOVE]]
+  // CHECK:   destroy_value [[VAL_MOVE]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]  
   b(x: y)
 
   // CHECK: [[NOCASE2]]:
-  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL_MOVE]]
 
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
-  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [var_decl] [[VAL_COPY]]
-  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
+  // CHECK:   [[VAL_MOVE:%.*]] = move_value [var_decl] [[VAL_COPY]]
+  // CHECK:   [[BORROWED_VAL_MOVE:%.*]] = begin_borrow [[VAL_MOVE]]
+  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_MOVE]] to [[TMP_VAL_COPY_ADDR:%.*]] :
   // CHECK:   apply {{.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
   case bars():
   // CHECK: [[CASE3]]:
-  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL_MOVE]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s10switch_var1cyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[FUNC]]()
   // CHECK:   destroy_value [[VAL]]
@@ -538,7 +544,7 @@ func test_mixed_let_var() {
     c()
 
   // CHECK: [[NOCASE3]]:
-  // CHECK:   destroy_value [[VAL_COPY]]
+  // CHECK:   destroy_value [[VAL_MOVE]]
   // CHECK:   [[D_FUNC:%.*]] = function_ref @$s10switch_var1dyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[D_FUNC]]()
   // CHECK:   destroy_value [[VAL]]
@@ -728,11 +734,12 @@ func test_multiple_patterns_value_semantics(_ y: C) {
   switch y {
     // CHECK:   checked_cast_br C in {{%.*}} : $C to D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]
     // CHECK: [[AS_D]]({{.*}}):
-    // CHECK:   [[ORIG_BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[ORIG:%.*]] :
+    // CHECK:   [[ORIG_MOVE:%.*]] = move_value [lexical] [var_decl] [[ORIG:%.*]] :
+    // CHECK:   [[ORIG_BORROW:%.*]] = begin_borrow [[ORIG_MOVE:%.*]] :
     // CHECK:   cond_br {{%.*}}, [[F_TRUE:bb[0-9]+]], [[F_FALSE:bb[0-9]+]]
     // CHECK: [[F_TRUE]]:
-    // CHECK:   [[BINDING:%.*]] = copy_value [[ORIG_BORROW]] :
-    // CHECK:   destroy_value [[ORIG]]
+    // CHECK:   [[BINDING:%.*]] = copy_value [[ORIG_MOVE]] :
+    // CHECK:   destroy_value [[ORIG_MOVE]]
     // CHECK:   br {{bb[0-9]+}}([[BINDING]]
     case let x as D where f(x), let x as D: break
     default: break

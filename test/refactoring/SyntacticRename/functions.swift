@@ -83,12 +83,13 @@ _ = Memberwise(/*memberwise-x:ref*/x: 1, z: 3)
 let memberwise = Memberwise.init(/*memberwise-x:ref*/x:z:)
 _ = memberwise . /*memberwise-x:ref*/x
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="import" -is-function-like -old-name "someFunc(a:)" >> %t.ranges/functions_import.swift
 // RUN: diff -u %S/Outputs/functions/import.swift.expected %t.ranges/functions_import.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="bar" -is-function-like -old-name "bar(_:)" >> %t.ranges/functions_bar.swift
 // RUN: diff -u %S/Outputs/functions/bar.swift.expected %t.ranges/functions_bar.swift
-// RUN: %refactor -find-rename-ranges -source-filename %s -pos="no-args" -is-function-like -old-name "aFunc" >> %t.ranges/functions_no-args.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="no-args" -is-function-like -old-name "aFunc()" >> %t.ranges/functions_no-args.swift
 // RUN: diff -u %S/Outputs/functions/no-args.swift.expected %t.ranges/functions_no-args.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="param-label" -is-function-like -old-name "aFunc(a:)" >> %t.ranges/functions_param-label.swift
 // RUN: diff -u %S/Outputs/functions/param-label.swift.expected %t.ranges/functions_param-label.swift

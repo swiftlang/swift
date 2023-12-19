@@ -20,6 +20,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -212,6 +213,9 @@ static_assert((int)BridgedFunction::EffectsKind::Custom == (int)swift::EffectsKi
 static_assert((int)BridgedFunction::PerformanceConstraints::None == (int)swift::PerformanceConstraints::None);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoAllocation == (int)swift::PerformanceConstraints::NoAllocation);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoLocks == (int)swift::PerformanceConstraints::NoLocks);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoRuntime == (int)swift::PerformanceConstraints::NoRuntime);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoExistentials == (int)swift::PerformanceConstraints::NoExistentials);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoObjCBridging == (int)swift::PerformanceConstraints::NoObjCBridging);
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
@@ -270,6 +274,9 @@ ArrayRef<SILValue> BridgedValueArray::getValues(SmallVectorImpl<SILValue> &stora
   return storage;
 }
 
+bool BridgedValue::findPointerEscape() const {
+  return swift::findPointerEscape(getSILValue());
+}
 
 //===----------------------------------------------------------------------===//
 //                                SILArgument

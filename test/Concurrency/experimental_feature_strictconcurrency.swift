@@ -75,3 +75,12 @@ func f() {
   print(TestStatics.immutableInferredSendable)
   print(TestStatics.mutable) // expected-warning{{reference to static property 'mutable' is not concurrency-safe because it involves shared mutable state}}
 }
+
+func testLocalNonisolatedUnsafe() async {
+  nonisolated(unsafe) var value = 1
+  let task = Task {
+    value = 2
+    return value
+  }
+  print(await task.value)
+}

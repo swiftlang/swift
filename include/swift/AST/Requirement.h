@@ -19,6 +19,7 @@
 
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/RequirementKind.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
@@ -26,6 +27,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
+class GenericContext;
 
 /// Return type of Requirement::checkRequirement().
 enum class CheckRequirementResult : uint8_t {
@@ -222,6 +224,36 @@ struct StructuralRequirement {
   /// diagnosed as redundant, since we want to give users the option of
   /// spelling out these requirements explicitly.
   bool inferred = false;
+
+  /// A flag indicating whether this requirement was produced via the expansion
+  /// of default conformances to invertible protocols.
+  bool fromDefault = false;
+};
+
+/// An "anti-conformance" requirement `Subject: ~Protocol`.
+struct InverseRequirement {
+  Type subject;
+  ProtocolDecl *protocol;
+  SourceLoc loc;
+
+  InverseRequirement(Type subject, ProtocolDecl *protocol, SourceLoc loc);
+
+  InvertibleProtocolKind getKind() const;
+
+  /// Adds the type parameters of this generic context to the result if
+  /// it has default requirements.
+  static void enumerateDefaultedParams(GenericContext *decl,
+                                       SmallVectorImpl<Type> &result);
+
+  /// \returns the protocols that are required by default for the given type
+  /// parameter. These are not inverses themselves.
+  static InvertibleProtocolSet expandDefault(Type gp);
+
+  /// Appends additional requirements corresponding to defaults for the given
+  /// generic parameters.
+  static void expandDefaults(ASTContext &ctx,
+                             ArrayRef<Type> gps,
+                             SmallVectorImpl<StructuralRequirement> &result);
 };
 
 } // end namespace swift

@@ -458,11 +458,12 @@ class LetFieldClass {
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
   // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
-  // CHECK:      [[REBORROWED_KRAKEN:%.*]] = begin_borrow [lexical] [var_decl] [[KRAKEN]]
+  // CHECK:      [[MOVED_KRAKEN:%.*]] = move_value [lexical] [var_decl] [[KRAKEN]]
+  // CHECK:      [[REBORROWED_KRAKEN:%.*]] = begin_borrow [[MOVED_KRAKEN]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[REBORROWED_KRAKEN]])
   // CHECK-NEXT: end_borrow [[REBORROWED_KRAKEN]]
-  // CHECK-NEXT: destroy_value [[KRAKEN]]
+  // CHECK-NEXT: destroy_value [[MOVED_KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[KRAKEN_LIFETIME:%.+]] = begin_borrow [lexical] [var_decl] [[KRAKEN_BOX]]
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_LIFETIME]]
@@ -505,9 +506,11 @@ class LetFieldClass {
   // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
-  // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [lexical] [var_decl] [[KRAKEN]]
+  // CHECK:      [[MOVED_KRAKEN:%.*]] = move_value [lexical] [var_decl] [[KRAKEN]]
+  // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[MOVED_KRAKEN]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN]])
+  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[KRAKEN_LIFETIME:%.+]] = begin_borrow [lexical] [var_decl] [[KRAKEN_BOX]]
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_LIFETIME]]
@@ -522,8 +525,7 @@ class LetFieldClass {
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
   // CHECK-NEXT: end_borrow [[KRAKEN_LIFETIME]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
-  // CHECK-NEXT: destroy_value [[KRAKEN]]
+  // CHECK-NEXT: destroy_value [[MOVED_KRAKEN]]
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
   func varkMethod() {

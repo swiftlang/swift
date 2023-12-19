@@ -926,7 +926,7 @@ public:
 
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
-  void verify(SILPassManager *passManager,
+  void verify(CalleeCache *calleeCache,
               bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 

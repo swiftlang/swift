@@ -114,10 +114,10 @@ internal struct DumpGenericMetadata: ParsableCommand {
           ? [swift_reflection_ptr_t:[swift_reflection_ptr_t]]()
           : try process.context.allocationStacks
 
-      let generics: [Metadata] = allocations.compactMap { allocation in
+      let generics: [Metadata] = allocations.compactMap { allocation -> Metadata? in
         let pointer = swift_reflection_allocationMetadataPointer(process.context, allocation)
         if pointer == 0 { return nil }
-        let allocation = allocations.last(where: { pointer >= $0.ptr && pointer < $0.ptr + UInt64($0.size) })
+        let allocation = allocations.last(where: { pointer >= $0.ptr && pointer < $0.ptr + swift_reflection_ptr_t($0.size) })
         let garbage = (allocation == nil && swift_reflection_ownsAddressStrict(process.context, UInt(pointer)) == 0)
         var currentBacktrace: String?
         if let style = backtraceOptions.style, let allocation, let stack = stacks[allocation.ptr] {

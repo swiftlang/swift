@@ -43,9 +43,13 @@ extension Context {
     }
   }
 
+  var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
+
   func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
   }
+
+  func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 }
 
 /// A context which allows mutation of a function's SIL.
@@ -282,7 +286,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func optimizeMemoryAccesses(in function: Function) -> Bool {
-    if BridgedPassContext.optimizeMemoryAccesses(function.bridged) {
+    if _bridged.optimizeMemoryAccesses(function.bridged) {
       notifyInstructionsChanged()
       return true
     }
@@ -290,7 +294,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func eliminateDeadAllocations(in function: Function) -> Bool {
-    if BridgedPassContext.eliminateDeadAllocations(function.bridged) {
+    if _bridged.eliminateDeadAllocations(function.bridged) {
       notifyInstructionsChanged()
       return true
     }
@@ -493,6 +497,11 @@ extension Instruction {
     context.notifyInstructionsChanged()
     bridged.setOperand(index, value.bridged)
     context.notifyInstructionChanged(self)
+  }
+
+  func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedPassContext.moveInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
   }
 }
 

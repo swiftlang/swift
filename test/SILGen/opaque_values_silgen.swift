@@ -501,11 +501,11 @@ public enum EnumWithTwoSameAddressOnlyPayloads<T> {
 // CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.yes!enumelt: [[YES_BLOCK:bb[0-9]+]], 
 // CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.and!enumelt: [[AND_BLOCK:bb[0-9]+]]
 // CHECK:       [[YES_BLOCK]]([[YES_VALUE:%[^,]+]] :
-// CHECK:         [[YES_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[YES_VALUE]]
+// CHECK:         [[YES_LIFETIME:%[^,]+]] = move_value [lexical] [var_decl] [[YES_VALUE]]
 // CHECK:         [[YES_COPY:%[^,]+]] = copy_value [[YES_LIFETIME]]
 // CHECK:         store [[YES_COPY]] to [init] [[RESULT_STORAGE]]
 // CHECK:       [[AND_BLOCK]]([[AND_VALUE:%[^,]+]] :
-// CHECK:         [[AND_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[AND_VALUE]]
+// CHECK:         [[AND_LIFETIME:%[^,]+]] = move_value [lexical] [var_decl] [[AND_VALUE]]
 // CHECK:         [[AND_COPY:%[^,]+]] = copy_value [[AND_LIFETIME]]
 // CHECK:         store [[AND_COPY]] to [init] [[RESULT_STORAGE]]
 // CHECK-LABEL: } // end sil function 'EnumWithTwoSameAddressOnlyPayloads_getPayload'

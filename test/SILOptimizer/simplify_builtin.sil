@@ -383,6 +383,74 @@ bb0:
   return %4 : $Int8
 }
 
+// CHECK-LABEL: sil @string_null_pointer_check :
+// CHECK:         %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'string_null_pointer_check'
+sil @string_null_pointer_check : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_ne :
+// CHECK:         %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'string_null_pointer_check_ne'
+sil @string_null_pointer_check_ne : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_no_integer_literal :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_no_integer_literal'
+sil @string_null_pointer_check_no_integer_literal : $@convention(thin) (Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64):
+  %1 = string_literal utf8 "hello"
+  %2 = builtin "ptrtoint_Word"(%1 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = builtin "zextOrBitCast_Word_Int64"(%2 : $Builtin.Word) : $Builtin.Int64
+  %4 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_not_zero :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_not_zero'
+sil @string_null_pointer_check_not_zero : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 123
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_no_string_literal :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_no_string_literal'
+sil @string_null_pointer_check_no_string_literal : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int1 {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
 // CHECK-LABEL: sil @convert_thick_to_thin1
 // CHECK-NOT: metatype $@thick C1<Int>.Type
 // CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
@@ -490,3 +558,4 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %3 = builtin "destroyArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
   return %0 : $Builtin.RawPointer
 }
+

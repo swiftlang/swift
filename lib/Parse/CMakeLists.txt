@@ -51,11 +51,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SwiftSyntaxMacros
     swiftASTGen
   )
-
-  target_compile_definitions(swiftParse
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-  )
 endif()
 
 if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)

@@ -302,18 +302,27 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     // above as the array would be passed indirectly.
     if (isFixLifetimeUseOfArray(user, arrayValue))
       continue;
+    if (auto *MDI = dyn_cast<MarkDependenceInst>(user)) {
+      if (MDI->getBase() == arrayValue) {
+        continue;
+      }
+    }
     // Check if this is a forEach call on the array.
     if (TryApplyInst *forEachCall = isForEachUseOfArray(user, arrayValue)) {
       forEachCalls.insert(forEachCall);
       continue;
     }
-    // Recursively classify begin_borrow and copy_value uses.
+    // Recursively classify begin_borrow, copy_value, and move_value uses.
     if (BeginBorrowInst *beginBorrow = dyn_cast<BeginBorrowInst>(user)) {
       classifyUsesOfArray(beginBorrow);
       continue;
     }
     if (CopyValueInst *copyValue = dyn_cast<CopyValueInst>(user)) {
       classifyUsesOfArray(copyValue);
+      continue;
+    }
+    if (MoveValueInst *moveValue = dyn_cast<MoveValueInst>(user)) {
+      classifyUsesOfArray(moveValue);
       continue;
     }
     if (DestroyValueInst *destroyValue = dyn_cast<DestroyValueInst>(user)) {

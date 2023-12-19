@@ -28,6 +28,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -700,8 +701,8 @@ public:
           auto interfaceType = archetype->getInterfaceType();
           auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
 
-          if (contextType.getPointer() != archetype) {
-            Out << "Archetype " << archetype->getString() << "does not appear"
+          if (!contextType->isEqual(archetype)) {
+            Out << "Archetype " << archetype->getString() << " does not appear"
                 << " inside its own generic environment\n";
             Out << "Interface type: " << interfaceType.getString() << "\n";
             Out << "Contextual type: " << contextType.getString() << "\n";
@@ -802,6 +803,13 @@ public:
       if (!shouldVerify(cast<Stmt>(S)))
         return false;
 
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+        if (!shouldVerify(expansion)) {
+          return false;
+        }
+      }
+
       if (!S->getElementExpr())
         return true;
 
@@ -811,6 +819,11 @@ public:
     }
 
     void cleanup(ForEachStmt *S) {
+      if (auto *expansion =
+              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+        cleanup(expansion);
+      }
+
       if (!S->getElementExpr())
         return;
 
@@ -1019,15 +1032,33 @@ public:
       return shouldVerifyChecked(S->getSubExpr());
     }
 
-    void verifyChecked(ThrowStmt *S) {
-      Type thrownError;
-      if (!Functions.empty()) {
-        if (auto fn = AnyFunctionRef::fromDeclContext(Functions.back()))
-          thrownError = fn->getThrownErrorType();
+    DeclContext *getInnermostDC() const {
+      for (auto scope : llvm::reverse(Scopes)) {
+        if (auto dc = scope.dyn_cast<DeclContext *>())
+          return dc;
       }
 
-      if (!thrownError)
-        thrownError = checkExceptionTypeExists("throw expression");
+      return nullptr;
+    }
+
+    void verifyChecked(ThrowStmt *S) {
+      Type thrownError;
+      SourceLoc loc = S->getThrowLoc();
+      if (loc.isValid()) {
+        auto catchNode = ASTScope::lookupCatchNode(getModuleContext(), loc);
+        if (catchNode) {
+          if (auto thrown = catchNode.getThrownErrorTypeInContext(Ctx)) {
+            thrownError = *thrown;
+          } else {
+            thrownError = Ctx.getNeverType();
+          }
+        } else {
+          thrownError = checkExceptionTypeExists("throw expression");
+        }
+      } else {
+        return;
+      }
+
       checkSameType(S->getSubExpr()->getType(), thrownError, "throw operand");
       verifyCheckedBase(S);
     }
@@ -1672,7 +1703,7 @@ public:
             auto concreteLayout = concreteTy->getCanonicalType()
                                             ->getExistentialLayout();
             canBeClass = concreteLayout.getKind() == ExistentialLayout::Kind::Class
-              && !concreteLayout.containsNonObjCProtocol;
+              && !concreteLayout.containsSwiftProtocol;
           } else {
             canBeClass = false;
           }
@@ -2607,6 +2638,14 @@ public:
       // Variables must have materializable type.
       if (!var->getInterfaceType()->isMaterializable()) {
         Out << "VarDecl has non-materializable type: ";
+        var->getInterfaceType().print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      // Catch cases where there's a missing generic environment.
+      if (var->getTypeInContext()->hasError()) {
+        Out << "VarDecl is missing a Generic Environment: ";
         var->getInterfaceType().print(Out);
         Out << "\n";
         abort();

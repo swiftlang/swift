@@ -313,6 +313,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
     SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
                               AllocationInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(AllocVectorInst, alloc_vector,
+                              AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackMetadataInst, alloc_pack_metadata,
@@ -579,6 +581,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   // Aggregate Types
   SINGLE_VALUE_INST(ObjectInst, object,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(VectorInst, vector,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleInst, tuple,
                     SingleValueInstruction, None, DoesNotRelease)

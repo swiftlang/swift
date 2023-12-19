@@ -30,35 +30,7 @@ bool CompletionOverrideLookup::addAccessControl(
   if (AccessOfContext < AccessLevel::Public)
     return false;
 
-  auto Access = VD->getFormalAccess();
-  // Use the greater access between the protocol requirement and the witness.
-  // In case of:
-  //
-  //   public protocol P { func foo() }
-  //   public class B { func foo() {} }
-  //   public class C: B, P {
-  //     <complete>
-  //   }
-  //
-  // 'VD' is 'B.foo()' which is implicitly 'internal'. But as the overriding
-  // declaration, the user needs to write both 'public' and 'override':
-  //
-  //   public class C: B {
-  //     public override func foo() {}
-  //   }
-  if (Access < AccessLevel::Public &&
-      !isa<ProtocolDecl>(VD->getDeclContext())) {
-    for (auto Conformance : CurrentNominal->getAllConformances()) {
-      Conformance->getRootConformance()->forEachValueWitness(
-          [&](ValueDecl *req, Witness witness) {
-            if (witness.getDecl() == VD)
-              Access = std::max(Access,
-                                Conformance->getProtocol()->getFormalAccess());
-          });
-    }
-  }
-
-  Access = std::min(Access, AccessOfContext);
+  AccessLevel Access = std::min(VD->getFormalAccess(), AccessOfContext);
   // Only emit 'public', not needed otherwise.
   if (Access < AccessLevel::Public)
     return false;

@@ -29,7 +29,7 @@ distributed actor Worker {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+  distributed func test(x: Int) throws {
     print("executed: \(#function)")
     MainActor.assumeIsolated {
       print("assume: this distributed actor shares executor with MainActor")

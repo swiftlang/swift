@@ -159,9 +159,11 @@ bb0(%0 : @owned $C):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_replace_pointer_escape :
-// CHECK:         begin_borrow
-// CHECK:       } // end sil function 'dont_replace_pointer_escape'
+// FIXME: re-enable this test when the [pointer_escape] flag is implemented.
+//
+// HECK-LABEL: sil [ossa] @dont_replace_pointer_escape :
+// HECK:         begin_borrow
+// HECK:       } // end sil function 'dont_replace_pointer_escape'
 sil [ossa] @dont_replace_pointer_escape : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
   %1 = begin_borrow [pointer_escape] %0 : $C
@@ -218,6 +220,20 @@ bb0(%0 : @owned $S2):
   destroy_value %0: $S2
   %7 = tuple ()
   return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_crash_on_bridge_object_to_word :
+// CHECK:       bb0(%0 : @owned $Builtin.BridgeObject):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dont_crash_on_bridge_object_to_word'
+sil [ossa] @dont_crash_on_bridge_object_to_word : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = begin_borrow %0 : $Builtin.BridgeObject
+  %2 = bridge_object_to_word %1 : $Builtin.BridgeObject to $Builtin.Word
+  end_borrow %1 : $Builtin.BridgeObject
+  destroy_value %0: $Builtin.BridgeObject
+  %6 = tuple ()
+  return %6 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @dont_replace_tuple_extract :

@@ -20,6 +20,8 @@
 // RUN: %target-build-swift -I %t -L %t -lUtils %s -o %t/main %target-rpath(%t) -package-name mypkg -DTESTABLE
 // RUN: %target-run %t/main %t/%target-library-name(Utils) | %FileCheck %s
 
+// UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=ios
 // REQUIRES: executable_test
 
 //--- Utils.swift

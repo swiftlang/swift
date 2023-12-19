@@ -2146,6 +2146,8 @@ namespace {
                                           TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
+    NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
+                                                 TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2631,6 +2633,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
+
+  case TypeReprKind::ResultDependsOn:
+    return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
+                                          options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -4462,7 +4468,6 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     }
     break;
   }
-
   return result;
 }
 
@@ -4522,6 +4527,31 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   }
 
   return ArraySliceType::get(baseTy);
+}
+
+NeverNullType
+TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
+                                             TypeResolutionOptions options) {
+  // _resultDependsOn is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters.
+  if (!options.is(TypeResolverContext::FunctionInput) ||
+      options.hasBase(TypeResolverContext::SubscriptDecl) ||
+      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+
+    decltype(diag::attr_only_on_parameters) diagID;
+    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
+        options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagID = diag::attr_only_valid_on_func_or_init_params;
+    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
+      diagID = diag::attr_not_on_variadic_parameters;
+    } else {
+      diagID = diag::attr_only_on_parameters;
+    }
+
+    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, "_resultDependsOn");
+    return ErrorType::get(getASTContext());
+  }
+  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType
@@ -4999,11 +5029,6 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         continue;
       }
 
-      if (auto inverse = ty->getAs<InverseType>()) {
-        Inverses.insert(inverse->getInverseKind());
-        continue;
-      }
-
       if (ty->is<ParameterizedProtocolType>() &&
           !options.isConstraintImplicitExistential() &&
           options.getContext() != TypeResolverContext::ExistentialConstraint) {
@@ -5012,7 +5037,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         continue;
       }
 
-      if (ty->is<ProtocolCompositionType>()) {
+      if (auto pct = ty->getAs<ProtocolCompositionType>()) {
         auto layout = ty->getExistentialLayout();
         if (auto superclass = layout.explicitSuperclass)
           if (checkSuperclass(tyR->getStartLoc(), superclass))
@@ -5020,6 +5045,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         if (!layout.getProtocols().empty())
           HasProtocol = true;
 
+        Inverses.insertAll(pct->getInverses());
         Members.push_back(ty);
         continue;
       }
@@ -5166,9 +5192,20 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
-  if (auto kp = ty->getKnownProtocol())
-    if (getInvertibleProtocolKind(*kp))
-      return InverseType::get(ty);
+  if (auto kp = ty->getKnownProtocol()) {
+    if (auto kind = getInvertibleProtocolKind(*kp)) {
+
+      // Gate the '~Escapable' type behind a specific flag for now.
+      if (*kind == InvertibleProtocolKind::Escapable &&
+          !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
+        diagnoseInvalid(repr, repr->getLoc(),
+                        diag::escapable_requires_feature_flag);
+        return ErrorType::get(getASTContext());
+      }
+
+      return ProtocolCompositionType::getInverseOf(getASTContext(), *kind);
+    }
+  }
 
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());
@@ -5400,6 +5437,7 @@ public:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
+    case TypeReprKind::ResultDependsOn:
       return false;
     }
   }
@@ -5625,4 +5663,104 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   }
 
   return type;
+}
+
+
+Type ExplicitCaughtTypeRequest::evaluate(
+    Evaluator &evaluator, ASTContext *ctxPtr, CatchNode catchNode
+) const {
+  ASTContext &ctx = *ctxPtr;
+
+  // try!/try? always catch 'any Error'.
+  if (catchNode.is<AnyTryExpr *>()) {
+    return ctx.getErrorExistentialType();
+  }
+
+  // Functions
+  if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>()) {
+    TypeRepr *thrownTypeRepr = func->getThrownTypeRepr();
+
+    // If there is no explicit thrown type, check whether it throws at all.
+    if (!thrownTypeRepr) {
+      // If it throws, it throws 'any Error'.
+      if (func->hasThrows())
+        return ctx.getErrorExistentialType();
+
+      // Otherwise, 'Never'.
+      return ctx.getNeverType();
+    }
+
+    // We have an explicit thrown error type, so resolve it.
+    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+      ctx.Diags.diagnose(thrownTypeRepr->getLoc(), diag::experimental_typed_throws);
+    }
+
+    auto options = TypeResolutionOptions(TypeResolverContext::None);
+    if (func->preconcurrency())
+      options |= TypeResolutionFlags::Preconcurrency;
+
+    return TypeResolution::forInterface(func, options,
+                                        /*unboundTyOpener*/ nullptr,
+                                        PlaceholderType::get,
+                                        /*packElementOpener*/ nullptr)
+        .resolveType(thrownTypeRepr);
+  }
+
+  // Closures
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+    // Explicit thrown error type.
+    if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
+      if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+        ctx.Diags.diagnose(thrownTypeRepr->getLoc(),
+                           diag::experimental_typed_throws);
+      }
+
+      return TypeResolution::resolveContextualType(
+               thrownTypeRepr, closure,
+               TypeResolutionOptions(TypeResolverContext::None),
+               /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+               /*packElementOpener*/ nullptr);
+    }
+
+    // Explicit 'throws' implies that this throws 'any Error'.
+    if (closure->getThrowsLoc().isValid()) {
+      return ctx.getErrorExistentialType();
+    }
+
+    // Thrown error type will be inferred.
+    return Type();
+  }
+
+  // do..catch statements.
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    // A do..catch block with no explicit 'throws' annotation will infer
+    // the thrown error type.
+    if (doCatch->getThrowsLoc().isInvalid()) {
+      // Prior to typed throws, the do..catch always throws 'any Error'.
+      if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
+        return ctx.getErrorExistentialType();
+
+      return Type();
+    }
+
+    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+      ctx.Diags.diagnose(doCatch->getThrowsLoc(), diag::experimental_typed_throws);
+      return ctx.getErrorExistentialType();
+    }
+
+    auto typeRepr = doCatch->getCaughtTypeRepr();
+
+    // If there is no explicitly-specified thrown error type, it's 'any Error'.
+    if (!typeRepr) {
+      return ctx.getErrorExistentialType();
+    }
+
+    return TypeResolution::resolveContextualType(
+        typeRepr, doCatch->getDeclContext(),
+        TypeResolutionOptions(TypeResolverContext::None),
+        /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+        /*packElementOpener*/ nullptr);
+  }
+
+  llvm_unreachable("Unhandled catch node");
 }

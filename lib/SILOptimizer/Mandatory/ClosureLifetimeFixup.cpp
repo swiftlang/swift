@@ -21,6 +21,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -895,10 +896,11 @@ static SILValue tryRewriteToPartialApplyStack(
     SILBuilderWithScope builder(std::next(destroy->getIterator()));
     // This getCapturedArg hack attempts to perfectly compensate for all the
     // other hacks involved in gathering new arguments above.
+    // argValue may be 'undef'
     auto getArgToDestroy = [&](SILValue argValue) -> SILValue {
       // A MoveOnlyWrapperToCopyableValueInst may produce a trivial value. Be
       // careful not to emit an extra destroy of the original.
-      if (argValue->getType().isTrivial(argValue->getFunction()))
+      if (argValue->getType().isTrivial(destroy->getFunction()))
         return SILValue();
 
       // We may have inserted a new begin_borrow->moveonlywrapper_to_copyvalue
@@ -1481,7 +1483,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
       }
       invalidateAnalysis(analysisInvalidationKind(modifiedCFG));
     }
-    LLVM_DEBUG(getFunction()->verify(getPassManager()));
+    LLVM_DEBUG(getFunction()->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache()));
 
   }
 

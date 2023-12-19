@@ -917,14 +917,23 @@ public struct AddCompletionHandler: PeerMacro {
 
     // Drop the @addCompletionHandler attribute from the new declaration.
     let newAttributeList = funcDecl.attributes.filter {
-      guard case let .attribute(attribute) = $0,
-            let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
-            let nodeType = node.attributeName.as(IdentifierTypeSyntax.self)
-      else {
+      guard case let .attribute(attribute) = $0  else {
         return true
       }
 
-      return attributeType.name.text != nodeType.name.text
+      if let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
+         let nodeType = node.attributeName.as(IdentifierTypeSyntax.self) {
+        return attributeType.name.text != nodeType.name.text
+      }
+      if let attributeMemberType = attribute.attributeName.as(MemberTypeSyntax.self),
+         let attributeModuleName = attributeMemberType.baseType.as(IdentifierTypeSyntax.self),
+         let nodeMemberType = node.attributeName.as(MemberTypeSyntax.self),
+         let moduleName = nodeMemberType.baseType.as(IdentifierTypeSyntax.self) {
+        return attributeModuleName.name.text != moduleName.name.text ||
+               nodeMemberType.name.text != attributeMemberType.name.text
+      }
+
+      return true
     }
 
     var newFunc = funcDecl
@@ -2057,6 +2066,31 @@ extension RequiredDefaultInitMacro: MemberMacro {
   }
 }
 
+public struct SendableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if protocols.isEmpty {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(type.trimmed): Sendable {
+      }
+
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -2183,7 +2217,7 @@ public struct TracedPreambleMacro: PreambleMacro {
 }
 
 @_spi(ExperimentalLanguageFeature)
-public struct Log2PreambleMacro: PreambleMacro {
+public struct LoggerMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingPreambleFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
@@ -2203,16 +2237,19 @@ public struct Log2PreambleMacro: PreambleMacro {
     let passedArgs = paramNames.map { "\($0): \\(\($0))" }.joined(separator: ", ")
 
     let entry: CodeBlockItemSyntax = """
-      log2("Entering \(funcBaseName)(\(raw: passedArgs))")
+      logger.log(entering: "\(funcBaseName)(\(raw: passedArgs))")
       """
 
     let argLabels = paramNames.map { "\($0):" }.joined()
 
     let exit: CodeBlockItemSyntax = """
-      log2("Exiting \(funcBaseName)(\(raw: argLabels))")
+      logger.log(exiting: "\(funcBaseName)(\(raw: argLabels))")
       """
 
     return [
+      """
+      let logger = Logger()
+      """,
       entry,
       """
       defer {
@@ -2221,4 +2258,19 @@ public struct Log2PreambleMacro: PreambleMacro {
       """,
     ]
   }
+}
+
+public struct AddMemberPeersMacro: MemberAttributeMacro {
+    public static func expansion(of node: AttributeSyntax, attachedTo declaration: some DeclGroupSyntax, providingAttributesFor member: some DeclSyntaxProtocol, in context: some MacroExpansionContext) throws -> [AttributeSyntax] {
+        ["@_AddPeer"]
+    }
+}
+
+public struct _AddPeerMacro: PeerMacro {
+    public static func expansion<Decl: DeclSyntaxProtocol>(of node: AttributeSyntax, providingPeersOf declaration: Decl, in context: some MacroExpansionContext) throws -> [DeclSyntax] {
+        guard let name = declaration.as(VariableDeclSyntax.self)?.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else {
+            return []
+        }
+        return ["static let \(raw: name)_special = 41"]
+    }
 }

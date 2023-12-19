@@ -41,6 +41,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -206,8 +207,10 @@ static void checkInheritanceClause(
       auto layout = inheritedTy->getExistentialLayout();
 
       // An inverse on an extension is an error.
-      if (isa<ExtensionDecl>(decl) && inheritedTy->is<InverseType>())
-        decl->diagnose(diag::inverse_extension, inheritedTy);
+      if (isa<ExtensionDecl>(decl))
+        if (auto pct = inheritedTy->getAs<ProtocolCompositionType>())
+          if (!pct->getInverses().empty())
+            decl->diagnose(diag::inverse_extension, inheritedTy);
 
       // Subclass existentials are not allowed except on classes and
       // non-@objc protocols.
@@ -2011,15 +2014,25 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (otherProto == proto)
       continue;
 
+    // For every invertible protocol IP and any protocol 'P', there is an
+    // implied requirement 'Self: IP', unless it was suppressed via
+    // `Self: ~IP`. So if this suppression annotation exists yet IP was
+    // implied anyway, emit a diagnostic.
     if (EnabledNoncopyableGenerics) {
-      // For any protocol 'P', there is an implied requirement 'Self: Copyable',
-      // unless it was suppressed via `Self: ~Copyable`. So if this suppression
-      // annotation exists yet Copyable was implied anyway, emit a diagnostic.
-      if (otherProto->isSpecificProtocol(KnownProtocolKind::Copyable))
-        if (!proto->canBeNoncopyable())
-          continue; // no ~Copyable annotation
+      if (auto kp = otherProto->getKnownProtocolKind()) {
+        if (auto ip = getInvertibleProtocolKind(*kp)) {
+          auto inverse = proto->getMarking(*ip).getInverse();
+          if (!inverse.isPresent())
+            continue; // no ~IP annotation
 
-      // TODO(kavon): emit tailored error diagnostic to remove the ~Copyable
+          auto &Diags = proto->getASTContext().Diags;
+          Diags.diagnose(inverse.getLoc(),
+                         diag::inverse_generic_but_also_conforms,
+                         proto->getSelfInterfaceType(),
+                         getProtocolName(*kp));
+          continue;
+        }
+      }
     }
 
     // SIMDScalar in the standard library currently emits this warning for:
@@ -2343,6 +2356,7 @@ public:
     (void) VD->getPropertyWrapperAuxiliaryVariables();
     (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
+    (void) getActorIsolation(VD);
 
     // Visit auxiliary decls first
     VD->visitAuxiliaryDecls([&](VarDecl *var) {
@@ -3566,6 +3580,8 @@ public:
         reason.setAttrInvalid();
       }
     }
+
+    TypeChecker::checkObjCImplementation(FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -4005,6 +4021,8 @@ public:
 
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
+
+    TypeChecker::checkObjCImplementation(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {

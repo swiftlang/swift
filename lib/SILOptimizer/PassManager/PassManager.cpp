@@ -374,7 +374,7 @@ void swift::executePassPipelinePlan(SILModule *SM,
 
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
                                irgen::IRGenModule *IRMod)
-    : Mod(M), IRMod(IRMod),
+    : Mod(M), IRMod(IRMod), irgen(nullptr),
       swiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define SIL_ANALYSIS(NAME) \
@@ -572,7 +572,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                  SILVerifyAroundPass.end(),
                                                  MatchFun))) {
-    F->verify(this);
+    F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
   }
 
@@ -667,7 +667,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   if (getOptions().VerifyAll &&
       (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
-    F->verify(this);
+    F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses(F);
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
@@ -676,7 +676,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
         (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                    SILVerifyAroundPass.end(),
                                                    MatchFun))) {
-      F->verify(this);
+      F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
     }
   }
@@ -782,7 +782,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
       (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                  SILVerifyAroundPass.end(),
                                                  MatchFun))) {
-    Mod->verify(this);
+    Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
   }
 
@@ -816,7 +816,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 
   if (Options.VerifyAll &&
       (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
-    Mod->verify(this);
+    Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses();
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
@@ -825,7 +825,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
         (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
                                                    SILVerifyAroundPass.end(),
                                                    MatchFun))) {
-      Mod->verify(this);
+      Mod->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
       verifyAnalyses();
     }
   }
@@ -901,6 +901,27 @@ void SILPassManager::execute() {
   }
 }
 
+irgen::IRGenModule *SILPassManager::getIRGenModule() {
+  // We need an IRGenModule to get the actual sizes from type lowering.
+  // Creating an IRGenModule involves some effort, let's cache it for the
+  // whole pass.
+  if (IRMod == nullptr) {
+    SILModule *module = getModule();
+
+    auto *irgenOpts = module->getIRGenOptionsOrNull();
+    if (!irgenOpts)
+      return nullptr;
+
+    if (irgen == nullptr)
+      irgen = new irgen::IRGenerator(*irgenOpts, *module);
+    auto targetMachine = irgen->createTargetMachine();
+    assert(targetMachine && "failed to create target");
+    IRMod = new irgen::IRGenModule(*irgen, std::move(targetMachine));
+  }
+
+  return IRMod;
+}
+
 /// D'tor.
 SILPassManager::~SILPassManager() {
 
@@ -940,6 +961,16 @@ SILPassManager::~SILPassManager() {
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
   }
+
+  if (irgen) {
+    // If irgen is set, we also own the IRGenModule
+    if (IRMod) {
+      delete IRMod;
+      IRMod = nullptr;
+    }
+    delete irgen;
+    irgen = nullptr;
+  }
 }
 
 void SILPassManager::notifyOfNewFunction(SILFunction *F, SILTransform *T) {
@@ -978,7 +1009,7 @@ void SILPassManager::addFunctionToWorklist(SILFunction *F,
     // this function to the pass manager to ensure that we perform this
     // verification.
     if (getOptions().VerifyAll) {
-      F->verify(this);
+      F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     }
 
     NewLevel = DerivationLevels[DerivedFrom] + 1;
@@ -1382,22 +1413,7 @@ void SwiftPassInvocation::finishedInstructionPassRun() {
 }
 
 irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
-  // We need an IRGenModule to get the actual sizes from type lowering.
-  // Creating an IRGenModule involves some effort, let's cache it for the
-  // whole pass.
-  if (irgenModule == nullptr && irgen == nullptr) {
-    SILModule *module = getPassManager()->getModule();
-
-    auto *irgenOpts = module->getIRGenOptionsOrNull();
-    if (!irgenOpts)
-      return nullptr;
-
-    irgen = new irgen::IRGenerator(*irgenOpts, *module);
-    auto targetMachine = irgen->createTargetMachine();
-    assert(targetMachine && "failed to create target");
-    irgenModule = new irgen::IRGenModule(*irgen, std::move(targetMachine));
-  }
-  return irgenModule;
+  return passManager->getIRGenModule();
 }
 
 void SwiftPassInvocation::endPass() {
@@ -1430,16 +1446,7 @@ void SwiftPassInvocation::endTransformFunction() {
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
 }
 
-SwiftPassInvocation::~SwiftPassInvocation() {
-  if (irgenModule) {
-    delete irgenModule;
-    irgenModule = nullptr;
-  }
-  if (irgen) {
-    delete irgen;
-    irgen = nullptr;
-  }
-}
+SwiftPassInvocation::~SwiftPassInvocation() {}
 
 //===----------------------------------------------------------------------===//
 //                           OptimizerBridging

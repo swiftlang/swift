@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -316,14 +317,25 @@ void SpecializedFunction::computeTypeReplacements(const ApplySite &apply) {
     auto resultType =
         fn->getConventions().getSILResultType(fn->getTypeExpansionContext());
     SmallVector<SILResultInfo, 4> indirectResults(substConv.getIndirectSILResults());
+    SmallVector<SILResultInfo, 4> targetIndirectResults(
+        fn->getConventions().getIndirectSILResults());
 
     for (auto pair : llvm::enumerate(apply.getArgumentOperands())) {
       if (pair.index() < substConv.getSILArgIndexOfFirstParam()) {
         auto formalIndex = substConv.getIndirectFormalResultIndexForSILArg(pair.index());
         auto fnResult = indirectResults[formalIndex];
         if (fnResult.isFormalIndirect()) {
-          // FIXME: properly get the type
-          auto indirectResultTy = M.getASTContext().getAnyObjectType();  //fnResult.getReturnValueType(M, fnType, expansion);
+          CanType indirectResultTy;
+          if (targetIndirectResults.size() > formalIndex) {
+            indirectResultTy =
+                targetIndirectResults[formalIndex].getReturnValueType(
+                    M, fnType, expansion);
+          } else {
+            indirectResultTy =
+                fnType->getResults()[formalIndex].getReturnValueType(M, fnType,
+                                                                     expansion);
+          }
+
           addIndirectResultType(formalIndex, indirectResultTy);
         }
 
@@ -2967,7 +2979,7 @@ bool usePrespecialized(
 
     if (specializedReInfo.getSpecializedType() != reInfo.getSpecializedType()) {
       SmallVector<Type, 4> newSubs;
-      auto specializedSig = SA->getSpecializedSignature();
+      auto specializedSig = SA->getUnerasedSpecializedSignature();
 
       auto erasedParams = SA->getTypeErasedParams();
       if(!ctxt.LangOpts.hasFeature(Feature::LayoutPrespecialization) || erasedParams.empty()) {
@@ -2985,21 +2997,65 @@ bool usePrespecialized(
         });
 
         auto layout = specializedSig->getLayoutConstraint(genericParam);
-
-        if (!erased || !layout || !layout->isClass()) {
-          newSubs.push_back(entry.value());
-        } else if (!entry.value()->isAnyClassReferenceType() ||
-                   entry.value()->isAnyExistentialType()) {
-          // non-reference or existential type can't be applied
-          break;
-        } else if (!specializedSig->getRequiredProtocols(genericParam)
-                        .empty()) {
+        if (!specializedSig->getRequiredProtocols(genericParam).empty()) {
           llvm::report_fatal_error("Unexpected protocol requirements");
-        } else if (layout->isNativeClass()) {
-          newSubs.push_back(genericParam->getASTContext().TheNativeObjectType);
-          score += 1;
+        }
+
+        if (!erased || !layout ||
+            (!layout->isClass() && !layout->isBridgeObject() &&
+             !layout->isFixedSizeTrivial() && !layout->isTrivialStride())) {
+          newSubs.push_back(entry.value());
+          continue;
+        }
+
+        auto lowered = refF->getLoweredType(entry.value());
+        while (auto singleton = lowered.getSingletonAggregateFieldType(
+                   refF->getModule(), refF->getResilienceExpansion())) {
+          lowered = singleton;
+        }
+
+        if (lowered.isBuiltinBridgeObject() && layout->isBridgeObject()) {
+          newSubs.push_back(genericParam->getASTContext().TheBridgeObjectType);
+        } else if (lowered.hasRetainablePointerRepresentation()) {
+          if (layout->isNativeClass()) {
+            newSubs.push_back(
+                genericParam->getASTContext().TheNativeObjectType);
+            score += 1;
+          } else {
+            newSubs.push_back(genericParam->getASTContext().getAnyObjectType());
+          }
+        } else if (layout->isFixedSizeTrivial() && lowered.isTrivial(refF)) {
+          auto *IGM = funcBuilder.getIRGenModule();
+          auto &ti = IGM->getTypeInfo(lowered);
+          auto fixedSize =
+              ti.buildTypeLayoutEntry(*IGM, lowered, false)->fixedSize(*IGM);
+
+          if (fixedSize &&
+              fixedSize->getValueInBits() == layout->getTrivialSizeInBits()) {
+            newSubs.push_back(CanType(
+                BuiltinIntegerType::get(layout->getTrivialSizeInBits(),
+                                        genericParam->getASTContext())));
+          }
+        } else if (layout->isTrivialStride() && lowered.isTrivial(refF)) {
+          auto *IGM = funcBuilder.getIRGenModule();
+          auto &ti = IGM->getTypeInfo(lowered);
+          auto *typeLayout = ti.buildTypeLayoutEntry(*IGM, lowered, false);
+          auto fixedSize = typeLayout->fixedSize(*IGM);
+          if (fixedSize) {
+            auto stride = fixedSize->roundUpToAlignment(
+                *typeLayout->fixedAlignment(*IGM));
+            if (stride.isZero())
+              stride = irgen::Size(1);
+
+            if (stride.getValueInBits() == layout->getTrivialStrideInBits()) {
+              newSubs.push_back(CanType(
+                  BuiltinIntegerType::get(layout->getTrivialStrideInBits(),
+                                          genericParam->getASTContext())));
+            }
+          }
         } else {
-          newSubs.push_back(genericParam->getASTContext().getAnyObjectType());
+          // no match
+          break;
         }
       }
 

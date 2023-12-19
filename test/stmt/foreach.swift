@@ -316,3 +316,18 @@ do {
     }
   }
 }
+
+// SE-0408
+do {
+  func variadic<each T: Collection>(ts: repeat each T) {
+    for t in repeat each ts where !ts.isEmpty {}
+    // expected-error@-1 {{'where' clause in pack iteration is not supported}}
+
+    func test(_: () -> Void) {}
+
+    test {
+      for t in repeat each ts where !ts.isEmpty {}
+      // expected-error@-1 {{'where' clause in pack iteration is not supported}}
+    }
+  }
+}

@@ -215,6 +215,12 @@ bool replayCachedCompilerOutputs(
               Outputs.try_emplace(ID, File);
             });
 
+    // If this input doesn't produce any outputs, don't try to look up cache.
+    // This can be a standalone emitModule action that only one input produces
+    // output.
+    if (Outputs.empty())
+      return;
+
     // Add cached diagnostic entry for lookup. Output path doesn't matter here.
     Outputs.try_emplace(file_types::ID::TY_CachedDiagnostics,
                         "<cached-diagnostics>");
@@ -222,7 +228,23 @@ bool replayCachedCompilerOutputs(
     return replayOutputsForInputFile(InputPath, Outputs);
   };
 
-  llvm::for_each(InputsAndOutputs.getAllInputs(), replayOutputFromInput);
+  // If there are primary inputs, look up only the primary input files.
+  // Otherwise, prepare to do cache lookup for all inputs.
+  if (InputsAndOutputs.hasPrimaryInputs())
+    InputsAndOutputs.forEachPrimaryInput([&](const InputFile &File) {
+      replayOutputFromInput(File);
+      return false;
+    });
+  else
+    llvm::for_each(InputsAndOutputs.getAllInputs(), replayOutputFromInput);
+
+  // If there is not diagnostic output, this is a job that produces no output
+  // and only diagnostics, like `typecheck-module-from-interface`, look up
+  // diagnostics from first file.
+  if (!DiagnosticsOutput)
+    replayOutputsForInputFile(
+        InputsAndOutputs.getFirstOutputProducingInput().getFileName(),
+        {{file_types::ID::TY_CachedDiagnostics, "<cached-diagnostics>"}});
 
   if (!CanReplayAllOutput)
     return false;

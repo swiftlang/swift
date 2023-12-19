@@ -1849,6 +1849,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_stable_abi_EQ)) {
+    OI.SanitizerUseStableABI =
+        parseSanitizerUseStableABI(A, OI.SelectedSanitizers, Diags);
+  }
+
   if (TC.getTriple().isOSWindows()) {
     if (const Arg *A = Args.getLastArg(options::OPT_libc)) {
       OI.RuntimeVariant =
@@ -2348,7 +2353,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
               file_types::TY_PrivateSwiftModuleInterfaceFile));
     }
-    if (Args.hasArgNoClaim(options::OPT_emit_package_module_interface_path)) {
+    if (Args.hasArg(options::OPT_package_name) &&
+        Args.hasArgNoClaim(options::OPT_emit_package_module_interface_path)) {
       TopLevelActions.push_back(
           C.createAction<VerifyModuleInterfaceJobAction>(MergeModuleAction,
               file_types::TY_PackageSwiftModuleInterfaceFile));
@@ -2995,7 +3001,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseModuleInterfacePath(C, JA, workingDirectory, Buf,
       file_types::TY_PrivateSwiftModuleInterfaceFile, Output.get());
 
-  if (C.getArgs().hasArg(options::OPT_emit_package_module_interface_path))
+  if (C.getArgs().hasArg(options::OPT_package_name) &&
+      C.getArgs().hasArg(options::OPT_emit_package_module_interface_path))
     chooseModuleInterfacePath(C, JA, workingDirectory, Buf,
       file_types::TY_PackageSwiftModuleInterfaceFile, Output.get());
 

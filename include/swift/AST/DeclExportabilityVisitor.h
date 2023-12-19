@@ -149,11 +149,8 @@ public:
     return true;                                                               \
   }
   UNREACHABLE(Module);
-  UNREACHABLE(TopLevelCode);
-  UNREACHABLE(PoundDiagnostic);
   UNREACHABLE(Missing);
   UNREACHABLE(MissingMember);
-  UNREACHABLE(MacroExpansion);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
 
@@ -167,11 +164,14 @@ public:
   // context has already been checked.
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
+  UNINTERESTING(TopLevelCode);
   UNINTERESTING(IfConfig);
   UNINTERESTING(Import);
+  UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);
+  UNINTERESTING(MacroExpansion);
 
 #undef UNINTERESTING
 };

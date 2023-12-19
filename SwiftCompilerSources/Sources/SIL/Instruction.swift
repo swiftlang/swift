@@ -841,8 +841,7 @@ final public class RefToBridgeObjectInst : SingleValueInstruction, ForwardingIns
 final public class BridgeObjectToRefInst : SingleValueInstruction,
                                            ConversionInstruction {}
 
-final public class BridgeObjectToWordInst : SingleValueInstruction,
-                                           ConversionInstruction {}
+final public class BridgeObjectToWordInst : SingleValueInstruction {}
 
 public typealias AccessKind = BridgedInstruction.AccessKind
 
@@ -881,7 +880,6 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
   public var borrowedValue: Value { operand.value }
 
   public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
-  public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
@@ -974,6 +972,9 @@ final public class ObjectInst : SingleValueInstruction {
   }
 }
 
+final public class VectorInst : SingleValueInstruction {
+}
+
 final public class TuplePackExtractInst: SingleValueInstruction, ForwardingInstruction {
   public var indexOperand: Operand { operands[0] }
   public var tupleOperand: Operand { operands[1] }
@@ -999,6 +1000,10 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var debugVariable: DebugVariable {
     return bridged.AllocStack_getVarInfo()
   }
+}
+
+final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
+  public var capacity: Value { operand.value }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {

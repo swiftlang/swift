@@ -35,13 +35,6 @@ if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swiftDriverTool clang-resource-headers)
 endif()
 
-if (SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftDriverTool
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-  )
-endif()
-
 set_swift_llvm_is_available(swiftDriverTool)
 
 set(LLVM_TARGET_DEFINITIONS SwiftCacheToolOptions.td)

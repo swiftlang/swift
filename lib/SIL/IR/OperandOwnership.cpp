@@ -128,6 +128,7 @@ SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
 SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 SHOULD_NEVER_VISIT_INST(TestSpecification)
 SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
+SHOULD_NEVER_VISIT_INST(Vector)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -148,6 +149,7 @@ OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
 OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
+OPERAND_OWNERSHIP(TrivialUse, AllocVector)
 OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
 OPERAND_OWNERSHIP(TrivialUse, MoveOnlyWrapperToCopyableAddr)
 OPERAND_OWNERSHIP(TrivialUse, CopyableToMoveOnlyWrapperAddr)
@@ -712,6 +714,9 @@ struct OperandOwnershipBuiltinClassifier
 #include "swift/AST/Builtins.def"
 
   OperandOwnership check(BuiltinInst *bi) { return visit(bi); }
+
+  OperandOwnership visitCreateAsyncTask(BuiltinInst *bi, StringRef attr,
+                                        int operationIndex);
 };
 
 } // end anonymous namespace
@@ -834,6 +839,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SSubOver)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StackAlloc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnprotectedStackAlloc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StackDealloc)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocVector)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToSCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Expect)
@@ -873,6 +879,8 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
 OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
                                                               StringRef) {
   if (bi->getFunction()->getConventions().useLoweredAddresses()) {
@@ -904,25 +912,44 @@ OperandOwnershipBuiltinClassifier
 
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;
+const int PARAMETER_INDEX_CREATE_ASYNC_TASK_WITH_EXECUTOR_FUNCTION = 3;
+const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION = 4;
 
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
-                                                        StringRef attr) {
+OperandOwnership OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(
+    BuiltinInst *bi, StringRef attr, int paramIndex) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION))
+  if (&op == &bi->getOperandRef(paramIndex))
     return OperandOwnership::DestroyingConsume;
 
   return OperandOwnership::InstantaneousUse;
 }
 
 OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
+                                                        StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION);
+}
+
+OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroup(BuiltinInst *bi,
                                                                StringRef attr) {
-  // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION))
-    return OperandOwnership::DestroyingConsume;
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION);
+}
 
-  return OperandOwnership::InstantaneousUse;
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskWithExecutor(
+    BuiltinInst *bi, StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_WITH_EXECUTOR_FUNCTION);
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroupWithExecutor(
+    BuiltinInst *bi, StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION);
 }
 
 OperandOwnership OperandOwnershipBuiltinClassifier::
@@ -969,6 +996,7 @@ BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)
 // ownership should be 'TrivialUse'.
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, ConvertTaskToJob)
 
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinaryTaskExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinarySerialExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildComplexEqualitySerialExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDefaultActorExecutorRef)

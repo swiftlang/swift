@@ -1633,6 +1633,9 @@ private:
       } else if (Mangled.nextIf('T')) {
         kind = Node::Kind::Identifier;
         name = "T";
+      } else if (Mangled.nextIf('B')) {
+        kind = Node::Kind::Identifier;
+        name = "B";
       } else if (Mangled.nextIf('E')) {
         kind = Node::Kind::Identifier;
         if (!demangleNatural(size, depth + 1))
@@ -1661,6 +1664,11 @@ private:
         if (!demangleNatural(size, depth + 1))
           return nullptr;
         name = "m";
+      } else if (Mangled.nextIf('S')) {
+        kind = Node::Kind::Identifier;
+        if (!demangleNatural(size, depth + 1))
+          return nullptr;
+        name = "S";
       } else {
         return nullptr;
       }

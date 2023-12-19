@@ -522,18 +522,6 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
     endif()
 
-    # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
-    # to the linker command line.
-    set(swift_ast_path_flags " -Wl")
-    get_property(modules GLOBAL PROPERTY swift_compiler_modules)
-    foreach(module ${modules})
-      get_target_property(module_file "SwiftModule${module}" "module_file")
-      string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
-    endforeach()
-
-    set_property(TARGET ${target} APPEND_STRING PROPERTY
-                 LINK_FLAGS ${swift_ast_path_flags})
-
     # Workaround for a linker crash related to autolinking: rdar://77839981
     set_property(TARGET ${target} APPEND_STRING PROPERTY
                  LINK_FLAGS " -lobjc ")
@@ -612,6 +600,9 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           set(swift_runtime_rpath "${host_lib_dir}")
         endif()
       endif()
+    endif()
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND SWIFT_USE_LINKER STREQUAL "lld")
+      target_link_options(${target} PRIVATE "SHELL:-Xlinker -z -Xlinker nostart-stop-gc")
     endif()
   endif()
 

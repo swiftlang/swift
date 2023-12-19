@@ -134,3 +134,17 @@ do {
   // CHECK: 42
   test(v: S(i: 42), \.i)
 }
+
+do {
+  @dynamicMemberLookup
+  struct Test<T> {
+    var obj: T
+
+    subscript<U>(dynamicMember member: KeyPath<T, U> & Sendable) -> U {
+      get { obj[keyPath: member] }
+    }
+  }
+
+  // CHECK: 5
+  print(Test(obj: "Hello").utf8.count)
+}

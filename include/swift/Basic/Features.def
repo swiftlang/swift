@@ -82,13 +82,17 @@ LANGUAGE_FEATURE(BuiltinHopToActor, 0, "Builtin.HopToActor", true)
 LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins", true)
 LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
 LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true)
+LANGUAGE_FEATURE(BuiltinBuildTaskExecutor, 0, "TaskExecutor-building builtins", true)
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
 LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins", true)
 LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin", true)
-LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
+LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "Task create in task group builtin with extra flags", true)
+LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in task group builtin with extra flags", true)
+LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create builtin with extra executor preference", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
 LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc", true)
+LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector", true)
 LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
 LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf", true)
 LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe", true)
@@ -115,12 +119,15 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
+UPCOMING_FEATURE(CompleteConcurrency, 0337, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
-UPCOMING_FEATURE(ExistentialAny, 335, 6)
+UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
 UPCOMING_FEATURE(FullTypedThrows, 413, 6)
+
+UPCOMING_FEATURE(ExistentialAny, 335, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -148,7 +155,6 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialConsumption, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
-EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
@@ -251,7 +257,7 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
-EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
+EXPERIMENTAL_FEATURE(NonescapableTypes, false)
 
 /// Enable the `@_extern` attribute.
 EXPERIMENTAL_FEATURE(Extern, true)
@@ -265,6 +271,15 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
+
+/// Enable bitwise-copyable feature.
+EXPERIMENTAL_FEATURE(BitwiseCopyable, true)
+
+/// Enables the FixedArray data type.
+EXPERIMENTAL_FEATURE(FixedArrays, true)
+
+// Group Main Actor Isolation Errors by Scope
+EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

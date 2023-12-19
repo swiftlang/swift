@@ -2,6 +2,7 @@ let foo: Int = 12
 let negfoo = -foo
 print("opposite of \(foo) is \(negfoo)")
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=1:5 -new-name bar >> %t.result/def.swift

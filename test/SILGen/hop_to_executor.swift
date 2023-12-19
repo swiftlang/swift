@@ -219,14 +219,15 @@ actor BlueActorImpl {
 // CHECK:     bb0([[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
 // CHECK:       hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK:       [[RED:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@thick RedActorImpl.Type) -> @owned RedActorImpl
-// CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[RED]] : $RedActorImpl
+// CHECK:       [[REDMOVE:%[0-9]+]] = move_value [lexical] [var_decl] [[RED]] : $RedActorImpl
+// CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [[REDMOVE]] : $RedActorImpl
 // CHECK:       [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:       [[METH:%[0-9]+]] = class_method [[REDBORROW]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
 // CHECK:       hop_to_executor [[REDBORROW]] : $RedActorImpl
 // CHECK-NEXT:  = apply [[METH]]([[INTARG]], [[REDBORROW]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
 // CHECK-NEXT:  hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK:       end_borrow [[REDBORROW]] : $RedActorImpl
-// CHECK:       destroy_value [[RED]] : $RedActorImpl
+// CHECK:       destroy_value [[REDMOVE]] : $RedActorImpl
 // CHECK: } // end sil function '$s4test13BlueActorImplC14createAndGreetyyYaF'
   func createAndGreet() async {
     let red = RedActorImpl()  // <- key difference from `poke` is local construction of the actor

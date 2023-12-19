@@ -12,71 +12,63 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftSyntax
+@_spi(RawSyntax) import SwiftSyntax
 
-extension BridgedSourceLoc: ExpressibleByNilLiteral {
+protocol BridgedNullable: ExpressibleByNilLiteral {
+  associatedtype RawPtr
+  init(raw: RawPtr?)
+}
+extension BridgedNullable {
   public init(nilLiteral: ()) {
     self.init(raw: nil)
   }
 }
 
-extension BridgedIdentifier: ExpressibleByNilLiteral {
-  public init(nilLiteral: ()) {
-    self.init(raw: nil)
-  }
-}
+extension BridgedSourceLoc: BridgedNullable {}
+extension BridgedIdentifier: BridgedNullable {}
+extension BridgedNullableExpr: BridgedNullable {}
+extension BridgedNullableStmt: BridgedNullable {}
+extension BridgedNullableTypeRepr: BridgedNullable {}
+extension BridgedNullablePattern: BridgedNullable {}
+extension BridgedNullableGenericParamList: BridgedNullable {}
+extension BridgedNullableTrailingWhereClause: BridgedNullable {}
+extension BridgedNullableParameterList: BridgedNullable {}
+extension BridgedNullablePatternBindingInitializer: BridgedNullable {}
 
 /// Protocol that declares that there's a "Nullable" variation of the type.
 ///
 /// E.g. BridgedExpr vs BridgedNullableExpr.
-protocol HasNullable {
-  associatedtype Nullable
-
-  /// Convert an `Optional<Self>` to `Nullable`.
-  static func asNullable(_ node: Self?) -> Nullable
+protocol BridgedHasNullable {
+  associatedtype Nullable: BridgedNullable
+  var raw: Nullable.RawPtr { get }
 }
-
-extension Optional where Wrapped: HasNullable {
+extension Optional where Wrapped: BridgedHasNullable {
   /// Convert an Optional to Nullable variation of the wrapped type.
   var asNullable: Wrapped.Nullable {
-    Wrapped.asNullable(self)
+    Wrapped.Nullable(raw: self?.raw)
   }
 }
 
-extension BridgedStmt: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableStmt {
-    .init(raw: node?.raw)
-  }
+extension BridgedStmt: BridgedHasNullable {
+  typealias Nullable = BridgedNullableStmt
 }
-
-extension BridgedExpr: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableExpr {
-    .init(raw: node?.raw)
-  }
+extension BridgedExpr: BridgedHasNullable {
+  typealias Nullable = BridgedNullableExpr
 }
-
-extension BridgedTypeRepr: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableTypeRepr {
-    .init(raw: node?.raw)
-  }
+extension BridgedTypeRepr: BridgedHasNullable {
+  typealias Nullable = BridgedNullableTypeRepr
 }
-
-extension BridgedGenericParamList: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableGenericParamList {
-    .init(raw: node?.raw)
-  }
+extension BridgedGenericParamList: BridgedHasNullable {
+  typealias Nullable = BridgedNullableGenericParamList
 }
-
-extension BridgedTrailingWhereClause: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableTrailingWhereClause {
-    .init(raw: node?.raw)
-  }
+extension BridgedTrailingWhereClause: BridgedHasNullable {
+  typealias Nullable = BridgedNullableTrailingWhereClause
 }
-
-extension BridgedParameterList: HasNullable {
-  static func asNullable(_ node: Self?) -> BridgedNullableParameterList {
-    .init(raw: node?.raw)
-  }
+extension BridgedParameterList: BridgedHasNullable {
+  typealias Nullable = BridgedNullableParameterList
+}
+extension BridgedPatternBindingInitializer: BridgedHasNullable {
+  typealias Nullable = BridgedNullablePatternBindingInitializer
 }
 
 public extension BridgedSourceLoc {
@@ -87,13 +79,6 @@ public extension BridgedSourceLoc {
   ) {
     precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
     self = BridgedSourceLoc(raw: buffer.baseAddress!).advanced(by: position.utf8Offset)
-  }
-}
-
-extension BridgedSourceRange {
-  @inline(__always)
-  init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
-    self.init(start: startToken.bridgedSourceLoc(in: astgen), end: endToken.bridgedSourceLoc(in: astgen))
   }
 }
 
@@ -109,6 +94,12 @@ extension String {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
+  }
+}
+
+extension SyntaxText {
+  var bridged: BridgedStringRef {
+    BridgedStringRef(data: self.baseAddress, count: self.count)
   }
 }
 
@@ -143,13 +134,20 @@ extension BridgedStringRef {
   }
 }
 
+extension BridgedStringRef: ExpressibleByStringLiteral {
+  public init(stringLiteral str: StaticString) {
+    self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
+  }
+}
+
 extension SyntaxProtocol {
   /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
   @inline(__always)
   func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
-    return BridgedSourceLoc(at: self.positionAfterSkippingLeadingTrivia, in: astgen.base)
+    astgen.generateSourceLoc(self)
   }
 }
 
@@ -157,13 +155,10 @@ extension Optional where Wrapped: SyntaxProtocol {
   /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
   @inline(__always)
   func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
-    guard let self else {
-      return nil
-    }
-
-    return self.bridgedSourceLoc(in: astgen)
+    astgen.generateSourceLoc(self)
   }
 }
 
@@ -171,31 +166,30 @@ extension TokenSyntax {
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext`.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifier(token:)")
   @inline(__always)
   func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
-    var text = self.text
-    return text.withBridgedString { bridged in
-      astgen.ctx.getIdentifier(bridged)
-    }
+    astgen.generateIdentifier(self)
   }
 
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
   /// source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
   @inline(__always)
   func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
-    return (self.bridgedIdentifier(in: astgen), self.bridgedSourceLoc(in: astgen))
+    astgen.generateIdentifierAndSourceLoc(self)
   }
 
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
   /// source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
   @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> BridgedIdentifierAndSourceLoc {
-    let (name, nameLoc) = self.bridgedIdentifierAndSourceLoc(in: astgen)
-    return .init(name: name, nameLoc: nameLoc)
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> BridgedLocatedIdentifier {
+    astgen.generateLocatedIdentifier(self)
   }
 }
 
@@ -203,25 +197,27 @@ extension Optional<TokenSyntax> {
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext`.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifier(token:)")
   @inline(__always)
   func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
-    guard let self else {
-      return nil
-    }
-
-    return self.bridgedIdentifier(in: astgen)
+    astgen.generateIdentifier(self)
   }
 
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
   /// source buffer provided by `astgen` excluding leading trivia.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
+  @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
   @inline(__always)
   func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
-    guard let self else {
-      return (nil, nil)
-    }
+    astgen.generateIdentifierAndSourceLoc(self)
+  }
+}
 
-    return self.bridgedIdentifierAndSourceLoc(in: astgen)
+extension BridgedSourceRange {
+  @available(*, deprecated, message: "use ASTContext.bridgedSourceRange(startToken:endToken:)")
+  @inline(__always)
+  init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
+    self = astgen.generateSourceRange(start: startToken, end: endToken)
   }
 }

@@ -1449,36 +1449,12 @@ void SILGenFunction::emitProlog(
 }
 
 SILValue SILGenFunction::emitMainExecutor(SILLocation loc) {
-  // Get main executor
-  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
-  if (!getMainExecutorFuncDecl) {
-    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
-    // up instead of crashing:
-    // @available(SwiftStdlib 5.1, *)
-    // @_silgen_name("swift_task_getMainExecutor")
-    // internal func _getMainExecutor() -> Builtin.Executor
-    auto &ctx = getASTContext();
+  auto &ctx = getASTContext();
+  auto builtinName = ctx.getIdentifier(
+      getBuiltinName(BuiltinValueKind::BuildMainActorExecutorRef));
+  auto resultType = SILType::getPrimitiveObjectType(ctx.TheExecutorType);
 
-    ParameterList *emptyParams = ParameterList::createEmpty(ctx);
-    getMainExecutorFuncDecl = FuncDecl::createImplicit(
-        ctx, StaticSpellingKind::None,
-        DeclName(
-            ctx,
-            DeclBaseName(ctx.getIdentifier("_getMainExecutor")),
-            /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
-        emptyParams, ctx.TheExecutorType,
-        getModule().getSwiftModule());
-    getMainExecutorFuncDecl->getAttrs().add(
-        new (ctx) SILGenNameAttr("swift_task_getMainExecutor", /*raw*/ false,
-                                 /*implicit*/ true));
-  }
-
-  auto fn = SGM.getFunction(
-      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
-      NotForDefinition);
-  SILValue fnRef = B.createFunctionRefFor(loc, fn);
-  return B.createApply(loc, fnRef, {}, {});
+  return B.createBuiltin(loc, builtinName, resultType, {}, {});
 }
 
 SILValue SILGenFunction::emitGenericExecutor(SILLocation loc) {

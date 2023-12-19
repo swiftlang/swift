@@ -440,6 +440,9 @@ enum class FixKind : uint8_t {
   /// Allow pack expansion expressions in a context that does not support them.
   AllowInvalidPackExpansion,
 
+  /// Ignore `where` clause in a for-in loop with a pack expansion expression.
+  IgnoreWhereClauseInPackIteration,
+
   /// Allow a pack expansion parameter of N elements to be matched
   /// with a single tuple literal argument of the same arity.
   DestructureTupleToMatchPackExpansionParameter,
@@ -2224,6 +2227,26 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidPackExpansion;
+  }
+};
+
+class IgnoreWhereClauseInPackIteration final : public ConstraintFix {
+  IgnoreWhereClauseInPackIteration(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreWhereClauseInPackIteration, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore where clause in pack iteration";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreWhereClauseInPackIteration *create(ConstraintSystem &cs,
+                                                  ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreWhereClauseInPackIteration;
   }
 };
 

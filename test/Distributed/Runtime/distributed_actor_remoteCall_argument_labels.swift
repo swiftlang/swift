@@ -8,6 +8,7 @@
 
 // The returned "effective" label changed in 5.9, to fix an incorrect behavior,
 // so we skip the test in previous releases:
+// UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
 import Distributed

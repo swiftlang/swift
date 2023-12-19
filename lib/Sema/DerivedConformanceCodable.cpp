@@ -1676,8 +1676,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           C, VarDecl::Introducer::Let,
           NamedPattern::createImplicit(C, theKeyDecl));
 
-      guardElements.emplace_back(SourceLoc(), theKeyPattern,
-                                 allKeysPopFirstCallExpr);
+      guardElements.emplace_back(ConditionalPatternBindingInfo::create(
+          C, SourceLoc(), theKeyPattern, allKeysPopFirstCallExpr));
 
       // generate: allKeys.isEmpty;
       auto *allKeysIsEmptyExpr =

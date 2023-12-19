@@ -51,8 +51,8 @@ static bool validateModule(
     llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
   info = swift::serialization::validateSerializedAST(
       data, requiresOSSAModules,
-      /*requiredSDK*/ StringRef(), /*requiresRevisionMatch*/ false,
-      &extendedInfo, /* dependencies*/ nullptr, &searchPaths);
+      /*requiredSDK*/ StringRef(), &extendedInfo, /* dependencies*/ nullptr,
+      &searchPaths);
   if (info.status != swift::serialization::Status::Valid) {
     llvm::outs() << "error: validateSerializedAST() failed\n";
     return false;

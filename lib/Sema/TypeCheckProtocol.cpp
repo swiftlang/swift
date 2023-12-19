@@ -3225,9 +3225,10 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       refResult.isolation.isGlobalActor() ||
       requirementIsolation.isGlobalActor()) {
     // If the witness or requirement has global actor isolation, downgrade
-    // based on context.
+    // based on context. Use the witness itself as the context, because
+    // an explicitly isolated witness should not suppress diagnostics.
     behavior = SendableCheckContext(
-        Conformance->getDeclContext()).defaultDiagnosticBehavior();
+        witness->getInnermostDeclContext()).defaultDiagnosticBehavior();
   }
 
   // Complain that this witness cannot conform to the requirement due to
@@ -4716,7 +4717,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     // No move-only type can witness an associatedtype requirement.
     // Pretend the failure is a lack of Copyable conformance.
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    assert(copyable && "missing _Copyable protocol!");
+    assert(copyable && "missing Copyable protocol!");
     return CheckTypeWitnessResult::forConformance(copyable);
   }
 
@@ -6616,6 +6617,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (NoncopyableGenerics
         && proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       checkCopyableConformance(conformance);
+    } else if (NoncopyableGenerics
+        && proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+      checkEscapableConformance(conformance);
     }
   }
 
@@ -7252,10 +7256,11 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(proto);
 
   // Find the default for the given associated type.
-  auto findAssociatedTypeDefault = [](AssociatedTypeDecl *assocType)
+  auto findAssociatedTypeDefault = [proto](AssociatedTypeDecl *assocType)
       -> std::pair<Type, AssociatedTypeDecl *> {
     auto defaultedAssocType =
-        AssociatedTypeInference::findDefaultedAssociatedType(assocType);
+        AssociatedTypeInference::findDefaultedAssociatedType(
+            proto, proto, assocType);
     if (!defaultedAssocType)
       return {Type(), nullptr};
 

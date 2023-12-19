@@ -68,7 +68,8 @@ public func foo(_ x: Double) {
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu0_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [lexical] [var_decl] [[C]]
+  // CHECK: [[C_MOVE:%.*]] = move_value [lexical] [var_decl] [[C]]
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C_MOVE]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
   // CHECK: [[BORROWED_C2:%.*]] = begin_borrow [[C_COPY]]
   let c: (Double) -> Struct1 = z.translate(radians:)
@@ -102,7 +103,8 @@ public func foo(_ x: Double) {
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu4_ : $@convention(thin) (Struct1) -> @owned @callee_guaranteed (Double) -> Struct1
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
-  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [lexical] [var_decl] [[F]]
+  // CHECK: [[MOVED_F:%.*]] = move_value [lexical] [var_decl] [[F]]
+  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[MOVED_F]]
   // CHECK: [[F_COPY:%.*]] = copy_value [[BORROWED_F]]
   // CHECK: [[BORROWED_F2:%.*]] = begin_borrow [[F_COPY]]
   let f = z.scale

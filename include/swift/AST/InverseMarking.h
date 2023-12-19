@@ -19,7 +19,7 @@
 
 namespace swift {
 
-class NoncopyableAnnotationRequest;
+class InvertibleAnnotationRequest;
 
 /// Describes the way an inverse and its corresponding positive contraint
 /// appears on a TypeDecl, i.e., the way it was marked.
@@ -87,7 +87,7 @@ private:
   Mark positive;
 
   // This friend initializes the marks.
-  friend NoncopyableAnnotationRequest;
+  friend InvertibleAnnotationRequest;
 public:
 
   // Creates an empty marking.

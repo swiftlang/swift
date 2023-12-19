@@ -531,9 +531,10 @@ suspend_other_threads(struct thread *self)
           tgkill(our_pid, tid, sig_to_use);
           ++pending;
         } else {
-          warn("swift-runtime: unable to suspend thread ");
+          warn("swift-runtime: failed to suspend thread ");
           warn(dp->d_name);
-          warn("\n");
+          warn(" while processing a crash; backtraces will be missing "
+               "information\n");
         }
       }
     }

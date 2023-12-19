@@ -1480,6 +1480,8 @@ void Serializer::serializeGenericRequirements(
       if (layout->isKnownSizeTrivial()) {
         size = layout->getTrivialSizeInBits();
         alignment = layout->getAlignmentInBits();
+      } else if (layout->isTrivialStride()) {
+        size = layout->getTrivialStrideInBits();
       }
       LayoutRequirementKind rawKind = LayoutRequirementKind::UnknownLayout;
       switch (layout->getKind()) {
@@ -1506,6 +1508,12 @@ void Serializer::serializeGenericRequirements(
         break;
       case LayoutConstraintKind::UnknownLayout:
         rawKind = LayoutRequirementKind::UnknownLayout;
+        break;
+      case LayoutConstraintKind::BridgeObject:
+        rawKind = LayoutRequirementKind::BridgeObject;
+        break;
+      case LayoutConstraintKind::TrivialStride:
+        rawKind = LayoutRequirementKind::TrivialStride;
         break;
       }
       scratch.push_back(rawKind);
@@ -2334,8 +2342,6 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
     return serialization::SelfAccessKind::Consuming;
   case swift::SelfAccessKind::Borrowing:
     return serialization::SelfAccessKind::Borrowing;
-  case swift::SelfAccessKind::ResultDependsOnSelf:
-    return serialization::SelfAccessKind::ResultDependsOnSelf;
   }
 
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
@@ -3199,6 +3205,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       }
 
       unsigned numNames = introducedDeclNames.size();
+
+      (void)evaluateOrDefault(S.getASTContext().evaluator,
+                              ResolveMacroConformances{theAttr, D}, {});
 
       unsigned numConformances = 0;
       for (auto conformance : theAttr->getConformances()) {
@@ -5141,10 +5150,6 @@ public:
     llvm_unreachable("modules are currently not first-class values");
   }
 
-  void visitInverseType(const InverseType *) {
-    llvm_unreachable("inverse types should not escape the type checker");
-  }
-
   void visitInOutType(const InOutType *) {
     llvm_unreachable("inout types are only used in function type parameters");
   }
@@ -5155,6 +5160,10 @@ public:
 
   void visitTypeVariableType(const TypeVariableType *) {
     llvm_unreachable("type variables should not escape the type checker");
+  }
+
+  void visitErrorUnionType(const ErrorUnionType *) {
+    llvm_unreachable("error union types do not persist in the AST");
   }
 
   void visitBuiltinTypeImpl(Type ty) {
@@ -5565,11 +5574,25 @@ public:
     for (auto proto : composition->getMembers())
       protocols.push_back(S.addTypeRef(proto));
 
+    bool inverseCopyable = false, inverseEscapable = false;
+    for (auto ip : composition->getInverses()) {
+      switch (ip) {
+      case InvertibleProtocolKind::Copyable:
+        inverseCopyable = true;
+        break;
+      case InvertibleProtocolKind::Escapable:
+        inverseEscapable = true;
+        break;
+      };
+    }
+
     unsigned abbrCode =
         S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         composition->hasExplicitAnyObject(),
+        inverseCopyable,
+        inverseEscapable,
         protocols);
   }
 

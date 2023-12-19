@@ -86,7 +86,7 @@ PROTOCOL(FixedWidthInteger)
 PROTOCOL(RangeReplaceableCollection)
 PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
-PROTOCOL(TaskExecutor)
+PROTOCOL(_TaskExecutor)
 PROTOCOL(GlobalActor)
 
 PROTOCOL_(BridgedNSError)
@@ -137,6 +137,8 @@ PROTOCOL(AsyncIteratorProtocol)
 PROTOCOL(FloatingPoint)
 
 INVERTIBLE_PROTOCOL_WITH_NAME(Copyable, "Copyable")
+INVERTIBLE_PROTOCOL_WITH_NAME(Escapable, "Escapable")
+PROTOCOL_(BitwiseCopyable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)

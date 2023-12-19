@@ -73,6 +73,9 @@ llvm::Optional<InvertibleProtocolKind>
 /// Returns the KnownProtocolKind corresponding to an InvertibleProtocolKind.
 KnownProtocolKind getKnownProtocolKind(InvertibleProtocolKind ip);
 
+void simple_display(llvm::raw_ostream &out,
+                    const InvertibleProtocolKind &value);
+
 } // end namespace swift
 
 #endif

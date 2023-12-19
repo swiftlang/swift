@@ -153,6 +153,11 @@
 #define SWIFT_UNCHECKED_SENDABLE \
   __attribute__((swift_attr("@Sendable")))
 
+/// Specifies that a specific c++ type such class or struct should be imported
+/// as a non-copyable Swift value type.
+#define SWIFT_NONCOPYABLE \
+  __attribute__((swift_attr("~Copyable")))
+
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
 // Empty defines for compilers that don't support `attribute(swift_attr)`.
@@ -166,6 +171,7 @@
 #define SWIFT_COMPUTED_PROPERTY
 #define SWIFT_MUTATING 
 #define SWIFT_UNCHECKED_SENDABLE
+#define SWIFT_NONCOPYABLE
 
 #endif // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 

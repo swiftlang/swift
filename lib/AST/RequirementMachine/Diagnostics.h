@@ -45,16 +45,26 @@ struct RequirementError {
     InvalidShapeRequirement,
     /// A pair of conflicting requirements, T == Int, T == String
     ConflictingRequirement,
+    /// An inverse requirement that conflicts with the computed requirements of
+    /// a generic parameter, e.g., T : Copyable, T : ~Copyable
+    ConflictingInverseRequirement,
     /// A recursive requirement, e.g. T == G<T.A>.
     RecursiveRequirement,
     /// A redundant requirement, e.g. T == T.
     RedundantRequirement,
+    /// A redundant requirement, e.g. T : ~Copyable, T : ~Copyable.
+    RedundantInverseRequirement,
     /// A not-yet-supported same-element requirement, e.g. each T == Int.
     UnsupportedSameElement,
   } kind;
 
+private:
   /// The invalid requirement.
-  Requirement requirement;
+  union {
+    Requirement requirement;
+    InverseRequirement inverse;
+  };
+public:
 
   /// A requirement that conflicts with \c requirement. Both
   /// requirements will have the same subject type.
@@ -67,12 +77,30 @@ private:
       : kind(kind), requirement(requirement),
         conflictingRequirement(llvm::None), loc(loc) {}
 
+  RequirementError(Kind kind, InverseRequirement inverse, SourceLoc loc)
+      : kind(kind), inverse(inverse),
+        conflictingRequirement(llvm::None), loc(loc) {}
+
   RequirementError(Kind kind, Requirement requirement,
                    Requirement conflict,
                    SourceLoc loc)
     : kind(kind), requirement(requirement), conflictingRequirement(conflict), loc(loc) {}
 
 public:
+  Requirement getRequirement() const {
+    assert(!(kind == Kind::InvalidInverseOuterSubject ||
+             kind == Kind::RedundantInverseRequirement ||
+             kind == Kind::ConflictingInverseRequirement));
+    return requirement;
+  }
+
+  InverseRequirement getInverse() const {
+    assert(kind == Kind::InvalidInverseOuterSubject ||
+           kind == Kind::RedundantInverseRequirement ||
+           kind == Kind::ConflictingInverseRequirement);
+    return inverse;
+  }
+
   static RequirementError forInvalidTypeRequirement(Type subjectType,
                                                     Type constraint,
                                                     SourceLoc loc) {
@@ -90,9 +118,15 @@ public:
     return {Kind::InvalidInverseSubject, req, loc};
   }
 
-  static RequirementError forInvalidInverseOuterSubject(Requirement req,
-                                                        SourceLoc loc) {
-    return {Kind::InvalidInverseOuterSubject, req, loc};
+  static
+  RequirementError forInvalidInverseOuterSubject(InverseRequirement req) {
+    return {Kind::InvalidInverseOuterSubject, req, req.loc};
+  }
+
+  static RequirementError forConflictingInverseRequirement(
+                                               InverseRequirement req,
+                                               SourceLoc loc) {
+    return {Kind::ConflictingInverseRequirement, req, loc};
   }
 
   static RequirementError forInvalidShapeRequirement(Requirement req,
@@ -114,6 +148,11 @@ public:
   static RequirementError forRedundantRequirement(Requirement req,
                                                   SourceLoc loc) {
     return {Kind::RedundantRequirement, req, loc};
+  }
+
+  static
+  RequirementError forRedundantInverseRequirement(InverseRequirement req) {
+    return {Kind::RedundantInverseRequirement, req, req.loc};
   }
 
   static RequirementError forRecursiveRequirement(Requirement req,

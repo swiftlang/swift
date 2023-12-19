@@ -775,11 +775,11 @@ LLVM_ATTRIBUTE_USED void AccessBase::dump() const { print(llvm::dbgs()); }
 
 bool swift::isIdentityPreservingRefCast(SingleValueInstruction *svi) {
   // Ignore both copies and other identity and ownership preserving casts
-  return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi)
-         || isa<EndInitLetRefInst>(svi)
-         || isa<BeginDeallocRefInst>(svi)
-         || isa<EndCOWMutationInst>(svi)
-         || isIdentityAndOwnershipPreservingRefCast(svi);
+  return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi) ||
+         isa<EndInitLetRefInst>(svi) || isa<BeginDeallocRefInst>(svi) ||
+         isa<EndCOWMutationInst>(svi) ||
+         isa<MarkUnresolvedReferenceBindingInst>(svi) ||
+         isIdentityAndOwnershipPreservingRefCast(svi);
 }
 
 // On some platforms, casting from a metatype to a reference type dynamically
@@ -2597,6 +2597,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::UnprotectedStackAlloc:
+    case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::StackDealloc:
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::StaticReport:
@@ -2611,6 +2612,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::CreateAsyncTaskWithExecutor:
+    case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::InitializeDefaultActor:
@@ -2642,6 +2645,12 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       if (builtin->getAllOperands().size() > 0) {
         visitor(&builtin->getAllOperands()[0]);
       }
+      return;
+
+    // These builtins take a generic 'T' as their operand.
+    case BuiltinValueKind::GetEnumTag:
+    case BuiltinValueKind::InjectEnumTag:
+      visitor(&builtin->getAllOperands()[0]);
       return;
 
     // Arrays: (T.Type, Builtin.RawPointer, Builtin.RawPointer,

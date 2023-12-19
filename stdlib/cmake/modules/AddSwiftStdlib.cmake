@@ -406,6 +406,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY")
   endif()
 
+  if (SWIFT_CONCURRENCY_USES_DISPATCH)
+    list(APPEND result "-DSWIFT_CONCURRENCY_USES_DISPATCH")
+  endif()
+
   string(TOUPPER "${SWIFT_SDK_${CFLAGS_SDK}_THREADING_PACKAGE}" _threading_package)
   list(APPEND result "-DSWIFT_THREADING_${_threading_package}")
 
@@ -929,7 +933,7 @@ function(add_swift_target_library_single target name)
         -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}")
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
     if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
       swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
       foreach(directory ${SWIFTLIB_INCLUDE})
@@ -1039,6 +1043,7 @@ function(add_swift_target_library_single target name)
     add_custom_target("${target}"
       DEPENDS
         "${swift_module_dependency_target}")
+    add_dependencies("${install_in_component}" "${target}")
 
     return()
   endif()
@@ -1072,6 +1077,7 @@ function(add_swift_target_library_single target name)
   if (SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
     add_custom_target("${target}"
       DEPENDS "${swift_module_dependency_target}")
+    add_dependencies("${install_in_component}" "${target}")
     return()
   endif()
 
@@ -1080,6 +1086,9 @@ function(add_swift_target_library_single target name)
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
               ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+  if (NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY)
+    add_dependencies("${install_in_component}" "${target}")
+  endif()
   # NOTE: always inject the LLVMSupport directory before anything else.  We want
   # to ensure that the runtime is built with our local copy of LLVMSupport
   target_include_directories(${target} BEFORE PRIVATE
@@ -2659,7 +2668,7 @@ function(_add_swift_target_executable_single name)
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL "WINDOWS")
     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}")
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
   endif()
 
   if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX")

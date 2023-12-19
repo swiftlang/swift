@@ -446,16 +446,24 @@ void ForEachStmt::setPattern(Pattern *p) {
 }
 
 Expr *ForEachStmt::getTypeCheckedSequence() const {
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(getParsedSequence()))
+    return expansion;
+
   return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
 }
 
-DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
-                                 SourceLoc doLoc, Stmt *body,
+DoCatchStmt *DoCatchStmt::create(DeclContext *dc,
+                                 LabeledStmtInfo labelInfo,
+                                 SourceLoc doLoc,
+                                 SourceLoc throwsLoc, TypeLoc thrownType,
+                                 Stmt *body,
                                  ArrayRef<CaseStmt *> catches,
                                  llvm::Optional<bool> implicit) {
+  ASTContext &ctx = dc->getASTContext();
   void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt *>(catches.size()),
                            alignof(DoCatchStmt));
-  return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
+  return ::new (mem) DoCatchStmt(dc, labelInfo, doLoc, throwsLoc, thrownType,
+                                 body, catches, implicit);
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
@@ -472,7 +480,16 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
   return false;
 }
 
+Type DoCatchStmt::getExplicitCaughtType() const {
+  ASTContext &ctx = DC->getASTContext();
+  return CatchNode(const_cast<DoCatchStmt *>(this)).getExplicitCaughtType(ctx);
+}
+
 Type DoCatchStmt::getCaughtErrorType() const {
+  // Check for an explicitly-specified error type.
+  if (Type explicitError = getExplicitCaughtType())
+    return explicitError;
+
   auto firstPattern = getCatches()
     .front()
     ->getCaseLabelItems()
@@ -555,6 +572,21 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   return false;
 }
 
+SourceRange ConditionalPatternBindingInfo::getSourceRange() const {
+  SourceLoc Start;
+  if (IntroducerLoc.isValid())
+    Start = IntroducerLoc;
+  else
+    Start = ThePattern->getStartLoc();
+
+  SourceLoc End = Initializer->getEndLoc();
+  if (Start.isValid() && End.isValid()) {
+    return SourceRange(Start, End);
+  } else {
+    return SourceRange();
+  }
+}
+
 PoundAvailableInfo *
 PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
                            SourceLoc LParenLoc,
@@ -587,18 +619,7 @@ SourceRange StmtConditionElement::getSourceRange() const {
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getSourceRange();
   case StmtConditionElement::CK_PatternBinding:
-    SourceLoc Start;
-    if (IntroducerLoc.isValid())
-      Start = IntroducerLoc;
-    else
-      Start = getPattern()->getStartLoc();
-    
-    SourceLoc End = getInitializer()->getEndLoc();
-    if (Start.isValid() && End.isValid()) {
-      return SourceRange(Start, End);
-    } else {
-      return SourceRange();
-    }
+    return getPatternBinding()->getSourceRange();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -620,7 +641,7 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().Start;
+    return getPatternBinding()->getStartLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getStartLoc();
   }
@@ -635,7 +656,7 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
-    return getSourceRange().End;
+    return getPatternBinding()->getEndLoc();
   case StmtConditionElement::CK_HasSymbol:
     return getHasSymbolInfo()->getEndLoc();
   }
@@ -648,7 +669,7 @@ static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {
   return Ctx.AllocateCopy(Arr);
 }
 
-IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
+IfStmt::IfStmt(SourceLoc IfLoc, Expr *Cond, BraceStmt *Then, SourceLoc ElseLoc,
                Stmt *Else, llvm::Optional<bool> implicit, ASTContext &Ctx)
     : IfStmt(LabeledStmtInfo(), IfLoc, exprToCond(Cond, Ctx), Then, ElseLoc,
              Else, implicit) {}

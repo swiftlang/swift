@@ -1639,6 +1639,8 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
     return true;
   }
 }

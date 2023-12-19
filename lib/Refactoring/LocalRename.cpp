@@ -16,6 +16,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDE/IDEBridging.h"
 #include "swift/Index/Index.h"
 
 using namespace swift::refactoring;
@@ -43,6 +44,28 @@ struct RenameRefInfo {
   SourceLoc Loc;   ///< The reference's source location.
   bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
 };
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// Returns `true` if the `RefInfo` points to a location that doesn't have any
+/// arguments. For example, returns `true` for `Foo.init` but `false` for
+/// `Foo.init()` or `Foo.init(a: 1)`.
+static bool
+isReferenceWithoutArguments(const llvm::Optional<RenameRefInfo> &refInfo) {
+  if (!refInfo) {
+    return false;
+  }
+  if (refInfo->IsArgLabel) {
+    return false;
+  }
+  std::vector<ResolvedLoc> resolvedLocs =
+      runNameMatcher(*refInfo->SF, refInfo->Loc);
+  if (!resolvedLocs.empty()) {
+    ResolvedLoc resolvedLoc = resolvedLocs.front();
+    return resolvedLoc.labelRanges.empty();
+  }
+  return false;
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 static llvm::Optional<RefactorAvailabilityInfo>
 renameAvailabilityInfo(const ValueDecl *VD,
@@ -88,12 +111,11 @@ renameAvailabilityInfo(const ValueDecl *VD,
       if (!CD->getParameters()->size())
         return llvm::None;
 
-      if (RefInfo && !RefInfo->IsArgLabel) {
-        NameMatcher Matcher(*(RefInfo->SF));
-        auto Resolved = Matcher.resolve({RefInfo->Loc});
-        if (Resolved.labelRanges.empty())
-          return llvm::None;
+#if SWIFT_BUILD_SWIFT_SYNTAX
+      if (isReferenceWithoutArguments(RefInfo)) {
+        return llvm::None;
       }
+#endif
     }
 
     // Disallow renaming 'callAsFunction' method with no arguments.
@@ -104,12 +126,11 @@ renameAvailabilityInfo(const ValueDecl *VD,
         if (!FD->getParameters()->size())
           return llvm::None;
 
-        if (RefInfo && !RefInfo->IsArgLabel) {
-          NameMatcher Matcher(*(RefInfo->SF));
-          auto Resolved = Matcher.resolve({RefInfo->Loc});
-          if (Resolved.labelRanges.empty())
-            return llvm::None;
+#if SWIFT_BUILD_SWIFT_SYNTAX
+        if (isReferenceWithoutArguments(RefInfo)) {
+          return llvm::None;
         }
+#endif
       }
     }
   }
@@ -207,22 +228,25 @@ private:
   bool finishDependency(bool isClangModule) override { return true; }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
-    if (symbol.USR == usr) {
-      if (auto loc = indexSymbolToRenameLoc(symbol)) {
-        // Inside capture lists like `{ [test] in }`, 'test' refers to both the
-        // newly declared, captured variable and the referenced variable it is
-        // initialized from. Make sure to only rename it once.
-        auto existingLoc = llvm::find_if(locations, [&](RenameLoc searchLoc) {
-          return searchLoc.Line == loc->Line && searchLoc.Column == loc->Column;
-        });
-        if (existingLoc == locations.end()) {
-          locations.push_back(std::move(*loc));
-        } else {
-          assert(existingLoc->OldName == loc->OldName &&
-                 existingLoc->IsFunctionLike == loc->IsFunctionLike &&
-                 "Asked to do a different rename for the same location?");
-        }
-      }
+    if (symbol.USR != usr) {
+      return IndexDataConsumer::Continue;
+    }
+    auto loc = indexSymbolToRenameLoc(symbol);
+    if (!loc) {
+      return IndexDataConsumer::Continue;
+    }
+    
+    // Inside capture lists like `{ [test] in }`, 'test' refers to both the
+    // newly declared, captured variable and the referenced variable it is
+    // initialized from. Make sure to only rename it once.
+    auto existingLoc = llvm::find_if(locations, [&](RenameLoc searchLoc) {
+      return searchLoc.Line == loc->Line && searchLoc.Column == loc->Column;
+    });
+    if (existingLoc == locations.end()) {
+      locations.push_back(std::move(*loc));
+    } else {
+      assert(existingLoc->OldName == loc->OldName &&
+             "Asked to do a different rename for the same location?");
     }
     return IndexDataConsumer::Continue;
   }
@@ -241,37 +265,19 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
     return llvm::None;
   }
 
-  NameUsage usage = NameUsage::Unknown;
+  RenameLocUsage usage = RenameLocUsage::Unknown;
   if (symbol.roles & (unsigned)index::SymbolRole::Call) {
-    usage = NameUsage::Call;
+    usage = RenameLocUsage::Call;
   } else if (symbol.roles & (unsigned)index::SymbolRole::Definition) {
-    usage = NameUsage::Definition;
+    usage = RenameLocUsage::Definition;
   } else if (symbol.roles & (unsigned)index::SymbolRole::Reference) {
-    usage = NameUsage::Reference;
+    usage = RenameLocUsage::Reference;
   } else {
     llvm_unreachable("unexpected role");
   }
 
-  bool isFunctionLike = false;
-
-  switch (symbol.symInfo.Kind) {
-  case index::SymbolKind::EnumConstant:
-  case index::SymbolKind::Function:
-  case index::SymbolKind::Constructor:
-  case index::SymbolKind::ConversionFunction:
-  case index::SymbolKind::InstanceMethod:
-  case index::SymbolKind::ClassMethod:
-  case index::SymbolKind::StaticMethod:
-    isFunctionLike = true;
-    break;
-  case index::SymbolKind::Class:
-  case index::SymbolKind::Enum:
-  case index::SymbolKind::Struct:
-  default:
-    break;
-  }
   StringRef oldName = stringStorage->copyString(symbol.name);
-  return RenameLoc{symbol.line, symbol.column, usage, oldName, isFunctionLike};
+  return RenameLoc{symbol.line, symbol.column, usage, oldName};
 }
 
 /// Get the decl context that we need to walk when renaming \p VD.

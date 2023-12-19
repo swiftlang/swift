@@ -60,7 +60,7 @@ static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
 }
 
 static bool isAnyObjectOrAny(Type type) {
-  return type->isAnyObject() || type->isAny();
+  return type->isAnyObject() || type->isMarkerExistential();
 }
 
 // For a given Decl and Type, if the type is not an optional return
@@ -1414,8 +1414,7 @@ private:
 
     assert(FD->getAttrs().hasAttribute<CDeclAttr>() && "not a cdecl function");
     os << "SWIFT_EXTERN ";
-    printFunctionDeclAsCFunctionDecl(
-        FD, FD->getAttrs().getAttribute<CDeclAttr>()->Name, resultTy);
+    printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << ";\n";
@@ -1425,12 +1424,12 @@ private:
     FunctionSwiftABIInformation(AbstractFunctionDecl *FD,
                                 LoweredFunctionSignature signature)
         : signature(signature) {
-      isCDecl = FD->getAttrs().hasAttribute<CDeclAttr>();
+      isCDecl = !FD->getCDeclName().empty();
       if (!isCDecl) {
         auto mangledName = SILDeclRef(FD).mangle();
         symbolName = FD->getASTContext().AllocateCopy(mangledName);
       } else {
-        symbolName = FD->getAttrs().getAttribute<CDeclAttr>()->Name;
+        symbolName = FD->getCDeclName();
       }
     }
 
@@ -2378,7 +2377,7 @@ private:
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
-    if (ty->isAny()) {
+    if (ty->isMarkerExistential()) {
       ty = ctx.getAnyObjectType();
     } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {
       ty = ctx.getBridgedToObjC(&owningPrinter.M, ty);
@@ -2858,12 +2857,16 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   return false;
 }
 
-/// Skip \c \@objcImplementation \c extension member implementations and
-/// overrides. They are already declared in handwritten headers, and they may
-/// have attributes that aren't allowed in a category.
+/// Skip \c \@objcImplementation functions, \c extension member
+/// implementations, and overrides. They are already declared in handwritten
+/// headers, and they may have attributes that aren't allowed in a category.
 ///
 /// \return true if \p VD should \em not be included in the header.
 static bool excludeForObjCImplementation(const ValueDecl *VD) {
+  // If it's an ObjC implementation (and not an extension, which might have
+  // members that need printing), skip it; it's declared elsewhere.
+  if (VD->isObjCImplementation() && ! isa<ExtensionDecl>(VD))
+    return true;
   // Exclude member implementations; they are declared elsewhere.
   if (VD->isObjCMemberImplementation())
     return true;

@@ -888,6 +888,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(*feature);
   }
 
+  // CompleteConcurrency enables all data-race safety upcoming features.
+  if (Opts.hasFeature(Feature::CompleteConcurrency)) {
+    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
+    Opts.Features.insert(Feature::DisableOutwardActorInference);
+  }
+
   // Map historical flags over to experimental features. We do this for all
   // compilers because that's how existing experimental feature flags work.
   if (Args.hasArg(OPT_enable_experimental_static_assert))
@@ -904,8 +910,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   if (Args.hasArg(OPT_experimental_one_way_closure_params))
     Opts.Features.insert(Feature::OneWayClosureParameters);
-  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
-    Opts.Features.insert(Feature::TypeWitnessSystemInference);
   if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
@@ -1002,7 +1006,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-  } else if (Opts.hasFeature(Feature::StrictConcurrency)) {
+  } else if (Opts.hasFeature(Feature::CompleteConcurrency) ||
+             Opts.hasFeature(Feature::StrictConcurrency)) {
     // Already set above.
   } else {
     // Default to minimal checking in Swift 5.x.
@@ -1344,6 +1349,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_warn_redundant_requirements))
     Opts.WarnRedundantRequirements = true;
 
+  if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
+    Opts.EnableExperimentalAssociatedTypeInference = true;
+  if (Args.hasArg(OPT_disable_experimental_associated_type_inference))
+    Opts.EnableExperimentalAssociatedTypeInference = false;
+
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
   for (auto &block: FrontendOpts.BlocklistConfigFilePaths)
@@ -1395,6 +1405,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+#ifndef NDEBUG
+  /// Enable round trip parsing via the new swift parser unless it is disabled
+  /// explicitly. The new Swift parser can have mismatches with C++ parser -
+  /// rdar://118013482 Use this flag to disable round trip through the new
+  /// Swift parser for such cases.
+  if (!Args.hasArg(OPT_disable_experimental_parser_round_trip)) {
+    Opts.Features.insert(Feature::ParserRoundTrip);
+    Opts.Features.insert(Feature::ParserValidation);
+  }
+#endif
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -2389,6 +2409,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
         parseSanitizerAddressUseODRIndicator(A, Opts.Sanitizers, Diags);
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_stable_abi_EQ)) {
+    IRGenOpts.SanitizerUseStableABI =
+        parseSanitizerUseStableABI(A, Opts.Sanitizers, Diags);
+  }
+
   if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
                                OPT_disable_verify_exclusivity)) {
     Opts.VerifyExclusivity
@@ -2404,6 +2429,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   Opts.OSSACompleteLifetimes |= Args.hasArg(OPT_enable_ossa_complete_lifetimes);
+
+  Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
 
   return false;
 }
@@ -3208,6 +3235,11 @@ bool CompilerInvocation::parseArgs(
     SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
     SILOpts.EmbeddedSwift = true;
+  } else {
+    if (SILOpts.NoAllocations) {
+      Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);
+      return true;
+    }
   }
 
   return false;
@@ -3217,8 +3249,7 @@ serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
   serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName,
-      !LangOpts.DebuggerSupport, &extendedInfo);
+      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -3254,7 +3285,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      LangOpts.SDKName, !LangOpts.DebuggerSupport, &extendedInfo);
+      LangOpts.SDKName, &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

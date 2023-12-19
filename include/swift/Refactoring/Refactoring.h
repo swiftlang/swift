@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IDE_REFACTORING_H
-#define SWIFT_IDE_REFACTORING_H
+#ifndef SWIFT_REFACTORING_REFACTORING_H
+#define SWIFT_REFACTORING_REFACTORING_H
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Refactoring/RenameLoc.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -61,21 +62,6 @@ struct RenameInfo {
 
 llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
 
-enum class NameUsage {
-  Unknown,
-  Reference,
-  Definition,
-  Call
-};
-
-struct RenameLoc {
-  unsigned Line;
-  unsigned Column;
-  NameUsage Usage;
-  StringRef OldName;
-  const bool IsFunctionLike;
-};
-
 /// An array of \c RenameLoc that also keeps the underlying string storage of
 /// the \c StringRef inside the \c RenameLoc alive.
 class RenameLocs {
@@ -100,6 +86,13 @@ public:
 ///   - valueDecl: The declaration that should be renamed
 RenameLocs localRenameLocs(SourceFile *sourceFile, const ValueDecl *valueDecl);
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// A `RenameLoc` together with the `ResolvedLoc` that it resolved to.
+struct ResolvedAndRenameLoc {
+  RenameLoc renameLoc;
+  ResolvedLoc resolved;
+};
+
 /// Given a list of `RenameLoc`s, get the corresponding `ResolveLoc`s.
 ///
 /// These resolve locations contain more structured information, such as the
@@ -108,10 +101,10 @@ RenameLocs localRenameLocs(SourceFile *sourceFile, const ValueDecl *valueDecl);
 /// If a \p newName is passed, it is used to verify that all \p renameLocs can
 /// be renamed to this name. If any the names cannot be renamed, an empty vector
 /// is returned and the issue is diagnosed via \p diags.
-std::vector<ResolvedLoc> resolveRenameLocations(ArrayRef<RenameLoc> renameLocs,
-                                                StringRef newName,
-                                                SourceFile &sourceFile,
-                                                DiagnosticEngine &diags);
+std::vector<ResolvedAndRenameLoc>
+resolveRenameLocations(ArrayRef<RenameLoc> renameLocs, StringRef newName,
+                       SourceFile &sourceFile, DiagnosticEngine &diags);
+#endif
 
 struct RangeConfig {
   unsigned BufferID;
@@ -182,4 +175,4 @@ collectRefactorings(ResolvedCursorInfoPtr CursorInfo, bool ExcludeRename);
 } // namespace ide
 } // namespace swift
 
-#endif // SWIFT_IDE_REFACTORING_H
+#endif // SWIFT_REFACTORING_REFACTORING_H

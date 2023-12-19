@@ -28,7 +28,8 @@ distributed actor FiveSevenActor_NothingExecutor {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+    @available(SwiftStdlib 5.9, *)
+    distributed func test(x: Int) throws {
     print("executed: \(#function)")
     defer {
       print("done executed: \(#function)")
@@ -46,7 +47,7 @@ distributed actor FiveNineActor_NothingExecutor {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+  distributed func test(x: Int) throws {
     print("executed: \(#function)")
     defer {
       print("done executed: \(#function)")
@@ -65,7 +66,8 @@ distributed actor FiveSevenActor_FiveNineExecutor {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+  @available(SwiftStdlib 5.9, *)
+  distributed func test(x: Int) throws {
     print("executed: \(#function)")
     defer {
       print("done executed: \(#function)")

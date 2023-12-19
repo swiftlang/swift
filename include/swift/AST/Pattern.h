@@ -447,6 +447,13 @@ public:
     return tp;
   }
 
+  static TypedPattern *createPropagated(ASTContext &ctx, Pattern *pattern,
+                                        TypeRepr *typeRepr) {
+    auto *TP = new (ctx) TypedPattern(pattern, typeRepr);
+    TP->setPropagatedType();
+    return TP;
+  }
+
   /// True if the type in this \c TypedPattern was propagated from a different
   /// \c TypedPattern.
   ///
@@ -566,6 +573,7 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   DeclNameRef getName() const { return Name; }
 
@@ -705,6 +713,12 @@ public:
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
 
   DeclContext *getDeclContext() const { return DC; }
+
+  void setDeclContext(DeclContext *newDC) {
+    DC = newDC;
+    if (MatchVar)
+      MatchVar->setDeclContext(newDC);
+  }
 
   /// The match expression if it has been computed, \c nullptr otherwise.
   /// Should only be used by the ASTDumper and ASTWalker.

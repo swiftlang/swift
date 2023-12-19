@@ -23,9 +23,8 @@ sil [ossa] @aggStructConsumeField : $@convention(thin) (@guaranteed AggStruct) -
 bb0(%0 : @guaranteed $AggStruct):
   debug_value %0 : $AggStruct, let, name "x", argno 1
   %2 = copy_value %0 : $AggStruct
-  %3 = begin_borrow [lexical] %2 : $AggStruct
-  %4 = copy_value %3 : $AggStruct
-  %5 = copyable_to_moveonlywrapper [owned] %4 : $AggStruct
+  %3 = move_value [lexical] [var_decl] %2 : $AggStruct
+  %5 = copyable_to_moveonlywrapper [owned] %3 : $AggStruct
   %6 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5 : $@moveOnly AggStruct
   debug_value %6 : $@moveOnly AggStruct, let, name "x2"
   %8 = begin_borrow %6 : $@moveOnly AggStruct
@@ -52,8 +51,6 @@ bb2:
 
 bb3:
   destroy_value %6 : $@moveOnly AggStruct
-  end_borrow %3 : $AggStruct
-  destroy_value %2 : $AggStruct
   %64 = tuple ()
   return %64 : $()
 }

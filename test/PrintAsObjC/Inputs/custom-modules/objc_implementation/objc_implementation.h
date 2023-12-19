@@ -6,3 +6,4 @@
 
 @end
 
+void CImplFunc(void);

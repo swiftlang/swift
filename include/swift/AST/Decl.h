@@ -241,8 +241,7 @@ enum class SelfAccessKind : uint8_t {
   LegacyConsuming,
   Consuming,
   Borrowing,
-  ResultDependsOnSelf,
-  LastSelfAccessKind = ResultDependsOnSelf,
+  LastSelfAccessKind = Borrowing,
 };
 enum : unsigned {
   NumSelfAccessKindBits =
@@ -941,6 +940,11 @@ public:
   /// including attributes that are generated as the result of member
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
+
+  /// True if this declaration provides an implementation for an imported
+  /// Objective-C declaration. This implies various restrictions and special
+  /// behaviors for it and, if it's an extension, its members.
+  bool isObjCImplementation() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
@@ -1837,11 +1841,6 @@ public:
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
 
-  /// True if this extension provides an implementation for an imported
-  /// Objective-C \c \@interface. This implies various restrictions and special
-  /// behaviors for its members.
-  bool isObjCImplementation() const;
-
   /// Returns the name of the category specified by the \c \@_objcImplementation
   /// attribute, or \c None if the name is invalid. Do not call unless
   /// \c isObjCImplementation() returns \c true.
@@ -2681,19 +2680,12 @@ private:
     /// Whether this declaration produces an implicitly unwrapped
     /// optional result.
     unsigned isIUO : 1;
-
-    /// Whether the "isEscapable" bit has been computed yet.
-    unsigned isEscapable : 1;
-
-    /// Whether this declaration is escapable.
-    unsigned isEscapableComputed : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
-  friend class IsEscapableRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
@@ -2778,6 +2770,10 @@ public:
   DeclNameRef createNameRef() const {
     return DeclNameRef(Name);
   }
+
+  /// Retrieve the C declaration name that names this function, or empty
+  /// string if it has none.
+  StringRef getCDeclName() const;
 
   /// Retrieve the name to use for this declaration when interoperating
   /// with the Objective-C runtime.
@@ -2905,6 +2901,10 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
+  /// Returns whether this declaration should be treated as having the \c
+  /// package access level.
+  bool hasPackageAccess() const;
+
   /// FIXME: This is deprecated.
   bool isRecursiveValidation() const;
 
@@ -2976,9 +2976,6 @@ public:
 
   /// Is this declaration 'final'?
   bool isFinal() const;
-
-  /// Is this declaration escapable?
-  bool isEscapable() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
@@ -3187,8 +3184,12 @@ public:
   /// Type if it `isNoncopyable` instead of using this.
   bool canBeNoncopyable() const;
 
-  /// Determine how the ~Copyable was applied to this TypeDecl, if at all.
-  InverseMarking getNoncopyableMarking() const;
+  /// Is this declaration escapable?
+  bool isEscapable() const;
+
+  /// Determine how the given invertible protocol was written on this TypeDecl,
+  /// if at all.
+  InverseMarking getMarking(InvertibleProtocolKind ip) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
@@ -5860,6 +5861,10 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 class VarDecl : public AbstractStorageDecl {
   friend class NamingPatternRequest;
   NamedPattern *NamingPattern = nullptr;
+  /// When the variable is declared in context of a for-in loop over the elements of 
+  /// a parameter pack, this is the opened element environment of the pack expansion
+  /// to use as the variable's context generic environment.
+  GenericEnvironment *OpenedElementEnvironment = nullptr;
 
 public:
   enum class Introducer : uint8_t {
@@ -5987,6 +5992,13 @@ public:
   NamedPattern *getNamingPattern() const;
   void setNamingPattern(NamedPattern *Pat);
 
+  GenericEnvironment *getOpenedElementEnvironment() const {
+    return OpenedElementEnvironment;
+  }
+  void setOpenedElementEnvironment(GenericEnvironment *Env) {
+    OpenedElementEnvironment = Env;
+  }
+
   /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
   /// CaseLabelItem. In that case, return the first case label item of the first
@@ -6090,7 +6102,7 @@ public:
   bool isAsyncLet() const;
 
   /// Is this var known to be a "local" distributed actor,
-  /// if so the implicit throwing ans some isolation checks can be skipped.
+  /// if so the implicit throwing and some isolation checks can be skipped.
   bool isKnownToBeLocal() const;
 
   /// Is this a stored property that will _not_ trigger any user-defined code
@@ -6421,6 +6433,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+    /// Whether or not this paramater is '_resultDependsOn'
+    IsResultDependsOn = 1 << 3,
   };
 
   /// The default value, if any, along with flags.
@@ -6634,6 +6649,16 @@ public:
     ArgumentNameAndFlags.setInt(flags);
   }
 
+  bool hasResultDependsOn() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsResultDependsOn);
+  }
+
+  void setResultDependsOn(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsResultDependsOn
+                                      : flags - Flags::IsResultDependsOn);
+  }
+
   /// Does this parameter reject temporary pointer conversions?
   bool isNonEphemeral() const;
 
@@ -6792,7 +6817,6 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
 
   SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
-  SourceLoc EndLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
@@ -6821,13 +6845,12 @@ public:
                                            Type ElementTy, DeclContext *Parent,
                                            GenericParamList *GenericParams);
 
-  static SubscriptDecl *create(ASTContext &Context, DeclName Name,
-                               SourceLoc StaticLoc,
-                               StaticSpellingKind StaticSpelling,
-                               SourceLoc SubscriptLoc, ParameterList *Indices,
-                               SourceLoc ArrowLoc, TypeRepr *ElementTyR,
-                               DeclContext *Parent,
-                               GenericParamList *GenericParams);
+  static SubscriptDecl *createParsed(ASTContext &Context, SourceLoc StaticLoc,
+                                     StaticSpellingKind StaticSpelling,
+                                     SourceLoc SubscriptLoc,
+                                     ParameterList *Indices, SourceLoc ArrowLoc,
+                                     TypeRepr *ElementTyR, DeclContext *Parent,
+                                     GenericParamList *GenericParams);
 
   static SubscriptDecl *create(ASTContext &Context, DeclName Name,
                                SourceLoc StaticLoc,
@@ -6841,7 +6864,9 @@ public:
                                        SourceLoc SubscriptLoc,
                                        ParameterList *Indices,
                                        SourceLoc ArrowLoc, Type ElementTy,
-                                       DeclContext *Parent, ClangNode ClangN);
+                                       DeclContext *Parent,
+                                       GenericParamList *GenericParams,
+                                       ClangNode ClangN);
   
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
@@ -6850,13 +6875,7 @@ public:
   
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
-  
-  SourceLoc getStartLoc() const {
-    return getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
-  }
-  SourceLoc getEndLoc() const { return EndLoc; }
 
-  void setEndLoc(SourceLoc sl) { EndLoc = sl; }
   SourceRange getSourceRange() const;
   SourceRange getSignatureSourceRange() const;
 
@@ -6965,7 +6984,7 @@ void simple_display(llvm::raw_ostream &out, BodyAndFingerprint value);
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
   friend class NeedsNewVTableEntryRequest;
-  friend class ThrownTypeRequest;
+  friend class ExplicitCaughtTypeRequest;
 
 public:
   /// records the kind of SILGen-synthesized body this decl represents
@@ -7730,8 +7749,7 @@ public:
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
   SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() && !isa<AccessorDecl>(this)
-              ? StaticLoc : FuncLoc;
+    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
   SourceRange getSourceRange() const;
 
@@ -7823,12 +7841,10 @@ class AccessorDecl final : public FuncDecl {
 
   AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
                AccessorKind accessorKind, AbstractStorageDecl *storage,
-               SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
-               TypeLoc thrownTy,
-               bool hasImplicitSelfDecl, DeclContext *parent)
-      : FuncDecl(DeclKind::Accessor, staticLoc, staticSpelling,
-                 /*func loc*/ declLoc,
+               TypeLoc thrownTy, bool hasImplicitSelfDecl, DeclContext *parent)
+      : FuncDecl(DeclKind::Accessor, /*StaticLoc*/ SourceLoc(),
+                 StaticSpellingKind::None, /*func loc*/ declLoc,
                  /*name*/ Identifier(), /*name loc*/ declLoc, async, asyncLoc,
                  throws, throwsLoc, thrownTy, hasImplicitSelfDecl,
                  /*genericParams*/ nullptr, parent),
@@ -7841,10 +7857,8 @@ class AccessorDecl final : public FuncDecl {
   static AccessorDecl *
   createImpl(ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
              AccessorKind accessorKind, AbstractStorageDecl *storage,
-             SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
-             SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
-             TypeLoc thrownTy,
-             DeclContext *parent, ClangNode clangNode);
+             bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+             TypeLoc thrownTy, DeclContext *parent, ClangNode clangNode);
 
   llvm::Optional<bool> getCachedIsTransparent() const {
     if (Bits.AccessorDecl.IsTransparentComputed)
@@ -7855,22 +7869,34 @@ class AccessorDecl final : public FuncDecl {
   friend class IsAccessorTransparentRequest;
 
 public:
-  static AccessorDecl *createDeserialized(ASTContext &ctx,
-                                          AccessorKind accessorKind,
-                                          AbstractStorageDecl *storage,
-                                          StaticSpellingKind staticSpelling,
-                                          bool async, bool throws,
-                                          Type thrownType,
-                                          Type fnRetType, DeclContext *parent);
+  static AccessorDecl *
+  createDeserialized(ASTContext &ctx, AccessorKind accessorKind,
+                     AbstractStorageDecl *storage, bool async, bool throws,
+                     Type thrownType, Type fnRetType, DeclContext *parent);
 
   static AccessorDecl *
   create(ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
-         AccessorKind accessorKind, AbstractStorageDecl *storage,
-         SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
+         AccessorKind accessorKind, AbstractStorageDecl *storage, bool async,
          SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
          TypeLoc thrownType, ParameterList *parameterList, Type fnRetType,
-         DeclContext *parent,
-         ClangNode clangNode = ClangNode());
+         DeclContext *parent, ClangNode clangNode = ClangNode());
+
+  /// Create a parsed accessor.
+  ///
+  /// \param paramList A parameter list for e.g \c set(newValue), or \c nullptr
+  /// if the accessor doesn't have any user-specified arguments.
+  static AccessorDecl *createParsed(ASTContext &ctx, AccessorKind accessorKind,
+                                    AbstractStorageDecl *storage,
+                                    SourceLoc declLoc,
+                                    SourceLoc accessorKeywordLoc,
+                                    ParameterList *paramList,
+                                    SourceLoc asyncLoc, SourceLoc throwsLoc,
+                                    TypeRepr *thrownType, DeclContext *dc);
+
+  /// Retrieve the implicit parameter name for the given accessor kind (e.g
+  /// \c oldValue for `didSet`, `newValue` for `set`), or an empty string if
+  /// the kind does not have an implicit parameter name.
+  static StringRef implicitParameterNameFor(AccessorKind kind);
 
   SourceLoc getAccessorKeywordLoc() const { return AccessorKeywordLoc; }
 

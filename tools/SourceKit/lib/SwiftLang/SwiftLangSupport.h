@@ -682,9 +682,9 @@ public:
 
   void findRelatedIdentifiersInFile(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver)
       override;
 
   void findActiveRegionsInFile(
@@ -695,7 +695,7 @@ public:
 
   CancellableResult<std::vector<CategorizedRenameRanges>>
   findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                   ArrayRef<RenameLocations> RenameLocations,
+                   ArrayRef<RenameLoc> RenameLocations,
                    ArrayRef<const char *> Args) override;
 
   void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,

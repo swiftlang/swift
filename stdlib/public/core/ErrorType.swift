@@ -200,6 +200,28 @@ public func _unexpectedError(
   #endif
 }
 
+/// Invoked by the compiler when the subexpression of a `try!` expression
+/// throws an error.
+@_silgen_name("swift_unexpectedErrorTyped")
+@_alwaysEmitIntoClient
+@inlinable
+public func _unexpectedErrorTyped<E: Error>(
+  _ error: __owned E,
+  filenameStart: Builtin.RawPointer,
+  filenameLength: Builtin.Word,
+  filenameIsASCII: Builtin.Int1,
+  line: Builtin.Word
+) {
+  #if !$Embedded
+  _unexpectedError(
+    error, filenameStart: filenameStart, filenameLength: filenameLength,
+    filenameIsASCII: filenameIsASCII, line: line
+  )
+  #else
+  Builtin.int_trap()
+  #endif
+}
+
 /// Invoked by the compiler when code at top level throws an uncaught error.
 @_silgen_name("swift_errorInMain")
 public func _errorInMain(_ error: Error) {

@@ -158,10 +158,15 @@ bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
 
   // Honour the user's request to add a rpath to the binary.  This defaults to
   // `true` on non-android and `false` on android since the library must be
-  // copied into the bundle.
+  // copied into the bundle. An exception is made for the Termux app as it
+  // builds and runs natively like a Unix environment on Android.
+#if defined(__TERMUX__)
+  bool apply_rpath = true;
+#else
+  bool apply_rpath = !T.isAndroid();
+#endif
   return Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
-                      options::OPT_no_toolchain_stdlib_rpath,
-                      !T.isAndroid());
+                      options::OPT_no_toolchain_stdlib_rpath, apply_rpath);
 }
 
 ToolChain::InvocationInfo

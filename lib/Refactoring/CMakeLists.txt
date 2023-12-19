@@ -1,8 +1,3 @@
-if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
-  # swiftRefactoring requires SwiftIDEUtilsBriding, which isn't built if SWIFT_BUILD_SWIFT_SYNTAX is `NO`.
-  return()
-endif()
-
 add_swift_host_library(swiftRefactoring STATIC
   AddEquatableConformance.cpp
   AddExplicitCodableImplementation.cpp
@@ -50,10 +45,14 @@ target_link_libraries(swiftRefactoring PRIVATE
   swiftAST
   swiftClangImporter
   swiftIDE
-  swiftIDEUtilsBridging
   swiftIndex
   swiftParse
   swiftSema)
 
-set_swift_llvm_is_available(swiftRefactoring)
+if(SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftRefactoring PRIVATE
+    swiftIDEUtilsBridging
+  )
+endif()
 
+set_swift_llvm_is_available(swiftRefactoring)

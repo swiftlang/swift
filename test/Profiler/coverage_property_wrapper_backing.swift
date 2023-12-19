@@ -93,8 +93,7 @@ struct U {
   // CHECK-NEXT:  [[@LINE-2]]:11 -> [[@LINE-2]]:40 : 0
   // CHECK-NEXT:  [[@LINE-3]]:14 -> [[@LINE-3]]:23 : 0
   // CHECK-NEXT:  [[@LINE-4]]:24 -> [[@LINE-4]]:29 : 1
-  // CHECK-NEXT:  [[@LINE-5]]:29 -> [[@LINE-5]]:40 : 0
-  // CHECK-NEXT:  [[@LINE-6]]:35 -> [[@LINE-6]]:40 : (0 - 1)
+  // CHECK-NEXT:  [[@LINE-5]]:35 -> [[@LINE-5]]:40 : (0 - 1)
   // CHECK-NEXT:  }
 }
 

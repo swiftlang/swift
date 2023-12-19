@@ -1195,8 +1195,7 @@ public:
         DC->getParentModule(), TS->getThrowLoc());
     Type errorType;
     if (catchNode) {
-      errorType = catchNode.getThrownErrorTypeInContext(getASTContext())
-          .value_or(Type());
+      errorType = catchNode.getThrownErrorTypeInContext(Ctx).value_or(Type());
     }
 
     // If there was no error type, use 'any Error'. We'll check it later.
@@ -1342,7 +1341,6 @@ public:
         case SelfAccessKind::Borrowing:
         case SelfAccessKind::NonMutating:
         case SelfAccessKind::Mutating:
-        case SelfAccessKind::ResultDependsOnSelf:
           ctx.Diags.diagnose(DS->getDiscardLoc(),
                              diag::discard_wrong_context_nonconsuming,
                              fn->getDescriptiveKind());
@@ -1378,15 +1376,15 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, IS);
 
-    Stmt *S = IS->getThenStmt();
-    typeCheckStmt(S);
-    IS->setThenStmt(S);
+    auto *TS = IS->getThenStmt();
+    typeCheckStmt(TS);
+    IS->setThenStmt(TS);
 
-    if ((S = IS->getElseStmt())) {
-      typeCheckStmt(S);
-      IS->setElseStmt(S);
+    if (auto *ES = IS->getElseStmt()) {
+      typeCheckStmt(ES);
+      IS->setElseStmt(ES);
     }
-    
+
     return IS;
   }
   
@@ -1679,7 +1677,7 @@ public:
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
 
-    Type caughtErrorType = TypeChecker::catchErrorType(Ctx, S);
+    Type caughtErrorType = TypeChecker::catchErrorType(DC, S);
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
@@ -2764,24 +2762,6 @@ static bool requiresNoDefinition(Decl *decl) {
   return false;
 }
 
-/// Expand all preamble macros attached to the given function declaration.
-static std::vector<ASTNode> expandPreamble(AbstractFunctionDecl *func) {
-  std::vector<ASTNode> preamble;
-
-  ASTContext &ctx = func->getASTContext();
-  ExpandPreambleMacroRequest request{func};
-  auto module = func->getParentModule();
-  for (auto bufferID : evaluateOrDefault(ctx.evaluator, request, { })) {
-    auto bufferStart = ctx.SourceMgr.getLocForBufferStart(bufferID);
-    auto preambleSF = module->getSourceFileContainingLocation(bufferStart);
-    preamble.insert(preamble.end(),
-                    preambleSF->getTopLevelItems().begin(),
-                    preambleSF->getTopLevelItems().end());
-  }
-
-  return preamble;
-}
-
 BraceStmt *
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
@@ -2855,17 +2835,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
         body->walk(ContextualizeClosuresAndMacros(AFD));
       }
     }
-  }
-
-  // Expand any preamble macros and introduce them into the body.
-  auto preamble = expandPreamble(AFD);
-  if (!preamble.empty()) {
-    auto newBody = std::move(preamble);
-    newBody.insert(
-        newBody.end(), body->getElements().begin(), body->getElements().end());
-
-    body = BraceStmt::create(
-        ctx, body->getLBraceLoc(), newBody, body->getRBraceLoc());
   }
 
   // Typechecking, in particular ApplySolution is going to replace closures

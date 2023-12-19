@@ -503,11 +503,6 @@ FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
                                     "_asyncMainDrainQueue");
 }
 
-FuncDecl *SILGenModule::getGetMainExecutor() {
-  return lookupConcurrencyIntrinsic(getASTContext(), GetMainExecutor,
-                                    "_getMainExecutor");
-}
-
 FuncDecl *SILGenModule::getSwiftJobRun() {
   return lookupConcurrencyIntrinsic(getASTContext(), SwiftJobRun,
                                     "_swiftJobRun");
@@ -804,23 +799,22 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
   if (!getASTContext().SILOpts.SkipNonExportableDecls)
     return false;
 
-  if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-    do {
-      if (afd->isExposedToClients())
-        return false;
+  if (D->isExposedToClients())
+    return false;
 
-      // If this function is nested within another function that is exposed to
-      // clients then it should be emitted.
-      auto dc = afd->getDeclContext()->getAsDecl();
-      afd = dc ? dyn_cast<AbstractFunctionDecl>(dc) : nullptr;
-    } while (afd);
+  if (isa<AbstractFunctionDecl>(D)) {
+    // If this function is nested within another function that is exposed to
+    // clients then it should be emitted.
+    auto dc = D->getDeclContext();
+    do {
+      if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
+        if (afd->isExposedToClients())
+          return false;
+    } while ((dc = dc->getParent()));
 
     // We didn't find a parent function that is exposed.
     return true;
   }
-
-  if (D->isExposedToClients())
-    return false;
 
   return true;
 }
@@ -1667,6 +1661,9 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
 
 void SILGenModule::
 emitPropertyWrapperBackingInitializer(VarDecl *var) {
+  if (M.getOptions().SkipNonExportableDecls)
+    return;
+
   auto initInfo = var->getPropertyWrapperInitializerInfo();
 
   if (initInfo.hasInitFromWrappedValue()) {

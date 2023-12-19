@@ -245,6 +245,8 @@ enum class UnqualifiedLookupFlags {
   ExcludeMacroExpansions = 1 << 6,
   /// This lookup should only return macros.
   MacroLookup            = 1 << 7,
+  /// This lookup should only return modules
+  ModuleLookup           = 1 << 8,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -550,8 +552,10 @@ void filterForDiscriminator(SmallVectorImpl<Result> &results,
 
 /// \returns The set of macro declarations with the given name that
 /// fulfill any of the given macro roles.
-SmallVector<MacroDecl *, 1>
-lookupMacros(DeclContext *dc, DeclNameRef macroName, MacroRoles roles);
+SmallVector<MacroDecl *, 1> lookupMacros(DeclContext *dc,
+                                         DeclNameRef moduleName,
+                                         DeclNameRef macroName,
+                                         MacroRoles roles);
 
 /// \returns Whether the given source location is inside an attached
 /// or freestanding macro argument.

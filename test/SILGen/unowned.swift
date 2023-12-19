@@ -89,10 +89,11 @@ func testunowned_local() -> C {
   // CHECK: [[C:%.*]] = apply
   let c = C()
 
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [lexical] [var_decl] [[C]]
+  // CHECK: [[MOVED_C:%.*]] = move_value [lexical] [var_decl] [[C]]
   // CHECK: [[UC:%.*]] = alloc_box ${ var @sil_unowned C }, let, name "uc"
   // CHECK: [[UC_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[UC]]
   // CHECK: [[PB_UC:%.*]] = project_box [[UC_LIFETIME]]
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[MOVED_C]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
   // CHECK: [[tmp1:%.*]] = ref_to_unowned [[C_COPY]] : $C to $@sil_unowned C
   // CHECK: [[tmp1_copy:%.*]] = copy_value [[tmp1]]
@@ -107,7 +108,7 @@ func testunowned_local() -> C {
 
   // CHECK: end_borrow [[UC_LIFETIME]]
   // CHECK: destroy_value [[UC]]
-  // CHECK: destroy_value [[C]]
+  // CHECK: destroy_value [[MOVED_C]]
   // CHECK: return [[tmp3]]
 }
 

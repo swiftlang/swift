@@ -255,12 +255,8 @@ static bool isSingleSwiftRefcounted(SILModule &M,
   if (Ty->isAnyExistentialType()) {
     auto layout = Ty->getExistentialLayout();
     // Must be no protocol constraints that aren't @objc or @_marker.
-    if (layout.containsNonObjCProtocol) {
-      for (auto proto : layout.getProtocols()) {
-        if (!proto->isObjC() && !proto->isMarkerProtocol()) {
-          return false;
-        }
-      }
+    if (layout.containsSwiftProtocol) {
+      return false;
     }
     
     // The Error existential has its own special layout.
@@ -592,6 +588,7 @@ SILType::getPreferredExistentialRepresentation(Type containedType) const {
     return ExistentialRepresentation::Class;
   
   // Otherwise, we need to use a fixed-sized buffer.
+  assert(!layout.isObjC());
   return ExistentialRepresentation::Opaque;
 }
 
@@ -1043,6 +1040,10 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
   return SILType();
 }
 
+bool SILType::isEscapable() const {
+  return getASTType()->isEscapable();
+}
+
 bool SILType::isMoveOnly() const {
   // Legacy check.
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
@@ -1159,13 +1160,6 @@ bool SILType::isMarkedAsImmortal() const {
     }
   }
   return false;
-}
-
-bool SILType::isEscapable() const {
-  if (auto *nom = getASTType().getAnyNominal())
-    return nom->isEscapable();
-
-  return true;
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {

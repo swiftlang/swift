@@ -21,7 +21,8 @@
 using namespace swift;
 using namespace swift::ide;
 
-std::vector<ResolvedLoc>
+#if SWIFT_BUILD_SWIFT_SYNTAX
+std::vector<ResolvedAndRenameLoc>
 swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
                                    StringRef NewName, SourceFile &SF,
                                    DiagnosticEngine &Diags) {
@@ -62,7 +63,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
         return {};
       }
 
-      if (RenameLoc.Usage == NameUsage::Call && !RenameLoc.IsFunctionLike) {
+      if (RenameLoc.Usage == RenameLocUsage::Call && !OldName.isFunction()) {
         Diags.diagnose(Location, diag::name_not_functionlike, NewName);
         return {};
       }
@@ -71,40 +72,35 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
     UnresolvedLocs.push_back({Location});
   }
 
-  std::vector<BridgedSourceLoc> BridgedUnresolvedLocs;
-  BridgedUnresolvedLocs.reserve(UnresolvedLocs.size());
-  for (SourceLoc Loc : UnresolvedLocs) {
-    BridgedUnresolvedLocs.push_back(BridgedSourceLoc(Loc));
-  }
+  assert(UnresolvedLocs.size() == RenameLocs.size());
 
-  BridgedResolvedLocVector bridgedResolvedLocs =
-      swift_SwiftIDEUtilsBridging_runNameMatcher(SF.getExportedSourceFile(),
-                                                 BridgedUnresolvedLocs.data(),
-                                                 BridgedUnresolvedLocs.size());
-  const std::vector<ResolvedLoc> &resolvedLocsInSourceOrder =
-      bridgedResolvedLocs.takeUnbridged();
+  std::vector<ResolvedLoc> resolvedLocsInSourceOrder =
+      runNameMatcher(SF, UnresolvedLocs);
 
-  // Callers expect the resolved locs in the same order as the unresolved locs.
-  // Sort them.
-  // FIXME: (NameMatcher) Can we change the callers to not rely on this?
-  std::vector<ResolvedLoc> resolvedLocsInRequestedOrder;
-  for (SourceLoc unresolvedLoc : UnresolvedLocs) {
-    auto found =
-        llvm::find_if(resolvedLocsInSourceOrder,
-                      [unresolvedLoc](const ResolvedLoc &resolved) {
-                        return resolved.range.getStart() == unresolvedLoc;
-                      });
+  // Callers need to corrolate the `ResolvedLoc` with the `RenameLoc` that they
+  // originated from. Match them.
+  std::vector<ResolvedAndRenameLoc> resolvedAndRenameLocs;
+  for (auto [unresolvedLoc, renameLoc] :
+       llvm::zip_equal(UnresolvedLocs, RenameLocs)) {
+    auto found = llvm::find_if(
+        resolvedLocsInSourceOrder,
+        [unresolvedLoc = unresolvedLoc](const ResolvedLoc &resolved) {
+          return resolved.range.getStart() == unresolvedLoc;
+        });
+    ResolvedLoc resolvedLoc;
     if (found == resolvedLocsInSourceOrder.end()) {
-      resolvedLocsInRequestedOrder.push_back(
+      resolvedLoc =
           ResolvedLoc(CharSourceRange(),
                       /*LabelRanges=*/{}, llvm::None, LabelRangeType::None,
-                      /*IsActive=*/true, ResolvedLocContext::Comment));
+                      /*IsActive=*/true, ResolvedLocContext::Comment);
     } else {
-      resolvedLocsInRequestedOrder.push_back(*found);
+      resolvedLoc = *found;
     }
+    resolvedAndRenameLocs.push_back({renameLoc, resolvedLoc});
   }
-  return resolvedLocsInRequestedOrder;
+  return resolvedAndRenameLocs;
 }
+#endif
 
 CancellableResult<std::vector<SyntacticRenameRangeDetails>>
 swift::ide::findSyntacticRenameRanges(SourceFile *SF,
@@ -112,6 +108,9 @@ swift::ide::findSyntacticRenameRanges(SourceFile *SF,
                                       StringRef NewName) {
   using ResultType =
       CancellableResult<std::vector<SyntacticRenameRangeDetails>>;
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  return ResultType::failure("find-syntactic-rename-ranges is not supported because sourcekitd was built without swift-syntax");
+#else
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
@@ -121,21 +120,19 @@ swift::ide::findSyntacticRenameRanges(SourceFile *SF,
   swift::PrintingDiagnosticConsumer DiagConsumer(DiagOS);
   DiagEngine.addConsumer(DiagConsumer);
 
-  auto ResolvedLocs =
+  auto ResolvedAndRenameLocs =
       resolveRenameLocations(RenameLocs, NewName, *SF, DiagEngine);
-  if (ResolvedLocs.size() != RenameLocs.size() || DiagConsumer.didErrorOccur())
+  if (ResolvedAndRenameLocs.size() != RenameLocs.size() ||
+      DiagConsumer.didErrorOccur())
     return ResultType::failure(ErrBuffer);
 
   std::vector<SyntacticRenameRangeDetails> Result;
-  size_t index = 0;
-  for (const RenameLoc &Rename : RenameLocs) {
-    ResolvedLoc &Resolved = ResolvedLocs[index++];
-
-    SyntacticRenameRangeDetails Details =
-        getSyntacticRenameRangeDetails(SM, Rename.OldName, Resolved, Rename);
+  for (const ResolvedAndRenameLoc &Loc : ResolvedAndRenameLocs) {
+    SyntacticRenameRangeDetails Details = getSyntacticRenameRangeDetails(
+        SM, Loc.renameLoc.OldName, Loc.resolved, Loc.renameLoc);
     if (Details.Type == RegionType::Mismatch) {
-      DiagEngine.diagnose(Resolved.range.getStart(), diag::mismatched_rename,
-                          NewName);
+      DiagEngine.diagnose(Loc.resolved.range.getStart(),
+                          diag::mismatched_rename, NewName);
       Result.emplace_back(SyntacticRenameRangeDetails{Details.Type, {}});
     } else {
       Result.push_back(Details);
@@ -146,4 +143,5 @@ swift::ide::findSyntacticRenameRanges(SourceFile *SF,
     return ResultType::failure(ErrBuffer);
 
   return ResultType::success(Result);
+#endif
 }

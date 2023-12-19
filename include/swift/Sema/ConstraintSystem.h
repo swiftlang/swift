@@ -519,6 +519,10 @@ public:
   /// Determine whether this type variable represents an opened opaque type.
   bool isOpaqueType() const;
 
+  /// Determine whether this type variable represents a type of a collection
+  /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
+  bool isCollectionLiteralType() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -1436,6 +1440,34 @@ struct MatchCallArgumentResult {
   }
 };
 
+/// Describes a potential throw site in the constraint system.
+///
+/// For example, given `try f() + a[b] + x.y`, each of `f()`, `a[b]`, `x`, and
+/// `x.y` is a potential throw site.
+struct PotentialThrowSite {
+  enum Kind {
+    /// The application of a function or subscript.
+    Application,
+
+    /// An explicit 'throw'.
+    ExplicitThrow,
+
+    /// A non-exhaustive do...catch, which rethrows whatever is thrown from
+    /// inside it's `do` block.
+    NonExhaustiveDoCatch,
+
+    /// A property access that can throw an error.
+    PropertyAccess,
+  } kind;
+
+  /// The type that describes the potential throw site, such as the type of the
+  /// function being called or type being thrown.
+  Type type;
+
+  /// The locator that specifies where the throwing operation occurs.
+  ConstraintLocator *locator;
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1542,6 +1574,13 @@ public:
   /// being solved.
   llvm::MapVector<const CaseLabelItem *, CaseLabelItemInfo>
       caseLabelItems;
+
+  /// Maps catch nodes to the set of potential throw sites that will be caught
+  /// at that location.
+
+  /// The set of opened types for a given locator.
+  std::vector<std::pair<CatchNode, PotentialThrowSite>>
+      potentialThrowSites;
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
@@ -2034,6 +2073,9 @@ struct DeclReferenceType {
   /// (e.g.) applying the base of a member access. This is the type of the
   /// expression used to form the declaration reference.
   Type adjustedReferenceType;
+
+  /// The type that could be thrown by accessing this declaration.
+  Type thrownErrorTypeOnAccess;
 };
 
 /// Describes a system of constraints on type variables, the
@@ -2205,6 +2247,11 @@ private:
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
+
+  /// Keep track of all of the potential throw sites.
+  /// FIXME: This data structure should be replaced with something that
+  /// is, in effect, a multimap-vector.
+  std::vector<std::pair<CatchNode, PotentialThrowSite>> potentialThrowSites;
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
@@ -2817,6 +2864,9 @@ public:
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
 
+    /// The length of \c potentialThrowSites.
+    unsigned numPotentialThrowSites;
+
     /// The length of \c exprPatterns.
     unsigned numExprPatterns;
 
@@ -3288,6 +3338,14 @@ public:
 
     return known->second;
   }
+
+  /// Note that there is a potential throw site at the given location.
+  void recordPotentialThrowSite(
+      PotentialThrowSite::Kind kind, Type type,
+      ConstraintLocatorBuilder locator);
+
+  /// Determine the caught error type for the given catch node.
+  Type getCaughtErrorType(CatchNode node);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
@@ -3761,6 +3819,21 @@ public:
                                        RememberChoice_t rememberChoice,
                                        ConstraintLocatorBuilder locator,
                                        ConstraintFix *compatFix = nullptr);
+
+  /// Given a tuple with a single unlabeled element that represents a pack
+  /// expansion (either directly via \c PackExpansionType or through a type
+  /// variable constrained to a pack expansion), materialize the pack expansion
+  /// and return its pattern type as a result. The result is a type variable
+  /// because element of the tuple is not required to be resolved at the time of
+  /// the call and operation is delayed until the element is sufficiently
+  /// resolved (see \c simplifyMaterializePackExpansionConstraint)
+  ///
+  /// \param tupleType A tuple with a single unlabeled element that represents a
+  /// pack expansion. 
+  /// \param locator The locator.
+  TypeVariableType *
+  addMaterializePackExpansionConstraint(Type tupleType,
+                                        ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
   void

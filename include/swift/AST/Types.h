@@ -439,6 +439,11 @@ protected:
     ID : 29
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
+    // Number of terms in the union.
+    NumTerms : 32
+  );
+    
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1,
     ExtInfoBits : NumSILExtInfoBits,
     HasClangTypeInfo : 1,
@@ -640,11 +645,21 @@ public:
 
   bool isPlaceholder();
 
-  /// DEPRECIATED: Returns true if this is a noncopyable type.
-  bool isNoncopyable();
+  /// Returns true if this type lacks conformance to Copyable in the context,
+  /// if provided.
+  bool isNoncopyable(GenericEnvironment *env = nullptr);
+  bool isNoncopyable(const DeclContext *dc) {
+    assert(dc);
+    return isNoncopyable(dc->getGenericEnvironmentOfContext());
+  };
 
-  /// Returns true if this type lacks conformance to Copyable in the context.
-  bool isNoncopyable(const DeclContext *dc);
+  /// Returns true if this type conforms to Escapable in the context,
+  /// if provided.
+  bool isEscapable(GenericEnvironment *env = nullptr);
+  bool isEscapable(const DeclContext *dc) {
+    assert(dc);
+    return isEscapable(dc->getGenericEnvironmentOfContext());
+  };
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -872,6 +887,9 @@ public:
   /// existential type: a protocol type, a protocol composition type, or
   /// an existential metatype.
   bool isAnyExistentialType();
+
+  /// isErrorExistentialType - Determines whether this type is 'any Error'.
+  bool isErrorExistentialType();
 
   /// isObjCExistentialType - Determines whether this type is an
   /// class-bounded existential type whose required conformances are
@@ -1532,48 +1550,6 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 
-/// InverseType represents the "inverse" of a ProtocolType as a constraint.
-/// An inverse represents the _absence_ of an implicit constraint to the given
-/// protocol.
-///
-/// Otherwise, an inverse is not a real type! It's an annotation for other types
-/// to signal whether an implicit requirement on that type should be omitted.
-/// Because that annotation is expressed in the surface language as if it _were_
-/// a type (that is, as a type constraint) we still model it as a Type through
-/// typechecking.
-class InverseType final : public TypeBase {
-  Type protocol;
-
-  InverseType(Type type,
-              const ASTContext *canonicalContext,
-              RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Inverse, canonicalContext, properties),
-        protocol(type) {
-    assert(protocol->is<ProtocolType>());
-  }
-
-public:
-  /// Produce an inverse constraint type for the given protocol type.
-  static Type get(Type protocolType);
-
-
-  /// Obtain the underlying \c ProtocolType that was inverted.
-  Type getInvertedProtocol() const {
-    return protocol;
-  }
-
-  /// Get known kind of inverse this type represents.
-  InvertibleProtocolKind getInverseKind() const;
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Inverse;
-  }
-};
-BEGIN_CAN_TYPE_WRAPPER(InverseType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getInvertedProtocol)
-END_CAN_TYPE_WRAPPER(InverseType, Type)
-
 /// ErrorType - Represents the type of an erroneously constructed declaration,
 /// expression, or type. When creating ErrorTypes, an associated error
 /// diagnostic should always be emitted. That way when later stages of
@@ -2228,23 +2204,24 @@ enum class ParamSpecifier : uint8_t {
   /// `__shared`, a legacy spelling of `borrowing`.
   LegacyShared = 4,
   /// `__owned`, a legacy spelling of `consuming`.
-  LegacyOwned = 5,
+  LegacyOwned = 5
 };
 
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
   enum ParameterFlags : uint16_t {
-    None         = 0,
-    Variadic     = 1 << 0,
-    AutoClosure  = 1 << 1,
+    None = 0,
+    Variadic = 1 << 0,
+    AutoClosure = 1 << 1,
     NonEphemeral = 1 << 2,
     SpecifierShift = 3,
-    Specifier    = 7 << SpecifierShift,
+    Specifier = 7 << SpecifierShift,
     NoDerivative = 1 << 6,
-    Isolated     = 1 << 7,
+    Isolated = 1 << 7,
     CompileTimeConst = 1 << 8,
-    NumBits = 9
+    ResultDependsOn = 1 << 9,
+    NumBits = 10
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2284,6 +2261,7 @@ public:
   bool isIsolated() const { return value.contains(Isolated); }
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
+  bool hasResultDependsOn() const { return value.contains(ResultDependsOn); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -5811,6 +5789,9 @@ public:
   /// Constructs a protocol composition corresponding to the `AnyObject` type.
   static Type theAnyObjectType(const ASTContext &C);
 
+  /// Constructs a protocol composition corresponding to the `~IP` type.
+  static Type getInverseOf(const ASTContext &C, InvertibleProtocolKind IP);
+
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
   /// slower, but stricter minimization at need (e.g. redeclaration checking).
@@ -6796,11 +6777,13 @@ public:
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
-  Type substBaseType(Type base, LookupConformanceFn lookupConformance);
+  Type substBaseType(Type base, LookupConformanceFn lookupConformance,
+                     SubstOptions options);
 
   /// Substitute the root generic type, looking up the chain of associated types.
   /// Returns null if the member could not be found in the new root.
-  Type substRootParam(Type newRoot, LookupConformanceFn lookupConformance);
+  Type substRootParam(Type newRoot, LookupConformanceFn lookupConformance,
+                      SubstOptions options);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -6958,6 +6941,43 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
+
+/// Represents the union of two or more
+class ErrorUnionType final
+    : public TypeBase,
+      public llvm::FoldingSetNode,
+      private llvm::TrailingObjects<ErrorUnionType, Type> {
+  friend TrailingObjects;
+
+  ErrorUnionType(const ASTContext *ctx, ArrayRef<Type> terms,
+                 RecursiveTypeProperties properties) 
+        : TypeBase(TypeKind::ErrorUnion, /*Context=*/ctx, properties) {
+    Bits.ErrorUnionType.NumTerms = terms.size();
+    std::uninitialized_copy(terms.begin(), terms.end(),
+                            getTrailingObjects<Type>());
+  }
+
+public:
+  /// Form a new error union type from a set of terms.
+  static Type get(const ASTContext &ctx, ArrayRef<Type> terms);
+
+  ArrayRef<Type> getTerms() const {
+    return { getTrailingObjects<Type>(), Bits.ErrorUnionType.NumTerms };
+  };
+
+  // Support for FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    Profile(id, getTerms());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ErrorUnion;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorUnionType, Type)
 
 /// PlaceholderType - This represents a placeholder type for a type variable
 /// or dependent member type that cannot be resolved to a concrete type
@@ -7294,8 +7314,7 @@ inline bool TypeBase::isConstraintType() const {
 inline bool CanType::isConstraintTypeImpl(CanType type) {
   return (isa<ProtocolType>(type) ||
           isa<ProtocolCompositionType>(type) ||
-          isa<ParameterizedProtocolType>(type) ||
-          isa<InverseType>(type));
+          isa<ParameterizedProtocolType>(type));
 }
 
 inline bool TypeBase::isExistentialType() {
@@ -7311,11 +7330,14 @@ inline bool CanType::isExistentialTypeImpl(CanType type) {
          isa<ProtocolCompositionType>(type) ||
          isa<ExistentialType>(type) ||
          isa<ParameterizedProtocolType>(type);
-  // TODO(kavon): treat InverseType as an existential, etc?
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
   return isExistentialTypeImpl(type) || isa<ExistentialMetatypeType>(type);
+}
+
+inline bool TypeBase::isErrorExistentialType() {
+  return getCanonicalType().isErrorExistentialType();
 }
 
 inline bool TypeBase::isClassExistentialType() {

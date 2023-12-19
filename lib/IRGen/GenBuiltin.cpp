@@ -31,8 +31,10 @@
 #include "GenCast.h"
 #include "GenConcurrency.h"
 #include "GenDistributed.h"
+#include "GenEnum.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
+#include "GenOpaque.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -319,13 +321,23 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup) {
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor) {
 
     auto flags = args.claimNext();
     auto taskGroup =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
-        ? args.claimNext()
-        : nullptr;
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+            ? args.claimNext()
+            : nullptr;
+
+    // ExecutorRef is two pointers: {Identity, Implementation}
+    std::pair<llvm::Value *, llvm::Value *> executorRef =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+            ? std::pair(args.claimNext(), args.claimNext())
+            : std::pair(nullptr, nullptr);
 
     // In embedded Swift, futureResultType is a thin metatype, not backed by any
     // actual value.
@@ -334,17 +346,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       futureResultType = args.claimNext();
     }
-
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF,
-        flags,
-        taskGroup,
-        futureResultType,
-        taskFunction, taskContext,
-        substitutions);
+        IGF, flags, taskGroup, executorRef.first, executorRef.second,
+        futureResultType, taskFunction, taskContext, substitutions);
 
     // Cast back to NativeObject/RawPointer.
     auto newTask = IGF.Builder.CreateExtractValue(newTaskAndContext, { 0 });
@@ -416,6 +423,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::BuildDefaultActorExecutorRef) {
     auto actor = args.claimNext();
     emitBuildDefaultActorExecutorRef(IGF, actor, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildOrdinaryTaskExecutorRef) {
+    auto actor = args.claimNext();
+    auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto conf = substitutions.getConformances()[0];
+    emitBuildOrdinaryTaskExecutorRef(IGF, actor, type, conf, out);
     return;
   }
 
@@ -1488,6 +1503,56 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto pointerSrc = args.claimNext();
     (void)args.claimAll();
     out.add(pointerSrc);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::AllocVector) {
+    (void)args.claimAll();
+    IGF.emitTrap("escaped vector allocation", /*EmitUnreachable=*/true);
+    out.add(llvm::UndefValue::get(IGF.IGM.Int8PtrTy));
+    llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    IGF.Builder.emitBlock(contBB);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::GetEnumTag) {
+    auto arg = args.claimNext();
+    auto ty = argTypes[0];
+    auto &ti = IGF.getTypeInfo(ty);
+
+    // If the type is just an archetype, then we know nothing about the enum
+    // strategy for it. Just call the vwt function. Otherwise, we know that this
+    // is at least an enum and can optimize away some of the cost of getEnumTag.
+    if (!ty.is<ArchetypeType>()) {
+      assert(ty.getEnumOrBoundGenericEnum() && "expected enum type in "
+             "getEnumTag builtin!");
+
+      auto &strategy = getEnumImplStrategy(IGF.IGM, ty);
+
+      out.add(strategy.emitGetEnumTag(IGF, ty, ti.getAddressForPointer(arg)));
+      return;
+    }
+
+    out.add(emitGetEnumTagCall(IGF, ty, ti.getAddressForPointer(arg)));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::InjectEnumTag) {
+    auto input = args.claimNext();
+    auto tag = args.claimNext();
+    auto inputTy = argTypes[0];
+    auto &inputTi = IGF.getTypeInfo(inputTy);
+
+    // In order for us to call 'storeTag' on an enum strategy (when type is not
+    // an archetype), we'd need to be able to map the tag back into an
+    // EnumElementDecl which might be fragile. We don't really care about being
+    // able to optimize this vwt function call anyway because we expect most
+    // use cases to be the truly dynamic case where the compiler has no static
+    // information about the type to be able to optimize it away. Just call the
+    // vwt function.
+
+    emitDestructiveInjectEnumTagCall(IGF, inputTy, tag,
+                                     inputTi.getAddressForPointer(input));
     return;
   }
 

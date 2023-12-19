@@ -3790,6 +3790,28 @@ type, use ``alloc_box``.
 
 ``T`` must not be a pack type.  To allocate a pack, use ``alloc_pack``.
 
+alloc_vector
+````````````
+::
+
+  sil-instruction ::= 'alloc_vector' sil-type, sil-operand
+
+  %1 = alloc_vector $T, %0 : $Builtin.Word
+  // %1 has type $*T
+
+Allocates uninitialized memory that is sufficiently aligned on the stack to
+contain a vector of values of type ``T``. The result of the instruction is
+the address of the allocated memory.
+The number of vector elements is specified by the operand, which must be a
+builtin integer value.
+
+``alloc_vector`` either allocates memory on the stack or - if contained in a
+global variable static initializer list - in the data section.
+
+``alloc_vector`` is a stack allocation instruction, unless it's contained in a
+global initializer list.  See the section above on stack discipline.  The
+corresponding stack deallocation instruction is ``dealloc_stack``.
+
 alloc_pack
 ``````````
 
@@ -5905,11 +5927,28 @@ Function Application
 These instructions call functions or wrap them in partial application or
 specialization thunks.
 
+In the following we allow for `apply`_, `begin_apply`_, and `try_apply`_ to have
+a callee or caller actor isolation attached to them::
+
+  sil-actor-isolation        ::= unspecified
+                             ::= actor_instance
+                             ::= nonisolated
+                             ::= nonisolated_unsafe
+                             ::= global_actor
+                             ::= global_actor_unsafe
+
+  sil-actor-isolation-callee ::= [callee_isolation=sil-actor-isolation]
+  sil-actor-isolation-caller ::= [caller_isolation=sil-actor-isolation]
+
+These can be used to write test cases with actor isolation using these
+instructions and is not intended to be used in SILGen today.
+
 apply
 `````
 ::
 
-  sil-instruction ::= 'apply' '[nothrow]'? sil-value
+  sil-instruction ::= 'apply' '[nothrow]'? sil-actor-isolation-callee?
+                        sil-actor-isolation-caller? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
@@ -6687,6 +6726,20 @@ object
   // Optionally there may be more elements, which are tail-allocated to T
 
 Constructs a statically initialized object. This instruction can only appear
+as final instruction in a global variable static initializer list.
+
+vector
+``````
+
+::
+
+  sil-instruction ::= 'vector' '(' (sil-operand (',' sil-operand)*)? ')'
+
+  vector (%a : $T, %b : $T, ...)
+  // $T must be a non-generic or bound generic reference type
+  // All operands must have the same type
+
+Constructs a statically initialized vector of elements. This instruction can only appear
 as final instruction in a global variable static initializer list.
 
 ref_element_addr

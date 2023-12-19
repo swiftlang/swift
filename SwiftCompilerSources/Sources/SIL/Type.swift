@@ -43,10 +43,6 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return bridged.isReferenceCounted(function.bridged)
   }
 
-  public func selfOrAnyFieldHasValueDeinit(in function: Function) -> Bool {
-    return bridged.selfOrAnyFieldHasValueDeinit(function.bridged)
-  }
-
   public var isUnownedStorageType: Bool {
     return bridged.isUnownedStorageType()
   }
@@ -251,7 +247,7 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 }
 
 extension BridgedType {
-  var type: Type { Type(bridged: self) }
+  public var type: Type { Type(bridged: self) }
   var typeOrNil: Type? { isNull() ? nil : type }
 }
 

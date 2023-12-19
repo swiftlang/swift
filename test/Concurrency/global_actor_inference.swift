@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
@@ -390,7 +390,7 @@ struct HasWrapperOnActor {
     synced = 17
   }
 
-  @WrapperActor var actorSynced: Int = 0
+  @WrapperActor var actorSynced: Int = 0 // expected-warning{{'nonisolated' is not supported on properties with property wrappers}}
 
   func testActorSynced() {
     _ = actorSynced
@@ -489,10 +489,10 @@ struct SimplePropertyWrapper {
 class WrappedContainsNonisolatedAttr {
   @SimplePropertyWrapper nonisolated var value 
   // expected-error@-1 {{'nonisolated' is not supported on properties with property wrappers}}
-  // expected-note@-2 2{{property declared here}}
+  // expected-note@-2 {{property declared here}}
 
   nonisolated func test() {
-    _ = value // expected-error {{main actor-isolated property 'value' can not be referenced from a non-isolated context}}
+    _ = value
     _ = $value // expected-error {{main actor-isolated property '$value' can not be referenced from a non-isolated context}}
   }
 }

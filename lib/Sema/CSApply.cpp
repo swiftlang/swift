@@ -1827,19 +1827,13 @@ namespace {
                                                  dc);
             capture->setImplicit();
             capture->setInterfaceType(base->getType()->mapTypeOutOfContext());
-            
-            NamedPattern *capturePat = new (context) NamedPattern(capture);
-            capturePat->setImplicit();
-            capturePat->setType(base->getType());
-            
-            auto capturePBE = PatternBindingEntry(capturePat,
-                                                  SourceLoc(), base, dc);
-            auto captureDecl = PatternBindingDecl::create(context, SourceLoc(),
-                                                          {}, SourceLoc(),
-                                                          capturePBE,
-                                                          dc);
-            captureDecl->setImplicit();
-            
+
+            auto *capturePat =
+                NamedPattern::createImplicit(context, capture, base->getType());
+
+            auto *captureDecl = PatternBindingDecl::createImplicit(
+                context, StaticSpellingKind::None, capturePat, base, dc);
+
             // Write the closure in terms of the capture.
             auto baseRef = new (context)
               DeclRefExpr(capture, DeclNameLoc(base->getLoc()), /*implicit*/ true);
@@ -2350,11 +2344,10 @@ namespace {
     /// Build an implicit argument for keypath based dynamic lookup,
     /// which consists of KeyPath expression and a single component.
     ///
-    /// \param keyPathTy The type of the keypath argument.
+    /// \param argType The type of the keypath subscript argument.
     /// \param dotLoc The location of the '.' preceding member name.
     /// \param memberLoc The locator to be associated with new argument.
-    Expr *buildKeyPathDynamicMemberArgExpr(BoundGenericType *keyPathTy,
-                                           SourceLoc dotLoc,
+    Expr *buildKeyPathDynamicMemberArgExpr(Type argType, SourceLoc dotLoc,
                                            ConstraintLocator *memberLoc) {
       using Component = KeyPathExpr::Component;
       auto &ctx = cs.getASTContext();
@@ -2363,7 +2356,7 @@ namespace {
       auto makeKeyPath = [&](ArrayRef<Component> components) -> Expr * {
         auto *kp = KeyPathExpr::createImplicit(ctx, /*backslashLoc*/ dotLoc,
                                                components, anchor->getEndLoc());
-        kp->setType(keyPathTy);
+        kp->setType(argType);
         cs.cacheExprTypes(kp);
 
         // See whether there's an equivalent ObjC key path string we can produce
@@ -2371,6 +2364,12 @@ namespace {
         checkAndSetObjCKeyPathString(kp);
         return kp;
       };
+
+      Type keyPathTy = argType;
+      if (auto *existential = keyPathTy->getAs<ExistentialType>()) {
+        keyPathTy = existential->getSuperclass();
+        assert(isKnownKeyPathType(keyPathTy));
+      }
 
       SmallVector<Component, 2> components;
       auto *componentLoc = cs.getConstraintLocator(
@@ -3482,8 +3481,8 @@ namespace {
         auto fieldName = overload.choice.getName().getBaseIdentifier().str();
         argExpr = buildDynamicMemberLookupArgExpr(fieldName, nameLoc, paramTy);
       } else {
-        argExpr = buildKeyPathDynamicMemberArgExpr(
-            paramTy->castTo<BoundGenericType>(), dotLoc, memberLocator);
+        argExpr =
+            buildKeyPathDynamicMemberArgExpr(paramTy, dotLoc, memberLocator);
       }
 
       if (!argExpr)
@@ -3843,6 +3842,11 @@ namespace {
       auto *locator = cs.getConstraintLocator(expr);
       auto *environment = cs.getPackElementEnvironment(locator,
           expansionTy->getCountType()->getCanonicalType());
+
+      // Assert that we have an opened element environment, otherwise we'll get
+      // an ASTVerifier crash when pack archetypes or element archetypes appear
+      // inside the pack expansion expression.
+      assert(environment);
       expr->setGenericEnvironment(environment);
 
       return expr;
@@ -5211,19 +5215,14 @@ namespace {
                                           dc);
       outerParam->setImplicit();
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
-      
-      NamedPattern *outerParamPat = new (ctx) NamedPattern(outerParam);
-      outerParamPat->setImplicit();
-      outerParamPat->setType(keyPathTy);
-      
-      auto outerParamPBE = PatternBindingEntry(outerParamPat,
-                                               SourceLoc(), E, dc);
+
+      auto *outerParamPat =
+          NamedPattern::createImplicit(ctx, outerParam, keyPathTy);
+
       solution.setExprTypes(E);
-      auto outerParamDecl = PatternBindingDecl::create(ctx, SourceLoc(),
-                                                       {}, SourceLoc(),
-                                                       outerParamPBE,
-                                                       dc);
-      outerParamDecl->setImplicit();
+      auto *outerParamDecl = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, outerParamPat, E, dc);
+
       auto outerParamCapture = CaptureListEntry(outerParamDecl);
       auto captureExpr = CaptureListExpr::create(ctx, outerParamCapture,
                                                  closure);
@@ -9111,53 +9110,42 @@ applySolutionToInitialization(Solution &solution, SyntacticElementTarget target,
   return resultTarget;
 }
 
-/// Apply the given solution to the for-each statement target.
-///
-/// \returns the resulting initialization expression.
-static llvm::Optional<SyntacticElementTarget> applySolutionToForEachStmt(
-    Solution &solution, SyntacticElementTarget target,
+static llvm::Optional<SequenceIterationInfo> applySolutionToForEachStmt(
+    Solution &solution, ForEachStmt *stmt, SequenceIterationInfo info,
+    DeclContext *dc,
     llvm::function_ref<
         llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
         rewriteTarget) {
-  auto resultTarget = target;
-  auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
-  auto *stmt = target.getAsForEachStmt();
+  auto &cs = solution.getConstraintSystem();
+
   auto *parsedSequence = stmt->getParsedSequence();
   bool isAsync = stmt->getAwaitLoc().isValid();
 
   // Simplify the various types.
-  forEachStmtInfo.sequenceType =
-      solution.simplifyType(forEachStmtInfo.sequenceType);
-  forEachStmtInfo.elementType =
-      solution.simplifyType(forEachStmtInfo.elementType);
-  forEachStmtInfo.initType =
-      solution.simplifyType(forEachStmtInfo.initType);
+  info.sequenceType = solution.simplifyType(info.sequenceType);
+  info.elementType = solution.simplifyType(info.elementType);
+  info.initType = solution.simplifyType(info.initType);
 
-  auto &cs = solution.getConstraintSystem();
-  auto *dc = target.getDeclContext();
+  // First, let's apply the solution to the expression.
+  auto *makeIteratorVar = info.makeIteratorVar;
 
-  // First, let's apply the solution to the sequence expression.
+  auto makeIteratorTarget = *cs.getTargetFor({makeIteratorVar, /*index=*/0});
+
+  auto rewrittenTarget = rewriteTarget(makeIteratorTarget);
+  if (!rewrittenTarget)
+    return llvm::None;
+
+  // Set type-checked initializer and mark it as such.
   {
-    auto *makeIteratorVar = forEachStmtInfo.makeIteratorVar;
-
-    auto makeIteratorTarget = *cs.getTargetFor({makeIteratorVar, /*index=*/0});
-
-    auto rewrittenTarget = rewriteTarget(makeIteratorTarget);
-    if (!rewrittenTarget)
-      return llvm::None;
-
-    // Set type-checked initializer and mark it as such.
-    {
-      makeIteratorVar->setInit(/*index=*/0, rewrittenTarget->getAsExpr());
-      makeIteratorVar->setInitializerChecked(/*index=*/0);
-    }
-
-    stmt->setIteratorVar(makeIteratorVar);
+    makeIteratorVar->setInit(/*index=*/0, rewrittenTarget->getAsExpr());
+    makeIteratorVar->setInitializerChecked(/*index=*/0);
   }
+
+  stmt->setIteratorVar(makeIteratorVar);
 
   // Now, `$iterator.next()` call.
   {
-    auto nextTarget = *cs.getTargetFor(forEachStmtInfo.nextCall);
+    auto nextTarget = *cs.getTargetFor(info.nextCall);
 
     auto rewrittenTarget = rewriteTarget(nextTarget);
     if (!rewrittenTarget)
@@ -9191,7 +9179,7 @@ static llvm::Optional<SyntacticElementTarget> applySolutionToForEachStmt(
             ShouldStop = true;
 
             auto nextRefType =
-              S.getResolvedType(call->getFn())->castTo<FunctionType>();
+                S.getResolvedType(call->getFn())->castTo<FunctionType>();
 
             // If the inferred witness is throwing, we need to wrap the call
             // into `try` expression.
@@ -9214,26 +9202,43 @@ static llvm::Optional<SyntacticElementTarget> applySolutionToForEachStmt(
     stmt->setNextCall(nextCall);
   }
 
-  // Coerce the pattern to the element type.
-  {
-    TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
-    options |= TypeResolutionFlags::OverrideType;
-
-    auto tryRewritePattern = [&](Pattern *EP, Type ty) {
-      return ::tryRewriteExprPattern(EP, solution, ty, rewriteTarget);
-    };
-
-    // Apply the solution to the pattern as well.
-    auto contextualPattern = target.getContextualPattern();
-    auto coercedPattern = TypeChecker::coercePatternToType(
-        contextualPattern, forEachStmtInfo.initType, options,
-        tryRewritePattern);
-    if (!coercedPattern)
+  // Convert that llvm::Optional<Element> value to the type of the pattern.
+  auto optPatternType = OptionalType::get(info.initType);
+  Type nextResultType = OptionalType::get(info.elementType);
+  if (!optPatternType->isEqual(nextResultType)) {
+    ASTContext &ctx = cs.getASTContext();
+    OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
+        stmt->getInLoc(), nextResultType->getOptionalObjectType(),
+        /*isPlaceholder=*/true);
+    Expr *convertElementExpr = elementExpr;
+    if (TypeChecker::typeCheckExpression(convertElementExpr, dc,
+                                         /*contextualInfo=*/
+                                         {info.initType, CTP_CoerceOperand})
+            .isNull()) {
       return llvm::None;
-
-    stmt->setPattern(coercedPattern);
-    resultTarget.setPattern(coercedPattern);
+    }
+    elementExpr->setIsPlaceholder(false);
+    stmt->setElementExpr(elementExpr);
+    stmt->setConvertElementExpr(convertElementExpr);
   }
+
+  // Get the conformance of the sequence type to the Sequence protocol.
+  auto sequenceProto = TypeChecker::getProtocol(
+      cs.getASTContext(), stmt->getForLoc(),
+      stmt->getAwaitLoc().isValid() ? KnownProtocolKind::AsyncSequence
+                                    : KnownProtocolKind::Sequence);
+
+  auto type = info.sequenceType->getRValueType();
+  if (type->isExistentialType()) {
+    auto *contextualLoc = solution.getConstraintLocator(
+        parsedSequence, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+    type = Type(solution.OpenedExistentialTypes[contextualLoc]);
+  }
+  auto sequenceConformance = TypeChecker::conformsToProtocol(
+      type, sequenceProto, dc->getParentModule());
+  assert(!sequenceConformance.isInvalid() &&
+         "Couldn't find sequence conformance");
+  stmt->setSequenceConformance(sequenceConformance);
 
   // Apply the solution to the filtering condition, if there is one.
   if (auto *whereExpr = stmt->getWhere()) {
@@ -9246,44 +9251,118 @@ static llvm::Optional<SyntacticElementTarget> applySolutionToForEachStmt(
     stmt->setWhere(rewrittenTarget->getAsExpr());
   }
 
-  // Convert that llvm::Optional<Element> value to the type of the pattern.
-  auto optPatternType = OptionalType::get(forEachStmtInfo.initType);
-  Type nextResultType = OptionalType::get(forEachStmtInfo.elementType);
-  if (!optPatternType->isEqual(nextResultType)) {
-    ASTContext &ctx = cs.getASTContext();
-    OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
-        stmt->getInLoc(), nextResultType->getOptionalObjectType(),
-        /*isPlaceholder=*/true);
-    Expr *convertElementExpr = elementExpr;
-    if (TypeChecker::typeCheckExpression(
-            convertElementExpr, dc,
-            /*contextualInfo=*/{forEachStmtInfo.initType, CTP_CoerceOperand})
-            .isNull()) {
+  return info;
+}
+
+static llvm::Optional<PackIterationInfo> applySolutionToForEachStmt(
+    Solution &solution, ForEachStmt *stmt, PackIterationInfo info,
+    llvm::function_ref<
+        llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+        rewriteTarget) {
+
+  // A special walker to record opened element environment for var decls in a
+  // for-each loop.
+  class Walker : public ASTWalker {
+    GenericEnvironment *Environment;
+
+  public:
+    Walker(GenericEnvironment *Environment) { this->Environment = Environment; }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      if (isa<ForEachStmt>(S)) {
+        return Action::SkipChildren(S);
+      }
+      return Action::Continue(S);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      if (auto *decl = dyn_cast<VarDecl>(D)) {
+        decl->setOpenedElementEnvironment(Environment);
+      }
+      if (isa<AbstractFunctionDecl>(D)) {
+        return Action::SkipChildren();
+      }
+      if (isa<NominalTypeDecl>(D)) {
+        return Action::SkipChildren();
+      }
+      return Action::Continue();
+    }
+  };
+
+  auto &cs = solution.getConstraintSystem();
+  auto *sequenceExpr = stmt->getParsedSequence();
+  PackExpansionExpr *expansion = cast<PackExpansionExpr>(sequenceExpr);
+
+  // First, let's apply the solution to the pack expansion.
+  auto makeExpansionTarget = *cs.getTargetFor(expansion);
+  auto rewrittenTarget = rewriteTarget(makeExpansionTarget);
+  if (!rewrittenTarget)
+    return llvm::None;
+
+  // Simplify the pattern type of the pack expansion.
+  info.patternType = solution.simplifyType(info.patternType);
+
+  // Record the opened element environment for the VarDecls inside the loop
+  Walker forEachWalker(expansion->getGenericEnvironment());
+  stmt->getPattern()->walk(forEachWalker);
+  stmt->getBody()->walk(forEachWalker);
+
+  return info;
+}
+
+/// Apply the given solution to the for-each statement target.
+///
+/// \returns the resulting initialization expression.
+static llvm::Optional<SyntacticElementTarget> applySolutionToForEachStmt(
+    Solution &solution, SyntacticElementTarget target,
+    llvm::function_ref<
+        llvm::Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+        rewriteTarget) {
+  auto resultTarget = target;
+  auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
+  auto *stmt = target.getAsForEachStmt();
+
+  Type rewrittenPatternType;
+
+  if (auto *info = forEachStmtInfo.dyn_cast<SequenceIterationInfo>()) {
+    auto resultInfo = applySolutionToForEachStmt(
+        solution, stmt, *info, target.getDeclContext(), rewriteTarget);
+    if (!resultInfo) {
       return llvm::None;
     }
-    elementExpr->setIsPlaceholder(false);
-    stmt->setElementExpr(elementExpr);
-    stmt->setConvertElementExpr(convertElementExpr);
+
+    forEachStmtInfo = *resultInfo;
+    rewrittenPatternType = resultInfo->initType;
+  } else {
+    auto resultInfo = applySolutionToForEachStmt(
+        solution, stmt, forEachStmtInfo.get<PackIterationInfo>(),
+        rewriteTarget);
+    if (!resultInfo) {
+      return llvm::None;
+    }
+
+    forEachStmtInfo = *resultInfo;
+    rewrittenPatternType = resultInfo->patternType;
   }
 
-  // Get the conformance of the sequence type to the Sequence protocol.
+  // Coerce the pattern to the element type.
   {
-    auto sequenceProto = TypeChecker::getProtocol(
-        cs.getASTContext(), stmt->getForLoc(),
-        stmt->getAwaitLoc().isValid() ? KnownProtocolKind::AsyncSequence
-                                      : KnownProtocolKind::Sequence);
+    TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
+    options |= TypeResolutionFlags::OverrideType;
 
-    auto type = forEachStmtInfo.sequenceType->getRValueType();
-    if (type->isExistentialType()) {
-      auto *contextualLoc = solution.getConstraintLocator(
-          parsedSequence, LocatorPathElt::ContextualType(CTP_ForEachSequence));
-      type = Type(solution.OpenedExistentialTypes[contextualLoc]);
-    }
-    auto sequenceConformance = TypeChecker::conformsToProtocol(
-        type, sequenceProto, dc->getParentModule());
-    assert(!sequenceConformance.isInvalid() &&
-           "Couldn't find sequence conformance");
-    stmt->setSequenceConformance(sequenceConformance);
+    auto tryRewritePattern = [&](Pattern *EP, Type ty) {
+      return ::tryRewriteExprPattern(EP, solution, ty, rewriteTarget);
+    };
+
+    // Apply the solution to the pattern as well.
+    auto contextualPattern = target.getContextualPattern();
+    auto coercedPattern = TypeChecker::coercePatternToType(
+        contextualPattern, rewrittenPatternType, options, tryRewritePattern);
+    if (!coercedPattern)
+      return llvm::None;
+
+    stmt->setPattern(coercedPattern);
+    resultTarget.setPattern(coercedPattern);
   }
 
   return resultTarget;

@@ -2,7 +2,6 @@
 //
 // REQUIRES: executable_test
 
-import CxxShim
 import StdlibUnittest
 import Fields
 

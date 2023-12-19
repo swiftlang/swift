@@ -20,7 +20,7 @@
 // RUN:   %S/Inputs/evil_macro_definitions.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
@@ -31,7 +31,7 @@
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
-// RUN: not %swift-target-frontend \
+// RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
 // RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \

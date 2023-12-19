@@ -25,28 +25,28 @@ func blah<T>(_ t: borrowing T) where T: ~Copyable,
 func foo<T: ~Copyable>(x: borrowing T) {}
 
 struct Buurap<T: ~Copyable> where T: ~Copyable {}
-// expected-warning@-1 {{redundant conformance constraint 'T' : '~Copyable'}}
+// expected-warning@-1 {{redundant constraint 'T' : '~Copyable'}}
 
 struct ExtraNoncopyStruct: ~Copyable, ~Copyable {}
 struct ExtraNoncopyEnum: ~Copyable, ~Copyable {}
 
 protocol ExtraNoncopyProto: ~Copyable, ~Copyable {}
-// expected-warning@-1 {{redundant conformance constraint 'Self' : '~Copyable'}}
+// expected-warning@-1 {{redundant constraint 'Self' : '~Copyable'}}
 
 protocol Foo: ~Copyable
          where Self: ~Copyable {
-         // expected-warning@-1 {{redundant conformance constraint 'Self' : '~Copyable'}}
+         // expected-warning@-1 {{redundant constraint 'Self' : '~Copyable'}}
 
     associatedtype Touch : ~Copyable,
                            ~Copyable
-    // expected-warning@-1 {{redundant conformance constraint 'Self.Touch' : '~Copyable'}}
+    // expected-warning@-1 {{redundant constraint 'Self.Touch' : '~Copyable'}}
 
     func test<T>(_ t: T) where T: ~Self  // expected-error {{type 'Self' is not invertible}}
 }
 
 protocol Sando { func make() }
 
-class C: ~Copyable,  // expected-error {{classes cannot be noncopyable}}
+class C: ~Copyable,  // expected-error {{classes cannot be '~Copyable'}}
          ~Sando // expected-error {{type 'Sando' is not invertible}}
          {}
 

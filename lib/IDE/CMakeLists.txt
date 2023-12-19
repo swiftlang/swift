@@ -46,4 +46,10 @@ target_link_libraries(swiftIDE PRIVATE
   swiftParse
   swiftSema)
 
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftIDE PRIVATE
+    swiftIDEUtilsBridging
+  )
+endif()
+
 set_swift_llvm_is_available(swiftIDE)

@@ -113,10 +113,11 @@ class MyNSError : NSError {
 // CHECK:   [[NSERROR_SUBCLASS:%.*]] = apply {{.*}}({{.*}}) : $@convention(method) (@thick MyNSError.Type) -> @owned MyNSError
 // CHECK:   [[UPCAST:%.*]] = upcast [[NSERROR_SUBCLASS]] : $MyNSError to $NSError
 // CHECK:   [[EXISTENTIAL_REF:%.*]] = init_existential_ref [[UPCAST]]
-// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [lexical] [var_decl] [[EXISTENTIAL_REF]]
+// CHECK:   [[MOVED_EXISTENTIAL_REF:%.*]] = move_value [lexical] [var_decl] [[EXISTENTIAL_REF]]
+// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [[MOVED_EXISTENTIAL_REF]]
 // CHECK:   [[COPY_BORROWED_EXISTENTIAL_REF:%.*]] = copy_value [[BORROWED_EXISTENTIAL_REF]]
 // CHECK:   end_borrow [[BORROWED_EXISTENTIAL_REF]]
-// CHECK:   destroy_value [[EXISTENTIAL_REF]]
+// CHECK:   destroy_value [[MOVED_EXISTENTIAL_REF]]
 // CHECK:   return [[COPY_BORROWED_EXISTENTIAL_REF]]
 // CHECK: } // end sil function '$s10objc_error14eraseMyNSError{{[_0-9a-zA-Z]*}}F'
 func eraseMyNSError() -> Error {

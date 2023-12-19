@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-concurrency -swift-version 6
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 6
 
 // REQUIRES: asserts
 

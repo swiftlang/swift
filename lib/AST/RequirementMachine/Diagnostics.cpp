@@ -60,11 +60,12 @@ bool swift::rewriting::diagnoseRequirementErrors(
 
     switch (error.kind) {
     case RequirementError::Kind::InvalidTypeRequirement: {
-      if (error.requirement.hasError())
+      auto requirement = error.getRequirement();
+      if (requirement.hasError())
         break;
 
-      Type subjectType = error.requirement.getFirstType();
-      Type constraint = error.requirement.getSecondType();
+      Type subjectType = requirement.getFirstType();
+      Type constraint = requirement.getSecondType();
 
       ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
                          subjectType, constraint);
@@ -94,10 +95,11 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::InvalidRequirementSubject: {
-      if (error.requirement.hasError())
+      auto requirement = error.getRequirement();
+      if (requirement.hasError())
         break;
 
-      auto subjectType = error.requirement.getFirstType();
+      auto subjectType = requirement.getFirstType();
 
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
                          subjectType);
@@ -106,45 +108,72 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::InvalidInverseSubject: {
-      if (error.requirement.hasError())
+      auto requirement = error.getRequirement();
+      if (requirement.hasError())
         break;
 
-      assert(error.requirement.getKind() == RequirementKind::Conformance);
+      assert(requirement.getKind() == RequirementKind::Conformance);
 
-      auto subjectType = error.requirement.getFirstType();
-      auto constraintType = error.requirement.getSecondType();
+      auto subjectType = requirement.getFirstType();
+      auto constraintType = requirement.getSecondType();
 
-      assert(constraintType->is<InverseType>());
+      assert(constraintType->is<ProtocolCompositionType>());
+
+      // Pick one of the inverses to diagnose.
+      auto inverses =
+          constraintType->getAs<ProtocolCompositionType>()->getInverses();
+      assert(!inverses.empty());
+
+      StringRef name = getProtocolName(getKnownProtocolKind(*inverses.begin()));
 
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_inverse_subject,
-                         subjectType, constraintType);
+                         subjectType, name);
       diagnosedError = true;
       break;
     }
 
     case RequirementError::Kind::InvalidInverseOuterSubject: {
-      if (error.requirement.hasError())
-        break;
-
-      assert(error.requirement.getKind() == RequirementKind::Conformance);
-
-      auto subjectType = error.requirement.getFirstType();
-      auto constraintType = error.requirement.getSecondType();
-
-      assert(constraintType->is<InverseType>());
+      auto inverse = error.getInverse();
+      auto subjectType = inverse.subject;
+      auto protoKind = getKnownProtocolKind(inverse.getKind());
 
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_inverse_outer_subject,
-                         subjectType.getString(), constraintType.getString());
+                         subjectType.getString(), getProtocolName(protoKind));
       diagnosedError = true;
       break;
     }
 
-    case RequirementError::Kind::InvalidShapeRequirement: {
-      if (error.requirement.hasError())
+    case RequirementError::Kind::RedundantInverseRequirement: {
+      // We only emit redundant requirement warnings if the user passed
+      // the -warn-redundant-requirements frontend flag.
+      if (!ctx.LangOpts.WarnRedundantRequirements)
         break;
 
-      auto lhs = error.requirement.getFirstType();
-      auto rhs = error.requirement.getSecondType();
+      auto inverse = error.getInverse();
+      auto protoName = getKnownProtocolKind(inverse.getKind());
+      ctx.Diags.diagnose(loc, diag::redundant_inverse_constraint,
+                         inverse.subject,
+                         getProtocolName(protoName));
+      break;
+    }
+
+    case RequirementError::Kind::ConflictingInverseRequirement: {
+      auto inverse = error.getInverse();
+      auto protoKind = getKnownProtocolKind(inverse.getKind());
+
+      ctx.Diags.diagnose(loc, diag::inverse_generic_but_also_conforms,
+                         inverse.subject,
+                         getProtocolName(protoKind));
+      break;
+    }
+
+    case RequirementError::Kind::InvalidShapeRequirement: {
+      auto requirement = error.getRequirement();
+      if (requirement.hasError())
+        break;
+
+      auto lhs = requirement.getFirstType();
+      auto rhs = requirement.getSecondType();
 
       // FIXME: Add tailored messages for specific issues.
       ctx.Diags.diagnose(loc, diag::invalid_shape_requirement,
@@ -154,7 +183,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::ConflictingRequirement: {
-      auto requirement = error.requirement;
+      auto requirement = error.getRequirement();
       auto conflict = error.conflictingRequirement;
 
       if (requirement.hasError())
@@ -186,7 +215,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::RecursiveRequirement: {
-      auto requirement = error.requirement;
+      auto requirement = error.getRequirement();
 
       if (requirement.hasError())
         break;
@@ -211,7 +240,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
       if (!ctx.LangOpts.WarnRedundantRequirements)
         break;
 
-      auto requirement = error.requirement;
+      auto requirement = error.getRequirement();
       if (requirement.hasError())
         break;
 
@@ -245,7 +274,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::UnsupportedSameElement: {
-      if (error.requirement.hasError())
+      if (error.getRequirement().hasError())
         break;
 
       ctx.Diags.diagnose(loc, diag::unsupported_same_element);
@@ -525,12 +554,21 @@ void RewriteSystem::computeRecursiveRequirementDiagnostics(
 }
 
 void RequirementMachine::computeRequirementDiagnostics(
-    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
+    SmallVectorImpl<RequirementError> &errors,
+    ArrayRef<InverseRequirement> inverses,
+    SourceLoc signatureLoc) {
   System.computeRedundantRequirementDiagnostics(errors);
   System.computeConflictingRequirementDiagnostics(errors, signatureLoc, Map,
                                                   getGenericParams());
   System.computeRecursiveRequirementDiagnostics(errors, signatureLoc, Map,
                                                 getGenericParams());
+
+  // Check that the generic parameters with inverses truly lack the conformance.
+  for (auto const& inverse : inverses)
+    if (requiresProtocol(inverse.subject, inverse.protocol))
+      errors.push_back(
+          RequirementError::forConflictingInverseRequirement(inverse,
+                                                             inverse.loc));
 }
 
 std::string RequirementMachine::getRuleAsStringForDiagnostics(

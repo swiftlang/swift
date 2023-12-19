@@ -27,6 +27,9 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
+static llvm::Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
+                                               Type type);
+
 bool BindingSet::forClosureResult() const {
   return Info.TypeVar->getImpl().isClosureResultType();
 }
@@ -457,9 +460,37 @@ void BindingSet::inferTransitiveBindings(
               inferredRootTy = fnType->getParams()[0].getParameterType();
           }
 
-          if (inferredRootTy && !inferredRootTy->isTypeVariableOrMember())
-            addBinding(
-                binding.withSameSource(inferredRootTy, BindingKind::Exact));
+          if (inferredRootTy) {
+            // If contextual root is not yet resolved, let's try to see if
+            // there are any bindings in its set. The bindings could be
+            // transitively used because conversions between generic arguments
+            // are not allowed.
+            if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
+              auto rootBindings = inferredBindings.find(contextualRootVar);
+              if (rootBindings != inferredBindings.end()) {
+                auto &bindings = rootBindings->getSecond();
+
+                // Don't infer if root is not yet fully resolved.
+                if (bindings.isDelayed())
+                  continue;
+
+                // Copy the bindings over to the root.
+                for (const auto &binding : bindings.Bindings)
+                  addBinding(binding, /*isTransitive=*/true);
+
+                // Make a note that the key path root is transitively adjacent
+                // to contextual root type variable and all of its variables.
+                // This is important for ranking.
+                AdjacentVars.insert(contextualRootVar);
+                AdjacentVars.insert(bindings.AdjacentVars.begin(),
+                                    bindings.AdjacentVars.end());
+              }
+            } else {
+              addBinding(
+                  binding.withSameSource(inferredRootTy, BindingKind::Exact),
+                  /*isTransitive=*/true);
+            }
+          }
         }
       }
     }
@@ -526,7 +557,8 @@ void BindingSet::inferTransitiveBindings(
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addBinding(binding.withSameSource(type, BindingKind::Supertypes));
+      addBinding(binding.withSameSource(type, BindingKind::Supertypes),
+                 /*isTransitive=*/true);
     }
   }
 }
@@ -604,7 +636,8 @@ void BindingSet::finalize(
                   continue;
             }
 
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
+            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
+                       /*isTransitive=*/false);
           }
         }
       }
@@ -634,8 +667,17 @@ void BindingSet::finalize(
         assert(isKnownKeyPathType(bindingTy) || bindingTy->is<FunctionType>());
 
         // Functions don't have capability so we can simply add them.
-        if (bindingTy->is<FunctionType>())
-          updatedBindings.insert(binding);
+        if (auto *fnType = bindingTy->getAs<FunctionType>()) {
+          auto extInfo = fnType->getExtInfo();
+
+          bool isKeyPathSendable = capability && capability->second;
+          if (!isKeyPathSendable && extInfo.isSendable()) {
+            fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
+                                       extInfo.withConcurrent(false));
+          }
+
+          updatedBindings.insert(binding.withType(fnType));
+        }
       }
 
       // Note that even though key path literal maybe be invalid it's
@@ -713,11 +755,11 @@ void BindingSet::finalize(
   }
 }
 
-void BindingSet::addBinding(PotentialBinding binding) {
+void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
   if (Bindings.count(binding))
     return;
 
-  if (!isViable(binding))
+  if (!isViable(binding, isTransitive))
     return;
 
   SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
@@ -1138,13 +1180,16 @@ void PotentialBindings::addLiteral(Constraint *constraint) {
   Literals.insert(constraint);
 }
 
-bool BindingSet::isViable(PotentialBinding &binding) {
+bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
   // for this constraint system, which is problematic for overload
   // resolution.
   auto type = binding.BindingType;
+
+  if (isTransitive && !checkTypeOfBinding(TypeVar, type))
+    return false;
 
   auto *NTD = type->getAnyNominal();
   if (!NTD)
@@ -1253,9 +1298,20 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
     return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
+  // If this is a collection literal type, it's preferrable to bind it
+  // early (unless it's delayed) to connect all of its elements even
+  // if it doesn't have any bindings.
+  if (TypeVar->getImpl().isCollectionLiteralType())
+    return !involvesTypeVariables();
+
   // Don't prioritize type variables that don't have any direct bindings.
   if (Bindings.empty())
     return false;
+
+  // Always prefer key path type if it has bindings and is not delayed
+  // because that means that it was possible to infer its capability.
+  if (TypeVar->getImpl().isKeyPathType())
+    return true;
 
   return !involvesTypeVariables();
 }
@@ -1319,6 +1375,14 @@ bool BindingSet::favoredOverConjunction(Constraint *conjunction) const {
           });
     }
   }
+
+  // If key path capability is not yet determined it cannot be favored
+  // over a conjunction because:
+  // 1. There could be no other bindings and that would mean that
+  //    key path would be selected even though it's not yet ready.
+  // 2. A conjunction could be the source of type context for the key path.
+  if (TypeVar->getImpl().isKeyPathType() && isDelayed())
+    return false;
 
   return true;
 }
@@ -1627,26 +1691,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// those types should be opened.
 void PotentialBindings::infer(Constraint *constraint) {
   switch (constraint->getKind()) {
-  case ConstraintKind::OptionalObject: {
-    // Inference through optional object is allowed if
-    // one of the types is resolved or "optional" type variable
-    // cannot be bound to l-value, otherwise there is a
-    // risk of binding "optional" to an optional type (inferred from
-    // the "object") and discovering an l-value binding for it later.
-    auto optionalType = constraint->getFirstType();
-
-    if (auto *optionalVar = optionalType->getAs<TypeVariableType>()) {
-      if (optionalVar->getImpl().canBindToLValue()) {
-        auto objectType =
-            constraint->getSecondType()->lookThroughAllOptionalTypes();
-        if (objectType->isTypeVariableOrMember())
-          return;
-      }
-    }
-
-    LLVM_FALLTHROUGH;
-  }
-
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
@@ -1656,6 +1700,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedMemberChainBase: {
     auto binding = inferFromRelational(constraint);
     if (!binding)

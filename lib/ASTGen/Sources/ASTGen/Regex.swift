@@ -45,9 +45,13 @@ public func _RegexLiteralLexingFn(
 ) -> /*CompletelyErroneous*/ Bool {
   let inputPtr = curPtrPtr.pointee
 
-  guard let (resumePtr, error) = swiftCompilerLexRegexLiteral(
-    start: inputPtr, bufferEnd: bufferEndPtr, mustBeRegex: mustBeRegex
-  ) else {
+  guard
+    let (resumePtr, error) = swiftCompilerLexRegexLiteral(
+      start: inputPtr,
+      bufferEnd: bufferEndPtr,
+      mustBeRegex: mustBeRegex
+    )
+  else {
     // Not a regex literal, fallback without advancing the pointer.
     return false
   }
@@ -97,12 +101,16 @@ public func _RegexLiteralParsingFn(
 ) -> Bool {
   let str = String(bridged: input)
   let captureBuffer = UnsafeMutableRawBufferPointer(
-    start: captureStructureOut, count: Int(captureStructureSize))
+    start: captureStructureOut,
+    count: Int(captureStructureSize)
+  )
   do {
     // FIXME: We need to plumb through the 'regexToEmit' result to the caller.
     // For now, it is the same as the input.
     let (_, version) = try swiftCompilerParseRegexLiteral(
-      str, captureBufferOut: captureBuffer)
+      str,
+      captureBufferOut: captureBuffer
+    )
     versionOut.pointee = UInt(version)
     return false
   } catch let error as CompilerParseError {
@@ -126,8 +134,8 @@ public func _RegexLiteralParsingFn(
   }
 }
 
-#else // canImport(_CompilerRegexParser)
+#else  // canImport(_CompilerRegexParser)
 
 #warning("Regex parsing is disabled")
 
-#endif // canImport(_CompilerRegexParser)
+#endif  // canImport(_CompilerRegexParser)

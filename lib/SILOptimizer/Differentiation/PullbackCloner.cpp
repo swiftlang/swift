@@ -3331,7 +3331,11 @@ void PullbackCloner::Implementation::
   builder.setCurrentDebugScope(remapScope(dti->getDebugScope()));
   builder.setInsertionPoint(arrayAdjoint->getParentBlock());
   for (auto use : dti->getResult(1)->getUses()) {
-    auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
+    auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
+    assert(mdi && "Expected mark_dependence user");
+    auto *ptai =
+        dyn_cast_or_null<PointerToAddressInst>(getSingleNonDebugUser(mdi));
+    assert(ptai && "Expected pointer_to_address user");
     auto adjBuf = getAdjointBuffer(origBB, ptai);
     auto *eltAdjBuf = getArrayAdjointElementBuffer(arrayAdjoint, 0, loc);
     builder.emitInPlaceAdd(loc, adjBuf, eltAdjBuf);

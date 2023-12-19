@@ -278,6 +278,9 @@ initializeExecutablePlugin(ASTContext &ctx,
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
     }
+
+    ctx.getPluginLoader().recordDependency(resolvedLibraryPath);
+
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 
@@ -510,6 +513,10 @@ ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
 ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
                                                          Decl *decl) const {
   if (decl->isImplicit())
+    return { };
+
+  // Member attribute macros do not apply to accessors.
+  if (isa<AccessorDecl>(decl))
     return { };
 
   // Member attribute macros do not apply to macro-expanded members.
@@ -834,6 +841,29 @@ getExplicitInitializerRange(AbstractStorageDecl *storage) {
   return SourceRange(equalLoc, initRange.End);
 }
 
+/// Compute the original source range for expanding a preamble macro.
+static CharSourceRange getPreambleMacroOriginalRange(AbstractFunctionDecl *fn) {
+  ASTContext &ctx = fn->getASTContext();
+
+  SourceLoc insertionLoc;
+
+  // If there is a body macro, start at the beginning of it.
+  if (auto bodyBufferID = evaluateOrDefault(
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+    insertionLoc = ctx.SourceMgr.getRangeForBuffer(*bodyBufferID).getStart();
+  } else {
+    // If there is a parsed body, start at the beginning of it.
+    SourceRange range = fn->getBodySourceRange();
+    if (range.isValid()) {
+      insertionLoc = range.Start;
+    } else {
+      insertionLoc = fn->getEndLoc();
+    }
+  }
+
+  return CharSourceRange(insertionLoc, 0);
+}
+
 static CharSourceRange getExpansionInsertionRange(MacroRole role,
                                                   ASTNode target,
                                                   SourceManager &sourceMgr) {
@@ -907,15 +937,11 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
 
   case MacroRole::Preamble: {
-    SourceLoc inBodyLoc;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(target.get<Decl *>())) {
-      inBodyLoc = fn->getMacroExpandedBody()->getStartLoc();
+      return getPreambleMacroOriginalRange(fn);
     }
 
-    if (inBodyLoc.isInvalid())
-      inBodyLoc = target.getEndLoc();
-
-    return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, inBodyLoc), 0);
+    return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc()), 0);
   }
 
   case MacroRole::Body: {
@@ -1885,8 +1911,8 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // When a macro is not found for a custom attribute, it may be a non-macro.
   // So bail out to prevent diagnostics from the contraint system.
   if (macroRef.getAttr()) {
-    auto foundMacros = namelookup::lookupMacros(
-        dc, macroRef.getMacroName(), roles);
+    auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),
+                                                macroRef.getMacroName(), roles);
     if (foundMacros.empty())
       return ConcreteDeclRef();
   }

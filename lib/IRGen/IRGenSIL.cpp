@@ -1134,6 +1134,7 @@ public:
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
+  void visitAllocVectorInst(AllocVectorInst *i);
   void visitAllocPackInst(AllocPackInst *i);
   void visitAllocPackMetadataInst(AllocPackMetadataInst *i);
   void visitAllocRefInst(AllocRefInst *i);
@@ -1236,6 +1237,9 @@ public:
   void visitEndInitLetRefInst(EndInitLetRefInst *i);
   void visitObjectInst(ObjectInst *i)  {
     llvm_unreachable("object instruction cannot appear in a function");
+  }
+  void visitVectorInst(VectorInst *i)  {
+    llvm_unreachable("vector instruction cannot appear in a function");
   }
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
@@ -1844,6 +1848,12 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   // Disable inlining of coroutine functions until we split.
   if (f->getLoweredFunctionType()->isCoroutine()) {
     CurFn->addFnAttr(llvm::Attribute::NoInline);
+  }
+
+  // Mark as 'nounwind' to avoid referencing exception personality symbols, this
+  // is okay even with C++ interop on because the landinpads are trapping.
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    CurFn->addFnAttr(llvm::Attribute::NoUnwind);
   }
 
   auto optMode = f->getOptimizationMode();
@@ -5883,6 +5893,15 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   }
   emitDebugInfoForAllocStack(i, type, addr.getAddress());
 }
+
+void IRGenSILFunction::visitAllocVectorInst(AllocVectorInst *i) {
+  const TypeInfo &type = getTypeInfo(i->getElementType());
+  Explosion capacity = getLoweredExplosion(i->getCapacity());
+  auto stackAddr = type.allocateVector(*this, i->getElementType(),
+                                       capacity.claimNext(), StringRef());
+  setLoweredStackAddress(i, stackAddr);
+}
+
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   auto addr = allocatePack(*this, i->getPackType());

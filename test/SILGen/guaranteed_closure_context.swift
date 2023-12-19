@@ -23,7 +23,7 @@ func guaranteed_captures() {
   // CHECK: [[IMMUTABLE_TRIVIAL:%.*]] = apply {{.*}} -> S
   let immutableTrivial = S()
   // CHECK: [[IMMUTABLE_RETAINABLE:%.*]] = apply {{.*}} -> @owned C
-  // CHECK: [[B_IMMUTABLE_RETAINABLE:%.*]] = begin_borrow [lexical] [var_decl] [[IMMUTABLE_RETAINABLE]] : $C
+  // CHECK: [[B_IMMUTABLE_RETAINABLE:%.*]] = move_value [lexical] [var_decl] [[IMMUTABLE_RETAINABLE]] : $C
   let immutableRetainable = C()
   // CHECK: [[IMMUTABLE_ADDRESS_ONLY:%.*]] = alloc_stack [lexical] $any P
   let immutableAddressOnly: P = C()
@@ -38,8 +38,9 @@ func guaranteed_captures() {
   // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]
 
+  // CHECK: [[B_IMMUTABLE_RETAINABLE_BORROW:%.*]] = begin_borrow [[B_IMMUTABLE_RETAINABLE]] : $C
   // CHECK: [[FN:%.*]] = function_ref [[FN_NAME:@\$s26guaranteed_closure_context0A9_capturesyyF17captureEverythingL_yyF]]
-  // CHECK: apply [[FN]]([[MUTABLE_TRIVIAL_BOX_BORROW]], [[MUTABLE_RETAINABLE_BOX_LIFETIME]], [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE]], [[IMMUTABLE_ADDRESS_ONLY]])
+  // CHECK: apply [[FN]]([[MUTABLE_TRIVIAL_BOX_BORROW]], [[MUTABLE_RETAINABLE_BOX_LIFETIME]], [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE_BORROW]], [[IMMUTABLE_ADDRESS_ONLY]])
   captureEverything()
 
   // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]

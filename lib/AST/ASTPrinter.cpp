@@ -943,28 +943,38 @@ public:
     InnermostOnly = 4,
     SwapSelfAndDependentMemberType = 8,
     PrintInherited = 16,
+    CollapseDefaultReqs = 32,
   };
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
-                                              Decl *attachingTo);
+                                              TypeDecl *attachingTo);
   void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
-                                                Decl *attachingTo);
+                                                TypeDecl *attachingTo);
   void printInherited(const Decl *decl);
 
   void printGenericSignature(GenericSignature genericSig,
+                             ArrayRef<InverseRequirement> inverses,
                              unsigned flags);
   void
-  printGenericSignature(GenericSignature genericSig, unsigned flags,
+  printGenericSignature(GenericSignature genericSig,
+                        ArrayRef<InverseRequirement> inverses,
+                        unsigned flags,
                         llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
       ArrayRef<GenericTypeParamType *> genericParams,
-      ArrayRef<Requirement> requirements, unsigned flags,
+      ArrayRef<Requirement> requirements,
+      ArrayRef<InverseRequirement> inverses,
+      unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
       ArrayRef<GenericTypeParamType *> genericParams,
-      ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
+      ArrayRef<Requirement> requirements,
+      ArrayRef<InverseRequirement> inverses,
+      bool &isFirstReq, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
   void printRequirement(const Requirement &req);
+  void printRequirement(const InverseRequirement &inverse,
+                        bool forInherited);
 
 private:
   bool shouldPrint(const Decl *D, bool Notify = false);
@@ -1447,6 +1457,40 @@ static unsigned getDepthOfType(Type ty) {
   return depth;
 }
 
+/// Recomputes which inverses must have been written for the given generic
+/// signature.
+static void reconstituteInverses(GenericSignature genericSig,
+                               ArrayRef<Type> typeParams,
+                               SmallVectorImpl<InverseRequirement> &inverses) {
+  auto &ctx = genericSig->getASTContext();
+
+  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
+    return;
+
+  for (auto tp : typeParams) {
+    assert(tp);
+
+    auto defaults = InverseRequirement::expandDefault(tp);
+    for (auto ip : defaults) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      // If the generic signature reflects the default requirement,
+      // then there was no inverse for this generic parameter.
+      if (genericSig->requiresProtocol(tp, proto))
+        continue;
+
+      inverses.push_back({tp, proto, SourceLoc()});
+    }
+  }
+}
+
+static void reconstituteInverses(GenericSignature genericSig,
+                                 ArrayRef<GenericTypeParamType *> genericParams,
+                                 SmallVectorImpl<InverseRequirement> &inverses) {
+  SmallVector<Type, 4> asType(genericParams);
+  reconstituteInverses(genericSig, asType, inverses);
+}
+
 namespace {
 struct RequirementPrintLocation {
   /// The Decl where the requirement should be attached (whether inherited or in
@@ -1558,10 +1602,22 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 }
 
 void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
-                                                      Decl *attachingTo) {
+                                                      TypeDecl* attachingTo) {
+  Type attachedGP[1];
+  if (auto proto = dyn_cast<ProtocolDecl>(attachingTo))
+    attachedGP[0] = proto->getSelfInterfaceType();
+  else if (auto assoc = dyn_cast<AssociatedTypeDecl>(attachingTo))
+    attachedGP[0] = assoc->getDeclaredInterfaceType();
+  else
+    llvm_unreachable("nonexhaustive");
+
+  SmallVector<InverseRequirement, 2> inverses;
+  reconstituteInverses(proto->getGenericSignature(), attachedGP, inverses);
+
   printGenericSignature(
       proto->getRequirementSignatureAsGenericSignature(),
-      PrintInherited,
+      inverses,
+      PrintInherited | CollapseDefaultReqs,
       [&](const Requirement &req) {
         // Skip the inferred 'Self : AnyObject' constraint if this is an
         // @objc protocol.
@@ -1579,12 +1635,13 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
 }
 
 void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
-                                                        Decl *attachingTo) {
-  unsigned flags = PrintRequirements;
+                                                        TypeDecl *attachingTo) {
+  unsigned flags = PrintRequirements | CollapseDefaultReqs;
   if (isa<AssociatedTypeDecl>(attachingTo))
     flags |= SwapSelfAndDependentMemberType;
   printGenericSignature(
       proto->getRequirementSignatureAsGenericSignature(),
+      {}, // NOTE: a protocol's inverses are only printed in inheritance clause!
       flags,
       [&](const Requirement &req) {
         auto location = bestRequirementPrintLocation(proto, req);
@@ -1632,30 +1689,33 @@ static void getRequirementsAtDepth(GenericSignature genericSig,
 }
 
 void PrintAST::printGenericSignature(GenericSignature genericSig,
+                                     ArrayRef<InverseRequirement> inverses,
                                      unsigned flags) {
-  printGenericSignature(genericSig, flags,
+  printGenericSignature(genericSig, inverses, flags,
                         // print everything
                         [&](const Requirement &) { return true; });
 }
 
 void PrintAST::printGenericSignature(
-    GenericSignature genericSig, unsigned flags,
+    GenericSignature genericSig,
+    ArrayRef<InverseRequirement> inverses,
+    unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   auto requirements = genericSig.getRequirements();
 
   if (flags & InnermostOnly) {
     auto genericParams = genericSig.getInnermostGenericParams();
 
-    printSingleDepthOfGenericSignature(genericParams, requirements, flags,
-                                       filter);
+    printSingleDepthOfGenericSignature(genericParams, requirements, inverses,
+                                       flags, filter);
     return;
   }
 
   auto genericParams = genericSig.getGenericParams();
 
   if (!Options.PrintInSILBody) {
-    printSingleDepthOfGenericSignature(genericParams, requirements, flags,
-                                       filter);
+    printSingleDepthOfGenericSignature(genericParams, requirements, inverses,
+                                       flags, filter);
     return;
   }
 
@@ -1672,30 +1732,55 @@ void PrintAST::printGenericSignature(
     } while (lastParamIdx < numParam &&
              genericParams[lastParamIdx]->getDepth() == depth);
 
-    // Collect requirements for this level.
+    // Collect requirements and generic parameters for this level.
+    auto genericParamsAtDepth =
+        genericParams.slice(paramIdx, lastParamIdx - paramIdx);
+
+    SmallVector<InverseRequirement, 2> inversesAtDepth;
+    if (flags & CollapseDefaultReqs)
+      reconstituteInverses(genericSig, genericParamsAtDepth, inversesAtDepth);
+
     SmallVector<Requirement, 2> requirementsAtDepth;
     getRequirementsAtDepth(genericSig, depth, requirementsAtDepth);
 
     printSingleDepthOfGenericSignature(
-        genericParams.slice(paramIdx, lastParamIdx - paramIdx),
-        requirementsAtDepth, flags, filter);
+        genericParamsAtDepth,
+        requirementsAtDepth, inversesAtDepth, flags, filter);
 
     paramIdx = lastParamIdx;
   }
 }
 
-void PrintAST::printSingleDepthOfGenericSignature(
-    ArrayRef<GenericTypeParamType *> genericParams,
-    ArrayRef<Requirement> requirements, unsigned flags,
-    llvm::function_ref<bool(const Requirement &)> filter) {
-  bool isFirstReq = true;
-  printSingleDepthOfGenericSignature(genericParams, requirements, isFirstReq,
-                                     flags, filter);
+/// \returns the invertible protocol kind iff this requirement is a conformance
+///          to an invertible protocol.
+static llvm::Optional<InvertibleProtocolKind>
+getInvertibleProtocolKind(const Requirement &req) {
+  if (req.getKind() != RequirementKind::Conformance)
+    return llvm::None;
+
+  auto constraintTy = req.getSecondType();
+  if (auto kp = constraintTy->getKnownProtocol())
+    return getInvertibleProtocolKind(*kp);
+
+  return llvm::None;
 }
 
 void PrintAST::printSingleDepthOfGenericSignature(
     ArrayRef<GenericTypeParamType *> genericParams,
-    ArrayRef<Requirement> requirements, bool &isFirstReq, unsigned flags,
+    ArrayRef<Requirement> requirements,
+    ArrayRef<InverseRequirement> inverses,
+    unsigned flags,
+    llvm::function_ref<bool(const Requirement &)> filter) {
+  bool isFirstReq = true;
+  printSingleDepthOfGenericSignature(genericParams, requirements, inverses,
+                                     isFirstReq, flags, filter);
+}
+
+void PrintAST::printSingleDepthOfGenericSignature(
+    ArrayRef<GenericTypeParamType *> genericParams,
+    ArrayRef<Requirement> requirements,
+    ArrayRef<InverseRequirement> inverses,
+    bool &isFirstReq, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
@@ -1703,6 +1788,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
   bool printInherited = (flags & PrintInherited);
   bool swapSelfAndDependentMemberType =
     (flags & SwapSelfAndDependentMemberType);
+  const bool collapseDefaults = (flags & CollapseDefaultReqs);
 
   unsigned typeContextDepth = 0;
   SubstitutionMap subMap;
@@ -1794,8 +1880,15 @@ void PrintAST::printSingleDepthOfGenericSignature(
   }
 
   if (printRequirements || printInherited) {
+    // If we're not collapsing defaults, we shouldn't also print inverses!
+    assert(collapseDefaults || inverses.empty());
+
     for (const auto &req : requirements) {
       if (!filter(req))
+        continue;
+
+      /// Skip all requirements for a conformance to an invertible protocol.
+      if (collapseDefaults && getInvertibleProtocolKind(req))
         continue;
 
       auto first = req.getFirstType();
@@ -1869,6 +1962,24 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
     }
+
+    for (auto inverse : inverses) {
+      if (dependsOnOpaque(inverse.subject))
+        continue;
+
+      if (isFirstReq) {
+        if (printRequirements)
+          Printer << " " << tok::kw_where << " ";
+        else
+          Printer << " : ";
+
+        isFirstReq = false;
+      } else {
+        Printer << ", ";
+      }
+
+      printRequirement(inverse, printInherited);
+    }
   }
 
   if (printParams && !genericParams.empty())
@@ -1911,6 +2022,19 @@ void PrintAST::printRequirement(const Requirement &req) {
     break;
   }
   printTransformedType(req.getSecondType());
+}
+
+void PrintAST::printRequirement(const InverseRequirement &inverse,
+                                bool forInherited) {
+  if (!forInherited) {
+    Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+    printTransformedType(inverse.subject);
+    Printer << " : ";
+    Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+  }
+
+  Printer << "~";
+  Printer << getProtocolName(getKnownProtocolKind(inverse.getKind()));
 }
 
 bool PrintAST::shouldPrintPattern(const Pattern *P) {
@@ -2150,10 +2274,6 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   case SelfAccessKind::Borrowing:
     if (!Options.excludeAttrKind(DAK_Borrowing))
       Printer.printKeyword("borrowing", Options, " ");
-    break;
-  case SelfAccessKind::ResultDependsOnSelf:
-    if (!Options.excludeAttrKind(DAK_ResultDependsOnSelf))
-      Printer.printKeyword("_resultDependsOnSelf", Options, " ");
     break;
   }
 }
@@ -2554,7 +2674,7 @@ void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
   if (decl->isGeneric())
     if (auto GenericSig = decl->getGenericSignature()) {
       Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
-      printGenericSignature(GenericSig, PrintParams | InnermostOnly);
+      printGenericSignature(GenericSig, {}, PrintParams | InnermostOnly);
       Printer.printStructurePost(PrintStructureKind::DeclGenericParameterClause);
     }
 }
@@ -2570,8 +2690,16 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
   if (parentSig && parentSig->isEqual(genericSig))
     return;
 
+  SmallVector<Type, 2> genericParams;
+  InverseRequirement::enumerateDefaultedParams(decl, genericParams);
+
+  SmallVector<InverseRequirement, 2> inverses;
+  reconstituteInverses(genericSig, genericParams, inverses);
+
   Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
-  printGenericSignature(genericSig, PrintRequirements,
+  printGenericSignature(genericSig,
+                        inverses,
+                        PrintRequirements | CollapseDefaultReqs,
                         [parentSig](const Requirement &req) {
                           if (parentSig)
                             return !parentSig->isRequirementSatisfied(req);
@@ -2723,10 +2851,13 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
                                              ExtensionDecl *ExtDecl) {
   auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
+    // NOTE: As with normal extensions, we do not collapse defaults.
     auto Sig = ED->getGenericSignature();
     printSingleDepthOfGenericSignature(Sig.getGenericParams(),
                                        Sig.getRequirements(),
-                                       IsFirst, PrintRequirements,
+                                       /*inverses=*/{},
+                                       IsFirst,
+                                       PrintRequirements,
                                        [](const Requirement &Req){
       return true;
     });
@@ -2824,7 +2955,12 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       auto baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
-      printGenericSignature(genericSig, PrintRequirements,
+      // NOTE: We do _not_ CollapseDefaultReqs for the where-clause of an
+      // extension, because conditions involving Copyable here are not
+      // automatically inferred based on the extension itself.
+      printGenericSignature(genericSig,
+                            {},
+                            PrintRequirements,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);
@@ -3114,6 +3250,8 @@ static bool usesFeatureBuiltinExecutor(Decl *decl) {
   return usesBuiltinType(decl, BuiltinTypeKind::BuiltinExecutor);
 }
 
+static bool usesFeatureBuiltinBuildTaskExecutor(Decl *decl) { return false; }
+
 static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
 }
@@ -3139,6 +3277,14 @@ static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
 }
 
 static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinCreateAsyncTaskInGroupWithExecutor(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinCreateAsyncTaskWithExecutor(Decl *decl) {
   return false;
 }
 
@@ -3216,6 +3362,10 @@ static bool usesFeatureBuiltinUnprotectedStackAlloc(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinAllocVector(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinAssumeAlignment(Decl *decl) {
   return false;
 }
@@ -3286,6 +3436,14 @@ static bool usesFeatureStrictConcurrency(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDeprecateApplicationMain(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureGroupActorErrors(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureImportObjcForwardDeclarations(Decl *decl) {
   ClangNode clangNode = decl->getClangNode();
   if (!clangNode)
@@ -3309,6 +3467,10 @@ static bool usesFeatureImplicitSome(Decl *decl) {
 }
 
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureCompleteConcurrency(Decl *decl) {
   return false;
 }
 
@@ -3363,8 +3525,9 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
 
 /// \param isRelevantInverse the function used to inspect a mark corresponding
 /// to an inverse to determine whether it "has" an inverse that we care about.
-static bool hasInverseCopyable(
+static bool hasInverse(
     Decl *decl,
+    InvertibleProtocolKind ip,
     std::function<bool(InverseMarking const&)> isRelevantInverse) {
 
   auto getTypeDecl = [](Type type) -> TypeDecl* {
@@ -3377,21 +3540,22 @@ static bool hasInverseCopyable(
 
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
-      if (isRelevantInverse(nominal->getNoncopyableMarking()))
+      if (isRelevantInverse(nominal->getMarking(ip)))
         return true;
   }
 
   if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-    if (isRelevantInverse(typeDecl->getNoncopyableMarking()))
+    if (isRelevantInverse(typeDecl->getMarking(ip)))
       return true;
 
     // Check the protocol's associated types too.
     if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-      auto hasNoncopyable = llvm::any_of(proto->getAssociatedTypeMembers(),
-                                         [&](AssociatedTypeDecl *assocTyDecl) {
-                                           return isRelevantInverse(assocTyDecl->getNoncopyableMarking());
-                                         });
-      if (hasNoncopyable)
+      auto hasInverse =
+          llvm::any_of(proto->getAssociatedTypeMembers(),
+                       [&](AssociatedTypeDecl *assocTyDecl) {
+                         return isRelevantInverse(assocTyDecl->getMarking(ip));
+                       });
+      if (hasInverse)
         return true;
     }
   }
@@ -3399,15 +3563,15 @@ static bool hasInverseCopyable(
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     // Check for noncopyable types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
-      bool hasNoncopyable = type.findIf([&](Type type) {
+      bool hasInverse = type.findIf([&](Type type) {
         if (auto *typeDecl = getTypeDecl(type))
-          if (isRelevantInverse(typeDecl->getNoncopyableMarking()))
+          if (isRelevantInverse(typeDecl->getMarking(ip)))
             return true;
 
         return false;
       });
 
-      if (hasNoncopyable)
+      if (hasInverse)
         return true;
     }
   }
@@ -3416,7 +3580,8 @@ static bool hasInverseCopyable(
 }
 
 static bool usesFeatureMoveOnly(Decl *decl) {
-  return hasInverseCopyable(decl, [](auto &marking) -> bool {
+  return hasInverse(decl, InvertibleProtocolKind::Copyable,
+                    [](auto &marking) -> bool {
     return marking.getInverse().is(InverseMarking::Kind::LegacyExplicit);
   });
 }
@@ -3458,24 +3623,23 @@ static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
 }
 
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
-  return hasInverseCopyable(decl, [](auto &marking) -> bool {
+  auto checkMarking = [](auto &marking) -> bool {
     switch (marking.getInverse().getKind()) {
     case InverseMarking::Kind::None:
-    case InverseMarking::Kind::LegacyExplicit: // covered by MoveOnly
+    case InverseMarking::Kind::LegacyExplicit: // covered by other checks.
       return false;
 
     case InverseMarking::Kind::Explicit:
     case InverseMarking::Kind::Inferred:
       return true;
     }
-  });
+  };
+
+  return hasInverse(decl, InvertibleProtocolKind::Copyable, checkMarking)
+      || hasInverse(decl, InvertibleProtocolKind::Escapable, checkMarking);
 }
 
 static bool usesFeatureOneWayClosureParameters(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
   return false;
 }
 
@@ -3592,7 +3756,7 @@ static bool usesFeatureStructLetDestructuring(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureNonEscapableTypes(Decl *decl) {
+static bool usesFeatureNonescapableTypes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<NonEscapableAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
     return true;
@@ -3601,6 +3765,14 @@ static bool usesFeatureNonEscapableTypes(Decl *decl) {
   if (fd && fd->getAttrs().getAttribute(DAK_ResultDependsOnSelf)) {
     return true;
   }
+  auto *pd = dyn_cast<ParamDecl>(decl);
+  if (pd && pd->hasResultDependsOn()) {
+    return true;
+  }
+  return false;
+}
+
+static bool usesFeatureFixedArrays(Decl *decl) {
   return false;
 }
 
@@ -3693,6 +3865,8 @@ static bool usesFeatureStaticExclusiveOnly(Decl *decl) {
 static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>();
 }
+
+static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
@@ -4353,6 +4527,9 @@ static void printParameterFlags(ASTPrinter &printer,
   
   if (flags.isIsolated())
     printer.printKeyword("isolated", options, " ");
+
+  if (flags.hasResultDependsOn())
+    printer.printKeyword("resultDependsOn", options, " ");
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
@@ -6049,7 +6226,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         switch (Options.OpaqueReturnTypePrinting) {
         case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
         case PrintOptions::OpaqueReturnTypePrintingMode::Description:
-          return true;
+          return false;
         case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
           return opaque->getDecl()->hasExplicitGenericParams();
         case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
@@ -6304,9 +6481,15 @@ public:
       Printer << "_";
   }
 
-  void visitInverseType(InverseType *T) {
-    Printer << "~";
-    visit(T->getInvertedProtocol());
+  void visitErrorUnionType(ErrorUnionType *T) {
+    Printer << "error_union(";
+    interleave(T->getTerms(),
+               [&](Type type) {
+                 visit(type);
+               }, [&]{
+                 Printer << ", ";
+               });
+    Printer << ")";
   }
 
   void visitPlaceholderType(PlaceholderType *T) {
@@ -6931,8 +7114,11 @@ public:
   }
 
   void printGenericSignature(GenericSignature genericSig,
+                             ArrayRef<InverseRequirement> inverses,
                              unsigned flags) {
-    PrintAST(Printer, Options).printGenericSignature(genericSig, flags);
+    PrintAST(Printer, Options).printGenericSignature(genericSig,
+                                                     inverses,
+                                                     flags);
   }
 
   void printSubstitutions(SubstitutionMap subs) {
@@ -6952,10 +7138,17 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
+    SmallVector<InverseRequirement, 2> inverses;
+    reconstituteInverses(T->getGenericSignature(),
+                         T->getGenericParams(),
+                         inverses);
+
     printFunctionExtInfo(T);
     printGenericSignature(T->getGenericSignature(),
+                          inverses,
                           PrintAST::PrintParams |
-                          PrintAST::PrintRequirements);
+                          PrintAST::PrintRequirements |
+                          PrintAST::CollapseDefaultReqs);
     Printer << " ";
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
@@ -7033,6 +7226,7 @@ public:
 
     if (auto sig = T->getInvocationGenericSignature()) {
       printGenericSignature(sig,
+                            /*inverses=*/{},
                             PrintAST::PrintParams |
                             PrintAST::PrintRequirements);
       Printer << " ";
@@ -7056,6 +7250,7 @@ public:
 
       sub->Printer << "@substituted ";
       sub->printGenericSignature(substitutions.getGenericSignature(),
+                                 /*inverses=*/{},
                                  PrintAST::PrintParams |
                                  PrintAST::PrintRequirements);
       sub->Printer << " ";
@@ -7162,7 +7357,7 @@ public:
       // printer, but only the sub-Printer.
       [&sub, T]{
         if (auto sig = T->getLayout()->getGenericSignature()) {
-          sub.printGenericSignature(sig,
+          sub.printGenericSignature(sig, /*inverses=*/{},
                           PrintAST::PrintParams | PrintAST::PrintRequirements);
           sub.Printer << " ";
         }
@@ -7407,39 +7602,51 @@ public:
     Printer << "each ";
   }
 
-  void printArchetypeCommon(ArchetypeType *T) {
-    if (Options.AlternativeTypeNames) {
-      auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
-      if (found != Options.AlternativeTypeNames->end()) {
-        if (T->isParameterPack()) printEach();
-        Printer << found->second.str();
-        return;
+  void printArchetypeCommon(Type interfaceTy, ArchetypeType *archetypeTy) {
+    if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
+      assert(archetypeTy->isRoot());
+
+      if (Options.AlternativeTypeNames) {
+        auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
+        if (found != Options.AlternativeTypeNames->end()) {
+          if (paramTy->isParameterPack()) printEach();
+          Printer << found->second.str();
+          return;
+        }
       }
+
+      visit(paramTy);
+      return;
     }
 
-    auto interfaceType = T->getInterfaceType();
-    if (auto *dependentMember = interfaceType->getAs<DependentMemberType>()) {
-      visitParentType(T->getParent());
-      printDependentMember(dependentMember);
-    } else {
-      visit(interfaceType);
+    auto *memberTy = interfaceTy->castTo<DependentMemberType>();
+    if (memberTy->getBase()->is<GenericTypeParamType>())
+      visitParentType(archetypeTy->getRoot());
+    else {
+      printArchetypeCommon(memberTy->getBase(), archetypeTy->getRoot());
+      Printer << ".";
     }
+
+    printDependentMember(memberTy);
   }
 
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    printArchetypeCommon(T);
+    printArchetypeCommon(T->getInterfaceType(), T);
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
-    if (auto parent = T->getParent()) {
-      printArchetypeCommon(T);
+    auto interfaceTy = T->getInterfaceType();
+    auto *paramTy = interfaceTy->getAs<GenericTypeParamType>();
+
+    if (!paramTy) {
+      assert(interfaceTy->is<DependentMemberType>());
+      printArchetypeCommon(interfaceTy, T);
       return;
     }
 
     // Try to print a named opaque type.
     auto printNamedOpaque = [&] {
-      unsigned ordinal =
-          T->getInterfaceType()->castTo<GenericTypeParamType>()->getIndex();
+      unsigned ordinal = paramTy->getIndex();
       if (auto genericParam = T->getDecl()->getExplicitGenericParam(ordinal)) {
         visit(genericParam->getDeclaredInterfaceType());
         return true;
@@ -7486,9 +7693,7 @@ public:
       Printer.printEscapedStringLiteral(
                                    decl->getOpaqueReturnTypeIdentifier().str());
 
-      Printer << ", " << T->getInterfaceType()
-                          ->castTo<GenericTypeParamType>()
-                          ->getIndex();
+      Printer << ", " << paramTy->getIndex();
 
       // The identifier after the closing parenthesis is irrelevant and can be
       // anything. It just needs to be there for the @_opaqueReturnTypeOf
@@ -7520,7 +7725,7 @@ public:
   }
 
   void visitPackArchetypeType(PackArchetypeType *T) {
-    printArchetypeCommon(T);
+    printArchetypeCommon(T->getInterfaceType(), T);
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
@@ -7657,7 +7862,7 @@ void LayoutConstraint::print(raw_ostream &OS,
 
 void LayoutConstraintInfo::print(ASTPrinter &Printer,
                                  const PrintOptions &PO) const {
-  Printer << getName(PO.PrintClassLayoutName);
+  Printer << getName(PO.PrintInternalLayoutName);
   switch (getKind()) {
   case LayoutConstraintKind::UnknownLayout:
   case LayoutConstraintKind::RefCountedObject:
@@ -7665,9 +7870,11 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   case LayoutConstraintKind::Class:
   case LayoutConstraintKind::NativeClass:
   case LayoutConstraintKind::Trivial:
-    return;
+  case LayoutConstraintKind::BridgeObject:
+    return; // non-parameterized cases
   case LayoutConstraintKind::TrivialOfAtMostSize:
   case LayoutConstraintKind::TrivialOfExactSize:
+  case LayoutConstraintKind::TrivialStride:
     Printer << "(";
     Printer << SizeInBits;
     if (Alignment)
@@ -7696,6 +7903,7 @@ void GenericSignature::print(ASTPrinter &Printer,
     return;
   }
   PrintAST(Printer, Opts).printGenericSignature(*this,
+                                                /*inverses=*/{},
                                                 PrintAST::PrintParams |
                                                 PrintAST::PrintRequirements);
 }
@@ -7878,7 +8086,7 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
       StreamPrinter sPrinter(os);
       TypePrinter typePrinter(sPrinter, PO);
       typePrinter
-          .printGenericSignature(genericSig,
+          .printGenericSignature(genericSig, /*inverses=*/{},
                                  PrintAST::PrintParams |
                                  PrintAST::PrintRequirements);
       os << ' ';
