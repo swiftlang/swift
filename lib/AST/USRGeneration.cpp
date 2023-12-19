@@ -324,6 +324,16 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
     return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 
+  if (const auto *Acc = D->getAccessor(AccKind)) {
+    if (auto ClangD = Acc->getClangDecl()) {
+      llvm::SmallString<128> Buffer;
+      bool Ignore = clang::index::generateUSRForDecl(ClangD, Buffer);
+      if (!Ignore)
+        OS << Buffer;
+      return Ignore;
+    }
+  }
+
   Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
                           SD, getUSRSpacePrefix(), SD->isStatic());
