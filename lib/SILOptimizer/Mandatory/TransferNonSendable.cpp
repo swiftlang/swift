@@ -2399,7 +2399,6 @@ CONSTANT_TRANSLATION(EndLifetimeInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
-CONSTANT_TRANSLATION(MarkDependenceInst, Ignored)
 CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
@@ -2597,6 +2596,13 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
+  translateSILAssign(mdi, mdi->getValue());
+  translateSILRequire(mdi->getBase());
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
