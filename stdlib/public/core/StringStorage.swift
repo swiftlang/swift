@@ -200,7 +200,7 @@ fileprivate func _allocate<T: AnyObject>(
     growTailBytes = numTailBytes
   }
 
-  let total = _mallocGoodSize(numHeaderBytes + growTailBytes)
+  let total = _mallocGoodSize(for: numHeaderBytes + growTailBytes)
   let totalTailBytes = total - numHeaderBytes
 
   return (tailAllocator(totalTailBytes), totalTailBytes)

@@ -307,7 +307,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
          getContiguousArrayStorageType(for: Element.self), realMinimumCapacity._builtinWordValue, Element.self)
       #else
       
-      let total = _mallocGoodSize(MemoryLayout<_ContiguousArrayStorage<Element>>.stride + (MemoryLayout<Element>.stride * realMinimumCapacity))
+      let total = _mallocGoodSize(for: MemoryLayout<_ContiguousArrayStorage<Element>>.stride + (MemoryLayout<Element>.stride * realMinimumCapacity))
       let tailSize = total - MemoryLayout<_ContiguousArrayStorage<Element>>.stride
       
       _storage = Builtin.allocWithTailElems_1(
