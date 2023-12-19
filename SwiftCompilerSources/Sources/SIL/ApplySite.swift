@@ -120,6 +120,12 @@ extension ApplySite {
     return nil
   }
 
+  /// Get the conventions of the callee without the applied substitutions.
+  public var originalCalleeConvention: FunctionConvention {
+    FunctionConvention(for: callee.type.bridged.getASTType(),
+      in: parentFunction)
+  }
+
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     if let callee = referencedFunction {
       return callee.hasSemanticsAttribute(attr)

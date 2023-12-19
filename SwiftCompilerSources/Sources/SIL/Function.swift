@@ -33,6 +33,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
+  public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
+
   /// Returns true if the function is a definition and not only an external declaration.
   ///
   /// This is the case if the functioun contains a body, i.e. some basic blocks.

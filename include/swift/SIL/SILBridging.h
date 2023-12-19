@@ -60,12 +60,86 @@ class SILWitnessTable;
 class SILDefaultWitnessTable;
 class NominalTypeDecl;
 class VarDecl;
+class TypeBase;
 class SwiftPassInvocation;
 class GenericSpecializationInformation;
 }
 
 bool swiftModulesInitialized();
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
+
+enum class BridgedResultConvention {
+  Indirect,
+  Owned,
+  Unowned,
+  UnownedInnerPointer,
+  Autoreleased,
+  Pack
+};
+
+// A null type indicates a non-existant result, in which case `convention` is undefined.
+struct BridgedResultInfo {
+  swift::TypeBase * _Nonnull type;
+  BridgedResultConvention convention;
+
+#ifdef USED_IN_CPP_SOURCE
+  inline static BridgedResultConvention
+  castToResultConvention(swift::ResultConvention convention);
+
+  BridgedResultInfo(swift::SILResultInfo resultInfo):
+    type(resultInfo.getInterfaceType().getPointer()),
+    convention(castToResultConvention(resultInfo.getConvention()))
+  {}
+#endif
+};
+
+struct BridgedResultInfoArray {
+  BridgedArrayRef resultInfoArray;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedResultInfoArray(llvm::ArrayRef<swift::SILResultInfo> results)
+    : resultInfoArray(results) {}
+
+  llvm::ArrayRef<swift::SILResultInfo> unbridged() const {
+    return resultInfoArray.unbridged<swift::SILResultInfo>();
+  }
+#endif
+
+  BRIDGED_INLINE SwiftInt count() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedResultInfo at(SwiftInt argumentIndex) const;
+};
+
+// Temporary access to the AST type within SIL until ASTBridging provides it.
+struct BridgedASTType {
+  swift::TypeBase * _Nullable type;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::Type unbridged() const {
+    return type;
+  }
+#endif
+
+  BRIDGED_INLINE bool isOpenedExistentialWithError() const;
+
+  // =========================================================================//
+  //                              SILFunctionType
+  // =========================================================================//
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedResultInfoArray SILFunctionType_getResults() const;
+
+  BRIDGED_INLINE SwiftUInt SILFunctionType_getNumIndirectFormalResults() const;
+
+  BRIDGED_INLINE SwiftUInt SILFunctionType_getNumPackResults() const;
+
+  BRIDGED_INLINE bool SILFunctionType_hasErrorResult() const;
+
+  BRIDGED_INLINE SwiftUInt SILFunctionType_getNumParameters() const;
+
+  BRIDGED_INLINE bool SILFunctionType_hasSelfParam() const;
+};
 
 struct BridgedType {
   void * _Nullable opaqueValue;
@@ -111,6 +185,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isAddress() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getObjectType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getASTType() const;
   BRIDGED_INLINE bool isTrivial(BridgedFunction f) const;
   BRIDGED_INLINE bool isNonTrivialOrContainsRawPointer(BridgedFunction f) const;
   BRIDGED_INLINE bool isValueTypeWithDeinit() const;
@@ -320,6 +395,7 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool hasOwnership() const;
+  BRIDGED_INLINE bool hasLoweredAddresses() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getFirstBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getLastBlock() const;
   BRIDGED_INLINE SwiftInt getNumIndirectFormalResults() const;
@@ -349,6 +425,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedNominalTypeDecl decl) const;
+  BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type) const;
 
   enum class ParseEffectsMode {
     argumentEffectsFromSource,
@@ -731,6 +808,7 @@ struct BridgedArgument {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
   BRIDGED_INLINE BridgedArgumentConvention getConvention() const;
   BRIDGED_INLINE bool isSelf() const;
+  BRIDGED_INLINE bool isReborrow() const;
 };
 
 struct OptionalBridgedArgument {

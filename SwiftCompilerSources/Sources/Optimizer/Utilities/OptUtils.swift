@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
 import SIL
 import OptimizerBridging
 

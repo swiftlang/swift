@@ -22,6 +22,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Nullability.h"
 #include "swift/SIL/ApplySite.h"
@@ -39,6 +40,57 @@
 #include <string>
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+//===----------------------------------------------------------------------===//
+//                             BridgedResultInfo
+//===----------------------------------------------------------------------===//
+
+BridgedResultConvention
+BridgedResultInfo::castToResultConvention(swift::ResultConvention convention) {
+  return static_cast<BridgedResultConvention>(convention);
+}
+
+SwiftInt BridgedResultInfoArray::count() const {
+  return unbridged().size();
+}
+
+BridgedResultInfo BridgedResultInfoArray::at(SwiftInt argumentIndex) const {
+  return BridgedResultInfo(unbridged()[argumentIndex]);
+}
+
+//===----------------------------------------------------------------------===//
+//                               BridgedASTType
+//===----------------------------------------------------------------------===//
+
+bool BridgedASTType::isOpenedExistentialWithError() const {
+  return unbridged()->isOpenedExistentialWithError();
+}
+
+BridgedResultInfoArray BridgedASTType::SILFunctionType_getResults() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->getResults();
+}
+
+SwiftUInt BridgedASTType::SILFunctionType_getNumIndirectFormalResults() const {
+  return unbridged()->castTo<swift::SILFunctionType>()
+    ->getNumIndirectFormalResults();
+}
+
+SwiftUInt BridgedASTType::SILFunctionType_getNumPackResults() const {
+  return unbridged()->castTo<swift::SILFunctionType>()
+    ->getNumPackResults();
+}
+
+bool BridgedASTType::SILFunctionType_hasErrorResult() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->hasErrorResult();
+}
+
+SwiftUInt BridgedASTType::SILFunctionType_getNumParameters() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->getNumParameters();
+}
+
+bool BridgedASTType::SILFunctionType_hasSelfParam() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->hasSelfParam();
+}
 
 //===----------------------------------------------------------------------===//
 //                                BridgedType
@@ -66,6 +118,10 @@ BridgedType BridgedType::getAddressType() const {
 
 BridgedType BridgedType::getObjectType() const {
   return unbridged().getObjectType();
+}
+
+BridgedASTType BridgedType::getASTType() const {
+  return {unbridged().getASTType().getPointer()};
 }
 
 bool BridgedType::isTrivial(BridgedFunction f) const {
@@ -368,6 +424,10 @@ bool BridgedArgument::isSelf() const {
   return fArg->isSelf();
 }
 
+bool BridgedArgument::isReborrow() const {
+  return getArgument()->isReborrow();
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedSubstitutionMap
 //===----------------------------------------------------------------------===//
@@ -421,6 +481,8 @@ BridgedStringRef BridgedFunction::getName() const {
 }
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
+
+bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
 
 OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {
   return {getFunction()->empty() ? nullptr : getFunction()->getEntryBlock()};
@@ -553,6 +615,9 @@ bool BridgedFunction::isResilientNominalDecl(BridgedNominalTypeDecl decl) const 
                                        getFunction()->getResilienceExpansion());
 }
 
+BridgedType BridgedFunction::getLoweredType(BridgedASTType type) const {
+  return BridgedType(getFunction()->getLoweredType(type.type));
+}
 
 //===----------------------------------------------------------------------===//
 //                                BridgedGlobalVar

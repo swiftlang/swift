@@ -28,6 +28,8 @@ public class Argument : Value, Hashable {
   public var index: Int {
     return parentBlock.arguments.firstIndex(of: self)!
   }
+
+  public var isReborrow: Bool { bridged.isReborrow() }
   
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -85,28 +87,37 @@ public struct Phi {
     return value.parentBlock
   }
 
-  public var incomingOperands: LazyMapSequence<PredecessorList, Operand> {
+  public func incomingOperand(inPredecessor predecessor: BasicBlock)
+  -> Operand {
     let blockArgIdx = value.index
-    return predecessors.lazy.map {
-      switch $0.terminator {
-        case let br as BranchInst:
-          return br.operands[blockArgIdx]
-        case let condBr as CondBranchInst:
-          if condBr.trueBlock == successor {
-            assert(condBr.falseBlock != successor)
-            return condBr.trueOperands[blockArgIdx]
-          } else {
-            assert(condBr.falseBlock == successor)
-            return condBr.falseOperands[blockArgIdx]
-          }
-        default:
-          fatalError("wrong terminator for phi-argument")
+    switch predecessor.terminator {
+    case let br as BranchInst:
+      return br.operands[blockArgIdx]
+    case let condBr as CondBranchInst:
+      if condBr.trueBlock == successor {
+        assert(condBr.falseBlock != successor)
+        return condBr.trueOperands[blockArgIdx]
+      } else {
+        assert(condBr.falseBlock == successor)
+        return condBr.falseOperands[blockArgIdx]
       }
+    default:
+      fatalError("wrong terminator for phi-argument")
     }
+  }
+
+  public var incomingOperands: LazyMapSequence<PredecessorList, Operand> {
+    predecessors.lazy.map { incomingOperand(inPredecessor: $0) }
   }
 
   public var incomingValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
     incomingOperands.lazy.map { $0.value }
+  }
+
+  public var isReborrow: Bool { value.isReborrow }
+
+  public var endsLifetime: Bool {
+    value.ownership == .owned || value.isReborrow
   }
 
   public static func ==(lhs: Phi, rhs: Phi) -> Bool {

@@ -59,6 +59,19 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     self.inExclusiveRange.insert(beginInst)
   }
 
+  init(for value: Value, _ context: some Context) {
+    var begin: Instruction
+    if let def = value.definingInstruction {
+      begin = def
+    } else if let result = TerminatorResult(value) {
+      begin = result.terminator
+    } else {
+      assert(Phi(value) != nil || value is FunctionArgument)
+      begin = value.parentBlock.instructions.first!
+    }
+    self = InstructionRange(begin: begin, context)
+  }
+
   /// Insert a potential end instruction.
   mutating func insert(_ inst: Instruction) {
     insertedInsts.insert(inst)
@@ -103,10 +116,19 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// Returns the end instructions.
+  ///
+  /// Warning: this returns `begin` if no instructions were inserted.
   var ends: LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>, Instruction> {
     blockRange.ends.map {
       $0.instructions.reversed().first(where: { insertedInsts.contains($0)})!
     }
+  }
+
+  // Returns the exit blocks.
+  var exitBlocks: LazySequence<FlattenSequence<
+                    LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
+                                    LazyFilterSequence<SuccessorArray>>>> {
+    blockRange.exits
   }
 
   /// Returns the exit instructions.

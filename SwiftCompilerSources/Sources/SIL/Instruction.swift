@@ -1071,6 +1071,8 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
   public var singleDirectResult: Value? { nil }
 
+  public var token: Value { getResult(index: resultCount - 1) }
+
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - 1)
   }
