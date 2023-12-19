@@ -56,10 +56,12 @@ class ImportSet final :
   unsigned HasHeaderImportModule : 1;
   unsigned NumTopLevelImports : 31;
   unsigned NumTransitiveImports;
+  unsigned NumTransitiveSwiftOnlyImports;
 
   ImportSet(bool hasHeaderImportModule,
             ArrayRef<ImportedModule> topLevelImports,
-            ArrayRef<ImportedModule> transitiveImports);
+            ArrayRef<ImportedModule> transitiveImports,
+            ArrayRef<ImportedModule> transitiveSwiftOnlyImports);
 
   ImportSet(const ImportSet &) = delete;
   void operator=(const ImportSet &) = delete;
@@ -73,7 +75,8 @@ public:
       ArrayRef<ImportedModule> topLevelImports);
 
   size_t numTrailingObjects(OverloadToken<ImportedModule>) const {
-    return NumTopLevelImports + NumTransitiveImports;
+    return NumTopLevelImports + NumTransitiveImports +
+           NumTransitiveSwiftOnlyImports;
   }
 
   /// This is a bit of a hack to make module name lookup work properly.
@@ -92,6 +95,12 @@ public:
     return {getTrailingObjects<ImportedModule>() +
               NumTopLevelImports,
             NumTransitiveImports};
+  }
+
+  ArrayRef<ImportedModule> getTransitiveSwiftOnlyImports() const {
+    return {getTrailingObjects<ImportedModule>() +
+              NumTopLevelImports + NumTransitiveImports,
+            NumTransitiveSwiftOnlyImports};
   }
 
   ArrayRef<ImportedModule> getAllImports() const {
@@ -115,6 +124,9 @@ class alignas(ImportedModule) ImportCache {
                             const ModuleDecl *,
                             const DeclContext *>,
                  ArrayRef<ImportPath::Access>> ShadowCache;
+  llvm::DenseMap<std::tuple<const ModuleDecl *,
+                            const DeclContext *>,
+                 bool> SwiftOnlyCache;
 
   ImportPath::Access EmptyAccessPath;
 
@@ -141,6 +153,12 @@ public:
                     const DeclContext *dc) {
     return !getAllVisibleAccessPaths(mod, dc).empty();
   }
+
+  /// Is `mod` imported from `dc` via a purely Swift access path?
+  /// Always returns false if `dc` is a non-Swift module and only takes
+  /// into account re-exports declared from Swift modules for transitive imports.
+  bool isImportedByViaSwiftOnly(const ModuleDecl *mod,
+                                const DeclContext *dc);
 
   /// Returns all access paths in 'mod' that are visible from 'dc' if we
   /// subtract imports of 'other'.
