@@ -3386,8 +3386,8 @@ void SourceFile::lookupImportedSPIGroups(
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
         (importedModule == import.module.importedModule ||
-         (imports.isImportedBy(importedModule, import.module.importedModule) &&
-          importedModule->isExportedAs(import.module.importedModule)))) {
+         imports.isImportedByViaSwiftOnly(importedModule,
+                                       import.module.importedModule))) {
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
