@@ -2435,10 +2435,21 @@ CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 
 //===---
+// Existential Box
+//
+
+// NOTE: Today these can only be used with Errors. Since Error is a sub-protocol
+// of Sendable, we actually do not have any way to truly test them. These are
+// just hypothetical assignments so we are complete.
+CONSTANT_TRANSLATION(AllocExistentialBoxInst, AssignFresh)
+CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Assign)
+CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Assign)
+CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
+
+//===---
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(AllocExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedTrivialBitCastInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedBitwiseCastInst, Unhandled)
@@ -2460,7 +2471,6 @@ CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
 CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
 CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(VectorInst, Unhandled)
@@ -2472,7 +2482,6 @@ CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialValueInst, Unhandled)
-CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Unhandled)
 CONSTANT_TRANSLATION(OpenPackElementInst, Unhandled)
 CONSTANT_TRANSLATION(PackLengthInst, Unhandled)
 CONSTANT_TRANSLATION(DynamicPackIndexInst, Unhandled)
@@ -2494,7 +2503,6 @@ CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocStackRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)

@@ -443,3 +443,37 @@ sil [ossa] @mark_dependence_test_base_is_a_require : $@convention(thin) @async (
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// NOTE: Since Error is Sendable, this just validates that we handle the
+// instruction and don't crash.
+sil [ossa] @alloc_existential_box_test : $@convention(thin) @async <T : Error> (@in T) -> @owned any Error {
+bb0(%inError : $*T):
+  %b = alloc_existential_box $Error, $T
+  %p = project_existential_box $T in %b : $Error
+  copy_addr [take] %inError to [init] %p : $*T
+
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<T>(%p) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+  return %b : $Error
+}
+
+sil [ossa] @alloc_existential_box_test_2 : $@convention(thin) @async <T : Error> (@in T) -> () {
+bb0(%inError : $*T):
+  %b = alloc_existential_box $Error, $T
+  %p = project_existential_box $T in %b : $Error
+  copy_addr [take] %inError to [init] %p : $*T
+
+  %bb = begin_borrow %b : $Error
+  %addr = open_existential_box %bb : $any Error to $*@opened("169A6848-B636-11EC-83C4-D0817AD59B9D", any Error) Self
+
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<@opened("169A6848-B636-11EC-83C4-D0817AD59B9D", any Error) Self>(%addr) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %bb : $Error
+
+  destroy_addr %p : $*T
+  dealloc_existential_box %b : $Error, $T
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
