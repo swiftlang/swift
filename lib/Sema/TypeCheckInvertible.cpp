@@ -342,8 +342,8 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
   // Walk the stored properties of classes and structs.
   if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
     for (auto property : nominal->getStoredProperties()) {
-      auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType())
-          ->getRValueType()->getReferenceStorageReferent();
+      auto propertyType = dc->mapTypeIntoContext(
+          property->getValueInterfaceType());
       if ((*this)(property, propertyType))
         return true;
     }
