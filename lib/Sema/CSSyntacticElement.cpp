@@ -379,7 +379,6 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
       constraints.push_back(
           Constraint::createCaughtError(cs, Type(thrownErrorTypeVar), closure,
                                         locator, referencedVars));
-      referencedVars.pop_back();
     }
   }
 
