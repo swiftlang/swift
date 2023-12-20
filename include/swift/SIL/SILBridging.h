@@ -809,6 +809,7 @@ struct BridgedArgument {
   BRIDGED_INLINE BridgedArgumentConvention getConvention() const;
   BRIDGED_INLINE bool isSelf() const;
   BRIDGED_INLINE bool isReborrow() const;
+  BRIDGED_INLINE bool hasResultDependsOn() const;
 };
 
 struct OptionalBridgedArgument {

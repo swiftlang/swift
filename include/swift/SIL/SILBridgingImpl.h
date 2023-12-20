@@ -424,6 +424,11 @@ bool BridgedArgument::isSelf() const {
   return fArg->isSelf();
 }
 
+bool BridgedArgument::hasResultDependsOn() const {
+  auto *fArg = static_cast<swift::SILFunctionArgument*>(getArgument());
+  return fArg->hasResultDependsOn();
+}
+
 bool BridgedArgument::isReborrow() const {
   return getArgument()->isReborrow();
 }
