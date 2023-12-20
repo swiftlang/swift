@@ -997,7 +997,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
     "createAsyncTaskWithExecutor", "", Special)
 
-/// createAsyncTaskWithExecutor(): (
+/// createAsyncTaskInGroupWithExecutor(): (
 ///     Int,                            // flags
 ///     Builtin.RawPointer,             // group
 ///     Builtin.Executor,               // executor
