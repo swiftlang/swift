@@ -580,16 +580,19 @@ function Build-CMakeProject {
 
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
-  
+
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
     TryAdd-KeyValue $Defines CMAKE_MT "mt"
 
     $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
-    if ($DebugInfo) {
-      $CFlags += if ($EnableCaching) { "/Z7" } else { "/Zi" }
-      # Add additional linker flags for generating the debug info.
-      Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
-      Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+    if ($UseMSVCCompilers.Contains("C") -Or $UseMSVCCompilers.Contains("CXX") -Or
+        $UsePinnedCompilers.Contains("C") -Or $UsePinnedCompilers.Contains("CXX")) {
+      if ($DebugInfo) {
+        $CFlags += if ($EnableCaching) { "/Z7" } else { "/Zi" }
+        # Add additional linker flags for generating the debug info.
+        Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
+        Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+      }
     }
     $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
 
