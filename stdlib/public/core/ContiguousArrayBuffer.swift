@@ -345,6 +345,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       self = _ContiguousArrayBuffer<Element>()
     }
     else {
+      #if !$Embedded
       _storage = Builtin.allocWithTailElems_1(
          getContiguousArrayStorageType(for: Element.self), realMinimumCapacity._builtinWordValue, Element.self)
       #else
