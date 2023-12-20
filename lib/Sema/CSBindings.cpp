@@ -2172,10 +2172,43 @@ static Type getOptionalSuperclass(Type type) {
     type = underlying;
   }
 
-  if (!type->mayHaveSuperclass())
-    return Type();
+  Type superclass;
+  if (auto *existential = type->getAs<ExistentialType>()) {
+    auto constraintTy = existential->getConstraintType();
+    if (auto *compositionTy = constraintTy->getAs<ProtocolCompositionType>()) {
+      SmallVector<Type, 2> members;
+      bool found = false;
+      // Preserve all of the protocol requirements of the type i.e.
+      // if the type was `any B & P` where `B : A` the supertype is
+      // going to be `any A & P`.
+      //
+      // This is especially important for Sendable key paths because
+      // to reserve sendability of the original type.
+      for (auto member : compositionTy->getMembers()) {
+        if (member->getClassOrBoundGenericClass()) {
+          member = member->getSuperclass();
+          if (!member)
+            return Type();
+          found = true;
+        }
+        members.push_back(member);
+      }
 
-  auto superclass = type->getSuperclass();
+      if (!found)
+        return Type();
+
+      superclass = ExistentialType::get(
+          ProtocolCompositionType::get(type->getASTContext(), members,
+                                       compositionTy->hasExplicitAnyObject()));
+    } else {
+      // Avoid producing superclass for situations like `any P` where `P` is
+      // `protocol P : C`.
+      return Type();
+    }
+  } else {
+    superclass = type->getSuperclass();
+  }
+
   if (!superclass)
     return Type();
 
@@ -2326,7 +2359,7 @@ bool TypeVarBindingProducer::computeNext() {
           auto supertype = *simplifiedSuper;
           // A key path type cannot be bound to type-erased key path variants.
           if (TypeVar->getImpl().isKeyPathType() &&
-              (supertype->isPartialKeyPath() || supertype->isAnyKeyPath()))
+              isTypeErasedKeyPathType(supertype))
             continue;
 
           addNewBinding(binding.withType(supertype));
