@@ -10,6 +10,8 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar119907089
+
 import Foundation
 import StdlibUnittest
 import ObjCClasses
