@@ -6312,6 +6312,14 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   return result;
 }
 
+FuncDecl *ASTContext::getDiagnoseUnavailableCodeReachedDecl() {
+  // FIXME: Remove this with rdar://119892482
+  if (AvailabilityContext::forDeploymentTarget(*this).isContainedIn(
+      getSwift59Availability()))
+    return getDiagnoseUnavailableCodeReached();
+  return getDiagnoseUnavailableCodeReachedAEIC();
+}
+
 void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {
   getImpl().Plugins = std::move(loader);
 }
