@@ -128,6 +128,12 @@ internal class __EmptySetSingleton: __RawSetStorage {
 }
 
 #if $Embedded
+// In embedded Swift, the stdlib is a .swiftmodule only without any .o/.a files,
+// to allow consuming it by clients with different LLVM codegen setting (-mcpu
+// flags, etc.), which means we cannot declare the singleton in a C/C++ file.
+//
+// TODO: We should figure out how to make this a constant so that it's placed in
+// non-writable memory (can't be a let, Builtin.addressof below requires a var).
 public var _swiftEmptySetSingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, UInt32, Int, Int, Int) =
     (
       /*isa*/0, /*refcount*/-1, // HeapObject header
