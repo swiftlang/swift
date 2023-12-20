@@ -436,21 +436,21 @@ function Ensure-WindowsSDK {
 }
 
 function Ensure-SwiftToolchain($Arch) {
-  if (-not (Test-Path $BinaryCache\wix-4.0.1.zip)) {
+  if (-not (Test-Path $BinaryCache\wix-4.0.3.zip)) {
     Write-Output "WiX not found. Downloading from nuget.org..."
-    Invoke-Program curl.exe -sL https://www.nuget.org/api/v2/package/wix/4.0.1 --output $BinaryCache\wix-4.0.1.zip --create-dirs
+    Invoke-Program curl.exe -sL https://www.nuget.org/api/v2/package/wix/4.0.3 --output $BinaryCache\wix-4.0.3.zip --create-dirs
   }
 
   if (-not $ToBatch) {
-    $SHA256 = Get-FileHash -Path "$BinaryCache\wix-4.0.1.zip" -Algorithm SHA256
-    if ($SHA256.Hash -ne "756AD3115F0CE808313266F4E401C0F520D319211DE0B9D8D7E7697020E0C461") {
-      throw "WiX SHA256 mismatch ($($SHA256.Hash) vs 756AD3115F0CE808313266F4E401C0F520D319211DE0B9D8D7E7697020E0C461)"
+    $SHA256 = Get-FileHash -Path "$BinaryCache\wix-4.0.3.zip" -Algorithm SHA256
+    if ($SHA256.Hash -ne "33B3F28556F2499D10E0E0382ED481BD71BCB6178A20E7AF15A6879571B6BD41") {
+      throw "WiX SHA256 mismatch ($($SHA256.Hash) vs 33B3F28556F2499D10E0E0382ED481BD71BCB6178A20E7AF15A6879571B6BD41)"
     }
   }
 
-  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\wix-4.0.1 | Out-Null
+  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\wix-4.0.3 | Out-Null
   Write-Output "Extracting WiX..."
-  Expand-Archive -Path $BinaryCache\wix-4.0.1.zip -Destination $BinaryCache\wix-4.0.1 -Force
+  Expand-Archive -Path $BinaryCache\wix-4.0.3.zip -Destination $BinaryCache\wix-4.0.3 -Force
 
   if (-not (Test-Path "$BinaryCache\${PinnedToolchain}.exe")) {
     Write-Output "Swift toolchain not found. Downloading from swift.org..."
@@ -467,7 +467,7 @@ function Ensure-SwiftToolchain($Arch) {
 
   New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains" | Out-Null
   Write-Output "Extracting Swift toolchain..."
-  Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn extract "$BinaryCache\${PinnedToolchain}.exe" -out "$BinaryCache\toolchains\"
+  Invoke-Program "$BinaryCache\wix-4.0.3\tools\net6.0\any\wix.exe" -- burn extract "$BinaryCache\${PinnedToolchain}.exe" -out "$BinaryCache\toolchains\"
   if ($PinnedLayout -eq "New") {
     [string[]] $Packages = @("UNUSED",
                              "rtl.msi","bld.msi","cli.msi","dbg.msi","ide.msi",
@@ -1748,7 +1748,7 @@ function Stage-BuildArtifacts($Arch) {
   } else {
     New-Item -Type Directory -Path "$($Arch.BinaryCache)\installer\$($Arch.VSName)\" -ErrorAction Ignore | Out-Null
   }
-  Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn detach "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$($Arch.BinaryCache)\installer\$($Arch.VSName)\"
+  Invoke-Program "$BinaryCache\wix-4.0.3\tools\net6.0\any\wix.exe" -- burn detach "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$($Arch.BinaryCache)\installer\$($Arch.VSName)\"
 }
 
 #-------------------------------------------------------------------
