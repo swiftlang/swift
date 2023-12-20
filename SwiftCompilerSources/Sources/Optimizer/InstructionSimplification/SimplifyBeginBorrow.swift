@@ -32,7 +32,7 @@ private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ co
     if tryReplaceCopy(of: forwardedValue, withCopiedOperandOf: beginBorrow, context) {
       return
     }
-    if beginBorrow.borrowedValue.isDestroyed(after: beginBorrow) {
+    if beginBorrow.borrowedValue.isDestroyed(after: beginBorrow, context) {
       convertAllUsesToOwned(of: beginBorrow, context)
     }
   }
@@ -117,8 +117,21 @@ private extension Value {
     return relevantUses.allSatisfy { $0.canAccept(ownership: .owned) }
   }
 
-  func isDestroyed(after nonDestroyUser: Instruction) -> Bool {
-    uses.getSingleUser(notOfType: DestroyValueInst.self) == nonDestroyUser
+  func isDestroyed(after nonDestroyUser: Instruction, _ context: SimplifyContext) -> Bool {
+    if uses.getSingleUser(notOfType: DestroyValueInst.self) != nonDestroyUser {
+      return false
+    }
+    let dominatorTree = context.dominatorTree
+    let nonDestroyBlock = nonDestroyUser.parentBlock
+    for use in uses {
+      if use.instruction == nonDestroyUser {
+        continue
+      }
+      if !nonDestroyBlock.dominates(use.instruction.parentBlock, dominatorTree) {
+        return false
+      }
+    }
+    return true
   }
 
   func replaceAllDestroys(with replacement: Value, _ context: SimplifyContext) {

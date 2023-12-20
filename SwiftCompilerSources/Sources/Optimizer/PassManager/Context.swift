@@ -344,6 +344,13 @@ struct SimplifyContext : MutatingContext {
   let preserveDebugInfo: Bool
 }
 
+extension SimplifyContext {
+  var dominatorTree: DominatorTree {
+    let bridgedDT = _bridged.getDomTree()
+    return DominatorTree(bridged: bridgedDT)
+  }
+}
+
 extension Type {
   func getStaticSize(context: SimplifyContext) -> Int? {
     let v = context._bridged.getStaticSize(self.bridged)
