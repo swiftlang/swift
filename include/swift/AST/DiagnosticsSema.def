@@ -5559,6 +5559,9 @@ ERROR(isolated_parameter_combined_nonisolated,none,
       "%0 with 'isolated' parameter cannot be 'nonisolated'",
       (DescriptiveDeclKind))
 
+NOTE(in_derived_conformance, none,
+     "in derived conformance to %0",
+     (Type))
 WARNING(non_sendable_param_type,none,
         "non-sendable type %0 %select{passed in call to %3 %kind2|"
         "exiting %3 context in call to non-isolated %kind2|"
