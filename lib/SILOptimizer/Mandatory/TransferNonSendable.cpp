@@ -215,7 +215,8 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
 
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
-      if (isa<UncheckedTrivialBitCastInst, UncheckedBitwiseCastInst>(svi)) {
+      if (isa<UncheckedTrivialBitCastInst, UncheckedBitwiseCastInst,
+              UncheckedValueCastInst>(svi)) {
         if (isNonSendableType(svi->getType(), fn) &&
             isNonSendableType(svi->getOperand(0)->getType(), fn)) {
           temp = svi->getOperand(0);
@@ -2481,7 +2482,6 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(UncheckedValueCastInst, Unhandled)
 CONSTANT_TRANSLATION(RefToUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(UnownedToRefInst, Unhandled)
 CONSTANT_TRANSLATION(BridgeObjectToWordInst, Unhandled)
@@ -2654,6 +2654,7 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 
 CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedTrivialBitCastInst)
 CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedBitwiseCastInst)
+CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 
 #undef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
 
