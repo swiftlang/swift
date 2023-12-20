@@ -8,7 +8,8 @@ import Builtin
 import Swift
 import SwiftShims
 
-class C {
+class B {}
+class C : B {
   @_hasStorage let i: Int
 }
 
@@ -360,3 +361,80 @@ bb3:
   return %0 : $C
 }
 
+// CHECK-LABEL: sil [ossa] @dont_replace_destroys_of_original_with_destroys_of_nondominating_forward : {{.*}} {
+// CHECK:         begin_borrow 
+// CHECK-LABEL: } // end sil function 'dont_replace_destroys_of_original_with_destroys_of_nondominating_forward'
+sil [ossa] @dont_replace_destroys_of_original_with_destroys_of_nondominating_forward : $@convention(thin) (@owned C) -> () {
+bb0(%21 : @owned $C):
+  cond_br undef, bb3, bb6
+
+bb3:
+  %39 = begin_borrow %21 : $C
+  %40 = upcast %39 : $C to $B
+  apply undef(%40) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %39 : $C
+  cond_br undef, bb4, bb5
+
+bb4:
+  destroy_value %21 : $C
+  br bb7
+
+bb5:
+  destroy_value %21 : $C
+  br bb7
+
+bb6:
+  destroy_value %21 : $C
+  br bb7
+
+bb7:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_replace_destroys_of_original_with_destroys_of_dominating_forward : {{.*}} {
+// CHECK-NOT:     begin_borrow
+// CHECK-LABEL: } // end sil function 'do_replace_destroys_of_original_with_destroys_of_dominating_forward'
+sil [ossa] @do_replace_destroys_of_original_with_destroys_of_dominating_forward : $@convention(thin) (@owned C) -> () {
+bb0(%21 : @owned $C):
+  %39 = begin_borrow %21 : $C
+  %40 = upcast %39 : $C to $B
+  apply undef(%40) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %39 : $C
+  cond_br undef, bb4, bb5
+
+bb4:
+  destroy_value %21 : $C
+  br bb7
+
+bb5:
+  destroy_value %21 : $C
+  br bb7
+
+bb7:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_replace_destroys_of_original_with_destroy_in_same_block : {{.*}} {
+// CHECK-NOT:     begin_borrow
+// CHECK-LABEL: } // end sil function 'do_replace_destroys_of_original_with_destroy_in_same_block'
+sil [ossa] @do_replace_destroys_of_original_with_destroy_in_same_block : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = begin_borrow %0 : $C
+  %5 = upcast %4 : $C to $B
+  apply undef(%5) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %4 : $C
+  destroy_value %0 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
