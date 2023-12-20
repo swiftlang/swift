@@ -52,6 +52,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
@@ -59,6 +60,7 @@
 #include "clang/Basic/Version.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexingAction.h"
 #include "clang/Lex/Preprocessor.h"
@@ -85,6 +87,7 @@
 #include "llvm/TextAPI/TextAPIReader.h"
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
 
 using namespace swift;
@@ -1040,19 +1043,13 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
 }
 
 std::vector<std::string>
-ClangImporter::getClangArguments(ASTContext &ctx, bool ignoreClangTarget) {
+ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) {
+  assert(!ctx.ClangImporterOpts.DirectClangCC1ModuleBuild &&
+         "direct-clang-cc1-module-build should not call this function");
   std::vector<std::string> invocationArgStrs;
   // When creating from driver commands, clang expects this to be like an actual
   // command line. So we need to pass in "clang" for argv[0]
-  if (!ctx.ClangImporterOpts.DirectClangCC1ModuleBuild)
-    invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
-  if (ctx.ClangImporterOpts.ExtraArgsOnly) {
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             ctx.ClangImporterOpts.ExtraArgs.begin(),
-                             ctx.ClangImporterOpts.ExtraArgs.end());
-    return invocationArgStrs;
-  }
-
+  invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
   switch (ctx.ClangImporterOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
   case ClangImporterOptions::Modes::PrecompiledModule:
@@ -1066,69 +1063,59 @@ ClangImporter::getClangArguments(ASTContext &ctx, bool ignoreClangTarget) {
   return invocationArgStrs;
 }
 
-std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
-    ClangImporter *importer, const ClangImporterOptions &importerOpts,
+std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+    ClangImporter *importer, ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-    ArrayRef<std::string> invocationArgStrs,
-    std::vector<std::string> *CC1Args) {
-  std::vector<const char *> invocationArgs;
-  invocationArgs.reserve(invocationArgStrs.size());
-  for (auto &argStr : invocationArgStrs)
-    invocationArgs.push_back(argStr.c_str());
+    bool ignoreClangTarget) {
+  // If using direct cc1 module build, return extra args only.
+  if (ctx.ClangImporterOpts.DirectClangCC1ModuleBuild)
+    return ctx.ClangImporterOpts.ExtraArgs;
 
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> clangDiags;
-  std::unique_ptr<clang::CompilerInvocation> CI;
-  if (importerOpts.DirectClangCC1ModuleBuild) {
-    // In this mode, we bypass createInvocationFromCommandLine, which goes
-    // through the Clang driver, and use strictly cc1 arguments to instantiate a
-    // clang Instance directly, assuming that the set of '-Xcc <X>' frontend flags is
-    // fully sufficient to do so.
+  // Otherwise, create cc1 arguments from driver args.
+  auto driverArgs = getClangDriverArguments(ctx, ignoreClangTarget);
 
-    // Because we are bypassing the Clang driver, we must populate
-    // the diagnostic options here explicitly.
-    std::unique_ptr<clang::DiagnosticOptions> clangDiagOpts =
-        clang::CreateAndPopulateDiagOpts(invocationArgs);
-    auto *diagClient = new ClangDiagnosticConsumer(
-        importer->Impl, *clangDiagOpts, importerOpts.DumpClangDiagnostics);
-    clangDiags = clang::CompilerInstance::createDiagnostics(
-        clangDiagOpts.release(), diagClient,
-        /*owned*/ true);
+  llvm::SmallVector<const char *> invocationArgs;
+  invocationArgs.reserve(driverArgs.size());
+  llvm::for_each(driverArgs, [&](const std::string &Arg) {
+    invocationArgs.push_back(Arg.c_str());
+  });
 
-    // Finally, use the CC1 command-line and the diagnostic engine
-    // to instantiate our Invocation.
-    CI = std::make_unique<clang::CompilerInvocation>();
-    if (!clang::CompilerInvocation::CreateFromArgs(
-        *CI, invocationArgs, *clangDiags, invocationArgs[0]))
-      return nullptr;
-  } else {
-    // Set up a temporary diagnostic client to report errors from parsing the
-    // command line, which may be important for Swift clients if, for example,
-    // they're using -Xcc options. Unfortunately this diagnostic engine has to
-    // use the default options because the /actual/ options haven't been parsed
-    // yet.
-    //
-    // The long-term client for Clang diagnostics is set up below, after the
-    // clang::CompilerInstance is created.
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
-        new clang::DiagnosticOptions};
-
-    auto *tempDiagClient = new ClangDiagnosticConsumer(
-        importer->Impl, *tempDiagOpts, importerOpts.DumpClangDiagnostics);
-    clangDiags = clang::CompilerInstance::createDiagnostics(tempDiagOpts.get(),
-                                                            tempDiagClient,
-                                                            /*owned*/ true);
-    clang::CreateInvocationOptions CIOpts;
-    CIOpts.VFS = VFS;
-    CIOpts.Diags = clangDiags;
-    CIOpts.RecoverOnError = false;
-    CIOpts.CC1Args = CC1Args;
-    CIOpts.ProbePrecompiled = true;
-    CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
+  if (ctx.ClangImporterOpts.DumpClangDiagnostics) {
+    llvm::errs() << "clang importer driver args: '";
+    llvm::interleave(
+        invocationArgs, [](StringRef arg) { llvm::errs() << arg; },
+        [] { llvm::errs() << "' '"; });
+    llvm::errs() << "'\n";
   }
 
-  if (!CI) {
-    return CI;
-  }
+  // Set up a temporary diagnostic client to report errors from parsing the
+  // command line, which may be important for Swift clients if, for example,
+  // they're using -Xcc options. Unfortunately this diagnostic engine has to
+  // use the default options because the /actual/ options haven't been parsed
+  // yet.
+  //
+  // The long-term client for Clang diagnostics is set up afterwards, after the
+  // clang::CompilerInstance is created.
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
+      new clang::DiagnosticOptions};
+
+  auto *tempDiagClient =
+      new ClangDiagnosticConsumer(importer->Impl, *tempDiagOpts,
+                                  ctx.ClangImporterOpts.DumpClangDiagnostics);
+
+  auto clangDiags = clang::CompilerInstance::createDiagnostics(
+      tempDiagOpts.get(), tempDiagClient,
+      /*owned*/ true);
+
+  clang::CreateInvocationOptions CIOpts;
+  CIOpts.VFS = VFS;
+  CIOpts.Diags = clangDiags;
+  CIOpts.RecoverOnError = false;
+  CIOpts.ProbePrecompiled = true;
+  auto CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
+
+  if (!CI)
+    return std::nullopt;
 
   // FIXME: clang fails to generate a module if there is a `-fmodule-map-file`
   // argument pointing to a missing file.
@@ -1146,7 +1133,12 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
-    if (TempVFS->exists(ModuleMapFile)) {
+    if (ctx.ClangImporterOpts.UseClangIncludeTree) {
+      // There is no need to add any module map file here. Issue a warning and
+      // drop the option.
+      importer->Impl.diagnose(SourceLoc(), diag::module_map_ignored,
+                              ModuleMapFile);
+    } else if (TempVFS->exists(ModuleMapFile)) {
       FilteredModuleMapFiles.push_back(ModuleMapFile);
     } else {
       importer->Impl.diagnose(SourceLoc(), diag::module_map_not_found,
@@ -1154,6 +1146,35 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     }
   }
   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
+
+  return CI->getCC1CommandLine();
+}
+
+std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
+    ClangImporter *importer, const ClangImporterOptions &importerOpts,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+    std::vector<std::string> &CC1Args) {
+  std::vector<const char *> invocationArgs;
+  invocationArgs.reserve(CC1Args.size());
+  llvm::for_each(CC1Args, [&](const std::string &Arg) {
+    invocationArgs.push_back(Arg.c_str());
+  });
+
+  // Create a diagnostics engine for creating clang compiler invocation. The
+  // option here is either generated by dependency scanner or just round tripped
+  // from `getClangCC1Arguments` so we don't expect it to fail. Use a simple
+  // printing diagnostics consumer for debugging any unexpected error.
+  auto diagOpts = llvm::makeIntrusiveRefCnt<clang::DiagnosticOptions>();
+  clang::DiagnosticsEngine clangDiags(
+      new clang::DiagnosticIDs(), diagOpts,
+      new clang::TextDiagnosticPrinter(llvm::errs(), diagOpts.get()));
+
+  // Finally, use the CC1 command-line and the diagnostic engine
+  // to instantiate our Invocation.
+  auto CI = std::make_unique<clang::CompilerInvocation>();
+  if (!clang::CompilerInvocation::CreateFromArgs(
+          *CI, invocationArgs, clangDiags, importerOpts.clangPath.c_str()))
+    return nullptr;
 
   return CI;
 }
@@ -1204,21 +1225,24 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create a new Clang compiler invocation.
   {
-    importer->Impl.ClangArgs = getClangArguments(ctx);
-    if (fileMapping.requiresBuiltinHeadersInSystemModules) {
-      importer->Impl.ClangArgs.push_back("-Xclang");
+    if (auto ClangArgs = getClangCC1Arguments(importer.get(), ctx, VFS))
+      importer->Impl.ClangArgs = *ClangArgs;
+    else
+      return nullptr;
+
+    if (fileMapping.requiresBuiltinHeadersInSystemModules)
       importer->Impl.ClangArgs.push_back("-fbuiltin-headers-in-system-modules");
-    }
+
     ArrayRef<std::string> invocationArgStrs = importer->Impl.ClangArgs;
     if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "'";
+      llvm::errs() << "clang importer cc1 args: '";
       llvm::interleave(
                        invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
                        [] { llvm::errs() << "' '"; });
       llvm::errs() << "'\n";
     }
     importer->Impl.Invocation = createClangInvocation(
-        importer.get(), importerOpts, VFS, invocationArgStrs);
+        importer.get(), importerOpts, VFS, importer->Impl.ClangArgs);
     if (!importer->Impl.Invocation)
       return nullptr;
   }
@@ -1296,10 +1320,12 @@ ClangImporter::create(ASTContext &ctx,
   if (ctx.LangOpts.ClangTarget.has_value()) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
-    auto swiftTargetClangArgs = getClangArguments(ctx, true);
-    ArrayRef<std::string> invocationArgStrs = swiftTargetClangArgs;
+    auto swiftTargetClangArgs =
+        getClangCC1Arguments(importer.get(), ctx, VFS, true);
+    if (!swiftTargetClangArgs)
+      return nullptr;
     auto swiftTargetClangInvocation = createClangInvocation(
-        importer.get(), importerOpts, VFS, invocationArgStrs);
+        importer.get(), importerOpts, VFS, *swiftTargetClangArgs);
     if (!swiftTargetClangInvocation)
       return nullptr;
     importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(

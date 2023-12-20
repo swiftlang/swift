@@ -1655,7 +1655,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.EnableClangSPI = false;
   }
 
-  Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {

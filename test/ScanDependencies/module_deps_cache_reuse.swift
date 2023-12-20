@@ -142,7 +142,7 @@ import SubE
 // CHECK: "-emit-pcm",
 // CHECK: "-module-name",
 // CHECK-NEXT: "C"
-// CHECK-NEXT: "-only-use-extra-clang-opts
+// CHECK: "-direct-clang-cc1-module-build"
 
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "{{.*}}/B-{{.*}}.pcm",
