@@ -3416,6 +3416,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (needsStackProtection())
     OS << "[stack_protection] ";
 
+  if (hasResultDependsOnSelf()) {
+    OS << "[_resultDependsOnSelf] ";
+  }
+
   llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
   printSILFunctionNameAndType(OS, this, sugaredTypeNames, &PrintCtx);
 

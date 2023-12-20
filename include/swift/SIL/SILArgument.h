@@ -366,8 +366,8 @@ class SILFunctionArgument : public SILArgument {
       ValueOwnershipKind ownershipKind, const ValueDecl *decl = nullptr,
       bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-      bool isCapture = false,
-      bool isParameterPack = false, bool hasResultDependsOn = false)
+      bool isCapture = false, bool isParameterPack = false,
+      bool hasResultDependsOn = false)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
                     ownershipKind, decl) {
     sharedUInt32().SILFunctionArgument.noImplicitCopy = isNoImplicitCopy;
