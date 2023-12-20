@@ -583,3 +583,32 @@ extension String.UTF8View {
     return try _guts.withFastUTF8(body)
   }
 }
+
+//Adds Hashable and Equatable conformance. Prevents compiler from synthesizing hashValue
+extension String.UTF8View {
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(0xFF as UInt8) // terminator
+    for element in self {
+      hasher.combine(element)
+    }
+  }
+  
+  @_alwaysEmitIntoClient
+  public var hashValue: Int {
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+extension String.UTF8View: Equatable {}
+
+@available(SwiftStdlib 5.7, *)
+extension String.UTF8View: Hashable {}

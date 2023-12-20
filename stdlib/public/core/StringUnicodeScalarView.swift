@@ -527,3 +527,32 @@ extension String.UnicodeScalarView {
     return r._knownUTF16
   }
 }
+
+//Adds Hashable and Equatable conformance. Prevents compiler from synthesizing hashValue
+extension String.UnicodeScalarView {
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    lhs.elementsEqual(rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(0xFF) // terminator
+    for element in self {
+      hasher.combine(element)
+    }
+  }
+  
+  @_alwaysEmitIntoClient
+  public var hashValue: Int {
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+extension String.UnicodeScalarView: Equatable {}
+
+@available(SwiftStdlib 5.7, *)
+extension String.UnicodeScalarView: Hashable {}
