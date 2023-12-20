@@ -118,11 +118,25 @@ private extension Value {
   }
 
   func isDestroyed(after nonDestroyUser: Instruction) -> Bool {
-    uses.getSingleUser(notOfType: DestroyValueInst.self) == nonDestroyUser
+    return uses.getSingleUser(notOfType: DestroyValueInst.self) == nonDestroyUser &&
+           nonDestroyUser.dominates(destroysOf: self)
   }
 
   func replaceAllDestroys(with replacement: Value, _ context: SimplifyContext) {
     uses.filterUsers(ofType: DestroyValueInst.self).replaceAll(with: replacement, context)
+  }
+}
+
+private extension Instruction {
+  func dominates(destroysOf value: Value) -> Bool {
+    // In instruction simplification we don't have a domtree. Therefore do a simple dominance
+    // check based on same-block relations.
+    if parentBlock == value.parentBlock {
+      // The value and instruction are in the same block. All uses are dominanted by both.
+      return true
+    }
+    let destroys = value.uses.filterUsers(ofType: DestroyValueInst.self)
+    return destroys.allSatisfy({ $0.instruction.parentBlock == parentBlock})
   }
 }
 
