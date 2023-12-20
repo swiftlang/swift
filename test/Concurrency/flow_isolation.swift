@@ -734,3 +734,28 @@ actor CheckDeinitFromActor {
     ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from non-isolated deinit; this is an error in Swift 6}}
   }
 }
+
+// https://github.com/apple/swift/issues/70550
+func testActorWithInitAccessorInit() {
+  @available(SwiftStdlib 5.1, *)
+  actor Angle {
+    var degrees: Double
+    var radians: Double = 0 {
+      @storageRestrictions(initializes: degrees)
+      init(initialValue)  {
+        degrees = initialValue * 180 / .pi
+      }
+
+      get { degrees * .pi / 180 }
+      set { degrees = newValue * 180 / .pi }
+    }
+
+    init(degrees: Double) {
+      self.degrees = degrees // Ok
+    }
+
+    init(radians: Double) {
+      self.radians = radians // Ok
+    }
+  }
+}

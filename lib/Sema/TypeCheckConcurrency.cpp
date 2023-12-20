@@ -1763,10 +1763,20 @@ static bool memberAccessHasSpecialPermissionInSwift5(
 
     // If the context in which we consider the access matches between the
     // old (escaping-use restriction) and new (flow-isolation) contexts,
-    // and it is a stored property, then permit it here without any warning.
+    // and it is a stored or init accessor property, then permit it here
+    // without any warning.
     // Later, flow-isolation pass will check and emit a warning if needed.
-    if (refCxt == oldFn && isStoredProperty(member))
-      return true;
+    if (refCxt == oldFn) {
+      if (isStoredProperty(member))
+        return true;
+
+      if (auto *var = dyn_cast<VarDecl>(member)) {
+        // Init accessor properties are permitted to access only stored
+        // properties.
+        if (var->hasInitAccessor())
+          return true;
+      }
+    }
 
     // Otherwise, it's definitely going to be illegal, so warn and permit.
     auto &diags = refCxt->getASTContext().Diags;
