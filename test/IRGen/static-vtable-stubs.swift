@@ -8,6 +8,9 @@
 
 // REQUIRES: concurrency
 
+// rdar://119900439
+// XFAIL: CPU=armv7k
+
 //--- A.swift
 open class C {
   private var i: [ObjectIdentifier:Any] = [:]
