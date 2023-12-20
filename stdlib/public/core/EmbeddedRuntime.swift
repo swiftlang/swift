@@ -276,7 +276,7 @@ public func swift_willThrow() throws {
 }
 
 @_extern(c, "arc4random_buf")
-public func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
+func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 
 public func swift_stdlib_random(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
   arc4random_buf(buf: buf, nbytes: nbytes)
