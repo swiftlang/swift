@@ -303,12 +303,12 @@ public class TestRebindingSelfIsDisallowed {
     
     doVoidStuff { [weak self] in
       let `self` = "self shouldn't become a string"
-      let _: Int = count // expected-error{{reference to property 'count' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
     }
     
     doVoidStuffNonEscaping { [weak self] in
       let `self` = "self shouldn't become a string"
-      let _: Int = count // expected-error{{reference to property 'count' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
     }
   }
   
@@ -316,4 +316,204 @@ public class TestRebindingSelfIsDisallowed {
     let `self` = "self shouldn't become a string"
     let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
   }
+}
+
+class TestGithubIssue70089 {
+    var x: Int = 0
+    nonisolated(unsafe) static let staticOptional: TestGithubIssue70089? = .init()
+    func method() { }
+
+    func f() {
+      doVoidStuff { [weak self] in
+        guard let self else { return }
+
+        doVoidStuff { [self] in
+          x += 1
+        }
+
+        doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+          x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+        }
+
+        doVoidStuff { [self = TestGithubIssue70089()] in // expected-note{{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+          x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.x += 1
+
+          doVoidStuff { // expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}}
+            x += 1  // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+            self.x += 1
+          }
+
+          doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+            x += 1  // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            self.x += 1
+          }
+        }
+
+        doVoidStuff {
+          doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+            x += 1  // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+            self.x += 1
+          }
+        }
+
+        doVoidStuff { [self] in
+          doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+            x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+            self.x += 1
+          }
+        }
+
+        doVoidStuff {
+          doVoidStuff { [self] in
+            x += 1
+            self.x += 1
+          }
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff {
+          x += 1 // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note{{reference 'self?.' explicitly}}
+          self?.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuffNonEscaping {
+          x += 1 // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note{{reference 'self?.' explicitly}}
+          self?.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        // Since this unwrapping is invalid, implicit self is disallowed in all nested closures:
+        guard let self = self ?? TestGithubIssue70089.staticOptional else { return }
+        
+        doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+          x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.x += 1
+        }
+
+        doVoidStuffNonEscaping {
+          x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.x += 1
+        }
+      }
+      
+      doVoidStuff { [self = TestGithubIssue70089()] in
+        doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+          x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.x += 1
+        }
+      }
+    }
+}
+
+class TestGithubIssue69911 {
+    var x: Int = 0
+    nonisolated(unsafe) static let staticOptional: TestGithubIssue69911? = .init()
+
+    func f() {
+      doVoidStuff { [weak self] in
+        guard let self else { return }
+
+        doVoidStuffNonEscaping {
+          x += 1
+          self.x += 1
+        }
+
+        doVoidStuffNonEscaping {
+          doVoidStuffNonEscaping {
+            x += 1
+            self.x += 1
+          }
+        }
+
+        doVoidStuff { [self] in
+          doVoidStuffNonEscaping {
+            x += 1
+            self.x += 1
+          }
+        }
+
+        doVoidStuffNonEscaping { [self] in
+          doVoidStuffNonEscaping { [self] in
+            x += 1
+            self.x += 1
+          }
+        }
+
+        doVoidStuffNonEscaping { [self = TestGithubIssue69911()] in
+           x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+           self.x += 1
+
+           doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+             x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+             self.x += 1
+           }
+
+           doVoidStuffNonEscaping {
+             x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+             self.x += 1
+           }
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuffNonEscaping { [weak self] in
+          x += 1 // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note {{reference 'self?.' explicitly}}
+          self?.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        // Since this unwrapping is invalid, implicit self is disallowed in all nested closures:
+        guard let self = self ?? TestGithubIssue69911.staticOptional else { return }
+
+        doVoidStuffNonEscaping {
+          x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.x += 1
+        }
+
+        doVoidStuffNonEscaping {
+          doVoidStuffNonEscaping {
+            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            self.x += 1
+          }
+        }
+
+        doVoidStuff { [self] in
+          doVoidStuffNonEscaping {
+            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            self.x += 1
+          }
+        }
+
+        doVoidStuffNonEscaping { [self] in
+          doVoidStuffNonEscaping { [self] in
+            x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+            self.x += 1
+          }
+        }
+
+        doVoidStuffNonEscaping { [self = TestGithubIssue69911()] in
+           x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+           self.x += 1
+        }
+
+        doVoidStuff { [self] in
+          doVoidStuffNonEscaping {
+            doVoidStuffNonEscaping {
+              doVoidStuff { [weak self] in
+                self?.x += 1
+                guard let self else { return }
+                x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+                self.x += 1
+              }
+            }
+          }
+        }
+      }
+    }
 }
