@@ -194,17 +194,48 @@ struct UseDefChainVisitor
 } // namespace
 
 static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
+  auto *fn = value->getFunction();
   SILValue result = value;
   while (true) {
     SILValue temp = result;
 
-    temp = getUnderlyingObject(temp);
+    temp = stripSinglePredecessorArgs(temp);
+    temp = stripAddressProjections(temp);
+    temp = stripIndexingInsts(temp);
+    temp = lookThroughOwnershipInsts(temp);
 
     if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
       if (isa<ExplicitCopyValueInst, CopyableToMoveOnlyWrapperValueInst,
               MoveOnlyWrapperToCopyableValueInst,
-              MoveOnlyWrapperToCopyableBoxInst>(svi)) {
+              MoveOnlyWrapperToCopyableBoxInst, BeginAccessInst,
+              MarkDependenceInst>(svi) ||
+          isIdentityPreservingRefCast(svi)) {
         temp = svi->getOperand(0);
+      }
+
+      // If we have a cast and our operand and result are non-Sendable, treat it
+      // as a look through.
+      if (isa<UncheckedTrivialBitCastInst, UncheckedBitwiseCastInst,
+              UncheckedValueCastInst>(svi)) {
+        if (isNonSendableType(svi->getType(), fn) &&
+            isNonSendableType(svi->getOperand(0)->getType(), fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+    }
+
+    if (auto *r = dyn_cast<RefToRawPointerInst>(temp)) {
+      // If our operand is a non-Sendable type, look through this instruction.
+      if (isNonSendableType(r->getOperand()->getType(), fn)) {
+        temp = r->getOperand();
+      }
+    }
+
+    if (auto *r = dyn_cast<RawPointerToRefInst>(temp)) {
+      // If our result is a non-Sendable type, look through this
+      // instruction. Builtin.RawPointer is always non-Sendable.
+      if (isNonSendableType(r->getType(), fn)) {
+        temp = r->getOperand();
       }
     }
 
@@ -2321,6 +2352,7 @@ CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, Assign)
+CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
 
 // These are used by SIL to aggregate values together in a gep like way. We
 // want to look at uses of structs, not the struct uses itself. So just
@@ -2435,16 +2467,21 @@ CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 
 //===---
+// Existential Box
+//
+
+// NOTE: Today these can only be used with Errors. Since Error is a sub-protocol
+// of Sendable, we actually do not have any way to truly test them. These are
+// just hypothetical assignments so we are complete.
+CONSTANT_TRANSLATION(AllocExistentialBoxInst, AssignFresh)
+CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Assign)
+CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Assign)
+CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
+
+//===---
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(AllocExistentialBoxInst, Unhandled)
-CONSTANT_TRANSLATION(IndexRawPointerInst, Unhandled)
-CONSTANT_TRANSLATION(UncheckedTrivialBitCastInst, Unhandled)
-CONSTANT_TRANSLATION(UncheckedBitwiseCastInst, Unhandled)
-CONSTANT_TRANSLATION(UncheckedValueCastInst, Unhandled)
-CONSTANT_TRANSLATION(RefToRawPointerInst, Unhandled)
-CONSTANT_TRANSLATION(RawPointerToRefInst, Unhandled)
 CONSTANT_TRANSLATION(RefToUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(UnownedToRefInst, Unhandled)
 CONSTANT_TRANSLATION(BridgeObjectToWordInst, Unhandled)
@@ -2460,7 +2497,6 @@ CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
 CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
 CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(VectorInst, Unhandled)
@@ -2472,7 +2508,6 @@ CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialValueInst, Unhandled)
-CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Unhandled)
 CONSTANT_TRANSLATION(OpenPackElementInst, Unhandled)
 CONSTANT_TRANSLATION(PackLengthInst, Unhandled)
 CONSTANT_TRANSLATION(DynamicPackIndexInst, Unhandled)
@@ -2494,7 +2529,6 @@ CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocStackRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocRefInst, Unhandled)
 CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
-CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
@@ -2593,9 +2627,61 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 
 #undef IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE
 
+#ifdef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
+#error "CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT already defined"
+#endif
+
+#define CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(INST)               \
+                                                                               \
+  TranslationSemantics PartitionOpTranslator::visit##INST(INST *cast) {        \
+    bool isOperandNonSendable =                                                \
+        isNonSendableType(cast->getOperand()->getType());                      \
+    bool isResultNonSendable = isNonSendableType(cast->getType());             \
+                                                                               \
+    if (isOperandNonSendable) {                                                \
+      if (isResultNonSendable) {                                               \
+        return TranslationSemantics::LookThrough;                              \
+      }                                                                        \
+                                                                               \
+      return TranslationSemantics::Require;                                    \
+    }                                                                          \
+                                                                               \
+    if (isResultNonSendable)                                                   \
+      return TranslationSemantics::AssignFresh;                                \
+                                                                               \
+    return TranslationSemantics::Ignored;                                      \
+  }
+
+CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedTrivialBitCastInst)
+CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedBitwiseCastInst)
+CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
+
+#undef CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT
+
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
+  // If our result is non sendable, perform a look through.
+  if (isNonSendableType(r->getType()))
+    return TranslationSemantics::LookThrough;
+
+  // Otherwise to be conservative, we need to treat this as a require.
+  return TranslationSemantics::Require;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
+  // If our source ref is non sendable, perform a look through.
+  if (isNonSendableType(r->getOperand()->getType()))
+    return TranslationSemantics::LookThrough;
+
+  // Otherwise to be conservative, we need to treat the raw pointer as a fresh
+  // sendable value.
+  return TranslationSemantics::AssignFresh;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
