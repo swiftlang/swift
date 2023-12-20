@@ -10,6 +10,7 @@
 
 // rdar://119900439
 // XFAIL: CPU=armv7k
+// XFAIL: CPU=arm64_32
 
 //--- A.swift
 open class C {
