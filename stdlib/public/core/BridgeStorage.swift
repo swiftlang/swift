@@ -179,16 +179,8 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inline(__always)
   internal init(native: Native) {
     _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
-    rawValue = Builtin.reinterpretCast(native)
+    rawValue = native
   }
-
-#if _pointerBitWidth(_64)
-  @inlinable
-  @inline(__always)
-  internal init(taggedPayload: UInt) {
-    rawValue = Builtin.reinterpretCast(taggedPayload)
-  }
-#endif
 
   @inlinable
   @inline(__always)
