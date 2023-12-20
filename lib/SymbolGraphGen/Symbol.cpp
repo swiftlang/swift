@@ -407,39 +407,62 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
-  if (const auto *FD = dyn_cast_or_null<FuncDecl>(D)) {
-    OS.attributeObject("functionSignature", [&](){
+  auto serializeParameterList = [&](const swift::ParameterList *ParamList) {
+    if (ParamList->size()) {
+      OS.attributeArray("parameters", [&]() {
+        for (const auto *Param : *ParamList) {
+          auto ExternalName = Param->getArgumentName().str();
+          auto InternalName = Param->getParameterName().str();
 
+          OS.object([&]() {
+            if (ExternalName.empty()) {
+              OS.attribute("name", InternalName);
+            } else {
+              OS.attribute("name", ExternalName);
+              if (ExternalName != InternalName && !InternalName.empty()) {
+                OS.attribute("internalName", InternalName);
+              }
+            }
+            Graph->serializeDeclarationFragments(
+                "declarationFragments",
+                Symbol(Graph, Param, getSynthesizedBaseTypeDecl(),
+                       getBaseType()),
+                OS);
+          }); // end parameter object
+        }
+      }); // end parameters:
+    }
+  };
+
+  if (const auto *FD = dyn_cast_or_null<FuncDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
       // Parameters
       if (const auto *ParamList = FD->getParameters()) {
-        if (ParamList->size()) {
-          OS.attributeArray("parameters", [&](){
-            for (const auto *Param : *ParamList) {
-              auto ExternalName = Param->getArgumentName().str();
-              auto InternalName = Param->getParameterName().str();
-
-              OS.object([&](){
-                if (ExternalName.empty()) {
-                  OS.attribute("name", InternalName);
-                } else {
-                  OS.attribute("name", ExternalName);
-                  if (ExternalName != InternalName &&
-                      !InternalName.empty()) {
-                    OS.attribute("internalName", InternalName);
-                  }
-                }
-                Graph->serializeDeclarationFragments("declarationFragments",
-                                                     Symbol(Graph, Param,
-                                                            getSynthesizedBaseTypeDecl(),
-                                                            getBaseType()), OS);
-              }); // end parameter object
-            }
-          }); // end parameters:
-        }
+        serializeParameterList(ParamList);
       }
 
       // Returns
       if (const auto ReturnType = FD->getResultInterfaceType()) {
+        Graph->serializeDeclarationFragments("returns", ReturnType, BaseType,
+                                             OS);
+      }
+    });
+  } else if (const auto *CD = dyn_cast_or_null<ConstructorDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
+      // Parameters
+      if (const auto *ParamList = CD->getParameters()) {
+        serializeParameterList(ParamList);
+      }
+    });
+  } else if (const auto *SD = dyn_cast_or_null<SubscriptDecl>(D)) {
+    OS.attributeObject("functionSignature", [&]() {
+      // Parameters
+      if (const auto *ParamList = SD->getIndices()) {
+        serializeParameterList(ParamList);
+      }
+
+      // Returns
+      if (const auto ReturnType = SD->getElementInterfaceType()) {
         Graph->serializeDeclarationFragments("returns", ReturnType, BaseType,
                                              OS);
       }
