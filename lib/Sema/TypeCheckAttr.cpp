@@ -5151,7 +5151,7 @@ enum class AbstractFunctionDeclLookupErrorKind {
 /// Used for resolving the referenced declaration in `@derivative` and
 /// `@transpose` attributes.
 static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
-    DeclAttribute *attr, Type baseType, DeclNameRefWithLoc funcNameWithLoc,
+    DeclAttribute *attr, Type baseType, const DeclNameRefWithLoc &funcNameWithLoc,
     DeclContext *lookupContext, NameLookupOptions lookupOptions,
     const llvm::function_ref<
         llvm::Optional<AbstractFunctionDeclLookupErrorKind>(
