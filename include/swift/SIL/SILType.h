@@ -508,6 +508,12 @@ public:
     return isObject() && isClassOrClassMetatype(getASTType());
   }
 
+  bool isDynamicSelfMetatype() const {
+    auto metaType = castTo<swift::MetatypeType>();
+    Type instTy = metaType->getInstanceType();
+    return instTy->is<DynamicSelfType>();
+  }
+
   bool isFunctionTypeWithContext() const {
     if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
       return fTy->getExtInfo().hasContext();

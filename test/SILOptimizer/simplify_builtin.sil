@@ -26,6 +26,9 @@ class C1<T> {
 class C2<T> : C1<T> {
 }
 
+class A {
+}
+
 // CHECK-LABEL: sil @constantFoldAdd
 // CHECK:         [[A:%.*]] = integer_literal $Builtin.Int64, 12
 // CHECK:         [[C:%.*]] = integer_literal $Builtin.Int1, 0
@@ -265,6 +268,34 @@ bb0:
   %3 = init_existential_metatype %1 : $@thick ((Float) -> Bool).Type, $@thick Any.Type
   %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
   return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_dynamic_self
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_dynamic_self'
+sil @same_metatype_dynamic_self : $@convention(method) (@guaranteed A) -> Builtin.Int1 {
+bb0(%0 : $A):
+  %2 = metatype $@thick @dynamic_self A.Type
+  %3 = init_existential_metatype %2 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %5 = metatype $@thick @dynamic_self A.Type
+  %6 = init_existential_metatype %5 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %13 = builtin "is_same_metatype"(%3 : $@thick any Any.Type, %6 : $@thick any Any.Type) : $Builtin.Int1
+  return %13 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_dynamic_self
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_dynamic_self'
+sil @unknown_same_metatype_dynamic_self : $@convention(method) (@guaranteed A) -> Builtin.Int1 {
+bb0(%0 : $A):
+  %2 = metatype $@thick @dynamic_self A.Type
+  %3 = init_existential_metatype %2 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %5 = metatype $@thick A.Type
+  %6 = init_existential_metatype %5 : $@thick A.Type, $@thick any Any.Type
+  %13 = builtin "is_same_metatype"(%3 : $@thick any Any.Type, %6 : $@thick any Any.Type) : $Builtin.Int1
+  return %13 : $Builtin.Int1
 }
 
 sil_global hidden [let] @g : $Int32
