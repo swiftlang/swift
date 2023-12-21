@@ -7,6 +7,9 @@
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
+// rdar://119743909 fails in optimze tests.
+// UNSUPPORTED: swift_test_mode_optimize
+
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
