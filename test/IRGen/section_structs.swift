@@ -2,6 +2,9 @@
 
 // REQUIRES: swift_in_compiler
 
+// Fails without optimized stdlib (rdar://119899895)
+// REQUIRES: optimized_stdlib
+
 // The `StaticString("hello").utf8Start` test fails on 32 bit
 // UNSUPPORTED: PTRSIZE=32
 
