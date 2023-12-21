@@ -1181,6 +1181,16 @@ ASTNode SourceFile::getMacroExpansion() const {
   return ASTNode::getFromOpaqueValue(genInfo.astNode);
 }
 
+SourceRange SourceFile::getMacroInsertionRange() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return SourceRange();
+
+  auto generatedInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  auto origRange = generatedInfo.originalSourceRange;
+  return {origRange.getStart(), origRange.getEnd()};
+}
+
 CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
