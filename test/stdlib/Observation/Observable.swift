@@ -215,6 +215,16 @@ class RecursiveOuter {
 class GuardedAvailability {
 }
 
+@Observable class TestASTScopeLCA {
+  // Make sure ASTScope unqualified lookup can find local variables
+  // inside initial values with closures when accessor macros are
+  // involved.
+  var state : Bool = {
+    let value = true
+    return value
+  }()
+}
+
 @main
 struct Validator {
   @MainActor
