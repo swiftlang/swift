@@ -186,7 +186,7 @@ fileprivate func _allocate<T: AnyObject>(
   let linearBucketThreshold = 128
   if _fastPath(numBytes < linearBucketThreshold) {
     // Allocate up to the nearest bucket of 16
-    let realNumBytes = _mallocGoodSize(for: numBytes)
+    let realNumBytes = numBytes //_mallocGoodSize(for: numBytes)
     let realNumTailBytes = realNumBytes - numHeaderBytes
     _internalInvariant(realNumTailBytes >= numTailBytes)
     let object = tailAllocator(realNumTailBytes)
@@ -200,8 +200,8 @@ fileprivate func _allocate<T: AnyObject>(
     growTailBytes = numTailBytes
   }
 
-  let total = _mallocGoodSize(for: numHeaderBytes + growTailBytes)
-  let totalTailBytes = total - numHeaderBytes
+  let total = numHeaderBytes + growTailBytes //_mallocGoodSize(for: numHeaderBytes + growTailBytes)
+  let totalTailBytes = growTailBytes //total - numHeaderBytes
 
   return (tailAllocator(totalTailBytes), totalTailBytes)
 }
