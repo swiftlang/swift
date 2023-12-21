@@ -271,8 +271,13 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsTy = lhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
+  let lhsMetatype = lhsExistential.metatype.type
+  let rhsMetatype = rhsExistential.metatype.type
+  if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
+    return nil
+  }
+  let lhsTy = lhsMetatype.instanceTypeOfMetatype(in: function)
+  let rhsTy = rhsMetatype.instanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
