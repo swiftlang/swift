@@ -279,12 +279,16 @@ StringCreateTests.test("Validating.utf32")
     index.map { modified[$0] = .max }
     return modified
   }()
+  let s4 = SimpleString.emoji.rawValue
+  let i4 = s4.unicodeScalars.map(\.value)
 
   expectEqual(String(validating: i1, as: UTF32.self), s1)
   expectEqual(String(validating: i2, as: UTF32.self), s2)
   expectNil(String(validating: i3, as: UTF32.self))
+  expectEqual(String(validating: i4, as: UTF32.self), s4)
 
   expectEqual(String(validating: AnySequence(i1), as: UTF32.self), s1)
   expectEqual(String(validating: AnySequence(i2), as: UTF32.self), s2)
   expectNil(String(validating: AnyCollection(i3), as: UTF32.self))
+  expectEqual(String(validating: AnySequence(i4), as: UTF32.self), s4)
 }

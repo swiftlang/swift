@@ -339,7 +339,7 @@ extension String {
           let copy: UnsafeMutableBufferPointer<UInt8>
           copy = UnsafeMutableBufferPointer.allocate(capacity: newCapacity)
           let copied = copy.moveInitialize(
-            fromContentsOf: buffer.prefix(through: written)
+            fromContentsOf: buffer.prefix(upTo: written)
           )
           buffer.deallocate()
           buffer = copy
