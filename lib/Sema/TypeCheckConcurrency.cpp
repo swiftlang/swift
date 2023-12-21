@@ -1004,6 +1004,8 @@ void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 static bool diagnoseSingleNonSendableType(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+  if (type->hasError())
+    return false;
 
   auto module = fromContext.fromDC->getParentModule();
   auto nominal = type->getAnyNominal();
