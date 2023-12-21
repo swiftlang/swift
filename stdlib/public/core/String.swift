@@ -523,12 +523,14 @@ extension String {
     validating codeUnits: some Sequence<Encoding.CodeUnit>,
     as encoding: Encoding.Type
   ) {
-    let newString: String?? = codeUnits.withContiguousStorageIfAvailable {
+    let contiguousResult = codeUnits.withContiguousStorageIfAvailable {
       String._validate($0, as: Encoding.self)
     }
-    if let newString {
-      guard let newString else { return nil }
-      self = newString
+    if let validationResult = contiguousResult {
+      guard let validatedString = validationResult else {
+        return nil
+      }
+      self = validatedString
       return
     }
 
@@ -583,14 +585,16 @@ extension String {
     validating codeUnits: some Sequence<Int8>,
     as encoding: Encoding.Type
   ) where Encoding: Unicode.Encoding, Encoding.CodeUnit == UInt8 {
-    let newString: String?? = codeUnits.withContiguousStorageIfAvailable {
+    let contiguousResult = codeUnits.withContiguousStorageIfAvailable {
       $0.withMemoryRebound(to: UInt8.self) {
         String._validate($0, as: Encoding.self)
       }
     }
-    if let newString {
-      guard let newString else { return nil }
-      self = newString
+    if let validationResult = contiguousResult {
+      guard let validatedString = validationResult else {
+        return nil
+      }
+      self = validatedString
       return
     }
 
