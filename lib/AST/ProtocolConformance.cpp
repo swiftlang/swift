@@ -811,13 +811,13 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
   ProtocolConformanceRef conformance =
     GenericConformance->getAssociatedConformance(assocType, protocol);
 
+  if (!conformance.isConcrete()) {
+    assert(GenericConformance->getAssociatedType(assocType));
+    return conformance;
+  }
+
   auto subMap = getSubstitutionMap();
-
-  Type origType =
-    (conformance.isConcrete()
-       ? conformance.getConcrete()->getType()
-       : GenericConformance->getAssociatedType(assocType));
-
+  Type origType = conformance.getConcrete()->getType();
   return conformance.subst(origType, subMap);
 }
 
