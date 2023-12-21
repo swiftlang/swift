@@ -2211,7 +2211,7 @@ TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
                                   DeclContext *DC) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid());
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
+  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
   return new (C) TypeExpr(Repr);
 }
@@ -2219,7 +2219,7 @@ TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
 TypeExpr *TypeExpr::createImplicitForDecl(DeclNameLoc Loc, TypeDecl *Decl,
                                           DeclContext *DC, Type ty) {
   ASTContext &C = Decl->getASTContext();
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
+  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
   auto result = new (C) TypeExpr(Repr);
   assert(ty && !ty->hasTypeParameter());
@@ -2237,8 +2237,8 @@ TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
   assert(NameLoc.isValid());
 
   // The base is the parent type.
-  auto *BaseTR =
-      new (C) SimpleIdentTypeRepr(ParentNameLoc, Parent->createNameRef());
+  auto *BaseTR = UnqualifiedIdentTypeRepr::create(C, ParentNameLoc,
+                                                  Parent->createNameRef());
   BaseTR->setValue(Parent, nullptr);
 
   auto *MemberTR =
@@ -2271,7 +2271,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
   }
 
   if (isa<UnqualifiedIdentTypeRepr>(ParentTR)) {
-    specializedTR = GenericIdentTypeRepr::create(
+    specializedTR = UnqualifiedIdentTypeRepr::create(
         C, ParentTR->getNameLoc(), ParentTR->getNameRef(), Args, AngleLocs);
     specializedTR->setValue(boundDecl, ParentTR->getDeclContext());
   } else {

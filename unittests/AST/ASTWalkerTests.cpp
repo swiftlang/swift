@@ -389,7 +389,8 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
 
   {
     auto *repr = MemberTypeRepr::create(
-        ctx, new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("A")),
+        ctx,
+        UnqualifiedIdentTypeRepr::create(ctx, dummyLoc, makeDeclNameRef("A")),
         dummyLoc, makeDeclNameRef("B"));
 
     EXPECT_EQ(TypeRepr_getString(repr), "A.B");
@@ -416,9 +417,10 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
   {
     auto *repr = MemberTypeRepr::create(
         ctx,
-        MemberTypeRepr::create(
-            ctx, new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("A")),
-            dummyLoc, makeDeclNameRef("B")),
+        MemberTypeRepr::create(ctx,
+                               UnqualifiedIdentTypeRepr::create(
+                                   ctx, dummyLoc, makeDeclNameRef("A")),
+                               dummyLoc, makeDeclNameRef("B")),
         dummyLoc, makeDeclNameRef("C"));
 
     EXPECT_EQ(TypeRepr_getString(repr), "A.B.C");
@@ -446,7 +448,7 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
 
   {
     auto *array = new (ctx) ArrayTypeRepr(
-        new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("A")),
+        UnqualifiedIdentTypeRepr::create(ctx, dummyLoc, makeDeclNameRef("A")),
         SourceRange());
 
     auto *repr = MemberTypeRepr::create(
@@ -482,18 +484,20 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
   {
     auto *repr = MemberTypeRepr::create(
         ctx,
-        MemberTypeRepr::create(
-            ctx,
-            GenericIdentTypeRepr::create(
-                ctx, dummyLoc, makeDeclNameRef("A"),
-                {new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("W"))},
-                SourceRange()),
-            dummyLoc, makeDeclNameRef("B"),
-            {new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("X")),
-             new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("Y"))},
-            SourceRange()),
+        MemberTypeRepr::create(ctx,
+                               UnqualifiedIdentTypeRepr::create(
+                                   ctx, dummyLoc, makeDeclNameRef("A"),
+                                   {UnqualifiedIdentTypeRepr::create(
+                                       ctx, dummyLoc, makeDeclNameRef("W"))},
+                                   SourceRange()),
+                               dummyLoc, makeDeclNameRef("B"),
+                               {UnqualifiedIdentTypeRepr::create(
+                                    ctx, dummyLoc, makeDeclNameRef("X")),
+                                UnqualifiedIdentTypeRepr::create(
+                                    ctx, dummyLoc, makeDeclNameRef("Y"))},
+                               SourceRange()),
         dummyLoc, makeDeclNameRef("C"),
-        {new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("Z"))},
+        {UnqualifiedIdentTypeRepr::create(ctx, dummyLoc, makeDeclNameRef("Z"))},
         SourceRange());
 
     EXPECT_EQ(TypeRepr_getString(repr), "A<W>.B<X, Y>.C<Z>");
@@ -531,23 +535,25 @@ TEST(ASTWalker, MemberTypeReprWalkingScheme) {
 
   {
     auto *array = new (ctx) ArrayTypeRepr(
-        MemberTypeRepr::create(
-            ctx, new (ctx) SimpleIdentTypeRepr(dummyLoc, makeDeclNameRef("Y")),
-            dummyLoc, makeDeclNameRef("Z")),
+        MemberTypeRepr::create(ctx,
+                               UnqualifiedIdentTypeRepr::create(
+                                   ctx, dummyLoc, makeDeclNameRef("Y")),
+                               dummyLoc, makeDeclNameRef("Z")),
         SourceRange());
 
     auto *repr = MemberTypeRepr::create(
         ctx,
         MemberTypeRepr::create(
             ctx,
-            GenericIdentTypeRepr::create(
+            UnqualifiedIdentTypeRepr::create(
                 ctx, dummyLoc, makeDeclNameRef("A"),
                 {MemberTypeRepr::create(
                      ctx,
-                     MemberTypeRepr::create(ctx,
-                                            new (ctx) SimpleIdentTypeRepr(
-                                                dummyLoc, makeDeclNameRef("V")),
-                                            dummyLoc, makeDeclNameRef("W")),
+                     MemberTypeRepr::create(
+                         ctx,
+                         UnqualifiedIdentTypeRepr::create(ctx, dummyLoc,
+                                                          makeDeclNameRef("V")),
+                         dummyLoc, makeDeclNameRef("W")),
                      dummyLoc, makeDeclNameRef("X")),
                  array},
                 SourceRange()),

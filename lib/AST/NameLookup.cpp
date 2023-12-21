@@ -3761,8 +3761,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                assocType->getDescriptiveKind(),
                                assocType->getName());
 
-            auto *baseTR = new (ctx) SimpleIdentTypeRepr(
-                identTypeRepr->getNameLoc(), DeclNameRef(moduleName));
+            auto *baseTR = UnqualifiedIdentTypeRepr::create(
+                ctx, identTypeRepr->getNameLoc(), DeclNameRef(moduleName));
 
             auto *newTE = new (ctx) TypeExpr(
                 MemberTypeRepr::create(ctx, baseTR, identTypeRepr->getNameLoc(),

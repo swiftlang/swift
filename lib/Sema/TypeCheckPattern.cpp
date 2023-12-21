@@ -194,15 +194,16 @@ static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
         return nullptr;
       }
 
-      auto *repr =
-          new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->createNameRef());
+      auto *repr = UnqualifiedIdentTypeRepr::create(C, dre->getNameLoc(),
+                                                    td->createNameRef());
       repr->setValue(td, nullptr);
 
       return repr;
     }
 
     DeclRefTypeRepr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
-      return new (C) SimpleIdentTypeRepr(udre->getNameLoc(), udre->getName());
+      return UnqualifiedIdentTypeRepr::create(C, udre->getNameLoc(),
+                                              udre->getName());
     }
 
     DeclRefTypeRepr *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {

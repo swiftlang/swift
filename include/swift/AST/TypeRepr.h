@@ -433,6 +433,14 @@ protected:
       : DeclRefTypeRepr(K, Id, Loc, NumGenericArgs, hasGenericArgList) {}
 
 public:
+  static UnqualifiedIdentTypeRepr *
+  create(const ASTContext &C, DeclNameLoc NameLoc, DeclNameRef Name);
+
+  static UnqualifiedIdentTypeRepr *create(const ASTContext &C,
+                                          DeclNameLoc NameLoc, DeclNameRef Name,
+                                          ArrayRef<TypeRepr *> GenericArgs,
+                                          SourceRange AngleBrackets);
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent;
@@ -447,12 +455,14 @@ protected:
 
 /// A simple identifier type like "Int".
 class SimpleIdentTypeRepr : public UnqualifiedIdentTypeRepr {
-public:
+  friend UnqualifiedIdentTypeRepr;
+
   SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
       : UnqualifiedIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id,
                                  /*NumGenericArgs=*/0,
                                  /*HasAngleBrackets=*/false) {}
 
+public:
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
   SimpleIdentTypeRepr(const SimpleIdentTypeRepr &repr)
@@ -477,6 +487,7 @@ private:
 class GenericIdentTypeRepr final
     : public UnqualifiedIdentTypeRepr,
       private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
+  friend UnqualifiedIdentTypeRepr;
   friend TrailingObjects;
   SourceRange AngleBrackets;
 
@@ -484,13 +495,13 @@ class GenericIdentTypeRepr final
                        ArrayRef<TypeRepr *> GenericArgs,
                        SourceRange AngleBrackets);
 
-public:
   static GenericIdentTypeRepr *create(const ASTContext &C,
                                       DeclNameLoc Loc,
                                       DeclNameRef Id,
                                       ArrayRef<TypeRepr*> GenericArgs,
                                       SourceRange AngleBrackets);
 
+public:
   ArrayRef<TypeRepr*> getGenericArgs() const {
     return {getTrailingObjects<TypeRepr *>(), getNumGenericArgs()};
   }

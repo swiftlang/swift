@@ -4249,8 +4249,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       if (*parsedRep == SILFunctionType::Representation::WitnessMethod) {
         auto protocolName = conventionAttr->getWitnessMethodProtocol();
         // FIXME: parse the DeclNameLoc to here
-        witnessMethodProtocol =
-          new (getASTContext()) SimpleIdentTypeRepr(DeclNameLoc(), protocolName);
+        witnessMethodProtocol = UnqualifiedIdentTypeRepr::create(
+            getASTContext(), DeclNameLoc(), protocolName);
       }
     }
   }

@@ -170,7 +170,7 @@ DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
     return MemberTypeRepr::create(C, Base, NameLoc, Name);
   }
 
-  return new (C) SimpleIdentTypeRepr(NameLoc, Name);
+  return UnqualifiedIdentTypeRepr::create(C, NameLoc, Name);
 }
 
 DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
@@ -180,12 +180,10 @@ DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
   if (Base) {
     return MemberTypeRepr::create(C, Base, NameLoc, Name, GenericArgs,
                                   AngleBrackets);
-  } else if (AngleBrackets.isInvalid() && GenericArgs.empty()) {
-    return new (C) SimpleIdentTypeRepr(NameLoc, Name);
   }
 
-  return GenericIdentTypeRepr::create(C, NameLoc, Name, GenericArgs,
-                                      AngleBrackets);
+  return UnqualifiedIdentTypeRepr::create(C, NameLoc, Name, GenericArgs,
+                                          AngleBrackets);
 }
 
 TypeRepr *DeclRefTypeRepr::getBase() const {
@@ -476,6 +474,23 @@ TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
 TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
                                           SourceRange Parens) {
   return create(C, {}, Parens);
+}
+
+UnqualifiedIdentTypeRepr *UnqualifiedIdentTypeRepr::create(const ASTContext &C,
+                                                           DeclNameLoc NameLoc,
+                                                           DeclNameRef Name) {
+  return new (C) SimpleIdentTypeRepr(NameLoc, Name);
+}
+
+UnqualifiedIdentTypeRepr *UnqualifiedIdentTypeRepr::create(
+    const ASTContext &C, DeclNameLoc NameLoc, DeclNameRef Name,
+    ArrayRef<TypeRepr *> GenericArgs, SourceRange AngleBrackets) {
+  if (AngleBrackets.isInvalid() && GenericArgs.empty()) {
+    return new (C) SimpleIdentTypeRepr(NameLoc, Name);
+  }
+
+  return GenericIdentTypeRepr::create(C, NameLoc, Name, GenericArgs,
+                                      AngleBrackets);
 }
 
 GenericIdentTypeRepr::GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
