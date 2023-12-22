@@ -562,10 +562,11 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 
       PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
         // Only unqualified identifiers can reference generic parameters.
-        if (auto *simpleIdentTR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+        auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(T);
+        if (unqualIdentTR && !unqualIdentTR->hasGenericArgList()) {
           if (auto *genericParam = dyn_cast_or_null<GenericTypeParamDecl>(
-                  simpleIdentTR->getBoundDecl())) {
-            simpleIdentTR->overwriteNameRef(genericParam->createNameRef());
+                  unqualIdentTR->getBoundDecl())) {
+            unqualIdentTR->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return Action::Continue();

@@ -9886,9 +9886,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   if (auto *lifetimeTyR =
           dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(FuncRetTy)) {
-    auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(lifetimeTyR->getBase());
-    if (!identTyR ||
-        identTyR->getNameRef().getBaseIdentifier() != Context.Id_Self) {
+    if (!lifetimeTyR->getBase()->isSimpleUnqualifiedIdentifier(
+            Context.Id_Self)) {
       diagnose(FuncRetTy->getStartLoc(),
                diag::lifetime_dependence_invalid_init_return);
       return nullptr;
