@@ -44,7 +44,7 @@ public:
 /// equivalently and where generic arguments can be walked to separately from
 /// the generic type.
 class SimpleTypeDeclFinder : public TypeDeclFinder {
-  /// The function to call when a \c IdentTypeRepr is seen.
+  /// The function to call when a \c TypeDecl is seen.
   llvm::function_ref<Action(const TypeDecl *)> Callback;
 
   Action visitNominalType(NominalType *ty) override;

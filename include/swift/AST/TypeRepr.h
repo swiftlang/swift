@@ -324,7 +324,7 @@ private:
   friend class TypeRepr;
 };
 
-class IdentTypeRepr;
+class UnqualifiedIdentTypeRepr;
 
 /// This is the abstract base class for types that directly reference a
 /// type declaration. In written syntax, this type representation consists of
@@ -361,15 +361,15 @@ public:
                                  SourceRange AngleBrackets);
 
   /// Returns the qualifier or base type representation. For example, `A.B`
-  /// for `A.B.C`. The base of a `IdentTypeRepr` is null.
+  /// for `A.B.C`. The base of a `UnqualifiedIdentTypeRepr` is null.
   TypeRepr *getBase() const;
 
   /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
-  /// qualifier of a `IdentTypeRepr` is itself.
+  /// qualifier of a `UnqualifiedIdentTypeRepr` is itself.
   TypeRepr *getRoot();
 
   /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
-  /// qualifier of a `IdentTypeRepr` is itself.
+  /// qualifier of a `UnqualifiedIdentTypeRepr` is itself.
   const TypeRepr *getRoot() const;
 
   DeclNameLoc getNameLoc() const;
@@ -426,10 +426,10 @@ protected:
 ///   Foo
 ///   Bar<Gen>
 /// \endcode
-class IdentTypeRepr : public DeclRefTypeRepr {
+class UnqualifiedIdentTypeRepr : public DeclRefTypeRepr {
 protected:
-  IdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id,
-                unsigned NumGenericArgs, bool hasGenericArgList)
+  UnqualifiedIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id,
+                           unsigned NumGenericArgs, bool hasGenericArgList)
       : DeclRefTypeRepr(K, Id, Loc, NumGenericArgs, hasGenericArgList) {}
 
 public:
@@ -437,7 +437,7 @@ public:
     return T->getKind() == TypeReprKind::SimpleIdent ||
            T->getKind() == TypeReprKind::GenericIdent;
   }
-  static bool classof(const IdentTypeRepr *T) { return true; }
+  static bool classof(const UnqualifiedIdentTypeRepr *T) { return true; }
 
 protected:
   SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
@@ -446,11 +446,12 @@ protected:
 };
 
 /// A simple identifier type like "Int".
-class SimpleIdentTypeRepr : public IdentTypeRepr {
+class SimpleIdentTypeRepr : public UnqualifiedIdentTypeRepr {
 public:
   SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
-      : IdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id, /*NumGenericArgs=*/0,
-                      /*HasAngleBrackets=*/false) {}
+      : UnqualifiedIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id,
+                                 /*NumGenericArgs=*/0,
+                                 /*HasAngleBrackets=*/false) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
@@ -474,7 +475,7 @@ private:
 ///   Bar<Gen>
 /// \endcode
 class GenericIdentTypeRepr final
-    : public IdentTypeRepr,
+    : public UnqualifiedIdentTypeRepr,
       private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
   friend TrailingObjects;
   SourceRange AngleBrackets;

@@ -189,7 +189,7 @@ DeclRefTypeRepr *DeclRefTypeRepr::create(const ASTContext &C, TypeRepr *Base,
 }
 
 TypeRepr *DeclRefTypeRepr::getBase() const {
-  if (isa<IdentTypeRepr>(this)) {
+  if (isa<UnqualifiedIdentTypeRepr>(this)) {
     return nullptr;
   }
 
@@ -202,8 +202,8 @@ TypeRepr *DeclRefTypeRepr::getRoot() {
 }
 
 const TypeRepr *DeclRefTypeRepr::getRoot() const {
-  if (auto *ITR = dyn_cast<IdentTypeRepr>(this))
-    return ITR;
+  if (auto *UITR = dyn_cast<UnqualifiedIdentTypeRepr>(this))
+    return UITR;
 
   return cast<MemberTypeRepr>(this)->getRoot();
 }
@@ -481,9 +481,9 @@ TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
 GenericIdentTypeRepr::GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
                                            ArrayRef<TypeRepr *> GenericArgs,
                                            SourceRange AngleBrackets)
-    : IdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id,
-                    /*NumGenericArgs=*/GenericArgs.size(),
-                    /*HasAngleBrackets=*/AngleBrackets.isValid()),
+    : UnqualifiedIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id,
+                               /*NumGenericArgs=*/GenericArgs.size(),
+                               /*HasAngleBrackets=*/AngleBrackets.isValid()),
       AngleBrackets(AngleBrackets) {
 #ifndef NDEBUG
   for (auto arg : GenericArgs)

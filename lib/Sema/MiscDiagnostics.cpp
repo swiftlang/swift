@@ -711,7 +711,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
             if (auto *TR =
                     dyn_cast_or_null<MemberTypeRepr>(TE->getTypeRepr())) {
-              if (!isa<IdentTypeRepr>(TR->getRoot())) {
+              if (!isa<UnqualifiedIdentTypeRepr>(TR->getRoot())) {
                 behavior = DiagnosticBehavior::Warning;
               }
             }

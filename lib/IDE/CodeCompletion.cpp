@@ -218,9 +218,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
       if (isa<MemberTypeRepr>(declRefTR))
         return false;
 
-      const auto *identTR = cast<IdentTypeRepr>(declRefTR);
       ImportPath::Module::Builder builder(
-          identTR->getNameRef().getBaseIdentifier(), identTR->getLoc());
+          declRefTR->getNameRef().getBaseIdentifier(), declRefTR->getLoc());
 
       if (auto Module = Context.getLoadedModule(builder.get()))
         ParsedTypeLoc.setType(ModuleType::get(Module));

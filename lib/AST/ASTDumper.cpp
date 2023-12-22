@@ -3297,7 +3297,9 @@ public:
   }
 
   void visitDeclRefTypeRepr(DeclRefTypeRepr *T, StringRef label) {
-    printCommon(isa<IdentTypeRepr>(T) ? "type_ident" : "type_member", label);
+    printCommon(isa<UnqualifiedIdentTypeRepr>(T) ? "type_unqualified_ident"
+                                                 : "type_member",
+                label);
 
     printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
     if (T->isBound())

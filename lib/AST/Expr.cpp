@@ -2270,7 +2270,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(DeclRefTypeRepr *ParentTR,
     return nullptr;
   }
 
-  if (isa<IdentTypeRepr>(ParentTR)) {
+  if (isa<UnqualifiedIdentTypeRepr>(ParentTR)) {
     specializedTR = GenericIdentTypeRepr::create(
         C, ParentTR->getNameLoc(), ParentTR->getNameRef(), Args, AngleLocs);
     specializedTR->setValue(boundDecl, ParentTR->getDeclContext());

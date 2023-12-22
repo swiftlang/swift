@@ -1278,7 +1278,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
 static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                             TypeResolution resolution,
                             SILTypeResolutionContext *silContext,
-                            IdentTypeRepr *repr) {
+                            UnqualifiedIdentTypeRepr *repr) {
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type = resolution.resolveTypeInContext(typeDecl, foundDC,
@@ -1338,7 +1338,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
                                 SourceRange parentRange,
                                 DeclRefTypeRepr *repr,
                                 NameLookupOptions lookupOptions) {
-  assert(parentType || isa<IdentTypeRepr>(repr));
+  assert(parentType || isa<UnqualifiedIdentTypeRepr>(repr));
 
   auto dc = resolution.getDeclContext();
   ASTContext &ctx = dc->getASTContext();
@@ -1587,7 +1587,7 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
 }
 
 static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
-                                           IdentTypeRepr *repr,
+                                           UnqualifiedIdentTypeRepr *repr,
                                            DeclContext *typeDC) {
   ASTContext &ctx = resolution.getASTContext();
   auto &diags = ctx.Diags;
@@ -1612,9 +1612,10 @@ static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
 ///
 /// \returns Either the resolved type or a null type, the latter of
 /// which indicates that some dependencies were unsatisfied.
-static Type resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
-                                            SILTypeResolutionContext *silContext,
-                                            IdentTypeRepr *repr) {
+static Type
+resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
+                                SILTypeResolutionContext *silContext,
+                                UnqualifiedIdentTypeRepr *repr) {
   const auto options = resolution.getOptions();
   ASTContext &ctx = resolution.getASTContext();
   auto &diags = ctx.Diags;
@@ -4708,10 +4709,10 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
 
   Type result;
 
-  if (auto *identTR = dyn_cast<IdentTypeRepr>(repr)) {
+  if (auto *unqualIdentTR = dyn_cast<UnqualifiedIdentTypeRepr>(repr)) {
     // The base component uses unqualified lookup.
     result = resolveUnqualifiedIdentTypeRepr(resolution.withOptions(options),
-                                             silContext, identTR);
+                                             silContext, unqualIdentTR);
 
     if (result && result->isParameterPack() &&
         // Workaround to allow 'shape' type checking of SIL.
@@ -5362,7 +5363,8 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
     auto diag =
         ctx.Diags.diagnose(repr->getLoc(), diag::each_non_pack, packReference);
     bool addEachFixitApplied = false;
-    if (auto *packIdent = dyn_cast<IdentTypeRepr>(repr->getPackType())) {
+    if (auto *packIdent =
+            dyn_cast<UnqualifiedIdentTypeRepr>(repr->getPackType())) {
       if (auto *packIdentBinding = packIdent->getBoundDecl()) {
         if (packIdentBinding->getLoc().isValid()) {
           diag.fixItInsert(packIdentBinding->getLoc(), "each ");

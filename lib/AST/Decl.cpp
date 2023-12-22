@@ -6732,7 +6732,7 @@ NominalTypeDecl::hasInverseMarking(InvertibleProtocolKind target) const {
       continue;
 
     auto *subjectRepr =
-        dyn_cast<IdentTypeRepr>(requirementRepr.getSubjectRepr());
+        dyn_cast<UnqualifiedIdentTypeRepr>(requirementRepr.getSubjectRepr());
 
     if (!(subjectRepr && subjectRepr->isBound()))
       continue;
@@ -6775,7 +6775,8 @@ ProtocolDecl::hasInverseMarking(InvertibleProtocolKind target) const {
         reqRepr.getKind() != RequirementReprKind::TypeConstraint)
       continue;
 
-    auto *subjectRepr = dyn_cast<IdentTypeRepr>(reqRepr.getSubjectRepr());
+    auto *subjectRepr =
+        dyn_cast<UnqualifiedIdentTypeRepr>(reqRepr.getSubjectRepr());
     auto *constraintRepr = reqRepr.getConstraintRepr();
 
     if (!subjectRepr || !subjectRepr->getNameRef().isSimpleName(ctx.Id_Self))

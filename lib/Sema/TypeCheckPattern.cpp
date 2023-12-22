@@ -184,7 +184,7 @@ static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
     DeclRefTypeRepr *visitExpr(Expr *e) { return nullptr; }
 
     DeclRefTypeRepr *visitTypeExpr(TypeExpr *te) {
-      return dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr());
+      return dyn_cast_or_null<UnqualifiedIdentTypeRepr>(te->getTypeRepr());
     }
 
     DeclRefTypeRepr *visitDeclRefExpr(DeclRefExpr *dre) {
@@ -565,7 +565,7 @@ public:
     EnumElementDecl *referencedElement = nullptr;
     TypeExpr *baseTE = nullptr;
 
-    if (isa<IdentTypeRepr>(repr)) {
+    if (isa<UnqualifiedIdentTypeRepr>(repr)) {
       // Not qualified. Try looking up an enum element in context.
       referencedElement = lookupUnqualifiedEnumMemberElement(
           DC, repr->getNameRef(), repr->getLoc());

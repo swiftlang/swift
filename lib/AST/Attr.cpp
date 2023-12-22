@@ -2749,13 +2749,13 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
       CustomAttr(atLoc, range, type, initContext, argList, implicit);
 }
 
-std::pair<IdentTypeRepr *, DeclRefTypeRepr *>
+std::pair<UnqualifiedIdentTypeRepr *, DeclRefTypeRepr *>
 CustomAttr::destructureMacroRef() {
   TypeRepr *typeRepr = getTypeRepr();
   if (!typeRepr)
     return {nullptr, nullptr};
-  if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
-    return {nullptr, identType};
+  if (auto *unqualIdentType = dyn_cast<UnqualifiedIdentTypeRepr>(typeRepr))
+    return {nullptr, unqualIdentType};
   if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr)) {
     if (auto *base = dyn_cast<SimpleIdentTypeRepr>(memType->getBase())) {
       return {base, memType};
