@@ -172,7 +172,7 @@ static bool hasEnumElementOrStaticVarMember(DeclContext *DC, Type ty,
 }
 
 static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
-  // FIXME: Support MemberTypeRepr nodes with non-DeclRefTypeRepr bases.
+  // FIXME: Support QualifiedIdentTypeRepr nodes with non-DeclRefTypeRepr bases.
   /// Translates an expression to a \c DeclRefTypeRepr.
   class ExprToDeclRefTypeRepr
       : public ExprVisitor<ExprToDeclRefTypeRepr, DeclRefTypeRepr *> {
@@ -212,7 +212,8 @@ static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
         return nullptr;
       }
 
-      return MemberTypeRepr::create(C, base, ude->getNameLoc(), ude->getName());
+      return QualifiedIdentTypeRepr::create(C, base, ude->getNameLoc(),
+                                            ude->getName());
     }
 
     DeclRefTypeRepr *
@@ -579,7 +580,7 @@ public:
     } else {
       // Otherwise, see whether we had an enum type as the penultimate
       // component, and look up an element inside it.
-      auto *qualIdentTR = cast<MemberTypeRepr>(repr);
+      auto *qualIdentTR = cast<QualifiedIdentTypeRepr>(repr);
 
       const auto options = TypeResolutionOptions(std::nullopt) |
                            TypeResolutionFlags::SilenceErrors;

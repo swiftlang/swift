@@ -3298,7 +3298,7 @@ public:
 
   void visitDeclRefTypeRepr(DeclRefTypeRepr *T, StringRef label) {
     printCommon(isa<UnqualifiedIdentTypeRepr>(T) ? "type_unqualified_ident"
-                                                 : "type_member",
+                                                 : "type_qualified_ident",
                 label);
 
     printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
@@ -3307,8 +3307,8 @@ public:
     else
       printFlag("unbound");
 
-    if (auto *memberTR = dyn_cast<MemberTypeRepr>(T)) {
-      printRec(memberTR->getBase());
+    if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T)) {
+      printRec(qualIdentTR->getBase());
     }
 
     for (auto *genArg : T->getGenericArgs()) {

@@ -2756,10 +2756,11 @@ CustomAttr::destructureMacroRef() {
     return {nullptr, nullptr};
   if (auto *unqualIdentType = dyn_cast<UnqualifiedIdentTypeRepr>(typeRepr))
     return {nullptr, unqualIdentType};
-  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr)) {
-    if (auto *base = dyn_cast<UnqualifiedIdentTypeRepr>(memType->getBase())) {
+  if (auto *qualIdentType = dyn_cast<QualifiedIdentTypeRepr>(typeRepr)) {
+    if (auto *base =
+            dyn_cast<UnqualifiedIdentTypeRepr>(qualIdentType->getBase())) {
       if (!base->hasGenericArgList())
-        return {base, memType};
+        return {base, qualIdentType};
     }
   }
   return {nullptr, nullptr};

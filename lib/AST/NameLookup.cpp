@@ -2774,11 +2774,12 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
               anyObject = true;
         }
         // TypeRepr version: Builtin.AnyObject
-        else if (auto *memberTR = dyn_cast_or_null<MemberTypeRepr>(
+        else if (auto *qualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
                      typealias->getUnderlyingTypeRepr())) {
-          if (!memberTR->hasGenericArgList() &&
-              memberTR->getNameRef().isSimpleName("AnyObject") &&
-              memberTR->getBase()->isSimpleUnqualifiedIdentifier("Builtin")) {
+          if (!qualIdentTR->hasGenericArgList() &&
+              qualIdentTR->getNameRef().isSimpleName("AnyObject") &&
+              qualIdentTR->getBase()->isSimpleUnqualifiedIdentifier(
+                  "Builtin")) {
             anyObject = true;
           }
         }
@@ -2941,9 +2942,9 @@ static DirectlyReferencedTypeDecls
 directReferencesForDeclRefTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                    DeclRefTypeRepr *repr, DeclContext *dc,
                                    bool allowUsableFromInline) {
-  if (auto *memberTR = dyn_cast<MemberTypeRepr>(repr)) {
+  if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(repr)) {
     auto result = directReferencesForTypeRepr(
-        evaluator, ctx, memberTR->getBase(), dc, allowUsableFromInline);
+        evaluator, ctx, qualIdentTR->getBase(), dc, allowUsableFromInline);
 
     // For a qualified identifier, perform qualified name lookup.
     result.first = directReferencesForQualifiedTypeLookup(
@@ -2993,7 +2994,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return result;
   }
 
-  case TypeReprKind::Member:
+  case TypeReprKind::QualifiedIdent:
   case TypeReprKind::UnqualifiedIdent:
     return directReferencesForDeclRefTypeRepr(evaluator, ctx,
                                               cast<DeclRefTypeRepr>(typeRepr),
@@ -3495,9 +3496,9 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
         // We only care about the type of an outermost member type
         // representation. For example, in `A<T>.B.C<U>`, check `C` and generic
         // arguments `U` and `T`, but not `A` or `B`.
-        if (auto *parentMemberTR =
-                dyn_cast_or_null<MemberTypeRepr>(Parent.getAsTypeRepr())) {
-          if (repr == parentMemberTR->getBase()) {
+        if (auto *parentQualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
+                Parent.getAsTypeRepr())) {
+          if (repr == parentQualIdentTR->getBase()) {
             return Action::Continue();
           }
         }
@@ -3765,8 +3766,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
             auto *baseTR = UnqualifiedIdentTypeRepr::create(
                 ctx, nameLoc, DeclNameRef(moduleName));
 
-            auto *newTE = new (ctx)
-                TypeExpr(MemberTypeRepr::create(ctx, baseTR, nameLoc, name));
+            auto *newTE = new (ctx) TypeExpr(
+                QualifiedIdentTypeRepr::create(ctx, baseTR, nameLoc, name));
             attr->resetTypeInformation(newTE);
             return nominal;
           }

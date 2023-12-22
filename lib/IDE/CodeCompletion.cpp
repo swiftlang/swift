@@ -215,7 +215,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
     if (auto *declRefTR =
             dyn_cast<DeclRefTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
       // If it has more than one component, it can't be a module name.
-      if (isa<MemberTypeRepr>(declRefTR))
+      if (isa<QualifiedIdentTypeRepr>(declRefTR))
         return false;
 
       ImportPath::Module::Builder builder(

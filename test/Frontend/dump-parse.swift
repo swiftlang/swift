@@ -126,7 +126,7 @@ struct SelfParam {
 
 // CHECK-LABEL: (func_decl range=[{{.+}}] "dumpMemberTypeRepr()"
 // CHECK-NEXT:    (parameter_list range=[{{.+}}])
-// CHECK-NEXT:    (result=type_member id="Element" unbound
+// CHECK-NEXT:    (result=type_qualified_ident id="Element" unbound
 // CHECK-NEXT:      (type_unqualified_ident id="Array" unbound
 // CHECK-NEXT:        (type_unqualified_ident id="Bool" unbound))
 func dumpMemberTypeRepr() -> Array<Bool>.Element { true }

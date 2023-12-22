@@ -176,9 +176,9 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   llvm_unreachable("Invalid type resolution context");
 }
 
-Type TypeResolution::resolveDependentMemberType(Type baseTy, DeclContext *DC,
-                                                SourceRange baseRange,
-                                                MemberTypeRepr *repr) const {
+Type TypeResolution::resolveDependentMemberType(
+    Type baseTy, DeclContext *DC, SourceRange baseRange,
+    QualifiedIdentTypeRepr *repr) const {
   // FIXME(ModQual): Reject qualified names immediately; they cannot be
   // dependent member types.
   Identifier refIdentifier = repr->getNameRef().getBaseIdentifier();
@@ -1791,7 +1791,8 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
 /// \param silContext Used to look up generic parameters in SIL mode.
 static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
                                           SILTypeResolutionContext *silContext,
-                                          Type parentTy, MemberTypeRepr *repr) {
+                                          Type parentTy,
+                                          QualifiedIdentTypeRepr *repr) {
   const auto options = resolution.getOptions();
   auto DC = resolution.getDeclContext();
   auto &ctx = DC->getASTContext();
@@ -2621,7 +2622,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
   case TypeReprKind::UnqualifiedIdent:
-  case TypeReprKind::Member: {
+  case TypeReprKind::QualifiedIdent: {
       return resolveDeclRefTypeRepr(cast<DeclRefTypeRepr>(repr), options);
   }
 
@@ -4735,7 +4736,7 @@ TypeResolver::resolveDeclRefTypeReprRec(DeclRefTypeRepr *repr,
       }
     }
   } else {
-    auto *qualIdentTR = cast<MemberTypeRepr>(repr);
+    auto *qualIdentTR = cast<QualifiedIdentTypeRepr>(repr);
     auto *baseTR = qualIdentTR->getBase();
 
     Type baseTy;
@@ -5942,9 +5943,9 @@ public:
     // We only care about the type of an outermost member type representation.
     // For example, in `A<T>.B.C<U>`, check `C` and generic arguments `U` and
     // `T`, but not `A` or `B`.
-    if (auto *parentMemberTR =
-            dyn_cast_or_null<MemberTypeRepr>(Parent.getAsTypeRepr())) {
-      if (T == parentMemberTR->getBase()) {
+    if (auto *parentQualIdentTR =
+            dyn_cast_or_null<QualifiedIdentTypeRepr>(Parent.getAsTypeRepr())) {
+      if (T == parentQualIdentTR->getBase()) {
         return Action::Continue();
       }
     }
@@ -5999,7 +6000,7 @@ private:
     case TypeReprKind::NamedOpaqueReturn:
     case TypeReprKind::Existential:
     case TypeReprKind::UnqualifiedIdent:
-    case TypeReprKind::Member:
+    case TypeReprKind::QualifiedIdent:
     case TypeReprKind::Dictionary:
     case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Inverse:

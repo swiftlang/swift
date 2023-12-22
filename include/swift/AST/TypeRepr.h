@@ -410,7 +410,7 @@ public:
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::UnqualifiedIdent ||
-           T->getKind() == TypeReprKind::Member;
+           T->getKind() == TypeReprKind::QualifiedIdent;
   }
   static bool classof(const DeclRefTypeRepr *T) { return true; }
 
@@ -474,9 +474,10 @@ protected:
 ///   Foo.Bar<Gen>.Baz
 ///   [Int].Bar
 /// \endcode
-class MemberTypeRepr final
+class QualifiedIdentTypeRepr final
     : public DeclRefTypeRepr,
-      private llvm::TrailingObjects<MemberTypeRepr, TypeRepr *, SourceRange> {
+      private llvm::TrailingObjects<QualifiedIdentTypeRepr, TypeRepr *,
+                                    SourceRange> {
   friend TrailingObjects;
 
   /// The qualifier or base type representation. For example, `A.B` for `A.B.C`.
@@ -486,19 +487,20 @@ class MemberTypeRepr final
     return getNumGenericArgs();
   }
 
-  MemberTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc);
+  QualifiedIdentTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc);
 
-  MemberTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc,
-                 ArrayRef<TypeRepr *> GenericArgs, SourceRange AngleBrackets);
+  QualifiedIdentTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc,
+                         ArrayRef<TypeRepr *> GenericArgs,
+                         SourceRange AngleBrackets);
 
 public:
-  static MemberTypeRepr *create(const ASTContext &C, TypeRepr *Base,
-                                DeclNameLoc NameLoc, DeclNameRef Name);
+  static QualifiedIdentTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                        DeclNameLoc NameLoc, DeclNameRef Name);
 
-  static MemberTypeRepr *create(const ASTContext &C, TypeRepr *Base,
-                                DeclNameLoc NameLoc, DeclNameRef Name,
-                                ArrayRef<TypeRepr *> GenericArgs,
-                                SourceRange AngleBrackets);
+  static QualifiedIdentTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                        DeclNameLoc NameLoc, DeclNameRef Name,
+                                        ArrayRef<TypeRepr *> GenericArgs,
+                                        SourceRange AngleBrackets);
 
   /// Returns the qualifier or base type representation. For example, `A.B`
   /// for `A.B.C`.
@@ -512,9 +514,9 @@ public:
   SourceRange getAngleBrackets() const;
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Member;
+    return T->getKind() == TypeReprKind::QualifiedIdent;
   }
-  static bool classof(const MemberTypeRepr *T) { return true; }
+  static bool classof(const QualifiedIdentTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const;
@@ -1603,7 +1605,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::PackElement:
     return false;
   case TypeReprKind::UnqualifiedIdent:
-  case TypeReprKind::Member:
+  case TypeReprKind::QualifiedIdent:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::Dictionary:

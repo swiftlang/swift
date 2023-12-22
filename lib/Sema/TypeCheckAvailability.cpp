@@ -4034,11 +4034,11 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   bool checkDeclRefTypeRepr(DeclRefTypeRepr *declRefTR) const {
     ArrayRef<AssociatedTypeDecl *> primaryAssociatedTypes;
 
-    if (auto *memberTR = dyn_cast<MemberTypeRepr>(declRefTR)) {
+    if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(declRefTR)) {
       // If the base is unavailable, don't go on to diagnose
       // the member since that will just produce a redundant
       // diagnostic.
-      if (diagnoseTypeReprAvailability(memberTR->getBase(), where, flags)) {
+      if (diagnoseTypeReprAvailability(qualIdentTR->getBase(), where, flags)) {
         return true;
       }
     }

@@ -1239,10 +1239,10 @@ private:
       return Action::Continue();
     }
 
-    auto *memberTyR = dyn_cast<MemberTypeRepr>(T);
+    auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(T);
 
     // If we're inferring `Foo`, don't look at a witness mentioning `Foo`.
-    if (!memberTyR) {
+    if (!qualIdentTR) {
       if (circularNames.count(declRefTyR->getNameRef().getBaseIdentifier()) >
           0) {
         // If unqualified lookup can find a type with this name without looking
@@ -1267,7 +1267,7 @@ private:
     }
 
     // If we're inferring `Foo`, don't look at a witness mentioning `Self.Foo`.
-    if (!memberTyR->getBase()->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
+    if (!qualIdentTR->getBase()->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
       return Action::Continue();
     }
 
