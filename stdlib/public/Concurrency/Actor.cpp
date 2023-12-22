@@ -2064,6 +2064,8 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
                        executor.getIdentity());
 
   assert(job && "no job provided");
+  job->SchedulerPrivate[0] = NULL;
+  job->SchedulerPrivate[1] = NULL;
 
   _swift_tsan_release(job);
 
