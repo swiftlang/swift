@@ -2246,11 +2246,7 @@ bool Traversal::visitDeclRefTypeRepr(DeclRefTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
-  return visitDeclRefTypeRepr(T);
-}
-
-bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
+bool Traversal::visitUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *T) {
   return visitDeclRefTypeRepr(T);
 }
 

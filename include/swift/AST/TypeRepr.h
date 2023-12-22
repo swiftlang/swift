@@ -196,10 +196,12 @@ public:
   /// \c Type::getCanonicalType() or \c Type::getWithoutParens().
   TypeRepr *getWithoutParens() const;
 
-  /// Whether this is a `SimpleIdentTypeRepr` matching the given identifier.
+  /// Whether this is a `UnqualifiedIdentTypeRepr` with no generic arguments,
+  /// matching the given identifier.
   bool isSimpleUnqualifiedIdentifier(Identifier identifier) const;
 
-  /// Whether this is a `SimpleIdentTypeRepr` matching the given string.
+  /// Whether this is a `UnqualifiedIdentTypeRepr` with no generic arguments,
+  /// matching the given string.
   bool isSimpleUnqualifiedIdentifier(StringRef str) const;
 
   //*** Allocation Routines ************************************************/
@@ -407,30 +409,40 @@ public:
   SourceRange getAngleBrackets() const;
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent ||
-           T->getKind() == TypeReprKind::GenericIdent ||
+    return T->getKind() == TypeReprKind::UnqualifiedIdent ||
            T->getKind() == TypeReprKind::Member;
   }
   static bool classof(const DeclRefTypeRepr *T) { return true; }
 
 protected:
   SourceLoc getLocImpl() const;
+  SourceLoc getEndLocImpl() const;
 
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   friend class TypeRepr;
 };
 
-/// An identifier type with an optional set of generic arguments.
+/// An unqualified identifier type an optional set of generic arguments.
 /// \code
 ///   Foo
 ///   Bar<Gen>
 /// \endcode
-class UnqualifiedIdentTypeRepr : public DeclRefTypeRepr {
-protected:
-  UnqualifiedIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id,
-                           unsigned NumGenericArgs, bool hasGenericArgList)
-      : DeclRefTypeRepr(K, Id, Loc, NumGenericArgs, hasGenericArgList) {}
+class UnqualifiedIdentTypeRepr final
+    : public DeclRefTypeRepr,
+      private llvm::TrailingObjects<UnqualifiedIdentTypeRepr, TypeRepr *,
+                                    SourceRange> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
+    return getNumGenericArgs();
+  }
+
+  UnqualifiedIdentTypeRepr(DeclNameRef Name, DeclNameLoc NameLoc);
+
+  UnqualifiedIdentTypeRepr(DeclNameRef Name, DeclNameLoc NameLoc,
+                           ArrayRef<TypeRepr *> GenericArgs,
+                           SourceRange AngleBrackets);
 
 public:
   static UnqualifiedIdentTypeRepr *
@@ -441,79 +453,18 @@ public:
                                           ArrayRef<TypeRepr *> GenericArgs,
                                           SourceRange AngleBrackets);
 
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+
+  SourceRange getAngleBrackets() const;
+
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent ||
-           T->getKind() == TypeReprKind::GenericIdent;
+    return T->getKind() == TypeReprKind::UnqualifiedIdent;
   }
   static bool classof(const UnqualifiedIdentTypeRepr *T) { return true; }
 
 protected:
   SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
 
-  friend class TypeRepr;
-};
-
-/// A simple identifier type like "Int".
-class SimpleIdentTypeRepr : public UnqualifiedIdentTypeRepr {
-  friend UnqualifiedIdentTypeRepr;
-
-  SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
-      : UnqualifiedIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id,
-                                 /*NumGenericArgs=*/0,
-                                 /*HasAngleBrackets=*/false) {}
-
-public:
-  // SmallVector::emplace_back will never need to call this because
-  // we reserve the right size, but it does try statically.
-  SimpleIdentTypeRepr(const SimpleIdentTypeRepr &repr)
-      : SimpleIdentTypeRepr(repr.getNameLoc(), repr.getNameRef()) {
-    llvm_unreachable("should not be called dynamically");
-  }
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent;
-  }
-  static bool classof(const SimpleIdentTypeRepr *T) { return true; }
-
-private:
-  SourceLoc getEndLocImpl() const { return getNameLoc().getEndLoc(); }
-  friend class TypeRepr;
-};
-
-/// An identifier type with generic arguments.
-/// \code
-///   Bar<Gen>
-/// \endcode
-class GenericIdentTypeRepr final
-    : public UnqualifiedIdentTypeRepr,
-      private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
-  friend UnqualifiedIdentTypeRepr;
-  friend TrailingObjects;
-  SourceRange AngleBrackets;
-
-  GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
-                       ArrayRef<TypeRepr *> GenericArgs,
-                       SourceRange AngleBrackets);
-
-  static GenericIdentTypeRepr *create(const ASTContext &C,
-                                      DeclNameLoc Loc,
-                                      DeclNameRef Id,
-                                      ArrayRef<TypeRepr*> GenericArgs,
-                                      SourceRange AngleBrackets);
-
-public:
-  ArrayRef<TypeRepr*> getGenericArgs() const {
-    return {getTrailingObjects<TypeRepr *>(), getNumGenericArgs()};
-  }
-  SourceRange getAngleBrackets() const { return AngleBrackets; }
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::GenericIdent;
-  }
-  static bool classof(const GenericIdentTypeRepr *T) { return true; }
-
-private:
-  SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
   friend class TypeRepr;
 };
 
@@ -567,7 +518,6 @@ public:
 
 private:
   SourceLoc getStartLocImpl() const;
-  SourceLoc getEndLocImpl() const;
 
   friend class TypeRepr;
 };
@@ -1652,8 +1602,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Existential:
   case TypeReprKind::PackElement:
     return false;
-  case TypeReprKind::SimpleIdent:
-  case TypeReprKind::GenericIdent:
+  case TypeReprKind::UnqualifiedIdent:
   case TypeReprKind::Member:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:

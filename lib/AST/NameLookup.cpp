@@ -2994,8 +2994,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   }
 
   case TypeReprKind::Member:
-  case TypeReprKind::GenericIdent:
-  case TypeReprKind::SimpleIdent:
+  case TypeReprKind::UnqualifiedIdent:
     return directReferencesForDeclRefTypeRepr(evaluator, ctx,
                                               cast<DeclRefTypeRepr>(typeRepr),
                                               dc, allowUsableFromInline);

@@ -1734,7 +1734,7 @@ resolveUnqualifiedIdentTypeRepr(TypeResolution resolution,
   if (id.isSimpleName(ctx.Id_Self)) {
     if (auto *typeDC = DC->getInnermostTypeContext()) {
       // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-      // The issue is though that IdentTypeRepr only accepts a ValueDecl
+      // The issue is though that DeclRefTypeRepr only accepts a ValueDecl
       // while the 'Self' type is more than just a reference to a TypeDecl.
       auto selfType = typeDC->getSelfInterfaceType();
 
@@ -2620,8 +2620,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::CompileTimeConst:
       return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
                                              options);
-  case TypeReprKind::SimpleIdent:
-  case TypeReprKind::GenericIdent:
+  case TypeReprKind::UnqualifiedIdent:
   case TypeReprKind::Member: {
       return resolveDeclRefTypeRepr(cast<DeclRefTypeRepr>(repr), options);
   }
@@ -5999,8 +5998,7 @@ private:
     case TypeReprKind::OpaqueReturn:
     case TypeReprKind::NamedOpaqueReturn:
     case TypeReprKind::Existential:
-    case TypeReprKind::SimpleIdent:
-    case TypeReprKind::GenericIdent:
+    case TypeReprKind::UnqualifiedIdent:
     case TypeReprKind::Member:
     case TypeReprKind::Dictionary:
     case TypeReprKind::ImplicitlyUnwrappedOptional:
