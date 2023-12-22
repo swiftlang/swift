@@ -12,6 +12,7 @@
 
 #include "swift/IDETool/CompilerInvocation.h"
 
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "clang/AST/DeclObjC.h"
@@ -78,24 +79,22 @@ static std::string adjustClangTriple(StringRef TripleStr) {
 }
 
 static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
-    FrontendInputsAndOutputs &inputsAndOutputs, StringRef UnresolvedPrimaryFile,
+    FrontendInputsAndOutputs &inputsAndOutputs,
+    StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
   assert(FileSystem);
 
-  llvm::SmallString<128> PrimaryFile;
-  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
-    PrimaryFile = UnresolvedPrimaryFile;
+  std::string PrimaryFile = resolveSymbolicLinks(
+      UnresolvedPrimaryFile, *FileSystem);
 
   unsigned primaryCount = 0;
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
-    llvm::SmallString<128> newFilename;
-    if (auto err = FileSystem->getRealPath(input.getFileName(), newFilename))
-      newFilename = input.getFileName();
-    llvm::sys::path::native(newFilename);
+    std::string newFilename = resolveSymbolicLinks(input.getFileName(),
+        *FileSystem, llvm::sys::path::Style::native);
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
@@ -104,7 +103,7 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     assert(primaryCount < 2 && "cannot handle multiple primaries");
 
     replacementInputsAndOutputs.addInput(
-        InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
+        InputFile(newFilename, newIsPrimary, input.getBuffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {

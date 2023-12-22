@@ -144,15 +144,19 @@ class SwiftEditorDocumentFileMap {
 
 public:
   bool getOrUpdate(StringRef FilePath,
+                   llvm::vfs::FileSystem &FileSystem,
                    SwiftLangSupport &LangSupport,
                    SwiftEditorDocumentRef &EditorDoc);
+
   /// Looks up the document only by the path name that was given initially.
   SwiftEditorDocumentRef getByUnresolvedName(StringRef FilePath);
-  /// Looks up the document by resolving symlinks in the paths.
-  /// If \p IsRealpath is \c true, then \p FilePath must already be
-  /// canonicalized to a realpath.
-  SwiftEditorDocumentRef findByPath(StringRef FilePath,
-                                    bool IsRealpath = false);
+
+  /// Looks up the document, resolving symlinks in paths if a filesystem
+  /// is provided, and otherwise assumes prior canonicalization.
+  SwiftEditorDocumentRef
+  findByPath(StringRef FilePath,
+             llvm::vfs::FileSystem *FileSystem = nullptr);
+
   SwiftEditorDocumentRef remove(StringRef FilePath);
 };
 
@@ -502,10 +506,6 @@ public:
   static void
   printMemberDeclDescription(const swift::ValueDecl *VD, swift::Type baseTy,
                              bool usePlaceholder, llvm::raw_ostream &OS);
-
-  /// Tries to resolve the path to the real file-system path. If it fails it
-  /// returns the original path;
-  static std::string resolvePathSymlinks(StringRef FilePath);
 
   /// The result returned from \c performWithParamsToCompletionLikeOperation.
   struct CompletionLikeOperationParams {

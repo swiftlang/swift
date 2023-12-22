@@ -9,6 +9,7 @@ add_sourcekit_executable(sourcekitd-test
 )
 target_link_libraries(sourcekitd-test PRIVATE
   SourceKitSupport
+  swiftBasic
   clangRewrite
   clangLex
   clangBasic)

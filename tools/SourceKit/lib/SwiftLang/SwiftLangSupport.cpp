@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
@@ -976,13 +977,6 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
   }
 }
 
-std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
-  std::string InputPath = FilePath.str();
-  llvm::SmallString<256> output;
-  if (llvm::sys::fs::real_path(InputPath, output))
-    return InputPath;
-  return std::string(output.str());
-}
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
   std::vector<Statistic *> stats = {
@@ -1044,10 +1038,8 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // Resolve symlinks for the input file; we resolve them for the input files
   // in the arguments as well.
   // FIXME: We need the Swift equivalent of Clang's FileEntry.
-  llvm::SmallString<128> bufferIdentifier;
-  if (auto err = FileSystem->getRealPath(
-          UnresolvedInputFile->getBufferIdentifier(), bufferIdentifier))
-    bufferIdentifier = UnresolvedInputFile->getBufferIdentifier();
+  std::string bufferIdentifier = resolveSymbolicLinks(
+      UnresolvedInputFile->getBufferIdentifier(), *FileSystem);
 
   // Create a buffer for code completion. This contains '\0' at 'Offset'
   // position of 'UnresolvedInputFile' buffer.

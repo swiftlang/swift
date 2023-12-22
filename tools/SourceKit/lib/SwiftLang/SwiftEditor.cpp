@@ -30,6 +30,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -299,12 +300,13 @@ SwiftEditorDocumentFileMap::getByUnresolvedName(StringRef FilePath) {
 }
 
 SwiftEditorDocumentRef
-SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
+SwiftEditorDocumentFileMap::findByPath(StringRef FilePath,
+    llvm::vfs::FileSystem *FileSystem) {
   SwiftEditorDocumentRef EditorDoc;
 
   std::string Scratch;
-  if (!IsRealpath) {
-    Scratch = SwiftLangSupport::resolvePathSymlinks(FilePath);
+  if (FileSystem) {
+    Scratch = resolveSymbolicLinks(FilePath, *FileSystem);
     FilePath = Scratch;
   }
   Queue.dispatchSync([&]{
@@ -321,12 +323,12 @@ SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
 }
 
 bool SwiftEditorDocumentFileMap::getOrUpdate(
-    StringRef FilePath, SwiftLangSupport &LangSupport,
-    SwiftEditorDocumentRef &EditorDoc) {
+    StringRef FilePath, llvm::vfs::FileSystem &FileSystem,
+    SwiftLangSupport &LangSupport, SwiftEditorDocumentRef &EditorDoc) {
 
   bool found = false;
 
-  std::string ResolvedPath = SwiftLangSupport::resolvePathSymlinks(FilePath);
+  std::string ResolvedPath = resolveSymbolicLinks(FilePath, FileSystem);
   Queue.dispatchBarrierSync([&]{
     DocInfo &Doc = Docs[FilePath];
     if (!Doc.DocRef) {
@@ -2392,7 +2394,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
     Snapshot = EditorDoc->initializeText(
         Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->resetSyntaxInfo(Snapshot, *this);
-    if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
+    if (EditorDocuments->getOrUpdate(Name, *fileSystem, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);

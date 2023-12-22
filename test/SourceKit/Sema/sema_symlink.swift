@@ -5,3 +5,6 @@
 // RUN: %diff -u %s.response %t.link.response
 // RUN: %sourcekitd-test -req=sema %t.dir/real.swift -- %t.dir/linked.swift | %sed_clean > %t.real.response
 // RUN: %diff -u %s.response %t.real.response
+
+// We can't resolve symlinks on a substituted drive without risking MAX_PATH issues
+// REQUIRES: !windows_substituted_drive

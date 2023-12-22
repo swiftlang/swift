@@ -27,6 +27,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/SymbolicLinks.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -640,8 +641,7 @@ mapOffsetToNewerSnapshot(unsigned Offset,
 static void mapLocToLatestSnapshot(
     SwiftLangSupport &Lang, LocationInfo &Location,
     ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
-  auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename,
-                                                         /*IsRealpath=*/true);
+  auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename);
   if (!EditorDoc)
     return;
 
@@ -1495,8 +1495,7 @@ public:
     // blocked waiting on the AST to be fully typechecked.
 
     ImmutableTextSnapshotRef InputSnap;
-    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(
-            PrimaryFilePath, /*IsRealpath=*/true))
+    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(PrimaryFilePath))
       InputSnap = EditorDoc->getLatestSnapshot();
     if (!InputSnap)
       return false;
@@ -1555,8 +1554,8 @@ SourceFile *SourceKit::retrieveInputFile(StringRef inputBufferName,
     // done that)
     if (haveRealPath)
       return nullptr;
-    std::string realPath =
-        SwiftLangSupport::resolvePathSymlinks(inputBufferName);
+    std::string realPath = resolveSymbolicLinks(inputBufferName,
+        CI.getFileSystem());
     return retrieveInputFile(realPath, CI, /*haveRealPath=*/true);
   }
 
@@ -2119,8 +2118,8 @@ void SwiftLangSupport::getCursorInfo(
   std::shared_ptr<llvm::MemoryBuffer> InputBuffer;
   if (InputBufferName.empty() && Length == 0) {
     std::string InputFileError;
-    llvm::SmallString<128> RealInputFilePath;
-    fileSystem->getRealPath(PrimaryFilePath, RealInputFilePath);
+    std::string RealInputFilePath = resolveSymbolicLinks(PrimaryFilePath,
+        *fileSystem);
     InputBuffer =
         std::shared_ptr<llvm::MemoryBuffer>(getASTManager()->getMemoryBuffer(
             RealInputFilePath, fileSystem, InputFileError));
