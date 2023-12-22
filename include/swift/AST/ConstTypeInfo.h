@@ -37,7 +37,8 @@ public:
     Tuple,
     Enum,
     Type,
-    Runtime
+    Runtime,
+    RawRepresentable
   };
 
   ValueKind getKind() const { return Kind; }
@@ -64,6 +65,25 @@ public:
 
 private:
   std::string Value;
+};
+
+class RawRepresentableValue : public CompileTimeValue {
+public:
+  RawRepresentableValue(std::string Name,
+                        std::shared_ptr<CompileTimeValue> Value)
+      : CompileTimeValue(ValueKind::RawRepresentable), Name(Name),
+        Value(Value) {}
+
+  std::string getName() const { return Name; }
+  std::shared_ptr<CompileTimeValue> getValue() const { return Value; }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::RawRepresentable;
+  }
+
+private:
+  std::string Name;
+  std::shared_ptr<CompileTimeValue> Value;
 };
 
 struct FunctionParameter {

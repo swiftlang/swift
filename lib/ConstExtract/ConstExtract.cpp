@@ -381,6 +381,31 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       return extractCompileTimeValue(injectIntoOptionalExpr->getSubExpr());
     }
 
+    case ExprKind::MemberRef: {
+      auto memberRefExpr = cast<MemberRefExpr>(expr);
+      // somehow check raw representable
+      auto base = memberRefExpr->getBase();
+      if (base->getKind() == ExprKind::Type) {
+        auto type = cast<TypeExpr>(base)->getInstanceType();
+        // FIXME: ApolloZhu check type == expr->getType()
+        // FIXME: ApolloZhu need a better way of getDecl for all types
+        auto typeDecl = type->getAs<NominalType>()->getDecl();
+        for (auto &protocol : typeDecl->getAllProtocols()) {
+          if (protocol->getKnownProtocolKind() &&
+              *protocol->getKnownProtocolKind() ==
+                  KnownProtocolKind::RawRepresentable) {
+            auto decl = memberRefExpr->getMember().getDecl();
+            // FIXME: ApolloZhu check it's actually VarDecl
+            auto caseName = decl->getName().getBaseIdentifier().str().str();
+            auto init = cast<VarDecl>(decl)->getParentInitializer();
+            return std::make_shared<RawRepresentableValue>(
+                caseName, extractCompileTimeValue(init));
+          }
+        }
+      }
+      break;
+    }
+
     default: {
       break;
     }
@@ -584,6 +609,16 @@ void writeValue(llvm::json::OStream &JSON,
   case CompileTimeValue::ValueKind::RawLiteral: {
     JSON.attribute("valueKind", "RawLiteral");
     JSON.attribute("value", cast<RawLiteralValue>(value)->getValue());
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::RawRepresentable: {
+    auto rawRepresentable = cast<RawRepresentableValue>(value);
+    JSON.attribute("valueKind", "RawRepresentable");
+    JSON.attributeObject("value", [&]() {
+      JSON.attribute("name", rawRepresentable->getName());
+      writeValue(JSON, rawRepresentable->getValue());
+    });
     break;
   }
 
