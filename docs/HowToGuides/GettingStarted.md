@@ -588,6 +588,12 @@ lit customizations, see [Testing.md](/docs/Testing.md). Also check out the
 [lit documentation](https://llvm.org/docs/CommandGuide/lit.html) to understand
 how the different lit commands work.
 
+This pertains to case 1:
+- When the command is initiated from the `swift` directory, it results in an error. 
+	For this reason, the command should not include the `swift` keyword nor should 
+	it specify paths starting from the `swift` directory.
+	It is recommended to omit the `swift` keyword to avoid such issues.
+
 ## Debugging issues
 
 In this section, we briefly describe two common ways of debugging: print
