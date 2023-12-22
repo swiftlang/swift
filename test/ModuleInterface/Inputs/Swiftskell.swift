@@ -31,6 +31,22 @@ public extension Eq where Self: Equatable {
   }
 }
 
+/// MARK: Result
+public enum Either<Success, Failure: Error> {
+  case success(Success)
+  case failure(Failure)
+}
+
+extension Either where Failure == Swift.Error {
+  public init(catching body: () throws -> Success) {
+    do {
+      self = .success(try body())
+    } catch {
+      self = .failure(error)
+    }
+  }
+}
+
 /// MARK: Iteration
 
 public protocol Generator: ~Copyable {
