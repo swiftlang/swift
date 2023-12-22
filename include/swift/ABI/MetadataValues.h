@@ -20,11 +20,11 @@
 #define SWIFT_ABI_METADATAVALUES_H
 
 #include "swift/ABI/KeyPath.h"
+#include "swift/ABI/Ownership.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
-#include "swift/AST/Ownership.h"
 #include "swift/Basic/Debug.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 
 #include <stdlib.h>

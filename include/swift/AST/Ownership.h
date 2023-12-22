@@ -19,6 +19,7 @@
 #ifndef SWIFT_OWNERSHIP_H
 #define SWIFT_OWNERSHIP_H
 
+#include "swift/ABI/Ownership.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
@@ -117,20 +118,6 @@ optionalityOf(ReferenceOwnership ownership) {
   llvm_unreachable("impossible");
 }
 
-/// Different kinds of value ownership supported by Swift.
-enum class ValueOwnership : uint8_t {
-  /// the context-dependent default ownership (sometimes shared,
-  /// sometimes owned)
-  Default,
-  /// an 'inout' exclusive, mutating borrow
-  InOut,
-  /// a 'borrowing' nonexclusive, usually nonmutating borrow
-  Shared,
-  /// a 'consuming' ownership transfer
-  Owned,
-
-  Last_Kind = Owned
-};
 enum : unsigned { NumValueOwnershipBits =
   countBitsUsed(static_cast<unsigned>(ValueOwnership::Last_Kind)) };
 
