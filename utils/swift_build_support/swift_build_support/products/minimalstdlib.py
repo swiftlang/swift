@@ -135,7 +135,7 @@ class MinimalStdlib(cmake_product.CMakeProduct):
             'SWIFT_STDLIB_ENABLE_VECTOR_TYPES:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK:BOOL', 'TRUE')
-        self.cmake_options.define('SWIFT_STDLIB_HAS_ASL:BOOL', 'FALSE')
+        self.cmake_options.define('SWIFT_STDLIB_HAS_OS_LOG:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_COMMANDLINE:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC:BOOL', 'FALSE')

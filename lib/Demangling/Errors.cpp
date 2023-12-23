@@ -27,7 +27,7 @@
 #include <io.h>
 #endif
 
-#if SWIFT_STDLIB_HAS_ASL
+#if SWIFT_STDLIB_HAS_OS_LOG
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
@@ -101,8 +101,10 @@ static void reportNow(uint32_t flags, const char *message) {
   fputs(message, stderr);
   fflush(stderr);
 #endif
-#if SWIFT_STDLIB_HAS_ASL
-  asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#if SWIFT_STDLIB_HAS_OS_LOG
+  os_log_t type = os_log_create("SwiftDemangle", "Error");
+  os_log_error(type, "%s", message);
+  os_release(type);
 #elif defined(__ANDROID__) && !defined(__TERMUX__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftDemangle", "%s", message);
 #endif

@@ -24,7 +24,7 @@
 
 #include <stdarg.h>
 
-#if SWIFT_STDLIB_HAS_ASL
+#if SWIFT_STDLIB_HAS_OS_LOG
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
@@ -40,8 +40,10 @@ void error(const char *prefix, const char *msg, const char *file = nullptr, unsi
     snprintf(buffer, sizeof(buffer), "%s%s\n", prefix, msg);
   }
 
-#if SWIFT_STDLIB_HAS_ASL
-  asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", buffer);
+#if SWIFT_STDLIB_HAS_OS_LOG
+  os_log_t type = os_log_create("SwiftRuntime", "Error");
+  os_log_error(type, "%s", buffer);
+  os_release(type);
 #elif defined(__ANDROID__) && !defined(__TERMUX__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", buffer);
 #elif defined(_WIN32)
