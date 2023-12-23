@@ -327,7 +327,7 @@ extension Set: Collection {
   /// Accesses the member at the given position.
   @inlinable
   public subscript(position: Index) -> Element {
-    //FIXME(accessors): Provide a _read
+    // FIXME(accessors): Provide a _read
     get {
       return _variant.element(at: position)
     }

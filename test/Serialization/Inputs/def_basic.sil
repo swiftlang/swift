@@ -1065,8 +1065,8 @@ sil [transparent] [serialized] @test_mark_fn_escape : $@convention(thin) () -> (
   %c = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %ca = project_box %c : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
-  //mark_function_escape %ba : $*Int
-  //mark_function_escape %ba : $*Int, %ca : $*Int
+  // mark_function_escape %ba : $*Int
+  // mark_function_escape %ba : $*Int, %ca : $*Int
 
   %28 = tuple ()
   return %28 : $()
