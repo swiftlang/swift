@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %sourcekitd-test -req=index-to-store %s -index-store-path %t/idx -index-unit-output-path %t/index_locals.o -req-opts=should_index_locals=1 -- %s
+// RUN: %sourcekitd-test -req=index-to-store %s -index-store-path %t/idx -index-unit-output-path %t/index_locals.o -req-opts=include_locals=1 -- %s
 // RUN: c-index-test core -print-record %t/idx | %FileCheck %s
 
 
