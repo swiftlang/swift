@@ -655,7 +655,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
       Type Ty = T->getType();
 
-      // Construct llvm::function_ref which can be used in the underlying
+      // Construct std::function which can be used in the underlying
       // SourceEntityWalker to lazily fetch SubstitutionMap for this TypeRepr
       std::function<SubstitutionMap()> SubstitutionsFn = [Ty]() {
         if (!Ty) {
