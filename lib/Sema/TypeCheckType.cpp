@@ -3510,12 +3510,14 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     bool isolated = false;
     bool compileTimeConst = false;
     bool hasResultDependsOn = false;
+    bool isTransferring = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
         case TypeReprKind::Ownership:
           ownership = cast<OwnershipTypeRepr>(specifierRepr)->getSpecifier();
           nestedRepr = specifierRepr->getBase();
+          isTransferring = ownership == ParamSpecifier::Transferring;
           continue;
         case TypeReprKind::Isolated:
           isolated = true;
@@ -3625,7 +3627,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst, hasResultDependsOn);
+        isolated, noDerivative, compileTimeConst, hasResultDependsOn,
+        isTransferring);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -4480,6 +4483,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::LegacyOwned:
   case ParamSpecifier::Borrowing:
     break;
+  case ParamSpecifier::Transferring:
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {

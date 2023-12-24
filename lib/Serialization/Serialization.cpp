@@ -2551,6 +2551,8 @@ static uint8_t getRawStableParamDeclSpecifier(swift::ParamDecl::Specifier sf) {
     return uint8_t(serialization::ParamDeclSpecifier::LegacyShared);
   case swift::ParamDecl::Specifier::LegacyOwned:
     return uint8_t(serialization::ParamDeclSpecifier::LegacyOwned);
+  case swift::ParamDecl::Specifier::Transferring:
+    return uint8_t(serialization::ParamDeclSpecifier::Transferring);
   }
   llvm_unreachable("bad param decl specifier kind");
 }
@@ -5426,7 +5428,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn());
+          paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn(),
+          paramFlags.isTransferring());
     }
   }
 

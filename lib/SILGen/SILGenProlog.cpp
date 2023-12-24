@@ -860,6 +860,7 @@ private:
           argrv = ManagedValue::forBorrowedAddressRValue(
               SGF.B.createCopyableToMoveOnlyWrapperAddr(pd, argrv.getValue()));
           break;
+        case swift::ParamSpecifier::Transferring:
         case swift::ParamSpecifier::Consuming:
         case swift::ParamSpecifier::Default:
         case swift::ParamSpecifier::InOut:

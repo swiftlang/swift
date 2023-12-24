@@ -3906,7 +3906,15 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
 
 static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
-static bool usesFeatureTransferringArgsAndResults(Decl *decl) { return false; }
+static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
+  if (auto *pd = dyn_cast<ParamDecl>(decl))
+    if (pd->getSpecifier() == ParamSpecifier::Transferring)
+      return true;
+
+  // TODO: Results.
+
+  return false;
+}
 
 static bool usesFeaturePreconcurrencyConformances(Decl *decl) {
   auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
@@ -4567,6 +4575,8 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printAttrName("@autoclosure ");
   if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
+  if (flags.isTransferring())
+    printer.printAttrName("@transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -4586,6 +4596,9 @@ static void printParameterFlags(ASTPrinter &printer,
     break;
   case ParamSpecifier::LegacyOwned:
     printer.printKeyword("__owned", options, " ");
+    break;
+  case ParamSpecifier::Transferring:
+    printer.printKeyword("transferring", options, " ");
     break;
   }
   
@@ -8066,6 +8079,11 @@ void SILParameterInfo::print(ASTPrinter &Printer,
   if (options.contains(SILParameterInfo::NotDifferentiable)) {
     options -= SILParameterInfo::NotDifferentiable;
     Printer << "@noDerivative ";
+  }
+
+  if (options.contains(SILParameterInfo::Transferring)) {
+    options -= SILParameterInfo::Transferring;
+    Printer << "@transferring ";
   }
 
   // If we did not handle a case in Options, this code was not updated

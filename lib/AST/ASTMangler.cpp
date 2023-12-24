@@ -2875,7 +2875,8 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
   // `inout` should already be specified in the flags.
   case ParamSpecifier::InOut:
     return flags;
-  
+
+  case ParamSpecifier::Transferring:
   case ParamSpecifier::Consuming:
   case ParamSpecifier::Borrowing:
     // Only mangle the ownership if it diverges from the default.
