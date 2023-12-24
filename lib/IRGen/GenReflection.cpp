@@ -1748,6 +1748,9 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
 }
 
 void IRGenModule::emitReflectionMetadataVersion() {
+  if (IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::None)
+    return;
+
   auto Init =
     llvm::ConstantInt::get(Int16Ty, SWIFT_REFLECTION_METADATA_VERSION);
   auto Version = new llvm::GlobalVariable(Module, Int16Ty, /*constant*/ true,
