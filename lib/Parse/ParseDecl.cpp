@@ -2873,7 +2873,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   if (DK == DAK_ResultDependsOnSelf &&
       !Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    diagnose(Loc, diag::requires_non_escapable_types, AttrName, true);
+    diagnose(Loc, diag::requires_experimental_feature, AttrName, true,
+             getFeatureName(Feature::NonescapableTypes));
     DiscardAttribute = true;
   }
 
@@ -5161,8 +5162,8 @@ ParserStatus Parser::parseTypeAttributeListPresent(
 
     if (Tok.isContextualKeyword("_resultDependsOn")) {
       if (!Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        diagnose(Tok, diag::requires_non_escapable_types, "resultDependsOn",
-                 false);
+        diagnose(Tok, diag::requires_experimental_feature, "resultDependsOn",
+                 false, getFeatureName(Feature::NonescapableTypes));
       }
       ResultDependsOnLoc = consumeToken();
       continue;
