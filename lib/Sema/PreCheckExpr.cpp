@@ -830,7 +830,7 @@ VarDecl *
 TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                    UnresolvedDotExpr *ctorRef) {
   // If the reference isn't to a constructor, we're done.
-  if (ctorRef->getName().getBaseName() != DeclBaseName::createConstructor())
+  if (!ctorRef->getName().getBaseName().isConstructor())
     return nullptr;
 
   if (auto ctorContext =

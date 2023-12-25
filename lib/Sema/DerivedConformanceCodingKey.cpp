@@ -419,7 +419,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
     };
 
     return deriveProperty(*this, optionalIntType, Context.Id_intValue, synth);
-  } else if (name == DeclBaseName::createConstructor()) {
+  } else if (name.isConstructor()) {
     auto argumentNames = requirement->getName().getArgumentNames();
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == Context.Id_stringValue) {

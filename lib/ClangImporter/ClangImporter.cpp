@@ -6267,7 +6267,7 @@ ClangImporter::Implementation::loadNamedMembers(
     }
   }
 
-  if (N == DeclBaseName::createConstructor()) {
+  if (N.isConstructor()) {
     if (auto *classDecl = dyn_cast<ClassDecl>(D)) {
       SmallVector<Decl *, 4> ctors;
       importInheritedConstructors(cast<clang::ObjCInterfaceDecl>(CD),
