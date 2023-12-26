@@ -191,6 +191,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     )
   endif()
 
+  if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "arm64    wasm32-none-none-wasm    wasm32-none-none-wasm
+    )
+  endif()
+
   if (SWIFT_HOST_VARIANT STREQUAL "linux")
     set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
       "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
