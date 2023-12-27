@@ -313,10 +313,50 @@ struct UntypedRes<Success>: P {
 }
 
 struct InfallibleRes<Success>: P {
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic13InfallibleResVyxGAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed InfallibleRes<τ_0_0>) -> @error_indirect τ_0_0.E
-  // CHECK: bb0(%0 : $*@error_type τ_0_0.E, %1 : $*InfallibleRes<τ_0_0>):
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic13InfallibleResVyxGAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed InfallibleRes<τ_0_0>) -> @error_indirect Never
+  // CHECK: bb0(%0 : $*Never, %1 : $*InfallibleRes<τ_0_0>):
   // CHECK: [[SELF:%.*]] = load [trivial] %1 : $*InfallibleRes<τ_0_0>
   // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic13InfallibleResV1fyyF : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>) -> ()
   // CHECK: = apply [[WITNESS]]<τ_0_0>([[SELF]]) : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>)
   func f() { }
+}
+
+// Protocol with a default implementation of its function with a
+// thrown error type.
+protocol P2 {
+  associatedtype Failure: Error
+  func f() throws(Failure)
+}
+
+extension P2 {
+  func f() throws(Failure) { }
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic1SVAA2P2A2aDP1fyy7FailureQzYKFTW : $@convention(witness_method: P2) (@in_guaranteed S) -> @error_indirect Never
+// CHECK: bb0(%0 : $*Never, %1 : $*S)
+struct S: P2 {
+  typealias Failure = Never
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic2GSVyxGAA2P2A2aEP1fyy7FailureQzYKFTW : $@convention(witness_method: P2) <τ_0_0> (@in_guaranteed GS<τ_0_0>) -> @error_indirect Never {
+// CHECK: bb0(%0 : $*Never, %1 : $*GS<τ_0_0>):
+struct GS<T>: P2 {
+  typealias Failure = Never
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic3GSFVyxq_GAA2P2A2aEP1fyy7FailureQzYKFTW : $@convention(witness_method: P2) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@in_guaranteed GSF<τ_0_0, τ_0_1>) -> @error_indirect τ_0_1 {
+// CHECK: bb0(%0 : $*τ_0_1, %1 : $*GSF<τ_0_0, τ_0_1>):
+struct GSF<T, Failure: Error>: P2 {
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic4GSF2Vyxq_GAA2P2A2aEP1fyy7FailureQzYKFTW : $@convention(witness_method: P2) <τ_0_0, τ_0_1 where τ_0_0 : Error> (@in_guaranteed GSF2<τ_0_0, τ_0_1>) -> @error_indirect τ_0_0 {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : $*GSF2<τ_0_0, τ_0_1>):
+struct GSF2<F: Error, T>: P2 {
+  typealias Failure = F
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic3GSAVyxGAA2P2A2aEP1fyy7FailureQzYKFTW : $@convention(witness_method: P2) <τ_0_0> (@in_guaranteed GSA<τ_0_0>) -> @error_indirect any Error {
+// CHECK: bb0(%0 : $*any Error, %1 : $*GSA<τ_0_0>):
+struct GSA<T>: P2 {
+  typealias Failure = any Error
 }
