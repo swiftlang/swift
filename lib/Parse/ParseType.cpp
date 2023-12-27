@@ -32,32 +32,29 @@
 using namespace swift;
 
 TypeRepr *
-Parser::applyAttributeToType(TypeRepr *ty, const TypeAttributes &attrs,
-                             ParamDecl::Specifier specifier,
-                             SourceLoc specifierLoc, SourceLoc isolatedLoc,
-                             SourceLoc constLoc, SourceLoc resultDependsOnLoc) {
+Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
+                                                       TypeRepr *ty) const {
   // Apply those attributes that do apply.
-  if (!attrs.empty()) {
-    ty = new (Context) AttributedTypeRepr(attrs, ty);
+  if (!Attributes.empty()) {
+    ty = new (p.Context) AttributedTypeRepr(Attributes, ty);
   }
 
   // Apply 'inout', 'consuming', or 'borrowing' modifiers.
-  if (specifierLoc.isValid() &&
-      specifier != ParamDecl::Specifier::Default) {
-    ty = new (Context) OwnershipTypeRepr(ty, specifier, specifierLoc);
+  if (SpecifierLoc.isValid() && Specifier != ParamDecl::Specifier::Default) {
+    ty = new (p.Context) OwnershipTypeRepr(ty, Specifier, SpecifierLoc);
   }
-  
+
   // Apply 'isolated'.
-  if (isolatedLoc.isValid()) {
-    ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
+  if (IsolatedLoc.isValid()) {
+    ty = new (p.Context) IsolatedTypeRepr(ty, IsolatedLoc);
   }
 
-  if (constLoc.isValid()) {
-    ty = new (Context) CompileTimeConstTypeRepr(ty, constLoc);
+  if (ConstLoc.isValid()) {
+    ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
   }
 
-  if (resultDependsOnLoc.isValid()) {
-    ty = new (Context) ResultDependsOnTypeRepr(ty, resultDependsOnLoc);
+  if (ResultDependsOnLoc.isValid()) {
+    ty = new (p.Context) ResultDependsOnTypeRepr(ty, ResultDependsOnLoc);
   }
 
   return ty;
@@ -388,9 +385,11 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   auto repr = SILBoxTypeRepr::create(Context, generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
+  ParsedTypeAttributeList parsedAttributeList;
+  parsedAttributeList.Specifier = ParamDecl::Specifier::LegacyOwned;
+  parsedAttributeList.Attributes = attrs;
   return makeParserResult(
-      applyAttributeToType(repr, attrs, ParamDecl::Specifier::LegacyOwned,
-                           SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc()));
+      parsedAttributeList.applyAttributesToType(*this, repr));
 }
 
 
@@ -408,14 +407,8 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   ParserStatus status;
 
   // Parse attributes.
-  ParamDecl::Specifier specifier;
-  SourceLoc specifierLoc;
-  SourceLoc isolatedLoc;
-  SourceLoc constLoc;
-  SourceLoc resultDependsOnLoc;
-  TypeAttributes attrs;
-  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc,
-                                   constLoc, resultDependsOnLoc, attrs);
+  ParsedTypeAttributeList parsedAttributeList;
+  status |= parsedAttributeList.parse(*this);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -439,7 +432,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     if (patternGenerics) {
       diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
     }
-    return parseSILBoxType(generics, attrs);
+    return parseSILBoxType(generics, parsedAttributeList.Attributes);
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID, reason);
@@ -596,8 +589,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   }
 
   return makeParserResult(
-      status, applyAttributeToType(tyR, attrs, specifier, specifierLoc,
-                                   isolatedLoc, constLoc, resultDependsOnLoc));
+      status, parsedAttributeList.applyAttributesToType(*this, tyR));
 }
 
 /// parseType

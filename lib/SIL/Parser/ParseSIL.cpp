@@ -1122,21 +1122,15 @@ bool SILParser::parseSILType(SILType &Result,
   }
 
   // Parse attributes.
-  ParamDecl::Specifier specifier;
-  SourceLoc specifierLoc;
-  SourceLoc isolatedLoc;
-  SourceLoc constLoc;
-  SourceLoc resultDependsOnLoc;
-  TypeAttributes attrs;
-  P.parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc,
-                           resultDependsOnLoc, attrs);
+  Parser::ParsedTypeAttributeList parsedAttrs;
+  parsedAttrs.parse(P);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
-  if (IsFuncDecl && !attrs.has(TAK_convention)) {
+  if (IsFuncDecl && !parsedAttrs.Attributes.has(TAK_convention)) {
     // Use a random location.
-    attrs.setAttr(TAK_convention, P.PreviousLoc);
-    attrs.ConventionArguments =
-      TypeAttributes::Convention::makeSwiftConvention("thin");
+    parsedAttrs.Attributes.setAttr(TAK_convention, P.PreviousLoc);
+    parsedAttrs.Attributes.ConventionArguments =
+        TypeAttributes::Convention::makeSwiftConvention("thin");
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
@@ -1147,9 +1141,7 @@ bool SILParser::parseSILType(SILType &Result,
   bindSILGenericParams(TyR.get());
   
   // Apply attributes to the type.
-  auto *attrRepr =
-      P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc,
-                             isolatedLoc, constLoc, resultDependsOnLoc);
+  auto *attrRepr = parsedAttrs.applyAttributesToType(P, TyR.get());
   auto Ty = performTypeResolution(attrRepr, /*IsSILType=*/true, OuterGenericSig,
                                   OuterGenericParams);
   if (OuterGenericSig) {
