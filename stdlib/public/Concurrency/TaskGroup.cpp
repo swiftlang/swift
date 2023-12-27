@@ -1779,14 +1779,14 @@ reevaluate_if_taskgroup_has_results:;
   // ==== 3) Add to wait queue -------------------------------------------------
   assert(assumed.readyTasks(this) == 0);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
+  if (!hasSuspended) {
+    waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
+    hasSuspended = true;
+  }
   while (true) {
-    if (!hasSuspended) {
-      hasSuspended = true;
-      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
-    }
     // Put the waiting task at the beginning of the wait queue.
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "WATCH OUT, SET WAITER ONTO waitQueue.head = %p", waitQueue.load(std::memory_order_relaxed));
-    if (waitQueue.compare_exchange_strong(
+    if (waitQueue.compare_exchange_weak(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
@@ -1941,13 +1941,13 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
 
   auto waitHead = waitQueue.load(std::memory_order_acquire);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
+  if (!hasSuspended) {
+    waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
+    hasSuspended = true;
+  }
   while (true) {
-    if (!hasSuspended) {
-      hasSuspended = true;
-      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
-    }
     // Put the waiting task at the beginning of the wait queue.
-    if (waitQueue.compare_exchange_strong(
+    if (waitQueue.compare_exchange_weak(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
