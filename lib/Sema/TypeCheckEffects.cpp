@@ -171,6 +171,17 @@ static bool classifyWitness(ModuleDecl *module,
 
     case PolymorphicEffectKind::Always:
       // Witness always has the effect.
+
+      // If the witness's thrown type is explicitly specified as a type
+      // parameter, then check whether the substituted type is `Never`.
+      if (kind == EffectKind::Throws) {
+        if (Type thrownError = witnessDecl->getThrownInterfaceType()) {
+          if (thrownError->hasTypeParameter())
+            thrownError = thrownError.subst(declRef.getSubstitutions());
+          if (thrownError->isNever())
+            return false;
+        }
+      }
       return true;
 
     case PolymorphicEffectKind::Invalid:

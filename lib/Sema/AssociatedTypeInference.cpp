@@ -821,6 +821,14 @@ private:
   llvm::Optional<AbstractTypeWitness>
   computeDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
 
+  /// Compute type witnesses for the Failure type from the
+  /// AsyncSequence or AsyncIteratorProtocol
+  llvm::Optional<AbstractTypeWitness>
+  computeFailureTypeWitness(
+      AssociatedTypeDecl *assocType,
+      ArrayRef<std::pair<ValueDecl *, ValueDecl *>> valueWitnesses
+  ) const;
+
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
   std::pair<Type, TypeDecl *>
@@ -1370,6 +1378,25 @@ next_witness:;
   return result;
 }
 
+/// Determine whether this is AsyncIteratorProtocol.Failure associated type.
+static bool isAsyncIteratorProtocolFailure(AssociatedTypeDecl *assocType) {
+  auto proto = assocType->getProtocol();
+  if (!proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol))
+    return false;
+
+  return assocType->getName().str().equals("Failure");
+}
+
+/// Determine whether this is AsyncIteratorProtocol.next() function.
+static bool isAsyncIteratorProtocolNext(ValueDecl *req) {
+  auto proto = dyn_cast<ProtocolDecl>(req->getDeclContext());
+  if (!proto ||
+      !proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol))
+    return false;
+
+  return req->getName().getBaseName() == req->getASTContext().Id_next;
+}
+
 InferredAssociatedTypes
 AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   const llvm::SetVector<AssociatedTypeDecl *> &assocTypes) {
@@ -1415,7 +1442,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                                           TinyPtrVector<AssociatedTypeDecl *>());
       if (llvm::find_if(referenced, [&](AssociatedTypeDecl *const assocType) {
                           return assocTypes.count(assocType);
-                        }) == referenced.end())
+                        }) == referenced.end() &&
+          !isAsyncIteratorProtocolNext(req))
         continue;
     }
 
@@ -1846,8 +1874,70 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
 }
 
 llvm::Optional<AbstractTypeWitness>
+AssociatedTypeInference::computeFailureTypeWitness(
+    AssociatedTypeDecl *assocType,
+    ArrayRef<std::pair<ValueDecl *, ValueDecl *>> valueWitnesses) const {
+  // Inference only applies to AsyncIteratorProtocol.Failure.
+  if (!isAsyncIteratorProtocolFailure(assocType))
+    return llvm::None;
+
+  // If there is a generic parameter named Failure, don't try to use next()
+  // to infer Failure.
+  if (auto genericSig = dc->getGenericSignatureOfContext()) {
+    for (auto gp : genericSig.getGenericParams()) {
+      // Packs cannot witness associated type requirements.
+      if (gp->isParameterPack())
+        continue;
+
+      if (gp->getName() == assocType->getName())
+        return llvm::None;
+    }
+  }
+
+  // Look for AsyncIteratorProtocol.next() and infer the Failure type from
+  // it.
+  for (const auto &witness : valueWitnesses) {
+    if (isAsyncIteratorProtocolNext(witness.first)) {
+      if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness.second)) {
+        // If it doesn't throw, Failure == Never.
+        if (!witnessFunc->hasThrows())
+          return AbstractTypeWitness(assocType, ctx.getNeverType());
+
+        // If it isn't 'rethrows', Failure == any Error.
+        if (!witnessFunc->getAttrs().hasAttribute<RethrowsAttr>())
+          return AbstractTypeWitness(assocType, ctx.getErrorExistentialType());
+
+        // Otherwise, we need to derive the Failure type from a type parameter
+        // that conforms to AsyncIteratorProtocol or AsyncSequence.
+        for (auto req : witnessFunc->getGenericSignature().getRequirements()) {
+          if (req.getKind() == RequirementKind::Conformance) {
+            auto proto = req.getProtocolDecl();
+            if (proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) ||
+                proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
+              auto failureAssocType = proto->getAssociatedType(ctx.getIdentifier("Failure"));
+              auto failureType = DependentMemberType::get(req.getFirstType(), failureAssocType);
+              return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(failureType));
+            }
+          }
+        }
+
+        return AbstractTypeWitness(assocType, ctx.getErrorExistentialType());
+      }
+
+      break;
+    }
+  }
+
+  return llvm::None;
+}
+
+llvm::Optional<AbstractTypeWitness>
 AssociatedTypeInference::computeDefaultTypeWitness(
     AssociatedTypeDecl *assocType) const {
+  // Ignore the default for AsyncIteratorProtocol.Failure
+  if (isAsyncIteratorProtocolFailure(assocType))
+    return llvm::None;
+
   // Go find a default definition.
   auto *const defaultedAssocType = findDefaultedAssociatedType(
       dc, dc->getSelfNominalTypeDecl(), assocType);
@@ -1942,7 +2032,11 @@ AssociatedTypeInference::computeAbstractTypeWitness(
 
   // If there is a generic parameter of the named type, use that.
   if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig.getInnermostGenericParams()) {
+    bool wantAllGenericParams = isAsyncIteratorProtocolFailure(assocType);
+    auto genericParams = wantAllGenericParams 
+        ? genericSig.getGenericParams()
+        : genericSig.getInnermostGenericParams();
+    for (auto gp : genericParams) {
       // Packs cannot witness associated type requirements.
       if (gp->isParameterPack())
         continue;
@@ -2552,7 +2646,20 @@ void AssociatedTypeInference::findSolutionsRec(
     // Filter out the associated types that remain unresolved.
     SmallVector<AssociatedTypeDecl *, 4> stillUnresolved;
     for (auto *const assocType : unresolvedAssocTypes) {
-      const auto typeWitness = typeWitnesses.begin(assocType);
+      auto typeWitness = typeWitnesses.begin(assocType);
+
+      // If we do not have a witness for AsyncIteratorProtocol.Failure,
+      // look for the witness to AsyncIteratorProtocol.next(). If it throws,
+      // use 'any Error'. Otherwise, use 'Never'.
+      if (typeWitness == typeWitnesses.end()) {
+        if (auto failureTypeWitness =
+                computeFailureTypeWitness(assocType, valueWitnesses)) {
+          typeWitnesses.insert(assocType,
+                               {failureTypeWitness->getType(), reqDepth});
+          typeWitness = typeWitnesses.begin(assocType);
+        }
+      }
+
       if (typeWitness == typeWitnesses.end()) {
         stillUnresolved.push_back(assocType);
       } else {

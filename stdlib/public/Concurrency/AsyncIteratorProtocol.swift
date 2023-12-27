@@ -87,12 +87,38 @@ import Swift
 /// a reference type.
 @available(SwiftStdlib 5.1, *)
 @rethrows
-public protocol AsyncIteratorProtocol {
+public protocol AsyncIteratorProtocol<Element, Failure> {
   associatedtype Element
+
+  /// The type of failure produced by iteration.
+  associatedtype Failure: Error = any Error
+
   /// Asynchronously advances to the next element and returns it, or ends the
   /// sequence if there is no next element.
-  /// 
+  ///
   /// - Returns: The next element, if it exists, or `nil` to signal the end of
   ///   the sequence.
   mutating func next() async throws -> Element?
+
+  /// Asynchronously advances to the next element and returns it, or ends the
+  /// sequence if there is no next element.
+  ///
+  /// - Returns: The next element, if it exists, or `nil` to signal the end of
+  ///   the sequence.
+  @available(SwiftStdlib 5.11, *)
+  mutating func _nextElement() async throws(Failure) -> Element?
+}
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncIteratorProtocol {
+  /// Default implementation of `_nextElement()` in terms of `next()`, which is
+  /// required to maintain backward compatibility with existing async iterators.
+  @available(SwiftStdlib 5.11, *)
+  public mutating func _nextElement() async throws(Failure) -> Element? {
+    do {
+      return try await next()
+    } catch {
+      throw error as! Failure
+    }
+  }
 }
