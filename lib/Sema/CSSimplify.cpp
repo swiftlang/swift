@@ -12207,13 +12207,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
       assert(contextualTy);
     }
 
-    // If there are no other options the solver might end up picking
-    // `AnyKeyPath` or `PartialKeyPath` based on a contextual conversion.
-    // This is an error during normal type-checking but okay in
-    // diagnostic mode because root and value are allowed to be holes.
-    if (contextualTy->isAnyKeyPath() || contextualTy->isPartialKeyPath())
-      return shouldAttemptFixes();
-
     if (auto bgt = contextualTy->getAs<BoundGenericType>()) {
       // We can get root and value from a concrete key path type.
       assert(bgt->isKeyPath() || bgt->isWritableKeyPath() ||
