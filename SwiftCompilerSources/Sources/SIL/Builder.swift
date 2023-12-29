@@ -419,4 +419,9 @@ public struct Builder {
                                                       BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
+    
+  public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
+      let endAccess = bridged.createEndAccess(beginAccess.bridged)
+      return notifyNew(endAccess.getAs(EndAccessInst.self))
+  }
 }
