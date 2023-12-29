@@ -432,7 +432,7 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
   // Construct the object header.
   llvm::StructType *ObjectHeaderTy = cast<llvm::StructType>(sTy->getElementType(0));
 
-  if (IGM.canMakeStaticObjectsReadOnly()) {
+  if (IGM.canMakeStaticObjectReadOnly(OI->getType())) {
     if (!IGM.swiftImmortalRefCount) {
       auto *var = new llvm::GlobalVariable(IGM.Module, IGM.Int8Ty,
                                         /*constant*/ true, llvm::GlobalValue::ExternalLinkage,

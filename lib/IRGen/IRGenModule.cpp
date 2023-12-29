@@ -2023,13 +2023,23 @@ bool IRGenModule::canUseObjCSymbolicReferences() {
       context.getObjCSymbolicReferencesAvailability());
 }
 
-bool IRGenModule::canMakeStaticObjectsReadOnly() {
+bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
   // TODO: Support constant static arrays on other platforms, too.
   // See also the comment in GlobalObjects.cpp.
   if (!Triple.isOSDarwin())
+    return false;
+
+  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  if (!clDecl)
+    return false;
+
+  // Currently only arrays can be put into a read-only data section.
+  // "Regular" classes have dynamically initialized metadata, which needs to be
+  // stored into the isa field at runtime.
+  if (clDecl->getNameStr() != "_ContiguousArrayStorage")
     return false;
 
   if (!getAvailabilityContext().isContainedIn(Context.getStaticReadOnlyArraysAvailability()))
