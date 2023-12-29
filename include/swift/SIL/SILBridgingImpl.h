@@ -1739,6 +1739,10 @@ BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, Brid
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
 }
 
+BridgedInstruction BridgedBuilder::createEndAccess(BridgedValue value) const {
+  return {unbridged().createEndAccess(regularLoc(), value.getSILValue(), false)};
+}
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif
