@@ -291,7 +291,7 @@ public:
   bool visitComponent(CanType type1, CanType type2,
                       SILParameterInfo param1, SILParameterInfo param2) {
     if (param1.getConvention() != param2.getConvention() ||
-        param1.getDifferentiability() != param2.getDifferentiability())
+        param1.getOptions().containsOnly(param2.getOptions()))
       return asImpl().visitDifferentTypeStructure(type1, type2);
 
     return asImpl().visit(param1.getInterfaceType(),

@@ -4092,36 +4092,36 @@ inline bool isPackParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
-/// The differentiability of a SIL function type parameter.
-enum class SILParameterDifferentiability : bool {
-  /// Either differentiable or not applicable.
-  ///
-  /// - If the function type is not `@differentiable`, parameter
-  ///   differentiability is not applicable. This case is the default value.
-  /// - If the function type is `@differentiable`, the function is
-  ///   differentiable with respect to this parameter.
-  DifferentiableOrNotApplicable,
-
-  /// Not differentiable: a `@noDerivative` parameter.
-  ///
-  /// May be applied only to parameters of `@differentiable` function types.
-  /// The function type is not differentiable with respect to this parameter.
-  NotDifferentiable,
-};
-
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
-  CanType Type;
-  ParameterConvention Convention;
-  SILParameterDifferentiability Differentiability;
+public:
+  enum Flag : uint8_t {
+    /// Not differentiable: a `@noDerivative` parameter.
+    ///
+    /// May be applied only to parameters of `@differentiable` function types.
+    /// The function type is not differentiable with respect to this parameter.
+    ///
+    /// If this is not set then the parameter is either differentiable or
+    /// differentiation is not applicable to the parameter:
+    ///
+    /// - If the function type is not `@differentiable`, parameter
+    ///   differentiability is not applicable. This case is the default value.
+    /// - If the function type is `@differentiable`, the function is
+    ///   differentiable with respect to this parameter.
+    NotDifferentiable = 0x1,
+  };
+
+  using Options = OptionSet<Flag>;
+
+private:
+  CanType type;
+  ParameterConvention convention;
+  Options options;
 
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  SILParameterInfo(
-      CanType type, ParameterConvention conv,
-      SILParameterDifferentiability differentiability =
-          SILParameterDifferentiability::DifferentiableOrNotApplicable)
-      : Type(type), Convention(conv), Differentiability(differentiability) {
+  SILParameterInfo(CanType type, ParameterConvention conv, Options options = {})
+      : type(type), convention(conv), options(options) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -4129,17 +4129,13 @@ public:
   /// calling convention of the parameter.
   ///
   /// For most purposes, you probably want \c getArgumentType .
-  CanType getInterfaceType() const {
-    return Type;
-  }
-  
+  CanType getInterfaceType() const { return type; }
+
   /// Return the type of a call argument matching this parameter.
   ///
   /// \c t must refer back to the function type this is a parameter for.
   CanType getArgumentType(SILModule &M, const SILFunctionType *t, TypeExpansionContext context) const;
-  ParameterConvention getConvention() const {
-    return Convention;
-  }
+  ParameterConvention getConvention() const { return convention; }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
   // transient SIL conventions that dictate SILValue types.
@@ -4186,14 +4182,65 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
-  SILParameterDifferentiability getDifferentiability() const {
-    return Differentiability;
+  bool hasOption(Flag flag) const { return options.contains(flag); }
+
+  Options getOptions() const { return options; }
+
+  SILParameterInfo addingOption(Flag flag) const {
+    auto options = getOptions();
+    options |= flag;
+    return SILParameterInfo(getInterfaceType(), getConvention(), options);
   }
 
-  SILParameterInfo getWithDifferentiability(
-      SILParameterDifferentiability differentiability) const {
+  SILParameterInfo removingOption(Flag flag) const {
+    auto options = getOptions();
+    options &= flag;
+    return SILParameterInfo(getInterfaceType(), getConvention(), options);
+  }
+
+  /// Add all flags in \p arg into a copy of this parameter info and return the
+  /// parameter info.
+  ///
+  /// NOTE: You can pass in SILParameterInfo::Flag to this function since said
+  /// type auto converts to Options.
+  SILParameterInfo operator|(Options arg) const {
     return SILParameterInfo(getInterfaceType(), getConvention(),
-                            differentiability);
+                            getOptions() | arg);
+  }
+
+  SILParameterInfo &operator|=(Options arg) {
+    options |= arg;
+    return *this;
+  }
+
+  /// Copy this parameter and intersect \p arg with the parameters former
+  /// options.
+  ///
+  /// NOTE: You can pass in SILParameterInfo::Flag to this function since said
+  /// type auto converts to Options.
+  SILParameterInfo operator&(Options arg) const {
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            getOptions() & arg);
+  }
+
+  SILParameterInfo &operator&=(Options arg) {
+    options &= arg;
+    return *this;
+  }
+
+  /// Copy this parameter such that its options contains the set subtraction of
+  /// \p arg from the parameters former options.
+  ///
+  /// NOTE: You can pass in SILParameterInfo::Flag to this function since said
+  /// type auto converts to Options.
+  SILParameterInfo operator-(Options arg) const {
+    return SILParameterInfo(getInterfaceType(), getConvention(),
+                            getOptions() - arg);
+  }
+
+  SILParameterInfo &operator-=(Options arg) {
+    options -= arg;
+    return *this;
   }
 
   /// The SIL storage type determines the ABI for arguments based purely on the
@@ -4209,12 +4256,12 @@ public:
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithInterfaceType(CanType type) const {
-    return SILParameterInfo(type, getConvention(), getDifferentiability());
+    return SILParameterInfo(type, getConvention(), getOptions());
   }
 
   /// Return a version of this parameter info with the convention replaced.
   SILParameterInfo getWithConvention(ParameterConvention c) const {
-    return SILParameterInfo(getInterfaceType(), c, getDifferentiability());
+    return SILParameterInfo(getInterfaceType(), c, getOptions());
   }
 
   /// Transform this SILParameterInfo by applying the user-provided
@@ -4244,7 +4291,7 @@ public:
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(getInterfaceType().getPointer());
     id.AddInteger((unsigned)getConvention());
-    id.AddInteger((unsigned)getDifferentiability());
+    id.AddInteger((unsigned)getOptions().toRaw());
   }
 
   SWIFT_DEBUG_DUMP;
@@ -4260,7 +4307,7 @@ public:
   bool operator==(SILParameterInfo rhs) const {
     return getInterfaceType() == rhs.getInterfaceType() &&
            getConvention() == rhs.getConvention() &&
-           getDifferentiability() == rhs.getDifferentiability();
+           getOptions().containsOnly(rhs.getOptions());
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -4309,35 +4356,36 @@ inline bool isIndirectFormalResult(ResultConvention convention) {
          convention == ResultConvention::Pack;
 }
 
-/// The differentiability of a SIL function type result.
-enum class SILResultDifferentiability : bool {
-  /// Either differentiable or not applicable.
-  ///
-  /// - If the function type is not `@differentiable`, result
-  ///   differentiability is not applicable. This case is the default value.
-  /// - If the function type is `@differentiable`, the function is
-  ///   differentiable with respect to this result.
-  DifferentiableOrNotApplicable,
-
-  /// Not differentiable: a `@noDerivative` result.
-  ///
-  /// May be applied only to result of `@differentiable` function types.
-  /// The function type is not differentiable with respect to this result.
-  NotDifferentiable,
-};
-
 /// A result type and the rules for returning it.
 class SILResultInfo {
-  CanType Type;
-  ResultConvention Convention;
-  SILResultDifferentiability Differentiability;
+public:
+  enum Flag : uint8_t {
+    /// Not differentiable: a `@noDerivative` result.
+    ///
+    /// May be applied only to result of `@differentiable` function types.
+    /// The function type is not differentiable with respect to this result.
+    ///
+    /// If this is not set then the function is either differentiable or
+    /// differentiability is not applicable. This can occur if:
+    ///
+    /// - The function type is not `@differentiable`, result
+    ///   differentiability is not applicable. This case is the default value.
+    /// - The function type is `@differentiable`, the function is
+    ///   differentiable with respect to this result.
+    NotDifferentiable = 0x1,
+  };
+
+  using Options = OptionSet<Flag>;
+
+private:
+  CanType type;
+  ResultConvention convention;
+  Options options;
 
 public:
   SILResultInfo() = default;
-  SILResultInfo(CanType type, ResultConvention conv,
-                SILResultDifferentiability differentiability =
-                    SILResultDifferentiability::DifferentiableOrNotApplicable)
-      : Type(type), Convention(conv), Differentiability(differentiability) {
+  SILResultInfo(CanType type, ResultConvention conv, Options options = {})
+      : type(type), convention(conv), options(options) {
     assert(type->isLegalSILType() && "SILResultInfo has illegal SIL type");
   }
 
@@ -4345,28 +4393,75 @@ public:
   /// calling convention of the parameter.
   ///
   /// For most purposes, you probably want \c getReturnValueType .
-  CanType getInterfaceType() const {
-    return Type;
-  }
-  
+  CanType getInterfaceType() const { return type; }
+
   /// The type of a return value corresponding to this result.
   ///
   /// \c t must refer back to the function type this is a parameter for.
   CanType getReturnValueType(SILModule &M, const SILFunctionType *t,
                              TypeExpansionContext context) const;
 
-  ResultConvention getConvention() const {
-    return Convention;
+  ResultConvention getConvention() const { return convention; }
+
+  Options getOptions() const { return options; }
+
+  bool hasOption(Flag flag) const { return options.contains(flag); }
+
+  SILResultInfo addingOption(Flag flag) const {
+    auto options = getOptions();
+    options |= flag;
+    return SILResultInfo(getInterfaceType(), getConvention(), options);
   }
 
-  SILResultDifferentiability getDifferentiability() const {
-    return Differentiability;
+  SILResultInfo removingOption(Flag flag) const {
+    auto options = getOptions();
+    options &= flag;
+    return SILResultInfo(getInterfaceType(), getConvention(), options);
   }
 
-  SILResultInfo
-  getWithDifferentiability(SILResultDifferentiability differentiability) const {
+  /// Add all flags in \p arg into a copy of this parameter info and return the
+  /// parameter info.
+  ///
+  /// NOTE: You can pass in SILResultInfo::Flag to this function since said
+  /// type auto converts to Options.
+  SILResultInfo operator|(Options arg) const {
     return SILResultInfo(getInterfaceType(), getConvention(),
-                         differentiability);
+                         getOptions() | arg);
+  }
+
+  SILResultInfo &operator|=(Options arg) {
+    options |= arg;
+    return *this;
+  }
+
+  /// Copy this parameter and intersect \p arg with the parameters former
+  /// options.
+  ///
+  /// NOTE: You can pass in SILResultInfo::Flag to this function since said
+  /// type auto converts to Options.
+  SILResultInfo operator&(Options arg) const {
+    return SILResultInfo(getInterfaceType(), getConvention(),
+                         getOptions() & arg);
+  }
+
+  SILResultInfo &operator&=(Options arg) {
+    options &= arg;
+    return *this;
+  }
+
+  /// Copy this parameter such that its options contains the set subtraction of
+  /// \p arg from the parameters former options.
+  ///
+  /// NOTE: You can pass in SILResultInfo::Flag to this function since said
+  /// type auto converts to Options.
+  SILResultInfo operator-(Options arg) const {
+    return SILResultInfo(getInterfaceType(), getConvention(),
+                         getOptions() - arg);
+  }
+
+  SILResultInfo &operator-=(Options arg) {
+    options -= arg;
+    return *this;
   }
 
   /// The SIL storage type determines the ABI for arguments based purely on the
@@ -4429,9 +4524,9 @@ public:
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(Type.getPointer());
+    id.AddPointer(type.getPointer());
     id.AddInteger(unsigned(getConvention()));
-    id.AddInteger(unsigned(getDifferentiability()));
+    id.AddInteger(unsigned(getOptions().toRaw()));
   }
 
   SWIFT_DEBUG_DUMP;
@@ -4448,8 +4543,8 @@ public:
   getOwnershipKind(SILFunction &, CanSILFunctionType fTy) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
-    return Type == rhs.Type && Convention == rhs.Convention
-      && Differentiability == rhs.Differentiability;
+    return type == rhs.type && convention == rhs.convention &&
+           getOptions().containsOnly(rhs.getOptions());
   }
   bool operator!=(SILResultInfo rhs) const {
     return !(*this == rhs);

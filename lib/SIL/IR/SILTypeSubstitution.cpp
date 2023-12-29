@@ -306,7 +306,7 @@ public:
 
   SILParameterInfo substInterface(SILParameterInfo orig) {
     return SILParameterInfo(visit(orig.getInterfaceType()),
-                            orig.getConvention(), orig.getDifferentiability());
+                            orig.getConvention(), orig.getOptions());
   }
 
   CanType visitSILPackType(CanSILPackType origType) {
