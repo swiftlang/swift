@@ -231,6 +231,8 @@ static bool mayConflictWithGlobalInit(AliasAnalysis *AA,
   if (auto *LI = dyn_cast<LoadInst>(sideEffectInst)) {
     return AA->mayWriteToMemory(globalInitCall, LI->getOperand());
   }
+  if (isa<CondFailInst>(sideEffectInst))
+    return false;
   return true;
 }
 
