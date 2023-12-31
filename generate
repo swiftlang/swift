@@ -1,0 +1,1 @@
+utils/build-script --swift-darwin-supported-archs "$(uname -m)" --xcode --clean

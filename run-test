@@ -1,0 +1,8 @@
+# Rebuild all test dependencies and run all tests under test/.
+utils/run-test --lit ../llvm-project/llvm/utils/lit/lit.py \
+  ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m)
+
+# Rebuild all test dependencies and run tests containing "MyTest".
+utils/run-test --lit ../llvm-project/llvm/utils/lit/lit.py \
+  ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m) \
+  --filter="MyTest"
