@@ -7648,6 +7648,13 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   if (keyPath->hasSingleInvalidComponent())
     return fail();
 
+  // If root is determined to be a hole it means that none of the components
+  // are resolvable and key path is not viable.
+  auto rootTy =
+      getFixedTypeRecursive(getKeyPathRootType(keyPath), /*wantRValue=*/false);
+  if (rootTy->isPlaceholder())
+    return fail();
+
   auto mutability = KeyPathMutability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
