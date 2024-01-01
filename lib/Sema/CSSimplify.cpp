@@ -10704,7 +10704,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       // Handle `next` reference.
       if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-          isRefTo(memberRef, ctx.Id_next, /*labels=*/{})) {
+          (isRefTo(memberRef, ctx.Id_next, /*labels=*/{}) ||
+           isRefTo(memberRef, ctx.Id_nextElement, /*labels=*/{}))) {
         auto *iteratorProto = cast<ProtocolDecl>(
             getContextualType(baseExpr, /*forConstraint=*/false)
                 ->getAnyNominal());
@@ -10930,7 +10931,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             if (auto *base = dyn_cast<DeclRefExpr>(UDE->getBase())) {
               if (auto var = dyn_cast_or_null<VarDecl>(base->getDecl())) {
                 if (var->getNameStr().contains("$generator") &&
-                    UDE->getName().getBaseIdentifier() == Context.Id_next)
+                    (UDE->getName().getBaseIdentifier() == Context.Id_next ||
+                     UDE->getName().getBaseIdentifier() == Context.Id_nextElement))
                   return success();
               }
             }

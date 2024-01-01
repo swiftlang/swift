@@ -4592,11 +4592,15 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // Now, result type of `.makeIterator()` is used to form a call to
   // `.next()`. `next()` is called on each iteration of the loop.
   {
+    FuncDecl *nextFn = isAsync ? ctx.getAsyncIteratorNext()
+                               : ctx.getIteratorNext();
+    Identifier nextId = nextFn ? nextFn->getName().getBaseIdentifier()
+                               : ctx.Id_next;
     auto *nextRef = UnresolvedDotExpr::createImplicit(
         ctx,
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
                               /*Implicit=*/true),
-        ctx.Id_next, /*labels=*/ArrayRef<Identifier>());
+        nextId, /*labels=*/ArrayRef<Identifier>());
     nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     Expr *nextCall = CallExpr::createImplicitEmpty(ctx, nextRef);

@@ -1914,7 +1914,7 @@ AssociatedTypeInference::computeFailureTypeWitness(
             auto proto = req.getProtocolDecl();
             if (proto->isSpecificProtocol(KnownProtocolKind::AsyncIteratorProtocol) ||
                 proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
-              auto failureAssocType = proto->getAssociatedType(ctx.getIdentifier("Failure"));
+              auto failureAssocType = proto->getAssociatedType(ctx.Id_Failure);
               auto failureType = DependentMemberType::get(req.getFirstType(), failureAssocType);
               return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(failureType));
             }

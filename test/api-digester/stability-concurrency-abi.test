@@ -63,6 +63,8 @@ Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift
 Protocol AsyncIteratorProtocol has generic signature change from to <Self.Failure : Swift.Error>
 Protocol AsyncSequence has generic signature change from <Self.AsyncIterator : _Concurrency.AsyncIteratorProtocol, Self.Element == Self.AsyncIterator.Element> to <Self.AsyncIterator : _Concurrency.AsyncIteratorProtocol, Self.Element == Self.AsyncIterator.Element, Self.Failure == Self.AsyncIterator.Failure>
 Struct CheckedContinuation has removed conformance to UnsafeSendable
+Protocol AsyncIteratorProtocol is now without @rethrows
+Protocol AsyncSequence is now without @rethrows
 
 // SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations
 Func SerialExecutor.enqueue(_:) has been added as a protocol requirement

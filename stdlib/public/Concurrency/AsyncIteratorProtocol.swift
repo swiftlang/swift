@@ -86,7 +86,6 @@ import Swift
 /// checking for cancellation as described above, or in `deinit` if it's
 /// a reference type.
 @available(SwiftStdlib 5.1, *)
-@rethrows
 public protocol AsyncIteratorProtocol<Element, Failure> {
   associatedtype Element
 

@@ -1149,6 +1149,10 @@ void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 /// Whether the given expression can throw, and if so, the thrown type.
 llvm::Optional<Type> canThrow(ASTContext &ctx, Expr *expr);
 
+/// Whether the given for..each statement can throw, and if so, the thrown
+/// error type.
+llvm::Optional<Type> canThrow(ASTContext &ctx, ForEachStmt *forEach);
+
 /// Determine the error type that is thrown out of the body of the given
 /// do-catch statement.
 ///

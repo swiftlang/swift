@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify
+// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -enable-experimental-feature TypedThrows
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
@@ -58,4 +58,17 @@ func testAssocTypeInference(sf: S.Failure, tsf: TS.Failure, gtsf1: GenericTS<MyE
 @available(SwiftStdlib 5.1, *)
 func test(s: S) async {
   for await x in s { _ = x }
+}
+
+enum OtherError: Error {
+case boom
+}
+
+
+@available(SwiftStdlib 5.1, *)
+func testMyError(s: GenericTS<MyError>, so: GenericTS<OtherError>) async throws(MyError) {
+  for try await x in s { _ = x }
+
+  for try await x in so { _ = x }
+  // expected-error@-1{{thrown expression type 'OtherError' cannot be converted to error type 'MyError'}}
 }

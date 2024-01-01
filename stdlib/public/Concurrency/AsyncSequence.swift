@@ -72,7 +72,6 @@ import Swift
 ///     // Prints "Odd Even Odd Even Odd Even Odd Even Odd Even "
 ///
 @available(SwiftStdlib 5.1, *)
-@rethrows
 public protocol AsyncSequence<Element, Failure> {
   /// The type of asynchronous iterator that produces elements of this
   /// asynchronous sequence.

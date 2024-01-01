@@ -9194,7 +9194,7 @@ static llvm::Optional<SequenceIterationInfo> applySolutionToForEachStmt(
       type, sequenceProto);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");
-  stmt->setSequenceConformance(sequenceConformance);
+  stmt->setSequenceConformance(type, sequenceConformance);
 
   // Apply the solution to the filtering condition, if there is one.
   if (auto *whereExpr = stmt->getWhere()) {
