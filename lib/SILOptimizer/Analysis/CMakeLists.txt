@@ -23,6 +23,7 @@ target_sources(swiftSILOptimizer PRIVATE
   PassManagerVerifierAnalysis.cpp
   ProtocolConformanceAnalysis.cpp
   Reachability.cpp
+  RegionAnalysis.cpp
   RCIdentityAnalysis.cpp
   SimplifyInstruction.cpp
   TypeExpansionAnalysis.cpp
