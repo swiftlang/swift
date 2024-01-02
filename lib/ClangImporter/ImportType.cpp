@@ -1283,8 +1283,6 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
   case ImportTypeKind::CompletionHandlerResultParameter:
-  case ImportTypeKind::CFRetainedOutParameter:
-  case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
   case ImportTypeKind::ObjCCollectionElement:
@@ -1311,8 +1309,6 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
   case ImportTypeKind::CompletionHandlerResultParameter:
-  case ImportTypeKind::CFRetainedOutParameter:
-  case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
     return true;
@@ -1388,7 +1384,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
 
 static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
                                       Type importedType,
-                                      ImportTypeKind importKind) {
+                                      ImportTypeAttrs attrs) {
   PointerTypeKind PTK;
   auto elementType = importedType->getAnyPointerElementType(PTK);
   if (!elementType || PTK != PTK_UnsafeMutablePointer)
@@ -1414,7 +1410,7 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
     resultTy = OptionalType::get(resultTy);
 
   PointerTypeKind pointerKind;
-  if (importKind == ImportTypeKind::CFRetainedOutParameter)
+  if (attrs.contains(ImportTypeAttr::CFRetainedOutParameter))
     pointerKind = PTK_UnsafeMutablePointer;
   else
     pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
@@ -1569,22 +1565,20 @@ static ImportedType adjustTypeForConcreteImport(
     break;
 
   case ImportHint::OtherPointer:
-    // Special-case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
-    if (importKind == ImportTypeKind::Parameter) {
+    // Remove 'Unmanaged' from audited CF out-parameters.
+    if (attrs.contains(ImportTypeAttr::CFRetainedOutParameter) ||
+        attrs.contains(ImportTypeAttr::CFUnretainedOutParameter)) {
+      if (Type outParamTy =
+              maybeImportCFOutParameter(impl, importedType, attrs)) {
+        importedType = outParamTy;
+        break;
+      }
+    } else if (importKind == ImportTypeKind::Parameter) {
+      // Special-case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
       if (Type result = maybeImportNSErrorOutParameter(impl, importedType,
                                                        resugarNSErrorPointer)) {
         importedType = result;
         optKind = OTK_None;
-        break;
-      }
-    }
-
-    // Remove 'Unmanaged' from audited CF out-parameters.
-    if (importKind == ImportTypeKind::CFRetainedOutParameter ||
-        importKind == ImportTypeKind::CFUnretainedOutParameter) {
-      if (Type outParamTy = maybeImportCFOutParameter(impl, importedType,
-                                                      importKind)) {
-        importedType = outParamTy;
         break;
       }
     }
@@ -2022,6 +2016,16 @@ ImportTypeAttrs swift::getImportTypeAttrs(const clang::Decl *D, bool isParam,
         continue;
       }
 
+      if (isa<clang::CFReturnsRetainedAttr>(attr)) {
+        attrs |= ImportTypeAttr::CFRetainedOutParameter;
+        continue;
+      }
+
+      if (isa<clang::CFReturnsNotRetainedAttr>(attr)) {
+        attrs |= ImportTypeAttr::CFUnretainedOutParameter;
+        continue;
+      }
+
       auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
       if (!swiftAttr)
         continue;
@@ -2297,13 +2301,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
 
 static ImportTypeKind
 getImportTypeKindForParam(const clang::ParmVarDecl *param) {
-  ImportTypeKind importKind = ImportTypeKind::Parameter;
-  if (param->hasAttr<clang::CFReturnsRetainedAttr>())
-    importKind = ImportTypeKind::CFRetainedOutParameter;
-  else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
-    importKind = ImportTypeKind::CFUnretainedOutParameter;
-
-  return importKind;
+  return ImportTypeKind::Parameter;
 }
 
 llvm::Optional<ClangImporter::Implementation::ImportParameterTypeResult>

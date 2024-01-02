@@ -157,18 +157,6 @@ enum class ImportTypeKind {
   /// * _Nullable_result is treated as _Nonnull rather than _Nullable_result.
   CompletionHandlerResultParameter,
 
-  /// Import the type of a parameter declared with
-  /// \c CF_RETURNS_RETAINED.
-  ///
-  /// This ensures that the parameter is not marked as Unmanaged.
-  CFRetainedOutParameter,
-
-  /// Import the type of a parameter declared with
-  /// \c CF_RETURNS_NON_RETAINED.
-  ///
-  /// This ensures that the parameter is not marked as Unmanaged.
-  CFUnretainedOutParameter,
-
   /// Import the type of an ObjC property.
   ///
   /// This enables the conversion of bridged types. Properties are always
@@ -210,7 +198,19 @@ enum class ImportTypeAttr : uint8_t {
   /// Type is in a declaration where it would be imported as Sendable by
   /// default. This comes directly from the parameters to
   /// \c getImportTypeAttrs() and merely affects diagnostics.
-  DefaultsToSendable = 1 << 3
+  DefaultsToSendable = 1 << 3,
+
+  /// Import the type of a parameter declared with
+  /// \c CF_RETURNS_RETAINED.
+  ///
+  /// This ensures that the parameter is not marked as Unmanaged.
+  CFRetainedOutParameter = 1 << 4,
+
+  /// Import the type of a parameter declared with
+  /// \c CF_RETURNS_NON_RETAINED.
+  ///
+  /// This ensures that the parameter is not marked as Unmanaged.
+  CFUnretainedOutParameter = 1 << 5,
 };
 
 /// Attributes which were set on the declaration and affect how its type is
