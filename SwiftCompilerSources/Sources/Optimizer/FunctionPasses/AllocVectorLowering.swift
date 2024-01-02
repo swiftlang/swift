@@ -441,17 +441,3 @@ private extension StoreInst {
     return false
   }
 }
-
-private extension Function {
-  var initializedGlobal: GlobalVariable? {
-    if !isGlobalInitOnceFunction {
-      return nil
-    }
-    for inst in entryBlock.instructions {
-      if let allocGlobal = inst as? AllocGlobalInst {
-        return allocGlobal.global
-      }
-    }
-    return nil
-  }
-}
