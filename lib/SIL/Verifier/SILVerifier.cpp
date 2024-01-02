@@ -6270,7 +6270,7 @@ public:
   }
 
   void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
-    require(apmi->getIntroducer()->mayRequirePackMetadata(),
+    require(apmi->getIntroducer()->mayRequirePackMetadata(*apmi->getFunction()),
             "Introduces instruction of kind which cannot emit on-stack pack "
             "metadata");
     require(F.getModule().getStage() == SILStage::Lowered,
