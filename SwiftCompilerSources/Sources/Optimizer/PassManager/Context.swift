@@ -210,6 +210,12 @@ extension MutatingContext {
   func notifyBranchesChanged() {
     _bridged.asNotificationHandler().notifyChanges(.branchesChanged)
   }
+
+  /// Notifies the pass manager that the optimization result of the current pass depends
+  /// on the body (i.e. SIL instructions) of another function than the currently optimized one.
+  func notifyDependency(onBodyOf otherFunction: Function) {
+    _bridged.notifyDependencyOnBodyOf(otherFunction.bridged)
+  }
 }
 
 /// The context which is passed to the run-function of a FunctionPass.
