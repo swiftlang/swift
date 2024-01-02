@@ -150,6 +150,9 @@ enum class ImportTypeKind {
   /// Parameters are always considered CF-audited.
   Parameter,
 
+  /// Import the type of a special "completion handler" function parameter.
+  CompletionHandlerParameter,
+
   /// Import the type of a parameter to a completion handler that can indicate
   /// a thrown error.
   ///

@@ -1282,6 +1282,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Result:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
+  case ImportTypeKind::CompletionHandlerParameter:
   case ImportTypeKind::CompletionHandlerResultParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
@@ -1308,6 +1309,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
+  case ImportTypeKind::CompletionHandlerParameter:
   case ImportTypeKind::CompletionHandlerResultParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
@@ -2299,11 +2301,6 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
 }
 
-static ImportTypeKind
-getImportTypeKindForParam(const clang::ParmVarDecl *param) {
-  return ImportTypeKind::Parameter;
-}
-
 llvm::Optional<ClangImporter::Implementation::ImportParameterTypeResult>
 ClangImporter::Implementation::importParameterType(
     const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
@@ -2316,7 +2313,9 @@ ClangImporter::Implementation::importParameterType(
   if (auto elaborated = dyn_cast<clang::ElaboratedType>(paramTy))
     paramTy = elaborated->desugar();
 
-  ImportTypeKind importKind = getImportTypeKindForParam(param);
+  ImportTypeKind importKind = paramIsCompletionHandler
+                                  ? ImportTypeKind::CompletionHandlerParameter
+                                  : ImportTypeKind::Parameter;
 
   // Import the parameter type into Swift.
   auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
@@ -3204,17 +3203,16 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
               decomposeCompletionHandlerType(swiftParamTy, *asyncInfo)) {
         swiftResultTy = replacedSwiftResultTy;
 
-        ImportTypeKind importKind = getImportTypeKindForParam(param);
-
         // Import the original completion handler type without adjustments.
         Type origSwiftParamTy =
-            importType(paramTy, importKind, paramAddDiag,
-                       allowNSUIntegerAsIntInParam, Bridgeability::Full,
-                       ImportTypeAttrs(), optionalityOfParam,
+            importType(paramTy, ImportTypeKind::CompletionHandlerParameter,
+                       paramAddDiag, allowNSUIntegerAsIntInParam,
+                       Bridgeability::Full, ImportTypeAttrs(),
+                       optionalityOfParam,
                        /*resugarNSErrorPointer=*/!paramIsError, llvm::None)
                 .getType();
-        completionHandlerType = mapGenericArgs(origDC, dc, origSwiftParamTy)
-            ->getCanonicalType();
+        completionHandlerType =
+            mapGenericArgs(origDC, dc, origSwiftParamTy)->getCanonicalType();
         continue;
       }
 
