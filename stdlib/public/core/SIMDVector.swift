@@ -33,8 +33,12 @@ prefix operator .!
 /// conform to `SIMD`.
 public protocol SIMDStorage {
   /// The type of scalars in the vector space.
+  #if $Embedded
+  associatedtype Scalar: Hashable
+  #else
   associatedtype Scalar: Codable, Hashable
-  
+  #endif
+
   /// The number of scalars, or elements, in the vector.
   var scalarCount: Int { get }
   
@@ -71,6 +75,20 @@ public protocol SIMDScalar {
   associatedtype SIMD64Storage: SIMDStorage where SIMD64Storage.Scalar == Self
 }
 
+#if $Embedded
+/// A SIMD vector of a fixed number of elements.
+public protocol SIMD<Scalar>:
+  SIMDStorage,
+  Hashable,
+  ExpressibleByArrayLiteral
+{
+  /// The mask type resulting from pointwise comparisons of this vector type.
+  associatedtype MaskStorage: SIMD
+    where MaskStorage.Scalar: FixedWidthInteger & SignedInteger
+}
+
+#else
+
 /// A SIMD vector of a fixed number of elements.
 public protocol SIMD<Scalar>:
   SIMDStorage,
@@ -83,6 +101,8 @@ public protocol SIMD<Scalar>:
   associatedtype MaskStorage: SIMD
     where MaskStorage.Scalar: FixedWidthInteger & SignedInteger
 }
+
+#endif
 
 extension SIMD {
   /// The valid indices for subscripting the vector.
@@ -111,6 +131,8 @@ extension SIMD {
   public func hash(into hasher: inout Hasher) {
     for i in indices { hasher.combine(self[i]) }
   }
+
+#if !$Embedded
   
   /// Encodes the scalars of this vector into the given encoder in an unkeyed
   /// container.
@@ -154,7 +176,9 @@ extension SIMD {
       return "\(Self.self)(" + indices.map({"\(self[$0])"}).joined(separator: ", ") + ")"
     }
   }
-  
+
+#endif
+
   /// A vector mask with the result of a pointwise equality comparison.
   ///
   /// Equivalent to:
@@ -539,6 +563,8 @@ extension SIMD where Scalar: FixedWidthInteger {
     return Self(repeating: 1)
   }
   
+#if !$Embedded
+
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
   @inlinable
@@ -560,7 +586,7 @@ extension SIMD where Scalar: FixedWidthInteger {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
-  
+
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
   @inlinable
@@ -582,6 +608,9 @@ extension SIMD where Scalar: FixedWidthInteger {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
+
+#endif
+
 }
 
 extension SIMD where Scalar: FloatingPoint {
@@ -607,6 +636,8 @@ extension SIMD where Scalar: FloatingPoint {
     return pointwiseMin(upperBound, pointwiseMax(lowerBound, self))
   }
 }
+
+#if !$Embedded
 
 extension SIMD
 where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
@@ -655,6 +686,8 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   }
 }
 
+#endif
+
 @frozen
 public struct SIMDMask<Storage>: SIMD
                   where Storage: SIMD,
@@ -695,6 +728,8 @@ public struct SIMDMask<Storage>: SIMD
   }
 }
 
+#if !$Embedded
+
 extension SIMDMask {
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane, using the given generator as a source for randomness.
@@ -713,6 +748,8 @@ extension SIMDMask {
     return SIMDMask.random(using: &g)
   }
 }
+
+#endif
 
 //  Implementations of integer operations. These should eventually all
 //  be replaced with @_semantics to lower directly to vector IR nodes.

@@ -155,6 +155,8 @@ extension SIMD${n} where Scalar: FixedWidthInteger {
   }
 }
 
+#if !$Embedded
+
 extension SIMD${n}: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
@@ -162,6 +164,8 @@ extension SIMD${n}: CustomDebugStringConvertible {
                        range(n)))})"
   }
 }
+
+#endif
 
 extension SIMD${n} where Scalar: BinaryFloatingPoint {
   /// Creates a new vector from the given vector of integers.

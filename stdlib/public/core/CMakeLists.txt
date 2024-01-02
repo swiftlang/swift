@@ -252,6 +252,9 @@ split_embedded_sources(
 if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+
+  list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
+  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
