@@ -200,7 +200,7 @@ set(SWIFT_STDLIB_REFLECTION_METADATA "enabled" CACHE STRING
 
 option(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
        "Should concurrency use the task-to-thread model."
-       "${SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default}")
+       FALSE)
 
 option(SWIFT_STDLIB_HAS_STDIN
        "Build stdlib assuming the platform supports stdin and getline API."
