@@ -194,6 +194,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
     )
   endif()
 
