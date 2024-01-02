@@ -82,44 +82,43 @@ func borrow(_ nc: borrowing NC) {}
 func mod(_ nc: inout NC) {}
 func take(_ nc: consuming NC) {}
 
-// TODO: Resolve thing being consumed more precisely than 'unknown'.
 // TODO: Use more specific diagnostic than "reinitialization of inout parameter"
 
 func test(c: C) {
   borrow(c.data)
-  take(c.data) // expected-error{{'unknown' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(c.data) // expected-error{{'c.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 
   borrow(c.mutableData)
   mod(&c.mutableData)
-  take(c.mutableData) // expected-error{{missing reinitialization of inout parameter 'unknown' after consume}} expected-note{{consumed here}}
+  take(c.mutableData) // expected-error{{missing reinitialization of inout parameter 'c.mutableData' after consume}} expected-note{{consumed here}}
 }
 func test(s: S) {
   borrow(s.data)
-  take(s.data) // expected-error{{'unknown' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.data) // expected-error{{'s.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 
   borrow(s.mutableData)
-  take(s.mutableData) // expected-error{{'unknown' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.mutableData) // expected-error{{'s.mutableData' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 func test(mut_s s: inout S) {
   borrow(s.data)
-  take(s.data) // expected-error{{'unknown' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(s.data) // expected-error{{'s.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 
   borrow(s.mutableData)
   mod(&s.mutableData)
-  take(s.mutableData) // expected-error{{missing reinitialization of inout parameter 'unknown' after consume}} expected-note{{consumed here}}
+  take(s.mutableData) // expected-error{{missing reinitialization of inout parameter 's.mutableData' after consume}} expected-note{{consumed here}}
 }
 func test(snc: borrowing SNC) {
   borrow(snc.data)
-  take(snc.data) // expected-error{{'unknown' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.data) // expected-error{{'snc.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 
   borrow(snc.mutableData)
-  take(snc.mutableData) // expected-error{{'unknown' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.mutableData) // expected-error{{'snc.mutableData' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 func test(mut_snc snc: inout SNC) {
   borrow(snc.data)
-  take(snc.data) // expected-error{{'unknown' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+  take(snc.data) // expected-error{{'snc.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 
   borrow(snc.mutableData)
   mod(&snc.mutableData)
-  take(snc.mutableData) // expected-error{{missing reinitialization of inout parameter 'unknown' after consume}} expected-note{{consumed here}}
+  take(snc.mutableData) // expected-error{{missing reinitialization of inout parameter 'snc.mutableData' after consume}} expected-note{{consumed here}}
 }
