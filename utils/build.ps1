@@ -413,6 +413,7 @@ function Fetch-Dependencies {
 
   if (-not (Test-Path $BinaryCache\WiX-$WiXVersion.zip)) {
     Write-Output "WiX not found. Downloading from nuget.org ..."
+    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache | Out-Null
     if ($ToBatch) {
       Write-Output "curl.exe -sL $WiXURL -o $BinaryCache\WiX-$WiXVersion.zip"
     } else {
