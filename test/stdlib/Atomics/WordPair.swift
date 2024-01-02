@@ -35,7 +35,11 @@ suite.test("basics") {
   //expectEqual(MemoryLayout<WordPair>.alignment, 2 * MemoryLayout<UInt>.alignment)
 
   let value0 = WordPair(first: 2, second: 1)
+#if _endian(little)
+  expectEqual(componentsInMemoryOrder(of: value0), UIntPair(2, 1))
+#else
   expectEqual(componentsInMemoryOrder(of: value0), UIntPair(1, 2))
+#endif
 
   let value1 = WordPair(first: .max, second: 0)
   expectEqual(value1.first, .max)

@@ -617,12 +617,6 @@ Added: _$ss6UInt64V15Synchronization11AtomicValueACMc
 // protocol witness table for Swift.UInt64 : Synchronization.AtomicValue in Synchronization
 Added: _$ss6UInt64V15Synchronization11AtomicValueACWP
 
-// protocol conformance descriptor for Swift.Float16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss7Float16V15Synchronization11AtomicValueACMc
-
-// protocol witness table for Swift.Float16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss7Float16V15Synchronization11AtomicValueACWP
-
 // protocol conformance descriptor for Swift.Duration : Synchronization.AtomicValue in Synchronization
 Added: _$ss8DurationV15Synchronization11AtomicValueACMc
 

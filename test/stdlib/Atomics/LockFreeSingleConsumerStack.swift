@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(%import-libdispatch)
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
 
@@ -46,9 +46,9 @@ class LockFreeSingleConsumerStack<Element> {
   // This method does not support multiple overlapping concurrent calls.
   func pop() -> Element? {
     precondition(
-      _consumerCount.wrappingAdd(by: 1, ordering: .acquiring).oldValue == 0,
+      _consumerCount.wrappingAdd(1, ordering: .acquiring).oldValue == 0,
       "Multiple consumers detected")
-    defer { _consumerCount.wrappingSubtract(by: 1, ordering: .releasing) }
+    defer { _consumerCount.wrappingSubtract(1, ordering: .releasing) }
     var done = false
     var current = _last.load(ordering: .acquiring)
     while let c = current {
