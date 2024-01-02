@@ -268,16 +268,13 @@ endmacro()
 #     cmake variables.
 macro(swift_common_unified_build_config product)
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(CLANG_MAIN_INCLUDE_DIR "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include")
-  set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
-  set(CLANG_INCLUDE_DIRS 
-    "${CLANG_MAIN_INCLUDE_DIR}"
-    "${CLANG_BUILD_INCLUDE_DIR}"
-  )
+
+  include_directories(${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}/tools/clang/include)
 
   # If cmark was checked out into tools/cmark, expect to build it as
   # part of the unified build.
@@ -293,15 +290,9 @@ macro(swift_common_unified_build_config product)
     get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
       ABSOLUTE)
 
-    set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
-    set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src/include")
+    include_directories(${PATH_TO_CMARK_BUILD}/src
+      ${CMARK_MAIN_SRC_DIR}/src/include)
   endif()
-
-  include_directories(
-      "${CLANG_BUILD_INCLUDE_DIR}"
-      "${CLANG_MAIN_INCLUDE_DIR}"
-      "${CMARK_MAIN_INCLUDE_DIR}"
-      "${CMARK_BUILD_INCLUDE_DIR}")
 
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
 
