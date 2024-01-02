@@ -3870,6 +3870,8 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
 
 static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
+static bool usesFeatureTransferringArgsAndResults(Decl *decl) { return false; }
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
