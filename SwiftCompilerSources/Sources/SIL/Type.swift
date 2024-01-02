@@ -112,6 +112,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     bridged.getInstanceTypeOfMetatype(function.bridged).type
   }
 
+  public var isDynamicSelfMetatype: Bool {
+    bridged.isDynamicSelfMetatype()
+  }
+
   public func representationOfMetatype(in function: Function) -> MetatypeRepresentation {
     bridged.getRepresentationOfMetatype(function.bridged)
   }

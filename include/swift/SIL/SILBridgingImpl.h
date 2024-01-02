@@ -236,6 +236,12 @@ BridgedType BridgedType::getInstanceTypeOfMetatype(BridgedFunction f) const {
   return unbridged().getInstanceTypeOfMetatype(f.getFunction());
 }
 
+bool BridgedType::isDynamicSelfMetatype() const {
+  auto metaType = unbridged().castTo<swift::MetatypeType>();
+  swift::Type instTy = metaType->getInstanceType();
+  return instTy->is<swift::DynamicSelfType>();
+}
+
 BridgedType::MetatypeRepresentation BridgedType::getRepresentationOfMetatype(BridgedFunction f) const {
   return BridgedType::MetatypeRepresentation(
       unbridged().getRepresentationOfMetatype(f.getFunction()));
