@@ -418,6 +418,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isGenericFunction() const;
   BRIDGED_INLINE bool hasSemanticsAttr(BridgedStringRef attrName) const;
   BRIDGED_INLINE bool hasUnsafeNonEscapableResult() const;
+  BRIDGED_INLINE bool hasResultDependsOnSelf() const;
   BRIDGED_INLINE EffectsKind getEffectAttribute() const;
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;
@@ -810,6 +811,7 @@ struct BridgedArgument {
   BRIDGED_INLINE BridgedArgumentConvention getConvention() const;
   BRIDGED_INLINE bool isSelf() const;
   BRIDGED_INLINE bool isReborrow() const;
+  BRIDGED_INLINE bool hasResultDependsOn() const;
 };
 
 struct OptionalBridgedArgument {

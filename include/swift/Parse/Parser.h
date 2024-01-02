@@ -1449,9 +1449,9 @@ public:
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
                                  ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc,
-                                 SourceLoc IsolatedLoc,
-                                 SourceLoc ConstLoc);
+                                 SourceLoc SpecifierLoc, SourceLoc IsolatedLoc,
+                                 SourceLoc ConstLoc,
+                                 SourceLoc ResultDependsOnLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

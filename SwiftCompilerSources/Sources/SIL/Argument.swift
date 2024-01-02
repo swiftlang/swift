@@ -52,6 +52,10 @@ final public class FunctionArgument : Argument {
   public var isIndirectResult: Bool {
     return index < parentFunction.numIndirectResultArguments
   }
+
+  public var hasResultDependsOn : Bool {
+    return bridged.hasResultDependsOn()
+  }
 }
 
 public struct Phi {

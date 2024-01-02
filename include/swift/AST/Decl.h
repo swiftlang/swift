@@ -6396,9 +6396,11 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeConst = 1 << 1,
+
+    HasResultDependsOn = 1 << 2,
   };
 
-  llvm::PointerIntPair<Identifier, 2, OptionSet<ArgumentNameFlags>>
+  llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
       ArgumentNameAndFlags;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
@@ -6650,13 +6652,15 @@ public:
   }
 
   bool hasResultDependsOn() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsResultDependsOn);
+    return ArgumentNameAndFlags.getInt().contains(
+        ArgumentNameFlags::HasResultDependsOn);
   }
 
   void setResultDependsOn(bool value = true) {
-    auto flags = DefaultValueAndFlags.getInt();
-    DefaultValueAndFlags.setInt(value ? flags | Flags::IsResultDependsOn
-                                      : flags - Flags::IsResultDependsOn);
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = value ? flags | ArgumentNameFlags::HasResultDependsOn
+                  : flags - ArgumentNameFlags::HasResultDependsOn;
+    ArgumentNameAndFlags.setInt(flags);
   }
 
   /// Does this parameter reject temporary pointer conversions?

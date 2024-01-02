@@ -31,12 +31,11 @@
 
 using namespace swift;
 
-TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
-                                       const TypeAttributes &attrs,
-                                       ParamDecl::Specifier specifier,
-                                       SourceLoc specifierLoc,
-                                       SourceLoc isolatedLoc,
-                                       SourceLoc constLoc) {
+TypeRepr *
+Parser::applyAttributeToType(TypeRepr *ty, const TypeAttributes &attrs,
+                             ParamDecl::Specifier specifier,
+                             SourceLoc specifierLoc, SourceLoc isolatedLoc,
+                             SourceLoc constLoc, SourceLoc resultDependsOnLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty()) {
     ty = new (Context) AttributedTypeRepr(attrs, ty);
@@ -55,6 +54,10 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
 
   if (constLoc.isValid()) {
     ty = new (Context) CompileTimeConstTypeRepr(ty, constLoc);
+  }
+
+  if (resultDependsOnLoc.isValid()) {
+    ty = new (Context) ResultDependsOnTypeRepr(ty, resultDependsOnLoc);
   }
 
   return ty;
@@ -385,10 +388,9 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   auto repr = SILBoxTypeRepr::create(Context, generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
-  return makeParserResult(applyAttributeToType(repr, attrs,
-                                               ParamDecl::Specifier::LegacyOwned,
-                                               SourceLoc(), SourceLoc(),
-                                               SourceLoc()));
+  return makeParserResult(
+      applyAttributeToType(repr, attrs, ParamDecl::Specifier::LegacyOwned,
+                           SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc()));
 }
 
 
@@ -594,9 +596,8 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   }
 
   return makeParserResult(
-      status,
-      applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc,
-                           constLoc));
+      status, applyAttributeToType(tyR, attrs, specifier, specifierLoc,
+                                   isolatedLoc, constLoc, resultDependsOnLoc));
 }
 
 /// parseType

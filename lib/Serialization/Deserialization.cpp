@@ -6658,13 +6658,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeConst;
+        isCompileTimeConst, hasResultDependsOn;
     bool isNoDerivative;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst);
+        isCompileTimeConst, hasResultDependsOn);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -6675,12 +6675,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     if (!paramTy)
       return paramTy.takeError();
 
-    params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
-                        ParameterTypeFlags(isVariadic, isAutoClosure,
-                                           isNonEphemeral, *ownership,
-                                           isIsolated, isNoDerivative,
-                                           isCompileTimeConst),
-                        MF.getIdentifier(internalLabelID));
+    params.emplace_back(
+        paramTy.get(), MF.getIdentifier(labelID),
+        ParameterTypeFlags(isVariadic, isAutoClosure, isNonEphemeral,
+                           *ownership, isIsolated, isNoDerivative,
+                           isCompileTimeConst, hasResultDependsOn),
+        MF.getIdentifier(internalLabelID));
   }
 
   if (!isGeneric) {

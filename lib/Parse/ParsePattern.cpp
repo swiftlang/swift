@@ -580,7 +580,8 @@ mapParsedParameters(Parser &parser,
               param->setIsolated(true);
             else if (isa<CompileTimeConstTypeRepr>(STR))
               param->setCompileTimeConst(true);
-
+            else if (isa<ResultDependsOnTypeRepr>(STR))
+              param->setResultDependsOn(true);
             unwrappedType = STR->getBase();
             continue;
           }

@@ -2241,20 +2241,20 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst)
+                     bool compileTimeConst, bool hasResultDependsOn)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
-              uint8_t(specifier) << SpecifierShift |
-              (isolated ? Isolated : 0) |
+              uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
-              (compileTimeConst ? CompileTimeConst : 0)){}
+              (compileTimeConst ? CompileTimeConst : 0) |
+              (hasResultDependsOn ? ResultDependsOn : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
-                    bool isolated, bool isNoDerivative,
-                    bool compileTimeConst);
+                    bool isolated, bool isNoDerivative, bool compileTimeConst,
+                    bool hasResultDependsOn);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2421,7 +2421,8 @@ public:
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
-                              /*compileTimeConst*/false);
+                              /*compileTimeConst*/ false,
+                              /*hasResultDependsOn*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -7517,7 +7518,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst) {
+    bool compileTimeConst, bool hasResultDependsOn) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -7527,8 +7528,8 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
            ownership == ParamSpecifier::InOut);
     ownership = ParamSpecifier::InOut;
   }
-  return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isolated,
-          isNoDerivative, compileTimeConst};
+  return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
+          isolated,   isNoDerivative, compileTimeConst, hasResultDependsOn};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
