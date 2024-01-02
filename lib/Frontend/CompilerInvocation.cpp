@@ -845,13 +845,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (auto feature = getExperimentalFeature(value)) {
 #ifdef NDEBUG
       if (!isFeatureAvailableInProduction(*feature)) {
-        llvm::errs() << "error: experimental feature '" << A->getValue() 
-                     << "' cannot be enabled in a production compiler\n";
-        exit(1);
+        Diags.diagnose(SourceLoc(), diag::experimental_not_supported_in_production,
+                       A->getValue());
+        HadError = true;
+      } else {
+        Opts.Features.insert(*feature);
       }
-#endif
-
+#else
       Opts.Features.insert(*feature);
+#endif
     }
 
     // Hack: In order to support using availability macros in SPM packages, we
@@ -1368,11 +1370,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
   if (Opts.hasFeature(Feature::Embedded)) {
-    assert(swiftModulesInitialized() && "no SwiftCompilerSources");
-
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;
     Opts.DisableImplicitConcurrencyModuleImport = true;
+
+    if (!swiftModulesInitialized()) {
+      Diags.diagnose(SourceLoc(), diag::no_swift_sources_with_embedded);
+      HadError = true;
+    }
 
     if (FrontendOpts.EnableLibraryEvolution) {
       Diags.diagnose(SourceLoc(), diag::evolution_with_embedded);
