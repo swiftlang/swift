@@ -152,9 +152,6 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
   /// The function containing the initialization code.
   SILFunction *OnceFunc;
 
-  /// A reference to the Builtin.once declaration.
-  FuncDecl *BuiltinOnceDecl;
-
   GenGlobalAccessors(SILGenModule &SGM,
                      SILGlobalVariable *OnceToken,
                      SILFunction *OnceFunc)
@@ -167,8 +164,6 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
                                     NLKind::QualifiedLookup, found);
 
     assert(found.size() == 1 && "didn't find Builtin.once?!");
-
-    BuiltinOnceDecl = cast<FuncDecl>(found[0]);
   }
 
   // Walk through non-binding patterns.
