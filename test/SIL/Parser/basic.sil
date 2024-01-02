@@ -1294,9 +1294,10 @@ bb0:
   %a = unchecked_addr_cast %1 : $*Builtin.Word to $*Builtin.RawPointer
   %2 = address_to_pointer %a : $*Builtin.RawPointer to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
-  // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $()
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
-  %6 = global_addr @staticProp : $*Int
+  // CHECK: [[O:%.*]] = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $Builtin.SILToken
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $Builtin.SILToken
+  // CHECK: global_addr @staticProp : $*Int depends_on [[O]]
+  %6 = global_addr @staticProp : $*Int depends_on %5
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }

@@ -1515,6 +1515,11 @@ public:
     if (isa<OpenPackElementInst>(value))
       return true;
 
+    if (auto *bi = dyn_cast<BuiltinInst>(value)) {
+      if (bi->getBuiltinInfo().ID == BuiltinValueKind::Once)
+        return true;
+    }
+
     // Add more token cases here as they arise.
 
     return false;
@@ -2297,6 +2302,10 @@ public:
             "global_addr cannot refer to a statically initialized object");
     checkGlobalAccessInst(GAI);
     checkAddressWalkerCanVisitAllTransitiveUses(GAI);
+    if (SILValue token = GAI->getDependencyToken()) {
+      require(token->getType().is<SILTokenType>(),
+              "depends_on operand of global_addr must be a token");
+    }
   }
 
   void checkGlobalValueInst(GlobalValueInst *GVI) {

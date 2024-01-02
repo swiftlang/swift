@@ -503,7 +503,7 @@ private func replace(findStringCall: ApplyInst,
   _ = varBuilder.createStruct(type: cacheType, elements: [zero, zero])
 
   let builder = Builder(before: findStringCall, context)
-  let cacheAddr = builder.createGlobalAddr(global: cacheVar)
+  let cacheAddr = builder.createGlobalAddr(global: cacheVar, dependencyToken: nil)
   let findStringRef = builder.createFunctionRef(cachedFindStringFunc)
   let newCall = builder.createApply(function: findStringRef, SubstitutionMap(),
                                     arguments: [findStringCall.arguments[0],

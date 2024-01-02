@@ -1114,6 +1114,10 @@ void BridgedInstruction::KeyPathInst_getReferencedFunctions(SwiftInt componentId
     }, [](swift::SILDeclRef) {});
 }
 
+void BridgedInstruction::GlobalAddrInst_clearToken() const {
+  getAs<swift::GlobalAddrInst>()->clearToken();
+}
+
 bool BridgedInstruction::GlobalValueInst_isBare() const {
   return getAs<swift::GlobalValueInst>()->isBare();
 }
@@ -1522,8 +1526,9 @@ BridgedInstruction BridgedBuilder::createVector(BridgedValueArray arguments) con
   return {unbridged().createVector(swift::ArtificialUnreachableLocation(), arguments.getValues(argValues))};
 }
 
-BridgedInstruction BridgedBuilder::createGlobalAddr(BridgedGlobalVar global) const {
-  return {unbridged().createGlobalAddr(regularLoc(), global.getGlobal())};
+BridgedInstruction BridgedBuilder::createGlobalAddr(BridgedGlobalVar global,
+                                                    OptionalBridgedValue dependencyToken) const {
+  return {unbridged().createGlobalAddr(regularLoc(), global.getGlobal(), dependencyToken.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createGlobalValue(BridgedGlobalVar global, bool isBare) const {

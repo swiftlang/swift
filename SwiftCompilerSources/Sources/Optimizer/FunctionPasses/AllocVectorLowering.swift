@@ -246,7 +246,7 @@ private func createOutlinedGlobal(
   }
 
   let builder = Builder(before: allocVectorBuiltin, context)
-  let globalAddr = builder.createGlobalAddr(global: outlinedGlobal)
+  let globalAddr = builder.createGlobalAddr(global: outlinedGlobal, dependencyToken: nil)
   let rawVectorPointer = builder.createAddressToPointer(address: globalAddr, pointerType: allocVectorBuiltin.type,
                                                         needStackProtection: false)
   allocVectorBuiltin.uses.replaceAll(with: rawVectorPointer, context)

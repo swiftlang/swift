@@ -29,6 +29,8 @@ class C2<T> : C1<T> {
 class A {
 }
 
+sil_global [let] @gg : $Int
+
 // CHECK-LABEL: sil @constantFoldAdd
 // CHECK:         [[A:%.*]] = integer_literal $Builtin.Int64, 12
 // CHECK:         [[C:%.*]] = integer_literal $Builtin.Int1, 0
@@ -327,34 +329,33 @@ sil [global_init_once_fn] @unknown_init : $@convention(c) () -> ()
 // CHECK-LABEL: sil @remove_builtin_once :
 // CHECK-NOT:     builtin
 // CHECK:       } // end sil function 'remove_builtin_once'
-sil @remove_builtin_once : $@convention(thin) (Builtin.RawPointer) -> () {
+sil @remove_builtin_once : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @side_effect_free_init : $@convention(c) () -> ()
-  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
-  %3 = tuple ()
-  return %3 : $()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  %3 = global_addr @gg : $*Int depends_on %2
+  %4 = address_to_pointer %3 : $*Int to $Builtin.RawPointer
+  return %4 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: sil @dont_remove_builtin_once_side_effect :
 // CHECK:         builtin
 // CHECK:       } // end sil function 'dont_remove_builtin_once_side_effect'
-sil @dont_remove_builtin_once_side_effect : $@convention(thin) (Builtin.RawPointer) -> () {
+sil @dont_remove_builtin_once_side_effect : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @init_with_side_effect : $@convention(c) () -> ()
-  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
-  %3 = tuple ()
-  return %3 : $()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  return %0 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: sil @dont_remove_builtin_once_unknown :
 // CHECK:         builtin
 // CHECK:       } // end sil function 'dont_remove_builtin_once_unknown'
-sil @dont_remove_builtin_once_unknown : $@convention(thin) (Builtin.RawPointer) -> () {
+sil @dont_remove_builtin_once_unknown : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @unknown_init : $@convention(c) () -> ()
-  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
-  %3 = tuple ()
-  return %3 : $()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  return %0 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: sil @generic_canBeClass

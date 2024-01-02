@@ -4344,14 +4344,14 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
             SILGlobalVariable::create(M, SILLinkage::DefaultForDeclaration,
                                       IsNotSerialized, "__ImageBase",
                                       BuiltinRawPtrTy);
-      ModuleBase = B.createGlobalAddr(SILLoc, ImageBase);
+      ModuleBase = B.createGlobalAddr(SILLoc, ImageBase, /*dependencyToken=*/ SILValue());
     } else {
       auto DSOHandle = M.lookUpGlobalVariable("__dso_handle");
       if (!DSOHandle)
         DSOHandle = SILGlobalVariable::create(M, SILLinkage::PublicExternal,
                                               IsNotSerialized, "__dso_handle",
                                               BuiltinRawPtrTy);
-      ModuleBase = B.createGlobalAddr(SILLoc, DSOHandle);
+      ModuleBase = B.createGlobalAddr(SILLoc, DSOHandle, /*dependencyToken=*/ SILValue());
     }
 
     auto ModuleBasePointer =

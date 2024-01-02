@@ -1124,7 +1124,10 @@ SILCloner<ImplClass>::visitGlobalAddrInst(GlobalAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createGlobalAddr(getOpLocation(Inst->getLoc()),
-                                          Inst->getReferencedGlobal()));
+                                          Inst->getReferencedGlobal(),
+                                          Inst->hasOperand() ?
+                                            getOpValue(Inst->getDependencyToken()) :
+                                            SILValue()));
 }
 
 template<typename ImplClass>

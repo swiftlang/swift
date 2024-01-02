@@ -110,6 +110,8 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     let initVal = cloner.clone(globalInitVal)
 
     uses.replaceAll(with: initVal, context)
+    // Also erases a builtin "once" on which the global_addr depends on. This is fine
+    // because we only replace the load if the global init function doesn't have any side effect.
     transitivelyErase(load: self, context)
     return true
   }

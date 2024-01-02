@@ -109,6 +109,10 @@ private extension BuiltinInst {
     if callee.instructions.contains(where: hasSideEffectForBuiltinOnce) {
       return
     }
+    for use in uses {
+      let ga = use.instruction as! GlobalAddrInst
+      ga.clearToken(context)
+    }
     context.erase(instruction: self)
   }
 

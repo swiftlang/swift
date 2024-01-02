@@ -535,6 +535,14 @@ extension RefElementAddrInst {
   }
 }
 
+extension GlobalAddrInst {
+  func clearToken(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.GlobalAddrInst_clearToken()
+    context.notifyInstructionChanged(self)
+  }
+}
+
 extension GlobalValueInst {
   func setIsBare(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()

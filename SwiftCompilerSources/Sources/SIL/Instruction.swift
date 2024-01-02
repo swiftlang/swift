@@ -650,6 +650,10 @@ final public class GlobalAddrInst : GlobalAccessInst, VarDeclInstruction {
   public var varDecl: VarDecl? {
     VarDecl(bridged: bridged.GlobalAddr_getDecl())
   }
+
+  public var dependencyToken: Value? {
+    operands.count == 1 ? operands[0].value : nil
+  }
 }
 
 final public class GlobalValueInst : GlobalAccessInst {

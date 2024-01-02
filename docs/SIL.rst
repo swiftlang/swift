@@ -5739,14 +5739,20 @@ global_addr
 
 ::
 
-  sil-instruction ::= 'global_addr' sil-global-name ':' sil-type
+  sil-instruction ::= 'global_addr' sil-global-name ':' sil-type ('depends_on' sil-operand)?
 
   %1 = global_addr @foo : $*Builtin.Word
+  %3 = global_addr @globalvar : $*Builtin.Word depends_on %2
+  // %2 has type $Builtin.SILToken
 
 Creates a reference to the address of a global variable which has been
 previously initialized by ``alloc_global``. It is undefined behavior to
 perform this operation on a global variable which has not been
 initialized, except the global variable has a static initializer.
+
+Optionally, the dependency to the initialization of the global can be
+specified with a dependency token ``depends_on <token>``. This is usually
+a ``builtin "once"`` which calls the initializer for the global variable.
 
 global_value
 `````````````

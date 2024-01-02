@@ -680,13 +680,11 @@ public:
     return insert(new (getModule())
                       AllocGlobalInst(getSILDebugLocation(Loc), g));
   }
-  GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILGlobalVariable *g) {
+  GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILGlobalVariable *g,
+                                   SILValue dependencyToken) {
     return insert(new (getModule()) GlobalAddrInst(getSILDebugLocation(Loc), g,
+                                                   dependencyToken,
                                                    getTypeExpansionContext()));
-  }
-  GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILType Ty) {
-    return insert(new (F->getModule())
-                  GlobalAddrInst(getSILDebugLocation(Loc), Ty));
   }
   GlobalValueInst *createGlobalValue(SILLocation Loc, SILGlobalVariable *g, bool isBare) {
     return insert(new (getModule()) GlobalValueInst(getSILDebugLocation(Loc), g,

@@ -1925,9 +1925,11 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
           .build();
   auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
   SmallVector<swift::Type, 3> ArgTypes = {HandleTy, BlockTy};
-  if (withContext)
+  if (withContext) {
     ArgTypes.push_back(ContextTy);
-  return getBuiltinFunction(Id, ArgTypes, VoidTy);
+    return getBuiltinFunction(Id, ArgTypes, VoidTy);
+  }
+  return getBuiltinFunction(Id, ArgTypes, Context.TheSILTokenType);
 }
 
 static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,

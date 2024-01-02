@@ -809,6 +809,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE void TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const;
   BRIDGED_INLINE SwiftInt KeyPathInst_getNumComponents() const;
   BRIDGED_INLINE void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const;
+  BRIDGED_INLINE void GlobalAddrInst_clearToken() const;
   BRIDGED_INLINE bool GlobalValueInst_isBare() const;
   BRIDGED_INLINE void GlobalValueInst_setIsBare() const;
   BRIDGED_INLINE void LoadInst_setOwnership(SwiftInt ownership) const;
@@ -1093,7 +1094,8 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createObject(BridgedType type, BridgedValueArray arguments,
                                                                      SwiftInt numBaseElements) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createVector(BridgedValueArray arguments) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createGlobalAddr(BridgedGlobalVar global) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createGlobalAddr(BridgedGlobalVar global,
+                                                                         OptionalBridgedValue dependencyToken) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createGlobalValue(BridgedGlobalVar global,
                                                                           bool isBare) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createStruct(BridgedType type,

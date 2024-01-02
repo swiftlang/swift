@@ -1502,6 +1502,9 @@ WARNING(warning_in_effects_attribute,none,
 ERROR(expected_in_attribute_list,none,
       "expected ']' or ',' in attribute list", ())
 
+ERROR(expected_depends_on,none,
+      "expected 'depends_on'", ())
+
 ERROR(type_attribute_applied_to_decl,none,
       "attribute can only be applied to types, not declarations", ())
 ERROR(decl_attribute_applied_to_type,none,
