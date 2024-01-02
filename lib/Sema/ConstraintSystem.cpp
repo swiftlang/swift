@@ -373,10 +373,6 @@ void ConstraintSystem::recordPotentialThrowSite(
     ConstraintLocatorBuilder locator) {
   ASTContext &ctx = getASTContext();
 
-  // Only record potential throw sites when typed throws is enabled.
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
-    return;
-
   // Catch node location is determined by the source location.
   auto sourceLoc = locator.getAnchor().getStartLoc();
   if (!sourceLoc)

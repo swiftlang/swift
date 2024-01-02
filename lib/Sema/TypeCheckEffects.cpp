@@ -663,8 +663,7 @@ static Expr *removeErasureToExistentialError(Expr *expr) {
     return expr;
 
   ASTContext &ctx = type->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows) ||
-      !ctx.LangOpts.hasFeature(Feature::TypedThrows))
+  if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
     return expr;
 
   // Look for an outer erasure expression.

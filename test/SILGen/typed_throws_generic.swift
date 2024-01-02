@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature TypedThrows -enable-experimental-feature FullTypedThrows | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
 
 public func genericThrow<E>(e: E) throws(E) {
   throw e

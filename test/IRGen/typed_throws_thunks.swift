@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-irgen -enable-experimental-feature TypedThrows -disable-availability-checking -runtime-compatibility-version none -target %module-target-future -enable-library-evolution | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -primary-file %s -emit-irgen -disable-availability-checking -runtime-compatibility-version none -target %module-target-future -enable-library-evolution | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: PTRSIZE=64
 // UNSUPPORTED: CPU=arm64e

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature TypedThrows | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 enum MyError: Error {
   case fail
