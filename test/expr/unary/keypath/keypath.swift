@@ -914,13 +914,13 @@ func testKeyPathHole() {
 
   func f(_ i: Int) {}
   f(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
-  // expected-error@-1 {{cannot convert value of key path type to expected argument type 'Int'}}
   f(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
-  // expected-error@-1 {{cannot convert value of key path type to expected argument type 'Int'}}
 
-  func provideValueButNotRoot<T>(_ fn: (T) -> String) {} 
+func provideValueButNotRoot<T>(_ fn: (T) -> String) {} // expected-note 2 {{in call to function 'provideValueButNotRoot'}}
   provideValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   provideValueButNotRoot(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+// expected-error@-1 {{generic parameter 'T' could not be inferred}}
   provideValueButNotRoot(\String.foo) // expected-error {{value of type 'String' has no member 'foo'}}
 
   func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {} 
@@ -1236,4 +1236,10 @@ func test_keypath_coercion_to_function() {
 
 func test_keypath_application_with_composition(v: String, kp: any KeyPath<String, Int> & PP) {
   _ = v[keyPath: kp] // Ok
+}
+
+func test_leading_dot_key_path_without_context() {
+  func test(_: AnyKeyPath?) {}
+  test(\.utf8)
+  // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}}
 }

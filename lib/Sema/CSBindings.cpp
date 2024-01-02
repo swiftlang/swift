@@ -600,7 +600,7 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
   return keyPathTy;
 }
 
-void BindingSet::finalize(
+bool BindingSet::finalize(
     llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings) {
   inferTransitiveBindings(inferredBindings);
 
@@ -654,9 +654,10 @@ void BindingSet::finalize(
 
       std::tie(isValid, capability) = CS.inferKeyPathLiteralCapability(TypeVar);
 
-      // Key path literal is not yet sufficiently resolved.
+      // Key path literal is not yet sufficiently resolved, this binding
+      // set is not viable.
       if (isValid && !capability)
-        return;
+        return false;
 
       // If the key path is sufficiently resolved we can add inferred binding
       // to the set.
@@ -728,7 +729,7 @@ void BindingSet::finalize(
       Bindings = std::move(updatedBindings);
       Defaults.clear();
 
-      return;
+      return true;
     }
 
     if (CS.shouldAttemptFixes() &&
@@ -752,6 +753,8 @@ void BindingSet::finalize(
         });
       }
     }
+
+    return true;
   }
 }
 
@@ -1030,7 +1033,8 @@ llvm::Optional<BindingSet> ConstraintSystem::determineBestBindings(
     // produce a default type.
     bool isViable = isViableForRanking(bindings);
 
-    bindings.finalize(cache);
+    if (!bindings.finalize(cache))
+      continue;
 
     if (!bindings || !isViable)
       continue;
