@@ -5143,6 +5143,8 @@ public:
   /// True if this protocol can only be conformed to by class types.
   bool requiresClass() const;
 
+  bool inheritsReflectable() const;
+
   /// Determine whether an existential conforming to this protocol can be
   /// matched with a generic type parameter constrained to this protocol.
   /// This is only permitted if there is nothing "non-trivial" that we

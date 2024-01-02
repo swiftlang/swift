@@ -556,7 +556,7 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
     for (auto proto : protos)
       types.push_back(proto->getDeclaredInterfaceType());
     return ProtocolCompositionType::get(Ctx, types,
-                                        /*HasExplicitAnyObject=*/false);
+                                        /*HasExplicitAnyObject=*/false, false);
   };
 
   if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {

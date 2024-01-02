@@ -2732,8 +2732,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
   }
 
-  if (Args.hasArg(OPT_disable_reflection_metadata)) {
-    Opts.ReflectionMetadata = ReflectionMetadataMode::None;
+  if (Args.hasArg(OPT_disable_reflection_metadata) || Args.hasArg(OPT_enable_opt_in_reflection_metadata)) {
+    Opts.ReflectionMetadata = ReflectionMetadataMode::OptIn;
     Opts.EnableReflectionNames = false;
   }
 

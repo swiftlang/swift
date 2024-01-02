@@ -629,7 +629,7 @@ namespace {
       // we don't want to break arrays of size PATH_MAX.
       if (size > 4096)
         return Type();
-      
+
       if (size == 1)
         return ParenType::get(elementType->getASTContext(), elementType);
 
@@ -1241,7 +1241,7 @@ namespace {
 
         importedType = ExistentialType::get(
             ProtocolCompositionType::get(Impl.SwiftContext, members,
-                                         /*HasExplicitAnyObject=*/false));
+                                         /*HasExplicitAnyObject=*/false, false));
       }
 
       // Class or Class<P> maps to an existential metatype.
@@ -1677,7 +1677,7 @@ ImportedType ClangImporter::Implementation::importType(
   if (auto nullability = type->getNullability()) {
     bool stripNonResultOptionality =
         importKind == ImportTypeKind::CompletionHandlerResultParameter;
-    
+
     optionality = translateNullability(*nullability, stripNonResultOptionality);
   }
 
@@ -1852,7 +1852,7 @@ private:
     members.push_back(proto->getDeclaredInterfaceType());
 
     return {
-      ProtocolCompositionType::get(ctx, members, explicitAnyObject), true };
+      ProtocolCompositionType::get(ctx, members, explicitAnyObject, false), true };
   }
 
   /// Visitor action: Recurse into the children of this type and try to add
@@ -2560,13 +2560,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
           return typePart->isEqual(genericParam->getDeclaredInterfaceType());
         });
   };
-  
+
   // Make sure all generic parameters are accounted for in the function signature.
   for (auto genericParam : genericParams) {
     bool shouldCheckResultType = resultType && resultType->hasTypeParameter();
     if (genericParamTypeUsedInSignature(genericParam, shouldCheckResultType))
       continue;
-    
+
     // If this generic parameter is not used in the function signature,
     // add a new parameter that accepts a metatype corresponding to that
     // generic parameter.

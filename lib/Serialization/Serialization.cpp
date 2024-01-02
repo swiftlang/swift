@@ -1501,6 +1501,8 @@ void Serializer::serializeGenericRequirements(
       case LayoutConstraintKind::Class:
         rawKind = LayoutRequirementKind::Class;
         break;
+      case LayoutConstraintKind::Reflectable:
+        break;
       case LayoutConstraintKind::NativeClass:
         rawKind = LayoutRequirementKind::NativeClass;
         break;
@@ -5579,6 +5581,7 @@ public:
     ProtocolCompositionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         composition->hasExplicitAnyObject(),
+        composition->hasExplicitReflectable(),
         protocols);
   }
 

@@ -1211,7 +1211,7 @@ public:
     }
 
     return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
-                                              isClassBound);
+                                              isClassBound, false);
   }
 
   const ConstrainedExistentialTypeRef *createConstrainedExistentialType(

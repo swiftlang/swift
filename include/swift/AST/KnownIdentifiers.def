@@ -177,6 +177,7 @@ IDENTIFIER_WITH_NAME(RefCountedObjectLayout, "_RefCountedObject")
 IDENTIFIER_WITH_NAME(NativeRefCountedObjectLayout, "_NativeRefCountedObject")
 IDENTIFIER_WITH_NAME(ClassLayout, "_Class")
 IDENTIFIER_WITH_NAME(NativeClassLayout, "_NativeClass")
+IDENTIFIER_WITH_NAME(Reflectable, "Reflectable")
 
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")

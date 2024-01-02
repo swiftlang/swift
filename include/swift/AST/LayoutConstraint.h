@@ -100,6 +100,10 @@ class LayoutConstraintInfo
     return isClass(Kind);
   }
 
+  bool isReflectable() const {
+    return isReflectable(Kind);
+  }
+
   bool isNativeClass() const {
     return isNativeClass(Kind);
   }
@@ -194,6 +198,8 @@ class LayoutConstraintInfo
 
   static bool isClass(LayoutConstraintKind Kind);
 
+  static bool isReflectable(LayoutConstraintKind Kind);
+
   static bool isNativeClass(LayoutConstraintKind Kind);
 
   static bool isRefCounted(LayoutConstraintKind Kind);
@@ -217,6 +223,7 @@ class LayoutConstraintInfo
   static LayoutConstraintInfo ClassConstraintInfo;
   static LayoutConstraintInfo NativeClassConstraintInfo;
   static LayoutConstraintInfo TrivialConstraintInfo;
+  static LayoutConstraintInfo ReflectableConstraintInfo;
 };
 
 /// A wrapper class containing a reference to the actual LayoutConstraintInfo

@@ -43,6 +43,10 @@ LayoutConstraint getLayoutConstraint(Identifier ID, ASTContext &Ctx) {
     return LayoutConstraint::getLayoutConstraint(
       LayoutConstraintKind::Class, Ctx);
 
+  if (ID == Ctx.Id_Reflectable)
+    return LayoutConstraint::getLayoutConstraint(
+      LayoutConstraintKind::Reflectable, Ctx);
+  
   if (ID == Ctx.Id_NativeClassLayout)
     return LayoutConstraint::getLayoutConstraint(
       LayoutConstraintKind::NativeClass, Ctx);
@@ -73,6 +77,8 @@ StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind, bool useClass
     return "_TrivialAtMost";
   case LayoutConstraintKind::TrivialOfExactSize:
     return "_Trivial";
+  case LayoutConstraintKind::Reflectable:
+    return "Reflectable";
   }
 
   llvm_unreachable("Unhandled LayoutConstraintKind in switch.");
@@ -125,6 +131,10 @@ bool LayoutConstraintInfo::isAnyRefCountedObject(LayoutConstraintKind Kind) {
 bool LayoutConstraintInfo::isClass(LayoutConstraintKind Kind) {
   return Kind == LayoutConstraintKind::Class ||
          Kind == LayoutConstraintKind::NativeClass;
+}
+
+bool LayoutConstraintInfo::isReflectable(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::Reflectable;
 }
 
 bool LayoutConstraintInfo::isNativeClass(LayoutConstraintKind Kind) {
@@ -324,6 +334,8 @@ LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind) {
         &LayoutConstraintInfo::RefCountedObjectConstraintInfo);
   case LayoutConstraintKind::UnknownLayout:
     return LayoutConstraint(&LayoutConstraintInfo::UnknownLayoutConstraintInfo);
+  case LayoutConstraintKind::Reflectable:
+    return LayoutConstraint(&LayoutConstraintInfo::ReflectableConstraintInfo);
   case LayoutConstraintKind::TrivialOfAtMostSize:
   case LayoutConstraintKind::TrivialOfExactSize:
     llvm_unreachable("Wrong layout constraint kind");
@@ -351,6 +363,9 @@ LayoutConstraintInfo LayoutConstraintInfo::NativeClassConstraintInfo(
 
 LayoutConstraintInfo LayoutConstraintInfo::TrivialConstraintInfo(
     LayoutConstraintKind::Trivial);
+
+LayoutConstraintInfo LayoutConstraintInfo::ReflectableConstraintInfo(
+    LayoutConstraintKind::Reflectable);
 
 int LayoutConstraint::compare(LayoutConstraint rhs) const {
   if (Ptr->getKind() != rhs->getKind())

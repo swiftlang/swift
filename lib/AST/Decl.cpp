@@ -6535,6 +6535,11 @@ bool ProtocolDecl::requiresClass() const {
     ProtocolRequiresClassRequest{const_cast<ProtocolDecl *>(this)}, false);
 }
 
+bool ProtocolDecl::inheritsReflectable() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    InheritsReflectableProtocolRequest{const_cast<ProtocolDecl *>(this)}, false);
+}
+
 bool ProtocolDecl::requiresSelfConformanceWitnessTable() const {
   return isSpecificProtocol(KnownProtocolKind::Error);
 }

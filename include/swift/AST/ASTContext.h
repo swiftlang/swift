@@ -589,6 +589,9 @@ public:
   /// Retrieve the type Swift.AnyObject as a constraint.
   CanType getAnyObjectConstraint() const;
 
+  /// Retrieve the type Swift.Reflectable as a constraint.
+  CanType getReflectableConstraint() const;
+
   /// Retrieve the type Swift.AnyObject as an existential type.
   CanType getAnyObjectType() const;
 

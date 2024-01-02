@@ -112,7 +112,7 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
     Ctx.TheBuiltinModule->lookupValue(Ctx.getIdentifier(strippedName),
                                       NLKind::QualifiedLookup,
                                       decls);
-    
+
     if (decls.size() == 1 && isa<TypeDecl>(decls[0]))
       return cast<TypeDecl>(decls[0])->getDeclaredInterfaceType();
   }
@@ -209,7 +209,7 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
                                      LookupConformanceFn lookupConformance) {
   if (!genericSig)
     return SubstitutionMap();
-  
+
   if (genericSig.getGenericParams().size() != args.size())
     return SubstitutionMap();
 
@@ -281,7 +281,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
     return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
   }
-  
+
   // TODO: named opaque types
   return Type();
 }
@@ -648,7 +648,7 @@ Type ASTBuilder::createProtocolCompositionType(
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
 
-  Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
+  Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound, false);
   if (forRequirement)
     return composition;
 

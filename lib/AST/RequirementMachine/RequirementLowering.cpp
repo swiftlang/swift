@@ -371,6 +371,12 @@ static void desugarConformanceRequirement(Requirement req,
                              LayoutConstraintKind::Class));
     }
 
+    if (compositionType->hasExplicitReflectable()) {
+      subReqs.emplace_back(RequirementKind::Layout, req.getFirstType(),
+                           LayoutConstraint::getLayoutConstraint(
+                             LayoutConstraintKind::Reflectable));
+    }
+
     for (auto memberType : compositionType->getMembers()) {
       subReqs.emplace_back(
           memberType->isConstraintType()

@@ -3944,6 +3944,39 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   auto layout = type2->getExistentialLayout();
 
   if (auto layoutConstraint = layout.getLayoutConstraint()) {
+    if (layoutConstraint->isReflectable()) {
+      if (kind == ConstraintKind::ConformsTo) {
+        if (!type1->satisfiesReflectableConstraint()) {
+          if (shouldAttemptFixes()) {
+            if (auto last = locator.last()) {
+              // If solver is in diagnostic mode and type1 is a hole, or if this
+              // is a superclass requirement, let's consider `AnyObject`
+              // conformance solved. The actual superclass requirement
+              // will also fail (because type can't satisfy it), and it's
+              // more interesting for diagnostics.
+              auto req = last->getAs<LocatorPathElt::AnyRequirement>();
+              if (!req)
+                return getTypeMatchFailure(locator);
+
+              // Superclass constraints are never satisfied by existentials,
+              // even those that contain the superclass a la `any C & P`.
+              // if (!type1->isExistentialType() &&
+              //     (type1->isPlaceholder() ||
+              //     req->getRequirementKind() == RequirementKind::Superclass))
+              //   return getTypeMatchSuccess();
+
+              auto *fix = fixRequirementFailure(*this, type1, type2, locator);
+              if (fix && !recordFix(fix)) {
+                recordFixedRequirement(getConstraintLocator(locator), type2);
+                return getTypeMatchSuccess();
+              }
+            }
+          }
+
+          return getTypeMatchFailure(locator);
+        }
+      }
+    }
     if (layoutConstraint->isClass()) {
       if (kind == ConstraintKind::ConformsTo) {
         if (!type1->satisfiesClassConstraint()) {
@@ -15559,6 +15592,12 @@ void ConstraintSystem::addConstraint(Requirement req,
     kind = ConstraintKind::Bind;
     break;
   case RequirementKind::Layout:
+    if (req.getLayoutConstraint()->isReflectable()) {
+      auto firstType = req.getFirstType();
+      auto reflectable = getASTContext().getReflectableConstraint();
+      addConstraint(ConstraintKind::ConformsTo, firstType, reflectable, locator);
+    }
+
     // Only a class constraint can be modeled as a constraint, and only that can
     // appear outside of a @_specialize at the moment anyway.
     if (req.getLayoutConstraint()->isClass()) {

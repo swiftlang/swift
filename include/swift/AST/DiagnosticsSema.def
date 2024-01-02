@@ -7708,5 +7708,13 @@ ERROR(referencebindings_binding_must_be_to_lvalue,none,
 ERROR(result_depends_on_no_result,none,
       "Incorrect use of %0 with no result", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: Reflectable
+//------------------------------------------------------------------------------
+
+ERROR(type_does_not_conform_reflectable_decl_owner,none,
+      "%kind0 requires that %1 be a Reflectable type",
+      (const ValueDecl *, Type, Type))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

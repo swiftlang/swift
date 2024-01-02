@@ -427,6 +427,7 @@ void decodeRequirement(NodePointer node,
               .Case("C", LayoutConstraintKind::Class)
               .Case("D", LayoutConstraintKind::NativeClass)
               .Case("T", LayoutConstraintKind::Trivial)
+              .Case("B", LayoutConstraintKind::Reflectable)
               .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
               .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
               .Default(llvm::None);

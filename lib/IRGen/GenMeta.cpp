@@ -6780,6 +6780,9 @@ GenericArgumentMetadata irgen::addGenericRequirements(
          [&]{ B.addInt32((uint32_t)GenericRequirementLayoutKind::Class); });
         break;
       }
+      case LayoutConstraintKind::Reflectable: {
+        break;
+      }
       default:
         // No other layout constraints are supported in source-level Swift
         // today.

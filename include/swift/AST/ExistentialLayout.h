@@ -31,6 +31,7 @@ struct ExistentialLayout {
 
   ExistentialLayout() {
     hasExplicitAnyObject = false;
+    hasExplicitReflectable = false;
     hasInverseCopyable = false;
     containsNonObjCProtocol = false;
     containsParameterized = false;
@@ -46,6 +47,9 @@ struct ExistentialLayout {
 
   /// Whether the existential contains an explicit '& AnyObject' constraint.
   bool hasExplicitAnyObject : 1;
+
+  /// Whether the existential contains an explicit '& Reflectable' constraint.
+  bool hasExplicitReflectable : 1;
 
   /// Whether the existential contains an explicit '& ~Copyable' constraint.
   bool hasInverseCopyable : 1;
@@ -70,6 +74,8 @@ struct ExistentialLayout {
   }
 
   bool isAnyObject() const;
+
+  bool isReflectable() const;
 
   bool isObjC() const {
     // FIXME: Does the superclass have to be @objc?

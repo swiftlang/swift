@@ -5703,8 +5703,9 @@ namespace {
   template<typename D>
   bool inheritanceListContainsProtocol(D decl, const ProtocolDecl *proto) {
     bool anyObject = false;
+    bool reflectable = false;
     for (const auto &found :
-            getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+            getDirectlyInheritedNominalTypeDecls(decl, anyObject, reflectable)) {
       if (auto protoDecl = dyn_cast<ProtocolDecl>(found.Item))
         if (protoDecl == proto || protoDecl->inheritsFrom(proto))
           return true;
@@ -8750,6 +8751,13 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
             Requirement(
               RequirementKind::Layout, paramType,
               LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)));
+        continue;
+      }
+      if (inheritedType->isReflectable()) {
+        requirements.push_back(
+            Requirement(
+              RequirementKind::Layout, paramType,
+              LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Reflectable)));
         continue;
       }
       if (inheritedType->getClassOrBoundGenericClass()) {

@@ -404,7 +404,7 @@ CanType TypeJoin::computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
     return TheAnyType;
 
   auto &ctx = result[0]->getASTContext();
-  return ProtocolCompositionType::get(ctx, result, false)->getCanonicalType();
+  return ProtocolCompositionType::get(ctx, result, false, false)->getCanonicalType();
 }
 
 CanType TypeJoin::visitProtocolCompositionType(CanType second) {

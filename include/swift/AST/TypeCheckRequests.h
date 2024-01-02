@@ -4644,6 +4644,24 @@ public:
   void cacheResult(llvm::Optional<SubstitutionMap>) const;
 };
 
+/// Determine if protocol inherits Reflectable.
+class InheritsReflectableProtocolRequest
+    : public SimpleRequest<InheritsReflectableProtocolRequest,
+                         bool(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

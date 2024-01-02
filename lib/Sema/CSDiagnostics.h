@@ -348,9 +348,15 @@ protected:
   bool diagnoseAsAmbiguousOperatorRef();
 
   DiagOnDecl getDiagnosticOnDecl() const override {
-    return (getRequirement().getKind() == RequirementKind::Layout ?
-            diag::type_does_not_conform_anyobject_decl_owner :
-            diag::type_does_not_conform_decl_owner);
+    if (getRequirement().getKind() == RequirementKind::Layout) {
+      if (getRequirement().getLayoutConstraint()->isReflectable())
+        return diag::type_does_not_conform_reflectable_decl_owner;
+      return diag::type_does_not_conform_anyobject_decl_owner;
+    }
+    
+    // if (auto layoutConstraint = layout.getLayoutConstraint()) {
+    // if (layoutConstraint->isReflectable()) {
+    return diag::type_does_not_conform_decl_owner;
   }
 
   DiagInReference getDiagnosticInRereference() const override {

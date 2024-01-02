@@ -1085,7 +1085,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           ArrayRef<TypeDecl *> typeDecls,
                           ResolveToNominalOptions options,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
-                          bool &anyObject);
+                          bool &anyObject,
+                          bool &reflectable);
 
 SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
     Evaluator &evaluator,
@@ -1136,10 +1137,12 @@ SelfBounds SelfBoundsFromWhereClauseRequest::evaluate(
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
+    bool reflectable = false;
     auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
                                                  ResolveToNominalOptions(),
                                                  modulesFound,
-                                                 result.anyObject);
+                                                 result.anyObject,
+                                                 reflectable);
     result.decls.insert(result.decls.end(),
                         rhsNominals.begin(),
                         rhsNominals.end());
@@ -1175,9 +1178,10 @@ SelfBounds SelfBoundsFromGenericSignatureRequest::evaluate(
 
     auto rhsDecls = directReferencesForType(req.getSecondType());
     SmallVector<ModuleDecl *, 2> modulesFound;
+    bool reflectable = false;
     auto rhsNominals = resolveTypeDeclsToNominal(
         evaluator, ctx, rhsDecls, ResolveToNominalOptions(),
-        modulesFound, result.anyObject);
+        modulesFound, result.anyObject, reflectable);
     result.decls.insert(result.decls.end(), rhsNominals.begin(),
                         rhsNominals.end());
   }
@@ -2663,6 +2667,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           ResolveToNominalOptions options,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject,
+                          bool &reflectable,
                           llvm::SmallPtrSetImpl<TypeAliasDecl *> &typealiases) {
   SmallPtrSet<NominalTypeDecl *, 4> knownNominalDecls;
   TinyPtrVector<NominalTypeDecl *> nominalDecls;
@@ -2698,7 +2703,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
-                                    options, modulesFound, anyObject, typealiases);
+                                    options, modulesFound, anyObject, reflectable, typealiases);
       std::for_each(underlyingNominalReferences.begin(),
                     underlyingNominalReferences.end(),
                     addNominalDecl);
@@ -2728,6 +2733,33 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         }
       }
 
+      if (typealias->getName().is("Reflectable")) {
+        // TypeRepr version: Builtin.AnyObject
+        if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
+          if (auto memberTR = dyn_cast<MemberTypeRepr>(typeRepr)) {
+            if (auto identBase =
+                    dyn_cast<IdentTypeRepr>(memberTR->getBaseComponent())) {
+              auto memberComps = memberTR->getMemberComponents();
+              if (memberComps.size() == 1 &&
+                  identBase->getNameRef().isSimpleName("Builtin") &&
+                  memberComps.front()->getNameRef().isSimpleName("Reflectable")) {
+                reflectable = true;
+              }
+            }
+          }
+        }
+
+        // Type version: an empty class-bound existential.
+        if (typealias->hasInterfaceType()) {
+          if (auto type = typealias->getUnderlyingType()) {
+            if (type->isAnyObject())
+              anyObject = true;
+            if (type->isReflectable())
+              reflectable = true;
+          }
+        }
+      }
+
       continue;
     }
 
@@ -2751,10 +2783,11 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           ArrayRef<TypeDecl *> typeDecls,
                           ResolveToNominalOptions options,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
-                          bool &anyObject) {
+                          bool &anyObject,
+                          bool &reflectable) {
   llvm::SmallPtrSet<TypeAliasDecl *, 4> typealiases;
   return resolveTypeDeclsToNominal(evaluator, ctx, typeDecls, options,
-                                   modulesFound, anyObject, typealiases);
+                                   modulesFound, anyObject, reflectable, typealiases);
 }
 
 /// Perform unqualified name lookup for types at the given location.
@@ -2857,10 +2890,11 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
     // to nominal type declarations, module declarations, and
     SmallVector<ModuleDecl *, 2> moduleDecls;
     bool anyObject = false;
+    bool reflectable = false;
     auto nominalTypeDecls =
       resolveTypeDeclsToNominal(ctx.evaluator, ctx, baseTypes,
                                 ResolveToNominalOptions(),
-                                moduleDecls, anyObject);
+                                moduleDecls, anyObject, reflectable);
 
     dc->lookupQualified(nominalTypeDecls, name, loc, options, members);
 
@@ -3146,10 +3180,11 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     // Resolve those type declarations to nominal type declarations.
     SmallVector<ModuleDecl *, 2> modulesFound;
     bool anyObject = false;
+    bool reflectable = false;
     auto inheritedNominalTypes
       = resolveTypeDeclsToNominal(evaluator, Ctx,
                                   inheritedTypes, ResolveToNominalOptions(),
-                                  modulesFound, anyObject);
+                                  modulesFound, anyObject, reflectable);
 
     // Look for a class declaration.
     ClassDecl *superclass = nullptr;
@@ -3190,7 +3225,8 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   SmallPtrSet<const ProtocolDecl *, 2> known;
   known.insert(PD);
   bool anyObject = false;
-  for (const auto &found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+  bool reflectable = false;
+  for (const auto &found : getDirectlyInheritedNominalTypeDecls(PD, anyObject, reflectable)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
       if (known.insert(proto).second)
         result.push_back(proto);
@@ -3231,10 +3267,11 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
+  bool reflectable = false;
   auto nominalTypes
     = resolveTypeDeclsToNominal(evaluator, ctx, referenced,
                                 ResolveToNominalFlags::AllowTupleType,
-                                modulesFound, anyObject);
+                                modulesFound, anyObject, reflectable);
 
   // If there is more than 1 element, we will emit a warning or an error
   // elsewhere, so don't handle that case here.
@@ -3583,9 +3620,10 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // Dig out the nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
+  bool reflectable = false;
   auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
                                             ResolveToNominalOptions(),
-                                            modulesFound, anyObject);
+                                            modulesFound, anyObject, reflectable);
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
 
@@ -3603,7 +3641,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
             LookupOuterResults::Included);
         nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
                                              ResolveToNominalOptions(),
-                                             modulesFound, anyObject);
+                                             modulesFound, anyObject, reflectable);
         if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front())) {
           auto nominal = nominals.front();
           if (nominal->getDeclContext()->isModuleScopeContext()) {
@@ -3638,7 +3676,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
-    bool &anyObject) {
+    bool &anyObject, bool &reflectable) {
   auto typeDecl = decl.dyn_cast<const TypeDecl *>();
   auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
 
@@ -3654,7 +3692,7 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   auto nominalTypes
     = resolveTypeDeclsToNominal(ctx.evaluator, ctx, referenced,
                                 ResolveToNominalOptions(),
-                                modulesFound, anyObject);
+                                modulesFound, anyObject, reflectable);
 
   // Dig out the source location
   // FIXME: This is a hack. We need cooperation from
@@ -3676,13 +3714,14 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    bool &anyObject) {
+    bool &anyObject,
+    bool &reflectable) {
   auto inheritedTypes = InheritedTypes(decl);
 
   // Gather results from all of the inherited types.
   SmallVector<InheritedNominalEntry, 4> result;
   for (unsigned i : inheritedTypes.getIndices()) {
-    getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
+    getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject, reflectable);
   }
 
   auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
@@ -3838,10 +3877,11 @@ ProtocolDecl *ImplementsAttrProtocolRequest::evaluate(
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
+  bool reflectable = false;
   auto nominalTypes
     = resolveTypeDeclsToNominal(evaluator, ctx, referenced,
                                 ResolveToNominalOptions(),
-                                modulesFound, anyObject);
+                                modulesFound, anyObject, reflectable);
 
   if (nominalTypes.empty())
     return nullptr;

@@ -421,7 +421,7 @@ class OpaqueArchetypeTypeRef final : public TypeRef {
       for (auto arg : argList)
         ID.addPointer(arg);
     }
-    
+
     return ID;
   }
 
@@ -432,7 +432,7 @@ public:
       : TypeRef(TypeRefKind::OpaqueArchetype), ID(id), Description(description),
         Ordinal(ordinal) {
     std::vector<unsigned> argumentListLengths;
-    
+
     for (auto argList : argumentLists) {
       argumentListLengths.push_back(argList.size());
       AllArgumentsBuf.insert(AllArgumentsBuf.end(),
@@ -461,17 +461,17 @@ public:
   unsigned getOrdinal() const {
     return Ordinal;
   }
-  
+
   /// A stable identifier for the opaque type.
   StringRef getID() const {
     return ID;
   }
-  
+
   /// A human-digestible, but not necessarily stable, description of the opaque type.
   StringRef getDescription() const {
     return Description;
   }
-  
+
   static bool classof(const TypeRef *T) {
     return T->getKind() == TypeRefKind::OpaqueArchetype;
   }
@@ -548,7 +548,7 @@ public:
   const TypeRef *getThrownError() const {
     return ThrownError;
   }
-  
+
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Function;
   }
@@ -558,12 +558,15 @@ class ProtocolCompositionTypeRef final : public TypeRef {
   std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass;
   bool HasExplicitAnyObject;
+  bool HasExplicitReflectable;
 
   static TypeRefID Profile(std::vector<const TypeRef *> Protocols,
                            const TypeRef *Superclass,
-                           bool HasExplicitAnyObject) {
+                           bool HasExplicitAnyObject,
+                           bool HasExplicitReflectable) {
     TypeRefID ID;
     ID.addInteger((uint32_t)HasExplicitAnyObject);
+    ID.addInteger((uint32_t)HasExplicitReflectable);
     for (auto Protocol : Protocols) {
       ID.addPointer(Protocol);
     }
@@ -574,17 +577,20 @@ class ProtocolCompositionTypeRef final : public TypeRef {
 public:
   ProtocolCompositionTypeRef(std::vector<const TypeRef *> Protocols,
                              const TypeRef *Superclass,
-                             bool HasExplicitAnyObject)
+                             bool HasExplicitAnyObject,
+                             bool HasExplicitReflectable)
     : TypeRef(TypeRefKind::ProtocolComposition),
       Protocols(Protocols), Superclass(Superclass),
-      HasExplicitAnyObject(HasExplicitAnyObject) {}
+      HasExplicitAnyObject(HasExplicitAnyObject),
+      HasExplicitReflectable(HasExplicitReflectable) {}
 
   template <typename Allocator>
   static const ProtocolCompositionTypeRef *
   create(Allocator &A, std::vector<const TypeRef *> Protocols,
-         const TypeRef *Superclass, bool HasExplicitAnyObject) {
+         const TypeRef *Superclass, bool HasExplicitAnyObject,
+         bool HasExplicitReflectable) {
     FIND_OR_CREATE_TYPEREF(A, ProtocolCompositionTypeRef, Protocols,
-                           Superclass, HasExplicitAnyObject);
+                           Superclass, HasExplicitAnyObject, HasExplicitReflectable);
   }
 
   // These are either NominalTypeRef or ObjCProtocolTypeRef.
@@ -596,6 +602,10 @@ public:
 
   bool hasExplicitAnyObject() const {
     return HasExplicitAnyObject;
+  }
+
+  bool hasExplicitReflectable() const {
+    return HasExplicitReflectable;
   }
 
   static bool classof(const TypeRef *TR) {

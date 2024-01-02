@@ -729,7 +729,7 @@ Type GenericSignatureImpl::getUpperBound(Type type,
   }
 
   auto constraint = ProtocolCompositionType::get(getASTContext(), types,
-                                                 hasExplicitAnyObject);
+                                                 hasExplicitAnyObject, true); // FIXME
 
   if (!constraint->isConstraintType()) {
     assert(constraint->getClassOrBoundGenericClass());

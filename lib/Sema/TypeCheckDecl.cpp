@@ -236,7 +236,8 @@ HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
     return false;
 
   bool anyObject = false;
-  auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+  bool reflectable = false;
+  auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject, reflectable);
   for (auto &found : inherited) {
     auto *protoDecl = dyn_cast<ProtocolDecl>(found.Item);
     if (!protoDecl)
@@ -659,8 +660,9 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
 
   // Determine the set of nominal types that this protocol inherits.
   bool anyObject = false;
+  bool reflectable = false;
   auto allInheritedNominals =
-    getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+    getDirectlyInheritedNominalTypeDecls(decl, anyObject, reflectable);
 
   // Quick check: do we inherit AnyObject?
   if (anyObject)
@@ -3264,4 +3266,32 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }
+}
+
+//----------------------------------------------------------------------------//
+// InheritsReflectableProtocolRequest
+//----------------------------------------------------------------------------//
+bool
+InheritsReflectableProtocolRequest::evaluate(Evaluator &evaluator,
+                                             ProtocolDecl *decl) const {
+
+  // Determine the set of nominal types that this protocol inherits.
+  bool anyObject = false;
+  bool reflectable = false;
+  auto allInheritedNominals =
+    getDirectlyInheritedNominalTypeDecls(decl, anyObject, reflectable);
+
+  // Quick check: do we inherit Reflectable?
+  if (reflectable)
+    return true;
+
+  // Look through all of the inherited nominals for Reflectable.
+  for (const auto &found : allInheritedNominals) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
+      if (proto->inheritsReflectable())
+        return true;
+    }
+  }
+
+  return false;
 }

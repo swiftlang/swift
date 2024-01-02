@@ -1425,7 +1425,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
       return I->second;
     }
-    
+
     // type-casting operators such as 'is' and 'as'.
     if (resolution.getOptions().is(TypeResolverContext::ExplicitCastExpr)) {
       auto lookupResult = TypeChecker::lookupUnqualified(
@@ -2086,9 +2086,9 @@ namespace {
 
     bool diagnoseMoveOnlyGeneric(TypeRepr *repr,
                                  Type unboundTy, Type genericArgTy);
-    
+
     bool diagnoseDisallowedExistential(TypeRepr *repr);
-    
+
     bool diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr);
 
     NeverNullType resolveOpenedExistentialArchetype(
@@ -2525,10 +2525,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
     auto *DC = getDeclContext();
-    
+
     bool isInExistential = diagnoseDisallowedExistential(opaqueRepr);
     bool hasInvalidPlaceholder = diagnoseInvalidPlaceHolder(opaqueRepr);
-    
+
     if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
       if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr)){
         return !isInExistential ? getOpaqueArchetypeIdentity(opaqueDecl, *ordinal)
@@ -2829,7 +2829,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   if (auto box = dyn_cast<SILBoxTypeRepr>(repr)) {
     return resolveSILBoxType(box, attrs.has(TAK_captures_generics), options);
   }
-  
+
   // Resolve global actor.
   CustomAttr *globalActorAttr = nullptr;
   Type globalActor;
@@ -2890,16 +2890,16 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
-  
+
   // If this is a reference to an opaque return type, resolve it.
   if (auto &opaque = attrs.OpaqueReturnTypeOf) {
     return resolveOpaqueReturnType(repr, opaque->mangledName, opaque->index,
                                    options);
   }
-  
+
   // In SIL *only*, allow @thin, @thick, or @objc_metatype to apply to
   // a metatype.
-  if (attrs.has(TAK_thin) || attrs.has(TAK_thick) || 
+  if (attrs.has(TAK_thin) || attrs.has(TAK_thick) ||
       attrs.has(TAK_objc_metatype)) {
     if (auto SF = getDeclContext()->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
@@ -2988,7 +2988,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       attrs.clearAttribute(attr);
     }
   };
-  
+
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TypeResolutionFlags::SILType)) {
@@ -3001,7 +3001,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
                              TAK_yield_many}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-  }  
+  }
 
   // Other function representation attributes are not normally supported at
   // source level, but we want to support them there in SIL files.
@@ -3258,7 +3258,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           .fixItRemove(getTypeAttrRangeWithAt(getASTContext(), loc));
       ty = ErrorType::get(getASTContext());
     }
-    
+
     attrs.clearAttribute(TAK_retroactive);
   }
 
@@ -3411,13 +3411,13 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       }
     }
   }
-  
+
   // In SIL *only*, allow @block_storage to specify a block storage type.
   if ((options & TypeResolutionFlags::SILType) && attrs.has(TAK_block_storage)) {
     ty = SILBlockStorageType::get(ty->getCanonicalType());
     attrs.clearAttribute(TAK_block_storage);
   }
-  
+
   // In SIL *only*, allow @box to specify a box type.
   if ((options & TypeResolutionFlags::SILType) && attrs.has(TAK_box)) {
     ty = SILBoxType::get(ty->getCanonicalType());
@@ -3599,7 +3599,7 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
       TypeArgsBuf.push_back(argTy);
     }
   }
-  
+
   // Use type reconstruction to summon the opaque type decl.
   Demangler demangle;
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
@@ -3613,7 +3613,7 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
   auto opaqueNode =
     builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
   opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
-  
+
   auto TypeArgs = ArrayRef<Type>(TypeArgsBuf);
   auto ty = builder.resolveOpaqueType(opaqueNode, TypeArgs, ordinal);
   if (!ty || ty->hasError()) {
@@ -3738,7 +3738,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   }
 
   auto fnTy = FunctionType::get(params, outputTy, extInfo);
-  
+
   if (fnTy->hasError())
     return fnTy;
 
@@ -3784,7 +3784,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
   // Substitute out parsed context types into interface types.
   auto genericSig = repr->getGenericSignature().getCanonicalSignature();
-  
+
   // Resolve the generic arguments.
   // Start by building a TypeSubstitutionMap.
   SubstitutionMap subMap;
@@ -3797,7 +3797,7 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
       diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
       return ErrorType::get(getASTContext());
     }
-  
+
     for (unsigned i : indices(params)) {
       auto argTy = resolveType(repr->getGenericArguments()[i], options);
       genericArgMap.insert({params[i], argTy->getCanonicalType()});
@@ -4920,7 +4920,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !elements[0].getType()->is<PackExpansionType>())
       return ParenType::get(ctx, elements[0].getType());
   }
-  
+
   if (moveOnlyElementIndex.has_value()
       && !options.contains(TypeResolutionFlags::SILType)
       && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
@@ -5034,7 +5034,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // AnyObject type in the standard library.
   auto composition =
       ProtocolCompositionType::get(getASTContext(), Members, Inverses,
-                                   /*HasExplicitAnyObject=*/false);
+                                   /*HasExplicitAnyObject=*/false, false);
   if (options.isConstraintImplicitExistential()) {
     return ExistentialType::get(composition);
   }
@@ -5068,7 +5068,7 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
         .fixItReplace(repr->getSourceRange(), fix);
       return constraintType;
     }
-    
+
     // Diagnose redundant `any` on an already existential type e.g. any (any P)
     // with a fix-it to remove first any.
     if (constraintType->is<ExistentialType>()) {
@@ -5291,7 +5291,7 @@ class ExistentialTypeVisitor
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
-    
+
 public:
   ExistentialTypeVisitor(ASTContext &ctx, bool checkStatements)
     : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }

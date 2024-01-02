@@ -3048,7 +3048,7 @@ static bool usesFeatureRetroactiveAttribute(Decl *decl) {
     return false;
 
   ArrayRef<InheritedEntry> entries = ext->getInherited().getEntries();
-  return std::find_if(entries.begin(), entries.end(), 
+  return std::find_if(entries.begin(), entries.end(),
     [](const InheritedEntry &entry) {
       return entry.isRetroactive;
     }) != entries.end();
@@ -3503,19 +3503,19 @@ static bool usesFeatureStructLetDestructuring(Decl *decl) {
   auto sd = dyn_cast<StructDecl>(decl);
   if (!sd)
     return false;
-    
+
   for (auto member : sd->getStoredProperties()) {
     if (!member->isLet())
       continue;
-    
+
     auto init = member->getParentPattern();
     if (!init)
       continue;
-      
+
     if (!init->getSingleVar())
       return true;
   }
-  
+
   return false;
 }
 
@@ -4258,7 +4258,7 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("__owned", options, " ");
     break;
   }
-  
+
   if (flags.isIsolated())
     printer.printKeyword("isolated", options, " ");
 
@@ -7055,7 +7055,7 @@ public:
     if (T->getLayout()->capturesGenericEnvironment()) {
       Printer << "@captures_generics ";
     }
-    
+
     {
       // A box layout has its own independent generic environment. Don't try
       // to print it with the environment's generic params.
@@ -7164,6 +7164,8 @@ public:
                  [&] { Printer << " & "; });
       if (T->hasExplicitAnyObject())
         Printer << " & AnyObject";
+      if (T->hasExplicitReflectable())
+        Printer << " & Reflectable";
     }
   }
 
@@ -7556,6 +7558,7 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   case LayoutConstraintKind::RefCountedObject:
   case LayoutConstraintKind::NativeRefCountedObject:
   case LayoutConstraintKind::Class:
+  case LayoutConstraintKind::Reflectable:
   case LayoutConstraintKind::NativeClass:
   case LayoutConstraintKind::Trivial:
     return;

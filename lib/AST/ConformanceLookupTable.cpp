@@ -205,8 +205,9 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
       bool anyObject = false;
+      bool reflectable = false;
       for (const auto &found :
-               getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
+               getDirectlyInheritedNominalTypeDecls(next, anyObject, reflectable)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
           protocols.push_back({proto, found.Loc, found.uncheckedLoc});
       }
@@ -492,8 +493,9 @@ void ConformanceLookupTable::addInheritedProtocols(
     ConformanceSource source) {
   // Find all of the protocols in the inheritance list.
   bool anyObject = false;
+  bool reflectable = false;
   for (const auto &found :
-          getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+          getDirectlyInheritedNominalTypeDecls(decl, anyObject, reflectable)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
       addProtocol(
         proto, found.Loc, source.withUncheckedLoc(found.uncheckedLoc));

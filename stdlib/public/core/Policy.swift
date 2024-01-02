@@ -316,6 +316,8 @@ public typealias AnyObject = Builtin.AnyObject
 public typealias AnyObject = Builtin.AnyObject
 #endif
 
+public typealias Reflectable = Builtin.Reflectable
+
 /// The protocol to which all class types implicitly conform.
 ///
 /// You can use the `AnyClass` protocol as the concrete type for an instance of

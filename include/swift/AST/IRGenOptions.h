@@ -89,7 +89,7 @@ enum class SwiftAsyncFramePointerKind : unsigned {
 };
 
 enum class ReflectionMetadataMode : unsigned {
-  None,         ///< Don't emit reflection metadata at all.
+  OptIn,        ///< Reflection is emitted only for Reflectable nominal types.
   DebuggerOnly, ///< Emit reflection metadata for the debugger, don't link them
                 ///  into runtime metadata and don't force them to stay alive.
   Runtime,      ///< Make reflection metadata fully available.

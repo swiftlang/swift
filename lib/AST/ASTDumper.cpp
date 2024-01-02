@@ -282,7 +282,7 @@ static StringRef getDumpString(ImportKind value) {
   case ImportKind::Var: return "var";
   case ImportKind::Func: return "func";
   }
-  
+
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
 
@@ -386,7 +386,7 @@ static StringRef getDumpString(LifetimeAnnotation lifetime) {
   case LifetimeAnnotation::None:
     return "";
   }
-  
+
   llvm_unreachable("Unhandled LifetimeAnnotation in switch.");
 }
 static StringRef getDumpString(AccessorKind kind) {
@@ -1305,7 +1305,7 @@ namespace {
                 "known_to_be_local", DeclModifierColor);
 
       printAccessors(VD);
-      
+
       printFoot();
     }
 
@@ -1369,7 +1369,7 @@ namespace {
           PD->getDefaultArgumentCaptureInfo().print(OS);
         }, "", CapturesColor);
       }
-      
+
       printFlag(PD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
                 "known_to_be_local", DeclModifierColor);
 
@@ -2009,7 +2009,7 @@ public:
       printRecArbitrary([&](StringRef label) {
         printHead("case_label_item", StmtColor, label);
         printFlag(LabelItem.isDefault(), "default");
-        
+
         if (auto *CasePattern = LabelItem.getPattern()) {
           printRec(CasePattern);
         }
@@ -2099,12 +2099,12 @@ public:
 
     printFlag(E->TrailingSemiLoc.isValid(), "trailing_semi");
   }
-  
+
   void printSemanticExpr(Expr * semanticExpr) {
     if (semanticExpr == nullptr) {
       return;
     }
-    
+
     printRec(semanticExpr, "semantic_expr");
   }
 
@@ -2134,7 +2134,7 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E, StringRef label) {
     printCommon(E, "integer_literal_expr", label);
-    
+
     printFlag(E->isNegative(), "negative", LiteralValueColor);
     Type T = GetTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
@@ -2148,7 +2148,7 @@ public:
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E, StringRef label) {
     printCommon(E, "float_literal_expr", label);
-    
+
     printFlag(E->isNegative(), "negative", LiteralValueColor);
     printFieldQuoted(E->getDigitsText(), "value", LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
@@ -2156,13 +2156,13 @@ public:
     if (!E->getBuiltinType().isNull()) {
       printFieldQuoted(E->getBuiltinType(), "builtin_type", ExprModifierColor);
     }
-    
+
     printFoot();
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E, StringRef label) {
     printCommon(E, "boolean_literal_expr", label);
-    
+
     printField(E->getValue(), "value", LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
     printInitializerField(E->getInitializer(), "initializer");
@@ -2172,7 +2172,7 @@ public:
 
   void visitStringLiteralExpr(StringLiteralExpr *E, StringRef label) {
     printCommon(E, "string_literal_expr", label);
-    
+
     printField(E->getEncoding(), "encoding", ExprModifierColor);
     printFieldQuoted(E->getValue(), "value", LiteralValueColor);
     printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
@@ -2200,7 +2200,7 @@ public:
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, StringRef label) {
     printCommon(E, "magic_identifier_literal_expr", label);
-    
+
     printField(E->getKind(), "kind", ExprModifierColor);
 
     if (E->isString()) {
@@ -2213,7 +2213,7 @@ public:
   }
   void visitRegexLiteralExpr(RegexLiteralExpr *E, StringRef label) {
     printCommon(E, "regex_literal_expr", label);
-    
+
     printFieldQuoted(E->getRegexText(), "text", LiteralValueColor);
     printInitializerField(E->getInitializer(), "initializer");
 
@@ -2227,7 +2227,7 @@ public:
     printInitializerField(E->getInitializer(), "initializer");
 
     printRec(E->getArgs());
-    
+
     printFoot();
   }
 
@@ -2767,7 +2767,7 @@ public:
         E->getCaptureInfo().print(OS);
       }, "", CapturesColor);
     }
-    // Printing a function type doesn't indicate whether it's escaping because it doesn't 
+    // Printing a function type doesn't indicate whether it's escaping because it doesn't
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
     if (auto Ty = GetTypeOfExpr(E)) {
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
@@ -3372,7 +3372,7 @@ public:
     printRec(T->getBase());
     printFoot();
   }
-  
+
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T, StringRef label) {
     printCommon("isolated", label);
     printRec(T->getBase());
@@ -4091,7 +4091,7 @@ namespace {
       printRec(T->getSelfType());
       printFoot();
     }
-    
+
     void printArchetypeCommon(ArchetypeType *T,
                               StringRef className,
                               StringRef label) {
@@ -4339,6 +4339,8 @@ namespace {
       printCommon("protocol_composition_type", label);
 
       printFlag(T->hasExplicitAnyObject(), "any_object");
+
+      printFlag(T->hasExplicitReflectable(), "reflectable");
 
       for (auto proto : T->getMembers()) {
         printRec(proto);

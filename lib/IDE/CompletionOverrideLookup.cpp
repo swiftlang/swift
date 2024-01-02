@@ -132,7 +132,7 @@ Type CompletionOverrideLookup::getOpaqueResultType(
       return opaqueTypes.front();
   }
   return ProtocolCompositionType::get(VD->getASTContext(), opaqueTypes,
-                                      hasExplicitAnyObject);
+                                      hasExplicitAnyObject, false);
 }
 
 void CompletionOverrideLookup::addValueOverride(
