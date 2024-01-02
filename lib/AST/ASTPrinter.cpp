@@ -7756,10 +7756,20 @@ public:
       // canonical types to sugared types.
       if (Options.GenericSig)
         T = Options.GenericSig->getSugaredType(T);
+
+      decl = T->getDecl();
     }
 
     // Print opaque types as "some ..."
     if (decl && decl->isOpaqueType()) {
+      // For SIL, we print opaque parameter types as canonical types, and parse
+      // them that way too (because they're printed in this way in the SIL
+      // generic parameter list).
+      if (Options.PrintInSILBody) {
+        Printer.printName(cast<GenericTypeParamType>(T->getCanonicalType())->getName());
+        return;
+      }
+
       // If we have and should print based on the type representation, do so.
       if (auto opaqueRepr = decl->getOpaqueTypeRepr()) {
         if (willUseTypeReprPrinting(opaqueRepr, Type(), Options)) {
