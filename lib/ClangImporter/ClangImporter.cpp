@@ -2458,6 +2458,8 @@ ClangImporter::Implementation::DiagnosticWalker::DiagnosticWalker(
 
 bool ClangImporter::Implementation::DiagnosticWalker::TraverseDecl(
     clang::Decl *D) {
+  if (!D)
+    return true;
   // In some cases, diagnostic notes about types (ex: built-in types) do not
   // have an obvious source location at which to display diagnostics. We
   // provide the location of the closest decl as a reasonable choice.
