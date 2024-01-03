@@ -1923,6 +1923,15 @@ static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
   return fn;
 }
 
+static bool shouldCheckSendable(Expr *expr) {
+  if (auto *declRef = dyn_cast<DeclRefExpr>(expr->findOriginalValue())) {
+    auto isolation = getActorIsolation(declRef->getDecl());
+    return isolation != ActorIsolation::NonisolatedUnsafe;
+  }
+
+  return true;
+}
+
 bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *declContext) {
   auto isolationCrossing = apply->getIsolationCrossing();
   if (!isolationCrossing.has_value())
@@ -1935,7 +1944,9 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
   // Check the 'self' argument.
   if (auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn())) {
     auto *base = selfApply->getBase();
-    if (diagnoseNonSendableTypes(
+
+    if (shouldCheckSendable(base) &&
+        diagnoseNonSendableTypes(
             base->getType(),
             declContext, base->getStartLoc(),
             diag::non_sendable_call_argument,
@@ -1954,6 +1965,7 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
     // Dig out the location of the argument.
     SourceLoc argLoc = apply->getLoc();
     Type argType;
+    bool checkSendable = true;
     if (auto argList = apply->getArgs()) {
       auto arg = argList->get(paramIdx);
       if (arg.getStartLoc().isValid())
@@ -1962,6 +1974,7 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
       // Determine the type of the argument, ignoring any implicit
       // conversions that could have stripped sendability.
       if (Expr *argExpr = arg.getExpr()) {
+        checkSendable = shouldCheckSendable(argExpr);
         argType = argExpr->findOriginalType();
 
         // If this is a default argument expression, don't check Sendability
@@ -1976,7 +1989,8 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
       }
     }
 
-    if (diagnoseNonSendableTypes(
+    if (checkSendable &&
+        diagnoseNonSendableTypes(
             argType ? argType : param.getParameterType(),
             declContext, argLoc, diag::non_sendable_call_argument,
             isolationCrossing.value().exitsIsolation(),
