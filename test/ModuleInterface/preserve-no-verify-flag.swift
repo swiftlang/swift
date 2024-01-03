@@ -1,5 +1,4 @@
 // RUN: %empty-directory(%t)
-// REQUIRES: swift-driver-change
 
 /// Check that the flag -no-verify-emitted-module-interface is written down in the swiftinterface.
 // RUN: %target-build-swift -emit-library -enable-library-evolution -emit-module-interface -emit-module -swift-version 5 -o %t/NoVerified.o -no-verify-emitted-module-interface -module-name NoVerified %s
