@@ -111,7 +111,7 @@ public typealias CLongDouble = Float80
 #endif
 #elseif $Embedded
 #if arch(x86_64) || arch(i386)
-public typealias CLongDouble = Float80
+public typealias CLongDouble = Double
 #endif
 #else
 // TODO: define CLongDouble for other OSes
