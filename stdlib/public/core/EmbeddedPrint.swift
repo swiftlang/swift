@@ -1,8 +1,26 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import SwiftShims
+
+// TODO: This is all a stop-gap so that at least some types are printable in
+// embedded Swift, in an embedded-programming friendly way (we mainly need
+// printing to not need to heap allocate).
+
 @_silgen_name("putchar")
 func putchar(_: UInt8)
 
-func print(_ s: StaticString, terminator: StaticString = "\n") {
-  var p = s.utf8Start
+public func print(_ string: StaticString, terminator: StaticString = "\n") {
+  var p = string.utf8Start
   while p.pointee != 0 {
     putchar(p.pointee)
     p += 1
@@ -43,7 +61,8 @@ extension BinaryInteger {
     withUnsafeTemporaryAllocation(byteCount: 64, alignment: 1) { buffer in
       var index = buffer.count - 1
       while value != 0 {
-        let (quotient, remainder) = value.quotientAndRemainder(dividingBy: Magnitude(radix))
+        let (quotient, remainder) =
+            value.quotientAndRemainder(dividingBy: Magnitude(radix))
         buffer[index] = _ascii(UInt8(truncatingIfNeeded: remainder))
         index -= 1
         value = quotient
@@ -55,18 +74,20 @@ extension BinaryInteger {
       let start = index + 1
       let end = buffer.count - 1
       let count = end - start + 1
-      printCharacters(UnsafeBufferPointer(start: buffer.baseAddress?.advanced(by: start).assumingMemoryBound(to: UInt8.self), count: count))
+
+      let pointerToPrint = buffer.baseAddress?.advanced(by: start).assumingMemoryBound(to: UInt8.self)
+      printCharacters(UnsafeBufferPointer(start: pointerToPrint, count: count))
     }
   }
 }
 
-func print(_ n: some BinaryInteger, terminator: StaticString = "\n") {
-  n.writeToStdout()
+public func print(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
+  integer.writeToStdout()
   print("", terminator: terminator)
 }
 
-func print(_ b: Bool, terminator: StaticString = "\n") {
-  if b {
+public func print(_ boolean: Bool, terminator: StaticString = "\n") {
+  if boolean {
     print("true", terminator: terminator)
   } else {
     print("false", terminator: terminator)
