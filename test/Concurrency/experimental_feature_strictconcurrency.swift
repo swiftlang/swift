@@ -84,3 +84,11 @@ func testLocalNonisolatedUnsafe() async {
   }
   print(await task.value)
 }
+
+@MainActor
+func iterate(stream: AsyncStream<Int>) async {
+  nonisolated(unsafe) var it = stream.makeAsyncIterator()
+  while let element = await it.next() {
+    print(element)
+  }
+}
