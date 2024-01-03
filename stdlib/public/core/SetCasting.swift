@@ -41,6 +41,7 @@ extension Set {
 /// - Precondition: `BaseValue` is a base class or base `@objc`
 ///   protocol (such as `AnyObject`) of `DerivedValue`.
 @inlinable
+@_unavailableInEmbedded
 public func _setUpCast<DerivedValue, BaseValue>(
   _ source: Set<DerivedValue>
 ) -> Set<BaseValue> {
@@ -57,6 +58,7 @@ public func _setUpCast<DerivedValue, BaseValue>(
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastIndirect")
+@_unavailableInEmbedded
 internal func _setDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>) {
@@ -71,6 +73,7 @@ internal func _setDownCastIndirect<SourceValue, TargetValue>(
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
 @inlinable
+@_unavailableInEmbedded
 public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   -> Set<DerivedValue> {
 
@@ -99,6 +102,7 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastConditionalIndirect")
+@_unavailableInEmbedded
 internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>
@@ -118,6 +122,7 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 /// - Precondition: `DerivedValue` is a subtype of `BaseValue` and both
 ///   are reference types.
 @inlinable
+@_unavailableInEmbedded
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {

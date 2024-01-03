@@ -127,6 +127,28 @@ internal class __EmptySetSingleton: __RawSetStorage {
 #endif
 }
 
+#if $Embedded
+// In embedded Swift, the stdlib is a .swiftmodule only without any .o/.a files,
+// to allow consuming it by clients with different LLVM codegen setting (-mcpu
+// flags, etc.), which means we cannot declare the singleton in a C/C++ file.
+//
+// TODO: We should figure out how to make this a constant so that it's placed in
+// non-writable memory (can't be a let, Builtin.addressof below requires a var).
+public var _swiftEmptySetSingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, UInt32, Int, Int, Int) =
+    (
+      /*isa*/0, /*refcount*/-1, // HeapObject header
+      /*count*/0, 
+      /*capacity*/0, 
+      /*scale*/0, 
+      /*reservedScale*/0, 
+      /*extra*/0, 
+      /*age*/0, 
+      /*seed*/0, 
+      /*rawElements*/1, 
+      /*metadata*/-1
+    )
+#endif
+
 extension __RawSetStorage {
   /// The empty singleton that is used for every single Set that is created
   /// without any elements. The contents of the storage must never be mutated.
@@ -364,7 +386,7 @@ extension _SetStorage {
         truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
     }
 
-    storage._seed = seed ?? _HashTable.hashSeed(for: storage, scale: scale)
+    storage._seed = seed ?? _HashTable.hashSeed(for: Builtin.castToNativeObject(storage), scale: scale)
     storage._rawElements = UnsafeMutableRawPointer(elementsAddr)
 
     // Initialize hash table metadata.
