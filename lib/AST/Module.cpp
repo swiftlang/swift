@@ -2716,14 +2716,6 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
   return nullptr;
 }
 
-bool ModuleDecl::isExportedAs(const ModuleDecl *other) const {
-  auto clangModule = findUnderlyingClangModule();
-  if (!clangModule)
-    return false;
-
-  return other->getRealName().str() == clangModule->ExportAsModule;
-}
-
 void ModuleDecl::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   for (const FileUnit *fileUnit : getFiles()) {
@@ -3519,8 +3511,8 @@ void SourceFile::lookupImportedSPIGroups(
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
         (importedModule == import.module.importedModule ||
-         (imports.isImportedBy(importedModule, import.module.importedModule) &&
-          importedModule->isExportedAs(import.module.importedModule)))) {
+         imports.isImportedByViaSwiftOnly(importedModule,
+                                       import.module.importedModule))) {
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
