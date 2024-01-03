@@ -32,14 +32,18 @@ namespace Lowering {
 class PackGeneratorRef {
   struct VTable {
     ManagedValue (*claimNext)(void *impl);
+    SILArgumentConvention (*getCurrentConvention)(void *impl);
     void (*finishCurrent)(void *impl, ManagedValue packAddr);
   };
 
   template <class Impl>
   struct VTableImpl {
     static constexpr VTable vtable = {
-      [](void *impl) {
+      [](void *impl) -> ManagedValue {
         return static_cast<Impl*>(impl)->claimNext();
+      },
+      [](void *impl) -> SILArgumentConvention {
+        return static_cast<Impl*>(impl)->getCurrentConvention();
       },
       [](void *impl, ManagedValue packAddr) {
         static_cast<Impl*>(impl)->finishCurrent(packAddr);
@@ -58,6 +62,9 @@ public:
 
   ManagedValue claimNext() {
     return vtable->claimNext(pointer);
+  }
+  SILArgumentConvention getCurrentConvention() {
+    return vtable->getCurrentConvention(pointer);
   }
   void finishCurrent(ManagedValue packAddr) {
     vtable->finishCurrent(pointer, packAddr);
