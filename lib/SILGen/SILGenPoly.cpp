@@ -3638,9 +3638,12 @@ void ResultPlanner::Operation::emitReabstractTupleIntoPackExpansion(
                               outerComponentIndex);
 
   SILType innerEltTy, outerEltTy;
+  CanType innerSubstEltType, outerSubstEltType;
   auto openedEnv = SGF.createOpenedElementValueEnvironment(
                    { innerPackExpansionTy, outerPackExpansionTy },
-                   { &innerEltTy, &outerEltTy });
+                   { &innerEltTy, &outerEltTy },
+                   { InnerSubstType, OuterSubstType },
+                   { &innerSubstEltType, &outerSubstEltType });
 
   auto innerFormalPackType = PackExpansion.InnerFormalPackType;
   auto outerFormalPackType = PackExpansion.OuterFormalPackType;
@@ -3675,20 +3678,11 @@ void ResultPlanner::Operation::emitReabstractTupleIntoPackExpansion(
                                          CleanupHandle::invalid());
     auto outerResultCtxt = SGFContext(&outerEltInit);
 
-    CanType innerSubstType = InnerSubstType;
-    CanType outerSubstType = OuterSubstType;
-    if (openedEnv) {
-      innerSubstType =
-        openedEnv->mapContextualPackTypeIntoElementContext(innerSubstType);
-      outerSubstType =
-        openedEnv->mapContextualPackTypeIntoElementContext(outerSubstType);
-    }
-
     // Reabstract.
     auto outerEltValue =
       SGF.emitTransformedValue(loc, innerEltValue,
-                               InnerOrigType, innerSubstType,
-                               OuterOrigType, outerSubstType,
+                               InnerOrigType, innerSubstEltType,
+                               OuterOrigType, outerSubstEltType,
                                outerEltTy, outerResultCtxt);
 
     // Force the value into the outer result address if necessary.

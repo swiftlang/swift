@@ -2697,6 +2697,11 @@ public:
   GenericEnvironment *
   createOpenedElementValueEnvironment(ArrayRef<SILType> packExpansionTys,
                                       ArrayRef<SILType*> eltTys);
+  GenericEnvironment *
+  createOpenedElementValueEnvironment(ArrayRef<SILType> packExpansionTys,
+                                      ArrayRef<SILType*> eltTys,
+                                      ArrayRef<CanType> formalPackExpansionTys,
+                                      ArrayRef<CanType*> formalEltTys);
 
   /// Emit a dynamic loop over a single pack-expansion component of a pack.
   ///
