@@ -281,6 +281,9 @@ EXPERIMENTAL_FEATURE(FixedArrays, true)
 // Group Main Actor Isolation Errors by Scope
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
+// Allow for the 'transferring' keyword to be applied to arguments and results.
+EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

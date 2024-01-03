@@ -222,8 +222,7 @@ SILFunctionType::getDifferentiabilityParameterIndices() {
   assert(isDifferentiable() && "Must be a differentiable function");
   SmallVector<unsigned, 8> paramIndices;
   for (auto paramAndIndex : enumerate(getParameters()))
-    if (paramAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable)
+    if (!paramAndIndex.value().hasOption(SILParameterInfo::NotDifferentiable))
       paramIndices.push_back(paramAndIndex.index());
   return IndexSubset::get(getASTContext(), getNumParameters(), paramIndices);
 }
@@ -234,8 +233,7 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
 
   // Check formal results.
   for (auto resultAndIndex : enumerate(getResults()))
-    if (resultAndIndex.value().getDifferentiability() !=
-        SILResultDifferentiability::NotDifferentiable)
+    if (!resultAndIndex.value().hasOption(SILResultInfo::NotDifferentiable))
       resultIndices.push_back(resultAndIndex.index());
 
   auto numSemanticResults = getNumResults();
@@ -254,8 +252,8 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
     //
     // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
     // parameters are not treated as differentiability results.
-    if (resultParamAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable)
+    if (!resultParamAndIndex.value().hasOption(
+            SILParameterInfo::NotDifferentiable))
       resultIndices.push_back(getNumResults() + resultParamAndIndex.index());
 
   numSemanticResults += getNumAutoDiffSemanticResultsParameters();
@@ -300,22 +298,21 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
          "Differentiability kind must be normal or linear");
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
-    auto &param = paramAndIndex.value();
+    auto param = paramAndIndex.value();
     unsigned index = paramAndIndex.index();
-    newParameters.push_back(param.getWithDifferentiability(
-        index < parameterIndices->getCapacity() &&
-                parameterIndices->contains(index)
-            ? SILParameterDifferentiability::DifferentiableOrNotApplicable
-            : SILParameterDifferentiability::NotDifferentiable));
+    newParameters.push_back(index < parameterIndices->getCapacity() &&
+                                    parameterIndices->contains(index)
+                                ? param - SILParameterInfo::NotDifferentiable
+                                : param | SILParameterInfo::NotDifferentiable);
   }
   SmallVector<SILResultInfo, 8> newResults;
   for (auto resultAndIndex : enumerate(getResults())) {
-    auto &result = resultAndIndex.value();
+    auto result = resultAndIndex.value();
     unsigned index = resultAndIndex.index();
-    newResults.push_back(result.getWithDifferentiability(
-        index < resultIndices->getCapacity() && resultIndices->contains(index)
-            ? SILResultDifferentiability::DifferentiableOrNotApplicable
-            : SILResultDifferentiability::NotDifferentiable));
+    newResults.push_back(index < resultIndices->getCapacity() &&
+                                 resultIndices->contains(index)
+                             ? result - SILResultInfo::NotDifferentiable
+                             : result | SILResultInfo::NotDifferentiable);
   }
   auto newExtInfo =
       getExtInfo().intoBuilder().withDifferentiabilityKind(kind).build();
@@ -335,13 +332,11 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
           .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
           .build();
   SmallVector<SILParameterInfo, 8> newParams;
-  for (auto &param : getParameters())
-    newParams.push_back(param.getWithDifferentiability(
-        SILParameterDifferentiability::DifferentiableOrNotApplicable));
+  for (SILParameterInfo param : getParameters())
+    newParams.push_back(param - SILParameterInfo::NotDifferentiable);
   SmallVector<SILResultInfo, 8> newResults;
-  for (auto &result : getResults())
-    newResults.push_back(result.getWithDifferentiability(
-        SILResultDifferentiability::DifferentiableOrNotApplicable));
+  for (SILResultInfo result : getResults())
+    newResults.push_back(result - SILResultInfo::NotDifferentiable);
   return SILFunctionType::get(
       getInvocationGenericSignature(), nondiffExtInfo, getCoroutineKind(),
       getCalleeConvention(), newParams, getYields(), newResults,
@@ -1743,8 +1738,7 @@ private:
                     bool isNonDifferentiable) {
     SILParameterInfo param(loweredType, convention);
     if (isNonDifferentiable)
-      param = param.getWithDifferentiability(
-          SILParameterDifferentiability::NotDifferentiable);
+      param = param.addingOption(SILParameterInfo::NotDifferentiable);
     Inputs.push_back(param);
 
     maybeAddForeignParameters();
@@ -4122,8 +4116,7 @@ getLoweredResultIndices(const SILFunctionType *functionType,
 
   // Check formal results.
   for (auto resultAndIndex : enumerate(functionType->getResults()))
-    if (resultAndIndex.value().getDifferentiability() !=
-        SILResultDifferentiability::NotDifferentiable)
+    if (!resultAndIndex.value().hasOption(SILResultInfo::NotDifferentiable))
       resultIndices.push_back(resultAndIndex.index());
 
   auto numResults = functionType->getNumResults();
@@ -4135,9 +4128,9 @@ getLoweredResultIndices(const SILFunctionType *functionType,
     if (!resultParamAndIndex.value().isAutoDiffSemanticResult())
       continue;
 
-    if (resultParamAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable &&
-       parameterIndices->contains(resultParamAndIndex.index()))
+    if (!resultParamAndIndex.value().hasOption(
+            SILParameterInfo::NotDifferentiable) &&
+        parameterIndices->contains(resultParamAndIndex.index()))
       resultIndices.push_back(numResults + semResultParamIdx);
     semResultParamIdx += 1;
   }

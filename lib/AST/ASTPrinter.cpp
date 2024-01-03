@@ -73,6 +73,8 @@
 
 using namespace swift;
 
+#pragma clang optimize off
+
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
     PrintOptions::defaultPrintExtensionContentAsMembers
@@ -3867,6 +3869,8 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
 }
 
 static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
+
+static bool usesFeatureTransferringArgsAndResults(Decl *decl) { return false; }
 
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
@@ -7988,13 +7992,17 @@ void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
-  switch (getDifferentiability()) {
-  case SILParameterDifferentiability::NotDifferentiable:
+  auto options = getOptions();
+
+  if (options.contains(SILParameterInfo::NotDifferentiable)) {
+    options -= SILParameterInfo::NotDifferentiable;
     Printer << "@noDerivative ";
-    break;
-  default:
-    break;
   }
+
+  // If we did not handle a case in Options, this code was not updated
+  // appropriately.
+  assert(!bool(options) && "Code not updated for introduced option");
+
   Printer << getStringForParameterConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }
@@ -8015,14 +8023,17 @@ void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
+
 void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
-  switch (getDifferentiability()) {
-  case SILResultDifferentiability::NotDifferentiable:
+  auto options = getOptions();
+
+  if (options.contains(SILResultInfo::NotDifferentiable)) {
+    options -= SILResultInfo::NotDifferentiable;
     Printer << "@noDerivative ";
-    break;
-  default:
-    break;
   }
+
+  assert(!bool(options) && "ResultInfo has option that was not handled?!");
+
   Printer << getStringForResultConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }

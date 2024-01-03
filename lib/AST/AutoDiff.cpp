@@ -313,7 +313,7 @@ autodiff::getSemanticResults(SILFunctionType *functionType,
     auto param = functionType->getParameters()[i];
     if (!param.isAutoDiffSemanticResult())
       continue;
-    if (param.getDifferentiability() != SILParameterDifferentiability::NotDifferentiable)
+    if (!param.hasOption(SILParameterInfo::NotDifferentiable))
       originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
   }
 }
