@@ -1633,6 +1633,52 @@ static ImportedType adjustTypeForConcreteImport(
   return {importedType, isIUO};
 }
 
+static void applyTypeAttributes(ImportTypeKind importKind,
+                                ImportTypeAttrs &attrs, clang::QualType type) {
+  bool isMainActor = false;
+  bool isSendable = false;
+  bool isNonSendable = false;
+
+  std::function<clang::QualType(clang::QualType)> skipUnrelatedSugar =
+      [&](clang::QualType type) -> clang::QualType {
+    if (auto *MQT = dyn_cast<clang::MacroQualifiedType>(type))
+      return MQT->isSugared() ? skipUnrelatedSugar(MQT->desugar()) : type;
+
+    if (auto *ET = dyn_cast<clang::ElaboratedType>(type))
+      return ET->isSugared() ? skipUnrelatedSugar(ET->desugar()) : type;
+
+    return type;
+  };
+
+  type = skipUnrelatedSugar(type);
+
+  // Consider only immediate attributes, don't look through the typerefs
+  // because they are imported separately.
+  while (const auto *AT = dyn_cast<clang::AttributedType>(type)) {
+    if (auto swiftAttr =
+            dyn_cast_or_null<clang::SwiftAttrAttr>(AT->getAttr())) {
+      if (isMainActorAttr(swiftAttr)) {
+        isMainActor = true;
+        isNonSendable =
+            importKind == ImportTypeKind::Parameter ||
+            importKind == ImportTypeKind::CompletionHandlerParameter;
+      } else if (swiftAttr->getAttribute() == "@Sendable")
+        isSendable = true;
+      else if (swiftAttr->getAttribute() == "@_nonSendable")
+        isNonSendable = true;
+    }
+
+    type = skipUnrelatedSugar(AT->getEquivalentType());
+  }
+
+  if (isMainActor)
+    attrs |= ImportTypeAttr::MainActor;
+  if (isSendable)
+    attrs |= ImportTypeAttr::Sendable;
+  if (isNonSendable)
+    attrs -= ImportTypeAttr::Sendable;
+}
+
 ImportedType ClangImporter::Implementation::importType(
     clang::QualType type, ImportTypeKind importKind,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
@@ -1678,6 +1724,8 @@ ImportedType ClangImporter::Implementation::importType(
     
     optionality = translateNullability(*nullability, stripNonResultOptionality);
   }
+
+  applyTypeAttributes(importKind, attrs, type);
 
   // If this is a completion handler parameter, record the function type whose
   // parameters will act as the results of the completion handler.
