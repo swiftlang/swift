@@ -91,4 +91,8 @@ func iterate(stream: AsyncStream<Int>) async {
   while let element = await it.next() {
     print(element)
   }
+
+  for await x in stream {
+    print(x)
+  }
 }
