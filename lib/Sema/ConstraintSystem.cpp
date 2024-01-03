@@ -1823,8 +1823,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
       // All global functions should be @Sendable
-      if (!funcDecl->getDeclContext()->isTypeContext() &&
-          !funcDecl->getDeclContext()->isLocalContext()) {
+      if (funcDecl->getDeclContext()->isModuleScopeContext()) {
         funcType =
             funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
       }
@@ -1849,7 +1848,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (isForCodeCompletion() && openedType->hasError()) {
       // In code completion, replace error types by placeholder types so we can
       // match the types we know instead of bailing out completely.
-      openedType = replaceParamErrorTypeByPlaceholder(openedType, value, /*hasAppliedSelf=*/true);
+      openedType = replaceParamErrorTypeByPlaceholder(
+          openedType, value, /*hasAppliedSelf=*/true);
     }
 
     // If we opened up any type variables, record the replacements.

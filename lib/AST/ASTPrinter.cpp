@@ -6244,7 +6244,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       if (param->isParameterPack())
         return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
-      if (archetype->isParameterPack())
+      if (isa<PackArchetypeType>(archetype))
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
         return false;
@@ -6560,7 +6560,10 @@ public:
 
     auto *typeAliasDecl = T->getDecl();
     if (typeAliasDecl->isGeneric()) {
-      printGenericArgs(T->getExpandedGenericArgs());
+      if (Options.PrintTypesForDebugging)
+        printGenericArgs(T->getDirectGenericArgs());
+      else
+        printGenericArgs(T->getExpandedGenericArgs());
     }
   }
 
@@ -6571,7 +6574,7 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
@@ -6582,7 +6585,7 @@ public:
       visit(EltType);
     }
 
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "}";
   }
 
@@ -6607,7 +6610,8 @@ public:
 
     if (rootParameterPacks.empty() &&
         (T->getCountType()->isParameterPack() ||
-         T->getCountType()->is<PackArchetypeType>())) {
+         T->getCountType()->is<PackArchetypeType>() ||
+         Options.PrintTypesForDebugging)) {
       Printer << "/* shape: ";
       visit(T->getCountType());
       Printer << " */ ";
@@ -6682,7 +6686,10 @@ public:
     }
     printQualifiedType(T);
 
-    printGenericArgs(T->getExpandedGenericArgs());
+    if (Options.PrintTypesForDebugging)
+      printGenericArgs(T->getGenericArgs());
+    else
+      printGenericArgs(T->getExpandedGenericArgs());
   }
 
   void visitParentType(Type T) {
@@ -7749,10 +7756,20 @@ public:
       // canonical types to sugared types.
       if (Options.GenericSig)
         T = Options.GenericSig->getSugaredType(T);
+
+      decl = T->getDecl();
     }
 
     // Print opaque types as "some ..."
     if (decl && decl->isOpaqueType()) {
+      // For SIL, we print opaque parameter types as canonical types, and parse
+      // them that way too (because they're printed in this way in the SIL
+      // generic parameter list).
+      if (Options.PrintInSILBody) {
+        Printer.printName(cast<GenericTypeParamType>(T->getCanonicalType())->getName());
+        return;
+      }
+
       // If we have and should print based on the type representation, do so.
       if (auto opaqueRepr = decl->getOpaqueTypeRepr()) {
         if (willUseTypeReprPrinting(opaqueRepr, Type(), Options)) {

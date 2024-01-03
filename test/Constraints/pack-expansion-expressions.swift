@@ -74,7 +74,7 @@ func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
     // expected-error@-1{{same-element requirements are not yet supported}}
 
   _ = (repeat (each c).forEach(function))
-  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(each C.Element) throws -> Void'}}
+  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '((each C).Element) throws -> Void'}}
 }
 
 func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
