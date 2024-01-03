@@ -708,9 +708,9 @@ extension Unsafe${Mutable}BufferPointer {
   ///     by this function.
   @inlinable
   @_alwaysEmitIntoClient
-  public func initialize<C: Collection>(
-    fromContentsOf source: C
-  ) -> Index where C.Element == Element {
+  public func initialize(
+    fromContentsOf source: some Collection<Element>
+  ) -> Index {
     let count = source.withContiguousStorageIfAvailable {
       guard let sourceAddress = $0.baseAddress, !$0.isEmpty else {
         return 0
@@ -811,9 +811,9 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the index of the last element updated.
   @inlinable
   @_alwaysEmitIntoClient
-  public func update<C: Collection>(
-    fromContentsOf source: C
-  ) -> Index where C.Element == Element {
+  public func update(
+    fromContentsOf source: some Collection<Element>
+  ) -> Index {
     let count = source.withContiguousStorageIfAvailable {
       guard let sourceAddress = $0.baseAddress else {
         return 0
