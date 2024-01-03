@@ -2124,18 +2124,18 @@ TupleElementAddressGenerator::projectElementAddress(SILGenFunction &SGF,
       SGF.B.createTupleElementAddr(loc, tupleAddr, eltIndex, eltTy));
   } else if (isSubstPackExpansion()) {
     eltValue = cloner.cloneForTuplePackExpansionComponent(tupleAddr,
-                                                         inducedPackType,
-                                                         eltIndex);
+                                                          getInducedPackType(),
+                                                          eltIndex);
   } else {
     auto packIndex =
-      SGF.B.createScalarPackIndex(loc, eltIndex, inducedPackType);
+      SGF.B.createScalarPackIndex(loc, eltIndex, getInducedPackType());
     auto eltAddr =
       SGF.B.createTuplePackElementAddr(loc, packIndex, tupleAddr, eltTy);
     eltValue = cloner.clone(eltAddr);
   }
 
   tupleValue = cloner.cloneForRemainingTupleComponents(tupleAddr,
-                                                       inducedPackType,
+                                                       getInducedPackTypeIfPresent(),
                                                        eltIndex + 1);
   this->tupleAddr = tupleValue;
 
