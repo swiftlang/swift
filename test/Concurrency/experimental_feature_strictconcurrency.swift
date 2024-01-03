@@ -96,4 +96,10 @@ func iterate(stream: AsyncStream<Int>) async {
   while let element = await it.next() {
     print(element)
   }
+
+  // expected-region-isolation-warning@+2 {{passing argument of non-sendable type 'AsyncStream<Int>.Iterator' from main actor-isolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  // expected-region-isolation-note@+1 {{access here could race}}
+  for await x in stream {
+    print(x)
+  }
 }
