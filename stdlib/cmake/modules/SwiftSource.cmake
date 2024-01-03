@@ -620,8 +620,6 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-disable-preallocated-instantiation-caches")
   endif()
 
-  list(APPEND swift_flags "-Xfrontend" "-enable-experimental-associated-type-inference")
-
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
