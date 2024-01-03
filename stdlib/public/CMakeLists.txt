@@ -192,8 +192,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   endif()
   if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-      "i686    i686-none-none-eabi       i686-none-none-eabi"
-      "x86_64  x86_64-none-none-eabi     x86_64-none-none-eabi"
+      "i686    i686-unknown-none-elf    i686-unknown-none-elf"
+      "i686    i686-unknown-none-coff    i686-unknown-none-coff"
+      "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+      "x86_64  x86_64-unknown-none-coff     x86_64-unknown-none-coff"
     )
   endif()
 
