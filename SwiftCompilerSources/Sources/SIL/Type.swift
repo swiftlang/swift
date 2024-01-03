@@ -90,6 +90,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     bridged.getInstanceTypeOfMetatype(function.bridged.getFunction()).type
   }
 
+  public var isDynamicSelfMetatype: Bool {
+    bridged.isDynamicSelfMetatype()
+  }
+
   public var isCalleeConsumedFunction: Bool { bridged.isCalleeConsumedFunction() }
 
   public var isMarkedAsImmortal: Bool { bridged.isMarkedAsImmortal() }
