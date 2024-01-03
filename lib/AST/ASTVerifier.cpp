@@ -3816,8 +3816,9 @@ public:
         if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
           auto *expansionBuffer =
               D->getModuleContext()->getSourceFileContainingLocation(Current.Start);
-          if (auto expansion = expansionBuffer->getMacroExpansion()) {
-            Current = expansion.getSourceRange();
+
+          if (auto expansionRange = expansionBuffer->getMacroInsertionRange()) {
+            Current = expansionRange;
           }
         }
 

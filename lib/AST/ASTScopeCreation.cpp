@@ -271,7 +271,6 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
   if (auto enclosingSF = SF->getEnclosingSourceFile()) {
     SourceLoc parentLoc;
     auto macroRole = SF->getFulfilledMacroRole();
-    auto expansion = SF->getMacroExpansion();
 
     // Determine the parent source location based on the macro role.
     AbstractFunctionDecl *bodyForDecl = nullptr;
@@ -283,34 +282,19 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::MemberAttribute:
     case MacroRole::Conformance:
     case MacroRole::Extension:
-      parentLoc = expansion.getStartLoc();
+    case MacroRole::Member:
+    case MacroRole::Peer:
+    case MacroRole::Preamble:
+      parentLoc = SF->getMacroInsertionRange().End;;
       break;
-    case MacroRole::Preamble: {
-      // Preamble macro roles start at the beginning of the macro body.
-      auto func = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
-      parentLoc = func->getMacroExpandedBody()->getStartLoc();
-      break;
-    }
-    case MacroRole::Body:
+    case MacroRole::Body: {
+      // Use the end location of the function decl itself as the parentLoc
+      // for the new function body scope. This is different from the end
+      // location of the original source range, which is after the end of the
+      // function decl.
+      auto expansion = SF->getMacroExpansion();
       parentLoc = expansion.getEndLoc();
       bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
-      break;
-    case MacroRole::Peer: {
-      ASTContext &ctx = SF->getASTContext();
-      SourceManager &sourceMgr = ctx.SourceMgr;
-      auto generatedSourceInfo =
-          *sourceMgr.getGeneratedSourceInfo(*SF->getBufferID());
-
-      ASTNode node = ASTNode::getFromOpaqueValue(generatedSourceInfo.astNode);
-      parentLoc = Lexer::getLocForEndOfToken(sourceMgr, node.getEndLoc());
-      break;
-    }
-    case MacroRole::Member: {
-      // For synthesized member macros, take the end loc of the
-      // enclosing declaration (before the closing brace), because
-      // the macro expansion is inside this scope.
-      auto *decl = expansion.getAsDeclContext()->getAsDecl();
-      parentLoc = decl->getEndLoc();
       break;
     }
     }
