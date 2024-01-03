@@ -1991,7 +1991,9 @@ private:
   VISIT(ModuleType, pass)
   VISIT(DynamicSelfType, pass)
 
-  NEVER_VISIT(SubstitutableType)
+  // Ignore attributes placed on generic parameter references and
+  // other substitutable types.
+  VISIT(SubstitutableType, pass)
   NEVER_VISIT(DependentMemberType)
 
   Result visitAnyFunctionType(AnyFunctionType *ty) {

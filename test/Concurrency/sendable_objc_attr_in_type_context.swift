@@ -21,6 +21,17 @@
 @interface MyValue : NSObject
 @end
 
+SWIFT_SENDABLE
+@protocol P <NSObject>
+@end
+
+@interface SendableValue : NSObject<P>
+@end
+
+SWIFT_SENDABLE
+@interface SendableMyValue : MyValue
+@end
+
 typedef void (^CompletionHandler)(void (^ SWIFT_SENDABLE)(void)) SWIFT_SENDABLE;
 
 @interface Test : NSObject
@@ -35,6 +46,14 @@ typedef void (^CompletionHandler)(void (^ SWIFT_SENDABLE)(void)) SWIFT_SENDABLE;
 
 // Placement of SWIFT_SENDABLE matters here
 void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^block)(void));
+
+@interface TestWithSendableID<T: SWIFT_SENDABLE id> : NSObject
+-(void) add: (T) object;
+@end
+
+@interface TestWithSendableSuperclass<T: MyValue *SWIFT_SENDABLE> : NSObject
+-(void) add: (T) object;
+@end
 
 #pragma clang assume_nonnull end
 
@@ -72,4 +91,16 @@ func test_sendable_attr_in_type_context(test: Test) {
   test.withAliasCompletionHandler { callback in
     doSomethingConcurrently(callback) // Ok
   }
+
+  _ = TestWithSendableID<SendableValue>() // Ok
+
+  // TOOD(diagnostics): Duplicate diagnostics
+  TestWithSendableID().add(MyValue())
+  // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+
+  TestWithSendableSuperclass().add(SendableMyValue()) // Ok
+
+  // TOOD(diagnostics): Duplicate diagnostics
+  TestWithSendableSuperclass().add(MyValue())
+  // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
 }
