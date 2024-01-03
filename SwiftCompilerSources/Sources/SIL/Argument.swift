@@ -167,7 +167,62 @@ public struct TerminatorResult {
   }
 }
 
-public enum ArgumentConvention {
+/// ArgumentConventions indexed on a SIL function's argument index.
+/// When derived from an ApplySite, this corresponds to the callee index.
+public struct ArgumentConventions : Collection, CustomStringConvertible {
+  public let functionConvention: FunctionConvention
+
+  public var bridgedFunctionType: BridgedASTType { functionConvention.bridgedFunctionType }
+
+  /// Indirect results including the error result.
+  public var indirectSILResults: LazyFilterSequence<FunctionConvention.Results> {
+    functionConvention.indirectSILResults
+  }
+
+  /// Number of SIL arguments for the function type's results
+  /// including the error result. Use this to avoid lazy iteration.
+  var indirectSILResultCount: Int {
+    functionConvention.indirectSILResultCount
+  }
+
+  public var parameters: FunctionConvention.Parameters { functionConvention.parameters }
+
+  public var startIndex: Int { 0 }
+
+  public var endIndex: Int { firstParameterIndex + parameters.count }
+
+  public func index(after index: Int) -> Int {
+    return index + 1
+  }
+
+  public subscript(_ index: Int) -> ArgumentConvention {
+    if index >= firstParameterIndex {
+      return parameters[index - indirectSILResultCount].convention
+    }
+    return ArgumentConvention(result: indirectSILResults[index].convention)
+  }
+
+  /// The SIL argument index of the function type's first parameter.
+  var firstParameterIndex: Int { indirectSILResultCount }
+
+  /// The SIL argument index of the 'self' paramter.
+  var selfIndex: Int? {
+    guard functionConvention.hasSelfParameter else { return nil }
+    // self is the last parameter
+    return endIndex - 1
+  }
+
+  public var description: String {
+    var str = String(taking: bridgedFunctionType.getDebugDescription())
+    indirectSILResults.forEach {
+      str += "\nindirect result: " + $0.description
+    }
+    parameters.forEach { str += "\n      parameter: " + $0.description }
+    return str
+  }
+}
+
+public enum ArgumentConvention : CustomStringConvertible {
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory.  The callee is responsible for destroying the
   /// object.  The callee may assume that the address does not alias any valid
@@ -231,6 +286,19 @@ public enum ArgumentConvention {
   /// callee; within the callee, they are individually treated like
   /// indirectOut arguments.
   case packOut
+
+  public init(result: ResultConvention) {
+    switch result {
+    case .indirect:
+      self = .indirectOut
+    case .owned:
+      self = .directOwned
+    case .unowned, .unownedInnerPointer, .autoreleased:
+      self = .directUnowned
+    case .pack:
+      self = .packOut
+    }
+  }
 
   public var isIndirect: Bool {
     switch self {
@@ -315,6 +383,35 @@ public enum ArgumentConvention {
          .packOwned,
          .packGuaranteed:
       return false
+    }
+  }
+
+  public var description: String {
+    switch self {
+    case .indirectIn:
+      return "indirectIn"
+    case .indirectInGuaranteed:
+      return "indirectInGuaranteed"
+    case .indirectInout:
+      return "indirectInout"
+    case .indirectInoutAliasable:
+      return "indirectInoutAliasable"
+    case .indirectOut:
+      return "indirectOut"
+    case .directOwned:
+      return "directOwned"
+    case .directUnowned:
+      return "directUnowned"
+    case .directGuaranteed:
+      return "directGuaranteed"
+    case .packInout:
+      return "packInout"
+    case .packOwned:
+      return "packOwned"
+    case .packGuaranteed:
+      return "packGuaranteed"
+    case .packOut:
+      return "packOut"
     }
   }
 }

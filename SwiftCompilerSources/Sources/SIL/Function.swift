@@ -35,6 +35,17 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
 
+  /// The lowered function type in the expansion context of self.
+  ///
+  /// Always expanding a function type means that the opaque result types
+  /// have the correct generic signature. For example:
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
+  /// is lowered to this inside its module:
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <ActualResultType>
+  /// and this outside its module
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
+  public var loweredFunctionType: BridgedASTType { bridged.getLoweredFunctionTypeInContext() }
+
   /// Returns true if the function is a definition and not only an external declaration.
   ///
   /// This is the case if the functioun contains a body, i.e. some basic blocks.
@@ -87,8 +98,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { bridged.getSILResultType().type }
 
-  public func getArgumentConvention(for argumentIndex: Int) -> ArgumentConvention {
-    return bridged.getSILArgumentConvention(argumentIndex).convention
+  public var convention: FunctionConvention {
+    FunctionConvention(for: loweredFunctionType, in: self)
+  }
+
+  public var argumentConventions: ArgumentConventions {
+    ArgumentConventions(functionConvention: convention)
   }
 
   public var returnInstruction: ReturnInst? {
@@ -387,9 +402,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         let addr = bridgedAddr.value
         let applySite = argOp.instruction as! FullApplySite
         let addrPath = addr.accessPath
-        let argIdx = argOp.index - ApplyOperands.firstArgumentIndex
-        let calleeArgIdx = applySite.calleeArgIndex(callerArgIndex: argIdx)
-        let convention = applySite.getArgumentConvention(calleeArgIndex: calleeArgIdx)
+        let calleeArgIdx = applySite.calleeArgumentIndex(of: argOp)!
+        let convention = applySite.convention(of: argOp)!
         assert(convention.isIndirectIn || convention.isInout)
         let argPath = argOp.value.accessPath
         assert(!argPath.isDistinct(from: addrPath))

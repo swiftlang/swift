@@ -77,19 +77,35 @@ enum class BridgedResultConvention {
   Pack
 };
 
-// A null type indicates a non-existant result, in which case `convention` is undefined.
 struct BridgedResultInfo {
   swift::TypeBase * _Nonnull type;
   BridgedResultConvention convention;
 
 #ifdef USED_IN_CPP_SOURCE
   inline static BridgedResultConvention
-  castToResultConvention(swift::ResultConvention convention);
+  castToResultConvention(swift::ResultConvention convention) {
+    return static_cast<BridgedResultConvention>(convention);
+  }
 
   BridgedResultInfo(swift::SILResultInfo resultInfo):
     type(resultInfo.getInterfaceType().getPointer()),
     convention(castToResultConvention(resultInfo.getConvention()))
   {}
+#endif
+};
+
+struct OptionalBridgedResultInfo {
+  swift::TypeBase * _Nullable type = nullptr;
+  BridgedResultConvention convention = BridgedResultConvention::Indirect;
+
+#ifdef USED_IN_CPP_SOURCE
+  OptionalBridgedResultInfo(llvm::Optional<swift::SILResultInfo> resultInfo) {
+    if (resultInfo) {
+      type = resultInfo->getInterfaceType().getPointer();
+      convention =
+        BridgedResultInfo::castToResultConvention(resultInfo->getConvention());
+    }
+  }
 #endif
 };
 
@@ -108,7 +124,61 @@ struct BridgedResultInfoArray {
   BRIDGED_INLINE SwiftInt count() const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedResultInfo at(SwiftInt argumentIndex) const;
+  BridgedResultInfo at(SwiftInt resultIndex) const;
+};
+
+// Unfortunately we need to take a detour over this enum.
+// Currently it's not possible to switch over `SILArgumentConvention::ConventionType`,
+// because it's not a class enum.
+enum class BridgedArgumentConvention {
+  Indirect_In,
+  Indirect_In_Guaranteed,
+  Indirect_Inout,
+  Indirect_InoutAliasable,
+  Indirect_Out,
+  Direct_Owned,
+  Direct_Unowned,
+  Direct_Guaranteed,
+  Pack_Owned,
+  Pack_Inout,
+  Pack_Guaranteed,
+  Pack_Out
+};
+
+struct BridgedParameterInfo {
+  swift::TypeBase * _Nonnull type;
+  BridgedArgumentConvention convention;
+
+#ifdef USED_IN_CPP_SOURCE
+  inline static BridgedArgumentConvention
+  castToArgumentConvention(swift::ParameterConvention convention) {
+    return static_cast<BridgedArgumentConvention>(
+      swift::SILArgumentConvention(convention).Value);
+  }
+
+  BridgedParameterInfo(swift::SILParameterInfo parameterInfo):
+    type(parameterInfo.getInterfaceType().getPointer()),
+    convention(castToArgumentConvention(parameterInfo.getConvention()))
+  {}
+#endif
+};
+
+struct BridgedParameterInfoArray {
+  BridgedArrayRef parameterInfoArray;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedParameterInfoArray(llvm::ArrayRef<swift::SILParameterInfo> parameters)
+    : parameterInfoArray(parameters) {}
+
+  llvm::ArrayRef<swift::SILParameterInfo> unbridged() const {
+    return parameterInfoArray.unbridged<swift::SILParameterInfo>();
+  }
+#endif
+
+  BRIDGED_INLINE SwiftInt count() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedParameterInfo at(SwiftInt parameterIndex) const;
 };
 
 // Temporary access to the AST type within SIL until ASTBridging provides it.
@@ -121,6 +191,8 @@ struct BridgedASTType {
   }
 #endif
 
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+
   BRIDGED_INLINE bool isOpenedExistentialWithError() const;
 
   // =========================================================================//
@@ -128,15 +200,17 @@ struct BridgedASTType {
   // =========================================================================//
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedResultInfoArray SILFunctionType_getResults() const;
+  BridgedResultInfoArray SILFunctionType_getResultsWithError() const;
 
-  BRIDGED_INLINE SwiftUInt SILFunctionType_getNumIndirectFormalResults() const;
+  BRIDGED_INLINE SwiftInt
+  SILFunctionType_getNumIndirectFormalResultsWithError() const;
 
-  BRIDGED_INLINE SwiftUInt SILFunctionType_getNumPackResults() const;
+  BRIDGED_INLINE SwiftInt SILFunctionType_getNumPackResults() const;
 
-  BRIDGED_INLINE bool SILFunctionType_hasErrorResult() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedResultInfo SILFunctionType_getErrorResult() const;
 
-  BRIDGED_INLINE SwiftUInt SILFunctionType_getNumParameters() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedParameterInfoArray SILFunctionType_getParameters() const;
 
   BRIDGED_INLINE bool SILFunctionType_hasSelfParam() const;
 };
@@ -339,24 +413,6 @@ struct BridgedOperandArray {
   SwiftInt count;
 };
 
-// Unfortunately we need to take a detour over this enum.
-// Currently it's not possible to switch over `SILArgumentConvention::ConventionType`,
-// because it's not a class enum.
-enum class BridgedArgumentConvention {
-  Indirect_In,
-  Indirect_In_Guaranteed,
-  Indirect_Inout,
-  Indirect_InoutAliasable,
-  Indirect_Out,
-  Direct_Owned,
-  Direct_Unowned,
-  Direct_Guaranteed,
-  Pack_Owned,
-  Pack_Inout,
-  Pack_Guaranteed,
-  Pack_Out
-};
-
 enum class BridgedMemoryBehavior {
   None,
   MayRead,
@@ -397,6 +453,7 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getLoweredFunctionTypeInContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getFirstBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getLastBlock() const;
   BRIDGED_INLINE SwiftInt getNumIndirectFormalResults() const;
@@ -405,7 +462,6 @@ struct BridgedFunction {
   BRIDGED_INLINE SwiftInt getSelfArgumentIndex() const;
   BRIDGED_INLINE SwiftInt getNumSILArguments() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSILArgumentType(SwiftInt idx) const;
-  BRIDGED_INLINE BridgedArgumentConvention getSILArgumentConvention(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getSILResultType() const;
   BRIDGED_INLINE bool isSwift51RuntimeAvailable() const;
   BRIDGED_INLINE bool isPossiblyUsedExternally() const;
@@ -758,7 +814,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getFailureBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap ApplySite_getSubstitutionMap() const;
-  BRIDGED_INLINE BridgedArgumentConvention ApplySite_getArgumentConvention(SwiftInt calleeArgIdx) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType ApplySite_getSubstitutedCalleeType() const;
   BRIDGED_INLINE SwiftInt ApplySite_getNumArguments() const;
   BRIDGED_INLINE SwiftInt FullApplySite_numIndirectResultArguments() const;
 

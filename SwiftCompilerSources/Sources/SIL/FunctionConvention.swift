@@ -13,7 +13,10 @@
 import SILBridging
 
 /// SIL function convention based on the AST function type and SIL stage.
-public struct FunctionConvention {
+///
+/// Provides Results and Parameters collections. ArgumentConventions
+/// maps these to SIL arguments.
+public struct FunctionConvention : CustomStringConvertible {
   let bridgedFunctionType: BridgedASTType
   let hasLoweredAddresses: Bool
 
@@ -22,7 +25,7 @@ public struct FunctionConvention {
     self.hasLoweredAddresses = function.hasLoweredAddresses
   }
 
-  struct Results : Collection {
+  public struct Results : Collection {
     let bridged: BridgedResultInfoArray
     let hasLoweredAddresses: Bool
 
@@ -40,59 +43,84 @@ public struct FunctionConvention {
     }
   }
 
-  var results: Results {
-    Results(bridged: bridgedFunctionType.SILFunctionType_getResults(),
+  /// All results including the error.
+  public var results: Results {
+    Results(bridged: bridgedFunctionType.SILFunctionType_getResultsWithError(),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
-  /// Number of SIL arguments for indirect results, not including error results.
-  var indirectSILResultCount: UInt {
+  public var errorResult: ResultInfo? {
+    return ResultInfo(
+      bridged: bridgedFunctionType.SILFunctionType_getErrorResult(),
+      hasLoweredAddresses: hasLoweredAddresses)
+  }
+
+  /// Number of indirect results including the error.
+  /// This avoids quadratic lazy iteration on indirectResults.count.
+  public var indirectSILResultCount: Int {
     // TODO: Return packs directly in lowered-address mode
     return hasLoweredAddresses
-    ? bridgedFunctionType.SILFunctionType_getNumIndirectFormalResults()
+    ? bridgedFunctionType.SILFunctionType_getNumIndirectFormalResultsWithError()
     : bridgedFunctionType.SILFunctionType_getNumPackResults()
   }
 
-  var errorResult: ResultInfo? {
-    guard bridgedFunctionType.SILFunctionType_hasErrorResult() else {
-      return nil
+  /// Indirect results including the error.
+  public var indirectSILResults: LazyFilterSequence<Results> {
+    hasLoweredAddresses
+    ? results.lazy.filter { $0.isSILIndirect }
+    : results.lazy.filter { $0.convention == .pack }
+  }
+
+  public struct Parameters : Collection {
+    let bridged: BridgedParameterInfoArray
+    let hasLoweredAddresses: Bool
+
+    public var startIndex: Int { 0 }
+
+    public var endIndex: Int { bridged.count() }
+
+    public func index(after index: Int) -> Int {
+      return index + 1
     }
-    return results[0]
+
+    public subscript(_ index: Int) -> ParameterInfo {
+      return ParameterInfo(bridged: bridged.at(index),
+        hasLoweredAddresses: hasLoweredAddresses)
+    }
   }
 
-  /// The number of SIL error results passed as address-typed arguments.
-  var indirectSILErrorResultCount: UInt {
-    guard hasLoweredAddresses else { return 0 }
-    return errorResult?.convention == .indirect ? 1 : 0
+  public var parameters: Parameters {
+    Parameters(bridged: bridgedFunctionType.SILFunctionType_getParameters(),
+      hasLoweredAddresses: hasLoweredAddresses)
   }
 
-  var parameterCount: UInt {
-    bridgedFunctionType.SILFunctionType_getNumParameters()
+  public var hasSelfParameter: Bool {
+    bridgedFunctionType.SILFunctionType_hasSelfParam()
   }
 
-  /// The SIL argument index of the function type's first parameter.
-  var firstParameterIndex: UInt {
-    indirectSILResultCount + indirectSILErrorResultCount
-  }
-
-  // The SIL argument index of the 'self' paramter.
-  var selfIndex: UInt? {
-    guard bridgedFunctionType.SILFunctionType_hasSelfParam() else { return nil }
-    return firstParameterIndex + parameterCount - 1
+  public var description: String {
+    var str = String(taking: bridgedFunctionType.getDebugDescription())
+    parameters.forEach { str += "\nparameter: " + $0.description }
+    results.forEach { str += "\n   result: " + $0.description }
+    str += (hasLoweredAddresses ? "\n[lowered_address]" : "\n[sil_opaque]")
+    return str
   }
 }
 
 /// A function result type and the rules for returning it in SIL.
-struct ResultInfo {
-  /// The unsubstituted parameter type that describes the abstract calling convention of the parameter.
+public struct ResultInfo : CustomStringConvertible {
+  /// The unsubstituted parameter type that describes the abstract
+  /// calling convention of the parameter.
   ///
   /// TODO: For most purposes, you probably want \c returnValueType.
-  let interfaceType: BridgedASTType
-  let convention: ResultConvention
-  let hasLoweredAddresses: Bool
+  public let interfaceType: BridgedASTType
+  public let convention: ResultConvention
+  public let hasLoweredAddresses: Bool
 
-  /// Is this result returned indirectly in SIL? Most formally indirect results can be returned directly in SIL. This depends on the calling function.
-  var isSILIndirect: Bool {
+  /// Is this result returned indirectly in SIL? Most formally
+  /// indirect results can be returned directly in SIL. This depends
+  /// on whether the calling function has lowered addresses.
+  public var isSILIndirect: Bool {
     switch convention {
     case .indirect:
       return hasLoweredAddresses || interfaceType.isOpenedExistentialWithError()
@@ -102,9 +130,45 @@ struct ResultInfo {
       return false
     }
   }
+
+  public var description: String {
+    convention.description + ": "
+    + String(taking: interfaceType.getDebugDescription())
+  }
 }
 
-public enum ResultConvention {
+public struct ParameterInfo : CustomStringConvertible {
+  /// The parameter type that describes the abstract calling
+  /// convention of the parameter.
+  public let interfaceType: BridgedASTType
+  public let convention: ArgumentConvention
+  public let hasLoweredAddresses: Bool
+
+  /// Is this parameter passed indirectly in SIL? Most formally
+  /// indirect results can be passed directly in SIL. This depends on
+  /// whether the calling function has lowered addresses.
+  public var isSILIndirect: Bool {
+    switch convention {
+    case .indirectIn, .indirectInGuaranteed:
+      return hasLoweredAddresses || interfaceType.isOpenedExistentialWithError()
+    case .indirectInout, .indirectInoutAliasable:
+      return true
+    case .directOwned, .directUnowned, .directGuaranteed:
+      return false
+    case .packInout, .packOwned, .packGuaranteed:
+      return true
+    case .indirectOut, .packOut:
+      fatalError("invalid parameter convention")
+    }
+  }
+
+  public var description: String {
+    convention.description + ": "
+    + String(taking: interfaceType.getDebugDescription())
+  }
+}
+
+public enum ResultConvention : CustomStringConvertible {
   /// This result is returned indirectly, i.e. by passing the address of an uninitialized object in memory.  The callee is responsible for leaving an initialized object at this address.  The callee may assume that the address does not alias any valid object.
   case indirect
 
@@ -135,6 +199,23 @@ public enum ResultConvention {
   public var isASTDirect: Bool {
     return !isASTIndirect
   }
+
+  public var description: String {
+    switch self {
+    case .indirect:
+      return "indirect"
+    case .owned:
+      return "owned"
+    case .unowned:
+      return "unowned"
+    case .unownedInnerPointer:
+      return "unownedInnerPointer"
+    case .autoreleased:
+      return "autoreleased"
+    case .pack:
+      return "pack"
+    }
+  }
 }
 
 // Bridging utilities
@@ -142,6 +223,11 @@ public enum ResultConvention {
 extension ResultInfo {
   init(bridged: BridgedResultInfo, hasLoweredAddresses: Bool) {
     self.interfaceType = BridgedASTType(type: bridged.type)
+    self.convention = ResultConvention(bridged: bridged.convention)
+    self.hasLoweredAddresses = hasLoweredAddresses
+  }
+  init(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
+    self.interfaceType = BridgedASTType(type: bridged.type!)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }
@@ -159,5 +245,13 @@ extension ResultConvention {
       default:
         fatalError("unsupported result convention")
     }
+  }
+}
+
+extension ParameterInfo {
+  init(bridged: BridgedParameterInfo, hasLoweredAddresses: Bool) {
+    self.interfaceType = BridgedASTType(type: bridged.type)
+    self.convention = bridged.convention.convention
+    self.hasLoweredAddresses = hasLoweredAddresses
   }
 }

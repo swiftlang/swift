@@ -78,16 +78,18 @@ public struct CalleeAnalysis {
   }
 
   /// Returns the argument specific side effects of an apply.
-  public func getSideEffects(of apply: ApplySite, forArgument argumentIdx: Int, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
-    let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: argumentIdx)
-    let convention = apply.getArgumentConvention(calleeArgIndex: calleeArgIdx)
-    let argument = apply.arguments[argumentIdx].at(path)
+  public func getSideEffects(of apply: ApplySite, operand: Operand, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
+    var result = SideEffects.GlobalEffects()
+    guard let calleeArgIdx = apply.calleeArgumentIndex(of: operand) else {
+      return result
+    }
+    let convention = apply.convention(of: operand)!
+    let argument = operand.value.at(path)
 
     guard let callees = getCallees(callee: apply.callee) else {
       return .worstEffects.restrictedTo(argument: argument, withConvention: convention)
     }
   
-    var result = SideEffects.GlobalEffects()
     for callee in callees {
       let calleeEffects = callee.getSideEffects(forArgument: argument,
                                                 atIndex: calleeArgIdx,
