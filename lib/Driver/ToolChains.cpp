@@ -397,6 +397,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
 
   addPluginArguments(inputArgs, arguments);
 
+  // Pass along -no-verify-emitted-module-interface only if it's effective.
+  // Assume verification by default as we want to know only when the user skips
+  // the verification.
+  if (!inputArgs.hasFlag(options::OPT_verify_emitted_module_interface,
+                         options::OPT_no_verify_emitted_module_interface,
+                         true))
+    arguments.push_back("-no-verify-emitted-module-interface");
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);

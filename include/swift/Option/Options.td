@@ -606,7 +606,8 @@ def verify_emitted_module_interface :
   HelpText<"Check that module interfaces emitted during compilation typecheck">;
 def no_verify_emitted_module_interface :
   Flag<["-"], "no-verify-emitted-module-interface">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
+        FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Don't check that module interfaces emitted during compilation typecheck">;
 
 def avoid_emit_module_source_info :
