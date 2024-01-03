@@ -207,6 +207,7 @@ function(add_pure_swift_host_library name)
     set(module_base "${module_dir}/${name}.swiftmodule")
     set(module_file "${module_base}/${module_triple}.swiftmodule")
     set(module_interface_file "${module_base}/${module_triple}.swiftinterface")
+    set(module_private_interface_file "${module_base}/${module_triple}.private.swiftinterface")
     set(module_sourceinfo_file "${module_base}/${module_triple}.swiftsourceinfo")
 
     set_target_properties(${name} PROPERTIES
@@ -231,7 +232,8 @@ function(add_pure_swift_host_library name)
         -enable-library-evolution;
         -emit-module-path;${module_file};
         -emit-module-source-info-path;${module_sourceinfo_file};
-        -emit-module-interface-path;${module_interface_file}
+        -emit-module-interface-path;${module_interface_file};
+        -emit-private-module-interface-path;${module_private_interface_file}
         >)
   else()
     # Emit a swiftmodule in the current directory.
