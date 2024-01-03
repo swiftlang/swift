@@ -13,27 +13,27 @@
 /// A type that supports atomic operations through a separate atomic storage
 /// representation.
 ///
-/// Types that conform to the `AtomicValue` protocol can be used as the `Value`
-/// type parameter with the `Atomic` type. Conformances that utilize existing
-/// atomic storage representations as their own representation will get the
-/// primitive atomic operations available on `Atomic` for free. Such operations
-/// include `load`, `store`, `exchange`, `compareExchange`, and
+/// Types that conform to the `AtomicRepresentable` protocol can be used as the
+/// `Value` type parameter with the `Atomic` type. Conformances that utilize
+/// existing atomic storage representations as their own representation will get
+/// the primitive atomic operations available on `Atomic` for free. Such
+/// operations include `load`, `store`, `exchange`, `compareExchange`, and
 /// `weakCompareExchange`.
 ///
-/// Conforming to the AtomicValue protocol
+/// Conforming to the AtomicRepresentable protocol
 /// --------------------------------------
 ///
 /// Conforming your own custom types allow them to be used in the `Atomic` type
 /// and get access to all of the primitive atomic operations explained above.
-/// There are two main ways to conform your type to `AtomicValue`:
+/// There are two main ways to conform your type to `AtomicRepresentable`:
 ///
 /// 1. Using a predefined `RawRepresentable` conformance
-/// 2. Manually conforming to `AtomicValue`
+/// 2. Manually conforming to `AtomicRepresentable`
 ///
 /// If you custom type already conforms to `RawRepresentable`, then adding the
-/// `AtomicValue` conformance may be really simple! If the `RawValue` associated
-/// type of your type is already itself an `AtomicValue`, then all you need to
-/// do is add the conformance and you're done!
+/// `AtomicRepresentable` conformance may be really simple! If the `RawValue`
+/// associated type of your type is already itself an `AtomicRepresentable`,
+/// then all you need to do is add the conformance and you're done!
 ///
 ///     enum TrafficLight: UInt8 {
 ///       case red
@@ -41,18 +41,18 @@
 ///       case green
 ///     }
 ///
-///     extension TrafficLight: AtomicValue {}
+///     extension TrafficLight: AtomicRepresentable {}
 ///
 /// And that's it! Here, we're utilizing Swift's automatic `RawRepresentable`
 /// conformance synthesis for enums by declaring our "raw value" to be a
-/// `UInt8`. By adding the `AtomicValue` conformance, we automatically figure
-/// out how to do the conformance from the `RawRepresentable` implementation and
-/// do all of th necessary work for you. However, it is still possible to
-/// customize this behavior using the manual method explained below.
+/// `UInt8`. By adding the `AtomicRepresentable` conformance, we automatically
+/// figure out how to do the conformance from the `RawRepresentable`
+/// implementation and do all of th necessary work for you. However, it is still
+/// possible to customize this behavior using the manual method explained below.
 ///
-/// Defining your own `AtomicValue` conformance is pretty simple. All you have
-/// to do is decide what atomic storage representation fits best for your type,
-/// and create the bidirectional relationship between the two.
+/// Defining your own `AtomicRepresentable` conformance is pretty simple. All
+/// you have to do is decide what atomic storage representation fits best for
+/// your type, and create the bidirectional relationship between the two.
 ///
 ///     // A point in an x-y coordinate system.
 ///     struct GridPoint {
@@ -60,7 +60,7 @@
 ///       var y: Int
 ///     }
 ///
-///     extension GridPoint: AtomicValue {
+///     extension GridPoint: AtomicRepresentable {
 ///       typealias AtomicRepresentation = WordPair.AtomicRepresentation
 ///
 ///       static func encodeAtomicRepresentation(
@@ -96,12 +96,12 @@
 /// define two static functions that go from both our custom type to its
 /// representation and the representation back to our own type. Because our
 /// representation is the same as `WordPair.AtomicRepresentation`, we will
-/// actually go through `WordPair`'s `AtomicValue` conformance to help define
-/// our own.
+/// actually go through `WordPair`'s `AtomicRepresentable` conformance to help
+/// define our own.
 ///
-/// This is all you need to do to conform your custom type to the `AtomicValue`
-/// protocol. From here, you can use this type in all of the primitive atomic
-/// operations like shown below:
+/// This is all you need to do to conform your custom type to the
+/// `AtomicRepresentable` protocol. From here, you can use this type in all of
+/// the primitive atomic operations like shown below:
 ///
 ///     func atomicGridPoint(_ gridPoint: Atomic<GridPoint>) {
 ///       let newGridPoint = GridPoint(x: 123, y: -456)
@@ -131,9 +131,9 @@
 /// List of Fundamental Atomic Representations
 /// ------------------------------------------
 ///
-/// When defining your own `AtomicValue` conformance, it is critical that your
-/// custom type should choose from the following list of types as its own
-/// `AtomicRepresentation`:
+/// When defining your own `AtomicRepresentable` conformance, it is critical
+/// that your custom type should choose from the following list of types as its
+/// own `AtomicRepresentation`:
 ///
 /// - `UInt8.AtomicRepresentation`
 /// - `UInt16.AtomicRepresentation`
@@ -153,14 +153,14 @@
 ///   prefer to use an unsigned integer's atomic representation instead of a
 ///   signed ones and vice versa. `Int` and `UInt`'s representation will be
 ///   64 bits wide on 64 bit systems and 32 bit wide on 32 bit systems. `Int64`
-///   and `UInt64` always conform to `AtomicValue` on 64 bit systems, but on
-///   32 bit systems they will only conform if the platform supports double wide
-///   atomics. `WordPair` will only conform to `AtomicValue` on platforms that
-///   support double wide atomics, but if they do it will be 128 bits wide on 64
-///   bit systems and 64 bits wide on 32 bit systems.
+///   and `UInt64` always conform to `AtomicRepresentable` on 64 bit systems,
+///   but on 32 bit systems they will only conform if the platform supports
+///   double wide atomics. `WordPair` will only conform to `AtomicRepresentable`
+///   on platforms that support double wide atomics, but if they do it will be
+///   128 bits wide on 64 bit systems and 64 bits wide on 32 bit systems.
 ///
 @available(SwiftStdlib 5.11, *)
-public protocol AtomicValue {
+public protocol AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   associatedtype AtomicRepresentation
@@ -195,14 +195,14 @@ public protocol AtomicValue {
 }
 
 //===----------------------------------------------------------------------===//
-// RawRepresentable AtomicValue conformance
+// RawRepresentable AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
 extension RawRepresentable
 where
-  Self: AtomicValue,
-  RawValue: AtomicValue
+  Self: AtomicRepresentable,
+  RawValue: AtomicRepresentable
 {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
@@ -251,11 +251,11 @@ where
 }
 
 //===----------------------------------------------------------------------===//
-// Never AtomicValue conformance
+// Never AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Never: AtomicValue {
+extension Never: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 5.11, *)
@@ -299,13 +299,13 @@ extension Never: AtomicValue {
 }
 
 //===----------------------------------------------------------------------===//
-// Duration AtomicValue conformance
+// Duration AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 #if _pointerBitWidth(_64) && _hasAtomicBitWidth(_128)
 
 @available(SwiftStdlib 5.11, *)
-extension Duration: AtomicValue {
+extension Duration: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 5.11, *)

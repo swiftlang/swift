@@ -34,12 +34,12 @@ class Bar: Equatable, CustomStringConvertible {
   }
 }
 
-enum Fred: Int, AtomicValue {
+enum Fred: Int, AtomicRepresentable {
   case one
   case two
 }
 
-struct Hyacinth: RawRepresentable, Equatable, AtomicOptionalWrappable {
+struct Hyacinth: RawRepresentable, Equatable, AtomicOptionalRepresentable {
   var rawValue: UnsafeRawPointer
 
   init(rawValue: UnsafeRawPointer) {

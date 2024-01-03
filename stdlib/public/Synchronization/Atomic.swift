@@ -17,7 +17,7 @@ import Builtin
 @frozen
 @_rawLayout(like: Value.AtomicRepresentation)
 @_staticExclusiveOnly
-public struct Atomic<Value: AtomicValue>: ~Copyable {
+public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   @available(SwiftStdlib 5.11, *)
   @_alwaysEmitIntoClient
   @_transparent

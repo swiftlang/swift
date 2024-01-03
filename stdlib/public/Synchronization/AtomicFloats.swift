@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// Float16 AtomicValue conformance
+// Float16 AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 
 @available(SwiftStdlib 5.11, *)
-extension Float16: AtomicValue {
+extension Float16: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 5.11, *)
@@ -65,11 +65,11 @@ extension Float16: AtomicValue {
 #endif
 
 //===----------------------------------------------------------------------===//
-// Float AtomicValue conformance
+// Float AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Float: AtomicValue {
+extension Float: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 5.11, *)
@@ -115,13 +115,13 @@ extension Float: AtomicValue {
 }
 
 //===----------------------------------------------------------------------===//
-// Double AtomicValue conformance
+// Double AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || _pointerBitWidth(_64)
 
 @available(SwiftStdlib 5.11, *)
-extension Double: AtomicValue {
+extension Double: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 5.11, *)

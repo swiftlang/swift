@@ -17,7 +17,7 @@ import Builtin
 % for (intType, intStorage, builtinInt) in intTypes:
 
 //===----------------------------------------------------------------------===//
-// ${intType} AtomicValue conformance
+// ${intType} AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 % if intType == "Int64" or intType == "UInt64":
@@ -25,7 +25,7 @@ import Builtin
 % end
 
 @available(SwiftStdlib 5.11, *)
-extension ${intType}: AtomicValue {
+extension ${intType}: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
 %   if intType == "Int" or intType == "UInt":

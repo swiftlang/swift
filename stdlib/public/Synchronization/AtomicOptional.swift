@@ -11,11 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 /// An atomic value that also supports atomic operations when wrapped
-/// in an `Optional`. Atomic optional wrappable types come with a
-/// standalone atomic representation for their optional-wrapped
-/// variants.
+/// in an `Optional`. Atomic optional representable types come with a standalone
+/// atomic representation for their optional-wrapped variants.
 @available(SwiftStdlib 5.11, *)
-public protocol AtomicOptionalWrappable: AtomicValue {
+public protocol AtomicOptionalRepresentable: AtomicRepresentable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -52,14 +51,14 @@ public protocol AtomicOptionalWrappable: AtomicValue {
 }
 
 //===----------------------------------------------------------------------===//
-// RawRepresentable AtomicOptionalWrappable conformance
+// RawRepresentable AtomicOptionalRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
 extension RawRepresentable
 where
-  Self: AtomicOptionalWrappable,
-  RawValue: AtomicOptionalWrappable
+  Self: AtomicOptionalRepresentable,
+  RawValue: AtomicOptionalRepresentable
 {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
@@ -118,11 +117,11 @@ where
 }
 
 //===----------------------------------------------------------------------===//
-// Optional AtomicValue conformance
+// Optional AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Optional: AtomicValue where Wrapped: AtomicOptionalWrappable {
+extension Optional: AtomicRepresentable where Wrapped: AtomicOptionalRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 5.11, *)

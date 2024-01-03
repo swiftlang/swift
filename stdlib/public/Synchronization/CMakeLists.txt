@@ -19,7 +19,7 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
   AtomicMemoryOrderings.swift
   AtomicOptional.swift
   AtomicPointers.swift
-  AtomicValue.swift
+  AtomicRepresentable.swift
   WordPair.swift
 
   GYB_SOURCES

@@ -18,13 +18,13 @@ import Builtin
 /// On platforms that support it, atomic operations on `WordPair` are done in a
 /// single operation for two words. Users can use this type as itself when used
 /// on `Atomic`, or it could be used as an intermediate step for custom
-/// `AtomicValue` types that are also double wide.
+/// `AtomicRepresentable` types that are also double wide.
 ///
 ///     let atomicPair = Atomic<WordPair>(WordPair(first: 0, second: 0))
 ///     atomicPair.store(WordPair(first: someVersion, second: .max), ordering: .relaxed)
 ///
-/// When used as an intermediate step for custom `AtomicValue` types, it is
-/// critical that their `AtomicRepresentation` be equal to
+/// When used as an intermediate step for custom `AtomicRepresentable` types, it
+/// is critical that their `AtomicRepresentation` be equal to
 /// `WordPair.AtomicRepresentation`.
 ///
 ///     struct GridPoint {
@@ -32,14 +32,14 @@ import Builtin
 ///       var y: Int
 ///     }
 ///
-///     extension GridPoint: AtomicValue {
+///     extension GridPoint: AtomicRepresentable {
 ///       typealias AtomicRepresentation = WordPair.AtomicRepresentation
 ///
 ///       ...
 ///     }
 ///
-/// - Note: This type only conforms to `AtomicValue` on platforms that support
-///   double wide atomics.
+/// - Note: This type only conforms to `AtomicRepresentable` on platforms that
+///   support double wide atomics.
 @available(SwiftStdlib 5.11, *)
 @frozen
 public struct WordPair {
@@ -65,7 +65,7 @@ public struct WordPair {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 5.11, *)
-extension WordPair: AtomicValue {
+extension WordPair: AtomicRepresentable {
 #if _pointerBitWidth(_64)
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.

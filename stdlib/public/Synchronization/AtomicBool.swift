@@ -13,11 +13,11 @@
 import Builtin
 
 //===----------------------------------------------------------------------===//
-// Bool AtomicValue conformance
+// Bool AtomicRepresentable conformance
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 5.11, *)
-extension Bool: AtomicValue {
+extension Bool: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 5.11, *)

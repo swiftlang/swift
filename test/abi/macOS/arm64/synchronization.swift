@@ -38,23 +38,23 @@
 // Synchronization Symbols
 //===----------------------------------------------------------------------===//
 
-// protocol descriptor for Synchronization.AtomicValue
-Added: _$s15Synchronization11AtomicValueMp
+// protocol descriptor for Synchronization.AtomicRepresentable
+Added: _$s15Synchronization19AtomicRepresentableMp
 
-// dispatch thunk of static Synchronization.AtomicValue.decodeAtomicRepresentation(__owned A.AtomicRepresentation) -> A
-Added: _$s15Synchronization11AtomicValueP06decodeB14Representationyx0bE0QznFZTj
+// dispatch thunk of static Synchronization.AtomicRepresentable.decodeAtomicRepresentation(__owned A.AtomicRepresentation) -> A
+Added: _$s15Synchronization19AtomicRepresentableP06decodeB14Representationyx0bE0QznFZTj
 
-// method descriptor for static Synchronization.AtomicValue.decodeAtomicRepresentation(__owned A.AtomicRepresentation) -> A
-Added: _$s15Synchronization11AtomicValueP06decodeB14Representationyx0bE0QznFZTq
+// method descriptor for static Synchronization.AtomicRepresentable.decodeAtomicRepresentation(__owned A.AtomicRepresentation) -> A
+Added: _$s15Synchronization19AtomicRepresentableP06decodeB14Representationyx0bE0QznFZTq
 
-// dispatch thunk of static Synchronization.AtomicValue.encodeAtomicRepresentation(__owned A) -> A.AtomicRepresentation
-Added: _$s15Synchronization11AtomicValueP06encodeB14Representationy0bE0QzxnFZTj
+// dispatch thunk of static Synchronization.AtomicRepresentable.encodeAtomicRepresentation(__owned A) -> A.AtomicRepresentation
+Added: _$s15Synchronization19AtomicRepresentableP06encodeB14Representationy0bE0QzxnFZTj
 
-// method descriptor for static Synchronization.AtomicValue.encodeAtomicRepresentation(__owned A) -> A.AtomicRepresentation
-Added: _$s15Synchronization11AtomicValueP06encodeB14Representationy0bE0QzxnFZTq
+// method descriptor for static Synchronization.AtomicRepresentable.encodeAtomicRepresentation(__owned A) -> A.AtomicRepresentation
+Added: _$s15Synchronization19AtomicRepresentableP06encodeB14Representationy0bE0QzxnFZTq
 
-// protocol requirements base descriptor for Synchronization.AtomicValue
-Added: _$s15Synchronization11AtomicValueTL
+// protocol requirements base descriptor for Synchronization.AtomicRepresentable
+Added: _$s15Synchronization19AtomicRepresentableTL
 
 // Synchronization.AtomicLoadOrdering.description.getter : Swift.String
 Added: _$s15Synchronization18AtomicLoadOrderingV11descriptionSSvg
@@ -335,26 +335,26 @@ Added: _$s15Synchronization20_Atomic128BitStorageVMn
 // type metadata for Synchronization._Atomic128BitStorage
 Added: _$s15Synchronization20_Atomic128BitStorageVN
 
-// protocol descriptor for Synchronization.AtomicOptionalWrappable
-Added: _$s15Synchronization23AtomicOptionalWrappableMp
+// protocol descriptor for Synchronization.AtomicOptionalRepresentable
+Added: _$s15Synchronization27AtomicOptionalRepresentableMp
 
-// dispatch thunk of static Synchronization.AtomicOptionalWrappable.decodeAtomicOptionalRepresentation(__owned A.AtomicOptionalRepresentation) -> A?
-Added: _$s15Synchronization23AtomicOptionalWrappableP06decodebC14RepresentationyxSg0bcF0QznFZTj
+// dispatch thunk of static Synchronization.AtomicOptionalRepresentable.decodeAtomicOptionalRepresentation(__owned A.AtomicOptionalRepresentation) -> A?
+Added: _$s15Synchronization27AtomicOptionalRepresentableP06decodebC14RepresentationyxSg0bcF0QznFZTj
 
-// method descriptor for static Synchronization.AtomicOptionalWrappable.decodeAtomicOptionalRepresentation(__owned A.AtomicOptionalRepresentation) -> A?
-Added: _$s15Synchronization23AtomicOptionalWrappableP06decodebC14RepresentationyxSg0bcF0QznFZTq
+// method descriptor for static Synchronization.AtomicOptionalRepresentable.decodeAtomicOptionalRepresentation(__owned A.AtomicOptionalRepresentation) -> A?
+Added: _$s15Synchronization27AtomicOptionalRepresentableP06decodebC14RepresentationyxSg0bcF0QznFZTq
 
-// dispatch thunk of static Synchronization.AtomicOptionalWrappable.encodeAtomicOptionalRepresentation(__owned A?) -> A.AtomicOptionalRepresentation
-Added: _$s15Synchronization23AtomicOptionalWrappableP06encodebC14Representationy0bcF0QzxSgnFZTj
+// dispatch thunk of static Synchronization.AtomicOptionalRepresentable.encodeAtomicOptionalRepresentation(__owned A?) -> A.AtomicOptionalRepresentation
+Added: _$s15Synchronization27AtomicOptionalRepresentableP06encodebC14Representationy0bcF0QzxSgnFZTj
 
-// method descriptor for static Synchronization.AtomicOptionalWrappable.encodeAtomicOptionalRepresentation(__owned A?) -> A.AtomicOptionalRepresentation
-Added: _$s15Synchronization23AtomicOptionalWrappableP06encodebC14Representationy0bcF0QzxSgnFZTq
+// method descriptor for static Synchronization.AtomicOptionalRepresentable.encodeAtomicOptionalRepresentation(__owned A?) -> A.AtomicOptionalRepresentation
+Added: _$s15Synchronization27AtomicOptionalRepresentableP06encodebC14Representationy0bcF0QzxSgnFZTq
 
-// base conformance descriptor for Synchronization.AtomicOptionalWrappable: Synchronization.AtomicValue
-Added: _$s15Synchronization23AtomicOptionalWrappablePAA0B5ValueTb
+// base conformance descriptor for Synchronization.AtomicOptionalRepresentable: Synchronization.AtomicRepresentable
+Added: _$s15Synchronization27AtomicOptionalRepresentablePAA0bD0Tb
 
-// protocol requirements base descriptor for Synchronization.AtomicOptionalWrappable
-Added: _$s15Synchronization23AtomicOptionalWrappableTL
+// protocol requirements base descriptor for Synchronization.AtomicOptionalRepresentable
+Added: _$s15Synchronization27AtomicOptionalRepresentableTL
 
 // type metadata accessor for Synchronization.Atomic
 Added: _$s15Synchronization6AtomicVMa
@@ -404,11 +404,11 @@ Added: _$s15Synchronization8WordPairV9hashValueSivg
 // property descriptor for Synchronization.WordPair.hashValue : Swift.Int
 Added: _$s15Synchronization8WordPairV9hashValueSivpMV
 
-// protocol conformance descriptor for Synchronization.WordPair : Synchronization.AtomicValue in Synchronization
-Added: _$s15Synchronization8WordPairVAA11AtomicValueAAMc
+// protocol conformance descriptor for Synchronization.WordPair : Synchronization.AtomicRepresentable in Synchronization
+Added: _$s15Synchronization8WordPairVAA19AtomicRepresentableAAMc
 
-// protocol witness table for Synchronization.WordPair : Synchronization.AtomicValue in Synchronization
-Added: _$s15Synchronization8WordPairVAA11AtomicValueAAWP
+// protocol witness table for Synchronization.WordPair : Synchronization.AtomicRepresentable in Synchronization
+Added: _$s15Synchronization8WordPairVAA19AtomicRepresentableAAWP
 
 // type metadata accessor for Synchronization.WordPair
 Added: _$s15Synchronization8WordPairVMa
@@ -431,215 +431,215 @@ Added: _$s15Synchronization8WordPairVs23CustomStringConvertibleAAMc
 // protocol conformance descriptor for Synchronization.WordPair : Swift.CustomDebugStringConvertible in Synchronization
 Added: _$s15Synchronization8WordPairVs28CustomDebugStringConvertibleAAMc
 
-// associated type descriptor for Synchronization.AtomicValue.AtomicRepresentation
-Added: _$s20AtomicRepresentation15Synchronization0A5ValuePTl
+// associated type descriptor for Synchronization.AtomicRepresentable.AtomicRepresentation
+Added: _$s20AtomicRepresentation15Synchronization0A13RepresentablePTl
 
-// associated type descriptor for Synchronization.AtomicOptionalWrappable.AtomicOptionalRepresentation
-Added: _$s28AtomicOptionalRepresentation15Synchronization0aB9WrappablePTl
+// associated type descriptor for Synchronization.AtomicOptionalRepresentable.AtomicOptionalRepresentation
+Added: _$s28AtomicOptionalRepresentation15Synchronization0aB13RepresentablePTl
 
-// protocol conformance descriptor for Swift.ObjectIdentifier : Synchronization.AtomicValue in Synchronization
-Added: _$sSO15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.ObjectIdentifier : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSO15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.ObjectIdentifier : Synchronization.AtomicValue in Synchronization
-Added: _$sSO15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.ObjectIdentifier : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSO15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.ObjectIdentifier : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSO15Synchronization23AtomicOptionalWrappableAAMc
+// protocol conformance descriptor for Swift.ObjectIdentifier : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSO15Synchronization27AtomicOptionalRepresentableAAMc
 
-// protocol witness table for Swift.ObjectIdentifier : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSO15Synchronization23AtomicOptionalWrappableAAWP
+// protocol witness table for Swift.ObjectIdentifier : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSO15Synchronization27AtomicOptionalRepresentableAAWP
 
-// protocol conformance descriptor for Swift.UnsafePointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSPyxG15Synchronization11AtomicValueABMc
+// protocol conformance descriptor for Swift.UnsafePointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSPyxG15Synchronization19AtomicRepresentableABMc
 
-// protocol witness table for Swift.UnsafePointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSPyxG15Synchronization11AtomicValueABWP
+// protocol witness table for Swift.UnsafePointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSPyxG15Synchronization19AtomicRepresentableABWP
 
-// protocol conformance descriptor for Swift.UnsafePointer<A> : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSPyxG15Synchronization23AtomicOptionalWrappableABMc
+// protocol conformance descriptor for Swift.UnsafePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSPyxG15Synchronization27AtomicOptionalRepresentableABMc
 
-// protocol witness table for Swift.UnsafePointer<A> : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSPyxG15Synchronization23AtomicOptionalWrappableABWP
+// protocol witness table for Swift.UnsafePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSPyxG15Synchronization27AtomicOptionalRepresentableABWP
 
-// protocol conformance descriptor for Swift.UnsafeBufferPointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSRyxG15Synchronization11AtomicValueABMc
+// protocol conformance descriptor for Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSRyxG15Synchronization19AtomicRepresentableABMc
 
-// protocol witness table for Swift.UnsafeBufferPointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSRyxG15Synchronization11AtomicValueABWP
+// protocol witness table for Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSRyxG15Synchronization19AtomicRepresentableABWP
 
-// protocol conformance descriptor for Swift.UnsafeRawPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSV15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.UnsafeRawPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSV15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.UnsafeRawPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSV15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.UnsafeRawPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSV15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.UnsafeRawPointer : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSV15Synchronization23AtomicOptionalWrappableAAMc
+// protocol conformance descriptor for Swift.UnsafeRawPointer : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSV15Synchronization27AtomicOptionalRepresentableAAMc
 
-// protocol witness table for Swift.UnsafeRawPointer : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSV15Synchronization23AtomicOptionalWrappableAAWP
+// protocol witness table for Swift.UnsafeRawPointer : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSV15Synchronization27AtomicOptionalRepresentableAAWP
 
-// protocol conformance descriptor for Swift.UnsafeRawBufferPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSW15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.UnsafeRawBufferPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSW15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.UnsafeRawBufferPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSW15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.UnsafeRawBufferPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSW15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.Bool : Synchronization.AtomicValue in Synchronization
-Added: _$sSb15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.Bool : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSb15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.Bool : Synchronization.AtomicValue in Synchronization
-Added: _$sSb15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.Bool : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSb15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.Double : Synchronization.AtomicValue in Synchronization
-Added: _$sSd15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.Double : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSd15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.Double : Synchronization.AtomicValue in Synchronization
-Added: _$sSd15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.Double : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSd15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.Float : Synchronization.AtomicValue in Synchronization
-Added: _$sSf15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.Float : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSf15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.Float : Synchronization.AtomicValue in Synchronization
-Added: _$sSf15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.Float : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSf15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.Int : Synchronization.AtomicValue in Synchronization
-Added: _$sSi15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.Int : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSi15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.Int : Synchronization.AtomicValue in Synchronization
-Added: _$sSi15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.Int : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSi15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSpyxG15Synchronization11AtomicValueABMc
+// protocol conformance descriptor for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSpyxG15Synchronization19AtomicRepresentableABMc
 
-// protocol witness table for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSpyxG15Synchronization11AtomicValueABWP
+// protocol witness table for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSpyxG15Synchronization19AtomicRepresentableABWP
 
-// protocol conformance descriptor for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSpyxG15Synchronization23AtomicOptionalWrappableABMc
+// protocol conformance descriptor for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSpyxG15Synchronization27AtomicOptionalRepresentableABMc
 
-// protocol witness table for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSpyxG15Synchronization23AtomicOptionalWrappableABWP
+// protocol witness table for Swift.UnsafeMutablePointer<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSpyxG15Synchronization27AtomicOptionalRepresentableABWP
 
-// protocol conformance descriptor for Swift.UnsafeMutableBufferPointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSryxG15Synchronization11AtomicValueABMc
+// protocol conformance descriptor for Swift.UnsafeMutableBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSryxG15Synchronization19AtomicRepresentableABMc
 
-// protocol witness table for Swift.UnsafeMutableBufferPointer<A> : Synchronization.AtomicValue in Synchronization
-Added: _$sSryxG15Synchronization11AtomicValueABWP
+// protocol witness table for Swift.UnsafeMutableBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSryxG15Synchronization19AtomicRepresentableABWP
 
-// protocol conformance descriptor for Swift.UInt : Synchronization.AtomicValue in Synchronization
-Added: _$sSu15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.UInt : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSu15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.UInt : Synchronization.AtomicValue in Synchronization
-Added: _$sSu15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.UInt : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSu15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.UnsafeMutableRawPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSv15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.UnsafeMutableRawPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSv15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.UnsafeMutableRawPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSv15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.UnsafeMutableRawPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSv15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.UnsafeMutableRawPointer : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSv15Synchronization23AtomicOptionalWrappableAAMc
+// protocol conformance descriptor for Swift.UnsafeMutableRawPointer : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSv15Synchronization27AtomicOptionalRepresentableAAMc
 
-// protocol witness table for Swift.UnsafeMutableRawPointer : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$sSv15Synchronization23AtomicOptionalWrappableAAWP
+// protocol witness table for Swift.UnsafeMutableRawPointer : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$sSv15Synchronization27AtomicOptionalRepresentableAAWP
 
-// protocol conformance descriptor for Swift.UnsafeMutableRawBufferPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSw15Synchronization11AtomicValueAAMc
+// protocol conformance descriptor for Swift.UnsafeMutableRawBufferPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSw15Synchronization19AtomicRepresentableAAMc
 
-// protocol witness table for Swift.UnsafeMutableRawBufferPointer : Synchronization.AtomicValue in Synchronization
-Added: _$sSw15Synchronization11AtomicValueAAWP
+// protocol witness table for Swift.UnsafeMutableRawBufferPointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sSw15Synchronization19AtomicRepresentableAAWP
 
-// protocol conformance descriptor for Swift.OpaquePointer : Synchronization.AtomicValue in Synchronization
-Added: _$ss13OpaquePointerV15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.OpaquePointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss13OpaquePointerV15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.OpaquePointer : Synchronization.AtomicValue in Synchronization
-Added: _$ss13OpaquePointerV15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.OpaquePointer : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss13OpaquePointerV15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.OpaquePointer : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$ss13OpaquePointerV15Synchronization23AtomicOptionalWrappableACMc
+// protocol conformance descriptor for Swift.OpaquePointer : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$ss13OpaquePointerV15Synchronization27AtomicOptionalRepresentableACMc
 
-// protocol witness table for Swift.OpaquePointer : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$ss13OpaquePointerV15Synchronization23AtomicOptionalWrappableACWP
+// protocol witness table for Swift.OpaquePointer : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$ss13OpaquePointerV15Synchronization27AtomicOptionalRepresentableACWP
 
-// protocol conformance descriptor for Swift.Int8 : Synchronization.AtomicValue in Synchronization
-Added: _$ss4Int8V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.Int8 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss4Int8V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.Int8 : Synchronization.AtomicValue in Synchronization
-Added: _$ss4Int8V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.Int8 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss4Int8V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.Int16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5Int16V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.Int16 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5Int16V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.Int16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5Int16V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.Int16 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5Int16V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.Int32 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5Int32V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.Int32 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5Int32V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.Int32 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5Int32V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.Int32 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5Int32V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.Int64 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5Int64V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.Int64 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5Int64V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.Int64 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5Int64V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.Int64 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5Int64V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.Never : Synchronization.AtomicValue in Synchronization
-Added: _$ss5NeverO15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.Never : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5NeverO15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.Never : Synchronization.AtomicValue in Synchronization
-Added: _$ss5NeverO15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.Never : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5NeverO15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.UInt8 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5UInt8V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.UInt8 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5UInt8V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.UInt8 : Synchronization.AtomicValue in Synchronization
-Added: _$ss5UInt8V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.UInt8 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss5UInt8V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.UInt16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss6UInt16V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.UInt16 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss6UInt16V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.UInt16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss6UInt16V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.UInt16 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss6UInt16V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.UInt32 : Synchronization.AtomicValue in Synchronization
-Added: _$ss6UInt32V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.UInt32 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss6UInt32V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.UInt32 : Synchronization.AtomicValue in Synchronization
-Added: _$ss6UInt32V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.UInt32 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss6UInt32V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.UInt64 : Synchronization.AtomicValue in Synchronization
-Added: _$ss6UInt64V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.UInt64 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss6UInt64V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.UInt64 : Synchronization.AtomicValue in Synchronization
-Added: _$ss6UInt64V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.UInt64 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss6UInt64V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.Float16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss7Float16V15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.Float16 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss7Float16V15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.Float16 : Synchronization.AtomicValue in Synchronization
-Added: _$ss7Float16V15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.Float16 : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss7Float16V15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.Duration : Synchronization.AtomicValue in Synchronization
-Added: _$ss8DurationV15Synchronization11AtomicValueACMc
+// protocol conformance descriptor for Swift.Duration : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss8DurationV15Synchronization19AtomicRepresentableACMc
 
-// protocol witness table for Swift.Duration : Synchronization.AtomicValue in Synchronization
-Added: _$ss8DurationV15Synchronization11AtomicValueACWP
+// protocol witness table for Swift.Duration : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss8DurationV15Synchronization19AtomicRepresentableACWP
 
-// protocol conformance descriptor for Swift.Unmanaged<A> : Synchronization.AtomicValue in Synchronization
-Added: _$ss9UnmanagedVyxG15Synchronization11AtomicValueADMc
+// protocol conformance descriptor for Swift.Unmanaged<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss9UnmanagedVyxG15Synchronization19AtomicRepresentableADMc
 
-// protocol witness table for Swift.Unmanaged<A> : Synchronization.AtomicValue in Synchronization
-Added: _$ss9UnmanagedVyxG15Synchronization11AtomicValueADWP
+// protocol witness table for Swift.Unmanaged<A> : Synchronization.AtomicRepresentable in Synchronization
+Added: _$ss9UnmanagedVyxG15Synchronization19AtomicRepresentableADWP
 
-// protocol conformance descriptor for Swift.Unmanaged<A> : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$ss9UnmanagedVyxG15Synchronization23AtomicOptionalWrappableADMc
+// protocol conformance descriptor for Swift.Unmanaged<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$ss9UnmanagedVyxG15Synchronization27AtomicOptionalRepresentableADMc
 
-// protocol witness table for Swift.Unmanaged<A> : Synchronization.AtomicOptionalWrappable in Synchronization
-Added: _$ss9UnmanagedVyxG15Synchronization23AtomicOptionalWrappableADWP
+// protocol witness table for Swift.Unmanaged<A> : Synchronization.AtomicOptionalRepresentable in Synchronization
+Added: _$ss9UnmanagedVyxG15Synchronization27AtomicOptionalRepresentableADWP
 
-// protocol conformance descriptor for <A where A: Synchronization.AtomicOptionalWrappable> A? : Synchronization.AtomicValue in Synchronization
-Added: _$sxSg15Synchronization11AtomicValueA2B0B17OptionalWrappableRzlMc
+// protocol conformance descriptor for <A where A: Synchronization.AtomicOptionalRepresentable> A? : Synchronization.AtomicRepresentable in Synchronization
+Added: _$sxSg15Synchronization19AtomicRepresentableA2B0b8OptionalC0RzlMc
