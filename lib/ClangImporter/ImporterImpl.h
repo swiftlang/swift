@@ -227,11 +227,7 @@ using ImportTypeAttrs = OptionSet<ImportTypeAttr>;
 /// \param D The declaration to extract attributes from.
 /// \param isParam Is the declaration a function parameter? If so, additional
 ///        attributes will be imported.
-/// \param sendableByDefault If the sendability of the declaration is not
-///        specified, should the \c \@Sendable attribute be added implicitly?
-///        Used for e.g. completion handlers.
-ImportTypeAttrs getImportTypeAttrs(const clang::Decl *D, bool isParam = false,
-                                   bool sendableByDefault = false);
+ImportTypeAttrs getImportTypeAttrs(const clang::Decl *D, bool isParam = false);
 
 struct ImportDiagnostic {
   ImportDiagnosticTarget target;

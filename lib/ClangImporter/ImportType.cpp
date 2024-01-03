@@ -1633,10 +1633,13 @@ static ImportedType adjustTypeForConcreteImport(
   return {importedType, isIUO};
 }
 
-static void applyTypeAttributes(ImportTypeKind importKind,
+static void applyTypeAttributes(ASTContext &SwiftContext,
+                                ImportTypeKind importKind,
                                 ImportTypeAttrs &attrs, clang::QualType type) {
   bool isMainActor = false;
-  bool isSendable = false;
+  bool isSendable =
+      SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
+      importKind == ImportTypeKind::CompletionHandlerParameter;
   bool isNonSendable = false;
 
   std::function<clang::QualType(clang::QualType)> skipUnrelatedSugar =
@@ -1725,7 +1728,7 @@ ImportedType ClangImporter::Implementation::importType(
     optionality = translateNullability(*nullability, stripNonResultOptionality);
   }
 
-  applyTypeAttributes(importKind, attrs, type);
+  applyTypeAttributes(SwiftContext, importKind, attrs, type);
 
   // If this is a completion handler parameter, record the function type whose
   // parameters will act as the results of the completion handler.
@@ -2048,14 +2051,10 @@ private:
 
 } // anonymous namespace
 
-ImportTypeAttrs swift::getImportTypeAttrs(const clang::Decl *D, bool isParam,
-                                          bool sendableByDefault) {
+ImportTypeAttrs swift::getImportTypeAttrs(const clang::Decl *D, bool isParam) {
   ImportTypeAttrs attrs;
 
-  if (sendableByDefault)
-    attrs |= ImportTypeAttr::DefaultsToSendable;
-
-  bool sendableRequested = sendableByDefault;
+  bool sendableRequested = false;
   bool sendableDisqualified = false;
 
   if (D->hasAttrs()) {
@@ -2477,12 +2476,6 @@ ClangImporter::Implementation::importParameterType(
   }
 
   if (!swiftParamTy) {
-    bool sendableByDefault =
-        paramIsCompletionHandler &&
-        SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers);
-
-    auto attrs = getImportTypeAttrs(param, /*isParam=*/true, sendableByDefault);
-
     // If this is the throws error parameter, we don't need to convert any
     // NSError** arguments to the sugared NSErrorPointer typealias form,
     // because all that is done with it is retrieving the canonical
