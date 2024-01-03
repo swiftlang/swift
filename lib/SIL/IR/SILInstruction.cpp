@@ -1391,6 +1391,13 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isAllocatingStack())
     return false;
 
+  // In OSSA, partial_apply is not considered stack allocating (not handled by
+  // stack nesting fixup or verification). Nonetheless, prevent it from being
+  // cloned so OSSA lowering can directly convert it to a single allocation.
+  if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
+    return !PA->isOnStack();
+  }
+
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1781,8 +1788,23 @@ static bool visitRecursivelyLifetimeEndingUses(
     
     // There shouldn't be any dead-end consumptions of a nonescaping
     // partial_apply that don't forward it along, aside from destroy_value.
-    assert(use->getUser()->hasResults()
-           && use->getUser()->getNumResults() == 1);
+    //
+    // On-stack partial_apply cannot be cloned, so it should never be used by a
+    // BranchInst.
+    //
+    // This is a fatal error because it performs SIL verification that is not
+    // separately checked in the verifier. It is the only check that verifies
+    // the structural requirements of on-stack partial_apply uses.
+    auto *user = use->getUser();
+    if (user->getNumResults() != 1) {
+      llvm::errs() << "partial_apply [on_stack] use:\n";
+      user->printInContext(llvm::errs());
+      if (isa<BranchInst>(user)) {
+        llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+      }
+      llvm::report_fatal_error("partial_apply [on_stack] must be directly "
+                               "forwarded to a destroy_value");
+    }
     if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
                                             noUsers, func)) {
       return false;
