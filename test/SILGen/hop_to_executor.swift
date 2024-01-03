@@ -379,7 +379,7 @@ func testGlobalActorClosure() {
   let pga: @PrivateGlobalActor () -> () = { @PrivateGlobalActor in print(5) }
   acceptAsyncClosure(pga)
 
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test17PublicGlobalActorVTU
+  // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test17PublicGlobalActorVTU
   // CHECK:         hop_to_executor {{%.*}} : $MyPublicActor
   // CHECK:         apply %0()
   let pbga: @PublicGlobalActor () -> () = { @PublicGlobalActor in print(5) }

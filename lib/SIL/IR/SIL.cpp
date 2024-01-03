@@ -172,7 +172,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
-      switch (getTypeLinkage_correct(CanType(req.getSecondType()))) {
+      switch (getTypeLinkage(CanType(req.getSecondType()))) {
       case FormalLinkage::PublicUnique:
       case FormalLinkage::PublicNonUnique:
         continue;
@@ -190,19 +190,6 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
 }
 
 /// Return the formal linkage of the given formal type.
-///
-/// Note that this function is buggy and generally should not be
-/// used in new code; we should migrate all callers to
-/// getTypeLinkage_correct and then consolidate them.
-FormalLinkage swift::getTypeLinkage(CanType t) {
-  assert(t->isLegalFormalType());
-  // Due to a bug, this always returns PublicUnique.
-  // It's a bit late in the 5.7 timeline to be changing that, but
-  // we can optimize it!
-  return FormalLinkage::PublicUnique;
-}
-
-/// Return the formal linkage of the given formal type.
 /// This in the appropriate linkage for a lazily-emitted entity
 /// derived from the type.
 ///
@@ -211,7 +198,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
 /// uniquely-emitted nominal type, the formal linkage of that
 /// type may differ from the formal linkage of the underlying
 /// type declaration.
-FormalLinkage swift::getTypeLinkage_correct(CanType t) {
+FormalLinkage swift::getTypeLinkage(CanType t) {
   assert(t->isLegalFormalType());
   
   class Walker : public TypeWalker {
@@ -265,7 +252,6 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 
   // Otherwise, check that we can fetch the type metadata.
   return M.isTypeMetadataAccessible(type.getASTType());
-
 }
 
 /// Can we perform value operations on the given type?  We have no way
