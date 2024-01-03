@@ -96,18 +96,30 @@ extension Tuple: Equatable where repeat each Element: Equatable {
   // FIXME: Hack
   @_disfavoredOverload
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    var result = true
-    func update<E: Equatable>(lhs: E, rhs: E) {
-      result = result && (lhs == rhs)
+    for (l, r) in repeat (each lhs, each rhs) {
+      if l != r { return false }
     }
-
-    repeat update(lhs: each lhs, rhs: each rhs)
-    return result
+    return true
   }
 }
 
 extension Tuple: Hashable where repeat each Element: Hashable {
   public func hash(into hasher: inout Hasher) {
-    repeat (each self).hash(into: &hasher)
+    for elt in repeat each self {
+      elt.hash(into: &hasher)
+    }
   }
 }
+
+extension Tuple: Comparable where repeat each Element: Comparable {
+  // FIXME: Hack
+  @_disfavoredOverload
+  public static func <(lhs: Self, rhs: Self) -> Bool {
+    for (l, r) in repeat (each lhs, each rhs) {
+      if l > r { return false }
+      if l < r { return true }
+    }
+    return false
+  }
+}
+
