@@ -3675,6 +3675,13 @@ NOTE(inconsistent_implicit_access_level_on_import_here,none,
 FIXIT(inconsistent_implicit_access_level_on_import_fixit,
      "%select{private|fileprivate|internal|package|public|%error}0 ",
      (AccessLevel))
+WARNING(inconsistent_import_access_levels,none,
+        "module %0 is imported as "
+        "'%select{private|fileprivate|internal|package|public|%error}1' "
+        "from the same file; "
+        "this '%select{private|fileprivate|internal|package|public|%error}2' "
+        "access level will be ignored",
+      (const ModuleDecl *, AccessLevel, AccessLevel))
 
 ERROR(implementation_only_decl_non_override,none,
       "'@_implementationOnly' can only be used on overrides", ())
