@@ -229,6 +229,15 @@ using ImportTypeAttrs = OptionSet<ImportTypeAttr>;
 ///        attributes will be imported.
 ImportTypeAttrs getImportTypeAttrs(const clang::Decl *D, bool isParam = false);
 
+/// Extract concurrency related attributes from a type.
+///
+/// \param SwiftContext The context.
+/// \param importKind The kind of import being performed.
+/// \param attrs The list to add the new attributes to.
+/// \param type The type to extract attributes from.
+void getConcurrencyAttrs(ASTContext &SwiftContext, ImportTypeKind importKind,
+                         ImportTypeAttrs &attrs, clang::QualType type);
+
 struct ImportDiagnostic {
   ImportDiagnosticTarget target;
   Diagnostic diag;

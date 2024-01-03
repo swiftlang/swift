@@ -1633,7 +1633,7 @@ static ImportedType adjustTypeForConcreteImport(
   return {importedType, isIUO};
 }
 
-static void applyTypeAttributes(ASTContext &SwiftContext,
+void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
                                 ImportTypeKind importKind,
                                 ImportTypeAttrs &attrs, clang::QualType type) {
   bool isMainActor = false;
@@ -1728,7 +1728,7 @@ ImportedType ClangImporter::Implementation::importType(
     optionality = translateNullability(*nullability, stripNonResultOptionality);
   }
 
-  applyTypeAttributes(SwiftContext, importKind, attrs, type);
+  getConcurrencyAttrs(SwiftContext, importKind, attrs, type);
 
   // If this is a completion handler parameter, record the function type whose
   // parameters will act as the results of the completion handler.
