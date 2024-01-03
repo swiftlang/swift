@@ -57,3 +57,11 @@ module ClangModuleWithOverlayedDep {
   header "ClangModuleWithOverlayedDep.h"
   export *
 }
+module CycleClangMiddle {
+  header "CycleClangMiddle.h"
+  export *
+}
+module CycleOverlay {
+  header "CycleOverlay.h"
+  export *
+}

@@ -795,16 +795,30 @@ void ModuleDependenciesCache::setSwiftOverlayDependencies(ModuleDependencyID mod
 
 std::vector<ModuleDependencyID>
 ModuleDependenciesCache::getAllDependencies(const ModuleDependencyID &moduleID) const {
-  const auto &optionalModuleInfo = findDependency(moduleID);
-  assert(optionalModuleInfo.has_value());
+  const auto &moduleInfo = findDependency(moduleID);
+  assert(moduleInfo.has_value());
   auto directDependenciesRef =
-      optionalModuleInfo.value()->getDirectModuleDependencies();
+      moduleInfo.value()->getDirectModuleDependencies();
   auto overlayDependenciesRef =
-      optionalModuleInfo.value()->getSwiftOverlayDependencies();
+      moduleInfo.value()->getSwiftOverlayDependencies();
   std::vector<ModuleDependencyID> result;
   result.insert(std::end(result), directDependenciesRef.begin(),
                 directDependenciesRef.end());
   result.insert(std::end(result), overlayDependenciesRef.begin(),
                 overlayDependenciesRef.end());
   return result;
+}
+
+ArrayRef<ModuleDependencyID>
+ModuleDependenciesCache::getOnlyOverlayDependencies(const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findDependency(moduleID);
+  assert(moduleInfo.has_value());
+  return moduleInfo.value()->getSwiftOverlayDependencies();
+}
+
+ArrayRef<ModuleDependencyID>
+ModuleDependenciesCache::getOnlyDirectDependencies(const ModuleDependencyID &moduleID) const {
+  const auto &moduleInfo = findDependency(moduleID);
+  assert(moduleInfo.has_value());
+  return moduleInfo.value()->getDirectModuleDependencies();
 }
