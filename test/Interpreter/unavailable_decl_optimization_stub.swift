@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -module-name main -Xfrontend -unavailable-decl-optimization=stub %s -o %t/a.out
+// RUN: %target-build-swift -module-name main %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out > %t/output 2>&1 || true
 // RUN: %FileCheck %s < %t/output
