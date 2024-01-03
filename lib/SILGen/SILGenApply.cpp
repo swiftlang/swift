@@ -444,17 +444,34 @@ public:
     auto base = c.getOverriddenVTableEntry();
     auto &baseCI = SGF.getConstantInfo(SGF.getTypeExpansionContext(), base);
     auto &derivedCI = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
+    subs = subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext());
+
+    // We use an orig function type based on the overridden vtable entry, but
+    // the substitutions we have are for the current function.  To get subs
+    // that will work on the overridden entry, we need to construct the
+    // override substitutions.
+    auto origFunctionType = baseCI.FormalPattern;
+    if (base.getDecl() == c.getDecl()) {
+      origFunctionType = origFunctionType.withSubstitutions(subs);
+    } else {
+      auto derivedCDR = ConcreteDeclRef(c.getDecl(), subs);
+      auto baseCDR = derivedCDR.getOverriddenDecl(base.getDecl());
+      origFunctionType =
+        origFunctionType.withSubstitutions(baseCDR.getSubstitutions());
+    }
+
     return Callee(
-        Kind::ClassMethod, SGF, c, baseCI.FormalPattern, derivedCI.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l);
+        Kind::ClassMethod, SGF, c, origFunctionType, derivedCI.FormalType,
+        subs, l);
   }
   static Callee forSuperMethod(SILGenFunction &SGF,
                                SILDeclRef c, SubstitutionMap subs,
                                SILLocation l) {
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
+    subs = subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext());
+    auto origFunctionType = ci.FormalPattern.withSubstitutions(subs);
     return Callee(
-        Kind::SuperMethod, SGF, c, ci.FormalPattern, ci.FormalType,
-        subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l);
+        Kind::SuperMethod, SGF, c, origFunctionType, ci.FormalType, subs, l);
   }
   static Callee forWitnessMethod(SILGenFunction &SGF,
                                  CanType protocolSelfType,
