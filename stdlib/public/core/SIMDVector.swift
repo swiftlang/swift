@@ -133,7 +133,7 @@ extension SIMD {
   }
 
 #if !$Embedded
-  
+
   /// Encodes the scalars of this vector into the given encoder in an unkeyed
   /// container.
   ///
@@ -147,7 +147,7 @@ extension SIMD {
       try container.encode(self[i])
     }
   }
-  
+
   /// Creates a new vector by decoding scalars from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -169,7 +169,7 @@ extension SIMD {
       self[i] = try container.decode(Scalar.self)
     }
   }
-  
+
   /// A textual description of the vector.
   public var description: String {
     get {
@@ -563,10 +563,9 @@ extension SIMD where Scalar: FixedWidthInteger {
     return Self(repeating: 1)
   }
   
-#if !$Embedded
-
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
+  @_unavailableInEmbedded
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: Range<Scalar>,
@@ -581,6 +580,7 @@ extension SIMD where Scalar: FixedWidthInteger {
   
   /// Returns a vector with random values from within the specified range in
   /// all lanes.
+  @_unavailableInEmbedded
   @inlinable
   public static func random(in range: Range<Scalar>) -> Self {
     var g = SystemRandomNumberGenerator()
@@ -589,6 +589,7 @@ extension SIMD where Scalar: FixedWidthInteger {
 
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
+  @_unavailableInEmbedded
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: ClosedRange<Scalar>,
@@ -603,13 +604,12 @@ extension SIMD where Scalar: FixedWidthInteger {
   
   /// Returns a vector with random values from within the specified range in
   /// all lanes.
+  @_unavailableInEmbedded
   @inlinable
   public static func random(in range: ClosedRange<Scalar>) -> Self {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
-
-#endif
 
 }
 
@@ -637,8 +637,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
 }
 
-#if !$Embedded
-
+@_unavailableInEmbedded
 extension SIMD
 where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   /// Returns a vector with random values from within the specified range in
@@ -686,8 +685,6 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   }
 }
 
-#endif
-
 @frozen
 public struct SIMDMask<Storage>: SIMD
                   where Storage: SIMD,
@@ -728,8 +725,7 @@ public struct SIMDMask<Storage>: SIMD
   }
 }
 
-#if !$Embedded
-
+@_unavailableInEmbedded
 extension SIMDMask {
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane, using the given generator as a source for randomness.
@@ -748,8 +744,6 @@ extension SIMDMask {
     return SIMDMask.random(using: &g)
   }
 }
-
-#endif
 
 //  Implementations of integer operations. These should eventually all
 //  be replaced with @_semantics to lower directly to vector IR nodes.
