@@ -71,6 +71,7 @@ CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
+CONSTANT_OWNERSHIP_INST(None, GlobalValue)
 CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocRef)
@@ -85,7 +86,6 @@ CONSTANT_OWNERSHIP_INST(Owned, EndInitLetRef)
 CONSTANT_OWNERSHIP_INST(Owned, BeginDeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
-CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
