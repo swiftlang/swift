@@ -2601,7 +2601,6 @@ void Lexer::lexImpl() {
   if (DiagQueue)
     DiagQueue->clear();
 
-  const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
@@ -2613,7 +2612,7 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
+  lexTrivia();
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -2817,8 +2816,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   return L.peekNextToken();
 }
 
-StringRef Lexer::lexTrivia(bool IsForTrailingTrivia,
-                           const char *AllTriviaStart) {
+void Lexer::lexTrivia() {
   CommentStart = nullptr;
 
 Restart:
@@ -2826,13 +2824,9 @@ Restart:
 
   switch (*CurPtr++) {
   case '\n':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     goto Restart;
   case '\r':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     if (CurPtr[0] == '\n') {
       ++CurPtr;
@@ -2844,8 +2838,7 @@ Restart:
   case '\f':
     goto Restart;
   case '/':
-    if (IsForTrailingTrivia || isKeepingComments()) {
-      // Don't lex comments as trailing trivia (for now).
+    if (isKeepingComments()) {
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {
@@ -2926,15 +2919,12 @@ Restart:
     bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/false);
     if (ShouldTokenize) {
       CurPtr = Tmp;
-      size_t Length = CurPtr - AllTriviaStart;
-      return StringRef(AllTriviaStart, Length);
+      return;
     }
     goto Restart;
   }
   // Reset the cursor.
   --CurPtr;
-  size_t Length = CurPtr - AllTriviaStart;
-  return StringRef(AllTriviaStart, Length);
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
