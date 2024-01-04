@@ -429,12 +429,6 @@ namespace swift {
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
 
-    /// The set of features that have been enabled.
-    FixedBitSet<numFeatures(), Feature> Features;
-
-    /// Temporary flag to support LLDB's transition to using \c Features.
-    bool EnableBareSlashRegexLiterals = false;
-
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
@@ -690,6 +684,12 @@ namespace swift {
     /// by name.
     bool hasFeature(llvm::StringRef featureName) const;
 
+    /// Enable the given feature.
+    void enableFeature(Feature feature) { Features.insert(feature); }
+
+    /// Disable the given feature.
+    void disableFeature(Feature feature) { Features.remove(feature); }
+
     /// Sets the "_hasAtomicBitWidth" conditional.
     void setHasAtomicBitWidth(llvm::Triple triple);
 
@@ -762,6 +762,11 @@ namespace swift {
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 10>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
+
+    /// The set of features that have been enabled. Doesn't include upcoming
+    /// features, which are checked against the language version in
+    /// `hasFeature`.
+    FixedBitSet<numFeatures(), Feature> Features;
   };
 
   class TypeCheckerOptions final {

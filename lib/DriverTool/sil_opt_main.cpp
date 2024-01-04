@@ -647,9 +647,9 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       toOptionalBool(options.EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly) {
     // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
-    Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
-    Invocation.getLangOptions().Features.insert(Feature::NoImplicitCopy);
-    Invocation.getLangOptions().Features.insert(
+    Invocation.getLangOptions().enableFeature(Feature::MoveOnly);
+    Invocation.getLangOptions().enableFeature(Feature::NoImplicitCopy);
+    Invocation.getLangOptions().enableFeature(
         Feature::OldOwnershipOperatorSpellings);
   }
   Invocation.getLangOptions().BypassResilienceChecks =
@@ -658,7 +658,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.DebugDiagnosticNames;
   for (auto &featureName : options.ExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureName)) {
-      Invocation.getLangOptions().Features.insert(*feature);
+      Invocation.getLangOptions().enableFeature(*feature);
     } else {
       llvm::errs() << "error: unknown feature "
                    << QuotedString(featureName) << "\n";
@@ -670,7 +670,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     options.EnableObjCInterop ? true :
     options.DisableObjCInterop ? false : llvm::Triple(options.Target).isOSDarwin();
 
-  Invocation.getLangOptions().Features.insert(Feature::LayoutPrespecialization);
+  Invocation.getLangOptions().enableFeature(Feature::LayoutPrespecialization);
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(options.PassRemarksPassed);
@@ -678,10 +678,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       createOptRemarkRegex(options.PassRemarksMissed);
 
   if (options.EnableExperimentalStaticAssert)
-    Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
+    Invocation.getLangOptions().enableFeature(Feature::StaticAssert);
 
   if (options.EnableExperimentalDifferentiableProgramming) {
-    Invocation.getLangOptions().Features.insert(
+    Invocation.getLangOptions().enableFeature(
         Feature::DifferentiableProgramming);
   }
 
