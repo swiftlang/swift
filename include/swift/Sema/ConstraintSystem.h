@@ -1466,6 +1466,15 @@ struct PotentialThrowSite {
 
   /// The locator that specifies where the throwing operation occurs.
   ConstraintLocator *locator;
+  
+  friend bool operator==(const PotentialThrowSite& lhs, const PotentialThrowSite &rhs) {
+    return lhs.kind == rhs.kind && lhs.type.getPointer() == rhs.type.getPointer() &&
+           lhs.locator == rhs.locator;
+  }
+  
+  friend bool operator!=(const PotentialThrowSite& lhs, const PotentialThrowSite &rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 /// A complete solution to a constraint system.

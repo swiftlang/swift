@@ -353,9 +353,21 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setCaseLabelItemInfo(info.first, info.second);
   }
 
-  potentialThrowSites.insert(potentialThrowSites.end(),
-                             solution.potentialThrowSites.begin(),
-                             solution.potentialThrowSites.end());
+  if (!potentialThrowSites.empty() && !solution.potentialThrowSites.empty()) {
+    DenseMap<void *, std::vector<PotentialThrowSite>> known;
+    for (const auto &throwSite : potentialThrowSites) {
+      known[throwSite.first.getOpaqueValue()].push_back(throwSite.second);
+    }
+      
+    for (const auto &throwSite : solution.potentialThrowSites) {
+      auto &sites = known[throwSite.first.getOpaqueValue()];
+      if (std::find(sites.begin(), sites.end(), throwSite.second) != sites.end())
+        continue;
+      
+      sites.push_back(throwSite.second);
+      potentialThrowSites.push_back(throwSite);
+    }
+  }
 
   for (auto param : solution.isolatedParams) {
     isolatedParams.insert(param);
