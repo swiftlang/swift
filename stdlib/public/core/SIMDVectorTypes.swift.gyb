@@ -155,6 +155,7 @@ extension SIMD${n} where Scalar: FixedWidthInteger {
   }
 }
 
+@_unavailableInEmbedded
 extension SIMD${n}: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
