@@ -439,15 +439,15 @@ ConstraintGraphScope::~ConstraintGraphScope() {
 ConstraintGraph::Change
 ConstraintGraph::Change::addedTypeVariable(TypeVariableType *typeVar) {
   Change result;
-  result.Kind = ChangeKind::AddedTypeVariable;
-  result.TypeVar = typeVar;
+  result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::AddedTypeVariable);
+  result.TheConstraint = nullptr;
   return result;
 }
 
 ConstraintGraph::Change
 ConstraintGraph::Change::addedConstraint(Constraint *constraint) {
   Change result;
-  result.Kind = ChangeKind::AddedConstraint;
+  result.TypeVarAndKind.setPointerAndInt(nullptr, ChangeKind::AddedConstraint);
   result.TheConstraint = constraint;
   return result;
 }
@@ -455,7 +455,7 @@ ConstraintGraph::Change::addedConstraint(Constraint *constraint) {
 ConstraintGraph::Change
 ConstraintGraph::Change::removedConstraint(Constraint *constraint) {
   Change result;
-  result.Kind = ChangeKind::RemovedConstraint;
+  result.TypeVarAndKind.setPointerAndInt(nullptr, ChangeKind::RemovedConstraint);
   result.TheConstraint = constraint;
   return result;
 }
@@ -464,8 +464,7 @@ ConstraintGraph::Change
 ConstraintGraph::Change::extendedEquivalenceClass(TypeVariableType *typeVar,
                                                   unsigned prevSize) {
   Change result;
-  result.Kind = ChangeKind::ExtendedEquivalenceClass;
-  result.EquivClass.TypeVar = typeVar;
+  result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::ExtendedEquivalenceClass);
   result.EquivClass.PrevSize = prevSize;
   return result;
 }
@@ -474,8 +473,7 @@ ConstraintGraph::Change
 ConstraintGraph::Change::boundTypeVariable(TypeVariableType *typeVar,
                                            Type fixed) {
   Change result;
-  result.Kind = ChangeKind::BoundTypeVariable;
-  result.Binding.TypeVar = typeVar;
+  result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::BoundTypeVariable);
   result.Binding.FixedType = fixed.getPointer();
   return result;
 }
@@ -486,9 +484,9 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
   llvm::SaveAndRestore<ConstraintGraphScope *> prevActiveScope(cg.ActiveScope,
                                                                nullptr);
 
-  switch (Kind) {
+  switch (TypeVarAndKind.getInt()) {
   case ChangeKind::AddedTypeVariable:
-    cg.removeNode(TypeVar);
+    cg.removeNode(TypeVarAndKind.getPointer());
     break;
 
   case ChangeKind::AddedConstraint:
@@ -500,13 +498,13 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
     break;
 
   case ChangeKind::ExtendedEquivalenceClass: {
-    auto &node = cg[EquivClass.TypeVar];
+    auto &node = cg[TypeVarAndKind.getPointer()];
     node.truncateEquivalenceClass(EquivClass.PrevSize);
     break;
    }
 
   case ChangeKind::BoundTypeVariable:
-    cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
+    cg.unbindTypeVariable(TypeVarAndKind.getPointer(), Binding.FixedType);
     break;
   }
 }
@@ -1565,23 +1563,23 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
     return;
 
   // Collect Changes for printing.
-  std::map<TypeVariableType *, TypeBase *> tvWithboundTypes;
+  std::map<TypeVariableType *, TypeBase *> tvWithBoundTypes;
   std::vector<TypeVariableType *> addedTypeVars;
   std::vector<TypeVariableType *> equivTypeVars;
   std::set<Constraint *> addedConstraints;
   std::set<Constraint *> removedConstraints;
   for (unsigned int i = ActiveScope->getStartIdx(); i < Changes.size(); i++) {
     auto change = Changes[i];
-    switch (change.Kind) {
+    switch (change.TypeVarAndKind.getInt()) {
     case ChangeKind::BoundTypeVariable:
-      tvWithboundTypes.insert(std::pair<TypeVariableType *, TypeBase *>(
-          change.Binding.TypeVar, change.Binding.FixedType));
+      tvWithBoundTypes.insert(std::pair<TypeVariableType *, TypeBase *>(
+          change.TypeVarAndKind.getPointer(), change.Binding.FixedType));
       break;
     case ChangeKind::AddedTypeVariable:
-      addedTypeVars.push_back(change.TypeVar);
+      addedTypeVars.push_back(change.TypeVarAndKind.getPointer());
       break;
     case ChangeKind::ExtendedEquivalenceClass:
-      equivTypeVars.push_back(change.EquivClass.TypeVar);
+      equivTypeVars.push_back(change.TypeVarAndKind.getPointer());
       break;
     case ChangeKind::AddedConstraint:
       addedConstraints.insert(change.TheConstraint);
@@ -1606,10 +1604,10 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
   PO.PrintTypesForDebugging = true;
   out.indent(indent);
   out << "(Changes:\n";
-  if (!tvWithboundTypes.empty()) {
+  if (!tvWithBoundTypes.empty()) {
     out.indent(indent + 2);
     out << "(Newly Bound: \n";
-    for (const auto &tvWithType : tvWithboundTypes) {
+    for (const auto &tvWithType : tvWithBoundTypes) {
       out.indent(indent + 4);
       out << "> $T" << tvWithType.first->getImpl().getID() << " := ";
       tvWithType.second->print(out, PO);

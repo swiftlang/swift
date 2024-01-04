@@ -441,7 +441,7 @@ private:
   void incrementConstraintsPerContractionCounter();
 
   /// The kind of change made to the graph.
-  enum class ChangeKind {
+  enum class ChangeKind: uint8_t {
     /// Added a type variable.
     AddedTypeVariable,
     /// Added a new constraint.
@@ -460,31 +460,26 @@ private:
   /// undo() method.
   class Change {
   public:
-    /// The kind of change.
-    ChangeKind Kind;
+    /// The type variable and the kind of change.
+    llvm::PointerIntPair<TypeVariableType *, 3, ChangeKind> TypeVarAndKind;
 
     union {
-      TypeVariableType *TypeVar;
       Constraint *TheConstraint;
 
       struct {
-        /// The type variable whose equivalence class was extended.
-        TypeVariableType *TypeVar;
-
         /// The previous size of the equivalence class.
         unsigned PrevSize;
       } EquivClass;
 
       struct {
-        /// The type variable being bound to a fixed type.
-        TypeVariableType *TypeVar;
-
         /// The fixed type to which the type variable was bound.
         TypeBase *FixedType;
       } Binding;
     };
 
-    Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
+    Change()
+      : TypeVarAndKind(nullptr, ChangeKind::AddedTypeVariable),
+        TheConstraint(nullptr) { }
 
     /// Create a change that added a type variable.
     static Change addedTypeVariable(TypeVariableType *typeVar);
