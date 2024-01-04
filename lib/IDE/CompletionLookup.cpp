@@ -83,8 +83,12 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   case CodeCompletionLiteralKind::StringLiteral:
     return Ctx.getStringType();
   case CodeCompletionLiteralKind::ArrayLiteral:
+    if (!Ctx.getArrayDecl())
+      return Type();
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
+    if (!Ctx.getDictionaryDecl())
+      return Type();
     return Ctx.getDictionaryDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::NilLiteral:
   case CodeCompletionLiteralKind::ColorLiteral:
