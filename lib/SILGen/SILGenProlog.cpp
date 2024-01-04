@@ -540,9 +540,13 @@ public:
       assert(componentInit);
       assert(componentInit->canPerformPackExpansionInitialization());
 
-      auto opening = SGF.createOpenedElementValueEnvironment(packComponentTy);
-      auto openedEnv = opening.first;
-      auto eltTy = opening.second;
+      SILType eltTy;
+      CanType substEltType;
+      auto openedEnv =
+        SGF.createOpenedElementValueEnvironment({packComponentTy},
+                                                {&eltTy},
+                                                {substExpansionType},
+                                                {&substEltType});
 
       SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
                               openedEnv, [&](SILValue indexWithinComponent,
@@ -555,12 +559,6 @@ public:
           auto eltAddr =
             SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
           auto eltAddrMV = cloner.clone(eltAddr);
-
-          CanType substEltType = substExpansionType.getPatternType();
-          if (openedEnv) {
-            substEltType =
-              openedEnv->mapContextualPackTypeIntoElementContext(substEltType);
-          }
 
           auto result = handleScalar(eltAddrMV, origPatternType, substEltType,
                                      eltInit, /*inout*/ false);

@@ -529,9 +529,13 @@ public:
     auto eltPatternTy =
       PackAddr->getType().castTo<SILPackType>()
                          ->getSILElementType(ComponentIndex);
-    auto result = SGF.createOpenedElementValueEnvironment(eltPatternTy);
-    auto openedEnv = result.first;
-    auto eltAddrTy = result.second;
+    auto substPatternType = FormalPackType.getElementType(ComponentIndex);
+
+    SILType eltAddrTy;
+    CanType substEltType;
+    auto openedEnv =
+      SGF.createOpenedElementValueEnvironment({eltPatternTy}, {&eltAddrTy},
+                                              {substPatternType}, {&substEltType});
 
     // Loop over the pack, initializing each value with the appropriate
     // element.
@@ -560,18 +564,10 @@ public:
           return eltMV;
         }();
 
-        // Map the formal type into the generic environment.
-        auto substType = FormalPackType.getElementType(ComponentIndex);
-        substType = cast<PackExpansionType>(substType).getPatternType();
-        if (openedEnv) {
-          substType = openedEnv->mapContextualPackTypeIntoElementContext(
-                        substType);
-        }
-
         // Finish in the normal way for scalar results.
         RValue rvalue =
           ScalarResultPlan::finish(SGF, loc, eltMV, OrigPatternType,
-                                   substType, eltInit, Rep);
+                                   substEltType, eltInit, Rep);
         assert(rvalue.isInContext()); (void) rvalue;
       });
     });

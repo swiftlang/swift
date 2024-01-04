@@ -452,42 +452,61 @@ GenericEnvironment *
 SILGenFunction::createOpenedElementValueEnvironment(
                                           ArrayRef<SILType> expansionTys,
                                           ArrayRef<SILType*> eltTys) {
-  // The element-types output array should be the same size as the
-  // expansion-types input array.  We don't currently have a reason
-  // to allow them to be empty --- we never do this with a dynamic
-  // set of types --- but maybe it's justifiable.
-  assert(expansionTys.size() == eltTys.size());
-  assert(!expansionTys.empty());
-  if (expansionTys.empty()) return nullptr;
+  return createOpenedElementValueEnvironment(expansionTys, eltTys, {}, {});
+}
 
-  auto countArchetype = cast<PackArchetypeType>(
-    expansionTys[0].castTo<PackExpansionType>().getCountType());
+
+GenericEnvironment *
+SILGenFunction::createOpenedElementValueEnvironment(
+                                          ArrayRef<SILType> expansionTys,
+                                          ArrayRef<SILType*> eltTys,
+                                          ArrayRef<CanType> formalExpansionTypes,
+                                          ArrayRef<CanType*> formalEltTypes) {
+  // The element-types output arrays should be the same size as their
+  // corresponding expansion-types input arrays.
+  assert(expansionTys.size() == eltTys.size());
+  assert(formalExpansionTypes.size() == formalEltTypes.size());
+
+  assert(!expansionTys.empty() || !formalExpansionTypes.empty());
+  auto countArchetype =
+    cast<PackArchetypeType>(
+      (expansionTys.empty()
+         ? cast<PackExpansionType>(formalExpansionTypes[0])
+         : expansionTys[0].castTo<PackExpansionType>()).getCountType());
 
   GenericEnvironment *env = nullptr;
-  for (auto i : indices(expansionTys)) {
-    auto exp = expansionTys[i].castTo<PackExpansionType>();
-    assert((i == 0 ||
-            countArchetype->getReducedShape() ==
-              cast<PackArchetypeType>(exp.getCountType())->getReducedShape())
+  auto processExpansion = [&](CanPackExpansionType expansion) -> CanType {
+    assert(countArchetype->getReducedShape() ==
+             cast<PackArchetypeType>(expansion.getCountType())->getReducedShape()
            && "expansions are over packs with different shapes");
 
-    // The lowered element type is the lowered pattern type, if that's
-    // invariant to expansion, or else the expansion mapping of that in
-    // the opened-element environment.
-    auto loweredPatternTy = exp.getPatternType();
-    auto loweredEltTy = loweredPatternTy;
-    if (!isPatternInvariantToExpansion(loweredPatternTy, countArchetype)) {
-      // Lazily create the opened-element environment if we find a
-      // pattern type that's not invariant to expansion.
-      if (!env) {
-        auto context = OpenedElementContext::
-            createForContextualExpansion(SGM.getASTContext(), exp);
-        env = context.environment;
-      }
-      loweredEltTy =
-        env->mapContextualPackTypeIntoElementContext(loweredPatternTy);
+    // The element type is the pattern type, if that's invariant to
+    // expansion, or else the expansion mapping of that in the
+    // opened-element environment.
+    auto patternType = expansion.getPatternType();
+    if (isPatternInvariantToExpansion(patternType, countArchetype))
+      return patternType;
+
+    // Lazily create the opened-element environment if we find a
+    // pattern type that's not invariant to expansion.
+    if (!env) {
+      auto context = OpenedElementContext::
+          createForContextualExpansion(SGM.getASTContext(), expansion);
+      env = context.environment;
     }
+    return env->mapContextualPackTypeIntoElementContext(patternType);
+  };
+
+  for (auto i : indices(expansionTys)) {
+    auto exp = expansionTys[i].castTo<PackExpansionType>();
+    auto loweredEltTy = processExpansion(exp);
     *eltTys[i] = SILType::getPrimitiveAddressType(loweredEltTy);
+  }
+
+  for (auto i : indices(formalExpansionTypes)) {
+    auto exp = cast<PackExpansionType>(formalExpansionTypes[i]);
+    auto eltType = processExpansion(exp);
+    *formalEltTypes[i] = eltType;
   }
 
   return env;
