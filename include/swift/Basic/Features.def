@@ -120,6 +120,7 @@ UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
+UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(FullTypedThrows, 413, 6)
 
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
@@ -216,9 +217,6 @@ EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
 /// Region Based Isolation testing using the TransferNonSendable pass
 EXPERIMENTAL_FEATURE(RegionBasedIsolation, false)
-
-/// Within strict concurrency, narrow global variable isolation requirements.
-EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
 
 /// Allow default values to require isolation at the call-site.
 EXPERIMENTAL_FEATURE(IsolatedDefaultValues, false)
