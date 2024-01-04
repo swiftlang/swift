@@ -352,7 +352,7 @@ extension String {
         break
       case .error:
         // validation error: clean up and return nil
-        buffer.prefix(through: written).deinitialize()
+        buffer.prefix(upTo: written).deinitialize()
         buffer.deallocate()
         return nil
       case .emptyInput:
