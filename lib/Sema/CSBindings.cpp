@@ -753,9 +753,9 @@ bool BindingSet::finalize(
         });
       }
     }
-
-    return true;
   }
+
+  return true;
 }
 
 void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
