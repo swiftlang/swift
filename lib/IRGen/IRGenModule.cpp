@@ -2046,8 +2046,23 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
   if (!Triple.isOSDarwin())
     return false;
 
-  return getAvailabilityContext().isContainedIn(
-          Context.getStaticReadOnlyArraysAvailability());
+  if (!getAvailabilityContext().isContainedIn(Context.getStaticReadOnlyArraysAvailability()))
+    return false;
+
+  if (!getStaticArrayStorageDecl())
+    return false;
+
+  return true;
+}
+
+ClassDecl *IRGenModule::getStaticArrayStorageDecl() {
+  SmallVector<ValueDecl *, 1> results;
+  Context.lookupInSwiftModule("__StaticArrayStorage", results);
+
+  if (results.size() != 1)
+    return nullptr;
+
+  return dyn_cast<ClassDecl>(results[0]);
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

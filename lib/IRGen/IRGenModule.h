@@ -927,6 +927,8 @@ public:
   
   bool canMakeStaticObjectsReadOnly();
 
+  ClassDecl *getStaticArrayStorageDecl();
+
   bool canUseObjCSymbolicReferences();
 
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
