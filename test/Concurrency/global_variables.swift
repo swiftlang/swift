@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables -parse-as-library -strict-concurrency=minimal -swift-version 5 %S/Inputs/GlobalVariables.swift
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
