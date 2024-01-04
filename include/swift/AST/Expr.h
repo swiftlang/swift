@@ -448,6 +448,10 @@ public:
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
 
+  /// Find the original expression value, looking through various
+  /// implicit conversions.
+  const Expr *findOriginalValue() const;
+
   /// Find the original type of a value, looking through various implicit
   /// conversions.
   Type findOriginalType() const;

@@ -2875,7 +2875,7 @@ FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
 
-Type Expr::findOriginalType() const {
+const Expr *Expr::findOriginalValue() const {
   auto *expr = this;
   do {
     expr = expr->getSemanticsProvidingExpr();
@@ -2898,6 +2898,11 @@ Type Expr::findOriginalType() const {
     break;
   } while (true);
 
+  return expr;
+}
+
+Type Expr::findOriginalType() const {
+  auto *expr = findOriginalValue();
   return expr->getType()->getRValueType();
 }
 

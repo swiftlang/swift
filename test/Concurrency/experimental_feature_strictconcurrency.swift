@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify -verify-additional-prefix region-isolation- -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -83,4 +83,23 @@ func testLocalNonisolatedUnsafe() async {
     return value
   }
   print(await task.value)
+}
+
+@MainActor
+func iterate(stream: AsyncStream<Int>) async {
+  nonisolated(unsafe) var it = stream.makeAsyncIterator()
+  // FIXME: Region isolation should consider a value from a 'nonisolated(unsafe)'
+  // declaration to be in a disconnected region
+
+  // expected-region-isolation-warning@+2 {{passing argument of non-sendable type 'AsyncStream<Int>.Iterator' from main actor-isolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  // expected-region-isolation-note@+1 {{access here could race}}
+  while let element = await it.next() {
+    print(element)
+  }
+
+  // expected-region-isolation-warning@+2 {{passing argument of non-sendable type 'AsyncStream<Int>.Iterator' from main actor-isolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  // expected-region-isolation-note@+1 {{access here could race}}
+  for await x in stream {
+    print(x)
+  }
 }
