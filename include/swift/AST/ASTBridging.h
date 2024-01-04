@@ -1161,6 +1161,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_Sendable,
   BridgedTypeAttrKind_retroactive,
   BridgedTypeAttrKind_unchecked,
+  BridgedTypeAttrKind_preconcurrency,
   BridgedTypeAttrKind__local,
   BridgedTypeAttrKind__noMetadata,
   BridgedTypeAttrKind__opaqueReturnTypeOf,

@@ -249,3 +249,28 @@ extension MainActorPreconcurrency: NotIsolated {
     }
   }
 }
+
+do {
+  class K {}
+
+  struct A : @preconcurrency Q {} // Ok
+  struct B : @preconcurrency K {
+    // expected-error@-1 {{'preconcurrency' attribute cannot apply to non-protocol type 'K'}}
+    var x: @preconcurrency Int
+    // expected-error@-1 {{'preconcurrency' attribute only applies in inheritance clauses}}
+  }
+
+  typealias T = @preconcurrency Q
+  // expected-error@-1 {{'preconcurrency' attribute only applies in inheritance clauses}}
+
+  func test(_: @preconcurrency K) {}
+  // expected-error@-1 {{'preconcurrency' attribute only applies in inheritance clauses}}
+}
+
+protocol InvalidUseOfPreconcurrencyAttr : @preconcurrency Q {
+  // expected-error@-1 {{'preconcurrency' attribute only applies in inheritance clauses}}
+}
+
+struct TestPreconcurrencyAttr {}
+extension TestPreconcurrencyAttr : @preconcurrency Q { // Ok
+}

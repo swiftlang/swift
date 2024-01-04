@@ -3250,6 +3250,25 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     attrs.clearAttribute(TAK_unchecked);
   }
 
+  if (attrs.has(TAK_preconcurrency)) {
+    ty = resolveType(repr, options);
+    if (!ty || ty->hasError()) return ty;
+
+    if (!options.is(TypeResolverContext::Inherited) ||
+        getDeclContext()->getSelfProtocolDecl()) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_preconcurrency),
+                      diag::preconcurrency_not_inheritance_clause);
+      ty = ErrorType::get(getASTContext());
+    } else if (!ty->isConstraintType()) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_preconcurrency),
+                      diag::preconcurrency_not_existential, ty);
+      ty = ErrorType::get(getASTContext());
+    }
+
+    // Nothing to record in the type. Just clear the attribute.
+    attrs.clearAttribute(TAK_preconcurrency);
+  }
+
   if (attrs.has(TAK_retroactive)) {
     ty = resolveType(repr, options);
     if (!ty || ty->hasError()) return ty;
