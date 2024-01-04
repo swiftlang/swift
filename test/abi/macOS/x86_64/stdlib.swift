@@ -131,18 +131,6 @@ Added: _$ss18DiscontiguousSliceVyxGSlsMc
 Added: _$ss18DiscontiguousSliceVyxGs23CustomStringConvertiblesMc
 Added: _$ss18DiscontiguousSliceVyxGs23CustomStringConvertiblesWP
 
-// (extension in Swift):Swift.MutableCollection.subscript.modify : (Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>
-Added: _$sSMsEys18DiscontiguousSliceVyxGs8RangeSetVy5IndexQzGciM
-
-// (extension in Swift):Swift.MutableCollection.subscript.getter : (Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>
-Added: _$sSMsEys18DiscontiguousSliceVyxGs8RangeSetVy5IndexQzGcig
-
-// property descriptor for (extension in Swift):Swift.MutableCollection.subscript(Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>
-Added: _$sSMsEys18DiscontiguousSliceVyxGs8RangeSetVy5IndexQzGcipMV
-
-// (extension in Swift):Swift.MutableCollection.subscript.setter : (Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>
-Added: _$sSMsEys18DiscontiguousSliceVyxGs8RangeSetVy5IndexQzGcis
-
 // (extension in Swift):Swift.Collection.removingSubranges(Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>
 Added: _$sSlsE17removingSubrangesys18DiscontiguousSliceVyxGs8RangeSetVy5IndexQzGF
 
@@ -180,7 +168,7 @@ Added: _$ss8RangeSetV6RangesV5_gaps9boundedByADyx_GSnyxG_tF
 Added: _$ss8RangeSetV6RangesV5countSivg
 Added: _$ss8RangeSetV6RangesV5countSivpMV
 Added: _$ss8RangeSetV6RangesV6_rangeADyx_GSnyxG_tcfC
-Added: _$ss8RangeSetV6RangesV7_insert10contentsOfySnyxG_tF
+Added: _$ss8RangeSetV6RangesV7_insert10contentsOfSbSnyxG_tF
 Added: _$ss8RangeSetV6RangesV7_rangesADyx_GSaySnyxGG_tcfC
 Added: _$ss8RangeSetV6RangesV7_remove10contentsOfySnyxG_tF
 Added: _$ss8RangeSetV6RangesV8endIndexSivg
@@ -203,8 +191,8 @@ Added: _$ss8RangeSetV6RangesVyx_GSksMc
 Added: _$ss8RangeSetV6RangesVyx_GSlsMc
 Added: _$ss8RangeSetV6RangesVyx_Gs23CustomStringConvertiblesMc
 Added: _$ss8RangeSetV6RangesVyx_Gs23CustomStringConvertiblesWP
+Added: _$ss8RangeSetV6insert_6withinSbx_qd__t5IndexQyd__RszSlRd__lF
 Added: _$ss8RangeSetV6insert10contentsOfySnyxG_tF
-Added: _$ss8RangeSetV6insert_6withinyx_qd__t5IndexQyd__RszSlRd__lF
 Added: _$ss8RangeSetV6rangesAB6RangesVyx_Gvg
 Added: _$ss8RangeSetV6rangesAB6RangesVyx_GvpMV
 Added: _$ss8RangeSetV6remove10contentsOfySnyxG_tF
