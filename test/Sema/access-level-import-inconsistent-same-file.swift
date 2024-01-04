@@ -91,7 +91,6 @@ public func dummyAPI(t: Lib1.Type1) {}
 //--- Client_Clang.swift
 
 public import ClangLib.Sub1 // expected-note {{imported 'public' here}}
-// expected-warning @-1 {{public import of 'Sub1' was not used in public declarations or inlinable code}}
 private import ClangLib.Sub1 // expected-warning {{module 'Sub1' is imported as 'public' from the same file; this 'private' access level will be ignored}}
 internal import ClangLib.Sub2
 

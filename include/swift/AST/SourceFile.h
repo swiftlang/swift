@@ -149,8 +149,7 @@ private:
       PreconcurrencyImportsUsed;
 
   /// The highest access level of declarations referencing each import.
-  llvm::DenseMap<AttributedImport<ImportedModule>, AccessLevel>
-      ImportsUseAccessLevel;
+  llvm::DenseMap<const ModuleDecl *, AccessLevel> ImportsUseAccessLevel;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -418,7 +417,7 @@ public:
   /// Return the highest access level of the declarations referencing
   /// this import in signature or inlinable code.
   AccessLevel
-  getMaxAccessLevelUsingImport(AttributedImport<ImportedModule> import) const;
+  getMaxAccessLevelUsingImport(const ModuleDecl *import) const;
 
   /// Register the use of \p import from an API with \p accessLevel.
   void registerAccessLevelUsingImport(AttributedImport<ImportedModule> import,

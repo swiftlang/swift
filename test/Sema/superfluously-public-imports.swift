@@ -24,6 +24,8 @@
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify
+// RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
+// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 -verify
 
@@ -211,3 +213,63 @@ func implicitlyInternalFunc(a: NotAnAPIType = notAnAPIFunc()) {}
 
 // For package decls we only remark on types used in signatures, not for inlinable code.
 package func packageFunc(a: PackageType = packageFunc()) {} // expected-remark {{struct 'PackageType' is imported via 'ImportUsedInPackage'}}
+
+/// Tests for imports of clang modules.
+//--- module.modulemap
+module ClangSimpleUnused {
+    header "ClangSimpleUnused.h"
+}
+module ClangSimple {
+    header "ClangSimple.h"
+}
+
+module ClangSubmodule {
+    header "ClangSubmodule.h"
+
+    module ClangSubmoduleSubmodule {
+      header "ClangSubmoduleSubmodule.h"
+    }
+}
+
+module ClangSubmoduleUnused {
+    header "ClangSubmoduleUnused.h"
+
+    module ClangSubmoduleUnsuedSubmodule {
+      header "ClangSubmoduleUnusedSubmodule.h"
+    }
+}
+
+module ClangTopModule {
+  header "ClangTopModule.h"
+  module ClangTopModuleSubmodule {
+    header "ClangTopModuleSubmodule.h"
+  }
+}
+
+//--- ClangSimpleUnused.h
+//--- ClangSimple.h
+struct ClangSimpleType {};
+
+//--- ClangSubmodule.h
+//--- ClangSubmoduleSubmodule.h
+struct ClangSubmoduleSubmoduleType {};
+
+//--- ClangSubmoduleUnused.h
+//--- ClangSubmoduleUnusedSubmodule.h
+
+//--- ClangTopModule.h
+struct ClangTopModuleType {};
+//--- ClangTopModuleSubmodule.h
+
+//--- ClientOfClangModules.swift
+public import ClangSimple
+public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
+public import ClangSubmodule.ClangSubmoduleSubmodule
+public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-warning {{public import of 'ClangSubmoduleUnused' was not used in public declarations or inlinable code}}
+
+// Only the top-level module is used, but we can't detect whether the submodule was used or not.
+public import ClangTopModule.ClangTopModuleSubmodule
+
+public func clangUser(a: ClangSimpleType) {} // expected-remark {{struct 'ClangSimpleType' is imported via 'ClangSimple'}}
+public func clangUser(a: ClangSubmoduleSubmoduleType) {} // expected-remark {{struct 'ClangSubmoduleSubmoduleType' is imported via 'ClangSubmodule'}}
+public func clangUser(a: ClangTopModuleType) {} // expected-remark {{struct 'ClangTopModuleType' is imported via 'ClangTopModule'}}
