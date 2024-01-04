@@ -957,8 +957,7 @@ FuncDecl *ASTContext::getAsyncIteratorNext() const {
   if (!proto)
     return nullptr;
 
-  if (auto *func = lookupRequirement(
-          proto, getIdentifier("_nextElement"))) {
+  if (auto *func = lookupRequirement(proto, Id_nextElement)) {
     getImpl().AsyncIteratorNext = func;
     return func;
   }

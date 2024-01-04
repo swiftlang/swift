@@ -1335,7 +1335,7 @@ public:
             isRethrowLikeTypedThrows(fnRef.getFunction())) {
           // If we are in a rethrowing context and the function we're referring
           // to is a rethrow-like function using typed throws or we are
-          // calling the next() or _nextElement() of an async iterator,
+          // calling the next() or nextElement() of an async iterator,
           // then look at all of the closure arguments.
           LLVM_FALLTHROUGH;
         } else {
@@ -3503,7 +3503,7 @@ private:
         CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
 
       // Note: we don't need to check the thrown error type specifically,
-      // because we will also be checking the _nextElement call.
+      // because we will also be checking the nextElement call.
     }
 
     return ShouldRecurse;

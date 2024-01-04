@@ -105,15 +105,15 @@ public protocol AsyncIteratorProtocol<Element, Failure> {
   /// - Returns: The next element, if it exists, or `nil` to signal the end of
   ///   the sequence.
   @available(SwiftStdlib 5.11, *)
-  mutating func _nextElement() async throws(Failure) -> Element?
+  mutating func nextElement() async throws(Failure) -> Element?
 }
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncIteratorProtocol {
-  /// Default implementation of `_nextElement()` in terms of `next()`, which is
+  /// Default implementation of `nextElement()` in terms of `next()`, which is
   /// required to maintain backward compatibility with existing async iterators.
   @_alwaysEmitIntoClient
-  public mutating func _nextElement() async throws(Failure) -> Element? {
+  public mutating func nextElement() async throws(Failure) -> Element? {
     do {
       return try await next()
     } catch {
