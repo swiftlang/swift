@@ -565,7 +565,6 @@ extension SIMD where Scalar: FixedWidthInteger {
   
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
-  @_unavailableInEmbedded
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: Range<Scalar>,
@@ -580,7 +579,6 @@ extension SIMD where Scalar: FixedWidthInteger {
   
   /// Returns a vector with random values from within the specified range in
   /// all lanes.
-  @_unavailableInEmbedded
   @inlinable
   public static func random(in range: Range<Scalar>) -> Self {
     var g = SystemRandomNumberGenerator()
@@ -589,7 +587,6 @@ extension SIMD where Scalar: FixedWidthInteger {
 
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
-  @_unavailableInEmbedded
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: ClosedRange<Scalar>,
@@ -604,7 +601,6 @@ extension SIMD where Scalar: FixedWidthInteger {
   
   /// Returns a vector with random values from within the specified range in
   /// all lanes.
-  @_unavailableInEmbedded
   @inlinable
   public static func random(in range: ClosedRange<Scalar>) -> Self {
     var g = SystemRandomNumberGenerator()
@@ -637,7 +633,6 @@ extension SIMD where Scalar: FloatingPoint {
   }
 }
 
-@_unavailableInEmbedded
 extension SIMD
 where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   /// Returns a vector with random values from within the specified range in
@@ -725,7 +720,6 @@ public struct SIMDMask<Storage>: SIMD
   }
 }
 
-@_unavailableInEmbedded
 extension SIMDMask {
   /// Returns a vector mask with `true` or `false` randomly assigned in each
   /// lane, using the given generator as a source for randomness.
