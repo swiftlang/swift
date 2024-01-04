@@ -112,7 +112,8 @@ public protocol AsyncIteratorProtocol<Element, Failure> {
 extension AsyncIteratorProtocol {
   /// Default implementation of `nextElement()` in terms of `next()`, which is
   /// required to maintain backward compatibility with existing async iterators.
-  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.11, *)
+  @inlinable
   public mutating func nextElement() async throws(Failure) -> Element? {
     do {
       return try await next()
