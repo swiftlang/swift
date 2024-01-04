@@ -180,6 +180,10 @@ static bool alwaysNoncopyable(Type ty) {
 static CanType preprocessType(GenericEnvironment *env, Type orig) {
   Type type = orig;
 
+  // Always strip off SILMoveOnlyWrapper.
+  if (auto wrapper = type->getAs<SILMoveOnlyWrappedType>())
+    type = wrapper->getInnerType();
+
   // Turn any type parameters into archetypes.
   if (env)
     if (!type->hasArchetype() || type->hasOpenedExistential())
