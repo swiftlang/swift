@@ -730,7 +730,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     //empty buffer singleton
     if !_isPOD(Element.self) && self.count == initializedCount && isUniquelyReferenced() {
       _ = beginCOWMutation()
-      target.initialize(
+      target.moveInitialize(
         from: firstElementAddress + bounds.lowerBound, count: initializedCount)
       _storage = _emptyArrayStorage
       endCOWMutation()
