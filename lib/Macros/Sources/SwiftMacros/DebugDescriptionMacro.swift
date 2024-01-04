@@ -47,7 +47,7 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
       return []
     }
 
-    guard propertyName == "debugDescription" || propertyName == "description" else {
+    guard DESCRIPTION_PROPERTIES.contains(propertyName) else {
       return []
     }
 
@@ -72,8 +72,8 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
       }
     }
 
-    // `debugDescription` takes priority: skip `description` if `debugDescription` also exists.
-    if propertyName == "description" && properties["debugDescription"] != nil {
+    // Skip if this description property is not prioritized.
+    guard propertyName == designatedProperty(properties) else {
       return []
     }
 
@@ -237,6 +237,23 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
     return [decl]
   }
+}
+
+/// The names of properties that can be converted to LLDB type summaries, in priority order.
+fileprivate let DESCRIPTION_PROPERTIES = [
+  "_debugDescription",
+  "debugDescription",
+  "description",
+]
+
+/// Identifies the prioritized description property, of available properties.
+fileprivate func designatedProperty(_ properties: [String: PatternBindingSyntax]) -> String? {
+  for name in DESCRIPTION_PROPERTIES {
+    if properties[name] != nil {
+      return name
+    }
+  }
+  return nil
 }
 
 // MARK: - Encoding
