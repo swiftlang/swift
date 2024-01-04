@@ -251,8 +251,14 @@ public:
   std::pair<ConstraintGraphNode &, unsigned> 
   lookupNode(TypeVariableType *typeVar);
 
+  /// Add a constraint to a vertex in the graph.
+  void addConstraint(TypeVariableType *typeVar, Constraint *constraint);
+
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
+
+  /// Remove a constraint from a vertex in the graph.
+  void removeConstraint(TypeVariableType *typeVar, Constraint *constraint);
 
   /// Remove a constraint from the graph.
   void removeConstraint(Constraint *constraint);
@@ -485,10 +491,12 @@ private:
     static Change addedTypeVariable(TypeVariableType *typeVar);
 
     /// Create a change that added a constraint.
-    static Change addedConstraint(Constraint *constraint);
+    static Change addedConstraint(TypeVariableType *typeVar,
+                                  Constraint *constraint);
 
     /// Create a change that removed a constraint.
-    static Change removedConstraint(Constraint *constraint);
+    static Change removedConstraint(TypeVariableType *typeVar,
+                                    Constraint *constraint);
 
     /// Create a change that extended an equivalence class.
     static Change extendedEquivalenceClass(TypeVariableType *typeVar,

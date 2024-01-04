@@ -445,17 +445,19 @@ ConstraintGraph::Change::addedTypeVariable(TypeVariableType *typeVar) {
 }
 
 ConstraintGraph::Change
-ConstraintGraph::Change::addedConstraint(Constraint *constraint) {
+ConstraintGraph::Change::addedConstraint(TypeVariableType *typeVar,
+                                         Constraint *constraint) {
   Change result;
-  result.TypeVarAndKind.setPointerAndInt(nullptr, ChangeKind::AddedConstraint);
+  result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::AddedConstraint);
   result.TheConstraint = constraint;
   return result;
 }
 
 ConstraintGraph::Change
-ConstraintGraph::Change::removedConstraint(Constraint *constraint) {
+ConstraintGraph::Change::removedConstraint(TypeVariableType *typeVar,
+                                           Constraint *constraint) {
   Change result;
-  result.TypeVarAndKind.setPointerAndInt(nullptr, ChangeKind::RemovedConstraint);
+  result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::RemovedConstraint);
   result.TheConstraint = constraint;
   return result;
 }
@@ -490,11 +492,11 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
     break;
 
   case ChangeKind::AddedConstraint:
-    cg.removeConstraint(TheConstraint);
+    cg.removeConstraint(TypeVarAndKind.getPointer(), TheConstraint);
     break;
 
   case ChangeKind::RemovedConstraint:
-    cg.addConstraint(TheConstraint);
+    cg.addConstraint(TypeVarAndKind.getPointer(), TheConstraint);
     break;
 
   case ChangeKind::ExtendedEquivalenceClass: {
@@ -525,10 +527,11 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
   TypeVariables.pop_back();
 }
 
-void ConstraintGraph::addConstraint(Constraint *constraint) {
-  // For the nodes corresponding to each type variable...
-  auto referencedTypeVars = constraint->getTypeVariables();
-  for (auto typeVar : referencedTypeVars) {
+void ConstraintGraph::addConstraint(TypeVariableType *typeVar,
+                                    Constraint *constraint) {
+  if (typeVar == nullptr) {
+    OrphanedConstraints.push_back(constraint);
+  } else {
     // Find the node for this type variable.
     auto &node = (*this)[typeVar];
 
@@ -536,21 +539,35 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
     node.addConstraint(constraint);
   }
 
-  // If the constraint doesn't reference any type variables, it's orphaned;
-  // track it as such.
-  if (referencedTypeVars.empty()) {
-    OrphanedConstraints.push_back(constraint);
-  }
-
   // Record the change, if there are active scopes.
   if (ActiveScope)
-    Changes.push_back(Change::addedConstraint(constraint));
+    Changes.push_back(Change::addedConstraint(typeVar, constraint));
 }
 
-void ConstraintGraph::removeConstraint(Constraint *constraint) {
+void ConstraintGraph::addConstraint(Constraint *constraint) {
   // For the nodes corresponding to each type variable...
   auto referencedTypeVars = constraint->getTypeVariables();
   for (auto typeVar : referencedTypeVars) {
+    addConstraint(typeVar, constraint);
+  }
+
+  // If the constraint doesn't reference any type variables, it's orphaned;
+  // track it as such.
+  if (referencedTypeVars.empty()) {
+    addConstraint(nullptr, constraint);
+  }
+}
+
+void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
+                                       Constraint *constraint) {
+  if (typeVar == nullptr) {
+    auto known = std::find(OrphanedConstraints.begin(),
+                           OrphanedConstraints.end(),
+                           constraint);
+    assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
+    *known = OrphanedConstraints.back();
+    OrphanedConstraints.pop_back();
+  } else {
     // Find the node for this type variable.
     auto &node = (*this)[typeVar];
 
@@ -558,19 +575,22 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     node.removeConstraint(constraint);
   }
 
-  // If this is an orphaned constraint, remove it from the list.
-  if (referencedTypeVars.empty()) {
-    auto known = std::find(OrphanedConstraints.begin(),
-                           OrphanedConstraints.end(),
-                           constraint);
-    assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
-    *known = OrphanedConstraints.back();
-    OrphanedConstraints.pop_back();
-  }
-
   // Record the change, if there are active scopes.
   if (ActiveScope)
-    Changes.push_back(Change::removedConstraint(constraint));
+    Changes.push_back(Change::removedConstraint(typeVar, constraint));
+}
+
+void ConstraintGraph::removeConstraint(Constraint *constraint) {
+  // For the nodes corresponding to each type variable...
+  auto referencedTypeVars = constraint->getTypeVariables();
+  for (auto typeVar : referencedTypeVars) {
+    removeConstraint(typeVar, constraint);
+  }
+
+  // If this is an orphaned constraint, remove it from the list.
+  if (referencedTypeVars.empty()) {
+    removeConstraint(nullptr, constraint);
+  }
 }
 
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
