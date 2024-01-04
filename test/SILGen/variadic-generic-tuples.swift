@@ -368,3 +368,34 @@ func testExistentialErasure<each T>(_: repeat each T) {
 
   g(1, "hi", false)
 }
+
+// Issue #70187
+func identityOnVariadicTuples<each T>(_ value: (repeat each T)) -> (repeat each T) {
+  (repeat each value)
+}
+
+func testPassReturnedVariadicTuple() {
+  takesVariadicTuple(tuple: identityOnVariadicTuples((1, 2, 3)))
+}
+// CHECK-LABEL: sil {{.*}}@$s4main29testPassReturnedVariadicTupleyyF :
+// CHECK:         [[RESULT_PACK:%.*]] = alloc_pack $Pack{Int, Int, Int}
+// CHECK-NEXT:    [[E0_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[I0:%.*]] = scalar_pack_index 0 of $Pack{Int, Int, Int}
+// CHECK-NEXT:    pack_element_set [[E0_ADDR]] : $*Int into [[I0]] of [[RESULT_PACK]] :
+// CHECK-NEXT:    [[E1_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[I1:%.*]] = scalar_pack_index 1 of $Pack{Int, Int, Int}
+// CHECK-NEXT:    pack_element_set [[E1_ADDR]] : $*Int into [[I1]] of [[RESULT_PACK]] :
+// CHECK-NEXT:    [[E2_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[I2:%.*]] = scalar_pack_index 2 of $Pack{Int, Int, Int}
+// CHECK-NEXT:    pack_element_set [[E2_ADDR]] : $*Int into [[I2]] of [[RESULT_PACK]] :
+// CHECK-NEXT:    [[ARG_PACK:%.*]] = alloc_pack $Pack{Int, Int, Int}
+// CHECK:         apply {{.*}}<Pack{Int, Int, Int}>([[RESULT_PACK]], [[ARG_PACK]])
+// CHECK:         [[E0:%.*]] = load [trivial] [[E0_ADDR]] : $*Int
+// CHECK-NEXT:    [[E1:%.*]] = load [trivial] [[E1_ADDR]] : $*Int
+// CHECK-NEXT:    [[E2:%.*]] = load [trivial] [[E2_ADDR]] : $*Int
+// CHECK-NEXT:    [[ARG_PACK2:%.*]] = alloc_pack $Pack{Int, Int, Int}
+
+func test() {
+  let tuple = identityOnVariadicTuples((1, 2, 3))
+  takesVariadicTuple(tuple: tuple)
+}
