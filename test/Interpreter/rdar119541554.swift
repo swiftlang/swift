@@ -5,7 +5,10 @@
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
-// REQUIRES: macos_min_version_13
+// REQUIRES: objc_interop
+
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 struct S {
   var x = 42
