@@ -127,10 +127,22 @@ static bool isUsefulForReferencedVars(Constraint *constraint) {
   }
 }
 
-void ConstraintGraphNode::addConstraint(Constraint *constraint) {
+void ConstraintGraphNode::addConstraint(Constraint *constraint, unsigned index) {
   assert(ConstraintIndex.count(constraint) == 0 && "Constraint re-insertion");
-  ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
+  unsigned lastIndex = Constraints.size()-1;
+
+  if (index != (unsigned)-1) {
+    if (index != lastIndex) {
+      auto *oldConstraint = Constraints[index];
+      ConstraintIndex[oldConstraint] = lastIndex;
+      Constraints[lastIndex] = oldConstraint;
+      Constraints[index] = constraint;
+    }
+    ConstraintIndex[constraint] = index;
+  } else {
+    ConstraintIndex[constraint] = lastIndex;
+  }
 
   {
     introduceToInference(constraint);
@@ -143,7 +155,7 @@ void ConstraintGraphNode::addConstraint(Constraint *constraint) {
   }
 }
 
-void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
+unsigned ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   auto pos = ConstraintIndex.find(constraint);
   assert(pos != ConstraintIndex.end());
 
@@ -166,7 +178,7 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   unsigned lastIndex = Constraints.size()-1;
   if (index == lastIndex) {
     Constraints.pop_back();
-    return;
+    return lastIndex;
   }
 
   // This constraint is somewhere in the middle; swap it with the last
@@ -176,6 +188,7 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints[index] = lastConstraint;
   ConstraintIndex[lastConstraint] = index;
   Constraints.pop_back();
+  return index;
 }
 
 void ConstraintGraphNode::notifyReferencingVars() const {
@@ -440,7 +453,6 @@ ConstraintGraph::Change
 ConstraintGraph::Change::addedTypeVariable(TypeVariableType *typeVar) {
   Change result;
   result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::AddedTypeVariable);
-  result.TheConstraint = nullptr;
   return result;
 }
 
@@ -449,16 +461,19 @@ ConstraintGraph::Change::addedConstraint(TypeVariableType *typeVar,
                                          Constraint *constraint) {
   Change result;
   result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::AddedConstraint);
-  result.TheConstraint = constraint;
+  result.Edge.TheConstraint = constraint;
+  result.Edge.Index = 0;
   return result;
 }
 
 ConstraintGraph::Change
 ConstraintGraph::Change::removedConstraint(TypeVariableType *typeVar,
-                                           Constraint *constraint) {
+                                           Constraint *constraint,
+                                           unsigned index) {
   Change result;
   result.TypeVarAndKind.setPointerAndInt(typeVar, ChangeKind::RemovedConstraint);
-  result.TheConstraint = constraint;
+  result.Edge.TheConstraint = constraint;
+  result.Edge.Index = index;
   return result;
 }
 
@@ -492,11 +507,12 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
     break;
 
   case ChangeKind::AddedConstraint:
-    cg.removeConstraint(TypeVarAndKind.getPointer(), TheConstraint);
+    cg.removeConstraint(TypeVarAndKind.getPointer(), Edge.TheConstraint);
     break;
 
   case ChangeKind::RemovedConstraint:
-    cg.addConstraint(TypeVarAndKind.getPointer(), TheConstraint);
+    cg.addConstraint(TypeVarAndKind.getPointer(), Edge.TheConstraint,
+                     Edge.Index);
     break;
 
   case ChangeKind::ExtendedEquivalenceClass: {
@@ -528,7 +544,8 @@ void ConstraintGraph::removeNode(TypeVariableType *typeVar) {
 }
 
 void ConstraintGraph::addConstraint(TypeVariableType *typeVar,
-                                    Constraint *constraint) {
+                                    Constraint *constraint,
+                                    unsigned index) {
   if (typeVar == nullptr) {
     OrphanedConstraints.push_back(constraint);
   } else {
@@ -536,7 +553,7 @@ void ConstraintGraph::addConstraint(TypeVariableType *typeVar,
     auto &node = (*this)[typeVar];
 
     // Note the constraint within the node for that type variable.
-    node.addConstraint(constraint);
+    node.addConstraint(constraint, index);
   }
 
   // Record the change, if there are active scopes.
@@ -560,6 +577,8 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
 
 void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
                                        Constraint *constraint) {
+  unsigned index = 0;
+
   if (typeVar == nullptr) {
     auto known = std::find(OrphanedConstraints.begin(),
                            OrphanedConstraints.end(),
@@ -572,12 +591,12 @@ void ConstraintGraph::removeConstraint(TypeVariableType *typeVar,
     auto &node = (*this)[typeVar];
 
     // Remove the constraint.
-    node.removeConstraint(constraint);
+    index = node.removeConstraint(constraint);
   }
 
   // Record the change, if there are active scopes.
   if (ActiveScope)
-    Changes.push_back(Change::removedConstraint(typeVar, constraint));
+    Changes.push_back(Change::removedConstraint(typeVar, constraint, index));
 }
 
 void ConstraintGraph::removeConstraint(Constraint *constraint) {
@@ -1602,10 +1621,10 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
       equivTypeVars.push_back(change.TypeVarAndKind.getPointer());
       break;
     case ChangeKind::AddedConstraint:
-      addedConstraints.insert(change.TheConstraint);
+      addedConstraints.insert(change.Edge.TheConstraint);
       break;
     case ChangeKind::RemovedConstraint:
-      removedConstraints.insert(change.TheConstraint);
+      removedConstraints.insert(change.Edge.TheConstraint);
       break;
     }
   }

@@ -92,13 +92,13 @@ private:
   ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
 
   /// Add a constraint to the list of constraints.
-  void addConstraint(Constraint *constraint);
+  void addConstraint(Constraint *constraint, unsigned index);
 
   /// Remove a constraint from the list of constraints.
   ///
   /// Note that this only removes the constraint itself; it does not
   /// remove the corresponding adjacencies.
-  void removeConstraint(Constraint *constraint);
+  unsigned removeConstraint(Constraint *constraint);
 
   /// Add the given type variables to this node's equivalence class.
   void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
@@ -252,7 +252,8 @@ public:
   lookupNode(TypeVariableType *typeVar);
 
   /// Add a constraint to a vertex in the graph.
-  void addConstraint(TypeVariableType *typeVar, Constraint *constraint);
+  void addConstraint(TypeVariableType *typeVar, Constraint *constraint,
+                     unsigned index=-1);
 
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
@@ -470,7 +471,10 @@ private:
     llvm::PointerIntPair<TypeVariableType *, 3, ChangeKind> TypeVarAndKind;
 
     union {
-      Constraint *TheConstraint;
+      struct {
+        Constraint *TheConstraint;
+        unsigned Index;
+      } Edge;
 
       struct {
         /// The previous size of the equivalence class.
@@ -484,8 +488,7 @@ private:
     };
 
     Change()
-      : TypeVarAndKind(nullptr, ChangeKind::AddedTypeVariable),
-        TheConstraint(nullptr) { }
+      : TypeVarAndKind(nullptr, ChangeKind::AddedTypeVariable) {}
 
     /// Create a change that added a type variable.
     static Change addedTypeVariable(TypeVariableType *typeVar);
@@ -496,7 +499,8 @@ private:
 
     /// Create a change that removed a constraint.
     static Change removedConstraint(TypeVariableType *typeVar,
-                                    Constraint *constraint);
+                                    Constraint *constraint,
+                                    unsigned index);
 
     /// Create a change that extended an equivalence class.
     static Change extendedEquivalenceClass(TypeVariableType *typeVar,
