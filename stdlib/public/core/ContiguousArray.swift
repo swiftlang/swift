@@ -1221,7 +1221,7 @@ extension ContiguousArray {
     _precondition(self.count <= buffer.count, 
       "Insufficient space allocated to copy array contents")
 
-    _buffer._copyContents(subRange: 0..<count, initializing: p)
+    _buffer._copyContents(subRange: _buffer.indices, initializing: p)
 
     var it = IndexingIterator(_elements: self)
     it._position = endIndex
