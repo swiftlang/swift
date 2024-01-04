@@ -260,13 +260,13 @@ private struct StackProtectionOptimization {
       
         for functionRefUse in fri.uses {
           guard let apply = functionRefUse.instruction as? ApplySite,
-                let callerArgIdx = apply.callerArgIndex(calleeArgIndex: arg.index) else {
+                let callerArgOp = apply.operand(forCalleeArgumentIndex: arg.index) else {
             if enableMoveInout {
               return NeedInsertMoves.yes
             }
             continue
           }
-          let callerArg = apply.arguments[callerArgIdx]
+          let callerArg = callerArgOp.value
           if callerArg.type.isAddress {
             // It's an indirect argument.
             switch callerArg.accessBase.isStackAllocated {

@@ -91,7 +91,7 @@ static void getVariableNameForValue(SILValue value2,
   // operand.
   StackList<llvm::PointerUnion<SILInstruction *, SILValue>> variableNamePath(
       value2->getFunction());
-  while (true) {
+  while (searchValue) {
     if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
       // If the instruction itself doesn't carry any variable info, see whether
       // it's copied from another place that does.
@@ -130,18 +130,44 @@ static void getVariableNameForValue(SILValue value2,
       variableNamePath.push_back({fArg});
       break;
     }
-
-    if (auto bai = dyn_cast_or_null<BeginApplyInst>(searchValue->getDefiningInstruction())) {
+    
+    auto getNamePathComponentFromCallee = [&](FullApplySite call) -> llvm::Optional<SILValue> {
       // Use the name of the property being accessed if we can get to it.
-      if (isa<FunctionRefBaseInst>(bai->getCallee())
-          || isa<MethodInst>(bai->getCallee())) {
-        variableNamePath.push_back(bai->getCallee()->getDefiningInstruction());
+      if (isa<FunctionRefBaseInst>(call.getCallee())
+          || isa<MethodInst>(call.getCallee())) {
+        variableNamePath.push_back(call.getCallee()->getDefiningInstruction());
         // Try to name the base of the property if this is a method.
-        if (bai->getSubstCalleeType()->hasSelfParam()) {
-          searchValue = bai->getSelfArgument();
-          continue;
+        if (call.getSubstCalleeType()->hasSelfParam()) {
+          return call.getSelfArgument();
         } else {
-          break;
+          return SILValue();
+        }
+      }
+      return llvm::None;
+    };
+
+    // Read or modify accessor.
+    if (auto bai = dyn_cast_or_null<BeginApplyInst>(searchValue->getDefiningInstruction())) {
+      if (auto selfParam = getNamePathComponentFromCallee(bai)) {
+        searchValue = *selfParam;
+        continue;
+      }
+    }
+    
+    // Addressor accessor.
+    if (auto ptrToAddr = dyn_cast<PointerToAddressInst>(stripAccessMarkers(searchValue))) {
+      // The addressor can either produce the raw pointer itself or an `UnsafePointer` stdlib type wrapping it.
+      ApplyInst *addressorInvocation;
+      if (auto structExtract = dyn_cast<StructExtractInst>(ptrToAddr->getOperand())) {
+        addressorInvocation = dyn_cast<ApplyInst>(structExtract->getOperand());
+      } else {
+        addressorInvocation = dyn_cast<ApplyInst>(ptrToAddr->getOperand());
+      }
+      
+      if (addressorInvocation) {
+        if (auto selfParam = getNamePathComponentFromCallee(addressorInvocation)) {
+          searchValue = *selfParam;
+          continue;
         }
       }
     }

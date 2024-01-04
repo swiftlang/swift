@@ -1823,8 +1823,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
       // All global functions should be @Sendable
-      if (!funcDecl->getDeclContext()->isTypeContext() &&
-          !funcDecl->getDeclContext()->isLocalContext()) {
+      if (funcDecl->getDeclContext()->isModuleScopeContext()) {
         funcType =
             funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
       }
@@ -1849,7 +1848,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (isForCodeCompletion() && openedType->hasError()) {
       // In code completion, replace error types by placeholder types so we can
       // match the types we know instead of bailing out completely.
-      openedType = replaceParamErrorTypeByPlaceholder(openedType, value, /*hasAppliedSelf=*/true);
+      openedType = replaceParamErrorTypeByPlaceholder(
+          openedType, value, /*hasAppliedSelf=*/true);
     }
 
     // If we opened up any type variables, record the replacements.
@@ -6676,6 +6676,19 @@ bool constraints::isKnownKeyPathType(Type type) {
          type->isAnyKeyPath();
 }
 
+bool constraints::isTypeErasedKeyPathType(Type type) {
+  assert(type);
+
+  if (type->isPartialKeyPath() || type->isAnyKeyPath())
+    return true;
+
+  if (!type->isExistentialType())
+    return false;
+
+  auto superclass = type->getSuperclass();
+  return superclass ? isTypeErasedKeyPathType(superclass) : false;
+}
+
 bool constraints::hasExplicitResult(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -7633,6 +7646,13 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   };
 
   if (keyPath->hasSingleInvalidComponent())
+    return fail();
+
+  // If root is determined to be a hole it means that none of the components
+  // are resolvable and key path is not viable.
+  auto rootTy =
+      getFixedTypeRecursive(getKeyPathRootType(keyPath), /*wantRValue=*/false);
+  if (rootTy->isPlaceholder())
     return fail();
 
   auto mutability = KeyPathMutability::Writable;

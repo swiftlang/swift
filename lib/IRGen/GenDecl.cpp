@@ -2245,6 +2245,10 @@ static std::string getEntryPointSection(IRGenModule &IGM) {
 }
 
 void IRGenerator::emitEntryPointInfo() {
+  if (SIL.getOptions().EmbeddedSwift) {
+    return;
+  }
+
   SILFunction *entrypoint = nullptr;
   if (!(entrypoint = SIL.lookUpFunction(
             SIL.getASTContext().getEntryPointFunctionName()))) {

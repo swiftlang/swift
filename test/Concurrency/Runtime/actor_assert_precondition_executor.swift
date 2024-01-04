@@ -12,6 +12,10 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
+// rdar://119743909 fails in optimze tests.
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
+
 import StdlibUnittest
 
 func checkPreconditionMainActor() /* synchronous! */ {

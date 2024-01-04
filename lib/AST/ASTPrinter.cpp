@@ -73,6 +73,8 @@
 
 using namespace swift;
 
+#pragma clang optimize off
+
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
     PrintOptions::defaultPrintExtensionContentAsMembers
@@ -3868,6 +3870,8 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
 
 static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
+static bool usesFeatureTransferringArgsAndResults(Decl *decl) { return false; }
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -4529,7 +4533,7 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printKeyword("isolated", options, " ");
 
   if (flags.hasResultDependsOn())
-    printer.printKeyword("resultDependsOn", options, " ");
+    printer.printKeyword("_resultDependsOn", options, " ");
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
@@ -6244,7 +6248,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       if (param->isParameterPack())
         return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
-      if (archetype->isParameterPack())
+      if (isa<PackArchetypeType>(archetype))
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
         return false;
@@ -6560,7 +6564,10 @@ public:
 
     auto *typeAliasDecl = T->getDecl();
     if (typeAliasDecl->isGeneric()) {
-      printGenericArgs(T->getExpandedGenericArgs());
+      if (Options.PrintTypesForDebugging)
+        printGenericArgs(T->getDirectGenericArgs());
+      else
+        printGenericArgs(T->getExpandedGenericArgs());
     }
   }
 
@@ -6571,7 +6578,7 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
@@ -6582,7 +6589,7 @@ public:
       visit(EltType);
     }
 
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "}";
   }
 
@@ -6607,7 +6614,8 @@ public:
 
     if (rootParameterPacks.empty() &&
         (T->getCountType()->isParameterPack() ||
-         T->getCountType()->is<PackArchetypeType>())) {
+         T->getCountType()->is<PackArchetypeType>() ||
+         Options.PrintTypesForDebugging)) {
       Printer << "/* shape: ";
       visit(T->getCountType());
       Printer << " */ ";
@@ -6682,7 +6690,10 @@ public:
     }
     printQualifiedType(T);
 
-    printGenericArgs(T->getExpandedGenericArgs());
+    if (Options.PrintTypesForDebugging)
+      printGenericArgs(T->getGenericArgs());
+    else
+      printGenericArgs(T->getExpandedGenericArgs());
   }
 
   void visitParentType(Type T) {
@@ -7749,10 +7760,20 @@ public:
       // canonical types to sugared types.
       if (Options.GenericSig)
         T = Options.GenericSig->getSugaredType(T);
+
+      decl = T->getDecl();
     }
 
     // Print opaque types as "some ..."
     if (decl && decl->isOpaqueType()) {
+      // For SIL, we print opaque parameter types as canonical types, and parse
+      // them that way too (because they're printed in this way in the SIL
+      // generic parameter list).
+      if (Options.PrintInSILBody) {
+        Printer.printName(cast<GenericTypeParamType>(T->getCanonicalType())->getName());
+        return;
+      }
+
       // If we have and should print based on the type representation, do so.
       if (auto opaqueRepr = decl->getOpaqueTypeRepr()) {
         if (willUseTypeReprPrinting(opaqueRepr, Type(), Options)) {
@@ -7971,13 +7992,17 @@ void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
-  switch (getDifferentiability()) {
-  case SILParameterDifferentiability::NotDifferentiable:
+  auto options = getOptions();
+
+  if (options.contains(SILParameterInfo::NotDifferentiable)) {
+    options -= SILParameterInfo::NotDifferentiable;
     Printer << "@noDerivative ";
-    break;
-  default:
-    break;
   }
+
+  // If we did not handle a case in Options, this code was not updated
+  // appropriately.
+  assert(!bool(options) && "Code not updated for introduced option");
+
   Printer << getStringForParameterConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }
@@ -7998,14 +8023,17 @@ void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
+
 void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
-  switch (getDifferentiability()) {
-  case SILResultDifferentiability::NotDifferentiable:
+  auto options = getOptions();
+
+  if (options.contains(SILResultInfo::NotDifferentiable)) {
+    options -= SILResultInfo::NotDifferentiable;
     Printer << "@noDerivative ";
-    break;
-  default:
-    break;
   }
+
+  assert(!bool(options) && "ResultInfo has option that was not handled?!");
+
   Printer << getStringForResultConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }

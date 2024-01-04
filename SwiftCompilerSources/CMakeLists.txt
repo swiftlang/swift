@@ -39,7 +39,7 @@ function(add_swift_compiler_module module)
   get_property(modules GLOBAL PROPERTY swift_compiler_modules)
   set_property(GLOBAL PROPERTY swift_compiler_modules ${modules} ${module})
 endfunction()
- 
+
 # Add source files to a swift compiler module.
 #
 function(swift_compiler_sources module)
@@ -273,9 +273,9 @@ else()
        "
 #define COMPILED_WITH_SWIFT
 
-#include \"Basic/BasicBridging.h\"
-#include \"SIL/SILBridging.h\"
-#include \"SILOptimizer/OptimizerBridging.h\"
+#include \"swift/Basic/BasicBridging.h\"
+#include \"swift/SIL/SILBridging.h\"
+#include \"swift/SILOptimizer/OptimizerBridging.h\"
 ")
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
@@ -287,9 +287,8 @@ else()
 
   # step 2: build a library containing that source file. This library depends on all the included header files.
   #         The swift modules can now depend on that target.
-  #         Note that this library is unused, i.e. not linked to anything.   
+  #         Note that this library is unused, i.e. not linked to anything.
   add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
-  target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
 
   # When building unified, we need to make sure all the Clang headers are
   # generated before we try to use them.

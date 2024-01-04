@@ -4359,6 +4359,20 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
+  for (const auto &featureArg : options::EnableExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureArg)) {
+      InitInvok.getLangOptions().Features.insert(*feature);
+    }
+  }
+
+  for (const auto &featureArg : options::EnableUpcomingFeatures) {
+    if (auto feature = getUpcomingFeature(featureArg)) {
+      InitInvok.getLangOptions().Features.insert(*feature);
+    }
+  }
+
+  // NOTE: 'setMainExecutablePath' must be after 'Features' because
+  // 'setRuntimeResourcePath()' called from here depends on 'Features'.
   InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
 
@@ -4426,18 +4440,6 @@ int main(int argc, char *argv[]) {
   if (options::EnableBareSlashRegexLiterals) {
     InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
-  }
-
-  for (const auto &featureArg : options::EnableExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
-    }
-  }
-
-  for (const auto &featureArg : options::EnableUpcomingFeatures) {
-    if (auto feature = getUpcomingFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
-    }
   }
 
   if (!options::Triple.empty())

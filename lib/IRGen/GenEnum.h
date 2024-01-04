@@ -256,6 +256,14 @@ public:
                                       SILType T,
                                       Address enumAddr) const = 0;
 
+  /// Return the enum case tag for the given value. Payload cases come first,
+  /// followed by non-payload cases. Used for the getEnumTag value witness.
+  ///
+  /// Only ever called for fixed types.
+  virtual llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF,
+                                           SILType T,
+                                           Address enumAddr) const;
+
   /// Project the address of the data for a case. Does not check or modify
   /// the referenced enum value.
   /// Corresponds to the SIL 'init_enum_data_addr' instruction.

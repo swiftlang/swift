@@ -198,7 +198,7 @@ namespace swift {
 
     /// Optimization mode for unavailable declarations.
     UnavailableDeclOptimization UnavailableDeclOptimizationMode =
-        UnavailableDeclOptimization::None;
+        UnavailableDeclOptimization::Stub;
 
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.
@@ -960,10 +960,6 @@ namespace swift {
     /// DWARFImporter delegate.
     bool DisableSourceImport = false;
 
-    /// When set, use ExtraArgs alone to configure clang instance because ExtraArgs
-    /// contains the full option set.
-    bool ExtraArgsOnly = false;
-
     /// When building a PCM, rely on the Swift frontend's command-line -Xcc flags
     /// to build the Clang module via Clang frontend directly,
     /// and completely bypass the Clang driver.
@@ -973,8 +969,11 @@ namespace swift {
     /// built and provided to the compiler invocation.
     bool DisableImplicitClangModules = false;
 
-    /// Enable ClangIncludeTree for explicit module builds.
+    /// Enable ClangIncludeTree for explicit module builds scanning.
     bool UseClangIncludeTree = false;
+
+    /// Using ClangIncludeTreeRoot for compilation.
+    bool HasClangIncludeTreeRoot = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

@@ -142,6 +142,22 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
   }
 }
 
+namespace {
+
+template<typename Container>
+bool containsValue(
+    const Container &container,
+    typename Container::value_type const &element
+) {
+  for (const auto &value : container) {
+    if (value == element)
+      return true;
+  }
+
+  return false;
+}
+
+}
 
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
@@ -177,7 +193,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   // Enable or disable ObjC interop appropriately for the platform
-  if (Triple.isOSDarwin()) {
+  if (Triple.isOSDarwin() &&
+      !containsValue(
+          inputArgs
+            .getAllArgValues(options::OPT_enable_experimental_feature),
+          "Embedded")) {
     arguments.push_back("-enable-objc-interop");
   } else {
     arguments.push_back("-disable-objc-interop");
@@ -376,6 +396,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   addPlatformSpecificPluginFrontendArgs(OI, output, inputArgs, arguments);
 
   addPluginArguments(inputArgs, arguments);
+
+  // Pass along -no-verify-emitted-module-interface only if it's effective.
+  // Assume verification by default as we want to know only when the user skips
+  // the verification.
+  if (!inputArgs.hasFlag(options::OPT_verify_emitted_module_interface,
+                         options::OPT_no_verify_emitted_module_interface,
+                         true))
+    arguments.push_back("-no-verify-emitted-module-interface");
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);

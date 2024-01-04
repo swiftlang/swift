@@ -2873,7 +2873,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   if (DK == DAK_ResultDependsOnSelf &&
       !Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-    diagnose(Loc, diag::requires_non_escapable_types, AttrName, true);
+    diagnose(Loc, diag::requires_experimental_feature, AttrName, true,
+             getFeatureName(Feature::NonescapableTypes));
     DiscardAttribute = true;
   }
 
@@ -5128,14 +5129,11 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-ParserStatus Parser::parseTypeAttributeListPresent(
-    ParamDecl::Specifier &Specifier, SourceLoc &SpecifierLoc,
-    SourceLoc &IsolatedLoc, SourceLoc &ConstLoc, SourceLoc &ResultDependsOnLoc,
-    TypeAttributes &Attributes) {
+ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
   PatternBindingInitializer *initContext = nullptr;
-  Specifier = ParamDecl::Specifier::Default;
+  auto &Tok = P.Tok;
   while (Tok.is(tok::kw_inout) ||
-         (canHaveParameterSpecifierContextualKeyword() &&
+         (P.canHaveParameterSpecifierContextualKeyword() &&
           (Tok.isContextualKeyword("__shared") ||
            Tok.isContextualKeyword("__owned") ||
            Tok.isContextualKeyword("isolated") ||
@@ -5146,31 +5144,31 @@ ParserStatus Parser::parseTypeAttributeListPresent(
 
     if (Tok.isContextualKeyword("isolated")) {
       if (IsolatedLoc.isValid()) {
-        diagnose(Tok, diag::parameter_specifier_repeated)
-          .fixItRemove(SpecifierLoc);
+        P.diagnose(Tok, diag::parameter_specifier_repeated)
+            .fixItRemove(SpecifierLoc);
       }
-      IsolatedLoc = consumeToken();
+      IsolatedLoc = P.consumeToken();
       continue;
     }
 
     if (Tok.isContextualKeyword("_const")) {
       Tok.setKind(tok::contextual_keyword);
-      ConstLoc = consumeToken();
+      ConstLoc = P.consumeToken();
       continue;
     }
 
     if (Tok.isContextualKeyword("_resultDependsOn")) {
-      if (!Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        diagnose(Tok, diag::requires_non_escapable_types, "resultDependsOn",
-                 false);
+      if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+        P.diagnose(Tok, diag::requires_experimental_feature, "resultDependsOn",
+                   false, getFeatureName(Feature::NonescapableTypes));
       }
-      ResultDependsOnLoc = consumeToken();
+      ResultDependsOnLoc = P.consumeToken();
       continue;
     }
 
     if (SpecifierLoc.isValid()) {
-      diagnose(Tok, diag::parameter_specifier_repeated)
-        .fixItRemove(SpecifierLoc);
+      P.diagnose(Tok, diag::parameter_specifier_repeated)
+          .fixItRemove(SpecifierLoc);
     } else {
       if (Tok.is(tok::kw_inout)) {
         Specifier = ParamDecl::Specifier::InOut;
@@ -5187,19 +5185,19 @@ ParserStatus Parser::parseTypeAttributeListPresent(
       }
     }
     Tok.setKind(tok::contextual_keyword);
-    SpecifierLoc = consumeToken();
+    SpecifierLoc = P.consumeToken();
   }
 
   ParserStatus status;
   while (Tok.is(tok::at_sign)) {
     // Ignore @substituted in SIL mode and leave it for the type parser.
-    if (isInSILMode() && peekToken().getText() == "substituted")
+    if (P.isInSILMode() && P.peekToken().getText() == "substituted")
       return status;
 
     if (Attributes.AtLoc.isInvalid())
       Attributes.AtLoc = Tok.getLoc();
-    SourceLoc AtLoc = consumeToken();
-    status |= parseTypeAttribute(Attributes, AtLoc, initContext);
+    SourceLoc AtLoc = P.consumeToken();
+    status |= P.parseTypeAttribute(Attributes, AtLoc, initContext);
     if (status.isError())
       return status;
   }

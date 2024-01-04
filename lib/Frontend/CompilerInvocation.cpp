@@ -845,13 +845,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (auto feature = getExperimentalFeature(value)) {
 #ifdef NDEBUG
       if (!isFeatureAvailableInProduction(*feature)) {
-        llvm::errs() << "error: experimental feature '" << A->getValue() 
-                     << "' cannot be enabled in a production compiler\n";
-        exit(1);
+        Diags.diagnose(SourceLoc(), diag::experimental_not_supported_in_production,
+                       A->getValue());
+        HadError = true;
+      } else {
+        Opts.Features.insert(*feature);
       }
-#endif
-
+#else
       Opts.Features.insert(*feature);
+#endif
     }
 
     // Hack: In order to support using availability macros in SPM packages, we
@@ -1368,11 +1370,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
   if (Opts.hasFeature(Feature::Embedded)) {
-    assert(swiftModulesInitialized() && "no SwiftCompilerSources");
-
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;
     Opts.DisableImplicitConcurrencyModuleImport = true;
+
+    if (!swiftModulesInitialized()) {
+      Diags.diagnose(SourceLoc(), diag::no_swift_sources_with_embedded);
+      HadError = true;
+    }
 
     if (FrontendOpts.EnableLibraryEvolution) {
       Diags.diagnose(SourceLoc(), diag::evolution_with_embedded);
@@ -1655,7 +1660,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.EnableClangSPI = false;
   }
 
-  Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
@@ -1688,6 +1692,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     // Only set UseClangIncludeTree when caching is enabled since it is not
     // useful in non-caching context.
     Opts.UseClangIncludeTree = !Args.hasArg(OPT_no_clang_include_tree);
+    Opts.HasClangIncludeTreeRoot = Args.hasArg(OPT_clang_include_tree_root);
   }
 
   return false;

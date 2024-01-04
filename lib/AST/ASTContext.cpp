@@ -4532,14 +4532,12 @@ SILFunctionType::SILFunctionType(
   // `@differentiable` function types.
   if (!ext.isDifferentiable()) {
     for (auto param : getParameters()) {
-      assert(param.getDifferentiability() ==
-                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+      assert(!param.hasOption(SILParameterInfo::NotDifferentiable) &&
              "non-`@differentiable` function type should not have "
              "`@noDerivative` parameter");
     }
     for (auto result : getResults()) {
-      assert(result.getDifferentiability() ==
-                 SILResultDifferentiability::DifferentiableOrNotApplicable &&
+      assert(!result.hasOption(SILResultInfo::NotDifferentiable) &&
              "non-`@differentiable` function type should not have "
              "`@noDerivative` result");
     }
@@ -6310,6 +6308,14 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
 
   return result;
+}
+
+FuncDecl *ASTContext::getDiagnoseUnavailableCodeReachedDecl() {
+  // FIXME: Remove this with rdar://119892482
+  if (AvailabilityContext::forDeploymentTarget(*this).isContainedIn(
+      getSwift59Availability()))
+    return getDiagnoseUnavailableCodeReached();
+  return getDiagnoseUnavailableCodeReachedAEIC();
 }
 
 void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {

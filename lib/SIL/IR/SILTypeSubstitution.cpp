@@ -306,7 +306,7 @@ public:
 
   SILParameterInfo substInterface(SILParameterInfo orig) {
     return SILParameterInfo(visit(orig.getInterfaceType()),
-                            orig.getConvention(), orig.getDifferentiability());
+                            orig.getConvention(), orig.getOptions());
   }
 
   CanType visitSILPackType(CanSILPackType origType) {
@@ -348,6 +348,8 @@ public:
                                 [&](Type substExpansionShape) {
       CanType substComponentType = visit(origType.getPatternType());
       if (substExpansionShape) {
+        if (auto packArchetype = substExpansionShape->getAs<PackArchetypeType>())
+          substExpansionShape = packArchetype->getReducedShape();
         substComponentType = CanPackExpansionType::get(substComponentType,
                                     substExpansionShape->getCanonicalType());
       }

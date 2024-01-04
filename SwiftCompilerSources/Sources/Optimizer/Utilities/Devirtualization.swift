@@ -107,7 +107,7 @@ extension DestroyValueInst : DevirtualizableDestroy {
     let builder = Builder(before: self, context)
     let subs = context.getContextSubstitutionMap(for: type)
     let deinitRef = builder.createFunctionRef(deinitializer)
-    if deinitializer.getArgumentConvention(for: deinitializer.selfArgumentIndex).isIndirect {
+    if deinitializer.argumentConventions[deinitializer.selfArgumentIndex].isIndirect {
       let allocStack = builder.createAllocStack(type)
       builder.createStore(source: destroyedValue, destination: allocStack, ownership: .initialize)
       builder.createApply(function: deinitRef, subs, arguments: [allocStack])
@@ -175,7 +175,7 @@ extension DestroyAddrInst : DevirtualizableDestroy {
     let builder = Builder(before: self, context)
     let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
     let deinitRef = builder.createFunctionRef(deinitializer)
-    if !deinitializer.getArgumentConvention(for: deinitializer.selfArgumentIndex).isIndirect {
+    if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex].isIndirect {
       let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)
       builder.createApply(function: deinitRef, subs, arguments: [value])
     } else {

@@ -123,9 +123,9 @@ func accessSweaterOfSweater(cat : Cat) async -> Sweater {
 
 // CHECK:    hop_to_executor [[GLOBAL_CAT]] : $Cat
 // CHECK:    [[THE_STRING:%[0-9]+]] = apply [[GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned String
-// CHECK:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK:    end_borrow [[GLOBAL_CAT]] : $Cat
 // CHECK:    destroy_value [[GLOBAL_CAT_REF]] : $Cat
+// CHECK:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK:    return [[THE_STRING]] : $String
 // CHECK: } // end sil function '$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYaF'
 func accessGlobalIsolatedMember(cat : Cat) async -> String {

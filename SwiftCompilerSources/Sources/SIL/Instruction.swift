@@ -914,21 +914,7 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
-
-  public func calleeArgIndex(callerArgIndex: Int) -> Int {
-    bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() + callerArgIndex
-  }
-
-  public func callerArgIndex(calleeArgIndex: Int) -> Int? {
-    let firstIdx = bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg()
-    if calleeArgIndex >= firstIdx {
-      let callerIdx = calleeArgIndex - firstIdx
-      if callerIdx < numArguments {
-        return callerIdx
-      }
-    }
-    return nil
-  }
+  public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
@@ -1070,6 +1056,8 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
 
   public var singleDirectResult: Value? { nil }
+
+  public var token: Value { getResult(index: resultCount - 1) }
 
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - 1)

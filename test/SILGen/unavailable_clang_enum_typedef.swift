@@ -19,5 +19,5 @@ typedef MyOptions MyOptionsTypedef;
 let _ = MyOptionsTypedef(rawValue: 1)
 
 // CHECK-LABEL: sil shared [transparent] [serialized]{{.*}} @$sSo9MyOptionsa8rawValueABs5Int32V_tcfC : $@convention(method) (Int32, @thin MyOptions.Type) -> MyOptions {
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb
+// CHECK-NOT:     _diagnoseUnavailableCodeReached
 // CHECK:       } // end sil function '$sSo9MyOptionsa8rawValueABs5Int32V_tcfC'

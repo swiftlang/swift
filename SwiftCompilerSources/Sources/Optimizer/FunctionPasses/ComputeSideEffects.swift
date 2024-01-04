@@ -239,9 +239,9 @@ private struct CollectedEffects {
   
   private mutating func handleApply(_ apply: ApplySite) {
     let callees = calleeAnalysis.getCallees(callee: apply.callee)
-    let args = apply.arguments.enumerated().lazy.map {
-      (calleeArgumentIndex: apply.calleeArgIndex(callerArgIndex: $0.0),
-       callerArgument: $0.1)
+    let args = apply.argumentOperands.lazy.map {
+      (calleeArgumentIndex: apply.calleeArgumentIndex(of: $0)!,
+       callerArgument: $0.value)
     }
     addEffects(ofFunctions: callees, withArguments: args)
   }
@@ -316,7 +316,7 @@ private struct CollectedEffects {
           if let calleePath = calleeEffect.copy    { addEffects(.copy,    to: argument, fromInitialPath: calleePath) }
           if let calleePath = calleeEffect.destroy { addEffects(.destroy, to: argument, fromInitialPath: calleePath) }
         } else {
-          let convention = callee.getArgumentConvention(for: calleeArgIdx)
+          let convention = callee.argumentConventions[calleeArgIdx]
           let wholeArgument = argument.at(defaultPath(for: argument))
           let calleeEffects = callee.getSideEffects(forArgument: wholeArgument,
                                                     atIndex: calleeArgIdx,
@@ -444,7 +444,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
       return .continueWalk
 
     case let apply as ApplySite:
-      if apply.isCalleeOperand(value) {
+      if apply.isCallee(operand: value) {
         // `CollectedEffects.handleApply` only handles argument operands of an apply, but not the callee operand.
         return .abortWalk
       }

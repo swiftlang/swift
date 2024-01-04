@@ -645,7 +645,7 @@ namespace {
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
       Expr *result = adjustTypeForDeclReference(
-          declRefExpr, fullType, adjustedFullType);
+          declRefExpr, fullType, adjustedFullType, locator);
       result = forceUnwrapIfExpected(result, locator);
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -925,6 +925,7 @@ namespace {
     /// conversions. This can happen due to `@preconcurrency`.
     Expr *adjustTypeForDeclReference(
         Expr *expr, Type openedType, Type adjustedOpenedType,
+        ConstraintLocatorBuilder locator,
         llvm::function_ref<Type(Type)> getNewType = [](Type type) {
           return type;
         }) {
@@ -960,7 +961,8 @@ namespace {
 
         expr = new (context) BindOptionalExpr(expr, SourceLoc(), 0, objectType);
         cs.cacheType(expr);
-        expr = adjustTypeForDeclReference(expr, objectType, adjustedObjectType);
+        expr = adjustTypeForDeclReference(
+            expr, objectType, adjustedObjectType, locator);
         expr = new (context) InjectIntoOptionalExpr(expr, adjustedRefType);
         cs.cacheType(expr);
         expr = new (context) OptionalEvaluationExpr(expr, adjustedRefType);
@@ -968,8 +970,7 @@ namespace {
         return expr;
       }
 
-      assert(false && "Unhandled adjustment");
-      return expr;
+      return coerceToType(expr, adjustedOpenedType, locator);
     }
 
     /// Determines if a partially-applied member reference should be
@@ -1539,7 +1540,7 @@ namespace {
         Expr *ref = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, dre, refTy));
 
-        ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy);
+        ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy, locator);
         return forceUnwrapIfExpected(ref, memberLocator);
       }
 
@@ -1685,7 +1686,7 @@ namespace {
 
         // Adjust the declaration reference type, if required.
         ref = adjustTypeForDeclReference(
-            ref, openedType, adjustedOpenedType, computeRefType);
+            ref, openedType, adjustedOpenedType, locator, computeRefType);
 
         closeExistentials(ref, locator, /*force=*/openedExistential);
 
@@ -1732,7 +1733,8 @@ namespace {
 
         Expr *result = memberRefExpr;
         result = adjustTypeForDeclReference(result, resultType(refTy),
-                                                    resultType(adjustedRefTy));
+                                            resultType(adjustedRefTy),
+                                            locator);
         closeExistentials(result, locator);
 
         // If the property is of dynamic 'Self' type, wrap an implicit
@@ -1764,7 +1766,7 @@ namespace {
       cs.setType(declRefExpr, refTy);
       Expr *ref = declRefExpr;
 
-      ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy);
+      ref = adjustTypeForDeclReference(ref, refTy, adjustedRefTy, locator);
 
       // A partial application thunk consists of two nested closures:
       //
@@ -1935,7 +1937,8 @@ namespace {
         apply = ConstructorRefCallExpr::create(context, ref, base);
       } else if (isUnboundInstanceMember) {
         ref = adjustTypeForDeclReference(
-            ref, cs.getType(ref), cs.simplifyType(adjustedOpenedType));
+            ref, cs.getType(ref), cs.simplifyType(adjustedOpenedType),
+            locator);
 
         // Reference to an unbound instance method.
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,

@@ -759,7 +759,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
       [&](SubstitutableType *t) -> Type {
         return nativeType;
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule(SGF.SGM.SwiftModule));
 
     // The intrinsic takes a T; reabstract to the generic abstraction
     // pattern.
@@ -1131,7 +1131,7 @@ static ManagedValue emitCBridgedToNativeValue(
   }
 
   // id-to-Any bridging.
-  if (nativeType->isAny()) {
+  if (nativeType->isMarkerExistential()) {
     // If this is not a call result, use the normal erasure logic.
     if (!isCallResult) {
       return SGF.emitTransformedValue(loc, unwrapBridgedOptionals(v),
@@ -1163,10 +1163,18 @@ static ManagedValue emitCBridgedToNativeValue(
     auto optionalBridgedTy = SILType::getOptionalType(loweredBridgedTy);
     auto optionalMV = SGF.B.createUncheckedBitCast(
         loc, unwrapBridgedOptionals(v), optionalBridgedTy);
-    return SGF.emitApplyOfLibraryIntrinsic(loc,
+    v = SGF.emitApplyOfLibraryIntrinsic(loc,
                            SGF.getASTContext().getBridgeAnyObjectToAny(),
                            SubstitutionMap(), optionalMV, C)
               .getAsSingleValue(SGF, loc);
+    
+    // Convert to the marker existential if necessary.
+    auto anyType = SGF.getASTContext().getAnyExistentialType();
+    if (nativeType != anyType) {
+      v = SGF.emitTransformedValue(loc, v, anyType, nativeType);
+    }
+
+    return v;
   }
 
   // Bridge NSError to Error.

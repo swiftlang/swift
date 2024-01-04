@@ -767,6 +767,13 @@ public:
     setIntroducer(introducer);
   }
 
+  static BindingPattern *createParsed(ASTContext &ctx, SourceLoc loc,
+                                      VarDecl::Introducer introducer,
+                                      Pattern *sub);
+
+  /// Create implicit 'let error' pattern for 'catch' statement.
+  static BindingPattern *createImplicitCatch(DeclContext *dc, SourceLoc loc);
+
   VarDecl::Introducer getIntroducer() const {
     return VarDecl::Introducer(Bits.BindingPattern.Introducer);
   }

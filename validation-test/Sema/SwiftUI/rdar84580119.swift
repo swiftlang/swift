@@ -16,7 +16,6 @@ extension EnvironmentValues {
     set { self[\.MyHorizontalAlignmentEnvironmentKey.self] = newValue }
     // expected-error@-1 {{generic parameter 'K' could not be inferred}}
     // expected-error@-2 {{cannot infer key path type from context; consider explicitly specifying a root type}}
-    // expected-error@-3 {{cannot convert value of key path type to expected argument type 'K.Type'}}
   }
 }
 

@@ -517,7 +517,7 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
         auto enumAddr = typeInfo->getAddressForPointer(castEnumPtr);
 
         auto &strategy = getEnumImplStrategy(IGM, entry.ty);
-        auto tag = strategy.emitGetEnumTag(IGF, entry.ty, enumAddr);
+        auto tag = strategy.emitFixedGetEnumTag(IGF, entry.ty, enumAddr);
         IGF.Builder.CreateRet(tag);
       });
 
@@ -2230,7 +2230,7 @@ bool EnumTypeLayoutEntry::buildSinglePayloadRefCountString(
   uint64_t zeroTagValue = 0;
   unsigned xiBitCount = 0;
   unsigned xiBitOffset = 0;
-  bool isSimple = true;
+  bool isSimple = false;
 
   auto &payloadTI = **cases[0]->getFixedTypeInfo();
 
@@ -2245,17 +2245,17 @@ bool EnumTypeLayoutEntry::buildSinglePayloadRefCountString(
 
       auto tzCount = mask.countTrailingZeros();
       auto shiftedMask = mask.lshr(tzCount);
-      auto toCount = shiftedMask.countTrailingOnes();
-      if (mask.popcount() > 64 || toCount != mask.popcount() ||
-          (tzCount % toCount != 0)) {
+      // auto toCount = shiftedMask.countTrailingOnes();
+      // if (mask.popcount() > 64 || toCount != mask.popcount() ||
+      //     (tzCount % toCount != 0)) {
         // We currently don't handle cases with non-contiguous or > 64 bits of
         // extra inhabitants
         isSimple = false;
-      } else {
-        xiBitCount = std::min(64u, mask.popcount());
-        xiBitOffset = mask.countTrailingZeros();
-        zeroTagValue = lowValue.extractBitsAsZExtValue(xiBitCount, xiBitOffset);
-      }
+      // } else {
+      //   xiBitCount = std::min(64u, mask.popcount());
+      //   xiBitOffset = mask.countTrailingZeros();
+      //   zeroTagValue = lowValue.extractBitsAsZExtValue(xiBitCount, xiBitOffset);
+      // }
     }
   }
 

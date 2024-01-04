@@ -14,6 +14,8 @@ public struct S {
 }
 
 // FULL-LABEL: "precise": "s:10Subscripts1SVyS2icip"
+// FULL: "functionSignature": {
+// FULL: "returns": [
 // FULL: "declarationFragments": [
 // FULL-NEXT:   {
 // FULL-NEXT:     "kind": "keyword",

@@ -350,7 +350,7 @@ func isBridgeToSwiftCall(_ value: Value) -> ApplyInst? {
     return nil
   }
   guard bridgingCall.arguments.count == 2,
-        bridgingCall.getArgumentConvention(calleeArgIndex: 0) == .directGuaranteed else {
+        bridgingCall.calleeArgumentConventions[0] == .directGuaranteed else {
     return nil
   }
   return bridgingCall
@@ -362,7 +362,7 @@ func isBridgeToObjcCall(_ value: Value) -> ApplyInst? {
         let bridgingFunc = bridgingCall.referencedFunction,
         bridgingFunc.hasSemanticsAttribute("convertToObjectiveC"),
         bridgingCall.arguments.count == 1,
-        bridgingCall.getArgumentConvention(calleeArgIndex: 0) == .directGuaranteed else {
+        bridgingCall.calleeArgumentConventions[0] == .directGuaranteed else {
     return nil
   }
   return bridgingCall

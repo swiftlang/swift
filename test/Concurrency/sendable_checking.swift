@@ -344,3 +344,17 @@ func testPointersAreNotSendable() {
     testSendable(rawMutableBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
   }
 }
+
+@available(*, unavailable)
+extension SynthesizedConformances.NotSendable: Sendable {}
+
+enum SynthesizedConformances {
+  // expected-note@+1 2 {{consider making struct 'NotSendable' conform to the 'Sendable' protocol}}
+  struct NotSendable: Equatable {}
+
+  // expected-warning@+2 2{{non-sendable type 'SynthesizedConformances.NotSendable' in asynchronous access to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-note@+1 2 {{in derived conformance to 'Equatable'}}
+  @MainActor struct Isolated: Equatable {
+    let x: NotSendable
+  }
+}

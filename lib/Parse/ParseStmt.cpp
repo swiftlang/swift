@@ -1075,8 +1075,8 @@ ParserResult<Stmt> Parser::parseStmtDiscard() {
 ///
 ParserResult<Stmt> Parser::parseStmtDefer() {
   SourceLoc DeferLoc = consumeToken(tok::kw_defer);
-  
-  // Macro expand out the defer into a closure and call, which we can typecheck
+
+  // Expand out the defer into a closure and call, which we can typecheck
   // and emit where needed.
   //
   // The AST representation for a defer statement is a bit weird.  We retain the
@@ -1088,17 +1088,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   //
   // As such, the body of the 'defer' is actually type checked within the
   // closure's DeclContext.
-  auto params = ParameterList::createEmpty(Context);
-  DeclName name(Context, Context.getIdentifier("$defer"), params);
-  auto *const tempDecl = FuncDecl::createImplicit(
-      Context, StaticSpellingKind::None, name, /*NameLoc=*/PreviousLoc,
-      /*Async=*/false,
-      /*Throws=*/false,
-      /*ThrownType=*/Type(),
-      /*GenericParams*/ nullptr, params, TupleType::getEmpty(Context),
-      CurDeclContext);
+  auto *DS = DeferStmt::create(CurDeclContext, DeferLoc);
   ParserStatus Status;
   {
+    auto *tempDecl = DS->getTempDecl();
     // Change the DeclContext for any variables declared in the defer to be within
     // the defer closure.
     ParseFunctionBody cc(*this, tempDecl);
@@ -1116,17 +1109,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     Fingerprint fp(std::move(currentHash));
     tempDecl->setBodyParsed(Body.get(), fp);
   }
-  
-  SourceLoc loc = tempDecl->getBodySourceRange().Start;
 
-  // Form the call, which will be emitted on any path that needs to run the
-  // code.
-  auto DRE = new (Context) DeclRefExpr(tempDecl, DeclNameLoc(loc),
-                                       /*Implicit*/true,
-                                       AccessSemantics::DirectToStorage);
-  auto call = CallExpr::createImplicitEmpty(Context, DRE);
-  
-  auto DS = new (Context) DeferStmt(DeferLoc, tempDecl, call);
   return makeParserResult(Status, DS);
 }
 
@@ -1230,18 +1213,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // then we get an implicit "let error" pattern.
   if (parsingContext == GuardedPatternContext::Catch &&
       P.Tok.isAny(tok::l_brace, tok::kw_where)) {
-    auto loc = P.Tok.getLoc();
-    auto errorName = P.Context.Id_error;
-    auto var = new (P.Context) VarDecl(/*IsStatic*/false,
-                                       VarDecl::Introducer::Let,
-                                       loc, errorName,
-                                       P.CurDeclContext);
-    var->setImplicit();
-    auto namePattern = new (P.Context) NamedPattern(var);
-    auto varPattern = new (P.Context)
-        BindingPattern(loc, VarDecl::Introducer::Let, namePattern);
-    varPattern->setImplicit();
-    patternResult = makeParserResult(varPattern);
+    patternResult = makeParserResult(
+        BindingPattern::createImplicitCatch(P.CurDeclContext, P.Tok.getLoc()));
   }
 
   // Okay, if the special code-completion didn't kick in, parse a
@@ -2312,7 +2285,6 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
 
   SmallVector<VarDecl*, 4> boundDecls;
   ParserStatus status;
-  llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyDecls;
   SmallVector<CaseLabelItem, 1> caseLabelItems;
 
   {
@@ -2327,21 +2299,6 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
       if (!consumeIf(tok::comma))
         break;
     }
-
-    // Grab the first case label item pattern and use it to initialize the case
-    // body var decls.
-    SmallVector<VarDecl *, 4> tmp;
-    caseLabelItems.front().getPattern()->collectVariables(tmp);
-    auto Result = Context.AllocateUninitialized<VarDecl *>(tmp.size());
-    for (unsigned i : indices(tmp)) {
-      auto *vOld = tmp[i];
-      auto *vNew = new (Context) VarDecl(
-          /*IsStatic*/ false, vOld->getIntroducer(),
-          vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-      vNew->setImplicit();
-      Result[i] = vNew;
-    }
-    caseBodyDecls.emplace(Result);
   }
 
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
@@ -2353,11 +2310,8 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
   }
 
   return makeParserResult(
-      status,
-      CaseStmt::create(
-          Context, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
-          /*UnknownAttrLoc*/ SourceLoc(), bodyResult.get()->getStartLoc(),
-          bodyResult.get(), caseBodyDecls, llvm::None, nullptr));
+      status, CaseStmt::createParsedDoCatch(Context, catchLoc, caseLabelItems,
+                                            bodyResult.get()));
 }
 
 static bool isStmtForCStyle(Parser &P) {
@@ -2664,17 +2618,15 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
   return Status;
 }
 
-static ParserStatus
-parseStmtCase(Parser &P, SourceLoc &CaseLoc,
-              SmallVectorImpl<CaseLabelItem> &LabelItems,
-              SmallVectorImpl<VarDecl *> &BoundDecls, SourceLoc &ColonLoc,
-              llvm::Optional<MutableArrayRef<VarDecl *>> &CaseBodyDecls) {
+static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
+                                  SmallVectorImpl<CaseLabelItem> &LabelItems,
+                                  SmallVectorImpl<VarDecl *> &BoundDecls,
+                                  SourceLoc &ColonLoc) {
   ParserStatus Status;
-  bool isFirst = true;
-  
   CaseLoc = P.consumeToken(tok::kw_case);
 
   {
+    bool isFirst = true;
     while (true) {
       GuardedPattern PatternResult;
       parseGuardedPattern(P, PatternResult, Status, BoundDecls,
@@ -2685,21 +2637,6 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
       if (!P.consumeIf(tok::comma))
         break;
     }
-
-    // Grab the first case label item pattern and use it to initialize the case
-    // body var decls.
-    SmallVector<VarDecl *, 4> tmp;
-    LabelItems.front().getPattern()->collectVariables(tmp);
-    auto Result = P.Context.AllocateUninitialized<VarDecl *>(tmp.size());
-    for (unsigned i : indices(tmp)) {
-      auto *vOld = tmp[i];
-      auto *vNew = new (P.Context) VarDecl(
-          /*IsStatic*/ false, vOld->getIntroducer(),
-          vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-      vNew->setImplicit();
-      Result[i] = vNew;
-    }
-    CaseBodyDecls.emplace(Result);
   }
 
   ColonLoc = P.Tok.getLoc();
@@ -2748,52 +2685,6 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
   return Status;
 }
 
-namespace {
-
-struct FallthroughFinder : ASTWalker {
-  FallthroughStmt *result;
-
-  FallthroughFinder() : result(nullptr) {}
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  // We walk through statements.  If we find a fallthrough, then we got what
-  // we came for.
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *s) override {
-    if (auto *f = dyn_cast<FallthroughStmt>(s)) {
-      result = f;
-    }
-
-    return Action::Continue(s);
-  }
-
-  // Expressions, patterns and decls cannot contain fallthrough statements, so
-  // there is no reason to walk into them.
-  PreWalkResult<Expr *> walkToExprPre(Expr *e) override {
-    return Action::SkipChildren(e);
-  }
-  PreWalkResult<Pattern *> walkToPatternPre(Pattern *p) override {
-    return Action::SkipChildren(p);
-  }
-
-  PreWalkAction walkToDeclPre(Decl *d) override {
-    return Action::SkipChildren();
-  }
-  PreWalkAction walkToTypeReprPre(TypeRepr *t) override {
-    return Action::SkipChildren();
-  }
-
-  static FallthroughStmt *findFallthrough(Stmt *s) {
-    FallthroughFinder finder;
-    s->walk(finder);
-    return finder.result;
-  }
-};
-
-} // end anonymous namespace
-
 ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   ParserStatus Status;
 
@@ -2830,10 +2721,9 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
-  llvm::Optional<MutableArrayRef<VarDecl *>> CaseBodyDecls;
   if (Tok.is(tok::kw_case)) {
-    Status |= ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls,
-                              ColonLoc, CaseBodyDecls);
+    Status |=
+        ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls, ColonLoc);
   } else if (Tok.is(tok::kw_default)) {
     Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems, ColonLoc);
   } else {
@@ -2863,10 +2753,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   }
 
   return makeParserResult(
-      Status,
-      CaseStmt::create(Context, CaseParentKind::Switch, CaseLoc, CaseLabelItems,
-                       UnknownAttrLoc, ColonLoc, Body, CaseBodyDecls,
-                       llvm::None, FallthroughFinder::findFallthrough(Body)));
+      Status, CaseStmt::createParsedSwitchCase(Context, CaseLoc, CaseLabelItems,
+                                               UnknownAttrLoc, ColonLoc, Body));
 }
 
 /// stmt-pound-assert:

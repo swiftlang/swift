@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 828; // ~Copyable / ~Escapable
+const uint16_t SWIFTMODULE_VERSION_MINOR = 830; // transferring
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -395,6 +395,14 @@ enum class SILParameterDifferentiability : uint8_t {
   NotDifferentiable,
 };
 
+/// These IDs must \em not be renumbered or reordered without incrementing the
+/// module version.
+enum class SILParameterInfoFlags : uint8_t {
+  NotDifferentiable = 0x1,
+};
+
+using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class ResultConvention : uint8_t {
@@ -407,12 +415,13 @@ enum class ResultConvention : uint8_t {
 };
 using ResultConventionField = BCFixed<3>;
 
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class SILResultDifferentiability : uint8_t {
-  DifferentiableOrNotApplicable = 0,
-  NotDifferentiable,
+/// These IDs must \em not be renumbered or reordered without incrementing the
+/// module version.
+enum class SILResultInfoFlags : uint8_t {
+  NotDifferentiable = 0x1,
 };
+
+using SILResultInfoOptions = OptionSet<SILResultInfoFlags>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1206,19 +1215,20 @@ namespace decls_block {
     // trailed by parameters
   );
 
-  using FunctionParamLayout = BCRecordLayout<
-    FUNCTION_PARAM,
-    IdentifierIDField,   // name
-    IdentifierIDField,   // internal label
-    TypeIDField,         // type
-    BCFixed<1>,          // vararg?
-    BCFixed<1>,          // autoclosure?
-    BCFixed<1>,          // non-ephemeral?
-    ParamDeclSpecifierField, // inout, shared or owned?
-    BCFixed<1>,          // isolated
-    BCFixed<1>,          // noDerivative?
-    BCFixed<1>           // compileTimeConst
-  >;
+  using FunctionParamLayout =
+      BCRecordLayout<FUNCTION_PARAM,
+                     IdentifierIDField,       // name
+                     IdentifierIDField,       // internal label
+                     TypeIDField,             // type
+                     BCFixed<1>,              // vararg?
+                     BCFixed<1>,              // autoclosure?
+                     BCFixed<1>,              // non-ephemeral?
+                     ParamDeclSpecifierField, // inout, shared or owned?
+                     BCFixed<1>,              // isolated
+                     BCFixed<1>,              // noDerivative?
+                     BCFixed<1>,              // compileTimeConst
+                     BCFixed<1>               // _resultDependsOn
+                     >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
     METATYPE_TYPE,

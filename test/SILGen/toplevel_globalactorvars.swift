@@ -66,8 +66,8 @@ await printFromMyActor(value: a)
 // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
 // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
 // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
-// CHECK: hop_to_executor [[MAIN_OPTIONAL]]
 // CHECK: end_borrow [[ACTORREF]]
+// CHECK: hop_to_executor [[MAIN_OPTIONAL]]
 
 if a < 10 {
 // CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
@@ -120,6 +120,6 @@ if a < 10 {
     // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
     // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
     // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
-    // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
     // CHECK: end_borrow [[ACTORREF]]
+    // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
 }

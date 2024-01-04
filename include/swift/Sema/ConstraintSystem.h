@@ -3823,14 +3823,17 @@ public:
   /// Given a tuple with a single unlabeled element that represents a pack
   /// expansion (either directly via \c PackExpansionType or through a type
   /// variable constrained to a pack expansion), materialize the pack expansion
-  /// and return its pattern type as a result. The result is a type variable
-  /// because element of the tuple is not required to be resolved at the time of
-  /// the call and operation is delayed until the element is sufficiently
-  /// resolved (see \c simplifyMaterializePackExpansionConstraint)
+  /// and return its pattern type as a result. The result is a type
+  /// variable because element of the tuple is not required to be resolved at
+  /// the time of the call and operation is delayed until the element is
+  /// sufficiently resolved (see \c simplifyMaterializePackExpansionConstraint)
   ///
   /// \param tupleType A tuple with a single unlabeled element that represents a
-  /// pack expansion. 
+  /// pack expansion.
   /// \param locator The locator.
+  ///
+  /// \returns A type variable type that represents the pattern type of the pack
+  /// expansion.
   TypeVariableType *
   addMaterializePackExpansionConstraint(Type tupleType,
                                         ConstraintLocatorBuilder locator);
@@ -6388,6 +6391,11 @@ public:
 /// Determine whether given type is a known one
 /// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathType(Type type);
+
+/// Determine whether the given type is a PartialKeyPath and
+/// AnyKeyPath or existential type thererof, for example,
+/// `PartialKeyPath<...> & Sendable`.
+bool isTypeErasedKeyPathType(Type type);
 
 /// Determine whether given declaration is one for a key path
 /// `{Writable, ReferenceWritable}KeyPath`.

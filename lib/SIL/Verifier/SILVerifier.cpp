@@ -6273,6 +6273,8 @@ public:
     require(apmi->getIntroducer()->mayRequirePackMetadata(),
             "Introduces instruction of kind which cannot emit on-stack pack "
             "metadata");
+    require(F.getModule().getStage() == SILStage::Lowered,
+            "Only supported in lowered SIL");
   }
 
   void checkDeallocPackMetadataInst(DeallocPackMetadataInst *dpmi) {
@@ -6280,6 +6282,8 @@ public:
     require(apmi, "Must have instruction operand.");
     require(isa<AllocPackMetadataInst>(apmi),
             "Must have alloc_pack_metadata operand");
+    require(F.getModule().getStage() == SILStage::Lowered,
+            "Only supported in lowered SIL");
   }
 
   void checkMoveOnlyWrapperToCopyableAddrInst(

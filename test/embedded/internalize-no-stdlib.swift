@@ -25,13 +25,11 @@ public func main() {
   start(p: Concrete())
 }
 
-// CHECK-ELF: @"\01l_entry_point" =
 // CHECK-ELF: @__swift_reflection_version =
 // CHECK-ELF: @_swift1_autolink_entries =
-// CHECK-ELF: @llvm.compiler.used = appending global [3 x ptr] [ptr @"\01l_entry_point", ptr @__swift_reflection_version, ptr @_swift1_autolink_entries], section "llvm.metadata"
+// CHECK-ELF: @llvm.compiler.used = appending global [2 x ptr] [ptr @__swift_reflection_version, ptr @_swift1_autolink_entries], section "llvm.metadata"
 // CHECK-ELF-NOT: @llvm.used
 
-// CHECK-MACHO: @"\01l_entry_point" =
 // CHECK-MACHO: @__swift_reflection_version =
 // CHECK-MACHO-NOT: @llvm.compiler.used
-// CHECK-MACHO: @llvm.used = appending global [2 x ptr] [ptr @"\01l_entry_point", ptr @__swift_reflection_version], section "llvm.metadata"
+// CHECK-MACHO: @llvm.used = appending global [1 x ptr] [ptr @__swift_reflection_version], section "llvm.metadata"

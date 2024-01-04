@@ -14,3 +14,7 @@ func f() async {
     n.pointee += 1
   }
 }
+
+struct S: Sendable {
+  var b: Undefined // expected-error{{cannot find type 'Undefined' in scope}}
+}

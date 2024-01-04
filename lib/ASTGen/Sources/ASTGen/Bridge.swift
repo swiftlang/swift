@@ -35,6 +35,12 @@ extension BridgedNullableTrailingWhereClause: BridgedNullable {}
 extension BridgedNullableParameterList: BridgedNullable {}
 extension BridgedNullablePatternBindingInitializer: BridgedNullable {}
 
+extension BridgedIdentifier: Equatable {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.raw == rhs.raw
+  }
+}
+
 /// Protocol that declares that there's a "Nullable" variation of the type.
 ///
 /// E.g. BridgedExpr vs BridgedNullableExpr.
@@ -58,6 +64,9 @@ extension BridgedExpr: BridgedHasNullable {
 extension BridgedTypeRepr: BridgedHasNullable {
   typealias Nullable = BridgedNullableTypeRepr
 }
+extension BridgedPattern: BridgedHasNullable {
+  typealias Nullable = BridgedNullablePattern
+}
 extension BridgedGenericParamList: BridgedHasNullable {
   typealias Nullable = BridgedNullableGenericParamList
 }
@@ -79,6 +88,12 @@ public extension BridgedSourceLoc {
   ) {
     precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
     self = BridgedSourceLoc(raw: buffer.baseAddress!).advanced(by: position.utf8Offset)
+  }
+}
+
+extension BridgedLabeledStmtInfo: ExpressibleByNilLiteral {
+  public init(nilLiteral: ()) {
+    self.init()
   }
 }
 

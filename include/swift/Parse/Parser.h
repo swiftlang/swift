@@ -1193,33 +1193,42 @@ public:
                            tok::kw_let);
   }
 
-  ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
-                                      SourceLoc &SpecifierLoc,
-                                      SourceLoc &IsolatedLoc,
-                                      SourceLoc &ConstLoc,
-                                      SourceLoc &ResultDependsOnLoc,
-                                      TypeAttributes &Attributes) {
-    if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
-        (canHaveParameterSpecifierContextualKeyword() &&
-         (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned") ||
-          Tok.getRawText().equals("consuming") ||
-          Tok.getRawText().equals("borrowing") ||
-          Tok.isContextualKeyword("isolated") ||
-          Tok.isContextualKeyword("_const") ||
-          Tok.getRawText().equals("_resultDependsOn"))))
-      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, IsolatedLoc,
-                                           ConstLoc, ResultDependsOnLoc,
-                                           Attributes);
-    return makeParserSuccess();
-  }
+  struct ParsedTypeAttributeList {
+    ParamDecl::Specifier Specifier = ParamDecl::Specifier::Default;
+    SourceLoc SpecifierLoc;
+    SourceLoc IsolatedLoc;
+    SourceLoc ConstLoc;
+    SourceLoc ResultDependsOnLoc;
+    TypeAttributes Attributes;
 
-  ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                             SourceLoc &SpecifierLoc,
-                                             SourceLoc &IsolatedLoc,
-                                             SourceLoc &ConstLoc,
-                                             SourceLoc &ResultDependsOnLoc,
-                                             TypeAttributes &Attributes);
+    /// Main entry point for parsing.
+    ///
+    /// Inline we just have the fast path of failing to match. We call slowParse
+    /// that contains the outline of more complex implementation. This is HOT
+    /// code!
+    ParserStatus parse(Parser &P) {
+      auto &Tok = P.Tok;
+      if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+          (P.canHaveParameterSpecifierContextualKeyword() &&
+           (Tok.getRawText().equals("__shared") ||
+            Tok.getRawText().equals("__owned") ||
+            Tok.getRawText().equals("consuming") ||
+            Tok.getRawText().equals("borrowing") ||
+            Tok.getRawText().equals("transferring") ||
+            Tok.isContextualKeyword("isolated") ||
+            Tok.isContextualKeyword("_const") ||
+            Tok.getRawText().equals("_resultDependsOn"))))
+        return slowParse(P);
+      return makeParserSuccess();
+    }
+
+    TypeRepr *applyAttributesToType(Parser &P, TypeRepr *Type) const;
+
+  private:
+    /// An out of line implementation of the more complicated cases. This
+    /// ensures on the inlined fast path we handle the case of not matching.
+    ParserStatus slowParse(Parser &P);
+  };
 
   bool parseConventionAttributeInternal(bool justChecking,
                                         TypeAttributes::Convention &convention);
@@ -1446,12 +1455,6 @@ public:
   
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
-
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
-                                 ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc,
-                                 SourceLoc IsolatedLoc,
-                                 SourceLoc ConstLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

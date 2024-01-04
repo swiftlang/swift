@@ -153,6 +153,10 @@ extension Sequence where Element == Operand {
   public func getSingleUser<I: Instruction>(notOfType: I.Type) -> Instruction? {
     ignoreUsers(ofType: I.self).singleUse?.instruction
   }
+
+  public var lifetimeEndingUses: LazyFilterSequence<Self> {
+    return self.lazy.filter { $0.endsLifetime }
+  }
 }
 
 extension OptionalBridgedOperand {

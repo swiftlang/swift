@@ -972,6 +972,58 @@ CheckInconsistentSPIOnlyImportsRequest::evaluate(
 }
 
 evaluator::SideEffect
+CheckInconsistentAccessLevelOnImportSameFileRequest::evaluate(
+    Evaluator &evaluator, SourceFile *SF) const {
+
+  // Gather the most permissive import decl for each imported module.
+  llvm::DenseMap<ModuleDecl *, const ImportDecl *> mostPermissiveImports;
+  for (auto *topLevelDecl : SF->getTopLevelDecls()) {
+    auto *importDecl = dyn_cast<ImportDecl>(topLevelDecl);
+    if (!importDecl)
+      continue;
+
+    ModuleDecl *importedModule = importDecl->getModule();
+    if (!importedModule)
+      continue;
+
+    auto otherImportDecl = mostPermissiveImports.find(importedModule);
+    if (otherImportDecl == mostPermissiveImports.end() ||
+        otherImportDecl->second->getAccessLevel() <
+          importDecl->getAccessLevel()) {
+      mostPermissiveImports[importedModule] = importDecl;
+    }
+  }
+
+  // Report import decls that are not the most permissive.
+  auto &diags = SF->getASTContext().Diags;
+  for (auto *topLevelDecl : SF->getTopLevelDecls()) {
+    auto *importDecl = dyn_cast<ImportDecl>(topLevelDecl);
+    if (!importDecl)
+      continue;
+
+    ModuleDecl *importedModule = importDecl->getModule();
+    if (!importedModule)
+      continue;
+
+    auto otherImportDecl = mostPermissiveImports.find(importedModule);
+    if (otherImportDecl != mostPermissiveImports.end() &&
+        otherImportDecl->second != importDecl &&
+        otherImportDecl->second->getAccessLevel() >
+          importDecl->getAccessLevel()) {
+      diags.diagnose(importDecl, diag::inconsistent_import_access_levels,
+                     importedModule,
+                     otherImportDecl->second->getAccessLevel(),
+                     importDecl->getAccessLevel());
+      diags.diagnose(otherImportDecl->second,
+                     diag::inconsistent_implicit_access_level_on_import_here,
+                     otherImportDecl->second->getAccessLevel());
+    }
+  }
+
+  return {};
+}
+
+evaluator::SideEffect
 CheckInconsistentAccessLevelOnImport::evaluate(
     Evaluator &evaluator, SourceFile *SF) const {
 

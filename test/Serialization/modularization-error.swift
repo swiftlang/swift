@@ -40,7 +40,7 @@
 // RUN: %target-swift-frontend %t/LibTypeChanged.swift -emit-module-path %t/B.swiftmodule -module-name B
 // RUN: not %target-swift-frontend -emit-sil %t/LibWithXRef.swiftmodule -module-name LibWithXRef -I %t 2>&1 \
 // RUN:   | %FileCheck --check-prefixes CHECK,CHECK-KIND-CHANGED-AND-MOVED %s
-// CHECK-KIND-CHANGED-AND-MOVED: LibWithXRef.swiftmodule:1:1: error: reference to type 'MyType' broken by a context change; the declaration kind of 'MyType' changed since building 'LibWithXRef', it was in 'A' and is now a candidate is found only in 'B'
+// CHECK-KIND-CHANGED-AND-MOVED: LibWithXRef.swiftmodule:1:1: error: reference to type 'MyType' broken by a context change; the declaration kind of 'MyType' changed since building 'LibWithXRef', it was in 'A' and now a candidate is found only in 'B'
 
 /// Remove MyType from all imported modules.
 // RUN: %target-swift-frontend %t/Empty.swift -emit-module-path %t/A.swiftmodule -module-name A

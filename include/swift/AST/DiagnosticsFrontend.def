@@ -563,6 +563,12 @@ ERROR(objc_with_embedded,none,
       "Objective-C interoperability cannot be enabled with embedded Swift.", ())
 ERROR(no_allocations_without_embedded,none,
       "-no-allocations is only applicable with embedded Swift.", ())
+ERROR(no_swift_sources_with_embedded,none,
+      "embedded swift cannot be enabled in a compiler built without Swift sources", ())
+
+ERROR(experimental_not_supported_in_production,none,
+      "experimental feature '%0' cannot be enabled in production compiler",
+      (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

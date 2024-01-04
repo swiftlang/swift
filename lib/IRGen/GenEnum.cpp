@@ -282,6 +282,12 @@ EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
   }
 }
 
+llvm::Value *
+EnumImplStrategy::emitFixedGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr) const {
+  assert(TIK >= Fixed);
+  return emitGetEnumTag(IGF, T, enumAddr);
+}
+
 namespace {
   /// Implementation strategy for singleton enums, with zero or one cases.
   class SingletonEnumImplStrategy final : public EnumImplStrategy {
@@ -1908,11 +1914,30 @@ namespace {
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size());
 
       auto PayloadT = getPayloadType(IGF.IGM, T);
+
       auto opaqueAddr = Address(
           IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGF.IGM.OpaquePtrTy),
           IGF.IGM.OpaqueTy, enumAddr.getAlignment());
+
       return emitGetEnumTagSinglePayloadCall(IGF, PayloadT, numEmptyCases,
                                              opaqueAddr);
+    }
+
+
+    llvm::Value *emitFixedGetEnumTag(IRGenFunction &IGF, SILType T,
+                                Address enumAddr) const override {
+      assert(TIK >= Fixed);
+      auto numEmptyCases =
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size());
+
+      auto PayloadT = getPayloadType(IGF.IGM, T);
+
+      auto &fixedTI = getFixedPayloadTypeInfo();
+      auto addr = IGF.Builder.CreateBitCast(
+          enumAddr.getAddress(), fixedTI.getStorageType()->getPointerTo());
+      return fixedTI.getEnumTagSinglePayload(IGF, numEmptyCases,
+                                             fixedTI.getAddressForPointer(addr),
+                                             PayloadT, /*isOutlined*/ false);
     }
 
     /// The payload for a single-payload enum is always placed in front and

@@ -3482,6 +3482,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool isolated = false;
     bool compileTimeConst = false;
+    bool hasResultDependsOn = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
@@ -3495,6 +3496,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeConst:
           compileTimeConst = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::ResultDependsOn:
+          hasResultDependsOn = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3593,7 +3598,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst);
+        isolated, noDerivative, compileTimeConst, hasResultDependsOn);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -4039,8 +4044,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   auto convention = DefaultParameterConvention;
   Type type;
   bool hadError = false;
-  auto differentiability =
-      SILParameterDifferentiability::DifferentiableOrNotApplicable;
+  auto parameterOptions = SILParameterInfo::Options();
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
@@ -4074,7 +4078,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
              ParameterConvention::Pack_Inout);
     if (attrs.has(TAK_noDerivative)) {
       attrs.clearAttribute(TAK_noDerivative);
-      differentiability = SILParameterDifferentiability::NotDifferentiable;
+      parameterOptions |= SILParameterInfo::NotDifferentiable;
     }
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
@@ -4094,7 +4098,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   if (hadError)
     type = ErrorType::get(getASTContext());
   return SILParameterInfo(type->getCanonicalType(), convention,
-                          differentiability);
+                          parameterOptions);
 }
 
 bool TypeResolver::resolveSingleSILResult(
@@ -4105,8 +4109,7 @@ bool TypeResolver::resolveSingleSILResult(
   Type type;
   auto convention = DefaultResultConvention;
   bool isErrorResult = false;
-  auto differentiability =
-      SILResultDifferentiability::DifferentiableOrNotApplicable;
+  SILResultInfo::Options resultInfoOptions;
   options.setContext(TypeResolverContext::FunctionResult);
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
@@ -4155,7 +4158,7 @@ bool TypeResolver::resolveSingleSILResult(
     // Recognize `@noDerivative`.
     if (attrs.has(TAK_noDerivative)) {
       attrs.clearAttribute(TAK_noDerivative);
-      differentiability = SILResultDifferentiability::NotDifferentiable;
+      resultInfoOptions |= SILResultInfo::NotDifferentiable;
     }
 
     // Recognize result conventions.
@@ -4193,7 +4196,7 @@ bool TypeResolver::resolveSingleSILResult(
   }
 
   SILResultInfo resolvedResult(type->getCanonicalType(), convention,
-                               differentiability);
+                               resultInfoOptions);
 
   if (!isErrorResult) {
     ordinaryResults.push_back(resolvedResult);

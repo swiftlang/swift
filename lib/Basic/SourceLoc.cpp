@@ -797,11 +797,11 @@ static bool isBeforeInSource(
   SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
       ? firstLoc
       : sourceMgr.getGeneratedSourceInfo(*firstMismatch)
-          ->originalSourceRange.getStart();
+          ->originalSourceRange.getEnd();
   SourceLoc secondLocInLCA = secondMismatch == secondAncestors.end()
       ? secondLoc
       : sourceMgr.getGeneratedSourceInfo(*secondMismatch)
-          ->originalSourceRange.getStart();
+          ->originalSourceRange.getEnd();
   return sourceMgr.isBeforeInBuffer(firstLocInLCA, secondLocInLCA) ||
     (allowEqual && firstLocInLCA == secondLocInLCA);
 }

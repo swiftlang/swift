@@ -2160,10 +2160,10 @@ ERROR(duplicate_storage_restrictions_attr_label,none,
 ERROR(storage_restrictions_attr_expected_name,none,
       "expected property name in @storageRestrictions list", ())
 
-ERROR(requires_non_escapable_types, none,
-      "'%0' %select{attribute|parameter specifier}1 is only valid when experimental "
-      "NonescapableTypes is enabled",
-      (StringRef, bool))
+ERROR(requires_experimental_feature, none,
+      "'%0' %select{attribute|parameter specifier}1 is only valid when experimental feature "
+      "%2 is enabled",
+      (StringRef, bool, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

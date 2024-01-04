@@ -75,7 +75,16 @@ public enum Ownership {
   /// points in the SSA graph, where more information about the value is
   /// statically available on some control flow paths.
   case none
-  
+
+  public var hasLifetime: Bool {
+    switch self {
+    case .owned, .guaranteed:
+      return true
+    case .unowned, .none:
+      return false
+    }
+  }
+
   public init(bridged: BridgedValue.Ownership) {
     switch bridged {
     case .Unowned:    self = .unowned
@@ -143,6 +152,12 @@ public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
 
 public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
   return !(lhs === rhs)
+}
+
+extension CollectionLikeSequence where Element == Value {
+  public func contains(_ element: Element) -> Bool {
+    return self.contains { $0 == element }
+  }
 }
 
 /// A projected value, which is defined by the original value and a projection path.

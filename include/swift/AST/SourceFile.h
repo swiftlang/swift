@@ -581,6 +581,11 @@ public:
   /// the \c SourceFileKind is \c MacroExpansion.
   ASTNode getMacroExpansion() const;
 
+  /// For source files created to hold the source code for a macro
+  /// expansion, this is the original source range replaced by the macro
+  /// expansion.
+  SourceRange getMacroInsertionRange() const;
+
   /// For source files created to hold the source code created by expanding
   /// an attached macro, this is the custom attribute that describes the macro
   /// expansion.

@@ -1002,11 +1002,15 @@ void swift::diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 /// Produce a diagnostic for a single instance of a non-Sendable type where
 /// a Sendable type is required.
 static bool diagnoseSingleNonSendableType(
-    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    Type type, SendableCheckContext fromContext,
+    Type inDerivedConformance, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+  if (type->hasError())
+    return false;
 
   auto module = fromContext.fromDC->getParentModule();
   auto nominal = type->getAnyNominal();
+  auto &ctx = module->getASTContext();
 
   return diagnoseSendabilityErrorBasedOn(nominal, fromContext,
                                          [&](DiagnosticBehavior behavior) {
@@ -1017,9 +1021,13 @@ static bool diagnoseSingleNonSendableType(
     if (wasSuppressed || behavior == DiagnosticBehavior::Ignore)
       return true;
 
+    if (inDerivedConformance) {
+      ctx.Diags.diagnose(loc, diag::in_derived_conformance,
+                         inDerivedConformance);
+    }
+
     if (type->is<FunctionType>()) {
-      module->getASTContext().Diags
-          .diagnose(loc, diag::nonsendable_function_type);
+      ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
     } else if (nominal && nominal->getParentModule() == module) {
       // If the nominal type is in the current module, suggest adding
       // `Sendable` if it might make sense. Otherwise, just complain.
@@ -1052,7 +1060,8 @@ static bool diagnoseSingleNonSendableType(
 }
 
 bool swift::diagnoseNonSendableTypes(
-    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    Type type, SendableCheckContext fromContext,
+    Type inDerivedConformance, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
   auto module = fromContext.fromDC->getParentModule();
 
@@ -1064,7 +1073,8 @@ bool swift::diagnoseNonSendableTypes(
   // FIXME: More detail for unavailable conformances.
   auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
-    return diagnoseSingleNonSendableType(type, fromContext, loc, diagnose);
+    return diagnoseSingleNonSendableType(
+        type, fromContext, inDerivedConformance, loc, diagnose);
   }
 
   // Walk the conformance, diagnosing any missing Sendable conformances.
@@ -1072,7 +1082,8 @@ bool swift::diagnoseNonSendableTypes(
   conformance.forEachMissingConformance(module,
       [&](BuiltinProtocolConformance *missing) {
         if (diagnoseSingleNonSendableType(
-                missing->getType(), fromContext, loc, diagnose)) {
+                missing->getType(), fromContext,
+                inDerivedConformance, loc, diagnose)) {
           anyMissing = true;
         }
 
@@ -1095,11 +1106,27 @@ bool swift::diagnoseNonSendableTypesInReference(
     return swift::getActorIsolation(declRef.getDecl());
   };
 
+  // If the violation is in the implementation of a derived conformance,
+  // point to the location of the parent type instead.
+  Type derivedConformanceType;
+  if (refLoc.isInvalid()) {
+    auto *decl = fromDC->getAsDecl();
+    if (decl && decl->isImplicit()) {
+      if (auto *implements = decl->getAttrs().getAttribute<ImplementsAttr>()) {
+        auto *parentDC = decl->getDeclContext();
+        refLoc = parentDC->getAsDecl()->getLoc();
+        derivedConformanceType =
+            implements->getProtocol(parentDC)->getDeclaredInterfaceType();
+      }
+    }
+  }
+
   // Check the 'self' argument.
   if (base) {
     if (diagnoseNonSendableTypes(
             base->getType(),
-            fromDC, base->getStartLoc(),
+            fromDC, derivedConformanceType,
+            base->getStartLoc(),
             diag::non_sendable_param_type,
             (unsigned)refKind, declRef.getDecl(),
             getActorIsolation()))
@@ -1114,7 +1141,8 @@ bool swift::diagnoseNonSendableTypesInReference(
       for (auto param : *function->getParameters()) {
         Type paramType = param->getInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
-            paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
+                paramType, fromDC, derivedConformanceType,
+                refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_param_type,
             (unsigned)refKind, function, getActorIsolation()))
           return true;
@@ -1127,7 +1155,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
-            resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
+            resultType, fromDC, derivedConformanceType,
+            refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_result_type,
             (unsigned)refKind, func, getActorIsolation()))
           return true;
@@ -1142,7 +1171,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         ? var->getTypeInContext()
         : var->getValueInterfaceType().subst(subs);
     if (diagnoseNonSendableTypes(
-            propertyType, fromDC, refLoc,
+            propertyType, fromDC,
+            derivedConformanceType, refLoc,
             diag::non_sendable_property_type,
             var,
             var->isLocalCapture(),
@@ -1157,7 +1187,8 @@ bool swift::diagnoseNonSendableTypesInReference(
         // Check params of this subscript override for sendability
         Type paramType = param->getInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
-                paramType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
+                paramType, fromDC, derivedConformanceType,
+                refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 diag::non_sendable_param_type,
                 (unsigned)refKind, subscript, getActorIsolation()))
           return true;
@@ -1168,7 +1199,8 @@ bool swift::diagnoseNonSendableTypesInReference(
       // Check the element type of a subscript.
       Type resultType = subscript->getElementInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
-          resultType, fromDC, refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
+              resultType, fromDC, derivedConformanceType,
+              refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
               diag::non_sendable_result_type,
           (unsigned)refKind, subscript, getActorIsolation()))
         return true;
@@ -1183,7 +1215,8 @@ bool swift::diagnoseNonSendableTypesInReference(
 void swift::diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, const DeclContext *fromDC) {
   diagnoseNonSendableTypes(
-      type, fromDC, loc, diag::non_sendable_type);
+      type, fromDC, /*inDerivedConformance*/Type(),
+      loc, diag::non_sendable_type);
 }
 
 namespace {
@@ -1935,7 +1968,8 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
     auto *base = selfApply->getBase();
     if (diagnoseNonSendableTypes(
             base->getType(),
-            declContext, base->getStartLoc(),
+            declContext, /*inDerivedConformance*/Type(),
+            base->getStartLoc(),
             diag::non_sendable_call_argument,
             isolationCrossing.value().exitsIsolation(),
             isolationCrossing.value().getDiagnoseIsolation()))
@@ -1976,7 +2010,8 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
 
     if (diagnoseNonSendableTypes(
             argType ? argType : param.getParameterType(),
-            declContext, argLoc, diag::non_sendable_call_argument,
+            declContext, /*inDerivedConformance*/Type(),
+            argLoc, diag::non_sendable_call_argument,
             isolationCrossing.value().exitsIsolation(),
             isolationCrossing.value().getDiagnoseIsolation()))
       return true;
@@ -2418,19 +2453,24 @@ namespace {
             // into async let to SIL level region based isolation.
             if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
               diagnoseNonSendableTypes(
-                  type, getDeclContext(), capture.getLoc(),
+                  type, getDeclContext(),
+                  /*inDerivedConformance*/Type(), capture.getLoc(),
                   diag::implicit_async_let_non_sendable_capture,
                   decl->getName());
             }
           } else {
             // Fallback to a generic implicit capture missing sendable
             // conformance diagnostic.
-            diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
+            diagnoseNonSendableTypes(type, getDeclContext(),
+                                     /*inDerivedConformance*/Type(),
+                                     capture.getLoc(),
                                      diag::implicit_non_sendable_capture,
                                      decl->getName());
           }
         } else {
-          diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
+          diagnoseNonSendableTypes(type, getDeclContext(),
+                                   /*inDerivedConformance*/Type(),
+                                   capture.getLoc(),
                                    diag::non_sendable_capture, decl->getName(),
                                    /*closure=*/closure != nullptr);
         }
@@ -3341,7 +3381,9 @@ namespace {
 
       // Check for sendability of the result type.
       if (diagnoseNonSendableTypes(
-             fnType->getResult(), getDeclContext(), apply->getLoc(),
+             fnType->getResult(), getDeclContext(),
+             /*inDerivedConformance*/Type(),
+             apply->getLoc(),
              diag::non_sendable_call_result_type,
              apply->isImplicitlyAsync().has_value(),
              *unsatisfiedIsolation))
@@ -3483,6 +3525,7 @@ namespace {
                                          llvm::None)) {
               if (diagnoseNonSendableTypes(
                              component.getComponentType(), getDeclContext(),
+                             /*inDerivedConformance*/Type(),
                              component.getLoc(),
                              diag::non_sendable_keypath_access)) {
                 diagnosed = true;
@@ -3516,6 +3559,7 @@ namespace {
               auto type = getType(arg.getExpr());
               if (type && shouldDiagnoseExistingDataRaces(getDeclContext()) &&
                   diagnoseNonSendableTypes(type, getDeclContext(),
+                                           /*inDerivedConformance*/Type(),
                                            component.getLoc(),
                                            diag::non_sendable_keypath_capture))
                 diagnosed = true;
@@ -5163,7 +5207,8 @@ static bool checkSendableInstanceStorage(
 
       // Check that the property type is Sendable.
       diagnoseNonSendableTypes(
-          propertyType, SendableCheckContext(dc, check), property->getLoc(),
+          propertyType, SendableCheckContext(dc, check),
+          /*inDerivedConformance*/Type(), property->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
@@ -5199,7 +5244,8 @@ static bool checkSendableInstanceStorage(
     /// Handle an enum associated value.
     bool operator()(EnumElementDecl *element, Type elementType) override {
       diagnoseNonSendableTypes(
-          elementType, SendableCheckContext(dc, check), element->getLoc(),
+          elementType, SendableCheckContext(dc, check),
+          /*inDerivedConformance*/Type(), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.

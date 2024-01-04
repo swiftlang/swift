@@ -94,8 +94,9 @@ enum class ProjectionKind : unsigned {
   RefCast = 1,
   BitwiseCast = 2,
   TailElems = 3,
+  BlockStorageCast = 4,
   FirstPointerKind = Upcast,
-  LastPointerKind = TailElems,
+  LastPointerKind = BlockStorageCast,
 
   // Index Projection Kinds
   FirstIndexKind = 7,
@@ -120,6 +121,7 @@ static inline bool isCastProjectionKind(ProjectionKind Kind) {
   case ProjectionKind::Upcast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
+  case ProjectionKind::BlockStorageCast:
     return true;
   case ProjectionKind::Struct:
   case ProjectionKind::Tuple:
@@ -318,15 +320,19 @@ public:
     auto *Ty = getPointer();
     assert(Ty->isCanonical());
     switch (getKind()) {
-      case ProjectionKind::Upcast:
-      case ProjectionKind::RefCast:
-      case ProjectionKind::BitwiseCast:
-        return SILType::getPrimitiveType(Ty->getCanonicalType(),
-                                         BaseType.getCategory());
-      case ProjectionKind::TailElems:
-        return SILType::getPrimitiveAddressType(Ty->getCanonicalType());
-      default:
-        llvm_unreachable("unknown cast projection type");
+    case ProjectionKind::Upcast:
+    case ProjectionKind::RefCast:
+    case ProjectionKind::BitwiseCast:
+      return SILType::getPrimitiveType(Ty->getCanonicalType(),
+                                       BaseType.getCategory());
+    case ProjectionKind::TailElems:
+      return SILType::getPrimitiveAddressType(Ty->getCanonicalType());
+    case ProjectionKind::BlockStorageCast: {
+      auto blockStorageTy = Ty->getCanonicalType()->castTo<SILBlockStorageType>();
+      return blockStorageTy->getCaptureAddressType();
+    }
+    default:
+      llvm_unreachable("unknown cast projection type");
     }
   }
 
@@ -421,6 +427,7 @@ public:
     case ProjectionKind::BitwiseCast:
       return true;
     case ProjectionKind::Upcast:
+    case ProjectionKind::BlockStorageCast:
     case ProjectionKind::Struct:
     case ProjectionKind::Tuple:
     case ProjectionKind::Index:
@@ -445,6 +452,7 @@ public:
     case ProjectionKind::RefCast:
     case ProjectionKind::Tuple:
     case ProjectionKind::Upcast:
+    case ProjectionKind::BlockStorageCast:
     case ProjectionKind::Box:
     case ProjectionKind::TailElems:
       return false;
