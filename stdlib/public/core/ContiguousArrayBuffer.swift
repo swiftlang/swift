@@ -722,7 +722,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     //Future: we could relax the count requirement, but we'd need to handle
     //incompletely consuming the buffer rather than just setting it to the
     //empty buffer singleton
-    if self.count == initializedCount && isUniquelyReferenced() {
+    if !_isPOD(Element.self) && self.count == initializedCount && isUniquelyReferenced() {
       _ = beginCOWMutation()
       target.initialize(
         from: firstElementAddress + bounds.lowerBound, count: initializedCount)
@@ -746,7 +746,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     //Future: we could relax the count requirement, but we'd need to handle
     //incompletely consuming the buffer rather than just setting it to the
     //empty buffer singleton
-    if self.count == buffer.count && isUniquelyReferenced() {
+    if !_isPOD(Element.self) && self.count == buffer.count && isUniquelyReferenced() {
       _ = beginCOWMutation()
       buffer.baseAddress!.moveInitialize(
         from: firstElementAddress,
