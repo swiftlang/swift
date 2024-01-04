@@ -195,12 +195,16 @@ extension RangeSet {
   ///     valid index of `collection` that isn't the collection's `endIndex`.
   ///   - collection: The collection that contains `index`.
   ///
+  /// - Returns: `true` if the range set was modified, or `false` if
+  ///   the given `index` was already in the range set.
+  ///
   /// - Complexity: O(*n*), where *n* is the number of ranges in the range
   ///   set.
+  @discardableResult
   public mutating func insert<C: Collection>(
     _ index: Bound, within collection: C
-  ) where C.Index == Bound {
-    insert(contentsOf: index ..< collection.index(after: index))
+  ) -> Bool where C.Index == Bound {
+    _ranges._insert(contentsOf: index ..< collection.index(after: index))
   }
   
   /// Removes the range that contains only the specified index from the range

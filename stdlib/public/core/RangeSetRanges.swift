@@ -128,18 +128,24 @@ extension RangeSet.Ranges {
 
   // Insert a non-empty range into the storage
   @usableFromInline
-  internal mutating func _insert(contentsOf range: Range<Bound>) {
-    let indices = _indicesOfRange(range, in: _storage)
-    if indices.isEmpty {
-      _storage.insert(range, at: indices.lowerBound)
-    } else {
-      let lower = Swift.min(
-      _storage[indices.lowerBound].lowerBound, range.lowerBound)
-      let upper = Swift.max(
-      _storage[indices.upperBound - 1].upperBound, range.upperBound)
-      _storage.replaceSubrange(
-      indices, with: CollectionOfOne(lower ..< upper))
-    }
+  @discardableResult
+  internal mutating func _insert(contentsOf range: Range<Bound>) -> Bool {
+  	let indices = _indicesOfRange(range, in: _storage)
+  	if indices.isEmpty {
+  		_storage.insert(range, at: indices.lowerBound)
+  		return true
+  	} else {
+  		let lower = Swift.min(
+  			_storage[indices.lowerBound].lowerBound, range.lowerBound)
+  		let upper = Swift.max(
+  			_storage[indices.upperBound - 1].upperBound, range.upperBound)
+  		let newRange = lower ..< upper
+  		if indices.count == 1 && newRange == _storage[indices.lowerBound] {
+  			return false
+  		}
+  		_storage.replaceSubrange(indices, with: CollectionOfOne(newRange))
+  		return true
+  	}
   }
 
   // Remove a non-empty range from the storage

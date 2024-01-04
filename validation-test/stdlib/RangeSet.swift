@@ -534,6 +534,53 @@ if #available(SwiftStdlib 5.11, *) {
       expectEqualSequence(string[set].reversed(), expected.reversed())
     }
   }
+
+  RangeSetTests.test("InsertionReturningPreviousContainment") {
+    do {
+      var s = RangeSet<Int>()
+      expectTrue(s.insert(20, within: parent))
+    }
+    do {
+      var s = source
+      expectTrue(s.insert(-100, within: parent))
+    }
+    do {
+      var s = source
+      expectFalse(s.insert(20, within: parent))
+    }
+    do {
+      var s = source
+      expectFalse(s.insert(21, within: parent))
+    }
+    do {
+      var s = source
+      expectTrue(s.insert(22, within: parent))
+    }
+    do {
+      var s = source
+      expectTrue(s.insert(23, within: parent))
+    }
+    do {
+      var s = source
+      expectTrue(s.insert(26, within: parent))
+    }
+    do {
+      var s = source
+      expectFalse(s.insert(27, within: parent))
+    }
+    do {
+      var s = source
+      expectFalse(s.insert(28, within: parent))
+    }
+    do {
+      var s = source
+      expectTrue(s.insert(29, within: parent))
+    }
+    do {
+      var s = source
+      expectTrue(s.insert(100, within: parent))
+    }
+  }
 }
 
 runAllTests()
