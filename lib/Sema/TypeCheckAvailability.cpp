@@ -360,6 +360,27 @@ static bool isInsideCompatibleUnavailableDeclaration(
           inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
 }
 
+static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
+    const Decl *D, const ExportContext &where) {
+  auto *DC = where.getDeclContext();
+  auto *SF = DC->getParentSourceFile();
+
+  // Unavailable-in-Swift declarations shouldn't be referenced directly in
+  // source. However, they can be referenced in implicit declarations that are
+  // printed in .swiftinterfaces.
+  if (!SF || SF->Kind != SourceFileKind::Interface)
+    return false;
+
+  if (auto constructor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl())) {
+    // Designated initializers inherited from an Obj-C superclass may have
+    // parameters that are unavailable-in-Swift.
+    if (constructor->isObjC())
+      return true;
+  }
+
+  return false;
+}
+
 namespace {
 
 /// A class to walk the AST to build the type refinement context hierarchy.
@@ -3038,7 +3059,9 @@ bool swift::diagnoseExplicitUnavailability(
     break;
 
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    // This API is explicitly unavailable in Swift.
+    if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
+      return true;
+
     platform = "Swift";
     break;
   }
