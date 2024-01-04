@@ -444,9 +444,9 @@ function Fetch-Dependencies {
   # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin | Out-Null
   Invoke-Program $BinaryCache\WiX-$WiXVersion\tools\net6.0\any\wix.exe -- burn extract $BinaryCache\$PinnedToolchain.exe -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
-  Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" | % {
+  Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | % {
     $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-    $TARGETDIR = if ($_.Name -eq "rti.msi") { "$BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin" } else { "$BinaryCache\toolchains\$PinnedToolchain" }
+    $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\0.0.0\usr\bin" } else { "$BinaryCache\toolchains\$PinnedToolchain" }
     Invoke-Program -OutNull msiexec.exe /lvx! $LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$_ ALLUSERS=0 TARGETDIR=$TARGETDIR
   }
 
