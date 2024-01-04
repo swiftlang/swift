@@ -22,12 +22,13 @@ extension StaticString {
 }
 
 @_silgen_name("putchar")
-func putchar(_: UInt8)
+@discardableResult
+func putchar(_: CInt) -> CInt
 
 extension Array<UInt8> {
     func print() {
         for byte in self {
-            putchar(byte)
+            putchar(CInt(byte))
         }
         putchar(10)
     }

@@ -17,24 +17,25 @@ import SwiftShims
 // printing to not need to heap allocate).
 
 @_silgen_name("putchar")
-func putchar(_: UInt8)
+@discardableResult
+func putchar(_: CInt) -> CInt
 
 public func print(_ string: StaticString, terminator: StaticString = "\n") {
   var p = string.utf8Start
   while p.pointee != 0 {
-    putchar(p.pointee)
+    putchar(CInt(p.pointee))
     p += 1
   }
   p = terminator.utf8Start
   while p.pointee != 0 {
-    putchar(p.pointee)
+    putchar(CInt(p.pointee))
     p += 1
   }
 }
 
 func printCharacters(_ buf: UnsafeRawBufferPointer) {
   for c in buf {
-    putchar(c)
+    putchar(CInt(c))
   }
 }
 
