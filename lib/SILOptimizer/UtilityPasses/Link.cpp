@@ -48,24 +48,34 @@ public:
   }
 
   void linkEmbeddedRuntimeFromStdlib() {
+    using namespace RuntimeConstants;
 #define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
                  MEMORY_EFFECTS)                                               \
-  linkEmbeddedRuntimeFunctionByName(#NAME);
+  linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT);
 
 #define RETURNS(...)
 #define ARGS(...)
 #define NO_ARGS
 #define ATTRS(...)
 #define NO_ATTRS
-#define EFFECT(...)
+#define EFFECT(...) { __VA_ARGS__ }
 #define MEMORY_EFFECTS(...)
 #define UNKNOWN_MEMEFFECTS
 
 #include "swift/Runtime/RuntimeFunctions.def"
   }
 
-  void linkEmbeddedRuntimeFunctionByName(StringRef name) {
+  void linkEmbeddedRuntimeFunctionByName(StringRef name,
+                                         ArrayRef<RuntimeEffect> effects) {
     SILModule &M = *getModule();
+
+    bool allocating = false;
+    for (RuntimeEffect rt : effects)
+      if (rt == RuntimeEffect::Allocating || rt == RuntimeEffect::Deallocating)
+        allocating = true;
+
+    // Don't link allocating runtime functions in -no-allocations mode.
+    if (M.getOptions().NoAllocations && allocating) return;
 
     // Bail if runtime function is already loaded.
     if (M.lookUpFunction(name)) return;

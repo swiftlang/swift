@@ -2635,7 +2635,7 @@ FUNCTION(GenericAssignWithCopy,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting, Deallocating),
+         EFFECT(RefCounting, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_assignWithTake(opaque* dest, opaque* src, const Metadata* type);
@@ -2645,7 +2645,7 @@ FUNCTION(GenericAssignWithTake,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting, Deallocating),
+         EFFECT(RefCounting, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initWithCopy(opaque* dest, opaque* src, const Metadata* type);
@@ -2655,7 +2655,7 @@ FUNCTION(GenericInitWithCopy,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting),
+         EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initWithTake(opaque* dest, opaque* src, const Metadata* type);
@@ -2665,7 +2665,7 @@ FUNCTION(GenericInitWithTake,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting),
+         EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initializeBufferWithCopyOfBuffer(ValueBuffer* dest, ValueBuffer* src, const Metadata* type);
@@ -2677,7 +2677,7 @@ FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
               getFixedBufferTy()->getPointerTo(),
               TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting),
+         EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
