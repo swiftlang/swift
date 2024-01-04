@@ -402,7 +402,6 @@ extension _StringGuts {
 
 // Old SPI(corelibs-foundation)
 extension _StringGuts {
-  @available(*, deprecated)
   public // SPI(corelibs-foundation)
   var _isContiguousASCII: Bool {
     return !isSmall && isFastUTF8 && isASCII
