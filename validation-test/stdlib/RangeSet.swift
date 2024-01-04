@@ -534,24 +534,6 @@ if #available(SwiftStdlib 5.11, *) {
       expectEqualSequence(string[set].reversed(), expected.reversed())
     }
   }
-
-  RangeSetTests.test("DiscontiguousSliceMutating/TooLarge") {
-    var initial = Array(1...21)
-    let evens = initial.indices(where: { $0.isMultiple(of: 2) })
-    let odds = initial.indices(where: { !$0.isMultiple(of: 2) })
-
-    expectCrashLater()
-    initial[evens] = initial[odds]
-  }
-
-  RangeSetTests.test("DiscontiguousSliceMutating/TooSmall") {
-    var initial = Array(1...21)
-    let evens = initial.indices(where: { $0.isMultiple(of: 2) })
-    let odds = initial.indices(where: { !$0.isMultiple(of: 2) })
-
-    expectCrashLater()
-    initial[odds] = initial[evens]
-  }
 }
 
 runAllTests()

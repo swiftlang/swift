@@ -380,46 +380,6 @@ extension Collection {
   }
 }
 
-extension MutableCollection {
-  /// Accesses a mutable view of this collection with the elements at the
-  /// given indices.
-  ///
-  /// - Parameter subranges: The ranges of the elements to retrieve from this
-  ///   collection.
-  /// - Returns: A collection of the elements at the positions in `subranges`.
-  ///
-  /// - Complexity: O(1) to access the elements, O(*m*) to mutate the
-  ///   elements at the positions in `subranges`, where *m* is the number of
-  ///   elements indicated by `subranges`.
-  @available(SwiftStdlib 5.11, *)
-  public subscript(subranges: RangeSet<Index>) -> DiscontiguousSlice<Self> {
-    get {
-      DiscontiguousSlice(_base: self, subranges: subranges)
-    }
-    set {
-      var indexOfReplacement = newValue.startIndex
-      for range in subranges.ranges {
-        _debugPrecondition(!range.isEmpty, "Empty range in a range set")
-        
-        var indexToReplace = range.lowerBound
-        repeat {
-          _precondition(
-            indexOfReplacement < newValue.endIndex,
-            "Attempt to replace discontinuous slice with too few elements")
-          
-          self[indexToReplace] = newValue[indexOfReplacement]
-          self.formIndex(after: &indexToReplace)
-          newValue.formIndex(after: &indexOfReplacement)
-        } while indexToReplace < range.upperBound
-      }
-      
-      _precondition(
-        indexOfReplacement == newValue.endIndex,
-        "Attempt to replace discontinuous slice with too many elements")
-    }
-  }
-}
-
 
 extension Collection {
   /// Returns a collection of the elements in this collection that are not
