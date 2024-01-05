@@ -3448,83 +3448,39 @@ private:
   void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
     assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
 
-    // If the original parameter type is a vanishing tuple, we want to emit
-    // this as if the argument source was wrapped in an extra level of
-    // tuple literal.
-    bool origTupleVanishes = origParamType.doesTupleVanish();
+    // Handle yields of storage reference expressions specially so that we
+    // don't emit them as +1 r-values and then expand.
+    if (IsYield) {
+      if (auto result = std::move(arg).findStorageReferenceExprForBorrow()) {
+        emitExpandedBorrowed(result, origParamType);
+        return;
+      }
+    }
 
     auto substType = arg.getSubstRValueType();
+    bool doesTupleVanish = origParamType.doesTupleVanish();
 
-    // If we're working with an r-value, just expand it out and emit
-    // all the elements individually.
-    // FIXME: this code is not doing the right thing with packs
-    if (arg.isRValue()) {
-      if (CanTupleType substArgType = dyn_cast<TupleType>(substType)) {
-        // The original type isn't necessarily a tuple.
-        if (!origParamType.matchesTuple(substArgType))
-          origParamType = origParamType.getTupleElementType(0);
-
-        assert(origParamType.matchesTuple(substArgType));
-
-        auto loc = arg.getKnownRValueLocation();
-        SmallVector<RValue, 4> elts;
-        std::move(arg).asKnownRValue(SGF).extractElements(elts);
-        for (auto i : indices(substArgType.getElementTypes())) {
-          emit({ loc, std::move(elts[i]) },
-               origParamType.getTupleElementType(i));
-        }
+    ArgumentSourceExpansion expander(SGF, std::move(arg), doesTupleVanish);
+    origParamType.forEachTupleElement(substType,
+                                      [&](TupleElementGenerator &origElt) {
+      if (!origElt.isOrigPackExpansion()) {
+        expander.withElement(origElt.getSubstIndex(),
+                             [&](ArgumentSource &&eltSource) {
+          emit(std::move(eltSource), origElt.getOrigType());
+        });
         return;
       }
 
-      auto loc = arg.getKnownRValueLocation();
-      SmallVector<RValue, 1> elts;
-      std::move(arg).asKnownRValue(SGF).extractElements(elts);
-      emit({ loc, std::move(elts[0]) },
-           origParamType.getTupleElementType(0));
-      return;
-    }
-
-    // Otherwise, we're working with an expression.
-    Expr *e = std::move(arg).asKnownExpr();
-
-    // If the source expression is a tuple literal, we can break it
-    // up directly.  We can also do this if the orig type is a vanishing
-    // tuple, because we want to treat that like it was the sole element
-    // of a tuple.  Note that vanishing tuples take priority: the
-    // singleton element could itself be a tuple.
-    auto tupleExpr = dyn_cast<TupleExpr>(e);
-    if (origTupleVanishes || tupleExpr) {
-      auto getElementExpr = [&](unsigned index) {
-        assert(!origTupleVanishes || index == 0);
-        return (origTupleVanishes ? e : tupleExpr->getElement(index));
-      };
-      origParamType.forEachTupleElement(substType,
-                                        [&](TupleElementGenerator &elt) {
-        if (!elt.isOrigPackExpansion()) {
-          emit(getElementExpr(elt.getSubstIndex()), elt.getOrigType());
-          return;
-        }
-
-        auto substEltTypes = elt.getSubstTypes();
-        SmallVector<ArgumentSource, 4> eltArgs;
-        eltArgs.reserve(substEltTypes.size());
-        for (auto i : elt.getSubstIndexRange()) {
-          eltArgs.emplace_back(getElementExpr(i));
-        }
-        emitPackArg(eltArgs, elt.getOrigType());
-      });
-      return;
-    }
-
-    if (IsYield) {
-      if (auto result = findStorageReferenceExprForBorrow(e)) {
-        emitExpandedBorrowed(result.getTransitiveRoot(), origParamType);
-        return;
+      auto substTypes = origElt.getSubstTypes();
+      SmallVector<ArgumentSource, 8> packEltSources;
+      packEltSources.reserve(substTypes.size());
+      for (auto substEltIndex : origElt.getSubstIndexRange()) {
+        expander.withElement(substEltIndex, [&](ArgumentSource &&eltSource) {
+          packEltSources.emplace_back(std::move(eltSource));
+        });
       }
-    }
-
-    // Fall back to the r-value case.
-    emitExpanded({ e, SGF.emitRValue(e) }, origParamType);
+      emitPackArg(packEltSources, origElt.getOrigType());
+    });
   }
 
   void emitIndirect(ArgumentSource &&arg,
