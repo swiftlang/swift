@@ -504,6 +504,10 @@ ERROR(error_cas, none, "CAS error encountered: %0", (StringRef))
 ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
 ERROR(error_replay_cached_diag, none, "failed to replay cached diagnostics: %0", (StringRef))
 
+ERROR(error_load_input_from_cas, none, "failed to load input '%0' from CAS", (StringRef))
+
+ERROR(error_wrong_input_num_for_input_file_key, none, "-input-file-key only support one input file", ())
+
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
       "expected "

@@ -17,6 +17,7 @@ add_swift_unittest(SwiftBasicTests
   EncodedSequenceTest.cpp
   ExponentialGrowthAppendingBinaryByteStreamTests.cpp
   FileSystemTest.cpp
+  FileTypes.cpp
   FixedBitSetTest.cpp
   FrozenMultiMapTest.cpp
   ImmutablePointerSetTest.cpp

@@ -56,6 +56,29 @@ ID file_types::lookupTypeForExtension(StringRef Ext) {
       .Default(TY_INVALID);
 }
 
+// Compute the file type from filename. This handles the lookup for extensions
+// with multiple dots, like `.private.swiftinterface` correctly.
+ID file_types::lookupTypeFromFilename(StringRef Filename) {
+  StringRef MaybeExt = Filename;
+  // Search from leftmost `.`, return the first match or till all dots are
+  // consumed.
+  size_t Pos = MaybeExt.find_first_of('.');
+  while(Pos != StringRef::npos) {
+    MaybeExt = MaybeExt.substr(Pos);
+    // If size is 1, that means only `.` is left, return invalid.
+    if (MaybeExt.size() == 1)
+      return TY_INVALID;
+    ID Type = lookupTypeForExtension(MaybeExt);
+    if (Type != TY_INVALID)
+      return Type;
+    // Drop `.` and keep looking.
+    MaybeExt = MaybeExt.drop_front();
+    Pos = MaybeExt.find_first_of('.');
+  }
+
+  return TY_INVALID;
+}
+
 ID file_types::lookupTypeForName(StringRef Name) {
   return llvm::StringSwitch<file_types::ID>(Name)
 #define TYPE(NAME, ID, EXTENSION, FLAGS) \
