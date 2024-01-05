@@ -1470,6 +1470,10 @@ static void reconstituteInverses(GenericSignature genericSig,
   for (auto tp : typeParams) {
     assert(tp);
 
+    // Any generic parameter requiring a class could not have an inverse.
+    if (genericSig->requiresClass(tp))
+      continue;
+
     auto defaults = InverseRequirement::expandDefault(tp);
     for (auto ip : defaults) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
