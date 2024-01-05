@@ -16,3 +16,7 @@ public func use_an_array() -> Int {
 	let a = [1, 2, 3] // expected-error {{cannot use allocating type '_ContiguousArrayStorage<Int>' in -no-allocations mode}}
 	return a.count
 }
+
+public func use_unsafepointer_allocate() -> UnsafeMutablePointer<UInt8> {
+	return UnsafeMutablePointer<UInt8>.allocate(capacity: 10) // expected-error {{cannot use allocating operation in -no-allocations mode}}
+}
