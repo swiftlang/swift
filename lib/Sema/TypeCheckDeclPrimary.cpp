@@ -2866,6 +2866,16 @@ public:
         AT->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
       }
     }
+
+    // An associated type that was introduced after the protocol
+    auto module = AT->getDeclContext()->getParentModule();
+    if (!defaultType &&
+        module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+        AvailabilityInference::availableRange(proto, Ctx)
+          .isSupersetOf(AvailabilityInference::availableRange(AT, Ctx))) {
+      AT->diagnose(
+          diag::resilient_associated_type_less_available_requires_default, AT);
+    }
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {

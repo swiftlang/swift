@@ -2851,7 +2851,6 @@ WARNING(assoc_type_default_conformance_failed,none,
 NOTE(assoc_type_default_here,none,
      "associated type %0 has default type %1 written here",
      (const AssociatedTypeDecl *, Type))
-
 ERROR(protocol_access,none,
       "%select{protocol must be declared %select{"
       "%select{private|fileprivate|internal|package|%error|%error}1"
@@ -6840,6 +6839,10 @@ ERROR(inlinable_decl_not_public,
 
 ERROR(inlinable_resilient_deinit,
       none, "deinitializer can only be '@inlinable' if the class is '@_fixed_layout'", ())
+
+ERROR(resilient_associated_type_less_available_requires_default,none,
+      "associated type %0 that is less available than its protocol must have a "
+      "default", (const AssociatedTypeDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: @_specialize diagnostics
