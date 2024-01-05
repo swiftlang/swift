@@ -928,7 +928,7 @@ namespace {
     using PrintBase::PrintBase;
 
     void printCommon(Pattern *P, const char *Name, StringRef Label) {
-     printHead(Name, PatternColor, Label);
+      printHead(Name, PatternColor, Label);
 
       printFlag(P->isImplicit(), "implicit", ExprModifierColor);
 
@@ -990,6 +990,22 @@ namespace {
     }
     void visitExprPattern(ExprPattern *P, StringRef label) {
       printCommon(P, "pattern_expr", label);
+      switch (P->getCachedMatchOperandOwnership()) {
+      case ValueOwnership::Default:
+        break;
+      case ValueOwnership::Shared:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
+                      "ownership");
+        break;
+      case ValueOwnership::InOut:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
+                      "ownership");
+        break;
+      case ValueOwnership::Owned:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
+                      "ownership");
+        break;
+      }
       if (auto m = P->getCachedMatchExpr())
         printRec(m);
       else
@@ -2011,6 +2027,22 @@ public:
         printFlag(LabelItem.isDefault(), "default");
         
         if (auto *CasePattern = LabelItem.getPattern()) {
+          switch (CasePattern->getOwnership()) {
+          case ValueOwnership::Default:
+            break;
+          case ValueOwnership::Shared:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
+                          "ownership");
+            break;
+          case ValueOwnership::InOut:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
+                          "ownership");
+            break;
+          case ValueOwnership::Owned:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
+                          "ownership");
+            break;
+          }
           printRec(CasePattern);
         }
         if (auto *Guard = LabelItem.getGuardExpr()) {
