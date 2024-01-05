@@ -2308,6 +2308,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.CMOMode = CrossModuleOptimizationMode::Aggressive;
   } else if (Args.hasArg(OPT_EnbaleDefaultCMO)) {
     Opts.CMOMode = CrossModuleOptimizationMode::Default;  
+  } else if (Args.hasArg(OPT_EnbaleCMOEverything)) {
+    Opts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
   Opts.EnableStackProtection =
       Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
