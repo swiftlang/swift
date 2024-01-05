@@ -25,22 +25,22 @@ extension HasAvailableConformance1 : Horse {}
 // example but with this flag.
 
 func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add @available attribute to enclosing global function}}
-  takesHorse(x) // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+  takesHorse(x) // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in Swift 6}}
   // expected-note@-1 {{add 'if #available' version check}}
 
-  takesHorseExistential(x) // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+  takesHorseExistential(x) // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in Swift 6}}
   // expected-note@-1 {{add 'if #available' version check}}
   
-  x.giddyUp() // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+  x.giddyUp() // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in Swift 6}}
   // expected-note@-1 {{add 'if #available' version check}}
   
-  _ = x.isGalloping // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+  _ = x.isGalloping // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in Swift 6}}
   // expected-note@-1 {{add 'if #available' version check}}
   
-  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+  _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in Swift 6}}
   // expected-note@-1 {{add 'if #available' version check}}
 
-  _ = UsesHorse<HasAvailableConformance1>.self // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
+  _ = UsesHorse<HasAvailableConformance1>.self // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in Swift 6}}
   // expected-note@-1 {{add 'if #available' version check}}
 }
 

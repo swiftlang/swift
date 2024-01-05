@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-conformance-availability-errors
+// RUN: %target-typecheck-verify-swift -swift-version 6
 
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 public protocol Horse {}
 func takesHorse<T : Horse>(_: T) {}

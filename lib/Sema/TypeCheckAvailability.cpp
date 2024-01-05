@@ -2182,17 +2182,14 @@ void TypeChecker::diagnosePotentialUnavailability(
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+    auto err = ctx.Diags.diagnose(
+        loc, diag::conformance_availability_only_version_newer, type, proto,
+        prettyPlatformString(targetPlatform(ctx.LangOpts)),
+        reason.getRequiredOSVersionRange().getLowerEndpoint());
 
-    auto diagID = (ctx.LangOpts.EnableConformanceAvailabilityErrors
-                   ? diag::conformance_availability_only_version_newer
-                   : diag::conformance_availability_only_version_newer_warn);
-    auto behavior = behaviorLimitForExplicitUnavailability(rootConf, dc);
-    auto err =
-      ctx.Diags.diagnose(
-               loc, diagID,
-               type, proto, prettyPlatformString(targetPlatform(ctx.LangOpts)),
-               reason.getRequiredOSVersionRange().getLowerEndpoint());
-    err.limitBehavior(behavior);
+    err.warnUntilSwiftVersionIf(
+        !ctx.LangOpts.EnableConformanceAvailabilityErrors, 6);
+    err.limitBehavior(behaviorLimitForExplicitUnavailability(rootConf, dc));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc,
