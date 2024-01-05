@@ -168,6 +168,56 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
       }
       return nil
     }
+
+    /// Produces the next element in the flat map sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator; if this call returns
+    /// `nil`, `next()` returns `nil`. Otherwise, `next()` calls the
+    /// transforming closure on the received element, takes the resulting
+    /// asynchronous sequence, and creates an asynchronous iterator from it.
+    /// `next()` then consumes values from this iterator until it terminates.
+    /// At this point, `next()` is ready to receive the next value from the base
+    /// sequence. If `transform` throws an error, the sequence terminates.
+    @available(SwiftStdlib 5.11, *)
+    @inlinable
+    public mutating func nextElement() async throws(Failure) -> SegmentOfResult.Element? {
+      while !finished {
+        if var iterator = currentIterator {
+          do {
+            guard let element = try await iterator.next() else {
+              currentIterator = nil
+              continue
+            }
+            // restore the iterator since we just mutated it with next
+            currentIterator = iterator
+            return element
+          } catch {
+            finished = true
+            throw error
+          }
+        } else {
+          guard let item = try await baseIterator.next() else {
+            return nil
+          }
+          let segment: SegmentOfResult
+          do {
+            segment = try await transform(item)
+            var iterator = segment.makeAsyncIterator()
+            guard let element = try await iterator.next() else {
+              currentIterator = nil
+              continue
+            }
+            currentIterator = iterator
+            return element
+          } catch {
+            finished = true
+            currentIterator = nil
+            throw error
+          }
+        }
+      }
+      return nil
+    }
   }
 
   @inlinable
