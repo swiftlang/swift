@@ -5093,7 +5093,8 @@ bool swift::contextRequiresStrictConcurrencyChecking(
       // features.
       if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
         auto *nominal = extension->getExtendedNominal();
-        if (nominal && hasExplicitIsolationAttribute(nominal))
+        if (nominal && hasExplicitIsolationAttribute(nominal) &&
+            !getActorIsolation(nominal).preconcurrency())
           return true;
       }
 

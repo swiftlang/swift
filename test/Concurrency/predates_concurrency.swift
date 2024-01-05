@@ -219,3 +219,29 @@ nonisolated func blah() {
   InferMainActorPreconcurrency.predatesConcurrency()
   // expected-warning@-1 {{call to main actor-isolated static method 'predatesConcurrency()' in a synchronous nonisolated context}}
 }
+
+protocol NotIsolated {
+  func requirement()
+  // expected-complete-tns-note@-1 {{mark the protocol requirement 'requirement()' 'async' to allow actor-isolated conformances}}
+}
+
+extension MainActorPreconcurrency: NotIsolated {
+  func requirement() {}
+  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-complete-tns-note@-2 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
+  // expected-complete-tns-note@-3 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
+
+
+  class Nested {
+    weak var c: MainActorPreconcurrency?
+
+    func test() {
+    // expected-complete-tns-note@-1 {{add '@MainActor' to make instance method 'test()' part of global actor 'MainActor'}}
+
+      if let c {
+        c.requirement()
+        // expected-complete-tns-warning@-1 {{call to main actor-isolated instance method 'requirement()' in a synchronous nonisolated context}}
+      }
+    }
+  }
+}
