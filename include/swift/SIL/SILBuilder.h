@@ -1672,6 +1672,7 @@ public:
   createTupleAddrConstructor(SILLocation Loc, SILValue DestAddr,
                              ArrayRef<SILValue> Elements,
                              IsInitialization_t IsInitOfDest) {
+    assert(getFunction().getModule().useLoweredAddresses());
     return insert(TupleAddrConstructorInst::create(getSILDebugLocation(Loc),
                                                    DestAddr, Elements,
                                                    IsInitOfDest, getModule()));
