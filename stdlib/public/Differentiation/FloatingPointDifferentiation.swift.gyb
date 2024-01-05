@@ -54,21 +54,42 @@ extension ${Self}: Differentiable {
 /// Derivatives of constructors.
 ${Availability(bits)}
 extension ${Self} {
-  @inlinable
-  @_transparent
-  @derivative(of: init(_:))
-  static func _vjpInit(x: ${Self})
-    -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
-    return (x, { v in v })
-  }
 
+  % for other_type in all_floating_point_types():
+  %{
+  Other = other_type.stdlib_name
+  other_bits = other_type.bits
+  }%
+  
+  % if other_bits == 80:
+  #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+  % end
+  % if other_bits == 16:
+  #if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+  % end
+
+  ${Availability(other_bits)}
   @inlinable
   @_transparent
   @derivative(of: init(_:))
-  static func _jvpInit(x: ${Self})
-  -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
-    return (x, { dx in dx })
+  static func _vjpInit(x: ${Other})
+  -> (value: ${Self}, pullback: (${Self}) -> ${Other}) {
+    return (value: ${Self}(x), pullback: { v in ${Other}(v) })
   }
+  
+  ${Availability(other_bits)}
+  @inlinable
+  @_transparent
+  @derivative(of: init(_:))
+  static func _jvpInit(x: ${Other})
+  -> (value: ${Self}, differential: (${Other}) -> ${Self}) {
+    return (value: ${Self}(x), differential: { dx in ${Self}(dx) })
+  }
+  
+  % if other_bits == 80 or other_bits == 16:
+  #endif
+  % end
+  % end
 }
 
 /// Derivatives of standard unary operators.
