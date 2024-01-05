@@ -1781,10 +1781,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
                        SILParameterInfo param) {
       auto bridgedTy = param.getInterfaceType();
       auto bridgedArg = emitNativeToBridgedValue(loc,
-                                 arg, nativeFormalTy,
+                                 arg.borrow(*this, loc), nativeFormalTy,
                                  bridgedTy,
                                  SILType::getPrimitiveObjectType(bridgedTy));
-      completionHandlerArgs.push_back(bridgedArg.borrow(*this, loc).getValue());
+      completionHandlerArgs.push_back(bridgedArg.getValue());
     };
  
     Scope completionArgDestructureScope(*this, loc);

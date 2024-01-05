@@ -82,6 +82,7 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
 -(void)doSomethingSlowNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSInteger))handler;
 -(void)findAnswerNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *))handler;
 -(void)doSomethingDangerousNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError *_Nullable))handler;
+-(void)doSomethingUnspecifiedNullablyWithCompletionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError *_Nullable))handler;
 
 // rdar://72604599
 - (void)stopRecordingWithHandler:(nullable void (^)(NSObject *_Nullable_result x, NSError *_Nullable error))handler __attribute__((swift_async_name("stopRecording()"))) __attribute__((swift_async(not_swift_private, 1)));
