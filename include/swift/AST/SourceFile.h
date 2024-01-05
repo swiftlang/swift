@@ -313,9 +313,6 @@ public:
   /// includes the SourceFileSyntax node corresponding to this source file.
   void *getExportedSourceFile() const;
 
-  /// The list of local type declarations in the source file.
-  llvm::SetVector<TypeDecl *> LocalTypeDecls;
-
   /// Defer type checking of `AFD` to the end of `Sema`
   void addDelayedFunction(AbstractFunctionDecl *AFD);
 
@@ -761,6 +758,8 @@ public:
 
   /// Returns true if the source file contains concurrency in the top-level
   bool isAsyncTopLevelSourceFile() const;
+
+  ArrayRef<TypeDecl *> getLocalTypeDecls() const;
 
 private:
 

@@ -2057,7 +2057,7 @@ public:
       SGM.visit(D);
     }
 
-    for (TypeDecl *TD : sf->LocalTypeDecls) {
+    for (TypeDecl *TD : sf->getLocalTypeDecls()) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-tydecl", TD);
       // FIXME: Delayed parsing would prevent these types from being added to

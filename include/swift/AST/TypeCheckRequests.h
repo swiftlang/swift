@@ -4732,6 +4732,23 @@ public:
   void cacheResult(llvm::Optional<SubstitutionMap>) const;
 };
 
+/// Collect all local type declarations in the SourceFile.
+class LocalTypeDeclsRequest
+    : public SimpleRequest<LocalTypeDeclsRequest,
+                           ArrayRef<TypeDecl *>(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<TypeDecl *> evaluate(Evaluator &evaluator, SourceFile *sf) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
