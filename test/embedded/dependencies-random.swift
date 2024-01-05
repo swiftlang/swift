@@ -20,7 +20,8 @@
 // DEP: _posix_memalign
 
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
+// RUN: %target-clang -x c -c %S/Inputs/linux-rng-support.c -o %t/linux-rng-support.o
+// RUN: %target-clang %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
