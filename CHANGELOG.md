@@ -3,6 +3,49 @@
 > **Note**\
 > This is in reverse chronological order, so newer entries are added to the top.
 
+## Swift 5.11
+
+* [SE-0413][]:
+
+  Functions can now specify the type of error that they throw as part of the
+  function signature. For example:
+
+  ```swift
+  func parseRecord(from string: String) throws(ParseError) -> Record { ... }
+  ```
+
+  A call to `parseRecord(from:)` will either return a `Record` instance or throw
+  an error of type `ParseError`. For example, a `do..catch` block will infer
+  the `error` variable as being of type `ParseError`:
+
+  ```swift
+  do {
+    let record = try parseRecord(from: myString)
+  } catch {
+    // error has type ParseError
+  }
+  ```
+
+  Typed throws generalizes over throwing and non-throwing functions. A function
+  that is specified as `throws` (without an explicitly-specified error type) is
+  equivalent to one that specifies `throws(any Error)`, whereas a non-throwing
+  is equivalent to one that specifies `throws(Never)`. Calls to functions that
+  are `throws(Never)` are non-throwing.
+
+  Typed throws can also be used in generic functions to propagate error types
+  from parameters, in a manner that is more precise than `rethrows`. For
+  example, the `Sequence.map` operation can propagate the thrown error type from
+  its closure parameter, indicating that it only throws errors of the same type
+  as that closure does:
+
+  ```swift
+  extension Sequence {
+    func map<T, E>(_ body: (Element) throws(E) -> T) throws(E) -> [T] { ... }
+  }
+  ```
+
+  When given a non-throwing closure as a parameter, `map` will not throw.
+
 * [#70065][]:
 
   With the implementation of [SE-0110][], a closure parameter syntax consisting
@@ -9861,6 +9904,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0394]: https://github.com/apple/swift-evolution/blob/main/proposals/0394-swiftpm-expression-macros.md
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
+[SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

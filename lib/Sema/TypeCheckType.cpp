@@ -3720,11 +3720,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   Type thrownTy;
   if (auto thrownTypeRepr = repr->getThrownTypeRepr()) {
     ASTContext &ctx = getASTContext();
-    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-      diagnoseInvalid(
-          thrownTypeRepr, thrownTypeRepr->getLoc(), diag::experimental_typed_throws);
-    }
-
     auto thrownTypeOptions = options.withoutContext();
     thrownTy = resolveType(thrownTypeRepr, thrownTypeOptions);
     if (thrownTy->hasError()) {
@@ -5694,10 +5689,6 @@ Type ExplicitCaughtTypeRequest::evaluate(
     }
 
     // We have an explicit thrown error type, so resolve it.
-    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-      ctx.Diags.diagnose(thrownTypeRepr->getLoc(), diag::experimental_typed_throws);
-    }
-
     auto options = TypeResolutionOptions(TypeResolverContext::None);
     if (func->preconcurrency())
       options |= TypeResolutionFlags::Preconcurrency;
@@ -5713,11 +5704,6 @@ Type ExplicitCaughtTypeRequest::evaluate(
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
     // Explicit thrown error type.
     if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
-      if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-        ctx.Diags.diagnose(thrownTypeRepr->getLoc(),
-                           diag::experimental_typed_throws);
-      }
-
       return TypeResolution::resolveContextualType(
                thrownTypeRepr, closure,
                TypeResolutionOptions(TypeResolverContext::None),
@@ -5739,16 +5725,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
     // A do..catch block with no explicit 'throws' annotation will infer
     // the thrown error type.
     if (doCatch->getThrowsLoc().isInvalid()) {
-      // Prior to typed throws, the do..catch always throws 'any Error'.
-      if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
-        return ctx.getErrorExistentialType();
-
       return Type();
-    }
-
-    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-      ctx.Diags.diagnose(doCatch->getThrowsLoc(), diag::experimental_typed_throws);
-      return ctx.getErrorExistentialType();
     }
 
     auto typeRepr = doCatch->getCaughtTypeRepr();

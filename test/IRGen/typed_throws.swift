@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-feature TypedThrows -disable-availability-checking -runtime-compatibility-version none -target %module-target-future | %FileCheck %s --check-prefix=CHECK-MANGLE
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-availability-checking -runtime-compatibility-version none -target %module-target-future | %FileCheck %s --check-prefix=CHECK-MANGLE
 
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-feature TypedThrows -disable-availability-checking -runtime-compatibility-version 5.8 -disable-concrete-type-metadata-mangled-name-accessors | %FileCheck %s --check-prefix=CHECK-NOMANGLE
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-availability-checking -runtime-compatibility-version 5.8 -disable-concrete-type-metadata-mangled-name-accessors | %FileCheck %s --check-prefix=CHECK-NOMANGLE
 
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-feature TypedThrows  | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  | %FileCheck %s --check-prefix=CHECK
 
 // XFAIL: CPU=arm64e
 // REQUIRES: PTRSIZE=64

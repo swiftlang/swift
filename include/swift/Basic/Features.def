@@ -116,6 +116,7 @@ LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexicalLifetimes annotations", true)
 LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive", true)
+LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -248,9 +249,6 @@ EXPERIMENTAL_FEATURE(Embedded, true)
 
 /// Enables noncopyable generics
 EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
-
-/// Enables typed throws.
-EXPERIMENTAL_FEATURE(TypedThrows, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)

@@ -19,12 +19,14 @@ func one() {
   do {
     
   } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
-    let error2 = error
+    let error2 = error // expected-warning{{constant 'error2' inferred to have type 'Never', which is an enum with no cases}}
+    // expected-note@-1{{add an explicit type annotation to silence this warning}}
   }
 
   do {
   } catch where true { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
-    let error2 = error
+    let error2 = error // expected-warning{{constant 'error2' inferred to have type 'Never', which is an enum with no cases}}
+    // expected-note@-1{{add an explicit type annotation to silence this warning}}
   } catch {
   }
   

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test -enable-experimental-feature TypedThrows
+// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test
 
 // expected-note@+1{{type declared here}}
 enum MyError: Error {

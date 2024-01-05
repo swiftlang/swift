@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TypedThrows -enable-upcoming-feature FullTypedThrows
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature FullTypedThrows
 
 enum MyError: Error {
 case failed

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature TypedThrows %s -dump-ast | %FileCheck %s
+// RUN: %target-swift-frontend %s -dump-ast | %FileCheck %s
 
 enum MyError: Error {
 case failed

@@ -82,6 +82,10 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether this is a resolution based on a pack reference.
   FromPackReference = 1 << 12,
+
+  /// Whether to suppress warnings about conversions from and bindings of type
+  /// Never
+  SilenceNeverWarnings = 1 << 13,
 };
 
 /// Type resolution contexts that require special handling.

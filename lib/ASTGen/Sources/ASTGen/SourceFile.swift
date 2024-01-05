@@ -52,7 +52,6 @@ extension Parser.ExperimentalFeatures {
       }
     }
     mapFeature(.ThenStatements, to: .thenStatements)
-    mapFeature(.TypedThrows, to: .typedThrows)
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TransferringArgsAndResults, to: .transferringArgsAndResults)
