@@ -823,3 +823,46 @@ func consumeExprOfLoadExprOfOwnedAddrOnlyLValue<T>(_ ty: T.Type) {
   var t = source(ty)
   sink(consume t)
 }
+
+struct Twople<T> {
+  var storage: (T, T)
+
+// CHECK-LABEL: sil {{.*}}[ossa] @$s20opaque_values_silgen6TwopleV2t12t2ACyxGx_xtcfC : {{.*}} {
+// CHECK:       bb0([[T1:%[^,]+]] : 
+// CHECK-SAME:      [[T2:%[^,]+]] : 
+// CHECK-SAME:  ):
+// CHECK:         [[VAR:%[^,]+]] = alloc_box
+// CHECK:         [[VAR_UNINIT:%[^,]+]] = mark_uninitialized [rootself] [[VAR]]
+// CHECK:         [[VAR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VAR_UNINIT]]
+// CHECK:         [[VAR_ADDR:%[^,]+]] = project_box [[VAR_LIFETIME]]
+// CHECK:         [[T1_BORROW:%[^,]+]] = begin_borrow [[T1]]
+// CHECK:         [[T1_COPY:%[^,]+]] = copy_value [[T1_BORROW]]
+// CHECK:         [[T2_BORROW:%[^,]+]] = begin_borrow [[T2]]
+// CHECK:         [[T2_COPY:%[^,]+]] = copy_value [[T2_BORROW]]
+// CHECK:         [[VAR_ACCESS:%[^,]+]] = begin_access [modify] [unknown] [[VAR_ADDR]]
+// CHECK:         [[STORAGE_ACCESS:%[^,]+]] = struct_element_addr [[VAR_ACCESS]]
+
+//                In opaque values mode, without regard to the fact that T is
+//                address-only, a tuple is constructed and assigned into the
+//                storage.
+// CHECK:         [[TUPLE:%[^,]+]] = tuple (
+// CHECK-SAME:        [[T1_COPY]]
+// CHECK-SAME:        [[T2_COPY]]
+// CHECK-SAME:    )
+// CHECK:         assign [[TUPLE]] to [[STORAGE_ACCESS]]
+
+// CHECK:         end_access [[VAR_ACCESS]]
+// CHECK:         end_borrow [[T2_BORROW]]
+// CHECK:         end_borrow [[T1_BORROW]]
+// CHECK:         [[RETVAL:%[^,]+]] = load [copy] [[VAR_ADDR]]
+// CHECK:         destroy_value [[T2]]
+// CHECK:         destroy_value [[T1]]
+// CHECK:         end_borrow [[VAR_LIFETIME]]
+// CHECK:         destroy_value [[VAR_UNINIT]]
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen6TwopleV2t12t2ACyxGx_xtcfC'
+  @_silgen_name("Twople_init_from_t1_t2")
+  init(t1: T, t2: T) {
+    self.storage = (t1, t2)
+  }
+}
