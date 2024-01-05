@@ -204,9 +204,6 @@ namespace swift {
     /// declarations introduced at the deployment target.
     bool WeakLinkAtTarget = false;
 
-    /// Should conformance availability violations be diagnosed as errors?
-    bool EnableConformanceAvailabilityErrors = false;
-
     /// Should the editor placeholder error be downgraded to a warning?
     bool WarnOnEditorPlaceholder = false;
 

@@ -2187,8 +2187,7 @@ void TypeChecker::diagnosePotentialUnavailability(
         prettyPlatformString(targetPlatform(ctx.LangOpts)),
         reason.getRequiredOSVersionRange().getLowerEndpoint());
 
-    err.warnUntilSwiftVersionIf(
-        !ctx.LangOpts.EnableConformanceAvailabilityErrors, 6);
+    err.warnUntilSwiftVersion(6);
     err.limitBehavior(behaviorLimitForExplicitUnavailability(rootConf, dc));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -2813,7 +2812,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
                                            const RootProtocolConformance *rootConf,
                                            const ExtensionDecl *ext,
                                            const ExportContext &where,
-                                           bool useConformanceAvailabilityErrorsOption) {
+                                           bool warnIfConformanceUnavailablePreSwift6) {
   auto *attr = AvailableAttr::isUnavailable(ext);
   if (!attr)
     return false;
@@ -2871,9 +2870,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
                  type, proto,
                  platform.empty(), platform, EncodedMessage.Message)
       .limitBehavior(behavior)
-      .warnUntilSwiftVersionIf(useConformanceAvailabilityErrorsOption &&
-                               !ctx.LangOpts.EnableConformanceAvailabilityErrors,
-                               6);
+      .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
@@ -4003,7 +4000,7 @@ public:
         Loc, subs, Where,
         /*depTy=*/Type(),
         /*replacementTy=*/Type(),
-        /*useConformanceAvailabilityErrorsOption=*/false,
+        /*warnIfConformanceUnavailablePreSwift6=*/false,
         /*suppressParameterizationCheckForOptional=*/ty->isOptional());
     return Action::Continue;
   }
@@ -4082,7 +4079,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
                                        const ExportContext &where,
                                        Type depTy, Type replacementTy,
-                                       bool useConformanceAvailabilityErrorsOption) {
+                                       bool warnIfConformanceUnavailablePreSwift6) {
   assert(!where.isImplicit());
 
   if (conformance.isPack()) {
@@ -4091,7 +4088,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     for (auto patternConf : pack->getPatternConformances()) {
       diagnosed |= diagnoseConformanceAvailability(
           loc, patternConf, where, depTy, replacementTy,
-          useConformanceAvailabilityErrorsOption);
+          warnIfConformanceUnavailablePreSwift6);
     }
     return diagnosed;
   }
@@ -4128,13 +4125,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   if (auto *ext = dyn_cast<ExtensionDecl>(rootConf->getDeclContext())) {
     if (TypeChecker::diagnoseConformanceExportability(loc, rootConf, ext, where,
-                                                      useConformanceAvailabilityErrorsOption)) {
+                                                      warnIfConformanceUnavailablePreSwift6)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
 
     if (diagnoseExplicitUnavailability(loc, rootConf, ext, where,
-                                       useConformanceAvailabilityErrorsOption)) {
+                                       warnIfConformanceUnavailablePreSwift6)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
@@ -4162,7 +4159,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   SubstitutionMap subConformanceSubs = concreteConf->getSubstitutionMap();
   if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
                                           depTy, replacementTy,
-                                          useConformanceAvailabilityErrorsOption))
+                                          warnIfConformanceUnavailablePreSwift6))
     return true;
 
   return false;
@@ -4173,13 +4170,13 @@ swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
                                            const ExportContext &where,
                                            Type depTy, Type replacementTy,
-                                           bool useConformanceAvailabilityErrorsOption,
+                                           bool warnIfConformanceUnavailablePreSwift6,
                                            bool suppressParameterizationCheckForOptional) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where,
                                         depTy, replacementTy,
-                                        useConformanceAvailabilityErrorsOption))
+                                        warnIfConformanceUnavailablePreSwift6))
       hadAnyIssues = true;
   }
 

@@ -227,7 +227,7 @@ diagnoseConformanceAvailability(SourceLoc loc,
                                 const ExportContext &context,
                                 Type depTy=Type(),
                                 Type replacementTy=Type(),
-                                bool useConformanceAvailabilityErrorsOption = false);
+                                bool warnIfConformanceUnavailablePreSwift6 = false);
 
 bool diagnoseSubstitutionMapAvailability(
     SourceLoc loc,
@@ -235,7 +235,7 @@ bool diagnoseSubstitutionMapAvailability(
     const ExportContext &context,
     Type depTy = Type(),
     Type replacementTy = Type(),
-    bool useConformanceAvailabilityErrorsOption = false,
+    bool warnIfConformanceUnavailablePreSwift6 = false,
     bool suppressParameterizationCheckForOptional = false);
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
@@ -273,7 +273,7 @@ bool diagnoseExplicitUnavailability(
     const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext,
     const ExportContext &where,
-    bool useConformanceAvailabilityErrorsOption = false);
+    bool warnIfConformanceUnavailablePreSwift6 = false);
 
 /// Diagnose uses of the runtime features of parameterized protools. Returns
 /// \c true if a diagnostic was emitted.

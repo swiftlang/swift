@@ -677,12 +677,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.WeakLinkAtTarget |= Args.hasArg(OPT_weak_link_at_target);
 
-  if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
-                               OPT_disable_conformance_availability_errors)) {
-    Opts.EnableConformanceAvailabilityErrors
-      = A->getOption().matches(OPT_enable_conformance_availability_errors);
-  }
-
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
 
   if (auto A = Args.getLastArg(OPT_disable_typo_correction,
