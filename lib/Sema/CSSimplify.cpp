@@ -13909,7 +13909,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // before matching base types if other side is an optional, so
     // score needs to account for number of such promotions.
     int optionalWraps = baseType2.getInt() - baseType1.getInt();
-    return recordFix(fix, baseImpact + abs(optionalWraps))
+    return recordFix(fix, baseImpact + std::abs(optionalWraps))
                ? SolutionKind::Error
                : SolutionKind::Solved;
   };
