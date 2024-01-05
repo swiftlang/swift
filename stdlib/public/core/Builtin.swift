@@ -725,9 +725,11 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
+  #if !$Embedded
   _internalInvariant(
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
     == 0)
+  #endif
   _internalInvariant(_usesNativeSwiftReferenceCounting(
       type(of: Builtin.reinterpretCast(object) as AnyObject)))
   return Bool(Builtin.isUnique_native(&object))
@@ -1061,4 +1063,15 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
 public // @SPI(OSLog)
 func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
   return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
+}
+
+@_transparent
+@_alwaysEmitIntoClient
+public
+func _allocateVector<Element>(elementType: Element.Type, capacity: Int) -> UnsafeMutablePointer<Element> {
+#if $BuiltinAllocVector
+  return UnsafeMutablePointer(Builtin.allocVector(elementType, capacity._builtinWordValue))
+#else
+  fatalError("unsupported compiler")
+#endif
 }

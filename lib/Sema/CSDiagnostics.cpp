@@ -1426,7 +1426,7 @@ SourceRange MemberAccessOnOptionalBaseFailure::getSourceRange() const {
     auto anchor = getAnchor();
     auto keyPathExpr = castToExpr<KeyPathExpr>(anchor);
     if (componentPathElt->getIndex() == 0) {
-      if (auto rootType = keyPathExpr->getRootType()) {
+      if (auto rootType = keyPathExpr->getExplicitRootType()) {
         return rootType->getSourceRange();
       } else {
         return keyPathExpr->getComponents().front().getLoc();
@@ -1483,7 +1483,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     // For members where the base type is an optional key path root
     // let's emit a tailored note suggesting to use its unwrapped type.
     auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
-    if (auto rootType = keyPathExpr->getRootType()) {
+    if (auto rootType = keyPathExpr->getExplicitRootType()) {
       emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
                      unwrappedBaseType);
 
@@ -2497,7 +2497,7 @@ bool ContextualFailure::diagnoseAsError() {
   if (path.empty()) {
     if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
       emitDiagnosticAt(KPE->getLoc(),
-                       diag::expr_smart_keypath_value_covert_to_contextual_type,
+                       diag::expr_keypath_type_covert_to_contextual_type,
                        getFromType(), getToType());
       return true;
     }
@@ -2603,6 +2603,11 @@ bool ContextualFailure::diagnoseAsError() {
 
     if (diagnoseYieldByReferenceMismatch())
       return true;
+
+    if (isExpr<KeyPathExpr>(anchor)) {
+      diagnostic = diag::expr_keypath_type_covert_to_contextual_type;
+      break;
+    }
 
     if (isExpr<OptionalTryExpr>(anchor) ||
         isExpr<OptionalEvaluationExpr>(anchor)) {
@@ -2741,6 +2746,11 @@ bool ContextualFailure::diagnoseAsError() {
 
   case ConstraintLocator::PatternMatch: {
     diagnostic = diag::cannot_match_value_with_pattern;
+    break;
+  }
+
+  case ConstraintLocator::KeyPathValue: {
+    diagnostic = diag::expr_keypath_value_covert_to_contextual_type;
     break;
   }
 
@@ -6124,7 +6134,7 @@ SourceLoc AnyObjectKeyPathRootFailure::getLoc() const {
   auto anchor = getAnchor();
 
   if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
-    if (auto rootTyRepr = KPE->getRootType())
+    if (auto rootTyRepr = KPE->getExplicitRootType())
       return rootTyRepr->getLoc();
   }
 
@@ -6135,7 +6145,7 @@ SourceRange AnyObjectKeyPathRootFailure::getSourceRange() const {
   auto anchor = getAnchor();
 
   if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
-    if (auto rootTyRepr = KPE->getRootType())
+    if (auto rootTyRepr = KPE->getExplicitRootType())
       return rootTyRepr->getSourceRange();
   }
 
@@ -6395,6 +6405,11 @@ bool InvalidPackExpansion::diagnoseAsError() {
   }
 
   emitDiagnostic(diag::expansion_expr_not_allowed);
+  return true;
+}
+
+bool InvalidWhereClauseInPackIteration::diagnoseAsError() {
+  emitDiagnostic(diag::pack_iteration_where_clause_not_supported);
   return true;
 }
 
@@ -7285,6 +7300,18 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 
   auto argType = getFromType();
 
+  // Unresolved key path argument requires a tailored diagnostic
+  // that doesn't mention a fallback type - `KeyPath<_, _>`.
+  if (argType->isKeyPath() && !isKnownKeyPathType(paramType)) {
+    auto keyPathTy = argType->castTo<BoundGenericType>();
+    auto rootTy = keyPathTy->getGenericArgs()[0];
+    if (rootTy->is<UnresolvedType>()) {
+      emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
+                     paramType);
+      return true;
+    }
+  }
+
   if (paramType->isAnyObject()) {
     emitDiagnostic(diag::cannot_convert_argument_value_anyobject, argType,
                    paramType);
@@ -7646,7 +7673,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
         paramFnType->getParams().front().getPlainType()->isEqual(kpRootType)))
     return false;
 
-  emitDiagnostic(diag::expr_smart_keypath_value_covert_to_contextual_type,
+  emitDiagnostic(diag::expr_keypath_value_covert_to_contextual_type,
                  kpValueType, paramFnType->getResult());
   return true;
 }
@@ -9102,61 +9129,6 @@ bool DefaultExprTypeMismatch::diagnoseAsError() {
   return true;
 }
 
-bool MissingExplicitExistentialCoercion::diagnoseAsError() {
-  auto diagnostic = emitDiagnostic(diag::result_requires_explicit_coercion,
-                                   ErasedResultType);
-  fixIt(diagnostic);
-  return true;
-}
-
-bool MissingExplicitExistentialCoercion::diagnoseAsNote() {
-  auto diagnostic = emitDiagnostic(
-      diag::candidate_result_requires_explicit_coercion, ErasedResultType);
-  fixIt(diagnostic);
-  return true;
-}
-
-bool MissingExplicitExistentialCoercion::fixItRequiresParens() const {
-  auto anchor = getAsExpr(getRawAnchor());
-
-  // If it's a member reference an an existential metatype, let's
-  // use the parent "call" expression.
-  if (auto *UDE = dyn_cast_or_null<UnresolvedDotExpr>(anchor))
-    anchor = findParentExpr(UDE);
-
-  if (!anchor)
-    return false;
-
-  const auto &solution = getSolution();
-  return llvm::any_of(
-      solution.OpenedExistentialTypes,
-      [&anchor](const auto &openedExistential) {
-        if (auto openedLoc = simplifyLocatorToAnchor(openedExistential.first)) {
-          return anchor == getAsExpr(openedLoc);
-        }
-        return false;
-      });
-}
-
-void MissingExplicitExistentialCoercion::fixIt(
-    InFlightDiagnostic &diagnostic) const {
-
-  if (ErasedResultType->hasTypeParameter())
-    return;
-
-  bool requiresParens = fixItRequiresParens();
-
-  auto callRange = getSourceRange();
-
-  if (requiresParens)
-    diagnostic.fixItInsert(callRange.Start, "(");
-
-  auto printOpts = PrintOptions::forDiagnosticArguments();
-  diagnostic.fixItInsertAfter(callRange.End,
-                              "as " + ErasedResultType->getString(printOpts) +
-                                  (requiresParens ? ")" : ""));
-}
-
 bool ConflictingPatternVariables::diagnoseAsError() {
   for (auto *var : Vars) {
     emitDiagnosticAt(var->getStartLoc(),
@@ -9333,5 +9305,10 @@ bool InvalidTypeSpecializationArity::diagnoseAsError() {
                                   NumArgs, NumParams,
                                   HasParameterPack,
                                   /*generic=*/nullptr);
+  return true;
+}
+
+bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
+  emitDiagnostic(diag::cannot_convert_type_to_keypath_subscript_index, ArgType);
   return true;
 }

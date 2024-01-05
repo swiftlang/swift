@@ -276,6 +276,29 @@ public:
   }
 };
 
+/// This record signifies that the task has an executor preference.
+/// This preference may be added or removed at runtime, e.g. when multiple
+/// `_withTaskExecutor { ... }` blocks are nested, they add more executor
+/// preferences.
+///
+/// Any number of these preferences may be present at runtime, and the
+/// innermost preference takes priority.
+class TaskExecutorPreferenceStatusRecord : public TaskStatusRecord {
+private:
+  const TaskExecutorRef Preferred;
+
+public:
+  TaskExecutorPreferenceStatusRecord(TaskExecutorRef executor)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskExecutorPreference),
+        Preferred(executor) {}
+
+  TaskExecutorRef getPreferredExecutor() { return Preferred; }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskExecutorPreference;
+  }
+};
+
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.
 class TaskDependencyStatusRecord : public TaskStatusRecord {
@@ -321,7 +344,7 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
     // (potentially intrusively), so that the appropriate escalation effect
     // (which may be different for each type of executor) can happen if a task
     // is escalated while enqueued.
-    ExecutorRef Executor;
+    SerialExecutorRef Executor;
   } DependentOn;
 
   // Enum specifying the type of dependency this task has
@@ -359,7 +382,7 @@ public:
       DependentOn.TaskGroup = taskGroup;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, ExecutorRef executor) :
+  TaskDependencyStatusRecord(AsyncTask *waitingTask, SerialExecutorRef executor) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(EnqueuedOnExecutor), WaitingTask(waitingTask) {
       DependentOn.Executor = executor;
@@ -369,7 +392,7 @@ public:
     return record->getKind() == TaskStatusRecordKind::TaskDependency;
   }
 
-  void updateDependencyToEnqueuedOn(ExecutorRef executor) {
+  void updateDependencyToEnqueuedOn(SerialExecutorRef executor) {
     DependencyKind = EnqueuedOnExecutor;
     DependentOn.Executor = executor;
   }

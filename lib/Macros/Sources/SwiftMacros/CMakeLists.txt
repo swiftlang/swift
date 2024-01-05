@@ -12,6 +12,7 @@
 
 add_swift_macro_library(SwiftMacros
   OptionSetMacro.swift
+  DebugDescriptionMacro.swift
   SWIFT_DEPENDENCIES
     SwiftDiagnostics
     SwiftSyntax

@@ -1271,7 +1271,8 @@ public:
 
   /// Find an associated type declaration that provides a default definition.
   static AssociatedTypeDecl *findDefaultedAssociatedType(
-                                                 AssociatedTypeDecl *assocType);
+      DeclContext *dc, NominalTypeDecl *adoptee,
+      AssociatedTypeDecl *assocType);
 };
 
 /// Match the given witness to the given requirement.

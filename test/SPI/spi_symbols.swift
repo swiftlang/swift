@@ -1,10 +1,10 @@
 // REQUIRES: VENDOR=apple
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/Inputs/spi_helper.swift -emit-ir -o %t/spi_helper.ll -emit-tbd-path %t/spi_helper.tbd -module-name spi_helper
+// RUN: %target-swift-frontend %S/Inputs/spi_helper.swift -emit-ir -o %t/spi_helper.ll -emit-tbd-path %t/spi_helper.tbd -module-name spi_helper -tbd-install_name spi_helper
 
 // RUN: cat %t/spi_helper.ll | %FileCheck -check-prefix=CHECK-IR %s
-// RUN: cat %t/spi_helper.tbd | %FileCheck -check-prefix=CHECK-TBD %s
+// RUN: %llvm-nm %t/spi_helper.tbd | %FileCheck -check-prefix=CHECK-TBD %s
 
 // Look for the SPI symbols in the IR
 // CHECK-IR: define swiftcc void @"$s10spi_helper0A4FuncyyF"

@@ -1,26 +1,26 @@
 /*
-    /*foo:unknown*/bar() is not /*foo:unknown*/bar(first:)
+    /*foo:unknown*/<base>foo</base>() is not /*foo:unknown*/foo(first:)
 */
-/// This describes /*foo:unknown*/bar and /*foo:unknown*/bar
-func /*foo:def*/bar() {
-    let /*foo:def*/bar = "Here is /*foo:unknown*/bar"
-    // /*foo:unknown*/bar's return
+/// This describes /*foo:unknown*/<base>foo</base> and /*foo:unknown*/<base>foo</base>
+func /*foo:def*/<base>foo</base>() {
+    let /*foo:def*/<base>foo</base> = "Here is /*foo:unknown*/<base>foo</base>"
+    // /*foo:unknown*/<base>foo</base>'s return
     #selector(Struct . /*foo:unknown*/foo(_:aboveSubview:))
     #selector(/*foo:unknown*/foo(_:))
-    #selector(#selector(/*foo:unknown*/bar))
+    #selector(#selector(/*foo:unknown*/<base>foo</base>))
 
     #if true
-        /*foo*/bar = 2
-        /*foo*/bar()
-        /*foo:call*/bar()
-        /*foo:unknown*/foo = 3
-        /*foo:unknown*/foo()
+        /*foo*/<base>foo</base> = 2
+        /*foo*/<base>foo</base>()
+        /*foo:call*/<base>foo</base>()
+        /*foo:unknown*/<base>foo</base> = 3
+        /*foo:unknown*/<base>foo</base>()
         #if false
-            /*foo:unknown*/bar += 2
-            /*foo:unknown*/bar()
+            /*foo:unknown*/<base>foo</base> += 2
+            /*foo:unknown*/<base>foo</base>()
         #endif
     #else
-        /*foo:unknown*/bar = 4
+        /*foo:unknown*/<base>foo</base> = 4
     #endif
 
     return 1

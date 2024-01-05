@@ -45,11 +45,13 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_cxxstdlib_darwin_dependencies}
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    -Xfrontend -enable-experimental-cxx-interop
+    -cxx-interoperability-mode=default
     -Xfrontend -module-interface-preserve-types-as-written
 
     SWIFT_COMPILE_FLAGS_LINUX
     ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}
+
+    DEPLOYMENT_VERSION_OSX ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX}
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS LINUX WINDOWS

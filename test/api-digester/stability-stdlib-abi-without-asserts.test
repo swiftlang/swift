@@ -51,6 +51,15 @@ Func _prespecialize() is a new API without @available attribute
 Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
 Func _diagnoseUnavailableCodeReached() is a new API without @available attribute
 
+// These functions are not actually added to the ABI, but they had been a part of
+// the ABI exposed by the runtime library, so this is not breakage.
+// They are now referenced by @_extern(c) declarations in the standard library, but
+// api-digester cannot match them with the baseline symbols in the baseline runtime
+// library, which were not exposed by the baseline stdlib module.
+Func _swift_retainCount(_:) is a new API without @available attribute
+Func _swift_unownedRetainCount(_:) is a new API without @available attribute
+Func _swift_weakRetainCount(_:) is a new API without @available attribute
+
 Func Collection.removingSubranges(_:) has been removed
 Func Collection.subranges(of:) has been removed
 Func Collection.subranges(where:) has been removed

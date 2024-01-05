@@ -74,21 +74,22 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
   return newBr;
 }
 
-static void
-deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> termOperands,
-                                          unsigned deadArgIndex) {
+static void deleteTriviallyDeadOperandsOfDeadArgument(
+    MutableArrayRef<Operand> termOperands, unsigned deadArgIndex,
+    InstModCallbacks callbacks = InstModCallbacks()) {
   Operand &op = termOperands[deadArgIndex];
   auto *i = op.get()->getDefiningInstruction();
   if (!i)
     return;
   op.set(SILUndef::get(op.get()->getType(), *i->getFunction()));
-  eliminateDeadInstruction(i);
+  eliminateDeadInstruction(i, callbacks);
 }
 
 // Our implementation assumes that our caller is attempting to remove a dead
 // SILPhiArgument from a SILBasicBlock and has already RAUWed the argument.
 TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
-                                 size_t argIndex, bool cleanupDeadPhiOps) {
+                                 size_t argIndex, bool cleanupDeadPhiOps,
+                                 InstModCallbacks callbacks) {
   if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
     SmallVector<SILValue, 8> trueArgs;
     SmallVector<SILValue, 8> falseArgs;
@@ -99,7 +100,7 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     if (destBlock == cbi->getTrueBB()) {
       if (cleanupDeadPhiOps) {
         deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
-                                                  argIndex);
+                                                  argIndex, callbacks);
       }
       trueArgs.erase(trueArgs.begin() + argIndex);
     }
@@ -107,7 +108,7 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     if (destBlock == cbi->getFalseBB()) {
       if (cleanupDeadPhiOps) {
         deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
-                                                  argIndex);
+                                                  argIndex, callbacks);
       }
       falseArgs.erase(falseArgs.begin() + argIndex);
     }
@@ -125,7 +126,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     SmallVector<SILValue, 8> args;
     llvm::copy(bi->getArgs(), std::back_inserter(args));
     if (cleanupDeadPhiOps) {
-      deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
+      deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex,
+                                                callbacks);
     }
     args.erase(args.begin() + argIndex);
     auto *result = SILBuilderWithScope(bi).createBranch(bi->getLoc(),
@@ -138,7 +140,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 }
 
 void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
-                             bool cleanupDeadPhiOps) {
+                             bool cleanupDeadPhiOps,
+                             InstModCallbacks callbacks) {
   assert(block->getArgument(argIndex)->isPhi()
          && "Only should be used on phi arguments");
   block->eraseArgument(argIndex);
@@ -155,7 +158,8 @@ void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
     predBlocks.insert(pred);
 
   for (auto *pred : predBlocks)
-    deleteEdgeValue(pred->getTerminator(), block, argIndex, cleanupDeadPhiOps);
+    deleteEdgeValue(pred->getTerminator(), block, argIndex, cleanupDeadPhiOps,
+                    callbacks);
 }
 
 /// Changes the edge value between a branch and destination basic block
@@ -510,6 +514,7 @@ static bool isSafeNonExitTerminator(TermInst *ti) {
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
     return false;
   // yield is special because it can do arbitrary,

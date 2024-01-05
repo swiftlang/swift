@@ -4,6 +4,8 @@
 // Building with embedded Swift should produce unavailability errors
 // RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature Embedded  -wmo
 
+// REQUIRES: swift_in_compiler
+
 @_unavailableInEmbedded
 public func embedded() { }
 public func regular() {

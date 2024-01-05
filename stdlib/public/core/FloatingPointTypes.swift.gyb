@@ -1061,13 +1061,13 @@ extension ${Self} {
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<Source: BinaryInteger>(_ value: Source) {
-    if value.bitWidth <= ${word_bits} {
+    if value.bitWidth <= 64 {
       if Source.isSigned {
-        let asInt = Int(truncatingIfNeeded: value)
-        _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(asInt._value)
+        let asInt = Int64(truncatingIfNeeded: value)
+        _value = Builtin.sitofp_Int64_FPIEEE${bits}(asInt._value)
       } else {
-        let asUInt = UInt(truncatingIfNeeded: value)
-        _value = Builtin.uitofp_Int${word_bits}_FPIEEE${bits}(asUInt._value)
+        let asUInt = UInt64(truncatingIfNeeded: value)
+        _value = Builtin.uitofp_Int64_FPIEEE${bits}(asUInt._value)
       }
     } else {
       // TODO: we can do much better than the generic _convert here for Float

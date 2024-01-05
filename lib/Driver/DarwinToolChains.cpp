@@ -317,8 +317,13 @@ toolchains::Darwin::addSanitizerArgs(ArgStringList &Arguments,
   // Linking sanitizers will add rpaths, which might negatively interact when
   // other rpaths are involved, so we should make sure we add the rpaths after
   // all user-specified rpaths.
-  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
+  if (context.OI.SelectedSanitizers & SanitizerKind::Address) {
+    if (context.OI.SanitizerUseStableABI)
+      addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan_abi",
+                                       *this, false);
+    else
+      addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
+  }
 
   if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
@@ -378,6 +383,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
     } else if (value.equals("5.8")) {
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
+    } else if (value.equals("5.11")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 11);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = llvm::None;
     } else {

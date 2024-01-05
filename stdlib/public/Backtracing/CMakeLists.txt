@@ -25,6 +25,7 @@ set(BACKTRACING_SOURCES
   Backtrace.swift
   BacktraceFormatter.swift
   ByteSwapping.swift
+  CachingMemoryReader.swift
   Context.swift
   Compression.swift
   CoreSymbolication.swift

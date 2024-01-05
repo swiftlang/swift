@@ -1636,6 +1636,9 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 
 void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (opaque->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   if (!opaque->isAvailableDuringLowering())
     return;
 
@@ -1699,7 +1702,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
                                             TypeExpansionContext::minimal())
             .getRecursiveProperties().isInfinite()) {
-    auto copyable = D->isNoncopyable()
+    auto copyable = D->canBeNoncopyable()
       ? IsNotCopyable : IsCopyable;
     auto structAccessible =
       IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));

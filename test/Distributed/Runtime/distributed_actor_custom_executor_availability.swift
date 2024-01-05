@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN:  %target-run %t/a.out
 
@@ -28,7 +28,8 @@ distributed actor FiveSevenActor_NothingExecutor {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+    @available(SwiftStdlib 5.9, *)
+    distributed func test(x: Int) throws {
     print("executed: \(#function)")
     defer {
       print("done executed: \(#function)")
@@ -46,7 +47,7 @@ distributed actor FiveNineActor_NothingExecutor {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+  distributed func test(x: Int) throws {
     print("executed: \(#function)")
     defer {
       print("done executed: \(#function)")
@@ -65,7 +66,8 @@ distributed actor FiveSevenActor_FiveNineExecutor {
     return MainActor.sharedUnownedExecutor
   }
 
-  distributed func test(x: Int) async throws {
+  @available(SwiftStdlib 5.9, *)
+  distributed func test(x: Int) throws {
     print("executed: \(#function)")
     defer {
       print("done executed: \(#function)")
@@ -76,6 +78,7 @@ distributed actor FiveSevenActor_FiveNineExecutor {
   }
 }
 
+@available(SwiftStdlib 5.7, *)
 @main struct Main {
   static func main() async {
     if #available(SwiftStdlib 5.9, *) {

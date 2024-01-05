@@ -38,7 +38,8 @@ class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
 class NodeBitfield;
-class SILPassManager;
+class OperandBitfield;
+class CalleeCache;
 
 namespace Lowering {
 class TypeLowering;
@@ -85,6 +86,9 @@ enum class PerformanceConstraints : uint8_t {
   None = 0,
   NoAllocation = 1,
   NoLocks = 2,
+  NoRuntime = 3,
+  NoExistentials = 4,
+  NoObjCBridging = 5
 };
 
 class SILSpecializeAttr final {
@@ -203,6 +207,7 @@ private:
   template <class, class> friend class SILBitfield;
   friend class BasicBlockBitfield;
   friend class NodeBitfield;
+  friend class OperandBitfield;
 
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
@@ -278,9 +283,12 @@ private:
   /// The head of a single-linked list of currently alive NodeBitfield.
   NodeBitfield *newestAliveNodeBitfield = nullptr;
 
+  /// The head of a single-linked list of currently alive OperandBitfields.
+  OperandBitfield *newestAliveOperandBitfield = nullptr;
+
   /// A monotonically increasing ID which is incremented whenever a
-  /// BasicBlockBitfield or NodeBitfield is constructed.
-  /// For details see SILBitfield::bitfieldID;
+  /// BasicBlockBitfield, NodeBitfield, or OperandBitfield is constructed.  For
+  /// details see SILBitfield::bitfieldID;
   int64_t currentBitfieldID = 1;
 
   /// Unique identifier for vector indexing and deterministic sorting.
@@ -303,7 +311,7 @@ private:
   /// empty.
   StringRef WasmExportName;
 
-  /// Name of a Wasm import module and field if @extern(wasm) attribute
+  /// Name of a Wasm import module and field if @_extern(wasm) attribute
   llvm::Optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
 
   /// Has value if there's a profile for this function
@@ -434,6 +442,8 @@ private:
   /// If true, the function returns a non-escapable value without any
   /// lifetime-dependence on an argument.
   unsigned HasUnsafeNonEscapableResult : 1;
+
+  unsigned HasResultDependsOnSelf : 1;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -719,6 +729,11 @@ public:
     HasUnsafeNonEscapableResult = value;
   }
 
+  bool hasResultDependsOnSelf() const { return HasResultDependsOnSelf; }
+
+  void setHasResultDependsOnSelf(bool flag = true) {
+    HasResultDependsOnSelf = flag;
+  }
   /// Returns true if this is a reabstraction thunk of escaping function type
   /// whose single argument is a potentially non-escaping closure. i.e. the
   /// thunks' function argument may itself have @inout_aliasable parameters.
@@ -1136,6 +1151,9 @@ public:
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
   MemoryBehavior getMemoryBehavior(bool observeRetains);
 
+  // Used by the MemoryLifetimeVerifier
+  bool argumentMayRead(Operand *argOp, SILValue addr);
+
   Purpose getSpecialPurpose() const { return specialPurpose; }
 
   /// Get this function's global_init attribute.
@@ -1288,14 +1306,14 @@ public:
   StringRef wasmExportName() const { return WasmExportName; }
   void setWasmExportName(StringRef value) { WasmExportName = value; }
 
-  /// Return Wasm import module name if @extern(wasm) was used otherwise empty
+  /// Return Wasm import module name if @_extern(wasm) was used otherwise empty
   StringRef wasmImportModuleName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->first;
     return StringRef();
   }
 
-  /// Return Wasm import field name if @extern(wasm) was used otherwise empty
+  /// Return Wasm import field name if @_extern(wasm) was used otherwise empty
   StringRef wasmImportFieldName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->second;
@@ -1403,7 +1421,7 @@ public:
     return std::find_if(begin(), end(),
                         [](const SILBasicBlock &BB) -> bool {
                           const TermInst *TI = BB.getTerminator();
-                          return isa<ThrowInst>(TI);
+                          return isa<ThrowInst>(TI) || isa<ThrowAddrInst>(TI);
                         });
   }
   
@@ -1413,7 +1431,7 @@ public:
     return std::find_if(begin(), end(),
                         [](const SILBasicBlock &BB) -> bool {
                           const TermInst *TI = BB.getTerminator();
-                          return isa<ThrowInst>(TI);
+                          return isa<ThrowInst>(TI) || isa<ThrowAddrInst>(TI);
                         });
   }
 
@@ -1455,7 +1473,8 @@ public:
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        getConventions().getNumIndirectSILResults());
+        getConventions().getNumIndirectSILResults() +
+          getConventions().getNumIndirectSILErrorResults());
   }
 
   const SILArgument *getSelfArgument() const {
@@ -1491,7 +1510,7 @@ public:
 
   /// verify - Run the SIL verifier to make sure that the SILFunction follows
   /// invariants.
-  void verify(SILPassManager *passManager = nullptr,
+  void verify(CalleeCache *calleeCache = nullptr,
               bool SingleFunction = true,
               bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
@@ -1499,11 +1518,11 @@ public:
   /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
   /// blocks.
   void verifyIncompleteOSSA() const {
-    verify(/*passManager*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+    verify(/*calleeCache*/nullptr, /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.
-  void verifyMemoryLifetime(SILPassManager *passManager);
+  void verifyMemoryLifetime(CalleeCache *calleeCache);
 
   /// Run the SIL ownership verifier to check that all values with ownership
   /// have a linear lifetime. Regular OSSA invariants are checked separately in

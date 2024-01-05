@@ -509,6 +509,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ProjectExistentialBoxInst:
   case SILInstructionKind::ObjCProtocolInst:
   case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::VectorInst:
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::StructInst:
@@ -524,6 +525,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::BranchInst:
@@ -699,6 +701,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::ProjectBoxInst:
     if (!cast<SingleValueInstruction>(inst)->getType().
           isLoadable(*inst->getFunction())) {
@@ -745,6 +748,13 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
     if (!ca->isTakeOfSrc())
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+    return RuntimeEffect::MetaData;
+  }
+  case SILInstructionKind::TupleAddrConstructorInst: {
+    auto *ca = cast<TupleAddrConstructorInst>(inst);
+    impactType = ca->getDest()->getType();
+    if (!ca->isInitializationOfDest())
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
     return RuntimeEffect::MetaData;
   }
   case SILInstructionKind::ExplicitCopyAddrInst: {
@@ -988,6 +998,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::RefCounting | RuntimeEffect::Deallocating;
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Allocating;
+    case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
@@ -1288,4 +1299,43 @@ swift::getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi) {
   }
 
   return newBI;
+}
+
+//===----------------------------------------------------------------------===//
+//                          Exploded Tuple Visitors
+//===----------------------------------------------------------------------===//
+
+bool swift::visitExplodedTupleType(SILType inputType,
+                                   llvm::function_ref<bool(SILType)> callback) {
+  auto tupType = inputType.getAs<TupleType>();
+  if (!tupType || tupType.containsPackExpansionType()) {
+    return callback(inputType);
+  }
+
+  for (auto elt : tupType->getElementTypes()) {
+    auto eltSILTy = SILType::getPrimitiveType(elt->getCanonicalType(),
+                                              inputType.getCategory());
+    if (!visitExplodedTupleType(eltSILTy, callback))
+      return false;
+  }
+
+  return true;
+}
+
+bool swift::visitExplodedTupleValue(
+    SILValue inputValue,
+    llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback) {
+  SILType inputType = inputValue->getType();
+  auto tupType = inputType.getAs<TupleType>();
+  if (!tupType || tupType.containsPackExpansionType()) {
+    return callback(inputValue, {});
+  }
+
+  for (auto eltIndex : range(tupType->getNumElements())) {
+    auto elt = callback(inputValue, eltIndex);
+    if (!visitExplodedTupleValue(elt, callback))
+      return false;
+  }
+
+  return true;
 }

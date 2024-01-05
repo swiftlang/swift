@@ -148,6 +148,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   // Check substitution maps.
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::AllocRefInst:
@@ -239,7 +240,9 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::ObjCProtocolInst:
   case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::VectorInst:
   case SILInstructionKind::TupleInst:
+  case SILInstructionKind::TupleAddrConstructorInst:
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::TuplePackExtractInst:
   case SILInstructionKind::TupleElementAddrInst:
@@ -270,6 +273,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::BranchInst:

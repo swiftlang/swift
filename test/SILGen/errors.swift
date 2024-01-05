@@ -107,11 +107,12 @@ func dont_return<T>(_ argument: T) throws -> T {
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [lexical] [[T0]]
-// CHECK-NEXT: debug_value [[BORROWED_T0]] : $Cat
+// CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
+// CHECK-NEXT: debug_value [[MOVED_T0]] : $Cat
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[MOVED_T0]]
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -314,10 +315,9 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH_ATE]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: [[T0_BORROW:%.*]] = begin_borrow [lexical] [[T0]]
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0_BORROW]]
-// CHECK-NEXT: end_borrow [[T0_BORROW]]
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[MOVED_T0]]
+// CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -326,10 +326,9 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 //   Catch HomeworkError.CatHidIt.
 // CHECK:    [[MATCH_HID]]([[T0:%.*]] : @owned $Cat):
-// CHECK-NEXT: [[T0_BORROW:%.*]] = begin_borrow [lexical] [[T0]]
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0_BORROW]]
-// CHECK-NEXT: end_borrow [[T0_BORROW]]
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: [[MOVED_T0:%.*]] = move_value [lexical] [var_decl] [[T0]]
+// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[MOVED_T0]]
+// CHECK-NEXT: destroy_value [[MOVED_T0]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -614,7 +613,8 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[T0:%.*]] = function_ref @$ss27_allocateUninitializedArray{{.*}}F
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
 // CHECK:         ([[ARRAY:%.*]], [[T2:%.*]]) = destructure_tuple [[T1]]
-// CHECK:         [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
+// CHECK:         [[MDI:%.*]] = mark_dependence [[T2]]  : $Builtin.RawPointer on [[ARRAY]]
+// CHECK:         [[ELT0:%.*]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*Cat
 //   Element 0.
 // CHECK:         [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK:         try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
@@ -695,7 +695,7 @@ class BaseThrowingInit : HasThrowingInit {
 // CHECK: sil hidden [ossa] @$s6errors16BaseThrowingInit{{.*}}c : $@convention(method) (Int, Int, @owned BaseThrowingInit) -> (@owned BaseThrowingInit, @error any Error)
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var BaseThrowingInit }
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]
-// CHECK:      [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_BOX]]
+// CHECK:      [[BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_BOX]]
 // CHECK:      [[PB:%.*]] = project_box [[BOX_LIFETIME]]
 //   Initialize subField.
 // CHECK:      [[T0:%.*]] = load_borrow [[PB]]
@@ -865,7 +865,7 @@ func testOptionalTryThatNeverThrows() {
 // CHECK-LABEL: sil hidden [ossa] @$s6errors18testOptionalTryVaryyF
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: [[BOX:%.+]] = alloc_box ${ var Optional<Cat> }
-// CHECK-NEXT: [[LIFETIME:%.+]] = begin_borrow [lexical] [[BOX]]
+// CHECK-NEXT: [[LIFETIME:%.+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK-NEXT: [[PB:%.*]] = project_box [[LIFETIME]]
 // CHECK: [[FN:%.+]] = function_ref @$s6errors10make_a_catAA3CatCyKF
 // CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
@@ -914,7 +914,7 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s6errors29testOptionalTryAddressOnlyVar{{.*}}F
 // CHECK: bb0(%0 : $*T):
 // CHECK: [[BOX:%.+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
-// CHECK: [[LIFETIME:%.+]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[LIFETIME:%.+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK-NEXT: [[PB:%.*]] = project_box [[LIFETIME]]
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: [[FN:%.+]] = function_ref @$s6errors11dont_return{{.*}}F
@@ -980,10 +980,12 @@ func testOptionalTryNeverFails() {
 // CHECK-LABEL: sil hidden [ossa] @$s6errors28testOptionalTryNeverFailsVaryyF
 // CHECK: bb0:
 // CHECK-NEXT:   [[BOX:%.+]] = alloc_box ${ var Optional<()> }
-// CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
+// CHECK-NEXT:   [[LIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+// CHECK-NEXT:   [[PB:%.*]] = project_box [[LIFETIME]]
 // CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
 // CHECK-NEXT:   [[ENUM:%.+]] = enum $Optional<()>, #Optional.some!enumelt, [[VALUE]]
 // CHECK-NEXT:   store [[ENUM]] to [trivial] [[PB]] :
+// CHECK-NEXT:   end_borrow [[LIFETIME]]
 // CHECK-NEXT:   destroy_value [[BOX]] : ${ var Optional<()> }
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
@@ -1011,7 +1013,7 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s6errors39testOptionalTryNeverFailsAddressOnlyVar{{.*}}F
 // CHECK: bb0(%0 : $*T):
 // CHECK:   [[BOX:%.+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
-// CHECK-NEXT:   [[LIFETIME:%.+]] = begin_borrow [lexical] [[BOX]]
+// CHECK-NEXT:   [[LIFETIME:%.+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[LIFETIME]]
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-NEXT:   copy_addr %0 to [init] [[BOX_DATA]] : $*T

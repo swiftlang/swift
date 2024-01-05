@@ -43,13 +43,13 @@ split_embedded_sources(
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
   EMBEDDED BidirectionalCollection.swift
-    NORMAL Bitset.swift
+  EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
     NORMAL BridgeObjectiveC.swift
-    NORMAL BridgeStorage.swift
+  EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
-    NORMAL BuiltinMath.swift
+  EMBEDDED BuiltinMath.swift
     NORMAL Character.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift
@@ -89,7 +89,7 @@ split_embedded_sources(
   # END WORKAROUND
   EMBEDDED Hasher.swift
     NORMAL Hashing.swift
-    NORMAL HashTable.swift
+  EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
     NORMAL InputStream.swift
@@ -111,7 +111,7 @@ split_embedded_sources(
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
     NORMAL NativeDictionary.swift
-    NORMAL NativeSet.swift
+  EMBEDDED NativeSet.swift
     NORMAL NewtypeWrapper.swift
     NORMAL NFC.swift
     NORMAL NFD.swift
@@ -139,15 +139,15 @@ split_embedded_sources(
   EMBEDDED SipHash.swift
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
-    NORMAL Set.swift
+  EMBEDDED Set.swift
   EMBEDDED SetAlgebra.swift
     NORMAL SetAnyHashableExtensions.swift
     NORMAL SetBridging.swift
-    NORMAL SetBuilder.swift
-    NORMAL SetCasting.swift
-    NORMAL SetStorage.swift
-    NORMAL SetVariant.swift
-    NORMAL ShadowProtocols.swift
+  EMBEDDED SetBuilder.swift
+  EMBEDDED SetCasting.swift
+  EMBEDDED SetStorage.swift
+  EMBEDDED SetVariant.swift
+  EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
   EMBEDDED Slice.swift
     NORMAL SmallString.swift
@@ -221,7 +221,7 @@ split_embedded_sources(
     NORMAL Diffing.swift
   EMBEDDED Duration.swift
   EMBEDDED DurationProtocol.swift
-    NORMAL FloatingPointRandom.swift
+  EMBEDDED FloatingPointRandom.swift
   EMBEDDED Instant.swift
     NORMAL Mirror.swift
     NORMAL PlaygroundDisplay.swift
@@ -252,6 +252,9 @@ split_embedded_sources(
 if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+
+  list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
+  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
@@ -300,6 +303,8 @@ list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concis
 
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
@@ -414,6 +419,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
         ${swift_stdlib_compile_flags} -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
+        -Xfrontend -enable-ossa-modules
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"

@@ -654,19 +654,15 @@ def disable_experimental_string_processing :
 
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
-  HelpText<"Enable experimental associated type inference via type witness systems">;
+  HelpText<"Enable experimental associated type inference improvements">;
+
+def disable_experimental_associated_type_inference :
+  Flag<["-"], "disable-experimental-associated-type-inference">,
+  HelpText<"Disable experimental associated type inference improvements">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
-
-def enable_conformance_availability_errors : Flag<["-"],
-  "enable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as errors">;
-
-def disable_conformance_availability_errors : Flag<["-"],
-  "disable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as warnings">;
 
 def warn_on_potentially_unavailable_enum_case : Flag<["-"],
   "warn-on-potentially-unavailable-enum-case">,
@@ -847,6 +843,10 @@ def disable_standard_substitutions_in_reflection_mangling : Flag<["-"], "disable
   
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
+
+def playground_option : Separate<["-"], "playground-option">,
+  Flags<[FrontendOption]>,
+  HelpText<"Provide an option to the playground transform (if enabled)">;
 
 def playground_high_performance : Flag<["-"], "playground-high-performance">,
   HelpText<"Omit instrumentation that has a high runtime performance impact">;
@@ -1107,9 +1107,6 @@ def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
 def target_sdk_name : Separate<["-"], "target-sdk-name">,
   HelpText<"Canonical name of the target SDK used for compilation">;
 
-def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
-  HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
-
 def candidate_module_file
   : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
     HelpText<"Specify Swift module may be ready to use for an interface">;
@@ -1125,6 +1122,11 @@ def disable_building_interface
 def experimental_skip_all_function_bodies:
   Flag<["-"], "experimental-skip-all-function-bodies">,
   HelpText<"Skip type-checking function bodies and all SIL generation">;
+
+def experimental_skip_non_inlinable_function_bodies_is_lazy
+  : Flag<["-"], "experimental-skip-non-inlinable-function-bodies-is-lazy">,
+  HelpText<"Infer lazy typechecking for "
+           "-experimental-skip-non-inlinable-function-bodies">;
 
 def experimental_allow_module_with_compiler_errors:
   Flag<["-"], "experimental-allow-module-with-compiler-errors">,
@@ -1155,9 +1157,11 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
            "disabled. NOTE: Can not be used if enable-ast-verifier is used "
            "as well">;
 
-def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
-  HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
-           "when optimizing ownership will be lowered before serializing SIL">;
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
+    HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
+            "when optimizing ownership will be lowered before serializing SIL">;
+}
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
@@ -1274,8 +1278,8 @@ def input_file_key : Separate<["-"], "input-file-key">,
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
   HelpText<"Cache Key for bridging header pch">;
 
-def clang_include_tree: Flag<["-"], "clang-include-tree">,
-  HelpText<"Use clang include tree">;
+def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
+  HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
 def cas_fs: Separate<["-"], "cas-fs">,
   HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
@@ -1299,4 +1303,9 @@ def platform_c_calling_convention :
 def platform_c_calling_convention_EQ :
     Joined<["-"], "experimental-platform-c-calling-convention=">,
     Alias<platform_c_calling_convention>;
+
+def disable_experimental_parser_round_trip : Flag<["-"],
+  "disable-experimental-parser-round-trip">,
+  HelpText<"Disable round trip through the new swift parser">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

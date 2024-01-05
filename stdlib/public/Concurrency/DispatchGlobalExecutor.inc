@@ -193,7 +193,6 @@ static dispatch_queue_t getTimerQueue(JobPriority priority) {
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");
-
   // We really want four things from the global execution service:
   //  - Enqueuing work should have minimal runtime and memory overhead.
   //  - Adding work should never result in an "explosion" where many

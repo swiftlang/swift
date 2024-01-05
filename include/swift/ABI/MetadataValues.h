@@ -1037,7 +1037,8 @@ class TargetFunctionTypeFlags {
     GlobalActorMask        = 0x10000000U,
     AsyncMask              = 0x20000000U,
     SendableMask           = 0x40000000U,
-    // NOTE: The next bit will need to introduce a separate flags word.
+    ExtendedFlagsMask      = 0x80000000U,
+    // NOTE: No more room for flags here. Use TargetExtendedFunctionTypeFlags.
   };
   int_type Data;
 
@@ -1099,6 +1100,12 @@ public:
         (Data & ~GlobalActorMask) | (globalActor ? GlobalActorMask : 0));
   }
 
+  constexpr TargetFunctionTypeFlags<int_type>
+  withExtendedFlags(bool extendedFlags) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~ExtendedFlagsMask) | (extendedFlags ? ExtendedFlagsMask : 0));
+  }
+
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {
@@ -1127,6 +1134,10 @@ public:
     return bool (Data & GlobalActorMask);
   }
 
+  bool hasExtendedFlags() const {
+    return bool (Data & ExtendedFlagsMask);
+  }
+
   int_type getIntValue() const {
     return Data;
   }
@@ -1143,6 +1154,43 @@ public:
   }
 };
 using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
+
+/// Extended flags in a function type metadata record.
+template <typename int_type>
+class TargetExtendedFunctionTypeFlags {
+  enum : int_type {
+    TypedThrowsMask        = 0x00000001U,
+  };
+  int_type Data;
+
+  constexpr TargetExtendedFunctionTypeFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr TargetExtendedFunctionTypeFlags() : Data(0) {}
+
+  constexpr TargetExtendedFunctionTypeFlags<int_type>
+  withTypedThrows(bool typedThrows) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+               (Data & ~TypedThrowsMask) | (typedThrows ? TypedThrowsMask : 0));
+  }
+
+  bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
+
+  int_type getIntValue() const {
+    return Data;
+  }
+
+  static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
+    return TargetExtendedFunctionTypeFlags(Data);
+  }
+
+  bool operator==(TargetExtendedFunctionTypeFlags<int_type> other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(TargetExtendedFunctionTypeFlags<int_type> other) const {
+    return Data != other.Data;
+  }
+};
+using ExtendedFunctionTypeFlags = TargetExtendedFunctionTypeFlags<uint32_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
@@ -2389,6 +2437,7 @@ public:
 /// Flags for schedulable jobs.
 class JobFlags : public FlagSet<uint32_t> {
 public:
+  // clang-format off
   enum {
     Kind           = 0,
     Kind_width     = 8,
@@ -2400,12 +2449,14 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask           = 24,
-    Task_IsFuture              = 25,
-    Task_IsGroupChildTask      = 26,
+    Task_IsChildTask                      = 24,
+    Task_IsFuture                         = 25,
+    Task_IsGroupChildTask                 = 26,
     // 27 is currently unused
-    Task_IsAsyncLetTask        = 28,
+    Task_IsAsyncLetTask                   = 28,
+    Task_HasInitialTaskExecutorPreference = 29,
   };
+  // clang-format on
 
   explicit JobFlags(uint32_t bits) : FlagSet(bits) {}
   JobFlags(JobKind kind) { setKind(kind); }
@@ -2437,6 +2488,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsAsyncLetTask,
                                 task_isAsyncLetTask,
                                 task_setIsAsyncLetTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskExecutorPreference,
+                                task_hasInitialTaskExecutorPreference,
+                                task_setHasInitialTaskExecutorPreference)
 };
 
 /// Kinds of task status record.
@@ -2462,6 +2516,10 @@ enum class TaskStatusRecordKind : uint8_t {
   /// escalated.
   EscalationNotification = 4,
 
+  /// A task executor preference, which may impact what executor a task will be
+  /// enqueued on.
+  TaskExecutorPreference = 5,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
@@ -2470,12 +2528,12 @@ enum class TaskStatusRecordKind : uint8_t {
 /// Kinds of option records that can be passed to creating asynchronous tasks.
 enum class TaskOptionRecordKind : uint8_t {
   /// Request a task to be kicked off, or resumed, on a specific executor.
-  Executor  = 0,
+  InitialTaskExecutor = 0,
   /// Request a child task to be part of a specific task group.
   TaskGroup = 1,
   /// DEPRECATED. AsyncLetWithBuffer is used instead.
   /// Request a child task for an 'async let'.
-  AsyncLet  = 2,
+  AsyncLet = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
   /// Information about the result type of the task, used in embedded Swift.

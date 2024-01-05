@@ -25,6 +25,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -914,139 +915,219 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return explicitFinalAttr;
 }
 
-bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *decl) const {
+InverseMarking
+InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
+                                       TypeDecl *decl,
+                                       InvertibleProtocolKind ip) const {
   auto &ctx = decl->getASTContext();
+  const auto TARGET = ip;
+  using Kind = InverseMarking::Kind;
+  using Mark = InverseMarking::Mark;
 
-  // ----------------
-  // The legacy check
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
-      if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
-        if (!decl->getASTContext().supportsMoveOnlyTypes())
-          decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+  switch (TARGET) {
+  case InvertibleProtocolKind::Copyable:
+    // Handle the legacy '@_moveOnly' attribute
+    if (auto attr = decl->getAttrs().getAttribute<MoveOnlyAttr>()) {
+      assert((isa<StructDecl, EnumDecl, ClassDecl>(decl)));
 
-        return true;
-      }
+      // FIXME: just never allow lexical-lifetimes to be disabled?
+      if (!ctx.supportsMoveOnlyTypes())
+        decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+
+      return InverseMarking::forInverse(Kind::LegacyExplicit,
+                                        attr->getLocation());
     }
-    return false;
+    break;
+
+  case InvertibleProtocolKind::Escapable:
+    // Handle the legacy '@_nonEscapable' attribute
+    if (auto attr = decl->getAttrs().getAttribute<NonEscapableAttr>()) {
+      assert((isa<ClassDecl, StructDecl, EnumDecl>(decl)));
+      return InverseMarking::forInverse(Kind::LegacyExplicit,
+                                        attr->getLocation());
+    }
+    break;
   }
-  // ----------------
+
+  // Legacy support stops here.
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return InverseMarking::forInverse(Kind::None);
 
   // FIXME: just never allow lexical-lifetimes to be disabled?
   if (!ctx.supportsMoveOnlyTypes())
     decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
 
-  if (isa<TypeAliasDecl>(decl)) {
-    llvm_unreachable("todo: handle type aliases");
-  }
+  /// The invertible protocol being targeted by this annotation request.
 
-  assert(isa<NominalTypeDecl>(decl) && "todo: handle non-nominals");
-
-  // Handle the legacy '@_moveOnly' attribute
-  if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
-    assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
-    return true;
-  }
-
-  // For all other nominals, we can simply check the inheritance clause.
-
-  // The set of defaults all types start with.
-  auto defaults = getInvertibleProtocols();
-  std::map<KnownProtocolKind, SourceLoc> lastInverse;
-
-  // Does correctness checking after inspecting the inheritance clause.
-  // TODO: we can probably move this to `checkInheritanceClause` instead.
-  auto foundInverse = [&](SourceLoc loc, KnownProtocolKind kind) {
-    // do we still have this default?
-    if (defaults.contains(kind)) {
-      defaults.remove(kind);
-      lastInverse.insert({kind, loc});
-
-      // Classes are always copyable.
-      if (isa<ClassDecl>(decl) && kind == KnownProtocolKind::Copyable) {
-        ctx.Diags.diagnose(loc, diag::noncopyable_class);
-        return;
-      }
-
-      return;
+  std::function<bool(Type)> isTarget = [&](Type t) -> bool {
+    if (auto kp = t->getKnownProtocol()) {
+      if (auto ip = getInvertibleProtocolKind(*kp))
+        return *ip == TARGET;
+    } else if (auto pct = t->getAs<ProtocolCompositionType>()) {
+      return llvm::any_of(pct->getMembers(), isTarget);
     }
-
-    // diagnose duplicate inverses
-    ctx.Diags.diagnose(loc, diag::inverse_duplicate);
-    ctx.Diags.diagnose(lastInverse[kind], diag::inverse_duplicate_previous);
-  };
-
-  // Check the inheritance clause for inverses.
-  auto inherited = decl->getInherited();
-  for (size_t i = 0; i < inherited.size(); i++) {
-    auto *repr = inherited.getTypeRepr(i);
-
-    if (!dyn_cast_or_null<InverseTypeRepr>(repr)) {
-      continue;
-    }
-
-    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
-    auto kp = type->getKnownProtocol();
-    if (!kp)
-      continue; // diagnosed elsewhere.
-
-    foundInverse(repr->getLoc(), *kp);
-  }
-
-  // Check the where-clause for a constraint Subject: ~Copyable where Subject
-  // refers to the where-clause owner.
-
-  Type owner;
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    owner = proto->getSelfInterfaceType();
-  } else if (auto *nom = dyn_cast<NominalTypeDecl>(decl)) {
-    owner = nom->getDeclaredInterfaceType();
-  }
-  // TODO(kavon): handle other TypeDecls
-
-
-  // Checks a requirement in a where-clause
-  auto checkRequirement = [&](const Requirement &req,
-                              RequirementRepr *repr) -> bool {
-    if (req.getKind() != RequirementKind::Conformance)
-      return false;
-
-    auto constraintTyRepr = repr->getConstraintRepr();
-    if (!dyn_cast_or_null<InverseTypeRepr>(constraintTyRepr))
-      return false;
-
-    auto kp = req.getSecondType()->getKnownProtocol();
-    if (!kp)
-      return false; // diagnosed elsewhere.
-
-    auto subject = req.getFirstType();
-    if (!subject)
-      return false;
-
-    if (subject->getCanonicalType() == owner->getCanonicalType())
-      foundInverse(constraintTyRepr->getLoc(), *kp);
 
     return false;
   };
 
-  if (owner) {
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      WhereClauseOwner(nominal).visitRequirements(TypeResolutionStage::Structural,
-                                                  checkRequirement);
-    } else if (auto *assocTy = dyn_cast<AssociatedTypeDecl>(decl)) {
-      WhereClauseOwner(assocTy).visitRequirements(TypeResolutionStage::Structural,
-                                                  checkRequirement);
+  auto isInverseTarget = [&](Type t) -> bool {
+    if (auto pct = t->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(TARGET);
+
+    return false;
+  };
+
+  // Function to check an inheritance clause for the ~IP marking.
+  auto searchInheritanceClause =
+      [&](InheritedTypes inherited) -> InverseMarking {
+    InverseMarking result;
+
+    for (size_t i = 0; i < inherited.size(); i++) {
+      auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
+      if (!type)
+        continue;
+
+      SourceLoc loc;
+      if (auto *repr = inherited.getTypeRepr(i))
+        loc = repr->getLoc();
+
+      if (isTarget(type))
+        result.positive.setIfUnset(Kind::Explicit, loc);
+
+      if (isInverseTarget(type))
+          result.inverse.setIfUnset(Kind::Explicit, loc);
+    }
+
+    return result;
+  };
+
+  // Function to check the generic parameters for an explicit ~TARGET marking
+  // which would result in an Inferred ~TARGET marking for this context.
+  auto hasInferredInverseTarget = [&](GenericContext *genCtx) -> Mark {
+    if (!genCtx->isGeneric())
+      return InverseMarking::Mark();
+
+    auto *gpList = genCtx->getParsedGenericParams();
+    llvm::SmallSet<GenericTypeParamDecl*, 4> params;
+
+    // Scan the inheritance clauses of generic parameters only for an inverse.
+    for (GenericTypeParamDecl *param : gpList->getParams()) {
+      auto clause = searchInheritanceClause(param->getInherited());
+      if (auto &inverse = clause.getInverse())
+        return inverse.with(Kind::Inferred);
+
+      params.insert(param);
+    }
+
+    Mark result;
+    // Next, scan the where clause and return the result.
+    WhereClauseOwner(genCtx).visitRequirements(TypeResolutionStage::Structural,
+      [&](Requirement req, RequirementRepr *repr) -> bool /* = stop search */ {
+      if (req.getKind() != RequirementKind::Conformance)
+        return false;
+
+      auto subject = req.getFirstType();
+      if (!subject->isTypeParameter())
+        return false;
+
+      // Skip outer params and implicit ones.
+      auto *param = subject->getRootGenericParam()->getDecl();
+      if (!param || !params.contains(param))
+        return false;
+
+      // Check constraint type
+      auto constraint = req.getSecondType();
+
+      // Found it?
+      if (isInverseTarget(constraint)) {
+        // Try to find a good location.
+        SourceLoc loc;
+        if (repr && !repr->isInvalid())
+          if (auto *constraintRepr = repr->getConstraintRepr())
+            if (!repr->isInvalid())
+              loc = constraintRepr->getLoc();
+
+        result.set(Kind::Inferred, loc);
+        return true;
+      }
+
+      return false;
+    });
+    return result;
+  };
+
+  // Checks a where clause for constraints of the form:
+  //   - selfTy : TARGET
+  //   - selfTy : ~TARGET
+  // and records them in the `InverseMarking` result.
+  auto genWhereClauseVisitor = [&](CanType selfTy, InverseMarking &result) {
+    return [&, selfTy](Requirement req,
+                       RequirementRepr *repr) -> bool/*=stop search*/ {
+      if (req.getKind() != RequirementKind::Conformance)
+        return false;
+
+      if (req.getFirstType()->getCanonicalType() != selfTy)
+        return false;
+
+      // Check constraint type
+      auto loc = repr->getConstraintRepr()->getLoc();
+      auto constraint = req.getSecondType();
+
+      if (isTarget(constraint))
+        result.positive.setIfUnset(Kind::Explicit, loc);
+
+      if (isInverseTarget(constraint))
+        result.inverse.setIfUnset(Kind::Explicit, loc);
+
+      return false;
+    };
+  };
+
+
+  /// MARK: procedure for determining if a nominal is marked with ~TARGET.
+
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    // Claim that the tuple decl has an inferred ~TARGET marking.
+    if (isa<BuiltinTupleDecl>(nominal))
+      return InverseMarking::forInverse(InverseMarking::Kind::Inferred);
+
+    if (!isa<ProtocolDecl>(nominal)) {
+      // Handle non-protocol nominals specially because they infer a ~TARGET
+      // based on their generic parameters.
+      auto result = searchInheritanceClause(nominal->getInherited());
+      result.inverse.setIfUnset(hasInferredInverseTarget(nominal));
+      return result;
     }
   }
 
-  return !defaults.contains(KnownProtocolKind::Copyable);
-}
 
-bool IsEscapableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
-  if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
-    return !decl->getAttrs().hasAttribute<NonEscapableAttr>();
+  /// MARK: procedure for handling other TypeDecls
+
+  // Check inheritance clause.
+  auto result = searchInheritanceClause(decl->getInherited());
+
+  // Check the where clause for markings that refer to this decl, if this
+  // TypeDecl has a where-clause at all.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();
+    WhereClauseOwner(proto)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           genWhereClauseVisitor(selfTy, result));
+
+  } else if (auto assocTy = dyn_cast<AssociatedTypeDecl>(decl)) {
+    auto selfTy = assocTy->getInterfaceType()->getCanonicalType();
+    WhereClauseOwner(assocTy)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           genWhereClauseVisitor(selfTy, result));
+
+  } else if (auto genericTyDecl = dyn_cast<GenericTypeDecl>(decl)) {
+    auto selfTy = genericTyDecl->getInterfaceType()->getCanonicalType();
+    WhereClauseOwner(genericTyDecl)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           genWhereClauseVisitor(selfTy, result));
   }
-  return true;
+
+  return result;
 }
 
 bool
@@ -2206,34 +2287,6 @@ static Type buildAddressorResultType(AccessorDecl *addressor,
 }
 
 Type
-ThrownTypeRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *func
-) const {
-  ASTContext &ctx = func->getASTContext();
-
-  TypeRepr *typeRepr = func->getThrownTypeRepr();
-  if (!typeRepr) {
-    // There is no explicit thrown type, so return a NULL type.
-    return Type();
-  }
-
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-    ctx.Diags.diagnose(typeRepr->getLoc(), diag::experimental_typed_throws);
-  }
-
-  auto options = TypeResolutionOptions(TypeResolverContext::None);
-  if (func->preconcurrency())
-    options |= TypeResolutionFlags::Preconcurrency;
-
-  auto *const dc = func->getInnermostDeclContext();
-  return TypeResolution::forInterface(dc, options,
-                                      /*unboundTyOpener*/ nullptr,
-                                      PlaceholderType::get,
-                                      /*packElementOpener*/ nullptr)
-      .resolveType(typeRepr);
-}
-
-Type
 ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
@@ -2443,12 +2496,16 @@ static Type validateParameterType(ParamDecl *decl) {
   Type Ty;
 
   auto *nestedRepr = decl->getTypeRepr();
+  ParamSpecifier ownership = ParamSpecifier::Default;
   while (true) {
     if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
       nestedRepr = attrTypeRepr->getTypeRepr();
       continue;
     }
     if (auto *specifierTypeRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      if (specifierTypeRepr->getKind() == TypeReprKind::Ownership)
+        ownership = cast<OwnershipTypeRepr>(specifierTypeRepr)->getSpecifier();
+
       nestedRepr = specifierTypeRepr->getBase();
       continue;
     }
@@ -2490,6 +2547,13 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (Ty->hasError()) {
+    decl->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  // Validate the presence of ownership for a parameter with an inverse applied.
+  if (diagnoseMissingOwnership(ctx, dc, ownership,
+                               decl->getTypeRepr(), Ty, options)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
@@ -3194,6 +3258,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   switch (kp) {
   case KnownProtocolKind::Sendable:
     return deriveImplicitSendableConformance(evaluator, nominal);
+  case KnownProtocolKind::Escapable:
   case KnownProtocolKind::Copyable:
     return deriveConformanceForInvertible(evaluator, nominal, kp);
   default:

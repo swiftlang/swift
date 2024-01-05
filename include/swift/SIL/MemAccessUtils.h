@@ -1591,6 +1591,9 @@ inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
     return false;
+  // This extracts out the block storage from an alloc_stack. We do not want
+  // to treat it as any more than a cast of the underlying value.
+  case SILInstructionKind::ProjectBlockStorageInst:
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
@@ -1639,6 +1642,8 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
     return true;
   }
 }

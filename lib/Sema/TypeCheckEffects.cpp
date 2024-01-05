@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -279,9 +280,10 @@ public:
     TheClosure = closure;
   }
 
-  explicit AbstractFunction(ParamDecl *parameter)
-    : TheKind(Kind::Parameter) {
+  explicit AbstractFunction(ParamDecl *parameter, SubstitutionMap subs)
+    : TheKind(Kind::Parameter), Substitutions(subs) {
     TheParameter = parameter;
+
   }
 
   Kind getKind() const { return TheKind; }
@@ -307,6 +309,24 @@ public:
     case Kind::Parameter: return getParameter()->getInterfaceType();
     }
     llvm_unreachable("bad kind");
+  }
+
+  /// Retrieve the interface type for a parameter based on an index into the
+  /// substituted parameter type. This
+  Type getOrigParamInterfaceType(unsigned substIndex) const {
+    switch (getKind()) {
+    case Kind::Opaque:
+    case Kind::Closure:
+    case Kind::Parameter:
+      return getType()->castTo<AnyFunctionType>()->getParams()[substIndex]
+                 .getParameterType();
+
+    case Kind::Function: {
+      auto params = getParameterList(static_cast<ValueDecl *>(getFunction()));
+      auto origIndex = params->getOrigParamIndex(getSubstitutions(), substIndex);
+      return params->get(origIndex)->getInterfaceType();
+    }
+    }
   }
 
   bool isAutoClosure() const {
@@ -343,6 +363,22 @@ public:
       fn = selfCall->getFn()->getValueProvidingExpr();
 
     return decomposeFunction(fn);
+  }
+
+  bool isPreconcurrency() const {
+    switch (getKind()) {
+    case Kind::Closure: {
+      auto *closure = dyn_cast<ClosureExpr>(getClosure());
+      return closure && closure->isIsolatedByPreconcurrency();
+    }
+
+    case Kind::Function:
+      return getActorIsolation(getFunction()).preconcurrency();
+
+    case Kind::Opaque:
+    case Kind::Parameter:
+      return false;
+    }
   }
 
   static AbstractFunction decomposeFunction(Expr *fn) {
@@ -386,7 +422,10 @@ public:
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
         return AbstractFunction(fn, DRE->getDeclRef().getSubstitutions());
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
-        return AbstractFunction(param);
+        SubstitutionMap subs;
+        if (auto genericEnv = param->getDeclContext()->getGenericEnvironmentOfContext())
+          subs = genericEnv->getForwardingSubstitutionMap();
+        return AbstractFunction(param, subs);
       }
 
     // Closures.
@@ -624,8 +663,7 @@ static Expr *removeErasureToExistentialError(Expr *expr) {
     return expr;
 
   ASTContext &ctx = type->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows) ||
-      !ctx.LangOpts.hasFeature(Feature::TypedThrows))
+  if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
     return expr;
 
   // Look for an outer erasure expression.
@@ -637,10 +675,65 @@ static Expr *removeErasureToExistentialError(Expr *expr) {
   return expr;
 }
 
+/// Determine whether the given function uses typed throws in a manner
+/// than is structurally similar to 'rethrows', e.g.,
+///
+/// \code
+/// func map<T, E>(_ body: (Element) throws(E) -> T) throws(E) -> [T]
+/// \endcode
+static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
+  // This notion is only for compatibility in Swift 5 and is disabled
+  // when FullTypedThrows is enabled.
+  ASTContext &ctx = func->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
+    return false;
+
+  // It must have a thrown error type...
+  auto thrownError = func->getThrownInterfaceType();
+  if (!thrownError)
+    return false;
+
+  /// ... that is a generic parameter type (call it E)
+  auto thrownErrorGP = thrownError->getAs<GenericTypeParamType>();
+  if (!thrownErrorGP)
+    return false;
+
+  /// ... of the generic function.
+  auto genericParams = func->getGenericParams();
+  if (!genericParams ||
+      thrownErrorGP->getDepth() !=
+          genericParams->getParams().front()->getDepth())
+    return false;
+
+  // E: Error must be the only conformance requirement on the generic parameter.
+  auto genericSig = func->getGenericSignature();
+  if (!genericSig)
+    return false;
+
+  auto requiredProtocols = genericSig->getRequiredProtocols(thrownErrorGP);
+  if (requiredProtocols.size() != 1 ||
+      requiredProtocols[0]->getKnownProtocolKind() != KnownProtocolKind::Error)
+    return false;
+
+  // Any parameters that are of throwing function type must also throw 'E'.
+  for (auto param : *func->getParameters()) {
+    auto paramTy = param->getInterfaceType();
+    if (auto paramFuncTy = paramTy->getAs<AnyFunctionType>()) {
+      if (auto paramThrownErrorTy = paramFuncTy->getEffectiveThrownErrorType())
+        if (!(*paramThrownErrorTy)->isEqual(thrownError))
+          return false;
+    }
+  }
+
+  return true;
+}
+
 /// A type expressing the result of classifying whether a call or function
 /// throws or is async.
 class Classification {
   bool IsInvalid = false;  // The AST is malformed.  Don't diagnose.
+
+  bool downgradeToWarning = false;
 
   // Throwing
   ConditionalEffectKind ThrowKind = ConditionalEffectKind::None;
@@ -718,6 +811,17 @@ public:
     return result;
   }
 
+  /// Return a classification that promotes a typed throws effect to an
+  /// untyped throws effect.
+  Classification promoteToUntypedThrows() const {
+    if (!hasThrows())
+      return *this;
+
+    Classification result(*this);
+    result.ThrownError = ThrownError->getASTContext().getErrorExistentialType();
+    return result;
+  }
+
   /// Return a classification that only retains the parts of this
   /// classification for the requested effect kind.
   Classification onlyEffect(EffectKind kind) const {
@@ -748,6 +852,8 @@ public:
     Classification result;
     if (!thrownError || isNeverThrownError(thrownError))
       return result;
+
+    assert(!thrownError->hasError());
 
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
@@ -848,8 +954,10 @@ public:
     }
 
     if (ThrowKind != ConditionalEffectKind::None ||
-        other.ThrowKind != ConditionalEffectKind::None)
-      ThrownError = TypeChecker::errorUnion(ThrownError, other.ThrownError);
+        other.ThrowKind != ConditionalEffectKind::None) {
+      ThrownError =
+          TypeChecker::errorUnion(ThrownError, other.ThrownError, nullptr);
+      }
 
     if (other.ThrowKind > ThrowKind) {
       ThrowKind = other.ThrowKind;
@@ -878,6 +986,13 @@ public:
 
   bool isInvalid() const { return IsInvalid; }
   void makeInvalid() { IsInvalid = true; }
+
+  bool shouldDowngradeToWarning() const {
+    return downgradeToWarning;
+  }
+  void setDowngradeToWarning(bool downgrade) {
+    downgradeToWarning = downgrade;
+  }
 
   ConditionalEffectKind getConditionalKind(EffectKind kind) const {
     switch (kind) {
@@ -955,6 +1070,30 @@ public:
     return Classification();
   }
 
+  /// Whether a missing 'await' error on accessing an async var should be
+  /// downgraded to a warning.
+  ///
+  /// Missing 'await' errors are downgraded for synchronous access to isolated
+  /// global or static 'let' variables, which was previously accepted in
+  /// compiler versions before 5.10, or for declarations marked preconcurrency.
+  bool downgradeAsyncAccessToWarning(Decl *decl) {
+    if (decl->preconcurrency()) {
+      return true;
+    }
+
+    if (auto *var = dyn_cast<VarDecl>(decl)) {
+      ActorReferenceResult::Options options = llvm::None;
+      // The newly-diagnosed cases are invalid regardless of the module context
+      // of the caller, i.e. isolated static and global 'let' variables.
+      auto *module = var->getDeclContext()->getParentModule();
+      if (!isLetAccessibleAnywhere(module, var, options)) {
+        return options.contains(ActorReferenceResult::Flags::Preconcurrency);
+      }
+    }
+
+    return false;
+  }
+
   Classification classifyLookup(LookupExpr *E) {
     auto member = E->getMember();
     if (!member)
@@ -970,6 +1109,9 @@ public:
     } else if (isa<SubscriptExpr>(E) || isa<DynamicSubscriptExpr>(E)) {
       reason = PotentialEffectReason::forSubscriptAccess();
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(member.getDecl()));
 
     classification.mergeImplicitEffects(
         member.getDecl()->getASTContext(),
@@ -996,6 +1138,9 @@ public:
       classification = Classification::forDeclRef(
           declRef, ConditionalEffectKind::Always, reason);
     }
+
+    classification.setDowngradeToWarning(
+        downgradeAsyncAccessToWarning(E->getDecl()));
 
     classification.mergeImplicitEffects(
         E->getDeclRef().getDecl()->getASTContext(),
@@ -1071,6 +1216,10 @@ public:
         ctx, E->isImplicitlyAsync().has_value(), E->implicitlyThrows(),
         PotentialEffectReason::forApply());
 
+    // Downgrade missing 'await' errors for preconcurrency references.
+    result.setDowngradeToWarning(
+        result.hasAsync() && fnRef.isPreconcurrency());
+
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
           !(kind == EffectKind::Async && E->isImplicitlyAsync()) &&
@@ -1079,7 +1228,7 @@ public:
       }
 
       // Handle rethrowing and reasync functions.
-      switch (fnRef.getPolymorphicEffectKind(kind)) {
+      switch (auto polyKind = fnRef.getPolymorphicEffectKind(kind)) {
       case PolymorphicEffectKind::ByConformance: {
         auto substitutions = fnRef.getSubstitutions();
         for (auto conformanceRef : substitutions.getConformances())
@@ -1090,35 +1239,62 @@ public:
         LLVM_FALLTHROUGH;
       }
 
+      case PolymorphicEffectKind::Always:
+        if (polyKind == PolymorphicEffectKind::ByConformance) {
+          LLVM_FALLTHROUGH;
+        } else if (RethrowsDC &&
+            fnRef.getKind() == AbstractFunction::Function &&
+            isRethrowLikeTypedThrows(fnRef.getFunction())) {
+          // If we are in a rethrowing context and the function we're referring
+          // to is a rethrow-like function using typed throws, then look at all
+          // of the closure arguments.
+          LLVM_FALLTHROUGH;
+        } else {
+          break;
+        }
+
       case PolymorphicEffectKind::ByClosure: {
         // We need to walk the original parameter types in parallel
         // because it only counts for rethrows/reasync purposes if it
         // lines up with a throws/async function parameter in the
         // original type.
-        auto *origType = fnRef.getType()->getAs<AnyFunctionType>();
-        if (!origType) {
+        Type fnInterfaceType = fnRef.getType();
+        if (!fnInterfaceType) {
           result.merge(Classification::forInvalidCode());
           return;
         }
 
         // Use the most significant result from the arguments.
-        auto params = origType->getParams();
-        if (params.size() != args->size()) {
+        auto *fnSubstType = fnInterfaceType.subst(fnRef.getSubstitutions())
+            ->getAs<AnyFunctionType>();
+        if (!fnSubstType)  {
           result.merge(Classification::forInvalidCode());
           return;
         }
 
-        for (unsigned i = 0, e = params.size(); i < e; ++i) {
-          result.merge(classifyArgument(args->getExpr(i),
-                                        params[i].getParameterType(),
-                                        kind));
+        if (fnSubstType->getParams().size() != args->size()) {
+          result.merge(Classification::forInvalidCode());
+          return;
+        }
+
+        for (unsigned i = 0, e = args->size(); i < e; ++i) {
+          Type origParamType = fnRef.getOrigParamInterfaceType(i);
+          auto argClassification = classifyArgument(
+              args->getExpr(i), origParamType, fnRef.getSubstitutions(), kind);
+
+          // Rethrows is untyped, so adjust the thrown error type.
+          if (kind == EffectKind::Throws &&
+              polyKind == PolymorphicEffectKind::ByClosure) {
+            argClassification = argClassification.promoteToUntypedThrows();
+          }
+
+          result.merge(argClassification);
         }
 
         return;
       }
 
       case PolymorphicEffectKind::None:
-      case PolymorphicEffectKind::Always:
       case PolymorphicEffectKind::Invalid:
         break;
       }
@@ -1200,7 +1376,7 @@ private:
                        EffectKind kind) {
     switch (fn.getKind()) {
     case AbstractFunction::Opaque: {
-      return classifyArgumentByType(fn.getType(),
+      return classifyArgumentByType(fn.getType(), fn.getSubstitutions(),
                                     ConditionalEffectKind::Always, reason,
                                     kind);
     }
@@ -1239,8 +1415,8 @@ private:
     else // otherwise, it throws unconditionally.
       conditional = ConditionalEffectKind::Always;
 
-    return classifyArgumentByType(param->getTypeInContext(),
-                                  conditional, reason, kind);
+    return classifyArgumentByType(
+        param->getInterfaceType(), subs, conditional, reason, kind);
   }
 
   bool isLocallyDefinedInPolymorphicEffectDeclContext(DeclContext *DC,
@@ -1265,8 +1441,15 @@ private:
     // within the rethrows context.
     if (!isLocallyDefinedInPolymorphicEffectDeclContext(fn, kind) ||
         !fn->hasBody()) {
+      auto conditional = ConditionalEffectKind::Always;
+
+      // If we are within a rethrows context prior, treat some typed-throws
+      // functions as conditionally throwing.
+      if (RethrowsDC && isRethrowLikeTypedThrows(fn))
+        conditional = ConditionalEffectKind::Conditional;
+
       return Classification::forDeclRef(
-          ConcreteDeclRef(fn, subs), ConditionalEffectKind::Always, reason)
+          ConcreteDeclRef(fn, subs), conditional, reason)
             .onlyEffect(kind);
     }
 
@@ -1562,7 +1745,8 @@ private:
   }
 
   /// Classify an argument being passed to a rethrows/reasync function.
-  Classification classifyArgument(Expr *arg, Type paramType, EffectKind kind) {
+  Classification classifyArgument(
+      Expr *arg, Type paramType, SubstitutionMap subs, EffectKind kind) {
     arg = arg->getValueProvidingExpr();
 
     if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(arg)) {
@@ -1575,7 +1759,7 @@ private:
         }
       }
 
-      return classifyArgumentByType(arg->getType(),
+      return classifyArgumentByType(arg->getType(), subs,
                                     ConditionalEffectKind::Always,
                                     PotentialEffectReason::forDefaultClosure(),
                                     kind);
@@ -1600,7 +1784,7 @@ private:
     // various tuple operations.
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-        return classifyTupleArgument(tuple, paramTupleType, kind);
+        return classifyTupleArgument(tuple, paramTupleType, subs, kind);
       }
 
       if (paramTupleType->getNumElements() != 1) {
@@ -1609,6 +1793,7 @@ private:
         // parameter type included a throwing function type.
         return classifyArgumentByType(
                                     paramType,
+                                    subs,
                                     ConditionalEffectKind::Always,
                                     PotentialEffectReason::forClosure(arg),
                                     kind);
@@ -1653,6 +1838,7 @@ private:
   /// Classify an argument to a rethrows/reasync function that's a tuple literal.
   Classification classifyTupleArgument(TupleExpr *tuple,
                                        TupleType *paramTupleType,
+                                       SubstitutionMap subs,
                                        EffectKind kind) {
     if (paramTupleType->getNumElements() != tuple->getNumElements())
       return Classification::forInvalidCode();
@@ -1661,7 +1847,7 @@ private:
     for (unsigned i : indices(tuple->getElements())) {
       result.merge(classifyArgument(tuple->getElement(i),
                                     paramTupleType->getElementType(i),
-                                    kind));
+                                    subs, kind));
     }
     return result;
   }
@@ -1670,7 +1856,8 @@ private:
   /// a throws/async function in a way that is permitted to cause a
   /// rethrows/reasync function to throw/async.
   static Classification 
-  classifyArgumentByType(Type paramType, ConditionalEffectKind conditional,
+  classifyArgumentByType(Type paramType, SubstitutionMap subs,
+                         ConditionalEffectKind conditional,
                          PotentialEffectReason reason, EffectKind kind) {
     if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
@@ -1688,8 +1875,10 @@ private:
         return Classification();
 
       case EffectKind::Throws:
-        if (auto thrownError = fnType->getEffectiveThrownErrorType())
-          return Classification::forThrows(*thrownError, conditional, reason);
+        if (auto thrownError = fnType->getEffectiveThrownErrorType()) {
+          return Classification::forThrows(
+              thrownError->subst(subs), conditional, reason);
+        }
 
         return Classification();
       }
@@ -1701,7 +1890,7 @@ private:
 
       for (auto eltType : tuple->getElementTypes()) {
         result.merge(
-            classifyArgumentByType(eltType, conditional, reason, kind));
+            classifyArgumentByType(eltType, subs, conditional, reason, kind));
       }
 
       return result;
@@ -2419,15 +2608,20 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
-                   PotentialEffectReason reason) :
+                   PotentialEffectReason reason,
+                   bool downgradeToWarning) :
       reason(reason),
-      expr(failingExpr) {}
+      expr(failingExpr),
+      downgradeToWarning(downgradeToWarning) {}
 
     /// Reason for throwing
     PotentialEffectReason reason;
 
     /// Failing expression
     Expr &expr;
+
+    /// Whether the error should be downgraded to a warning.
+    bool downgradeToWarning;
   };
 
   SmallVector<Expr *, 4> errorOrder;
@@ -2622,7 +2816,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// Retrieve the type of the error that can be caught when an error is
   /// thrown from the given location.
   Type getCaughtErrorTypeAt(SourceLoc loc) {
-    auto module = CurContext.getDeclContext()->getParentModule();
+    auto dc = CurContext.getDeclContext();
+    auto module = dc->getParentModule();
     if (CatchNode catchNode = ASTScope::lookupCatchNode(module, loc)) {
       if (auto caughtType = catchNode.getThrownErrorTypeInContext(Ctx))
         return *caughtType;
@@ -2823,6 +3018,14 @@ private:
 
       auto asyncKind = classification.getConditionalKind(EffectKind::Async);
       E->setNoAsync(asyncKind == ConditionalEffectKind::None);
+    } else {
+      // HACK: functions can get queued multiple times in
+      // definedFunctions, so be sure to be idempotent.
+      if (!E->isThrowsSet()) {
+        E->setThrows(ThrownErrorDestination());
+      }
+
+      E->setNoAsync(true);
     }
 
     // If current apply expression did not type-check, don't attempt
@@ -2976,8 +3179,9 @@ private:
                                     CurContext.isWithinInterpolatedString());
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
-        uncoveredAsync[anchor].emplace_back(*expr,
-                                            classification.getAsyncReason());
+        uncoveredAsync[anchor].emplace_back(
+            *expr, classification.getAsyncReason(),
+            classification.shouldDowngradeToWarning());
       }
     }
 
@@ -3102,6 +3306,12 @@ private:
     if (!Flags.has(ContextFlags::HasTryThrowSite))
       diagnoseRedundantTry(E);
 
+    if (auto thrownError = TypeChecker::canThrow(Ctx, E->getSubExpr())) {
+      E->setThrownError(*thrownError);
+    } else {
+      E->setThrownError(Ctx.getNeverType());
+    }
+
     scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
   }
@@ -3116,6 +3326,12 @@ private:
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite))
       diagnoseRedundantTry(E);
+
+    if (auto thrownError = TypeChecker::canThrow(Ctx, E->getSubExpr())) {
+      E->setThrownError(*thrownError);
+    } else {
+      E->setThrownError(Ctx.getNeverType());
+    }
 
     scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
@@ -3186,7 +3402,13 @@ private:
         awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
     }
 
+    bool downgradeToWarning = llvm::all_of(errors,
+        [&](DiagnosticInfo diag) -> bool {
+          return diag.downgradeToWarning;
+        });
+
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
+      .warnUntilSwiftVersionIf(downgradeToWarning, 6)
       .fixItInsert(awaitInsertLoc, "await ")
       .highlight(anchor->getSourceRange());
 
@@ -3351,22 +3573,26 @@ void TypeChecker::checkPropertyWrapperEffects(
   expr->walk(LocalFunctionEffectsChecker());
 }
 
-bool TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
+llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   ApplyClassifier classifier(ctx);
   auto classification = classifier.classifyExpr(expr, EffectKind::Throws);
-  return classification.getConditionalKind(EffectKind::Throws) !=
-      ConditionalEffectKind::None;
+  if (classification.getConditionalKind(EffectKind::Throws) ==
+        ConditionalEffectKind::None)
+    return llvm::None;
+
+  return classification.getThrownError();
 }
 
-Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
-  // When typed throws is disabled, this is always "any Error".
-  // FIXME: When we distinguish "precise" typed throws from normal typed
-  // throws, we'll be able to compute a more narrow catch error type in some
-  // case, e.g., from a `try` but not a `throws`.
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
-    return ctx.getErrorExistentialType();
+Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
+  ASTContext &ctx = dc->getASTContext();
 
-  // Classify the throwing behavior of the "do" body.
+  // If the do..catch statement explicitly specifies that it throws, use
+  // that type.
+  if (Type explicitError = stmt->getExplicitCaughtType()) {
+    return explicitError;
+  }
+
+  // Otherwise, infer the thrown error type from the "do" body.
   ApplyClassifier classifier(ctx);
   Classification classification = classifier.classifyStmt(
       stmt->getBody(), EffectKind::Throws);
@@ -3378,27 +3604,83 @@ Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
   return classification.getThrownError();
 }
 
-Type TypeChecker::errorUnion(Type type1, Type type2) {
+/// Explode the given type into the set of error unions.
+///
+/// \returns \c true if any of the types is the error existential type, which
+/// means the entire error union is any Error.
+static bool expandErrorUnions(Type type,
+                              llvm::function_ref<Type(Type)> simplifyType,
+                              SmallVectorImpl<Type> &terms) {
+  // If we have a type variable in the type and a type simplification function,
+  // apply it first.
+  if (type->hasTypeVariable() && simplifyType)
+    type = simplifyType(type);
+
+  // If we have an error union type, handle it's terms individually.
+  if (auto errorUnionType = type->getAs<ErrorUnionType>()) {
+    for (auto term : errorUnionType->getTerms())
+      if (expandErrorUnions(term, simplifyType, terms))
+        return true;
+
+    return false;
+  }
+
+  // If we have 'any Error', we're done.
+  if (type->isErrorExistentialType())
+    return true;
+
+  // If we have anything other than 'Never', record it.
+  if (!isNeverThrownError(type))
+    terms.push_back(type);
+
+  return false;
+}
+
+Type TypeChecker::errorUnion(Type type1, Type type2,
+                             llvm::function_ref<Type(Type)> simplifyType) {
   // If one type is NULL, return the other.
   if (!type1)
     return type2;
   if (!type2)
     return type1;
 
-  // If the two types are the same, the union is trivial.
-  if (type1->isEqual(type2))
-    return type1;
+  // Expand the error types we're given.
+  //   - If any term is 'any Error', early return 'any Error'
+  //   - Every 'Never' term is dropped.
+  SmallVector<Type, 2> terms;
+  if (expandErrorUnions(type1, simplifyType, terms))
+    return type1->getASTContext().getErrorExistentialType();
+  if (expandErrorUnions(type2, simplifyType, terms))
+    return type1->getASTContext().getErrorExistentialType();
 
-  // If either type is Never, return the other.
-  if (isNeverThrownError(type1))
-    return type2;
-  if (isNeverThrownError(type2))
-    return type1;
+  // If we have more than one term, filter out duplicates and look to see if
+  // we have obviously-different types.
+  if (terms.size() > 1) {
+    llvm::SmallDenseMap<CanType, Type> knownTypes;
+    unsigned distinctConcreteTypes = 0;
+    auto newEnd = std::remove_if(terms.begin(), terms.end(),
+                                 [&](Type type) -> bool {
+      // If we have already seen this type, remove it from the list of terms.
+      if (!knownTypes.insert({type->getCanonicalType(), type}).second)
+        return true;
 
-  // The union of two different error types is "any Error".
-  // FIXME: When either or both contain type variables, we'll need to form an
-  // actual union type here.
-  return type1->getASTContext().getErrorExistentialType();
+      // We have not seen this type before. If it doesn't involve any
+      // type variables, note that we've seen another concrete type.
+      if (!type->hasTypeVariable())
+        ++distinctConcreteTypes;
+
+      return false;
+    });
+
+    // If we saw more than one distinct concrete type, return 'any Error'.
+    if (distinctConcreteTypes > 1)
+      return type1->getASTContext().getErrorExistentialType();
+
+    // Remove any duplicated terms.
+    terms.erase(newEnd, terms.end());
+  }
+
+  return ErrorUnionType::get(type1->getASTContext(), terms);
 }
 
 namespace {
@@ -3443,6 +3725,13 @@ ThrownErrorSubtyping
 swift::compareThrownErrorsForSubtyping(
     Type subThrownError, Type superThrownError, DeclContext *dc
 ) {
+  // Deal with NULL errors. This should only occur when there is no standard
+  // library.
+  if (!subThrownError || !superThrownError) {
+    assert(!dc->getASTContext().getStdlibModule() && "NULL thrown error type");
+    return ThrownErrorSubtyping::ExactMatch;
+  }
+
   // Easy case: exact match.
   if (superThrownError->isEqual(subThrownError))
     return ThrownErrorSubtyping::ExactMatch;

@@ -110,14 +110,15 @@ void SILFunctionBuilder::addFunctionAttributes(
       auto *effectsAttr = cast<EffectsAttr>(attr);
       if (effectsAttr->getKind() == EffectsKind::Custom) {
         customEffects.push_back(effectsAttr);
+        continue;
+      }
+      if (F->getEffectsKind() != EffectsKind::Unspecified) {
+        // If multiple known effects are specified, the most restrictive one
+        // is used.
+        F->setEffectsKind(
+            std::min(effectsAttr->getKind(), F->getEffectsKind()));
       } else {
-        if (F->getEffectsKind() != EffectsKind::Unspecified &&
-            F->getEffectsKind() != effectsAttr->getKind()) {
-          mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
-              diag::warning_in_effects_attribute, "mismatching function effects");
-        } else {
-          F->setEffectsKind(effectsAttr->getKind());
-        }
+        F->setEffectsKind(effectsAttr->getKind());
       }
     }
   }
@@ -181,7 +182,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   if (auto *EA = ExternAttr::find(Attrs, ExternKind::Wasm)) {
-    // @extern(wasm) always has explicit names
+    // @_extern(wasm) always has explicit names
     F->setWasmImportModuleAndField(*EA->ModuleName, *EA->Name);
   }
 
@@ -192,6 +193,12 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoLocks);
   } else if (Attrs.hasAttribute<NoAllocationAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoAllocation);
+  } else if (Attrs.hasAttribute<NoRuntimeAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoRuntime);
+  } else if (Attrs.hasAttribute<NoExistentialsAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoExistentials);
+  } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
   }
 
   if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
@@ -200,6 +207,10 @@ void SILFunctionBuilder::addFunctionAttributes(
 
   if (Attrs.hasAttribute<UnsafeNonEscapableResultAttr>()) {
     F->setHasUnsafeNonEscapableResult(true);
+  }
+
+  if (Attrs.hasAttribute<ResultDependsOnSelfAttr>()) {
+    F->setHasResultDependsOnSelf();
   }
 
   // Validate `@differentiable` attributes by calling `getParameterIndices`.

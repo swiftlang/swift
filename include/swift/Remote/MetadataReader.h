@@ -1001,8 +1001,14 @@ public:
       #undef CASE
       }
 
+      BuiltType thrownError = BuiltType();
+      if (Function->hasThrownError()) {
+        thrownError = readTypeFromMetadata(Function->getThrownError(), false,
+                                           recursion_limit);
+      }
+
       auto BuiltFunction = Builder.createFunctionType(
-          Parameters, Result, flags, diffKind, globalActor);
+          Parameters, Result, flags, diffKind, globalActor, thrownError);
       TypeCache[TypeCacheKey] = BuiltFunction;
       return BuiltFunction;
     }
@@ -3116,7 +3122,8 @@ private:
         break;
         
       case GenericParamKind::TypePack:
-        assert(false && "Packs not supported here yet");
+        // assert(false && "Packs not supported here yet");
+        return {};
 
       default:
         // We don't know about this kind of parameter.

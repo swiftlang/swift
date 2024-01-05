@@ -4,18 +4,22 @@ module BasicBridging {
   export *
 }
 
-module CBasicBridging {
-  header "swift/Basic/CBasicBridging.h"
-}
-
 module ASTBridging {
   header "swift/AST/ASTBridging.h"
   requires cplusplus
   export *
 }
 
-module CASTBridging {
-  header "swift/AST/CASTBridging.h"
+module IDEBridging {
+  header "swift/IDE/IDEBridging.h"
+  requires cplusplus
+  export *
+}
+
+module ParseBridging {
+  header "swift/Parse/ParseBridging.h"
+  requires cplusplus
+  export *
 }
 
 module SILBridging {
@@ -26,10 +30,5 @@ module SILBridging {
 
 module OptimizerBridging {
   header "swift/SILOptimizer/OptimizerBridging.h"
-  export *
-}
-
-module _RegexParserBridging {
-  header "swift/Parse/RegexParserBridging.h"
   export *
 }

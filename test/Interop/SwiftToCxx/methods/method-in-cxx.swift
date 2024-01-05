@@ -61,6 +61,16 @@ public final class ClassWithMethods {
     }
 }
 
+public class ClassWithNonFinalMethods {
+    class public func classClassMethod(x: Int) -> Int {
+        print("ClassWithNonFinalMethods.classClassMethod;")
+        return x + 2
+    }
+    static public func staticClassMethod() {
+        print("ClassWithNonFinalMethods.staticClassMethod;")
+    }
+}
+
 public final class PassStructInClassMethod {
     var largeStruct: LargeStruct
     init() { largeStruct = LargeStruct(x1: 1, x2: 2, x3: 3, x4: 4, x5: 5, x6: 6) }
@@ -162,6 +172,12 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ(result, x, swift::TypeMetadataTrait<ClassWithMethods>::getTypeMetadata());
 // CHECK-NEXT: });
+// CHECK-NEXT: }
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int ClassWithNonFinalMethods::classClassMethod(swift::Int x) {
+// CHECK-NEXT: return _impl::$s7Methods017ClassWithNonFinalA0C05classB6Method1xS2i_tFZ(x, swift::TypeMetadataTrait<ClassWithNonFinalMethods>::getTypeMetadata());
+// CHECK-NEXT: }
+// CHECK-NEXT: SWIFT_INLINE_THUNK void ClassWithNonFinalMethods::staticClassMethod() {
+// CHECK-NEXT: return _impl::$s7Methods017ClassWithNonFinalA0C06staticB6MethodyyFZ(swift::TypeMetadataTrait<ClassWithNonFinalMethods>::getTypeMetadata());
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK LargeStruct LargeStruct::doubled() const {

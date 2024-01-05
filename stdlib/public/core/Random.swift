@@ -51,7 +51,6 @@ import SwiftShims
 ///
 /// Types that conform to `RandomNumberGenerator` should specifically document
 /// the thread safety and quality of the generator.
-@_unavailableInEmbedded
 public protocol RandomNumberGenerator {
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
@@ -64,7 +63,6 @@ public protocol RandomNumberGenerator {
   mutating func next() -> UInt64
 }
 
-@_unavailableInEmbedded
 extension RandomNumberGenerator {
   
   // An unavailable default implementation of next() prevents types that do

@@ -45,14 +45,14 @@ func /*varargs:def*/withVarargs(x: Int..., y: Int, _: Int) {}
 /*varargs:call*/withVarargs(2, y: 2)
 
 
-func /*varargs2:def*/betterName(a: Int, b: Int, c: Int...) {}
+func /*varargs2:def*/<base>withVarargs</base>(<arglabel index=0>x</arglabel><param index=0></param>: Int, <arglabel index=1>y</arglabel><param index=1></param>: Int, <arglabel index=2>_</arglabel><param index=2></param>: Int...) {}
 
 // valid
-/*varargs2:call*/betterName(a: 1, b: 2, c: 4, 5)
-/*varargs2:call*/betterName(a: 1, b: 2)
+/*varargs2:call*/<base>withVarargs</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, <callcombo index=2></callcombo>4, 5)
+/*varargs2:call*/<base>withVarargs</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2)
 
 // false positive
-/*varargs2:call*/betterName(a: 1, 2, b: 2, c: 4)
+/*varargs2:call*/<base>withVarargs</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>1, 2, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, <callcombo index=2></callcombo>4)
 
 
 func /*mixed:def*/withAllOfTheAbove(x: Int = 2, _: Int..., z: Int = 2, c: () -> Int) {}

@@ -787,6 +787,31 @@ FUNCTION(GetFunctionMetadataDifferentiable,
          MEMEFFECTS(ReadOnly))
 
 // Metadata *
+// swift_getExtendedFunctionTypeMetadata(unsigned long flags,
+//                                       unsigned long diffKind,
+//                                       const Metadata **parameters,
+//                                       const uint32_t *parameterFlags,
+//                                       const Metadata *result,
+//                                       const Metadata *globalActor,
+//                                       uint32_t extendedflags,
+//                                       const Metadata *thrownError);
+FUNCTION(GetFunctionMetadataExtended,
+         swift_getExtendedFunctionTypeMetadata,
+         C_CC, TypedThrowsAvailability,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy,
+              SizeTy,
+              TypeMetadataPtrTy->getPointerTo(0),
+              Int32Ty->getPointerTo(0),
+              TypeMetadataPtrTy,
+              TypeMetadataPtrTy,
+              Int32Ty,
+              TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData),
+         MEMEFFECTS(ReadOnly))
+
+// Metadata *
 // swift_getFunctionTypeMetadataGlobalActor(unsigned long flags,
 //                                          unsigned long diffKind,
 //                                          const Metadata **parameters,
@@ -1310,7 +1335,8 @@ FUNCTION(GetExistentialMetadata,
 // swift_getExtendedExistentialTypeShape(
 //             const NonUniqueExtendedExistentialTypeShape *nonUnique);
 FUNCTION(GetExtendedExistentialTypeShape,
-         swift_getExtendedExistentialTypeShape, C_CC, AlwaysAvailable,
+         swift_getExtendedExistentialTypeShape, C_CC,
+         ParameterizedExistentialAvailability,
          RETURNS(TypeMetadataPtrTy),
          ARGS(Int8PtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind, WillReturn),
@@ -1321,7 +1347,8 @@ FUNCTION(GetExtendedExistentialTypeShape,
 //             const NonUniqueExtendedExistentialTypeShape *shape,
 //             const void * const *generalizationArgs);
 FUNCTION(GetExtendedExistentialTypeMetadata,
-         swift_getExtendedExistentialTypeMetadata, C_CC, AlwaysAvailable,
+         swift_getExtendedExistentialTypeMetadata, C_CC,
+         ParameterizedExistentialAvailability,
          RETURNS(TypeMetadataPtrTy),
          ARGS(Int8PtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind, WillReturn),
@@ -1332,7 +1359,8 @@ FUNCTION(GetExtendedExistentialTypeMetadata,
 //             const ExtendedExistentialTypeShape *shape,
 //             const void * const *generalizationArgs);
 FUNCTION(GetExtendedExistentialTypeMetadataUnique,
-         swift_getExtendedExistentialTypeMetadata_unique, C_CC, AlwaysAvailable,
+         swift_getExtendedExistentialTypeMetadata_unique, C_CC,
+         ParameterizedExistentialAvailability,
          RETURNS(TypeMetadataPtrTy),
          ARGS(Int8PtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind, WillReturn),
@@ -2282,7 +2310,7 @@ FUNCTION(TaskCreate,
 
 // void swift_task_switch(AsyncContext *resumeContext,
 //                        TaskContinuationFunction *resumeFunction,
-//                        ExecutorRef newExecutor);
+//                        SerialExecutorRef newExecutor);
 FUNCTION(TaskSwitchFunc,
          swift_task_switch, SwiftAsyncCC,
          ConcurrencyAvailability,
@@ -2344,7 +2372,7 @@ FUNCTION(ContinuationThrowingResumeWithError,
          EFFECT(Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// ExecutorRef swift_task_getCurrentExecutor();
+// SerialExecutorRef swift_task_getCurrentExecutor();
 FUNCTION(TaskGetCurrentExecutor,
          swift_task_getCurrentExecutor, SwiftCC,
          ConcurrencyAvailability,
@@ -2354,7 +2382,7 @@ FUNCTION(TaskGetCurrentExecutor,
          EFFECT(Concurrency),
          MEMEFFECTS(ArgMemOnly))
 
-// ExecutorRef swift_task_getMainExecutor();
+// SerialExecutorRef swift_task_getMainExecutor();
 FUNCTION(TaskGetMainExecutor,
          swift_task_getMainExecutor, SwiftCC,
          ConcurrencyAvailability,
@@ -2607,7 +2635,7 @@ FUNCTION(GenericAssignWithCopy,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting, Deallocating),
+         EFFECT(RefCounting, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_assignWithTake(opaque* dest, opaque* src, const Metadata* type);
@@ -2617,7 +2645,7 @@ FUNCTION(GenericAssignWithTake,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting, Deallocating),
+         EFFECT(RefCounting, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initWithCopy(opaque* dest, opaque* src, const Metadata* type);
@@ -2627,7 +2655,7 @@ FUNCTION(GenericInitWithCopy,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting),
+         EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initWithTake(opaque* dest, opaque* src, const Metadata* type);
@@ -2637,7 +2665,7 @@ FUNCTION(GenericInitWithTake,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting),
+         EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_generic_initializeBufferWithCopyOfBuffer(ValueBuffer* dest, ValueBuffer* src, const Metadata* type);
@@ -2649,7 +2677,7 @@ FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
               getFixedBufferTy()->getPointerTo(),
               TypeMetadataPtrTy),
          ATTRS(NoUnwind),
-         EFFECT(Refcounting),
+         EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
 // unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,

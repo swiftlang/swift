@@ -53,13 +53,34 @@ public:
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D))
-      if (!isa<ProtocolDecl>(NTD))
+    auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D);
+    if (!NTD)
+      if (auto *ETD = dyn_cast<ExtensionDecl>(D))
+        NTD = ETD->getExtendedNominal();
+    if (NTD)
+      if (!isa<ProtocolDecl>(NTD) && CheckedDecls.insert(NTD).second) {
+        if (NTD->getAttrs().hasAttribute<ExtractConstantsFromMembersAttr>()) {
+          ConformanceTypeDecls.push_back(NTD);
+          goto visitAuxiliaryDecls;
+        }
+
         for (auto &Protocol : NTD->getAllProtocols())
-          if (Protocols.count(Protocol->getName().str().str()) != 0)
+          if (Protocol->getAttrs()
+                  .hasAttribute<ExtractConstantsFromMembersAttr>() ||
+              Protocols.count(Protocol->getName().str().str()) != 0) {
             ConformanceTypeDecls.push_back(NTD);
+            goto visitAuxiliaryDecls;
+          }
+      }
+  visitAuxiliaryDecls:
+    // Visit peers expanded from macros
+    D->visitAuxiliaryDecls([&](Decl *decl) { decl->walk(*this); },
+                           /*visitFreestandingExpanded=*/false);
     return Action::Continue();
   }
+
+private:
+  std::unordered_set<NominalTypeDecl *> CheckedDecls;
 };
 
 std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
@@ -412,11 +433,13 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
   }
 
   if (auto accessorDecl = propertyDecl->getAccessor(AccessorKind::Get)) {
-    auto node = accessorDecl->getTypecheckedBody()->getFirstElement();
-    if (auto *stmt = node.dyn_cast<Stmt *>()) {
-      if (stmt->getKind() == StmtKind::Return) {
-        return {propertyDecl,
-                extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
+    if (auto body = accessorDecl->getTypecheckedBody()) {
+      auto node = body->getFirstElement();
+      if (auto *stmt = node.dyn_cast<Stmt *>()) {
+        if (stmt->getKind() == StmtKind::Return) {
+          return {propertyDecl,
+                  extractCompileTimeValue(cast<ReturnStmt>(stmt)->getResult())};
+        }
       }
     }
   }
@@ -460,37 +483,55 @@ extractEnumCases(NominalTypeDecl *Decl) {
   return llvm::None;
 }
 
-ConstValueTypeInfo
-ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
-                                   NominalTypeDecl *Decl) const {
-  // Use 'getStoredProperties' to get lowered lazy and wrapped properties
+ConstValueTypeInfo ConstantValueInfoRequest::evaluate(
+    Evaluator &Evaluator, NominalTypeDecl *Decl,
+    llvm::PointerUnion<const SourceFile *, ModuleDecl *> extractionScope)
+    const {
+
+  auto shouldExtract = [&](DeclContext *decl) {
+    if (auto SF = extractionScope.dyn_cast<const SourceFile *>())
+      return decl->getOutermostParentSourceFile() == SF;
+    return decl->getParentModule() == extractionScope.get<ModuleDecl *>();
+  };
+
+  std::vector<ConstValueTypePropertyInfo> Properties;
+  llvm::Optional<std::vector<EnumElementDeclValue>> EnumCases;
+
+  // Use 'getStoredProperties' to get lowered lazy and wrapped properties.
+  // @_objcImplementation extensions might contain stored properties.
   auto StoredProperties = Decl->getStoredProperties();
   std::unordered_set<VarDecl *> StoredPropertiesSet(StoredProperties.begin(),
                                                     StoredProperties.end());
-
-  std::vector<ConstValueTypePropertyInfo> Properties;
   for (auto Property : StoredProperties) {
-    Properties.push_back(extractTypePropertyInfo(Property));
+    if (shouldExtract(Property->getDeclContext())) {
+      Properties.push_back(extractTypePropertyInfo(Property));
+    }
   }
 
-  for (auto Member : Decl->getMembers()) {
-    auto *VD = dyn_cast<VarDecl>(Member);
+  auto extract = [&](class Decl *Member) {
     // Ignore plain stored properties collected above,
     // instead gather up remaining static and computed properties.
-    if (!VD || StoredPropertiesSet.count(VD))
-      continue;
-    Properties.push_back(extractTypePropertyInfo(VD));
+    if (auto *VD = dyn_cast<VarDecl>(Member))
+      if (!StoredPropertiesSet.count(VD))
+        Properties.push_back(extractTypePropertyInfo(VD));
+  };
+
+  if (shouldExtract(Decl)) {
+    for (auto Member : Decl->getAllMembers()) {
+      extract(Member);
+    }
+    EnumCases = extractEnumCases(Decl);
   }
 
   for (auto Extension: Decl->getExtensions()) {
-    for (auto Member : Extension->getMembers()) {
-      if (auto *VD = dyn_cast<VarDecl>(Member)) {
-        Properties.push_back(extractTypePropertyInfo(VD));
+    if (shouldExtract(Extension)) {
+      for (auto Member : Extension->getAllMembers()) {
+        extract(Member);
       }
     }
   }
 
-  return ConstValueTypeInfo{Decl, Properties, extractEnumCases(Decl)};
+  return ConstValueTypeInfo{Decl, Properties, EnumCases};
 }
 
 std::vector<ConstValueTypeInfo>
@@ -504,7 +545,8 @@ gatherConstValuesForModule(const std::unordered_set<std::string> &Protocols,
   Module->walk(ConformanceCollector);
   for (auto *CD : ConformanceDecls)
     Result.emplace_back(evaluateOrDefault(CD->getASTContext().evaluator,
-                                          ConstantValueInfoRequest{CD}, {}));
+                                          ConstantValueInfoRequest{CD, Module},
+                                          {}));
   return Result;
 }
 
@@ -520,8 +562,8 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
     D->walk(ConformanceCollector);
 
   for (auto *CD : ConformanceDecls)
-    Result.emplace_back(evaluateOrDefault(CD->getASTContext().evaluator,
-                                          ConstantValueInfoRequest{CD}, {}));
+    Result.emplace_back(evaluateOrDefault(
+        CD->getASTContext().evaluator, ConstantValueInfoRequest{CD, SF}, {}));
   return Result;
 }
 

@@ -473,7 +473,7 @@ extension _DictionaryStorage {
         truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
     }
 
-    storage._seed = seed ?? _HashTable.hashSeed(for: storage, scale: scale)
+    storage._seed = seed ?? _HashTable.hashSeed(for: Builtin.castToNativeObject(storage), scale: scale)
     storage._rawKeys = UnsafeMutableRawPointer(keysAddr)
     storage._rawValues = UnsafeMutableRawPointer(valuesAddr)
 

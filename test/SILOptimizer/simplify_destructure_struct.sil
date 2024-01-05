@@ -70,4 +70,74 @@ bb0(%0 : @owned $String, %1 : $Int):
   return %4 : $String
 }
 
+// CHECK-LABEL: sil [ossa] @forward_with_copy :
+// CHECK:         %2 = copy_value %0
+// CHECK:         %3 = struct $S (%0 : $String, %1 : $Int)
+// CHECK:         fix_lifetime %1
+// CHECK:         destroy_value %3
+// CHECK:         return %2
+// CHECK:       } // end sil function 'forward_with_copy'
+sil [ossa] @forward_with_copy : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  (%4, %5) = destructure_struct %3 : $S
+  fix_lifetime %5 : $Int
+  destroy_value %2 : $S
+  return %4 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_with_two_copies :
+// CHECK:         %2 = copy_value %0
+// CHECK:         %3 = struct $S (%0 : $String, %1 : $Int)
+// CHECK:         %4 = copy_value %3
+// CHECK:         fix_lifetime %1
+// CHECK:         destroy_value %3
+// CHECK:         destroy_value %4
+// CHECK:         return %2
+// CHECK:       } // end sil function 'forward_with_two_copies'
+sil [ossa] @forward_with_two_copies : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  %4 = copy_value %3 : $S
+  (%5, %6) = destructure_struct %4 : $S
+  fix_lifetime %6 : $Int
+  destroy_value %2 : $S
+  destroy_value %3 : $S
+  return %5 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @copy_has_other_uses :
+// CHECK:         destructure_struct
+// CHECK:       } // end sil function 'copy_has_other_uses'
+sil [ossa] @copy_has_other_uses : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  fix_lifetime %3 : $S
+  (%5, %6) = destructure_struct %3 : $S
+  fix_lifetime %6 : $Int
+  destroy_value %2 : $S
+  return %5 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @different_basic_block :
+// CHECK:       bb2:
+// CHECK:         destructure_struct
+// CHECK:       } // end sil function 'different_basic_block'
+sil [ossa] @different_basic_block : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %3 : $S
+  unreachable
+bb2:
+  (%4, %5) = destructure_struct %3 : $S
+  fix_lifetime %5 : $Int
+  destroy_value %2 : $S
+  return %4 : $String
+}
 

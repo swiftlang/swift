@@ -179,6 +179,12 @@ function(_add_host_variant_c_compile_link_flags name)
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${_lto_flag_out}>)
     target_link_options(${name} PRIVATE ${_lto_flag_out})
   endif()
+
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+     set(_cov_flags $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
+     target_compile_options(${name} PRIVATE ${_cov_flags})
+     target_link_options(${name} PRIVATE ${_cov_flags})
+  endif()
 endfunction()
 
 
@@ -321,11 +327,6 @@ function(_add_host_variant_c_compile_flags target)
   string(TOUPPER "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_THREADING_PACKAGE}" _threading_package)
   target_compile_definitions(${target} PRIVATE
     "SWIFT_THREADING_${_threading_package}")
-
-  if(SWIFT_ANALYZE_CODE_COVERAGE)
-    target_compile_options(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
-  endif()
 
   if((SWIFT_HOST_VARIANT_ARCH STREQUAL "armv7" OR
       SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64") AND
@@ -521,36 +522,30 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
     endif()
 
-    # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
-    # to the linker command line.
-    set(swift_ast_path_flags " -Wl")
-    get_property(modules GLOBAL PROPERTY swift_compiler_modules)
-    foreach(module ${modules})
-      get_target_property(module_file "SwiftModule${module}" "module_file")
-      string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
-    endforeach()
-
-    set_property(TARGET ${target} APPEND_STRING PROPERTY
-                 LINK_FLAGS ${swift_ast_path_flags})
-
     # Workaround for a linker crash related to autolinking: rdar://77839981
     set_property(TARGET ${target} APPEND_STRING PROPERTY
                  LINK_FLAGS " -lobjc ")
 
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD|WINDOWS")
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASRLF_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
       # At build time and run time, link against the swift libraries in the
       # installed host toolchain.
-      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+      if(SWIFT_PATH_TO_SWIFT_SDK)
+        set(swift_dir "${SWIFT_PATH_TO_SWIFT_SDK}/usr")
+      else()
+        get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+        get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+      endif()
       set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-      set(swiftrt "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}/swiftrt.o")
+      set(host_lib_arch_dir "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}")
 
+      set(swiftrt "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
       target_link_libraries(${target} PRIVATE ${swiftrt})
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
+      target_link_directories(${target} PRIVATE ${host_lib_arch_dir})
 
       # At runtime, use swiftCore in the current toolchain.
       # For building stdlib, LD_LIBRARY_PATH will be set to builder's stdlib
@@ -605,6 +600,9 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           set(swift_runtime_rpath "${host_lib_dir}")
         endif()
       endif()
+    endif()
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND SWIFT_USE_LINKER STREQUAL "lld")
+      target_link_options(${target} PRIVATE "SHELL:-Xlinker -z -Xlinker nostart-stop-gc")
     endif()
   endif()
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency -swift-version 6 %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -swift-version 6 %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -swift-version 6 %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency && asserts
 
@@ -57,7 +57,7 @@ func tryKeyPathsMisc(d : Door) {
 
 func tryKeyPathsFromAsync() async {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to actor-isolated property 'unsafeGlobActor_mutable'}}
+    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'}}
 }
 
 func tryNonSendable() {
@@ -68,7 +68,7 @@ func tryNonSendable() {
 
 func tryKeypaths() {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to actor-isolated property 'unsafeGlobActor_mutable'}}
+    _ = \Door.unsafeGlobActor_mutable // expected-error {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'}}
 
     _ = \Door.immutable
     _ = \Door.globActor_immutable
@@ -83,7 +83,7 @@ func tryKeypaths() {
     let _ : PartialKeyPath<Door> = \.mutable // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
     let _ : AnyKeyPath = \Door.mutable  // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
 
-    _ = \Door.globActor_mutable // expected-error{{cannot form key path to actor-isolated property 'globActor_mutable'}}
+    _ = \Door.globActor_mutable // expected-error{{cannot form key path to main actor-isolated property 'globActor_mutable'}}
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
-    _ = \Door.["hello"] // expected-error {{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
+    _ = \Door.["hello"] // expected-error {{cannot form key path to main actor-isolated subscript 'subscript(_:)'}}
 }

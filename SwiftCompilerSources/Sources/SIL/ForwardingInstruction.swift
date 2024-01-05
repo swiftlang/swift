@@ -18,6 +18,10 @@ public protocol ForwardingInstruction : Instruction {
 
   /// Return true if the forwarded value has the same representation. If true, then the result can be mapped to the same storage without a move or copy.
   var preservesRepresentation: Bool { get }
+
+  var canForwardGuaranteedValues: Bool { get }
+
+  var canForwardOwnedValues: Bool { get }
 }
 
 extension ForwardingInstruction {
@@ -47,6 +51,14 @@ extension ForwardingInstruction {
   public var preservesReferenceCounts: Bool {
     bridged.ForwardingInst_preservesOwnership()
   }
+
+  // Most forwarding instructions can forward owned and guaranteed values.
+  // Therefore define a default implementation of `true`.
+  public var canForwardGuaranteedValues: Bool { true }
+
+  // Most forwarding instructions can forward owned and guaranteed values.
+  // Therefore define a default implementation of `true`.
+  public var canForwardOwnedValues: Bool { true }
 }
 
 // An instruction that forwards a single value to a single result.
@@ -242,12 +254,15 @@ extension MarkUninitializedInst {
 
 extension StructExtractInst {
   public var preservesRepresentation: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
 }
 
 extension TupleExtractInst {
   public var preservesRepresentation: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
 }
 
 extension TuplePackExtractInst {
   public var preservesRepresentation: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
 }

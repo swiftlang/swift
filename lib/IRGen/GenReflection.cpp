@@ -176,6 +176,20 @@ public:
 
 llvm::Optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+  // The Swift 5.11 runtime is the first version able to demangle types
+  // that involve typed throws.
+  bool usesTypedThrows = type.findIf([](CanType t) -> bool {
+    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      if (!fn.getThrownError().isNull())
+        return true;
+    }
+
+    return false;
+  });
+  if (usesTypedThrows) {
+    return llvm::VersionTuple(5, 11);
+  }
+
   // The Swift 5.5 runtime is the first version able to demangle types
   // related to concurrency.
   bool needsConcurrency = type.findIf([](CanType t) -> bool {
@@ -382,7 +396,7 @@ getTypeRefImpl(IRGenModule &IGM,
     useFlatUnique = true;
     break;
     
-  case MangledTypeRefRole::FieldMetadata:
+  case MangledTypeRefRole::FieldMetadata: {
     // We want to keep fields of noncopyable type from being exposed to
     // in-process runtime reflection libraries in older Swift runtimes, since
     // they more than likely assume they can copy field values, and the language
@@ -391,11 +405,16 @@ getTypeRefImpl(IRGenModule &IGM,
     // noncopyable, use a function to emit the type ref which will look for a
     // signal from future runtimes whether they support noncopyable types before
     // exposing their metadata to them.
-    if (type->isNoncopyable()) {
+    Type contextualTy = type;
+    if (sig)
+      contextualTy = sig.getGenericEnvironment()->mapTypeIntoContext(type);
+
+    if (contextualTy->isNoncopyable()) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
       return getTypeRefByFunction(IGM, sig, type);
     }
-    LLVM_FALLTHROUGH;
+  }
+  LLVM_FALLTHROUGH;
 
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
@@ -1729,6 +1748,9 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
 }
 
 void IRGenModule::emitReflectionMetadataVersion() {
+  if (IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::None)
+    return;
+
   auto Init =
     llvm::ConstantInt::get(Int16Ty, SWIFT_REFLECTION_METADATA_VERSION);
   auto Version = new llvm::GlobalVariable(Module, Int16Ty, /*constant*/ true,

@@ -16,13 +16,13 @@
 
 #include "TypeCheckMacros.h"
 #include "../AST/InlinableText.h"
-#include "TypeChecker.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/CASTBridging.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
@@ -37,6 +37,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
@@ -45,47 +46,6 @@
 #include "llvm/Config/config.h"
 
 using namespace swift;
-
-extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
-extern "C" void swift_ASTGen_destroyMacro(void *macro);
-
-extern "C" void swift_ASTGen_freeBridgedString(BridgedString);
-
-extern "C" void *swift_ASTGen_resolveExecutableMacro(const char *moduleName,
-                                                     const char *typeName,
-                                                     void *opaquePluginHandle);
-extern "C" void swift_ASTGen_destroyExecutableMacro(void *macro);
-
-extern "C" ptrdiff_t swift_ASTGen_checkMacroDefinition(
-    void *diagEngine, void *sourceFile, const void *macroSourceLocation,
-    BridgedString *expansionSourceOutPtr, ptrdiff_t **replacementsPtr,
-    ptrdiff_t *numReplacements);
-extern "C" void swift_ASTGen_freeExpansionReplacements(
-    ptrdiff_t *replacementsPtr,
-    ptrdiff_t numReplacements);
-
-extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *diagEngine, const void *macro, uint8_t externalKind,
-    const char *discriminator, uint8_t rawMacroRole, void *sourceFile,
-    const void *sourceLocation, BridgedString *evaluatedSourceOut);
-
-extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *diagEngine, const void *macro, uint8_t externalKind,
-    const char *discriminator, const char *qualifiedType,
-    const char *conformances, uint8_t rawMacroRole, void *customAttrSourceFile,
-    const void *customAttrSourceLocation, void *declarationSourceFile,
-    const void *declarationSourceLocation, void *parentDeclSourceFile,
-    const void *parentDeclSourceLocation, BridgedString *evaluatedSourceOut);
-
-extern "C" bool swift_ASTGen_initializePlugin(void *handle, void *diagEngine);
-extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
-extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
-    void *handle, const char *libraryPath, const char *moduleName,
-    BridgedString *errorOut);
-
-static inline StringRef toStringRef(BridgedString bridged) {
-  return {reinterpret_cast<const char *>(bridged.data), size_t(bridged.length)};
-}
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
 /// Look for macro's type metadata given its external module and type name.
@@ -185,7 +145,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   ASTContext &ctx = macro->getASTContext();
   auto sourceFile = macro->getParentSourceFile();
 
-  BridgedString externalMacroName{nullptr, 0};
+  BridgedStringRef externalMacroName{nullptr, 0};
   ptrdiff_t *replacements = nullptr;
   ptrdiff_t numReplacements = 0;
   auto checkResult = swift_ASTGen_checkMacroDefinition(
@@ -217,7 +177,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   case BridgedExternalMacro: {
     // An external macro described as ModuleName.TypeName. Get both identifiers.
     assert(!replacements && "External macro doesn't have replacements");
-    StringRef externalMacroStr = toStringRef(externalMacroName);
+    StringRef externalMacroStr = externalMacroName.unbridged();
     StringRef externalModuleName, externalTypeName;
     std::tie(externalModuleName, externalTypeName) = externalMacroStr.split('.');
 
@@ -259,7 +219,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
     return handleExternalMacroDefinition(ctx, expansion);
 
   // Expansion string text.
-  StringRef expansionText = toStringRef(externalMacroName);
+  StringRef expansionText = externalMacroName.unbridged();
 
   // Copy over the replacements.
   SmallVector<ExpandedMacroReplacement, 2> replacementsVec;
@@ -318,23 +278,28 @@ initializeExecutablePlugin(ASTContext &ctx,
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
     }
+
+    ctx.getPluginLoader().recordDependency(resolvedLibraryPath);
+
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 
-    BridgedString errorOut{nullptr, 0};
+    BridgedStringRef bridgedErrorOut{nullptr, 0};
     bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
         executablePlugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
-        &errorOut);
+        &bridgedErrorOut);
+
+    auto errorOut = bridgedErrorOut.unbridged();
     if (!loaded) {
       SWIFT_DEFER { swift_ASTGen_freeBridgedString(errorOut); };
       return llvm::createStringError(
           llvm::inconvertibleErrorCode(),
           "failed to load library plugin '%s' in plugin server '%s'; %s",
           resolvedLibraryPathStr.c_str(),
-          executablePlugin->getExecutablePath().data(), errorOut.data);
+          executablePlugin->getExecutablePath().data(), errorOut.data());
     }
 
-    assert(errorOut.data == nullptr);
+    assert(errorOut.data() == nullptr);
 
     // Set a callback to load the library again on reconnections.
     auto *callback = new std::function<void(void)>(
@@ -550,6 +515,10 @@ ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   if (decl->isImplicit())
     return { };
 
+  // Member attribute macros do not apply to accessors.
+  if (isa<AccessorDecl>(decl))
+    return { };
+
   // Member attribute macros do not apply to macro-expanded members.
   if (decl->isInMacroExpansionInContext())
     return { };
@@ -607,9 +576,9 @@ static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
 bool swift::isInvalidAttachedMacro(MacroRole role,
                                    Decl *attachedTo) {
   switch (role) {
-  case MacroRole::Expression:
-  case MacroRole::Declaration:
-  case MacroRole::CodeItem:
+#define FREESTANDING_MACRO_ROLE(Name, Description) case MacroRole::Name:
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
+#include "swift/Basic/MacroRoles.def"
     llvm_unreachable("Invalid macro role for attached macro");
 
   case MacroRole::Accessor:
@@ -638,6 +607,14 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
   case MacroRole::Extension:
     // Only primary declarations of nominal types
     if (isa<NominalTypeDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Preamble:
+  case MacroRole::Body:
+    // Only function declarations.
+    if (isa<AbstractFunctionDecl>(attachedTo))
       return false;
 
     break;
@@ -735,7 +712,9 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
   for (auto item : expansionBuffer->getTopLevelItems()) {
     auto *decl = item.dyn_cast<Decl *>();
     if (!decl) {
-      if (role != MacroRole::CodeItem) {
+      if (role != MacroRole::CodeItem &&
+          role != MacroRole::Preamble &&
+          role != MacroRole::Body) {
         auto &ctx = expansionBuffer->getASTContext();
         ctx.Diags.diagnose(item.getStartLoc(),
                            diag::expected_macro_expansion_decls);
@@ -834,25 +813,11 @@ static std::string expandMacroDefinition(
 
 static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
   switch (role) {
-  case MacroRole::Expression:
-    return GeneratedSourceInfo::ExpressionMacroExpansion;
-  case MacroRole::Declaration:
-  case MacroRole::CodeItem:
-    return GeneratedSourceInfo::FreestandingDeclMacroExpansion;
-  case MacroRole::Accessor:
-    return GeneratedSourceInfo::AccessorMacroExpansion;
-  case MacroRole::MemberAttribute:
-    return GeneratedSourceInfo::MemberAttributeMacroExpansion;
-  case MacroRole::Member:
-    return GeneratedSourceInfo::MemberMacroExpansion;
-  case MacroRole::Peer:
-    return GeneratedSourceInfo::PeerMacroExpansion;
-  case MacroRole::Conformance:
-    return GeneratedSourceInfo::ConformanceMacroExpansion;
-  case MacroRole::Extension:
-    return GeneratedSourceInfo::ExtensionMacroExpansion;
+#define MACRO_ROLE(Name, Description)                 \
+  case MacroRole::Name:                               \
+    return GeneratedSourceInfo::Name##MacroExpansion;
+#include "swift/Basic/MacroRoles.def"
   }
-  llvm_unreachable("unhandled MacroRole");
 }
 
 // If this storage declaration is a variable with an explicit initializer,
@@ -874,6 +839,29 @@ getExplicitInitializerRange(AbstractStorageDecl *storage) {
     return llvm::None;
 
   return SourceRange(equalLoc, initRange.End);
+}
+
+/// Compute the original source range for expanding a preamble macro.
+static CharSourceRange getPreambleMacroOriginalRange(AbstractFunctionDecl *fn) {
+  ASTContext &ctx = fn->getASTContext();
+
+  SourceLoc insertionLoc;
+
+  // If there is a body macro, start at the beginning of it.
+  if (auto bodyBufferID = evaluateOrDefault(
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, llvm::None)) {
+    insertionLoc = ctx.SourceMgr.getRangeForBuffer(*bodyBufferID).getStart();
+  } else {
+    // If there is a parsed body, start at the beginning of it.
+    SourceRange range = fn->getBodySourceRange();
+    if (range.isValid()) {
+      insertionLoc = range.Start;
+    } else {
+      insertionLoc = fn->getEndLoc();
+    }
+  }
+
+  return CharSourceRange(insertionLoc, 0);
 }
 
 static CharSourceRange getExpansionInsertionRange(MacroRole role,
@@ -948,6 +936,20 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     return CharSourceRange(afterDeclLoc, 0);
   }
 
+  case MacroRole::Preamble: {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(target.get<Decl *>())) {
+      return getPreambleMacroOriginalRange(fn);
+    }
+
+    return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc()), 0);
+  }
+
+  case MacroRole::Body: {
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+    return CharSourceRange(afterDeclLoc, 0);
+  }
+
   case MacroRole::Expression:
   case MacroRole::Declaration:
   case MacroRole::CodeItem:
@@ -1011,6 +1013,8 @@ static uint8_t getRawMacroRole(MacroRole role) {
   // in ASTGen.
   case MacroRole::Conformance:
   case MacroRole::Extension: return 8;
+  case MacroRole::Preamble: return 9;
+  case MacroRole::Body: return 10;
   }
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
@@ -1121,7 +1125,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     if (!astGenSourceFile)
       return nullptr;
 
-    BridgedString evaluatedSourceOut{nullptr, 0};
+    BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags, externalDef.opaqueHandle,
@@ -1129,10 +1133,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceOut);
-    if (!evaluatedSourceOut.data)
+    if (!evaluatedSourceOut.unbridged().data())
       return nullptr;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-        toStringRef(evaluatedSourceOut),
+        evaluatedSourceOut.unbridged(),
         adjustMacroExpansionBufferName(*discriminator));
     swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;
@@ -1400,7 +1404,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (auto var = dyn_cast<VarDecl>(attachedTo))
       searchDecl = var->getParentPatternBinding();
 
-    BridgedString evaluatedSourceOut{nullptr, 0};
+    BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags, externalDef.opaqueHandle,
@@ -1409,10 +1413,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
-    if (!evaluatedSourceOut.data)
+    if (!evaluatedSourceOut.unbridged().data())
       return nullptr;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-        toStringRef(evaluatedSourceOut),
+        evaluatedSourceOut.unbridged(),
         adjustMacroExpansionBufferName(*discriminator));
     swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;
@@ -1589,6 +1593,44 @@ ArrayRef<unsigned> ExpandAccessorMacros::evaluate(
   return storage->getASTContext().AllocateCopy(bufferIDs);
 }
 
+ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *fn) const {
+  llvm::SmallVector<unsigned, 1> bufferIDs;
+  fn->forEachAttachedMacro(MacroRole::Preamble,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        auto macroSourceFile = ::evaluateAttachedMacro(
+            macro, fn, customAttr, false, MacroRole::Preamble);
+        if (!macroSourceFile)
+          return;
+
+        if (auto bufferID = macroSourceFile->getBufferID())
+          bufferIDs.push_back(*bufferID);
+      });
+
+  std::reverse(bufferIDs.begin(), bufferIDs.end());
+  return fn->getASTContext().AllocateCopy(bufferIDs);
+}
+
+llvm::Optional<unsigned> ExpandBodyMacroRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *fn) const {
+  llvm::Optional<unsigned> bufferID;
+  fn->forEachAttachedMacro(MacroRole::Body,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        // FIXME: Should we complain if we already expanded a body macro?
+        if (bufferID)
+          return;
+
+        auto macroSourceFile = ::evaluateAttachedMacro(
+            macro, fn, customAttr, false, MacroRole::Body);
+        if (!macroSourceFile)
+          return;
+
+        bufferID = macroSourceFile->getBufferID();
+      });
+
+  return bufferID;
+}
+
 llvm::Optional<unsigned>
 swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
@@ -1702,7 +1744,8 @@ ArrayRef<unsigned>
 ExpandExtensionMacros::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominal) const {
   SmallVector<unsigned, 2> bufferIDs;
-  for (auto customAttrConst : nominal->getSemanticAttrs().getAttributes<CustomAttr>()) {
+  for (auto customAttrConst :
+       nominal->getExpandedAttrs().getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
     auto *macro = nominal->getResolvedMacro(customAttr);
 
@@ -1868,8 +1911,8 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // When a macro is not found for a custom attribute, it may be a non-macro.
   // So bail out to prevent diagnostics from the contraint system.
   if (macroRef.getAttr()) {
-    auto foundMacros = namelookup::lookupMacros(
-        dc, macroRef.getMacroName(), roles);
+    auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),
+                                                macroRef.getMacroName(), roles);
     if (foundMacros.empty())
       return ConcreteDeclRef();
   }

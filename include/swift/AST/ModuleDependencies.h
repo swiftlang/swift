@@ -123,6 +123,10 @@ using ModuleDependencyIDSetVector =
 
 namespace dependencies {
   std::string createEncodedModuleKindAndName(ModuleDependencyID id);
+  bool checkImportNotTautological(const ImportPath::Module, 
+                                  const SourceLoc,
+                                  const SourceFile&,
+                                  bool);
 }
 
 /// Base class for the variant storage of ModuleDependencyInfo.
@@ -910,10 +914,6 @@ public:
       return Path.str();
     return Mapper->mapToString(Path);
   }
-
-  /// Wrap the filesystem on the specified `CompilerInstance` with a
-  /// caching `DependencyScanningWorkerFilesystem`
-  void overlaySharedFilesystemCacheForCompilation(CompilerInstance &Instance);
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);

@@ -152,6 +152,11 @@ swift_create_post_build_symlink(swift-frontend
   DESTINATION "swift-cache-tool${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
+swift_create_post_build_symlink(swift-frontend
+  SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "swift-parse-test${CMAKE_EXECUTABLE_SUFFIX}"
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
 add_swift_tool_symlink(swift swift-frontend compiler)
 add_swift_tool_symlink(swiftc swift-frontend compiler)
 add_swift_tool_symlink(swift-symbolgraph-extract swift-frontend compiler)

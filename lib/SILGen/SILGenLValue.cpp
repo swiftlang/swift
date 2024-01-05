@@ -2009,6 +2009,25 @@ namespace {
   class AddressorComponent
       : public AccessorBasedComponent<PhysicalPathComponent> {
     SILType SubstFieldType;
+    
+    static SGFAccessKind getAccessKindForAddressor(SGFAccessKind accessKind) {
+      // Addressors cannot be consumed through.
+      switch (accessKind) {
+      case SGFAccessKind::IgnoredRead:
+      case SGFAccessKind::BorrowedAddressRead:
+      case SGFAccessKind::BorrowedObjectRead:
+      case SGFAccessKind::OwnedAddressRead:
+      case SGFAccessKind::OwnedObjectRead:
+      case SGFAccessKind::Write:
+      case SGFAccessKind::ReadWrite:
+        return accessKind;
+        
+      case SGFAccessKind::OwnedAddressConsume:
+      case SGFAccessKind::OwnedObjectConsume:
+        return SGFAccessKind::ReadWrite;
+      }
+      llvm_unreachable("uncovered switch");
+    }
   public:
      AddressorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
                         bool isSuper,
@@ -2048,8 +2067,20 @@ namespace {
 
       // Enter an unsafe access scope for the access.
       addr =
-          enterAccessScope(SGF, loc, base, addr, getTypeData(), getAccessKind(),
+          enterAccessScope(SGF, loc, base, addr, getTypeData(),
+                           getAccessKindForAddressor(getAccessKind()),
                            SILAccessEnforcement::Unsafe, ActorIso);
+
+      // Validate the use of the access if it's noncopyable.
+      if (addr.getType().isMoveOnly()) {
+        MarkUnresolvedNonCopyableValueInst::CheckKind kind
+          = getAccessorDecl()->getAccessorKind() == AccessorKind::MutableAddress
+              ? MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable
+              : MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign;
+        auto checkedAddr = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          loc, addr.getValue(), kind);
+        addr = std::move(addr).transform(checkedAddr);
+      }
 
       return addr;
     }
@@ -2931,9 +2962,12 @@ class LLVM_LIBRARY_VISIBILITY SILGenBorrowedBaseVisitor
 public:
   SILGenLValue &SGL;
   SILGenFunction &SGF;
+  AbstractionPattern Orig;
 
-  SILGenBorrowedBaseVisitor(SILGenLValue &SGL, SILGenFunction &SGF)
-      : SGL(SGL), SGF(SGF) {}
+  SILGenBorrowedBaseVisitor(SILGenLValue &SGL,
+                            SILGenFunction &SGF,
+                            AbstractionPattern Orig)
+      : SGL(SGL), SGF(SGF), Orig(Orig) {}
 
   static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
     if (auto *m = dyn_cast<MemberRefExpr>(e)) {
@@ -2976,15 +3010,22 @@ public:
         case ParamSpecifier::LegacyOwned:
           return false;
         }
-        llvm_unreachable("unhandled switch case");
+        if (pd->hasResultDependsOn()) {
+          return true;
+        }
       }
     }
     return false;
   }
 
+  /// For any other Expr's that this SILGenBorrowedBaseVisitor doesn't already
+  /// define a visitor stub, defer back to SILGenLValue's visitRec as it is
+  /// most-likely a non-lvalue root expression.
   LValue visitExpr(Expr *e, SGFAccessKind accessKind, LValueOptions options) {
-    e->dump(llvm::errs());
-    llvm::report_fatal_error("Unimplemented node!");
+    assert(!isNonCopyableBaseBorrow(SGF, e)
+            && "unexpected recursion in SILGenLValue::visitRec!");
+
+    return SGL.visitRec(e, accessKind, options, Orig);
   }
 
   LValue visitMemberRefExpr(MemberRefExpr *e, SGFAccessKind accessKind,
@@ -3074,10 +3115,10 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // apply the lvalue within a formal access to the original value instead of
   // an actual loaded copy.
   if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e)) {
-    SILGenBorrowedBaseVisitor visitor(*this, SGF);
+    SILGenBorrowedBaseVisitor visitor(*this, SGF, orig);
     auto accessKind = SGFAccessKind::BorrowedObjectRead;
-    if (e->getType()->is<LValueType>())
-      accessKind = SGFAccessKind::BorrowedAddressRead;
+    assert(!e->getType()->is<LValueType>()
+        && "maybe need SGFAccessKind::BorrowedAddressRead ?");
     return visitor.visit(e, accessKind, options);
   }
 

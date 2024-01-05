@@ -572,7 +572,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   C_CC = getOptions().PlatformCCallingConvention;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
-  SwiftCC = llvm::CallingConv::Swift;
+
+  bool isSwiftCCSupported =
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_Swift)
+    == clang::TargetInfo::CCCR_OK;
+  if (isSwiftCCSupported) {
+    SwiftCC = llvm::CallingConv::Swift;
+  } else {
+    SwiftCC = DefaultCC;
+  }
 
   bool isAsyncCCSupported =
     clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
@@ -601,15 +609,22 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolSize = Size(ClangASTContext->getTypeSize(atomicBoolTy));
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
-  // On WebAssembly, tail optional arguments are not allowed because Wasm requires
-  // callee and caller signature to be the same. So LLVM adds dummy arguments for
-  // `swiftself` and `swifterror`. If there is `swiftself` but is no `swifterror` in
-  // a swiftcc function or invocation, then LLVM adds dummy `swifterror` parameter or
-  // argument. To count up how many dummy arguments should be added, we need to mark
-  // it as `swifterror` even though it's not in register.
-  ShouldUseSwiftError =
-    clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
-      ClangCodeGen->CGM()) || TargetInfo.OutputObjectFormat == llvm::Triple::Wasm;
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+    // On WebAssembly, tail optional arguments are not allowed because Wasm
+    // requires callee and caller signature to be the same. So LLVM adds dummy
+    // arguments for `swiftself` and `swifterror`. If there is `swiftself` but
+    // is no `swifterror` in a swiftcc function or invocation, then LLVM adds
+    // dummy `swifterror` parameter or argument. To count up how many dummy
+    // arguments should be added, we need to mark it as `swifterror` even though
+    // it's not in register.
+    ShouldUseSwiftError = true;
+  } else if (!isSwiftCCSupported) {
+    ShouldUseSwiftError = false;
+  } else {
+    ShouldUseSwiftError =
+        clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
+            ClangCodeGen->CGM());
+  }
 
 #ifndef NDEBUG
   sanityCheckStdlib(*this);
@@ -659,7 +674,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
   SwiftTaskOptionRecordPtrTy = SizeTy; // Builtin.RawPointer? that we get as (TaskOptionRecord*)
   SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftTaskOptionRecordTy = createStructType(*this, "swift.task_option", {
+  SwiftTaskOptionRecordTy = createStructType(
+      *this, "swift.task_option", {
     SizeTy,                     // Flags
     SwiftTaskOptionRecordPtrTy, // Parent
   });
@@ -682,6 +698,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
+  });
+  SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy =
+      createStructType(*this, "swift.task_executor_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    SwiftExecutorTy,         // Executor
   });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
@@ -765,20 +786,6 @@ namespace RuntimeConstants {
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
   const auto WillReturn = llvm::Attribute::WillReturn;
-
-#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
-  const auto NoEffect = RuntimeEffect::NoEffect;
-  const auto Locking = RuntimeEffect::Locking;
-  const auto Allocating = RuntimeEffect::Allocating;
-  const auto Deallocating = RuntimeEffect::Deallocating;
-  const auto RefCounting = RuntimeEffect::RefCounting;
-  const auto ObjectiveC = RuntimeEffect::ObjectiveC;
-  const auto Concurrency = RuntimeEffect::Concurrency;
-  const auto AutoDiff = RuntimeEffect::AutoDiff;
-  const auto MetaData = RuntimeEffect::MetaData;
-  const auto Casting = RuntimeEffect::Casting;
-  const auto ExclusivityChecking = RuntimeEffect::ExclusivityChecking;
-#endif
 
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
     return RuntimeAvailability::AlwaysAvailable;
@@ -866,6 +873,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TaskExecutorAvailability(ASTContext &context) {
+    auto featureAvailability = context.getTaskExecutorAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyDiscardingTaskGroupAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getConcurrencyDiscardingTaskGroupAvailability();
@@ -878,6 +893,14 @@ namespace RuntimeConstants {
   RuntimeAvailability DifferentiationAvailability(ASTContext &context) {
     auto featureAvailability = context.getDifferentiationAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability TypedThrowsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTypedThrowsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -927,6 +950,14 @@ namespace RuntimeConstants {
     // swift_task_run_inline is only available under task-to-thread execution
     // model.
     return RuntimeAvailability::ConditionallyAvailable;
+  }
+
+  RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
   }
 
 } // namespace RuntimeConstants
@@ -1412,6 +1443,12 @@ void IRGenModule::constructInitialFnAttributes(
   if (stackProtector == StackProtectorMode::StackProtector) {
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
+  }
+
+  // Mark as 'nounwind' to avoid referencing exception personality symbols, this
+  // is okay even with C++ interop on because the landinpads are trapping.
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    Attrs.addAttribute(llvm::Attribute::NoUnwind);
   }
 }
 
@@ -1987,13 +2024,6 @@ bool IRGenModule::canUseObjCSymbolicReferences() {
 }
 
 bool IRGenModule::canMakeStaticObjectsReadOnly() {
-  // Unconditionally disable this until we can fix the metadata.
-  // The trick of using the Empty array metadata for static arrays
-  // breaks Obj-C interop quite badly.
-  // rdar://101126543
-  return false;
-
-#if 0
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -2002,9 +2032,23 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
   if (!Triple.isOSDarwin())
     return false;
 
-  return getAvailabilityContext().isContainedIn(
-          Context.getImmortalRefCountSymbolsAvailability());
-#endif
+  if (!getAvailabilityContext().isContainedIn(Context.getStaticReadOnlyArraysAvailability()))
+    return false;
+
+  if (!getStaticArrayStorageDecl())
+    return false;
+
+  return true;
+}
+
+ClassDecl *IRGenModule::getStaticArrayStorageDecl() {
+  SmallVector<ValueDecl *, 1> results;
+  Context.lookupInSwiftModule("__StaticArrayStorage", results);
+
+  if (results.size() != 1)
+    return nullptr;
+
+  return dyn_cast<ClassDecl>(results[0]);
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

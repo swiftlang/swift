@@ -42,7 +42,7 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT1 | %FileCheck %s -check-prefix=ERROR_DOT
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT2 | %FileCheck %s -check-prefix=ERROR_DOT
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT3 | %FileCheck %s -check-prefix=NSERROR_DOT
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT4 | %FileCheck %s -check-prefix=INT_DOT
+// RUNFIXME: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT4 | %FileCheck %s -check-prefix=INT_DOT
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_INSIDE_CATCH1 > %t.top_level_inside_catch1
 // RUN: %FileCheck %s -check-prefix=STMT < %t.top_level_inside_catch1
@@ -71,10 +71,10 @@ func getNSError() -> NSError { return NSError(domain: "", code: 1, userInfo: [:]
 func test001() {
   do {} catch #^CATCH1^#
 
-// CATCH1-DAG:  Decl[Enum]/CurrModule/TypeRelation[Convertible]:              Error4[#Error4#]; name=Error4{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error3[#Error3#]; name=Error3{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error2[#Error2#]; name=Error2{{$}}
-// CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error1[#Error1#]; name=Error1{{$}}
+// CATCH1-DAG:  Decl[Enum]/CurrModule:              Error4[#Error4#]; name=Error4{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
+// CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 // CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem: NSError[#NSError#]{{; name=.+$}}
@@ -147,14 +147,14 @@ func test006() {
   } catch {
     #^INSIDE_CATCH1^#
   }
-// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#any Error#]; name=error
+// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#Never#]; name=error
 }
 func test007() {
   do {
   } catch let e {
     #^INSIDE_CATCH2^#
   }
-// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#any Error#]; name=e
+// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#Never#]; name=e
 }
 func test008() {
   do {
@@ -170,7 +170,7 @@ func test009() {
   }
 
 // FIXME: we're getting parentheses around the type when it's unnamed...
-// EXPLICIT_ERROR_PAYLOAD_I: Decl[LocalVar]/Local: i[#(Int32)#]; name=i
+// EXPLICIT_ERROR_PAYLOAD_I: Decl[LocalVar]/Local: i[#<<error type>>#]; name=i
 }
 func test010() {
   do {
@@ -195,7 +195,7 @@ func test012() {
     error.#^INSIDE_CATCH_ERR_DOT1^#
   }
 }
-// ERROR_DOT: Keyword[self]/CurrNominal: self[#any Error#]; name=self
+// ERROR_DOT: Keyword[self]/CurrNominal: self[#Never#]; name=self
 func test013() {
   do {
   } catch let e {

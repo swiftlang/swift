@@ -143,7 +143,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("extract-comment", SourceKitRequest::ExtractComment)
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
-        .Case("syntactic-rename", SourceKitRequest::SyntacticRename)
         .Case("find-rename-ranges", SourceKitRequest::FindRenameRanges)
         .Case("find-local-rename-ranges", SourceKitRequest::FindLocalRenameRanges)
         .Case("translate", SourceKitRequest::NameTranslation)
@@ -200,7 +199,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- extract-comment\n"
                      << "- module-groups\n"
                      << "- range\n"
-                     << "- syntactic-rename\n"
                      << "- find-rename-ranges\n"
                      << "- find-local-rename-ranges\n"
                      << "- translate\n"

@@ -842,6 +842,26 @@ func testResilientSinglePayloadEnumSimpleTag() {
 
 testResilientSinglePayloadEnumSimpleTag()
 
+func testResilientSinglePayloadEnumSimpleTagMultiExtraTagPayload() {
+    let x = switch getResilientSinglePayloadEnumSimpleMultiExtraTagPayloadEmpty3() {
+    case .nonEmpty: 0
+    case .empty0: 1
+    case .empty1: 2
+    case .empty2: 3
+    case .empty3: 4
+    case .empty4: 5
+    case .empty5: 6
+    case .empty6: 7
+    case .empty7: 8
+    case .empty8: 9
+    }
+
+    // CHECK: Enum case: 4
+    print("Enum case: \(x)")
+}
+
+testResilientSinglePayloadEnumSimpleTagMultiExtraTagPayload()
+
 func testResilientSinglePayloadEnumIndirectTag() {
     let x = switch getResilientSinglePayloadEnumIndirectNonEmpty(SimpleClass(x: 23)) {
     case .nonEmpty: 0
@@ -1131,6 +1151,35 @@ func testArrayAssignWithCopy() {
 }
 
 testArrayAssignWithCopy()
+
+// This is a regression test for rdar://118366415
+func testTupleAlignment() {
+    let ptr = allocateInternalGenericPtr(of: TupleLargeAlignment<TestClass>.self)
+
+    do {
+        let x = TupleLargeAlignment(TestClass())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = TupleLargeAlignment(TestClass())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: TupleLargeAlignment<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testTupleAlignment()
 
 #if os(macOS)
 

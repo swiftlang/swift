@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
@@ -32,10 +33,11 @@ using namespace swift;
 
 LangOptions::LangOptions() {
   // Note: Introduce default-on language options here.
-#ifndef NDEBUG
-  Features.insert(Feature::ParserRoundTrip);
-  Features.insert(Feature::ParserValidation);
-#endif
+  // Enable any playground options that are enabled by default.
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  if (DefaultOn) \
+    PlaygroundOptions.insert(PlaygroundOption::OptionName);
+#include "swift/Basic/PlaygroundOptions.def"
 }
 
 struct SupportedConditionalValue {
@@ -638,6 +640,23 @@ bool swift::includeInModuleInterface(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
+llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {
+  switch (option) {
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  case PlaygroundOption::OptionName: return #OptionName;
+#include "swift/Basic/PlaygroundOptions.def"
+  }
+  llvm_unreachable("covered switch");
+}
+
+llvm::Optional<PlaygroundOption> swift::getPlaygroundOption(llvm::StringRef name) {
+  return llvm::StringSwitch<llvm::Optional<PlaygroundOption>>(name)
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  .Case(#OptionName, PlaygroundOption::OptionName)
+#include "swift/Basic/PlaygroundOptions.def"
+  .Default(llvm::None);
+}
+
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   switch (AccessNoteBehavior) {
   case AccessNoteDiagnosticBehavior::Ignore:
@@ -653,26 +672,30 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   llvm_unreachable("covered switch");
 }
 
+namespace {
+  static constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
+       {"-I",
+        "-F",
+        "-fmodule-map-file=",
+        "-iquote",
+        "-idirafter",
+        "-iframeworkwithsysroot",
+        "-iframework",
+        "-iprefix",
+        "-iwithprefixbefore",
+        "-iwithprefix",
+        "-isystemafter",
+        "-isystem",
+        "-isysroot",
+        "-ivfsoverlay",
+        "-working-directory=",
+        "-working-directory"};
+}
+
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     std::function<std::string(StringRef)> pathRemapCallback) const {
   auto consumeIncludeOption = [](StringRef &arg, StringRef &prefix) {
-    static StringRef options[] = {"-I",
-                                  "-F",
-                                  "-fmodule-map-file=",
-                                  "-iquote",
-                                  "-idirafter",
-                                  "-iframeworkwithsysroot",
-                                  "-iframework",
-                                  "-iprefix",
-                                  "-iwithprefixbefore",
-                                  "-iwithprefix",
-                                  "-isystemafter",
-                                  "-isystem",
-                                  "-isysroot",
-                                  "-ivfsoverlay",
-                                  "-working-directory=",
-                                  "-working-directory"};
-    for (StringRef &option : options)
+    for (const auto &option : knownSearchPathPrefiexes)
       if (arg.consume_front(option)) {
         prefix = option;
         return true;
@@ -704,4 +727,35 @@ std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     }
   }
   return args;
+}
+
+std::vector<std::string>
+ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
+  auto matchIncludeOption = [](StringRef &arg) {
+    for (const auto &option : knownSearchPathPrefiexes)
+      if (arg.consume_front(option))
+        return true;
+    return false;
+  };
+
+  std::vector<std::string> filtered_args;
+  bool skip_next = false;
+  std::vector<std::string> args;
+  for (auto A : ExtraArgs) {
+    StringRef arg(A);
+    if (skip_next) {
+      skip_next = false;
+      continue;
+    } else if (matchIncludeOption(arg)) {
+      if (arg.empty()) {
+        // Option pair
+        skip_next = true;
+      } // else non-pair option e.g. '-I/search/path'
+      continue;
+    } else {
+      filtered_args.push_back(A);
+    }
+  }
+
+  return filtered_args;
 }

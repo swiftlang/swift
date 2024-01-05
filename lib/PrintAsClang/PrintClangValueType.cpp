@@ -502,16 +502,16 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (!isOpaqueLayout)
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 
-  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName,
-                         typeMetadataFuncGenericParams,
-                         typeDecl->getModuleContext(), declAndTypePrinter);
+  printTypeGenericTraits(
+      os, typeDecl, typeMetadataFuncName, typeMetadataFuncGenericParams,
+      typeDecl->getModuleContext(), declAndTypePrinter, isOpaqueLayout);
 }
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
-    llvm::function_ref<void()> cxxParamPrinter, bool isSelf) {
+    llvm::function_ref<void()> cxxParamPrinter, bool forceSelf) {
   // A Swift value type is passed to its underlying Swift function
-  if (isSelf) {
+  if (forceSelf) {
     os << "_getOpaquePointer()";
   } else {
     // FIXME: can we propagate the _impl request here?
@@ -581,14 +581,27 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  if (!typeDecl->isGeneric()) {
-    // FIXME: generic type support.
+
+  if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl))
     os << "template<>\n";
-    os << "static inline const constexpr bool isUsableInGenericContext<";
-    printer.printNominalTypeReference(typeDecl,
-                                      /*moduleContext=*/nullptr);
-    os << "> = true;\n";
-  }
+  os << "static inline const constexpr bool isUsableInGenericContext<";
+  printer.printNominalTypeReference(typeDecl,
+                                    /*moduleContext=*/nullptr);
+  os << "> = ";
+  if (typeDecl->isGeneric()) {
+    auto signature = typeDecl->getGenericSignature().getCanonicalSignature();
+    llvm::interleave(
+        signature.getInnermostGenericParams(), os,
+        [&](const GenericTypeParamType *genericParamType) {
+          os << "isUsableInGenericContext<";
+          printer.printGenericTypeParamTypeName(genericParamType);
+          os << '>';
+        },
+        " && ");
+  } else
+    os << "true";
+  os << ";\n";
+
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
   os << "\n";
@@ -598,7 +611,8 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
 void ClangValueTypePrinter::printTypeGenericTraits(
     raw_ostream &os, const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
     ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
-    const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter) {
+    const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter,
+    bool isOpaqueLayout) {
   auto *NTD = dyn_cast<NominalTypeDecl>(typeDecl);
   ClangSyntaxPrinter printer(os);
   // FIXME: avoid popping out of the module's namespace here.
@@ -637,7 +651,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   }
   os << "> {\n";
   os << "  static ";
-  ClangSyntaxPrinter(os).printInlineForThunk();
+  ClangSyntaxPrinter(os).printInlineForHelperFunction();
   os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
   if (!typeDecl->hasClangNode()) {
@@ -668,14 +682,16 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     os << "::";
     printer.printBaseName(typeDecl);
     os << "> = true;\n";
-    if (NTD && NTD->isResilient()) {
+  }
+  if (isOpaqueLayout) {
+    assert(NTD && "not a nominal type?");
+    assert(!isa<ClassDecl>(typeDecl) && !typeDecl->hasClangNode());
+    if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(NTD))
       os << "template<>\n";
-      os << "static inline const constexpr bool isOpaqueLayout<";
-      printer.printBaseName(typeDecl->getModuleContext());
-      os << "::";
-      printer.printBaseName(typeDecl);
-      os << "> = true;\n";
-    }
+    os << "static inline const constexpr bool isOpaqueLayout<";
+    printer.printNominalTypeReference(NTD,
+                                      /*moduleContext=*/nullptr);
+    os << "> = true;\n";
   }
 
   // FIXME: generic support.

@@ -568,21 +568,18 @@ func convTupleAny(_ f1: @escaping () -> (),
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypSgIegn_S2iIegyy_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Any>) -> ()) -> ()
-// CHECK:         [[ANY_VALUE:%.*]] = alloc_stack $Any
-// CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[ANY_VALUE]]
-// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK:         [[OPTIONAL_ADDR:%.*]] = alloc_stack $Optional<Any>
+// CHECK-NEXT:    [[OPTIONAL_PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[OPTIONAL_ADDR]] : $*Optional<Any>, #Optional.some
+// CHECK-NEXT:    [[ANY_PAYLOAD_ADDR:%.*]] = init_existential_addr [[OPTIONAL_PAYLOAD_ADDR]] : $*Any, $(Int, Int)
+// CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD_ADDR]]
 // CHECK-NEXT:    store %0 to [trivial] [[LEFT_ADDR]]
-// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
+// CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD_ADDR]]
 // CHECK-NEXT:    store %1 to [trivial] [[RIGHT_ADDR]]
-// CHECK-NEXT:    [[OPTIONAL_VALUE:%.*]] = alloc_stack $Optional<Any>
-// CHECK-NEXT:    [[OPTIONAL_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    copy_addr [take] [[ANY_VALUE]] to [init] [[OPTIONAL_PAYLOAD]]
-// CHECK-NEXT:    inject_enum_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    apply %2([[OPTIONAL_VALUE]])
+// CHECK-NEXT:    inject_enum_addr [[OPTIONAL_ADDR]]
+// CHECK-NEXT:    apply %2([[OPTIONAL_ADDR]])
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    destroy_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    dealloc_stack [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    dealloc_stack [[ANY_VALUE]]
+// CHECK-NEXT:    destroy_addr [[OPTIONAL_ADDR]]
+// CHECK-NEXT:    dealloc_stack [[OPTIONAL_ADDR]]
 // CHECK-NEXT:    return
 
 // ==== Support collection subtyping in function argument position

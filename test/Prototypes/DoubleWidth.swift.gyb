@@ -393,8 +393,10 @@ extension DoubleWidth : FixedWidthInteger {
         
     let low =
       DoubleWidth<Low>(mid1.partial, a.partial)
+    let (sum_, overflow_) =
+      mid1.carry.addingReportingOverflow(mid2.partial)
     let high =
-      DoubleWidth(High(mid2.carry + d.carry), mid1.carry + mid2.partial)
+      DoubleWidth(High(mid2.carry + d.carry + (overflow_ ? 1 : 0)), sum_)
         
     if isNegative {
       let (lowComplement, overflow) = (~low).addingReportingOverflow(1)
@@ -595,9 +597,13 @@ extension DoubleWidth : UnsignedInteger where Base : UnsignedInteger {
   ) -> (quotient: Low, remainder: Magnitude) {
     // The following invariants are guaranteed to hold by dividingFullWidth or
     // quotientAndRemainder before this method is invoked:
-    assert(lhs.high != (0 as Low))
     assert(rhs.leadingZeroBitCount == 0)
     assert(Magnitude(lhs.high, lhs.mid) < rhs)
+
+    guard lhs.high != (0 as Low) else {
+      let lhs_ = Magnitude(lhs.mid, lhs.low)
+      return lhs_ < rhs ? (0, lhs_) : (1, lhs_ &- rhs)
+    }
 
     // Estimate the quotient.
     var quotient = lhs.high == rhs.high
@@ -699,8 +705,10 @@ extension DoubleWidth : UnsignedInteger where Base : UnsignedInteger {
 
     // Left shift both rhs and lhs, then divide and right shift the remainder.
     let shift = rhs.leadingZeroBitCount
+    // Note the use of `>>` instead of `&>>` below,
+    // as `high` should be zero if `shift` is zero.
+    let high = (lhs >> (Magnitude.bitWidth &- shift)).low
     let rhs = rhs &<< shift
-    let high = (lhs &>> (Magnitude.bitWidth &- shift)).low
     let lhs = lhs &<< shift
     let (quotient, remainder) =
       Magnitude._divide((high, lhs.high, lhs.low), by: rhs)
@@ -805,6 +813,34 @@ dwTests.test("Arithmetic/unsigned") {
 
   expectEqual(x % 3, 1)
   expectEqual(x % y, x)
+
+  do {
+    let lhs = DoubleWidth<UInt8>((high: 0b0011_0000, low: 0))
+    let rhs = DoubleWidth<UInt8>((high: 0b0010_0000, low: 0))
+    expectEqual(lhs % rhs, 4096)
+  }
+  do {
+    let lhs = UInt128((high: 0xa0c7d7165cf01386, low: 0xbf3f66a93056143f))
+    let rhs = UInt128((high: 0x9ac3a19b1e7d6b83, low: 0x513929792d588736))
+    expectEqual(String(lhs % rhs), "7997221894243298914179865336050715913")
+  }
+  do {
+    let lhs = UInt128((high: 0xea8a9116b7af33b7, low: 0x3d9d6779ddd22ca3))
+    let rhs = UInt128((high: 0xc3673efc7f1f37cc, low: 0x312f661057d0ba94))
+    expectEqual(String(lhs % rhs), "52023287460685389410162512181093036559")
+  }
+  do {
+    let lhs = UInt256("2369676578372158364766242369061213561181961479062237766620")!
+    let rhs = UInt256("102797312405202436815976773795958969482")!
+    expectEqual(String(lhs / rhs), "23051931251193218442")
+  }
+  do {
+    let lhs = UInt256("96467201117289166187766181030232879447148862859323917044548749804018359008044")!
+    let rhs = UInt256("4646260627574879223760172113656436161581617773435991717024")!
+    expectEqual(String(lhs / rhs), "20762331011904583253")
+  }
+
+  expectTrue((0xff01 as DoubleWidth<UInt8>).multipliedFullWidth(by: 0x101) == (high: 256, low: 1))
 }
 
 dwTests.test("Arithmetic/signed") {

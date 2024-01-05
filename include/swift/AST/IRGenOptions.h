@@ -273,6 +273,8 @@ public:
   /// Whether to enable ODR indicators when building with ASan.
   unsigned SanitizeAddressUseODRIndicator : 1;
 
+  unsigned SanitizerUseStableABI : 1;
+
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
@@ -516,7 +518,7 @@ public:
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
-        SanitizeAddressUseODRIndicator(false),
+        SanitizeAddressUseODRIndicator(false), SanitizerUseStableABI(false),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
@@ -537,7 +539,7 @@ public:
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLayoutStringValueWitnesses(false),
         EnableLayoutStringValueWitnessesInstantiation(false),
-        EnableObjectiveCProtocolSymbolicReferences(false),
+        EnableObjectiveCProtocolSymbolicReferences(true),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),

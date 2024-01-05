@@ -234,7 +234,7 @@ extension UnaryInstruction {
 final public class UnimplementedInstruction : Instruction {
 }
 
-public protocol StoringInstruction : AnyObject {
+public protocol StoringInstruction : Instruction {
   var operands: OperandArray { get }
 }
 
@@ -269,6 +269,8 @@ final public class StoreInst : Instruction, StoringInstruction {
 
 final public class StoreWeakInst : Instruction, StoringInstruction { }
 final public class StoreUnownedInst : Instruction, StoringInstruction { }
+
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction { }
 
 final public class AssignInst : Instruction, StoringInstruction {
   // must match with enum class swift::AssignOwnershipQualifier
@@ -357,9 +359,9 @@ final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 public struct VarDecl {
   var bridged: BridgedVarDecl
   
-  public init?(bridged: OptionalBridgedVarDecl) {
-    guard let decl = bridged.decl else { return nil }
-    self.bridged = BridgedVarDecl(decl: decl)
+  public init?(bridged: BridgedNullableVarDecl) {
+    guard let decl = bridged.raw else { return nil }
+    self.bridged = BridgedVarDecl(raw: decl)
   }
   
   public var userFacingName: String { String(bridged.getUserFacingName()) }
@@ -438,6 +440,8 @@ final public class DestroyAddrInst : Instruction, UnaryInstruction {
   public var destroyedAddress: Value { operand.value }
 }
 
+final public class EndLifetimeInst : Instruction, UnaryInstruction {}
+
 final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.InjectEnumAddrInst_caseIndex() }
@@ -493,6 +497,9 @@ extension LoadInstruction {
   public var address: Value { operand.value }
 }
 
+/// Instructions, beginning a borrow-scope which must be ended by `end_borrow`.
+public protocol BorrowIntroducingInstruction : SingleValueInstruction {}
+
 final public class LoadInst : SingleValueInstruction, LoadInstruction {
   // must match with enum class LoadOwnershipQualifier
   public enum LoadOwnership: Int {
@@ -505,7 +512,7 @@ final public class LoadInst : SingleValueInstruction, LoadInstruction {
 
 final public class LoadWeakInst : SingleValueInstruction, LoadInstruction {}
 final public class LoadUnownedInst : SingleValueInstruction, LoadInstruction {}
-final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction {}
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
   public typealias ID = BridgedInstruction.BuiltinValueKind
@@ -817,13 +824,13 @@ class GetAsyncContinuationInst : SingleValueInstruction {}
 final public
 class GetAsyncContinuationAddrInst : SingleValueInstruction, UnaryInstruction {}
 
-
 final public
 class MarkDependenceInst : SingleValueInstruction, ForwardingInstruction {
   public var valueOperand: Operand { operands[0] }
   public var baseOperand: Operand { operands[1] }
   public var value: Value { return valueOperand.value }
   public var base: Value { return baseOperand.value }
+  public var isNonEscaping: Bool { bridged.MarkDependenceInst_isNonEscaping() }
 }
 
 final public class RefToBridgeObjectInst : SingleValueInstruction, ForwardingInstruction {
@@ -834,8 +841,7 @@ final public class RefToBridgeObjectInst : SingleValueInstruction, ForwardingIns
 final public class BridgeObjectToRefInst : SingleValueInstruction,
                                            ConversionInstruction {}
 
-final public class BridgeObjectToWordInst : SingleValueInstruction,
-                                           ConversionInstruction {}
+final public class BridgeObjectToWordInst : SingleValueInstruction {}
 
 public typealias AccessKind = BridgedInstruction.AccessKind
 
@@ -870,15 +876,10 @@ extension BeginAccessInst : ScopedInstruction {
   }
 }
 
-final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {
+final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
   public var borrowedValue: Value { operand.value }
 
-  public typealias EndBorrowSequence = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndBorrowInst?>>,
-                                                       EndBorrowInst>
-
-  public var endBorrows: EndBorrowSequence {
-    uses.lazy.compactMap({ $0.instruction as? EndBorrowInst })
-  }
+  public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
@@ -913,21 +914,7 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
-
-  public func calleeArgIndex(callerArgIndex: Int) -> Int {
-    bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() + callerArgIndex
-  }
-
-  public func callerArgIndex(calleeArgIndex: Int) -> Int? {
-    let firstIdx = bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg()
-    if calleeArgIndex >= firstIdx {
-      let callerIdx = calleeArgIndex - firstIdx
-      if callerIdx < numArguments {
-        return callerIdx
-      }
-    }
-    return nil
-  }
+  public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
@@ -971,6 +958,9 @@ final public class ObjectInst : SingleValueInstruction {
   }
 }
 
+final public class VectorInst : SingleValueInstruction {
+}
+
 final public class TuplePackExtractInst: SingleValueInstruction, ForwardingInstruction {
   public var indexOperand: Operand { operands[0] }
   public var tupleOperand: Operand { operands[1] }
@@ -996,6 +986,10 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var debugVariable: DebugVariable {
     return bridged.AllocStack_getVarInfo()
   }
+}
+
+final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
+  public var capacity: Value { operand.value }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
@@ -1063,6 +1057,8 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
   public var singleDirectResult: Value? { nil }
 
+  public var token: Value { getResult(index: resultCount - 1) }
+
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - 1)
   }
@@ -1091,6 +1087,10 @@ final public class ReturnInst : TermInst, UnaryInstruction {
 
 final public class ThrowInst : TermInst, UnaryInstruction {
   public var thrownValue: Value { operand.value }
+  public override var isFunctionExiting: Bool { true }
+}
+
+final public class ThrowAddrInst : TermInst {
   public override var isFunctionExiting: Bool { true }
 }
 

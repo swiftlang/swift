@@ -284,6 +284,8 @@ public:
     return is<BuiltinVectorType>();
   }
 
+  bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
+
   SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
@@ -392,6 +394,9 @@ public:
 
   /// Whether the type contains any flavor of pack.
   bool hasAnyPack() const { return getASTType()->hasAnyPack(); }
+
+  /// Whether the type's layout is known to include some flavor of pack.
+  bool isOrContainsPack(const SILFunction &F) const;
 
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
@@ -860,10 +865,6 @@ public:
     if (!this->is<SILBoxType>())
       return false;
     return getSILBoxFieldType(fn).isMoveOnly();
-  }
-
-  bool isBoxedNonCopyableType(const SILFunction &fn) const {
-    return isBoxedNonCopyableType(&fn);
   }
 
   bool isBoxedMoveOnlyWrappedType(const SILFunction *fn) const {

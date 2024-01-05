@@ -21,7 +21,6 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
@@ -421,6 +420,12 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       MadeChange = true;
       continue;
     }
+#ifndef NDEBUG
+    std::string OrigIStr;
+#endif
+    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigIStr); I->print(SS);
+               OrigIStr = SS.str(););
+    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigIStr << '\n');
 
     // Canonicalize the instruction.
     if (scCanonicalize.tryCanonicalize(I)) {
@@ -456,13 +461,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     // Then begin... SILCombine.
     Builder.setInsertionPoint(I);
-
-#ifndef NDEBUG
-    std::string OrigIStr;
-#endif
-    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigIStr); I->print(SS);
-               OrigIStr = SS.str(););
-    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigIStr << '\n');
 
     SILInstruction *currentInst = I;
     if (SILInstruction *Result = visit(I)) {
@@ -542,7 +540,7 @@ static bool passesRegistered = false;
 // Called from initializeSwiftModules().
 void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn) {
-  swiftInstPasses[instClassName.get()] = runFn;
+  swiftInstPasses[instClassName.unbridged()] = runFn;
   passesRegistered = true;
 }
 

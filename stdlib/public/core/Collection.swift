@@ -923,7 +923,6 @@ extension Collection {
   ///   sequence may change when your program is compiled using a different
   ///   version of Swift.
   @inlinable
-  @_unavailableInEmbedded
   public func randomElement<T: RandomNumberGenerator>(
     using generator: inout T
   ) -> Element? {

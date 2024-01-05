@@ -64,6 +64,7 @@ class ModuleDecl;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
+class IdentTypeRepr;
 
 class alignas(1 << AttrAlignInBits) AttributeBase
     : public ASTAllocated<AttributeBase> {
@@ -1769,6 +1770,15 @@ public:
   TypeRepr *getTypeRepr() const;
   Type getType() const;
 
+  /// Destructure an attribute's type repr for a macro reference.
+  ///
+  /// For a 1-level member type repr whose base and member are both identifier
+  /// types, e.g. `Foo.Bar`, return a pair of the base and the member.
+  ///
+  /// For an identifier type repr, return a pair of `nullptr` and the
+  /// identifier.
+  std::pair<IdentTypeRepr *, IdentTypeRepr *> destructureMacroRef();
+
   /// Whether the attribute has any arguments.
   bool hasArgs() const { return argList != nullptr; }
 
@@ -2343,7 +2353,7 @@ public:
   }
 };
 
-/// Define the `@extern` attribute, used to import external declarations in
+/// Define the `@_extern` attribute, used to import external declarations in
 /// the specified way to interoperate with Swift.
 class ExternAttr : public DeclAttribute {
   SourceLoc LParenLoc, RParenLoc;
@@ -2368,7 +2378,7 @@ public:
   const llvm::Optional<StringRef> ModuleName;
 
   /// The declaration name to import
-  /// std::nullopt if the declaration name is not specified with @extern(c)
+  /// std::nullopt if the declaration name is not specified with @_extern(c)
   const llvm::Optional<StringRef> Name;
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
@@ -2847,53 +2857,62 @@ public:
   SourceLoc getStartLoc(bool forModifiers = false) const;
 };
 
-/// Predicate used to filter attributes to only the original attributes.
-class OrigDeclAttrFilter {
+/// Predicate used to filter attributes to only the parsed attributes.
+class ParsedDeclAttrFilter {
   const Decl *decl;
 
 public:
-  OrigDeclAttrFilter() : decl(nullptr) {}
+  ParsedDeclAttrFilter() : decl(nullptr) {}
 
-  OrigDeclAttrFilter(const Decl *decl) : decl(decl) {}
+  ParsedDeclAttrFilter(const Decl *decl) : decl(decl) {}
 
   llvm::Optional<const DeclAttribute *>
   operator()(const DeclAttribute *Attr) const;
 };
 
-/// Attributes applied directly to the declaration.
+/// Attributes written in source on a declaration.
 ///
 /// We should really just have \c DeclAttributes and \c SemanticDeclAttributes,
 /// but currently almost all callers expect the latter. Instead of changing all
 /// callers of \c getAttrs, instead provide a way to retrieve the original
 /// attributes.
-class OrigDeclAttributes {
+class ParsedDeclAttributes {
 public:
-  using OrigFilteredRange = OptionalTransformRange<iterator_range<DeclAttributes::const_iterator>, OrigDeclAttrFilter>;
+  using ParsedFilteredRange =
+      OptionalTransformRange<iterator_range<DeclAttributes::const_iterator>,
+                             ParsedDeclAttrFilter>;
 
 private:
-  OrigFilteredRange origRange;
+  ParsedFilteredRange parsedRange;
 
 public:
-  OrigDeclAttributes() : origRange(make_range(DeclAttributes::const_iterator(nullptr), DeclAttributes::const_iterator(nullptr)), OrigDeclAttrFilter()) {}
+  ParsedDeclAttributes()
+      : parsedRange(make_range(DeclAttributes::const_iterator(nullptr),
+                               DeclAttributes::const_iterator(nullptr)),
+                    ParsedDeclAttrFilter()) {}
 
-  OrigDeclAttributes(const DeclAttributes &allAttrs, const Decl *decl) : origRange(make_range(allAttrs.begin(), allAttrs.end()), OrigDeclAttrFilter(decl)) {}
+  ParsedDeclAttributes(const DeclAttributes &allAttrs, const Decl *decl)
+      : parsedRange(make_range(allAttrs.begin(), allAttrs.end()),
+                    ParsedDeclAttrFilter(decl)) {}
 
-  OrigFilteredRange::iterator begin() const { return origRange.begin(); }
-  OrigFilteredRange::iterator end() const { return origRange.end(); }
+  ParsedFilteredRange::iterator begin() const { return parsedRange.begin(); }
+  ParsedFilteredRange::iterator end() const { return parsedRange.end(); }
 
   template <typename AttrType, bool AllowInvalid>
   using AttributeKindRange =
-  OptionalTransformRange<OrigFilteredRange, ToAttributeKind<AttrType, AllowInvalid>>;
+      OptionalTransformRange<ParsedFilteredRange,
+                             ToAttributeKind<AttrType, AllowInvalid>>;
 
   template <typename AttrType, bool AllowInvalid = false>
   AttributeKindRange<AttrType, AllowInvalid> getAttributes() const {
-    return AttributeKindRange<AttrType, AllowInvalid>(origRange, ToAttributeKind<AttrType, AllowInvalid>());
+    return AttributeKindRange<AttrType, AllowInvalid>(
+        parsedRange, ToAttributeKind<AttrType, AllowInvalid>());
   }
 
   /// Retrieve the first attribute of the given attribute class.
   template <typename AttrType>
   const AttrType *getAttribute(bool allowInvalid = false) const {
-    for (auto *attr : origRange) {
+    for (auto *attr : parsedRange) {
       if (auto *specificAttr = dyn_cast<AttrType>(attr)) {
         if (specificAttr->isValid() || allowInvalid)
           return specificAttr;

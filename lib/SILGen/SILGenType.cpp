@@ -307,7 +307,7 @@ public:
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !isResilient)
+    if (classIsPublic && !theClass->hasPackageAccess() && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -758,7 +758,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
     CanAnyFunctionType::get(genericSig,
                             reqtSubstTy->getParams(),
                             reqtSubstTy.getResult(),
-                            reqtOrigTy->getExtInfo());
+                            reqtSubstTy->getExtInfo());
 
   // Coroutine lowering requires us to provide these substitutions
   // in order to recreate the appropriate yield types for the accessor
@@ -1080,7 +1080,7 @@ void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
   auto serialized = IsSerialized_t::IsNotSerialized;
   bool nomIsPublic = nom->getEffectiveAccess() >= AccessLevel::Public;
   // We only serialize the deinit if the type is public and not resilient.
-  if (nomIsPublic && !nom->isResilient())
+  if (nomIsPublic && !nom->hasPackageAccess() && !nom->isResilient())
     serialized = IsSerialized;
   SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
 }
@@ -1113,7 +1113,7 @@ public:
 
     // If this is a nominal type that is move only, emit a deinit table for it.
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->isNoncopyable()) {
+      if (nom->canBeNoncopyable()) {
         SGM.emitNonCopyableTypeDeinitTable(nom);
       }
     }
@@ -1178,7 +1178,7 @@ public:
     if (auto *cd = dyn_cast<ClassDecl>(theType))
       return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->isNoncopyable()) {
+      if (nom->canBeNoncopyable()) {
         return SGM.emitMoveOnlyDestructor(nom, dd);
       }
     }
@@ -1242,7 +1242,7 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    SGM.visitEmittedAccessors(asd, [&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
   }
@@ -1422,7 +1422,7 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    SGM.visitEmittedAccessors(asd, [&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
   }

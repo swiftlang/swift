@@ -173,7 +173,7 @@ namespace {
 
       if (ctx.TypeCheckerOpts.DebugTimeFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
-        llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
+        llvm::errs() << llvm::format("%0.2f", std::ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
 
         if (AFD) {
@@ -1090,12 +1090,6 @@ public:
     Expr *E = RS->getResult();
     TypeCheckExprOptions options = {};
     
-    if (LeaveBraceStmtBodyUnchecked) {
-      assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
-             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
-
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
@@ -1201,8 +1195,7 @@ public:
         DC->getParentModule(), TS->getThrowLoc());
     Type errorType;
     if (catchNode) {
-      errorType = catchNode.getThrownErrorTypeInContext(getASTContext())
-          .value_or(Type());
+      errorType = catchNode.getThrownErrorTypeInContext(Ctx).value_or(Type());
     }
 
     // If there was no error type, use 'any Error'. We'll check it later.
@@ -1383,15 +1376,15 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, IS);
 
-    Stmt *S = IS->getThenStmt();
-    typeCheckStmt(S);
-    IS->setThenStmt(S);
+    auto *TS = IS->getThenStmt();
+    typeCheckStmt(TS);
+    IS->setThenStmt(TS);
 
-    if ((S = IS->getElseStmt())) {
-      typeCheckStmt(S);
-      IS->setElseStmt(S);
+    if (auto *ES = IS->getElseStmt()) {
+      typeCheckStmt(ES);
+      IS->setElseStmt(ES);
     }
-    
+
     return IS;
   }
   
@@ -1475,6 +1468,7 @@ public:
   }
 
   void checkCaseLabelItemPattern(CaseStmt *caseBlock, CaseLabelItem &labelItem,
+                                 CaseParentKind parentKind,
                                  bool &limitExhaustivityChecks,
                                  Type subjectType) {
     Pattern *pattern = labelItem.getPattern();
@@ -1491,6 +1485,9 @@ public:
     if (subjectType) {
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
       TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      if (parentKind == CaseParentKind::DoCatch)
+        patternOptions |= TypeResolutionFlags::SilenceNeverWarnings;
+
       auto coercedPattern = TypeChecker::coercePatternToType(
           contextualPattern, subjectType, patternOptions);
       if (coercedPattern)
@@ -1591,8 +1588,8 @@ public:
       for (auto &labelItem : caseLabelItemArray) {
         // Resolve the pattern in our case label if it has not been resolved and
         // check that our var decls follow invariants.
-        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
-                                  subjectType);
+        checkCaseLabelItemPattern(caseBlock, labelItem, parentKind,
+                                  limitExhaustivityChecks, subjectType);
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
@@ -1684,7 +1681,7 @@ public:
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
 
-    Type caughtErrorType = TypeChecker::catchErrorType(Ctx, S);
+    Type caughtErrorType = TypeChecker::catchErrorType(DC, S);
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
@@ -2046,9 +2043,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
         (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
     if (isDiscarded)
       options |= TypeCheckExprFlags::IsDiscarded;
-    if (LeaveBraceStmtBodyUnchecked) {
-      options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-    }
 
     auto resultTy =
         TypeChecker::typeCheckExpression(E, DC, /*contextualInfo=*/{}, options);
@@ -2086,7 +2080,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(D, LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(D);
     return;
   }
 
@@ -2395,8 +2389,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (auto Init = PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/false);
+            typeCheckPatternBinding(PBD, i);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
             // This is important to get the correct USR of variables defined
             // in closures initializing lazy variables.
@@ -2716,11 +2709,66 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   return body;
 }
 
+/// Determine whether the given declaration requires a definition.
+///
+/// Only valid for declarations that can have definitions, i.e.,
+/// functions, initializers, etc.
+static bool requiresDefinition(Decl *decl) {
+  // Invalid, implicit, and Clang-imported declarations never
+  // require a definition.
+  if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
+    return false;
+
+  // Protocol requirements do not require definitions.
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return false;
+
+  // Functions can have _silgen_name, semantics, and NSManaged attributes.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
+        func->getAttrs().hasAttribute<ExternAttr>() ||
+        func->getAttrs().hasAttribute<SemanticsAttr>() ||
+        func->getAttrs().hasAttribute<NSManagedAttr>())
+      return false;
+  }
+
+  // Declarations in SIL and module interface files don't require
+  // definitions.
+  auto dc = decl->getDeclContext();
+  if (auto sourceFile = dc->getParentSourceFile()) {
+    switch (sourceFile->Kind) {
+    case SourceFileKind::SIL:
+    case SourceFileKind::Interface:
+      return false;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::MacroExpansion:
+      break;
+    }
+  }
+
+  // Declarations deserialized from a module file don't require definitions.
+  if (auto fileUnit = dyn_cast<FileUnit>(dc->getModuleScopeContext()))
+    if (fileUnit->getKind() == FileUnitKind::SerializedAST)
+      return false;
+
+  // Everything else requires a definition.
+  return true;
+}
+
+/// Determine whether the given declaration should not have a definition.
+static bool requiresNoDefinition(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    // Function with @_extern should not have a body.
+    return func->getAttrs().hasAttribute<ExternAttr>();
+  }
+  // Everything else can have a definition.
+  return false;
+}
+
 BraceStmt *
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
-  assert(!AFD->isBodySkipped());
-
   ASTContext &ctx = AFD->getASTContext();
 
   llvm::Optional<FunctionBodyTimer> timer;
@@ -2728,11 +2776,31 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
 
-  auto SF = AFD->getParentSourceFile();
-  if (SF)
-    TypeChecker::buildTypeRefinementContextHierarchyDelayed(*SF, AFD);
+  /// If the function body has been skipped, there's nothing to do here.
+  if (AFD->isBodySkipped())
+    return nullptr;
 
-  BraceStmt *body = AFD->getBody();
+  BraceStmt *body = AFD->getMacroExpandedBody();
+
+  // If there is no function body, there is nothing to type-check.
+  if (!body) {
+    // If a definition is required here, complain.
+    if (requiresDefinition(AFD)) {
+      if (isa<ConstructorDecl>(AFD))
+        AFD->diagnose(diag::missing_initializer_def);
+      else
+        AFD->diagnose(diag::func_decl_without_brace);
+    }
+
+    return nullptr;
+  }
+
+  // If the function body must not have a definition, complain and drop it.
+  if (requiresNoDefinition(AFD)) {
+    AFD->diagnose(diag::func_decl_no_body_expected);
+    return nullptr;
+  }
+
   assert(body && "Expected body to type-check");
 
   // It's possible we synthesized an already type-checked body, in which case
@@ -2778,12 +2846,22 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   // So, build out the body now.
   ASTScope::expandFunctionBody(AFD);
 
+  if (AFD->isDistributedThunk()) {
+    if (auto func = dyn_cast<FuncDecl>(AFD)) {
+      if (TypeChecker::checkDistributedFunc(func)) {
+        return errorBody();
+      }
+    }
+  }
+
   // Type check the function body if needed.
   bool hadError = false;
   if (!alreadyTypeChecked) {
     StmtChecker SC(AFD);
     hadError = SC.typeCheckBody(body);
   }
+
+
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means

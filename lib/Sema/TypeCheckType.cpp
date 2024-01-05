@@ -2086,8 +2086,6 @@ namespace {
 
     bool diagnoseMoveOnlyGeneric(TypeRepr *repr,
                                  Type unboundTy, Type genericArgTy);
-    bool diagnoseMissingOwnership(TypeRepr *repr,
-                                  TypeResolutionOptions options);
     
     bool diagnoseDisallowedExistential(TypeRepr *repr);
     
@@ -2148,6 +2146,8 @@ namespace {
                                           TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
+    NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
+                                                 TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2360,60 +2360,49 @@ bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
   return false;
 }
 
-/// Assuming this repr has resolved to a noncopyable type, checks
-/// to see if that resolution happened in a context requiring an ownership
-/// annotation. If it did and there was no ownership specified, emits a
-/// diagnostic.
-///
-/// \returns true if an error diagnostic was emitted
-bool TypeResolver::diagnoseMissingOwnership(TypeRepr *repr,
-                                            TypeResolutionOptions options) {
-  // Though this is only required on function inputs... we can ignore
-  // InoutFunctionInput since it's already got ownership.
-  if (!options.is(TypeResolverContext::FunctionInput))
-    return false;
 
-  // Enum cases don't need to specify ownership for associated values
+bool swift::diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
+                                     ParamSpecifier ownership,
+                                     TypeRepr *repr, Type ty,
+                                     TypeResolutionOptions options) {
+  assert(!ty->hasError());
+  assert(!options.contains(TypeResolutionFlags::SILType));
+
   if (options.hasBase(TypeResolverContext::EnumElementDecl))
-    return false;
+    return false; // no need for ownership in enum cases.
 
-  // Otherwise, we require ownership.
-  if (options.contains(TypeResolutionFlags::HasOwnership))
-    return false;
+  if (!ty->isNoncopyable(dc))
+    return false; // copyable types do not need ownership
 
-  // Don't diagnose in SIL; ownership is already required there.
-  if (options.contains(TypeResolutionFlags::SILType))
-    return false;
+  if (ownership != ParamSpecifier::Default)
+    return false; // it has ownership
 
-  //////////////////
-  // At this point, we know we have a noncopyable parameter that is missing an
-  // ownership specifier, so we need to emit an error
+  auto &diags = ctx.Diags;
+  auto loc = repr->getLoc();
+  repr->setInvalid();
 
   // We don't yet support any ownership specifiers for parameters of subscript
   // decls, give a tailored error message saying you simply can't use a
   // noncopyable type here.
   if (options.hasBase(TypeResolverContext::SubscriptDecl)) {
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_subscript_unsupported);
+    diags.diagnose(loc, diag::noncopyable_parameter_subscript_unsupported);
   } else {
     // general error diagnostic
-    diagnose(repr->getLoc(),
-             diag::noncopyable_parameter_requires_ownership);
+    diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
 
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_ownership_suggestion,
-             "borrowing", "for an immutable reference")
+    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                   "borrowing", "for an immutable reference")
         .fixItInsert(repr->getStartLoc(), "borrowing ");
 
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_ownership_suggestion,
-             "inout", "for a mutable reference")
+    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                   "inout", "for a mutable reference")
         .fixItInsert(repr->getStartLoc(), "inout ");
 
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_ownership_suggestion,
-             "consuming", "to take the value from the caller")
+    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                   "consuming", "to take the value from the caller")
         .fixItInsert(repr->getStartLoc(), "consuming ");
   }
 
-  // to avoid duplicate diagnostics
-  repr->setInvalid();
   return true;
 }
 
@@ -2444,6 +2433,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   switch (repr->getKind()) {
   case TypeReprKind::Error:
+    cast<ErrorTypeRepr>(repr)->dischargeDiagnostic(getASTContext());
     return ErrorType::get(getASTContext());
 
   case TypeReprKind::Attributed:
@@ -2643,6 +2633,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
+
+  case TypeReprKind::ResultDependsOn:
+    return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
+                                          options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -3473,6 +3467,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
   SmallVector<AnyFunctionType::Param, 8> elements;
   elements.reserve(inputRepr->getNumElements());
 
+  auto *dc = getDeclContext();
+
   auto elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::FunctionInput);
   for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
@@ -3486,6 +3482,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool isolated = false;
     bool compileTimeConst = false;
+    bool hasResultDependsOn = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
@@ -3499,6 +3496,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::CompileTimeConst:
           compileTimeConst = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::ResultDependsOn:
+          hasResultDependsOn = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3517,7 +3518,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       if (ATR->getAttrs().has(TAK_noDerivative)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
             isDifferentiableProgrammingEnabled(
-                *getDeclContext()->getParentSourceFile()))
+                *dc->getParentSourceFile()))
           diagnose(nestedRepr->getLoc(),
                    diag::attr_only_on_parameters_of_differentiable,
                    "@noDerivative")
@@ -3565,6 +3566,24 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       }
     }
 
+    // Validate the presence of ownership for a noncopyable parameter.
+    if (inStage(TypeResolutionStage::Interface)) {
+      diagnoseMissingOwnership(getASTContext(), dc, ownership,
+                               eltTypeRepr, ty, options);
+
+      // @_staticExclusiveOnly types cannot be passed as 'inout' in function
+      // types.
+      if (auto SD = ty->getStructOrBoundGenericStruct()) {
+        if (getASTContext().LangOpts.hasFeature(Feature::StaticExclusiveOnly) &&
+            SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
+            ownership == ParamSpecifier::InOut) {
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::attr_static_exclusive_only_let_only_param,
+                   ty);
+        }
+      }
+    }
+
     Identifier argumentLabel;
     Identifier parameterName;
     if (inputRepr->getElement(i).NameLoc.isValid() &&
@@ -3579,7 +3598,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst);
+        isolated, noDerivative, compileTimeConst, hasResultDependsOn);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -3701,11 +3720,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   Type thrownTy;
   if (auto thrownTypeRepr = repr->getThrownTypeRepr()) {
     ASTContext &ctx = getASTContext();
-    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
-      diagnoseInvalid(
-          thrownTypeRepr, thrownTypeRepr->getLoc(), diag::experimental_typed_throws);
-    }
-
     auto thrownTypeOptions = options.withoutContext();
     thrownTy = resolveType(thrownTypeRepr, thrownTypeOptions);
     if (thrownTy->hasError()) {
@@ -4025,8 +4039,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   auto convention = DefaultParameterConvention;
   Type type;
   bool hadError = false;
-  auto differentiability =
-      SILParameterDifferentiability::DifferentiableOrNotApplicable;
+  auto parameterOptions = SILParameterInfo::Options();
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
@@ -4060,7 +4073,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
              ParameterConvention::Pack_Inout);
     if (attrs.has(TAK_noDerivative)) {
       attrs.clearAttribute(TAK_noDerivative);
-      differentiability = SILParameterDifferentiability::NotDifferentiable;
+      parameterOptions |= SILParameterInfo::NotDifferentiable;
     }
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
@@ -4080,7 +4093,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   if (hadError)
     type = ErrorType::get(getASTContext());
   return SILParameterInfo(type->getCanonicalType(), convention,
-                          differentiability);
+                          parameterOptions);
 }
 
 bool TypeResolver::resolveSingleSILResult(
@@ -4091,8 +4104,7 @@ bool TypeResolver::resolveSingleSILResult(
   Type type;
   auto convention = DefaultResultConvention;
   bool isErrorResult = false;
-  auto differentiability =
-      SILResultDifferentiability::DifferentiableOrNotApplicable;
+  SILResultInfo::Options resultInfoOptions;
   options.setContext(TypeResolverContext::FunctionResult);
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
@@ -4141,7 +4153,7 @@ bool TypeResolver::resolveSingleSILResult(
     // Recognize `@noDerivative`.
     if (attrs.has(TAK_noDerivative)) {
       attrs.clearAttribute(TAK_noDerivative);
-      differentiability = SILResultDifferentiability::NotDifferentiable;
+      resultInfoOptions |= SILResultInfo::NotDifferentiable;
     }
 
     // Recognize result conventions.
@@ -4179,7 +4191,7 @@ bool TypeResolver::resolveSingleSILResult(
   }
 
   SILResultInfo resolvedResult(type->getCanonicalType(), convention,
-                               differentiability);
+                               resultInfoOptions);
 
   if (!isErrorResult) {
     ordinaryResults.push_back(resolvedResult);
@@ -4389,10 +4401,6 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     }
   }
 
-  // Noncopyable types must have an ownership specifier when used as a parameter
-  if (inStage(TypeResolutionStage::Interface) && result->isNoncopyable(dc))
-      diagnoseMissingOwnership(repr, options);
-
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
   if (result->is<FunctionType>())
@@ -4435,9 +4443,6 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     options.setContext(TypeResolverContext::InoutFunctionInput);
   }
 
-  // Remember that we've seen an ownership specifier for this base type.
-  options |= TypeResolutionFlags::HasOwnership;
-
   auto result = resolveType(repr->getBase(), options);
   if (result->hasError())
     return result;
@@ -4461,7 +4466,6 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     }
     break;
   }
-
   return result;
 }
 
@@ -4521,6 +4525,31 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   }
 
   return ArraySliceType::get(baseTy);
+}
+
+NeverNullType
+TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
+                                             TypeResolutionOptions options) {
+  // _resultDependsOn is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters.
+  if (!options.is(TypeResolverContext::FunctionInput) ||
+      options.hasBase(TypeResolverContext::SubscriptDecl) ||
+      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+
+    decltype(diag::attr_only_on_parameters) diagID;
+    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
+        options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagID = diag::attr_only_valid_on_func_or_init_params;
+    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
+      diagID = diag::attr_not_on_variadic_parameters;
+    } else {
+      diagID = diag::attr_only_on_parameters;
+    }
+
+    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, "_resultDependsOn");
+    return ErrorType::get(getASTContext());
+  }
+  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType
@@ -4955,6 +4984,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // there is only one superclass.
   Type SuperclassType;
   SmallVector<Type, 4> Members;
+  InvertibleProtocolSet Inverses;
 
   // Whether we saw at least one protocol. A protocol composition
   // must either be empty (in which case it is Any or AnyObject),
@@ -5005,7 +5035,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         continue;
       }
 
-      if (ty->is<ProtocolCompositionType>()) {
+      if (auto pct = ty->getAs<ProtocolCompositionType>()) {
         auto layout = ty->getExistentialLayout();
         if (auto superclass = layout.explicitSuperclass)
           if (checkSuperclass(tyR->getStartLoc(), superclass))
@@ -5013,6 +5043,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
         if (!layout.getProtocols().empty())
           HasProtocol = true;
 
+        Inverses.insertAll(pct->getInverses());
         Members.push_back(ty);
         continue;
       }
@@ -5039,7 +5070,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // In user-written types, AnyObject constraints always refer to the
   // AnyObject type in the standard library.
   auto composition =
-      ProtocolCompositionType::get(getASTContext(), Members,
+      ProtocolCompositionType::get(getASTContext(), Members, Inverses,
                                    /*HasExplicitAnyObject=*/false);
   if (options.isConstraintImplicitExistential()) {
     return ExistentialType::get(composition);
@@ -5159,9 +5190,20 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
-  if (auto kp = ty->getKnownProtocol())
-    if (getInvertibleProtocols().contains(*kp))
-      return ty; // FIXME: this ought to be wrapped in an InverseType
+  if (auto kp = ty->getKnownProtocol()) {
+    if (auto kind = getInvertibleProtocolKind(*kp)) {
+
+      // Gate the '~Escapable' type behind a specific flag for now.
+      if (*kind == InvertibleProtocolKind::Escapable &&
+          !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
+        diagnoseInvalid(repr, repr->getLoc(),
+                        diag::escapable_requires_feature_flag);
+        return ErrorType::get(getASTContext());
+      }
+
+      return ProtocolCompositionType::getInverseOf(getASTContext(), *kind);
+    }
+  }
 
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());
@@ -5393,6 +5435,7 @@ public:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
+    case TypeReprKind::ResultDependsOn:
       return false;
     }
   }
@@ -5618,4 +5661,86 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   }
 
   return type;
+}
+
+
+Type ExplicitCaughtTypeRequest::evaluate(
+    Evaluator &evaluator, ASTContext *ctxPtr, CatchNode catchNode
+) const {
+  ASTContext &ctx = *ctxPtr;
+
+  // try!/try? always catch 'any Error'.
+  if (catchNode.is<AnyTryExpr *>()) {
+    return ctx.getErrorExistentialType();
+  }
+
+  // Functions
+  if (auto func = catchNode.dyn_cast<AbstractFunctionDecl *>()) {
+    TypeRepr *thrownTypeRepr = func->getThrownTypeRepr();
+
+    // If there is no explicit thrown type, check whether it throws at all.
+    if (!thrownTypeRepr) {
+      // If it throws, it throws 'any Error'.
+      if (func->hasThrows())
+        return ctx.getErrorExistentialType();
+
+      // Otherwise, 'Never'.
+      return ctx.getNeverType();
+    }
+
+    // We have an explicit thrown error type, so resolve it.
+    auto options = TypeResolutionOptions(TypeResolverContext::None);
+    if (func->preconcurrency())
+      options |= TypeResolutionFlags::Preconcurrency;
+
+    return TypeResolution::forInterface(func, options,
+                                        /*unboundTyOpener*/ nullptr,
+                                        PlaceholderType::get,
+                                        /*packElementOpener*/ nullptr)
+        .resolveType(thrownTypeRepr);
+  }
+
+  // Closures
+  if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
+    // Explicit thrown error type.
+    if (auto thrownTypeRepr = closure->getExplicitThrownTypeRepr()) {
+      return TypeResolution::resolveContextualType(
+               thrownTypeRepr, closure,
+               TypeResolutionOptions(TypeResolverContext::None),
+               /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+               /*packElementOpener*/ nullptr);
+    }
+
+    // Explicit 'throws' implies that this throws 'any Error'.
+    if (closure->getThrowsLoc().isValid()) {
+      return ctx.getErrorExistentialType();
+    }
+
+    // Thrown error type will be inferred.
+    return Type();
+  }
+
+  // do..catch statements.
+  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+    // A do..catch block with no explicit 'throws' annotation will infer
+    // the thrown error type.
+    if (doCatch->getThrowsLoc().isInvalid()) {
+      return Type();
+    }
+
+    auto typeRepr = doCatch->getCaughtTypeRepr();
+
+    // If there is no explicitly-specified thrown error type, it's 'any Error'.
+    if (!typeRepr) {
+      return ctx.getErrorExistentialType();
+    }
+
+    return TypeResolution::resolveContextualType(
+        typeRepr, doCatch->getDeclContext(),
+        TypeResolutionOptions(TypeResolverContext::None),
+        /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+        /*packElementOpener*/ nullptr);
+  }
+
+  llvm_unreachable("Unhandled catch node");
 }

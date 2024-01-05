@@ -22,15 +22,16 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ContextualTypeInfo.h"
 
 namespace swift {
 
 namespace constraints {
-/// Describes information about a for-each loop that needs to be tracked
-/// within the constraint system.
-struct ForEachStmtInfo {
+/// Describes information about a for-in loop over a sequence that needs to be
+/// tracked in the constraint system.
+struct SequenceIterationInfo {
   /// The type of the sequence.
   Type sequenceType;
 
@@ -46,6 +47,17 @@ struct ForEachStmtInfo {
   /// Implicit `$iterator.next()` call.
   Expr *nextCall;
 };
+
+/// Describes information about a for-in loop over a pack that needs to be
+/// tracked in the constraint system.
+struct PackIterationInfo {
+  /// The type of the pattern that matches the elements.
+  Type patternType;
+};
+
+/// Describes information about a for-in loop that needs to be tracked
+/// within the constraint system.
+using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
 
 /// Describes the target to which a constraint system's solution can be
 /// applied.

@@ -847,7 +847,9 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
       assert(mdi->getBase() == tempObj);
       SILBuilderWithScope builder(user);
       auto newInst = builder.createMarkDependence(user->getLoc(),
-                       mdi->getValue(), si->getSrc());
+                                                  mdi->getValue(),
+                                                  si->getSrc(),
+                                                  mdi->isNonEscaping());
       mdi->replaceAllUsesWith(newInst);
       toDelete.push_back(mdi);
       break;

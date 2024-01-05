@@ -455,7 +455,6 @@ extension Collection {
 // shuffled()/shuffle()
 //===----------------------------------------------------------------------===//
 
-@_unavailableInEmbedded
 extension Sequence {
   /// Returns the elements of the sequence, shuffled using the given generator
   /// as a source for randomness.
@@ -504,13 +503,13 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
+  @_unavailableInEmbedded
   public func shuffled() -> [Element] {
     var g = SystemRandomNumberGenerator()
     return shuffled(using: &g)
   }
 }
 
-@_unavailableInEmbedded
 extension MutableCollection where Self: RandomAccessCollection {
   /// Shuffles the collection in place, using the given generator as a source
   /// for randomness.
@@ -563,6 +562,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
+  @_unavailableInEmbedded
   public mutating func shuffle() {
     var g = SystemRandomNumberGenerator()
     shuffle(using: &g)

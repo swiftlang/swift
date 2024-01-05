@@ -143,11 +143,9 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 
     std::vector<CounterMappingRegion> Regions;
     for (const auto &MR : M->getMappedRegions()) {
-      // The SubFileID here is 0, because it's an index into VirtualFileMapping,
+      // The FileID here is 0, because it's an index into VirtualFileMapping,
       // and we only ever have a single file associated for a function.
-      Regions.emplace_back(CounterMappingRegion::makeRegion(
-          MR.Counter, /*SubFileID*/ 0, MR.StartLine, MR.StartCol, MR.EndLine,
-          MR.EndCol));
+      Regions.push_back(MR.getLLVMRegion(/*FileID*/ 0));
     }
     // Append each function's regions into the encoded buffer.
     ArrayRef<unsigned> VirtualFileMapping(FileID);

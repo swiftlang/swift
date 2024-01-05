@@ -2690,12 +2690,22 @@ public:
 
   void visitForceTryExpr(ForceTryExpr *E, StringRef label) {
     printCommon(E, "force_try_expr", label);
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitOptionalTryExpr(OptionalTryExpr *E, StringRef label) {
     printCommon(E, "optional_try_expr", label);
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -3375,6 +3385,13 @@ public:
     printFoot();
   }
 
+  void visitResultDependsOnTypeRepr(ResultDependsOnTypeRepr *T,
+                                    StringRef label) {
+    printCommon("_resultDependsOn", label);
+    printRec(T->getBase());
+    printFoot();
+  }
+
   void visitOptionalTypeRepr(OptionalTypeRepr *T, StringRef label) {
     printCommon("type_optional", label);
     printRec(T->getBase());
@@ -3708,35 +3725,31 @@ public:
       return;
     }
 
-    printFieldQuotedRaw([&](raw_ostream &out) { genericSig->print(out); },
-                        "generic_signature");
-
-    auto printSubstitution = [&](GenericTypeParamType * genericParam,
-                                 Type replacementType) {
-      printFieldQuotedRaw([&](raw_ostream &out) {
-        genericParam->print(out);
-        out << " -> ";
-        if (replacementType) {
-          PrintOptions opts;
-          opts.PrintForSIL = true;
-          opts.PrintTypesForDebugging = true;
-          replacementType->print(out, opts);
-        }
-        else
-          out << "<unresolved concrete type>";
-      }, "");
-    };
+    printFieldRaw([&](raw_ostream &out) { genericSig->print(out); },
+                  "generic_signature");
 
     auto genericParams = genericSig.getGenericParams();
     auto replacementTypes =
     static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
     for (unsigned i : indices(genericParams)) {
       if (style == SubstitutionMap::DumpStyle::Minimal) {
-        printSubstitution(genericParams[i], replacementTypes[i]);
+        printFieldRaw([&](raw_ostream &out) {
+          genericParams[i]->print(out);
+          out << " -> ";
+          if (replacementTypes[i])
+            out << replacementTypes[i];
+          else
+            out << "<unresolved concrete type>";
+        }, "");
       } else {
         printRecArbitrary([&](StringRef label) {
           printHead("substitution", ASTNodeColor, label);
-          printSubstitution(genericParams[i], replacementTypes[i]);
+          printFieldRaw([&](raw_ostream &out) {
+            genericParams[i]->print(out);
+            out << " -> ";
+          }, "");
+          if (replacementTypes[i])
+            printRec(replacementTypes[i]);
           printFoot();
         });
       }
@@ -4330,6 +4343,17 @@ namespace {
 
       printFlag(T->hasExplicitAnyObject(), "any_object");
 
+      for (auto ip : T->getInverses()) {
+        switch (ip) {
+        case InvertibleProtocolKind::Copyable:
+          printFlag("inverse_copyable");
+          break;
+        case InvertibleProtocolKind::Escapable:
+          printFlag("inverse_escapable");
+          break;
+        }
+      }
+
       for (auto proto : T->getMembers()) {
         printRec(proto);
       }
@@ -4408,6 +4432,13 @@ namespace {
     void visitTypeVariableType(TypeVariableType *T, StringRef label) {
       printCommon("type_variable_type", label);
       printField(T->getID(), "id");
+      printFoot();
+    }
+
+    void visitErrorUnionType(ErrorUnionType *T, StringRef label) {
+      printCommon("error_union_type", label);
+      for (auto term : T->getTerms())
+        printRec(term);
       printFoot();
     }
 

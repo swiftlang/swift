@@ -133,3 +133,29 @@ Tests.test("AddressOnly") {
     }
 }
 
+// coverage for rdar://117082469
+Tests.test("global borrowing access") {
+  class Retainable { var data = 0 }
+
+  struct HasStatic : ~Copyable {
+    var x = 1
+    var y = Retainable()
+
+    static let a = HasStatic()
+    static var b = HasStatic()
+  }
+
+  // test the let 'a'
+  expectEqual(HasStatic.a.x, 1)
+  expectEqual(HasStatic.a.y.data, 0)
+
+  // test the var 'b'
+  expectEqual(HasStatic.b.x, 1)
+  HasStatic.b.x += 10
+  expectEqual(HasStatic.b.x, 11)
+
+  expectEqual(HasStatic.b.y.data, 0)
+  HasStatic.b.y.data += 121
+  expectEqual(HasStatic.b.y.data, 121)
+}
+

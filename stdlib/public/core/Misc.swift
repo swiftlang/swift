@@ -160,11 +160,10 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
 }
 
 /// This marker protocol represents types that support copying.
-/// This type is not yet available for use to express explicit
-/// constraints on generics in your programs. It is currently
-/// only used internally by the compiler.
-@available(*, unavailable)
-@_marker public protocol _Copyable {} // FIXME: rdar://115793371 (delete _Copyable from stdlib)
-
-
 @_marker public protocol Copyable {}
+
+@_marker public protocol Escapable {}
+
+#if $BitwiseCopyable
+@_marker public protocol _BitwiseCopyable {}
+#endif

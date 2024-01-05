@@ -10,7 +10,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
-@preconcurrency import Dispatch
+import Dispatch
 
 protocol WithSpecifiedExecutor: Actor {
   nonisolated var executor: any SpecifiedExecutor { get }
@@ -61,7 +61,7 @@ actor MyActor: WithSpecifiedExecutor {
   }
 
   func test(expectedExecutor: some SerialExecutor, expectedQueue: DispatchQueue) {
-    // FIXME(waiting on preconditions to merge): expectedExecutor.preconditionIsolated("Expected to be on: \(expectedExecutor)")
+    expectedExecutor.preconditionIsolated("Expected to be on: \(expectedExecutor)")
     dispatchPrecondition(condition: .onQueue(expectedQueue))
     print("\(Self.self): on executor \(expectedExecutor)")
   }

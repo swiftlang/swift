@@ -313,7 +313,8 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
       Result.Freestanding = true;
     break;
   }
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion: {
+  case GeneratedSourceInfo::DeclarationMacroExpansion: 
+  case GeneratedSourceInfo::CodeItemMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
         ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());
     Result.ExpansionLoc = RegularLocation(expansion);
@@ -321,12 +322,17 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
     Result.Freestanding = true;
     break;
   }
+
+#define FREESTANDING_MACRO_EXPANSION(Name, Description)
+#define ATTACHED
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:
-  case GeneratedSourceInfo::ExtensionMacroExpansion: {
+  case GeneratedSourceInfo::ExtensionMacroExpansion:
+  case GeneratedSourceInfo::PreambleMacroExpansion:
+  case GeneratedSourceInfo::BodyMacroExpansion: {
     auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
     auto attr = Info.attachedMacroCustomAttr;
     if (auto *macroDecl = decl->getResolvedMacro(attr)) {
@@ -767,7 +773,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           val = B.createMarkUnresolvedNonCopyableValueInst(
               loc, val,
               MarkUnresolvedNonCopyableValueInst::CheckKind::
-                  AssignableButNotConsumable);
+                  NoConsumeOrAssign);
         }
         val = emitLoad(loc, val, tl, SGFContext(), IsNotTake).forward(*this);
       }
@@ -1101,6 +1107,11 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
+// The emitBuiltinCreateAsyncTask function symbol is exposed from
+// SILGenBuiltin so that it is available from SILGenFunction. There is a
+// fair bit of work involved going from what is available at the SGF to
+// what is needed for actually calling the CreateAsyncTask builtin, so in
+// order to avoid additional maintenance, it's good to re-use that.
 ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         SubstitutionMap subs,
                                         ArrayRef<ManagedValue> args,
@@ -1443,7 +1454,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
           *this, moduleLoc, subs,
           {ManagedValue::forObjectRValueWithoutOwnership(taskFlags),
            ManagedValue::forObjectRValueWithoutOwnership(mainFunctionRef)},
-          {})
+          {}) //, /*inGroup=*/false, /*withExecutor=*/false)
           .forward(*this);
   DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
   task = structure->getResult(0);
@@ -1722,11 +1733,7 @@ void SILGenFunction::emitProfilerIncrement(ProfileCounterRef Ref) {
   if (!SP->hasRegionCounters() || !getModule().getOptions().UseProfile.empty())
     return;
 
-  const auto &RegionCounterMap = SP->getRegionCounterMap();
-  auto CounterIt = RegionCounterMap.find(Ref);
-
-  assert(CounterIt != RegionCounterMap.end() &&
-         "cannot increment non-existent counter");
+  auto CounterIdx = SP->getCounterIndexFor(Ref);
 
   // If we're at an unreachable point, the increment can be elided as the
   // counter cannot be incremented.
@@ -1734,7 +1741,7 @@ void SILGenFunction::emitProfilerIncrement(ProfileCounterRef Ref) {
     return;
 
   B.createIncrementProfilerCounter(
-      Ref.getLocation(), CounterIt->second, SP->getPGOFuncName(),
+      Ref.getLocation(), CounterIdx, SP->getPGOFuncName(),
       SP->getNumRegionCounters(), SP->getPGOFuncHash());
 }
 

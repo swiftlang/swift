@@ -62,7 +62,8 @@ public:
   virtual ~APIRecorder() {}
 
   virtual void addSymbol(StringRef name, llvm::MachO::SymbolKind kind,
-                         SymbolSource source, Decl *decl) {}
+                         SymbolSource source, Decl *decl,
+                         llvm::MachO::SymbolFlags flags) {}
   virtual void addObjCInterface(const ClassDecl *decl) {}
   virtual void addObjCCategory(const ExtensionDecl *decl) {}
   virtual void addObjCMethod(const GenericContext *ctx, SILDeclRef method) {}
@@ -70,14 +71,16 @@ public:
 
 class SimpleAPIRecorder final : public APIRecorder {
 public:
-  using SymbolCallbackFn = llvm::function_ref<void(
-      StringRef, llvm::MachO::SymbolKind, SymbolSource, Decl *)>;
+  using SymbolCallbackFn =
+      llvm::function_ref<void(StringRef, llvm::MachO::SymbolKind, SymbolSource,
+                              Decl *, llvm::MachO::SymbolFlags)>;
 
   SimpleAPIRecorder(SymbolCallbackFn func) : func(func) {}
 
   void addSymbol(StringRef symbol, llvm::MachO::SymbolKind kind,
-                 SymbolSource source, Decl *decl) override {
-    func(symbol, kind, source, decl);
+                 SymbolSource source, Decl *decl,
+                 llvm::MachO::SymbolFlags flags) override {
+    func(symbol, kind, source, decl, flags);
   }
 
 private:
@@ -99,17 +102,18 @@ class TBDGenVisitor : public IRSymbolVisitor {
   APIRecorder &recorder;
 
   using SymbolKind = llvm::MachO::SymbolKind;
+  using SymbolFlags = llvm::MachO::SymbolFlags;
 
   std::vector<Decl*> DeclStack;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     previousInstallNameMap;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     parsePreviousModuleInstallNameMap();
-  void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
-                         SymbolSource source);
-  void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
-  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
-  void addSymbol(StringRef name, SymbolSource source,
+  void addSymbolInternal(StringRef name, SymbolKind kind, SymbolSource source,
+                         SymbolFlags);
+  void addLinkerDirectiveSymbolsLdHide(StringRef name, SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, SymbolKind kind);
+  void addSymbol(StringRef name, SymbolSource source, SymbolFlags flags,
                  SymbolKind kind = SymbolKind::GlobalSymbol);
 
   void addSymbol(LinkEntity entity);

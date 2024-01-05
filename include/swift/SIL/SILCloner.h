@@ -890,6 +890,17 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitAllocVectorInst(
+    AllocVectorInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createAllocVector(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getCapacity()),
+                                    getOpType(Inst->getElementType())));
+}
+
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitAllocPackMetadataInst(
     AllocPackMetadataInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1217,10 +1228,11 @@ void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
     return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
   }
 
-  recordClonedInstruction(
-      Inst, getBuilder().createBeginBorrow(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()),
-                                           Inst->isLexical()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createBeginBorrow(
+                              getOpLocation(Inst->getLoc()),
+                              getOpValue(Inst->getOperand()), Inst->isLexical(),
+                              Inst->hasPointerEscape(), Inst->isFromVarDecl()));
 }
 
 template <typename ImplClass>
@@ -1930,9 +1942,9 @@ void SILCloner<ImplClass>::visitMoveValueInst(MoveValueInst *Inst) {
   if (!getBuilder().hasOwnership()) {
     return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
   }
-  auto *MVI = getBuilder().createMoveValue(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()),
-                                           Inst->isLexical());
+  auto *MVI = getBuilder().createMoveValue(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+      Inst->isLexical(), Inst->hasPointerEscape(), Inst->isFromVarDecl());
   MVI->setAllowsDiagnostics(Inst->getAllowDiagnostics());
   recordClonedInstruction(Inst, MVI);
 }
@@ -2155,6 +2167,16 @@ SILCloner<ImplClass>::visitObjectInst(ObjectInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitVectorInst(VectorInst *Inst) {
+  auto Elements = getOpValueArray<8>(Inst->getElements());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst,
+      getBuilder().createVector(getOpLocation(Inst->getLoc()), Elements));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitStructInst(StructInst *Inst) {
   auto Elements = getOpValueArray<8>(Inst->getElements());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2179,6 +2201,35 @@ SILCloner<ImplClass>::visitTupleInst(TupleInst *Inst) {
                                getBuilder().hasOwnership()
                                    ? Inst->getForwardingOwnershipKind()
                                    : ValueOwnershipKind(OwnershipKind::None)));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTupleAddrConstructorInst(
+    TupleAddrConstructorInst *Inst) {
+  SmallVector<SILValue, 8> Elements;
+  for (auto e : Inst->getElements()) {
+    SILValue mappedValue = getOpValue(e);
+
+    // Check if mappedValue only consists of empty tuple elements. If it does,
+    // then we do not add it to our result. This is because we know that the
+    // corresponding elements in getOpValue(Inst->getDest()) will also change
+    // into an empty exploded tuple. Since we only have leaf non-empty non-tuple
+    // elements as operands, these are not represented.
+    bool FoundNonTuple = false;
+    mappedValue->getType().getASTType().visit(
+        [&](CanType ty) { FoundNonTuple |= !ty->is<TupleType>(); });
+    if (FoundNonTuple)
+      Elements.push_back(mappedValue);
+  }
+
+  if (Elements.empty())
+    return;
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createTupleAddrConstructor(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getDest()), Elements,
+                                    Inst->isInitializationOfDest()));
 }
 
 template<typename ImplClass>
@@ -2899,8 +2950,9 @@ void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getValue()),
                 getOpValue(Inst->getBase()),
                 getBuilder().hasOwnership()
-                    ? Inst->getForwardingOwnershipKind()
-                    : ValueOwnershipKind(OwnershipKind::None)));
+                ? Inst->getForwardingOwnershipKind()
+                : ValueOwnershipKind(OwnershipKind::None),
+                /*isNonEscaping*/false));
 }
 
 template<typename ImplClass>
@@ -3132,6 +3184,14 @@ SILCloner<ImplClass>::visitThrowInst(ThrowInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createThrow(getOpLocation(Inst->getLoc()),
                                      getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitThrowAddrInst(ThrowAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createThrowAddr(getOpLocation(Inst->getLoc())));
 }
 
 template<typename ImplClass>

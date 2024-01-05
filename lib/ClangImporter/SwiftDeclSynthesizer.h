@@ -60,6 +60,10 @@ public:
                        VarDecl::Introducer introducer, bool isImplicit,
                        AccessLevel access, AccessLevel setterAccess);
 
+  /// Create a reinterpretCast from the `exprType`, to the `givenType`.
+  static Expr *synthesizeReturnReinterpretCast(ASTContext &ctx, Type givenType,
+                                               Type exprType, Expr *baseExpr);
+
   /// Create a new named constant with the given value.
   ///
   /// \param name The name of the constant.
@@ -285,7 +289,7 @@ public:
   FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
 
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
-                         clang::CXXMethodDecl *clangOperator);
+                         clang::OverloadedOperatorKind opKind);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);

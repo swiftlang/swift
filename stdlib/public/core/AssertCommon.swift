@@ -252,7 +252,9 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-@_unavailableInEmbedded
+#if !$Embedded
+
+/// Used to evaluate editor placeholders.
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
@@ -260,6 +262,19 @@ func _undefined<T>(
 ) -> T {
   _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
 }
+
+#else
+
+/// Used to evaluate editor placeholders.
+public // COMPILER_INTRINSIC
+func _undefined<T>(
+  _ message: @autoclosure () -> StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) -> T {
+  _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
+}
+
+#endif
 
 /// Called when falling off the end of a switch and the type can be represented
 /// as a raw value.
@@ -314,6 +329,17 @@ internal func _diagnoseUnexpectedEnumCase<SwitchedValue>(
 @_semantics("unavailable_code_reached")
 @usableFromInline // COMPILER_INTRINSIC
 internal func _diagnoseUnavailableCodeReached() -> Never {
+  _diagnoseUnavailableCodeReached_aeic()
+}
+
+// FIXME: Remove this with rdar://119892482
+/// An `@_alwaysEmitIntoClient` variant of `_diagnoseUnavailableCodeReached()`.
+/// This is temporarily needed by the compiler to reference from back deployed
+/// clients.
+@_alwaysEmitIntoClient
+@inline(never)
+@_semantics("unavailable_code_reached")
+internal func _diagnoseUnavailableCodeReached_aeic() -> Never {
   _assertionFailure(
     "Fatal error", "Unavailable code reached", flags: _fatalErrorFlags())
 }

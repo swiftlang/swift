@@ -772,10 +772,13 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
     }
 
     StringRef Content = Compression.empty() ? Output : toStringRef(Compression);
-    // Store CachedDiagnostics in the CAS/Cache. There is no real associated
-    // inputs.
+    // Store CachedDiagnostics in the CAS/Cache.
+    // FIXME: Currently associated with first output producing input file.
     auto Err = Instance.getCASOutputBackend().storeCachedDiagnostics(
-        "<cached-diagnostics>", Content);
+        Instance.getInvocation()
+            .getFrontendOptions()
+            .InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
+        Content);
 
     if (Err) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,

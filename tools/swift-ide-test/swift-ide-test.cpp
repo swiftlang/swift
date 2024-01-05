@@ -414,12 +414,6 @@ static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
     llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-ObjCForwardDeclarations("enable-objc-forward-declarations",
-    llvm::cl::desc("Import Objective-C forward declarations when possible"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 EnableSwift3ObjCInference("enable-swift3-objc-inference",
     llvm::cl::desc("Enable Swift 3's @objc inference rules"),
     llvm::cl::cat(Category),
@@ -796,6 +790,11 @@ static llvm::cl::opt<bool>
                      llvm::cl::desc("Enable C++ interop."),
                      llvm::cl::cat(Category), llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+    CxxInteropVersion("cxx-interoperability-mode",
+                      llvm::cl::desc("C++ interop mode."),
+                      llvm::cl::cat(Category));
+
 static llvm::cl::opt<bool>
     CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
         llvm::cl::desc("Imports getters and setters as computed properties."),
@@ -864,6 +863,11 @@ static llvm::cl::list<std::string>
   EnableExperimentalFeatures("enable-experimental-feature",
                              llvm::cl::desc("Enable an experimental feature"),
                              llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+  EnableUpcomingFeatures("enable-upcoming-feature",
+      llvm::cl::desc("Enable a feature that will be introduced in an upcoming language version"),
+      llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
@@ -1142,8 +1146,9 @@ static bool performWithCompletionLikeOperationParams(
 }
 
 template <typename ResultType>
-static int printResult(CancellableResult<ResultType> Result,
-                       llvm::function_ref<int(ResultType &)> PrintSuccess) {
+static int
+printResult(CancellableResult<ResultType> Result,
+            llvm::function_ref<int(const ResultType &)> PrintSuccess) {
   switch (Result.getKind()) {
   case CancellableResultKind::Success: {
     return PrintSuccess(Result.getResult());
@@ -1161,7 +1166,7 @@ static int printResult(CancellableResult<ResultType> Result,
 static int printTypeContextInfo(
     CancellableResult<TypeContextInfoResult> CancellableResult) {
   return printResult<TypeContextInfoResult>(
-      CancellableResult, [](TypeContextInfoResult &Result) {
+      CancellableResult, [](const TypeContextInfoResult &Result) {
         llvm::outs() << "-----BEGIN TYPE CONTEXT INFO-----\n";
         for (auto resultItem : Result.Results) {
           llvm::outs() << "- TypeName: ";
@@ -1222,7 +1227,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
 static int printConformingMethodList(
     CancellableResult<ConformingMethodListResults> CancellableResult) {
   return printResult<ConformingMethodListResults>(
-      CancellableResult, [](ConformingMethodListResults &Results) {
+      CancellableResult, [](const ConformingMethodListResults &Results) {
         auto Result = Results.Result;
         if (!Result) {
           return 0;
@@ -1391,7 +1396,7 @@ static int printCodeCompletionResults(
     bool PrintAnnotatedDescription) {
   llvm::raw_fd_ostream &OS = llvm::outs();
   return printResult<CodeCompleteResult>(
-      CancellableResult, [&](CodeCompleteResult &Result) {
+      CancellableResult, [&](const CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, OS, IncludeKeywords, IncludeComments,
             IncludeSourceText, PrintAnnotatedDescription,
@@ -4354,6 +4359,20 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
+  for (const auto &featureArg : options::EnableExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureArg)) {
+      InitInvok.getLangOptions().Features.insert(*feature);
+    }
+  }
+
+  for (const auto &featureArg : options::EnableUpcomingFeatures) {
+    if (auto feature = getUpcomingFeature(featureArg)) {
+      InitInvok.getLangOptions().Features.insert(*feature);
+    }
+  }
+
+  // NOTE: 'setMainExecutablePath' must be after 'Features' because
+  // 'setRuntimeResourcePath()' called from here depends on 'Features'.
   InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
 
@@ -4382,6 +4401,14 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableCxxInterop) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
+  }
+  if (!options::CxxInteropVersion.empty()) {
+    InitInvok.getLangOptions().EnableCXXInterop = true;
+    if (options::CxxInteropVersion == "upcoming-swift")
+      InitInvok.getLangOptions().cxxInteropCompatVersion =
+          version::Version({version::getUpcomingCxxInteropCompatVersion()});
+    else
+      llvm::errs() << "invalid CxxInteropVersion\n";
   }
   if (options::CxxInteropGettersSettersAsProperties) {
     InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;
@@ -4413,12 +4440,6 @@ int main(int argc, char *argv[]) {
   if (options::EnableBareSlashRegexLiterals) {
     InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
-  }
-
-  for (const auto &featureArg : options::EnableExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
-    }
   }
 
   if (!options::Triple.empty())
@@ -4475,8 +4496,13 @@ int main(int argc, char *argv[]) {
     options::EnableDeserializationSafety;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
+  // The manner in which swift-ide-test constructs its CompilerInvocation does
+  // not hit the codepath in arg parsing that would normally construct
+  // ClangImporter options based on enabled language features etc. Explicitly
+  // enable them here.
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
-    options::ObjCForwardDeclarations;
+      InitInvok.getLangOptions().hasFeature(
+          Feature::ImportObjcForwardDeclarations);
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

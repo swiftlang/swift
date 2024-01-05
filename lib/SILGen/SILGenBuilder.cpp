@@ -534,6 +534,9 @@ static ManagedValue createInputFunctionArgument(
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
     }
+    if (pd->hasResultDependsOn()) {
+      arg->setHasResultDependsOn();
+    }
   }
   if (isNoImplicitCopy)
     arg->setNoImplicitCopy(isNoImplicitCopy);
@@ -681,7 +684,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
   if (!type.isAddressOnly(getFunction()) ||
       !SGF.silConv.useLoweredAddresses()) {
     SILValue noneValue = createOptionalNone(loc, type);
-    return ManagedValue::forObjectRValueWithoutOwnership(noneValue);
+    return SGF.emitManagedRValueWithCleanup(noneValue);
   }
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, type);
@@ -1021,10 +1024,12 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
 
 ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
                                                  ManagedValue value,
-                                                 ManagedValue base) {
+                                                 ManagedValue base,
+                                                 bool isNonEscaping) {
   CleanupCloner cloner(*this, value);
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
-                                   base.forward(getSILGenFunction()));
+                                   base.forward(getSILGenFunction()),
+                                   isNonEscaping);
   return cloner.clone(mdi);
 }
 

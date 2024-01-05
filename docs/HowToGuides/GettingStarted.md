@@ -164,6 +164,11 @@ toolchain as a one-off, there are a couple of differences:
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
+   Note that [a prebuilt Swift release toolchain](https://www.swift.org/download/)
+   is installed and added to the `PATH` in all these Docker containers: it is
+   recommended that you do the same, in order to build the portions of the Swift
+   compiler written in Swift.
+
 2. To install [Sccache][] (optional):
    * If you're not building within a Docker container:
      ```sh
@@ -258,8 +263,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```
    - Linux:
      ```sh
-     utils/build-script --release-debuginfo --skip-early-swift-driver \
-       --skip-early-swiftsyntax
+     utils/build-script --release-debuginfo
      ```
      If you installed and want to use Sccache, include the `--sccache` option in
      the invocation as well.
@@ -267,12 +271,9 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    <br />
 
    > **Note**  
-   > If you are planning to work on the compiler, but not the parts that are
+   > If you are planning to work on the compiler on macOS, but not the parts that are
    > written in Swift, pass `--bootstrapping=hosttools` to speed up local
-   > development. Note that on Linux — unlike macOS, where the toolchain already
-   > comes with Xcode — this option additionally requires
-   > [a recent Swift toolchain](https://www.swift.org/download/) to be
-   > installed.
+   > development.
 
    This will create a directory `swift-project/build/Ninja-RelWithDebInfoAssert`
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
@@ -284,9 +285,9 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    > Consider [`--debug-swift` to build a debug variant of the compiler](#debugging-issues) and have
    > the swift targets (including `swift-frontend`) built in debug mode.
 
-   If you would like to additionally build the Swift corelibs,
+   On Linux, if you would like to additionally build the Swift corelibs,
    ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
-   on Linux, add the `--xctest` flag to `build-script`.
+   add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
 `Ninja-RelWithDebInfoAssert` build on macOS, unless explicitly mentioned otherwise.

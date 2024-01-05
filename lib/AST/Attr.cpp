@@ -860,13 +860,16 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
 }
 
 llvm::Optional<const DeclAttribute *>
-OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
+ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
+  if (Attr->isImplicit())
+    return llvm::None;
+
   auto declLoc = decl->getStartLoc();
   auto *mod = decl->getModuleContext();
   auto *declFile = mod->getSourceFileContainingLocation(declLoc);
   auto *attrFile = mod->getSourceFileContainingLocation(Attr->getLocation());
   if (!declFile || !attrFile)
-    return Attr;
+    return llvm::None;
 
   // Only attributes in the same buffer as the declaration they're attached to
   // are part of the original attribute list.
@@ -970,9 +973,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
   case DAK_Custom: {
-
     auto attr = cast<CustomAttr>(this);
-    if (auto type = attr->getType()) {
+    if (auto type =
+            D->getResolvedCustomAttrType(const_cast<CustomAttr *>(attr))) {
       // Print custom attributes only if the attribute decl is accessible.
       // FIXME: rdar://85477478 They should be rejected.
       if (auto attrDecl = type->getNominalOrBoundGenericNominal()) {
@@ -1045,7 +1048,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     return true;
 
   case DAK_SPIAccessControl: {
-    if (!Options.PrintSPIs) return false;
+    if (Options.printPublicInterface()) return false;
 
     auto spiAttr = static_cast<const SPIAccessControlAttr*>(this);
     interleave(spiAttr->getSPIGroups(),
@@ -1097,7 +1100,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto Attr = cast<AvailableAttr>(this);
     if (Options.SuppressNoAsyncAvailabilityAttr && Attr->isNoAsync())
       return false;
-    if (!Options.PrintSPIs && Attr->IsSPI) {
+    if (Options.printPublicInterface() && Attr->IsSPI) {
       assert(Attr->hasPlatform());
       assert(Attr->Introduced.has_value());
       Printer.printAttrName("@available");
@@ -1141,7 +1144,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_Extern: {
     auto *Attr = cast<ExternAttr>(this);
-    Printer.printAttrName("@extern");
+    Printer.printAttrName("@_extern");
     Printer << "(";
     switch (Attr->getExternKind()) {
     case ExternKind::C:
@@ -1152,7 +1155,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       break;
     case ExternKind::Wasm:
       Printer << "wasm";
-      // @extern(wasm) always has names.
+      // @_extern(wasm) always has names.
       Printer << ", module: \"" << *Attr->ModuleName << "\"";
       Printer << ", name: \"" << *Attr->Name << "\"";
       break;
@@ -1193,7 +1196,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<SpecializeAttr>(this);
     // Don't print the _specialize attribute if it is marked spi and we are
     // asked to skip SPI.
-    if (!Options.PrintSPIs && !attr->getSPIGroups().empty())
+    if (Options.printPublicInterface() && !attr->getSPIGroups().empty())
       return false;
 
     // Don't print the _specialize attribute if we are asked to skip the ones
@@ -1258,7 +1261,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                       Printer << "@_noMetadata ";
                   }
                   auto OptionsCopy = Options;
-                  OptionsCopy.PrintClassLayoutName = typeErased;
+                  OptionsCopy.PrintInternalLayoutName = typeErased;
                   req.print(Printer, OptionsCopy);
                 },
                 [&] { Printer << ", "; });
@@ -1746,7 +1749,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_RawLayout:
     return "_rawLayout";
   case DAK_Extern:
-    return "extern";
+    return "_extern";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2582,6 +2585,21 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
 
   return new (ctx)
       CustomAttr(atLoc, range, type, initContext, argList, implicit);
+}
+
+std::pair<IdentTypeRepr *, IdentTypeRepr *> CustomAttr::destructureMacroRef() {
+  TypeRepr *typeRepr = getTypeRepr();
+  if (!typeRepr)
+    return {nullptr, nullptr};
+  if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
+    return {nullptr, identType};
+  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr))
+    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getBaseComponent()))
+      if (memType->getMemberComponents().size() == 1)
+        if (auto first =
+                dyn_cast<IdentTypeRepr>(memType->getMemberComponents().front()))
+          return {base, first};
+  return {nullptr, nullptr};
 }
 
 TypeRepr *CustomAttr::getTypeRepr() const { return typeExpr->getTypeRepr(); }

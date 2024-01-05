@@ -134,14 +134,14 @@ bool Parser::startsParameterName(bool isClosure) {
   if (nextTok.canBeArgumentLabel()) {
     // If the first name wasn't a contextual keyword, we're done.
     if (!Tok.isContextualKeyword("isolated") &&
-        !Tok.isContextualKeyword("some") &&
-        !Tok.isContextualKeyword("any") &&
+        !Tok.isContextualKeyword("some") && !Tok.isContextualKeyword("any") &&
         !Tok.isContextualKeyword("each") &&
         !Tok.isContextualKeyword("__shared") &&
         !Tok.isContextualKeyword("__owned") &&
         !Tok.isContextualKeyword("borrowing") &&
-        !Tok.isContextualKeyword("consuming") &&
-        !Tok.is(tok::kw_repeat))
+        !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
+        (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
+         !Tok.isContextualKeyword("_resultDependsOn")))
       return true;
 
     // Parameter specifiers can be an argument label, but they're also
@@ -227,14 +227,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     {
       // ('inout' | '__shared' | '__owned' | isolated)?
       bool hasSpecifier = false;
-      while (Tok.is(tok::kw_inout)
-             || (canHaveParameterSpecifierContextualKeyword()
-                 && (Tok.isContextualKeyword("__shared")
-                     || Tok.isContextualKeyword("__owned")
-                     || Tok.isContextualKeyword("borrowing")
-                     || Tok.isContextualKeyword("consuming")
-                     || Tok.isContextualKeyword("isolated")
-                     || Tok.isContextualKeyword("_const")))) {
+      while (Tok.is(tok::kw_inout) ||
+             (canHaveParameterSpecifierContextualKeyword() &&
+              (Tok.isContextualKeyword("__shared") ||
+               Tok.isContextualKeyword("__owned") ||
+               Tok.isContextualKeyword("borrowing") ||
+               Tok.isContextualKeyword("consuming") ||
+               Tok.isContextualKeyword("isolated") ||
+               Tok.isContextualKeyword("_const") ||
+               (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+                Tok.isContextualKeyword("_resultDependsOn"))))) {
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
@@ -404,26 +406,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           // Mark current parameter type as invalid so it is possible
           // to diagnose it as destructuring of the closure parameter list.
           param.isPotentiallyDestructured = true;
-          if (!isClosure) {
-            // Unnamed parameters must be written as "_: Type".
-            diagnose(typeStartLoc, diag::parameter_unnamed)
-                .fixItInsert(typeStartLoc, "_: ");
-          } else {
-            // Unnamed parameters were accidentally possibly accepted after
-            // SE-110 depending on the kind of declaration.  We now need to
-            // warn about the misuse of this syntax and offer to
-            // fix it.
-            // An exception to this rule is when the type is declared with type sugar
-            // Reference: https://github.com/apple/swift/issues/54133
-            if (isa<OptionalTypeRepr>(param.Type)
-                || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
-                diagnose(typeStartLoc, diag::parameter_unnamed)
-                    .fixItInsert(typeStartLoc, "_: ");
-            } else {
-                diagnose(typeStartLoc, diag::parameter_unnamed_warn)
-                    .fixItInsert(typeStartLoc, "_: ");
-            }
-          }
+          // Unnamed parameters must be written as "_: Type".
+          diagnose(typeStartLoc, diag::parameter_unnamed)
+              .fixItInsert(typeStartLoc, "_: ");
         }
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell
@@ -564,6 +549,12 @@ mapParsedParameters(Parser &parser,
         param->setCompileTimeConst();
       }
 
+      if (paramInfo.ResultDependsOnLoc.isValid()) {
+        type = new (parser.Context)
+            ResultDependsOnTypeRepr(type, paramInfo.ResultDependsOnLoc);
+        param->setResultDependsOn();
+      }
+
       param->setTypeRepr(type);
 
       // Dig through the type to find any attributes or modifiers that are
@@ -589,7 +580,8 @@ mapParsedParameters(Parser &parser,
               param->setIsolated(true);
             else if (isa<CompileTimeConstTypeRepr>(STR))
               param->setCompileTimeConst(true);
-
+            else if (isa<ResultDependsOnTypeRepr>(STR))
+              param->setResultDependsOn(true);
             unwrappedType = STR->getBase();
             continue;
           }
@@ -1053,7 +1045,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
         }
       }
     } else {
-      Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+      Ty = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));
     }
     
     result = makeParserResult(result,
@@ -1278,7 +1270,7 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
 
   TypeRepr *repr = Ty.getPtrOrNull();
   if (!repr)
-    repr = new (Context) ErrorTypeRepr(PreviousLoc);
+    repr = ErrorTypeRepr::create(Context, PreviousLoc);
 
   return makeParserResult(status, new (Context) TypedPattern(P, repr));
 }

@@ -663,9 +663,9 @@ private:
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
 
+public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext);
 
-public:
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
   // Cache for already-specialized function templates and any thunks they may
@@ -1987,5 +1987,15 @@ inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
 
 }
 }
+
+// Forwards to synthesizeCxxBasicMethod(), producing a thunk that calls a
+// virtual function.
+clang::CXXMethodDecl *synthesizeCxxVirtualMethod(
+    swift::ClangImporter &Impl, const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method);
+
+// Exposed to produce a Swift method body for calling a Swift thunk.
+std::pair<swift::BraceStmt *, bool>
+synthesizeForwardingThunkBody(swift::AbstractFunctionDecl *afd, void *context);
 
 #endif

@@ -216,10 +216,7 @@ public:
     return getSILType(funcTy->getErrorResult(), context);
   }
 
-  bool isTypedError() const {
-    return !funcTy->getErrorResult()
-        .getInterfaceType()->isExistentialWithError();
-  }
+  bool isTypedError() const;
 
   /// Returns an array of result info.
   /// Provides convenient access to the underlying SILFunctionType.
@@ -243,6 +240,12 @@ public:
     }
 
     return 0;
+  }
+
+  bool isArgumentIndexOfIndirectErrorResult(unsigned idx) {
+    unsigned indirectResults = getNumIndirectSILResults();
+    return idx >= indirectResults &&
+           idx < indirectResults + getNumIndirectSILErrorResults();
   }
 
   /// Are any SIL results passed as address-typed arguments?

@@ -3045,7 +3045,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   auto completionHandler = [&](PatternMatchEmission &emission,
                                ArgArray argArray, ClauseRow &row) {
     auto clause = row.getClientData<CaseStmt>();
-    emitProfilerIncrement(clause->getBody());
+    emitProfilerIncrement(clause);
 
     // Certain catch clauses can be entered along multiple paths because they
     // have multiple labels. When we need multiple entrance path, we factor the

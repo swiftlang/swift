@@ -262,6 +262,10 @@ compiler):
 - They must not reference any ``internal`` entities except for those that have
   been declared ``@usableFromInline`` or ``@inlinable``.
 
+Inlinable functions that return opaque types also have additional restrictions.
+The underlying concrete type cannot be changed for such a function without
+breaking backward compatibility, because the identity of the concrete type has
+been exposed by inlining the body of the function into client modules.
 
 Always Emit Into Client
 -----------------------

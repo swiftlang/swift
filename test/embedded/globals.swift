@@ -2,6 +2,7 @@
 // RUN: %target-swift-emit-ir -target armv7-apple-none-macho -parse-stdlib -module-name Swift %s -enable-experimental-feature Embedded -wmo -parse-as-library -O | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: CODEGENERATOR=ARM
 
 precedencegroup AssignmentPrecedence { assignment: true }
 public typealias IntegerLiteralType = Int

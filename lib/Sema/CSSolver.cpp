@@ -206,6 +206,9 @@ Solution ConstraintSystem::finalize() {
   for (const auto &item : caseLabelItems)
     solution.caseLabelItems.insert(item);
 
+  for (const auto &throwSite : potentialThrowSites)
+    solution.potentialThrowSites.push_back(throwSite);
+
   for (const auto &pattern : exprPatterns)
     solution.exprPatterns.insert(pattern);
 
@@ -349,6 +352,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     if (!getCaseLabelItemInfo(info.first))
       setCaseLabelItemInfo(info.first, info.second);
   }
+
+  potentialThrowSites.insert(potentialThrowSites.end(),
+                             solution.potentialThrowSites.begin(),
+                             solution.potentialThrowSites.end());
 
   for (auto param : solution.isolatedParams) {
     isolatedParams.insert(param);
@@ -653,6 +660,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numContextualTypes = cs.contextualTypes.size();
   numTargets = cs.targets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
+  numPotentialThrowSites = cs.potentialThrowSites.size();
   numExprPatterns = cs.exprPatterns.size();
   numIsolatedParams = cs.isolatedParams.size();
   numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
@@ -775,6 +783,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);
+
+  // Remove any potential throw sites.
+  truncate(cs.potentialThrowSites, numPotentialThrowSites);
 
   // Remove any ExprPattern mappings.
   truncate(cs.exprPatterns, numExprPatterns);
@@ -1515,14 +1526,6 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
       LLVM_FALLTHROUGH;
 
     case SolutionResult::UndiagnosedError:
-      /// If we have a SolutionCallback, we are inspecting constraint system
-      /// solutions directly and thus also want to receive ambiguous solutions.
-      /// Hence always run the second (salvaging) stage.
-      if (shouldSuppressDiagnostics() && !Context.SolutionCallback) {
-        solution.markAsDiagnosed();
-        return llvm::None;
-      }
-
       if (stage == 1) {
         diagnoseFailureFor(target);
         reportSolutionsToSolutionCallback(solution);

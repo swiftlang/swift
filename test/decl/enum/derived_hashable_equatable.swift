@@ -106,14 +106,14 @@ enum HasUnavailableElement: Hashable {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_a = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
   // CHECK-NEXT:    private var index_b: Int
   // CHECK-NEXT:    switch b {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_b = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
   // CHECK-NEXT:    return index_a == index_b
   // CHECK-NEXT:  }
@@ -124,7 +124,7 @@ enum HasUnavailableElement: Hashable {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      discriminator = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
   // CHECK-NEXT:    hasher.combine(discriminator)
   // CHECK-NEXT:  }
@@ -151,7 +151,7 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK-NEXT:      hasher.combine(0)
   // CHECK-NEXT:      hasher.combine(a0)
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
   // CHECK-NEXT:  }
 
@@ -163,7 +163,7 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK-NEXT:      }
   // CHECK-NEXT:      return true
   // CHECK-NEXT:    case (.b, .b):
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    default:
   // CHECK-NEXT:      return false
   // CHECK-NEXT:    }

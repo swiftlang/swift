@@ -112,7 +112,7 @@ enum class ExposureKind: uint8_t {
 enum : unsigned { NumExposureKindBits =
   countBitsUsed(static_cast<unsigned>(ExposureKind::Last_ExposureKind)) };
   
-/// This enum represents the possible values of the @extern attribute.
+/// This enum represents the possible values of the @_extern attribute.
 enum class ExternKind: uint8_t {
   /// Reference an externally defined C function.
   /// The imported function has C function pointer representation,

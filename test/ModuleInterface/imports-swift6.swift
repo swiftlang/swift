@@ -19,9 +19,7 @@
 
 //--- main.swift
 @_exported public import resilient // expected-warning {{public import of 'resilient' was not used in public declarations or inlinable code}}
-public import B.B2 // expected-warning {{public import of 'B2' was not used in public declarations or inlinable code}}
-// expected-warning @-1 {{public import of 'B' was not used in public declarations or inlinable code}}
-// FIXME: We don't want this last warning.
+public import B.B2 // expected-warning {{public import of 'B' was not used in public declarations or inlinable code}}
 
 public import func C.c // expected-warning {{public import of 'C' was not used in public declarations or inlinable code}}
 // expected-warning @-1 {{scoped imports are not yet supported in module interfaces}}
@@ -34,8 +32,7 @@ public import NotSoSecret2 // expected-warning {{'NotSoSecret2' inconsistently i
 
 //--- main-other.swift
 public import A // expected-warning {{public import of 'A' was not used in public declarations or inlinable code}}
-public import B.B3 // expected-warning {{public import of 'B3' was not used in public declarations or inlinable code}}
-// expected-warning @-1 {{public import of 'B' was not used in public declarations or inlinable code}}
+public import B.B3 // expected-warning {{public import of 'B' was not used in public declarations or inlinable code}}
 public import D // expected-warning {{public import of 'D' was not used in public declarations or inlinable code}}
 
 public import NotSoSecret // expected-warning {{'NotSoSecret' inconsistently imported as implementation-only}}

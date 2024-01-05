@@ -10,36 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CASTBridging
-import SwiftCompilerPluginMessageHandling
+import ASTBridging
+import BasicBridging
+@_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import SwiftSyntaxMacroExpansion
-import SwiftSyntaxMacros
-
-extension SyntaxProtocol {
-  func token(at position: AbsolutePosition) -> TokenSyntax? {
-    // If the position isn't within this node at all, return early.
-    guard position >= self.position && position < self.endPosition else {
-      return nil
-    }
-
-    // If we are a token syntax, that's it!
-    if let token = Syntax(self).as(TokenSyntax.self) {
-      return token
-    }
-
-    // Otherwise, it must be one of our children.
-    for child in children(viewMode: .sourceAccurate) {
-      if let token = child.token(at: position) {
-        return token
-      }
-    }
-    fatalError("Children of syntax node do not cover all positions in it")
-  }
-}
+@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacroExpansion
+@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
 /// Describes a macro that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
@@ -70,6 +49,8 @@ extension MacroRole {
     case 6: self = .conformance
     case 7: self = .codeItem
     case 8: self = .`extension`
+    case 9: self = .preamble
+    case 10: self = .body
 
     default: fatalError("unknown macro role")
     }
@@ -148,11 +129,7 @@ enum ASTGenMacroDiagnostic: DiagnosticMessage, FixItMessage {
   var message: String {
     switch self {
     case .thrownError(let error):
-      if let err = error as? PluginError {
-        return err.description
-      } else {
-        return String(describing: error)
-      }
+      return String(describing: error)
 
     case .oldStyleExternalMacro:
       return "external macro definitions are now written using #externalMacro"
@@ -221,7 +198,7 @@ func checkMacroDefinition(
   diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeRawPointer,
   macroLocationPtr: UnsafePointer<UInt8>,
-  externalMacroOutPtr: UnsafeMutablePointer<BridgedString>,
+  externalMacroOutPtr: UnsafeMutablePointer<BridgedStringRef>,
   replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
   numReplacementsPtr: UnsafeMutablePointer<Int>
 ) -> Int {
@@ -253,6 +230,20 @@ func checkMacroDefinition(
         switch type {
         case "ExternalMacro":
           return Int(BridgedMacroDefinitionKind.builtinExternalMacro.rawValue)
+
+        // These builtins don't exist, but are put into the standard library at
+        // least for documentation purposes right now. Don't emit a warning for
+        // them, but do fail operation.
+        case "FileIDMacro",
+          "FilePathMacro",
+          "FileMacro",
+          "FunctionMacro",
+          "LineMacro",
+          "ColumnMacro",
+          "DSOHandleMacro",
+          "WarningMacro",
+          "ErrorMacro":
+          return -1
 
         default:
           // Warn about the unknown builtin.
@@ -397,10 +388,10 @@ public func freeExpansionReplacements(
 // Make an expansion result for '@_cdecl' function caller.
 func makeExpansionOutputResult(
   expandedSource: String?,
-  outputPointer: UnsafeMutablePointer<BridgedString>
+  outputPointer: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   guard var expandedSource = expandedSource else {
-    outputPointer.pointee = BridgedString()
+    outputPointer.pointee = BridgedStringRef()
     return -1
   }
   outputPointer.pointee = allocateBridgedString(expandedSource)
@@ -417,7 +408,7 @@ func expandFreestandingMacro(
   rawMacroRole: UInt8,
   sourceFilePtr: UnsafeRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
-  expandedSourceOutPtr: UnsafeMutablePointer<BridgedString>
+  expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   // We didn't expand anything so far.
   assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
@@ -501,7 +492,7 @@ func expandFreestandingMacroIPC(
   // Map the macro role.
   let pluginMacroRole: PluginMessage.MacroRole
   switch macroRole {
-  case .accessor, .member, .memberAttribute, .peer, .conformance, .extension:
+  case .accessor, .member, .memberAttribute, .peer, .conformance, .extension, .preamble, .body:
     preconditionFailure("unhandled macro role for freestanding macro")
 
   case .expression: pluginMacroRole = .expression
@@ -612,10 +603,7 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     return nil
   }
 
-  let sourceFilePtr = sourceFilePtr.bindMemory(
-    to: ExportedSourceFile.self,
-    capacity: 1
-  )
+  let sourceFilePtr = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
 
   // Find the offset.
   let buffer = sourceFilePtr.pointee.buffer
@@ -635,12 +623,11 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   var currentSyntax = Syntax(token)
   var resultSyntax: Node? = nil
   while let parentSyntax = currentSyntax.parent {
-    if let typedParent = parentSyntax.as(type) {
+    currentSyntax = parentSyntax
+    if let typedParent = currentSyntax.as(type) {
       resultSyntax = typedParent
       break
     }
-
-    currentSyntax = parentSyntax
   }
 
   // If we didn't find anything, complain and fail.
@@ -650,26 +637,16 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   // If we want the outermost node, keep looking.
-  // FIXME: This is VERY SPECIFIC to handling of types. We must be able to
-  // do better.
+  // E.g. for 'foo.bar' we want the member ref expression instead of the
+  // identifier expression.
   if wantOutermost {
-    while let parentSyntax = resultSyntax.parent {
-      // Look through type compositions.
-      if let compositionElement = parentSyntax.as(CompositionTypeElementSyntax.self),
-        let compositionList = compositionElement.parent?.as(CompositionTypeElementListSyntax.self),
-        let typedParent = compositionList.parent?.as(type)
-      {
+    while let parentSyntax = currentSyntax.parent,
+      parentSyntax.position == resultSyntax.position
+    {
+      currentSyntax = parentSyntax
+      if let typedParent = currentSyntax.as(type) {
         resultSyntax = typedParent
-        continue
       }
-
-      guard let typedParent = parentSyntax.as(type),
-        typedParent.position == resultSyntax.position
-      else {
-        break
-      }
-
-      resultSyntax = typedParent
     }
   }
 
@@ -692,7 +669,7 @@ func expandAttachedMacro(
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
   parentDeclSourceFilePtr: UnsafeRawPointer?,
   parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
-  expandedSourceOutPtr: UnsafeMutablePointer<BridgedString>
+  expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   // We didn't expand anything so far.
   assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
@@ -803,6 +780,9 @@ func expandAttachedMacroIPC(
   case .peer: macroRole = .peer
   case .conformance: macroRole = .conformance
   case .extension: macroRole = .`extension`
+  case .preamble: macroRole = .preamble
+  case .body: macroRole = .body
+
   case .expression,
     .declaration,
     .codeItem:

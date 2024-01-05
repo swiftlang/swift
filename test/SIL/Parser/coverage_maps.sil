@@ -18,6 +18,7 @@ sil_coverage_map "coverage_maps.sil" "someFunction" "coverage_maps.sil:someFunct
 // CHECK: 17:9 -> 17:17 : ((0 + 2) - 3)
 // CHECK: 17:9 -> 17:17 : ((0 + 2) - 3)
 // CHECK: 22:11 -> 139:2 : 1
+// CHECK: 54:1 -> 55:1 : skipped
 // CHECK: }
 sil_coverage_map "/some/other/file.sil" "someFunction" "/some/other/file.sil:someFunction" 0 {
   4:19 -> 31:1 : 0
@@ -26,4 +27,5 @@ sil_coverage_map "/some/other/file.sil" "someFunction" "/some/other/file.sil:som
   17:9 -> 17:17: ((0 + 2) - 3)
   17:9 -> 17:17: (0 + (2 - 3))
   22:11->139:2 : (zero + 1)
+  54:1 -> 55:1 : skipped
 }

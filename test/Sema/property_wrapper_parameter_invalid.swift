@@ -279,3 +279,15 @@ func testInvalidWrapperInference() {
   // expected-error@+1 {{contextual closure type '() -> Void' expects 0 arguments, but 1 was used in closure body}}
   testExtraParameter { $value in }
 }
+
+// rdar://116522161 - failed to produce a diagnostic on invalid projection use
+func testInvalidProjectionInAmbiguousContext() {
+  func test<T>(_: [T], _: (T) -> Void) {}
+
+  func ambiguous() -> Int { 42 }
+  func ambiguous() -> String { "" }
+
+  test([42]) { $v in // expected-error {{inferred projection type 'Int' is not a property wrapper}}
+    ambiguous()
+  }
+}

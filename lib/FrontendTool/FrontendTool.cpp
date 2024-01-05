@@ -987,13 +987,26 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
     // Copy the settings from the module interface to add SPI printing.
     ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
-    privOpts.PrintPrivateInterfaceContent = true;
+    privOpts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(
         Instance.getOutputBackend(),
         Invocation.getPrivateModuleInterfaceOutputPathForWholeModule(),
         privOpts,
+        Invocation.getLangOptions(),
+        Instance.getMainModule());
+  }
+  if (opts.InputsAndOutputs.hasPackageModuleInterfaceOutputPath()) {
+    // Copy the settings from the module interface to add package decl printing.
+    ModuleInterfaceOptions pkgOpts = Invocation.getModuleInterfaceOptions();
+    pkgOpts.setInterfaceMode(PrintOptions::InterfaceMode::Package);
+    pkgOpts.ModulesToSkipInPublicInterface.clear();
+
+    hadAnyError |= printModuleInterfaceIfNeeded(
+        Instance.getOutputBackend(),
+        Invocation.getPackageModuleInterfaceOutputPathForWholeModule(),
+        pkgOpts,
         Invocation.getLangOptions(),
         Instance.getMainModule());
   }
@@ -2239,10 +2252,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
               llvm::Optional<PrettyStackTraceFileContents> &trace) {
              trace.emplace(*buffer);
            });
-
-  // Setting DWARF Version based on frontend options.
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  IRGenOpts.DWARFVersion = IRGenOpts.DWARFVersion;
 
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {

@@ -142,6 +142,22 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
   }
 }
 
+namespace {
+
+template<typename Container>
+bool containsValue(
+    const Container &container,
+    typename Container::value_type const &element
+) {
+  for (const auto &value : container) {
+    if (value == element)
+      return true;
+  }
+
+  return false;
+}
+
+}
 
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
@@ -177,7 +193,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   // Enable or disable ObjC interop appropriately for the platform
-  if (Triple.isOSDarwin()) {
+  if (Triple.isOSDarwin() &&
+      !containsValue(
+          inputArgs
+            .getAllArgValues(options::OPT_enable_experimental_feature),
+          "Embedded")) {
     arguments.push_back("-enable-objc-interop");
   } else {
     arguments.push_back("-disable-objc-interop");
@@ -251,6 +271,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension_library);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
@@ -288,6 +309,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_sanitize_address_use_odr_indicator);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_stable_abi_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
@@ -374,6 +396,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   addPlatformSpecificPluginFrontendArgs(OI, output, inputArgs, arguments);
 
   addPluginArguments(inputArgs, arguments);
+
+  // Pass along -no-verify-emitted-module-interface only if it's effective.
+  // Assume verification by default as we want to know only when the user skips
+  // the verification.
+  if (!inputArgs.hasFlag(options::OPT_verify_emitted_module_interface,
+                         options::OPT_no_verify_emitted_module_interface,
+                         true))
+    arguments.push_back("-no-verify-emitted-module-interface");
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
@@ -727,6 +757,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
+  case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
@@ -856,6 +887,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
@@ -992,6 +1027,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
     case file_types::TY_PrivateSwiftModuleInterfaceFile:
+    case file_types::TY_PackageSwiftModuleInterfaceFile:
     case file_types::TY_SwiftModuleSummaryFile:
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
@@ -1146,6 +1182,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");

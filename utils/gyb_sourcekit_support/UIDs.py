@@ -146,6 +146,7 @@ UID_KEYS = [
     KEY('Simplified', 'key.simplified'),
     KEY('RangeContent', 'key.rangecontent'),
     KEY('CancelOnSubsequentRequest', 'key.cancel_on_subsequent_request'),
+    KEY('IncludeNonEditableBaseNames', 'key.include_non_editable_base_names'),
     KEY('RenameLocations', 'key.renamelocations'),
     KEY('Locations', 'key.locations'),
     KEY('NameType', 'key.nametype'),
@@ -264,7 +265,6 @@ UID_REQUESTS = [
     REQUEST('NameTranslation', 'source.request.name.translation'),
     REQUEST('MarkupToXML', 'source.request.convert.markup.xml'),
     REQUEST('Statistics', 'source.request.statistics'),
-    REQUEST('SyntacticRename', 'source.request.syntacticrename'),
     REQUEST('FindRenameRanges', 'source.request.find-syntactic-rename-ranges'),
     REQUEST('FindLocalRenameRanges',
             'source.request.find-local-rename-ranges'),
@@ -510,4 +510,6 @@ UID_KINDS = [
     KIND('MacroRolePeer', 'source.lang.swift.macro_role.peer'),
     KIND('MacroRoleConformance', 'source.lang.swift.macro_role.conformance'),
     KIND('MacroRoleExtension', 'source.lang.swift.macro_role.extension'),
+    KIND('MacroRolePreamble', 'source.lang.swift.macro_role.preamble'),
+    KIND('MacroRoleBody', 'source.lang.swift.macro_role.body'),
 ]

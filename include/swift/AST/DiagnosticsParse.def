@@ -429,8 +429,6 @@ ERROR(destructor_decl_outside_class_or_noncopyable,none,
       "deinitializers may only be declared within a class, actor, or noncopyable type", ())
 ERROR(destructor_decl_on_noncopyable_enum,none,
       "deinitializers are not yet supported on noncopyable enums", ())
-ERROR(destructor_decl_on_objc_enum,none,
-      "deinitializers cannot be declared on an @objc enum type", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -963,8 +961,8 @@ ERROR(cannot_suppress_here,none,
 ERROR(only_suppress_copyable,none,
       "can only suppress 'Copyable'", ())
 
-ERROR(already_suppressed,none,
-      "duplicate suppression of %0", (Identifier))
+ERROR(already_suppressed_copyable,none,
+      "duplicate suppression of 'Copyable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Pattern parsing diagnostics
@@ -1031,8 +1029,6 @@ ERROR(parameter_operator_keyword_argument,none,
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
-WARNING(parameter_unnamed_warn,none,
-        "unnamed parameters must be written with the empty name '_'", ())
 
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
@@ -1197,6 +1193,9 @@ ERROR(expected_catch_where_expr,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'catch'", ())
 ERROR(docatch_not_trycatch,PointsToFirstBadToken,
       "the 'do' keyword is used to specify a 'catch' region",
+      ())
+ERROR(do_throws_without_catch,none,
+      "a 'do' statement with a 'throws' clause must have at least one 'catch'",
       ())
 
 // C-Style For Stmt
@@ -1869,7 +1868,7 @@ ERROR(attr_rawlayout_expected_params,none,
       "expected %1 argument after %0 argument in @_rawLayout attribute", (StringRef, StringRef))
 
 ERROR(attr_extern_expected_label,none,
-      "expected %0 argument to @extern attribute", (StringRef))
+      "expected %0 argument to @_extern attribute", (StringRef))
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -2076,13 +2075,6 @@ ERROR(expected_multiple_closures_block_rbrace,none,
       "expected '}' at the end of a trailing closures block", ())
 
 //------------------------------------------------------------------------------
-// MARK: diagnostics emitted by Swift libraries
-//------------------------------------------------------------------------------
-
-ERROR(foreign_diagnostic,none,
-      "%0", (StringRef))
-
-//------------------------------------------------------------------------------
 // MARK: macros
 //------------------------------------------------------------------------------
 ERROR(expected_lparen_macro,PointsToFirstBadToken,
@@ -2167,6 +2159,11 @@ ERROR(duplicate_storage_restrictions_attr_label,none,
 
 ERROR(storage_restrictions_attr_expected_name,none,
       "expected property name in @storageRestrictions list", ())
+
+ERROR(requires_experimental_feature, none,
+      "'%0' %select{attribute|parameter specifier}1 is only valid when experimental feature "
+      "%2 is enabled",
+      (StringRef, bool, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

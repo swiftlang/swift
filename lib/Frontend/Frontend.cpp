@@ -165,6 +165,15 @@ CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.PrivateModuleInterfaceOutputPath;
 }
 
+std::string
+CompilerInvocation::getPackageModuleInterfaceOutputPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "PackageModuleInterfaceOutputPath only makes sense when the whole "
+         "module can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.PackageModuleInterfaceOutputPath;
+}
+
 std::string CompilerInvocation::getAPIDescriptorPathForWholeModule() const {
   assert(
       getFrontendOptions().InputsAndOutputs.isWholeModule() &&
@@ -529,6 +538,12 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
   // DiagConsumers are added.
   setupCachingDiagnosticsProcessorIfNeeded();
 
+  // Dump module search paths if -Rmodule-loading is on.
+  const auto &LangOpts = Invocation.getLangOptions();
+  if (LangOpts.EnableModuleLoadingRemarks) {
+    Invocation.getSearchPathOptions().dump(LangOpts.Target.isOSDarwin());
+  }
+
   // If we expect an implicit stdlib import, load in the standard library. If we
   // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
   // trigger a bunch of other errors due to the stdlib being missing, or at
@@ -803,8 +818,9 @@ bool CompilerInstance::setUpModuleLoaders() {
 
 bool CompilerInstance::setUpPluginLoader() {
   /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
-  auto loader =
-      std::make_unique<PluginLoader>(*Context, getDependencyTracker());
+  auto loader = std::make_unique<PluginLoader>(
+      *Context, getDependencyTracker(),
+      Invocation.getFrontendOptions().DisableSandbox);
   Context->setPluginLoader(std::move(loader));
   return false;
 }
@@ -853,7 +869,7 @@ bool CompilerInstance::setUpInputs() {
   // There is no input file when building PCM using ClangIncludeTree.
   if (Invocation.getFrontendOptions().RequestedAction ==
           FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getClangImporterOptions().UseClangIncludeTree)
+      Invocation.getClangImporterOptions().HasClangIncludeTreeRoot)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
@@ -938,11 +954,13 @@ CompilerInstance::getInputBuffersIfPresent(const InputFile &input) {
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+  // Avoid memory-mapping when the compiler is run for IDE inspection,
+  // since that would prevent the user from saving the file.
   FileOrError inputFileOrErr =
     swift::vfs::getFileOrSTDIN(getFileSystem(), input.getFileName(),
                               /*FileSize*/-1,
                               /*RequiresNullTerminator*/true,
-                              /*IsVolatile*/false,
+                              /*IsVolatile*/getInvocation().isIDEInspection(),
       /*Bad File Descriptor Retry*/getInvocation().getFrontendOptions()
                                .BadFileDescriptorRetryCount);
   if (!inputFileOrErr) {

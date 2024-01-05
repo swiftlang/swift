@@ -59,9 +59,8 @@ private struct FindWrites : AddressDefUseWalker {
       return address == ca.sourceOperand ? .continueWalk : .abortWalk
 
     case let apply as FullApplySite:
-      if let callerArgIdx = apply.argumentIndex(of: address) {
-        let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: callerArgIdx)
-        let convention = apply.getArgumentConvention(calleeArgIndex: calleeArgIdx)
+      if let calleeArgIdx = apply.calleeArgumentIndex(of: address) {
+        let convention = apply.calleeArgumentConventions[calleeArgIdx]
         if convention.isIndirectIn {
           return .continueWalk
         }

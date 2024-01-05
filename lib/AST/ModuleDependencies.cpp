@@ -16,6 +16,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
@@ -143,6 +144,11 @@ void ModuleDependencyInfo::addModuleImport(
     SmallString<64> importedModuleName;
     realPath.getString(importedModuleName);
     if (importedModuleName == BUILTIN_NAME)
+      continue;
+
+    // Ignore/diagnose tautological imports akin to import resolution
+    if (!swift::dependencies::checkImportNotTautological(
+            realPath, importDecl->getLoc(), sf, importDecl->isExported()))
       continue;
 
     addModuleImport(realPath, &alreadyAddedModules);
@@ -403,9 +409,37 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr,
-      /* OptimizeArgs */ true);
+      /* SharedFS */ nullptr);
   SharedFilesystemCache.emplace();
+}
+
+bool
+swift::dependencies::checkImportNotTautological(const ImportPath::Module modulePath, 
+                                                const SourceLoc importLoc,
+                                                const SourceFile &SF,
+                                                bool isExported) {
+  if (modulePath.front().Item != SF.getParentModule()->getName() ||
+      // Overlays use an @_exported self-import to load their clang module.
+      isExported ||
+      // Imports of your own submodules are allowed in cross-language libraries.
+      modulePath.size() != 1 ||
+      // SIL files self-import to get decls from the rest of the module.
+      SF.Kind == SourceFileKind::SIL)
+    return true;
+
+  ASTContext &ctx = SF.getASTContext();
+
+  StringRef filename = llvm::sys::path::filename(SF.getFilename());
+  if (filename.empty())
+    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module,
+                       modulePath.front().Item);
+  else
+    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module_with_file,
+                       filename, modulePath.front().Item);
+
+  return false;
+
+  return false;
 }
 
 void SwiftDependencyTracker::addCommonSearchPathDeps(
@@ -425,7 +459,7 @@ void SwiftDependencyTracker::addCommonSearchPathDeps(
     std::error_code EC;
     for (auto &Arch : AllSupportedArches) {
       SmallString<256> LayoutFile(RuntimeLibPath);
-      llvm::sys::path::append(LayoutFile, "layout-" + Arch + ".yaml");
+      llvm::sys::path::append(LayoutFile, "layouts-" + Arch + ".yaml");
       FS->status(LayoutFile);
     }
   }
@@ -444,17 +478,6 @@ SwiftDependencyTracker::createTreeFromDependencies() {
           return Mapper->mapDirEntry(Entry, Storage);
         return Entry.getTreePath();
       });
-}
-
-void SwiftDependencyScanningService::overlaySharedFilesystemCacheForCompilation(
-    CompilerInstance &Instance) {
-  auto existingFS = Instance.getSourceMgr().getFileSystem();
-  llvm::IntrusiveRefCntPtr<
-      clang::tooling::dependencies::DependencyScanningWorkerFilesystem>
-      depFS =
-          new clang::tooling::dependencies::DependencyScanningWorkerFilesystem(
-              getSharedFilesystemCache(), existingFS);
-  Instance.getSourceMgr().setFileSystem(depFS);
 }
 
 bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
@@ -533,8 +556,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       ClangScanningFormat,
       Instance.getInvocation().getFrontendOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS,
-      /* ReuseFileManager */ false, /* OptimizeArgs */ false);
+      UseClangIncludeTree ? nullptr : CacheFS);
 
   return false;
 }

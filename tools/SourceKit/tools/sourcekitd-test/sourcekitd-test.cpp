@@ -1102,13 +1102,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     break;
 
-  case SourceKitRequest::SyntacticRename:
   case SourceKitRequest::FindRenameRanges: {
-    if (Opts.Request == SourceKitRequest::SyntacticRename) {
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSyntacticRename);
-    } else {
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestFindRenameRanges);
-    }
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestFindRenameRanges);
     if (Opts.RenameSpecPath.empty()) {
       llvm::errs() << "Missing '-rename-spec <file path>'\n";
       return 1;
@@ -1586,7 +1582,6 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         break;
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
 #include "swift/Refactoring/RefactoringKinds.def"
-      case SourceKitRequest::SyntacticRename:
       case SourceKitRequest::SyntacticMacroExpansion:
         printSyntacticRenameEdits(Info, llvm::outs());
         break;
@@ -2461,10 +2456,13 @@ static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
     sourcekitd_variant_t Range = sourcekitd_variant_array_get_value(Res, i);
     int64_t Offset = sourcekitd_variant_dictionary_get_int64(Range, KeyOffset);
     int64_t Length = sourcekitd_variant_dictionary_get_int64(Range, KeyLength);
+    auto Usage = sourcekitd_variant_dictionary_get_uid(Range, KeyNameType);
     auto LineCol = resolveToLineCol(Offset, Filename, VFSFiles);
-    OS << LineCol.first << ':' << LineCol.second << " - " << Length << '\n';
+    OS << LineCol.first << ':' << LineCol.second << " - " << Length << " - "
+       << sourcekitd_uid_get_string_ptr(Usage) << '\n';
   }
   OS << "END RANGES\n";
+  OS << "NAME: " << sourcekitd_variant_dictionary_get_string(Info, KeyName);
 }
 
 static void printActiveRegions(sourcekitd_variant_t Info, StringRef Filename,

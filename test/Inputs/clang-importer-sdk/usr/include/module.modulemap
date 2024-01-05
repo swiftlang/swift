@@ -3,7 +3,9 @@ module ctypes {
   header "ctypes.h"
   explicit module bits {
     header "ctypes/bits.h"
+    export *
   }
+  export *
 }
 module stdio { header "stdio.h" }
 module cvars { header "cvars.h" }

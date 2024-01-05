@@ -138,25 +138,80 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       "Enable build of the embedded Swift standard library and runtime"
       TRUE)
 
-if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+# Temporarily, by default only build embedded stdlib when building the compiler, to
+# unblock CI jobs that run against old(er) toolchains.
+option(SWIFT_ALLOW_BUILD_EMBEDDED_STDLIB_WITH_HOST_COMPILER
+       "Build embedded Swift standard library and runtime even
+       if we are not building our own compiler"
+       FALSE)
+
+if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND (NOT SWIFT_HOST_VARIANT STREQUAL "linux"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(NOT SWIFT_INCLUDE_TOOLS)
-  # Temporarily, only build embedded stdlib when building the compiler, to
-  # unblock CI jobs that run against old(er) toolchains.
-  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB ${SWIFT_ALLOW_BUILD_EMBEDDED_STDLIB_WITH_HOST_COMPILER})
 elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
-  set(EMBEDDED_STDLIB_TARGET_TRIPLES
-    # arch    module_name               target triple
-    "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
-    "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
-    "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
-    "arm64    arm64-apple-macos         arm64-apple-macos10.13"
-    "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+  set(EMBEDDED_STDLIB_TARGET_TRIPLES)
+  if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      # arch    module_name               target triple
+      "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
+      "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
+      "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+      "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
     )
+  endif()
+  if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
+    )
+  endif()
+
+  # the following are all ELF targets
+  if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
+      "armv6m   armv6m-none-none-eabi     armv6-none-none-eabi"
+      "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
+      "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+    )
+  endif()
+  if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
+    )
+  endif()
+  if("RISCV" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
+      "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
+    )
+  endif()
+
+  if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
+    )
+  endif()
+
+  if (SWIFT_HOST_VARIANT STREQUAL "linux")
+    set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
+      "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
+      # In practice this expands to either:
+      # "x86_64   x86_64-unknown-linux-gnu  x86_64-unknown-linux-gnu"
+      # "aarch64  aarch64-unknown-linux-gnu aarch64-unknown-linux-gnu"
+      )
+  elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
+    set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
+      "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
+      "arm64    arm64-apple-macos         arm64-apple-macos10.13"
+      "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+      )
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB)
@@ -166,7 +221,12 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+endif()
 
+if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
+  # In some internal Apple configurations we have the need
+  # to build Core and Onone separately from the rest
+  # of the stdlib
   if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
     add_subdirectory(Differentiation)
   endif()

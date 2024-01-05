@@ -268,16 +268,13 @@ endmacro()
 #     cmake variables.
 macro(swift_common_unified_build_config product)
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(CLANG_MAIN_INCLUDE_DIR "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include")
-  set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
-  set(CLANG_INCLUDE_DIRS 
-    "${CLANG_MAIN_INCLUDE_DIR}"
-    "${CLANG_BUILD_INCLUDE_DIR}"
-  )
+
+  include_directories(${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}/tools/clang/include)
 
   # If cmark was checked out into tools/cmark, expect to build it as
   # part of the unified build.
@@ -293,22 +290,11 @@ macro(swift_common_unified_build_config product)
     get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
       ABSOLUTE)
 
-    set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
-    set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src/include")
+    include_directories(${PATH_TO_CMARK_BUILD}/src
+      ${CMARK_MAIN_SRC_DIR}/src/include)
   endif()
-
-  include_directories(
-      "${CLANG_BUILD_INCLUDE_DIR}"
-      "${CLANG_MAIN_INCLUDE_DIR}"
-      "${CMARK_MAIN_INCLUDE_DIR}"
-      "${CMARK_BUILD_INCLUDE_DIR}")
 
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
-
-  check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
-  if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types")
-  endif()
 endmacro()
 
 # Common cmake project config for additional warnings.
@@ -317,25 +303,42 @@ macro(swift_common_cxx_warnings)
   # Make unhandled switch cases be an error in assert builds
   if(DEFINED LLVM_ENABLE_ASSERTIONS)
     check_cxx_compiler_flag("-Werror=switch" CXX_SUPPORTS_WERROR_SWITCH_FLAG)
-    append_if(CXX_SUPPORTS_WERROR_SWITCH_FLAG "-Werror=switch" CMAKE_CXX_FLAGS)
+    if(CXX_SUPPORTS_WERROR_SWITCH_FLAG)
+      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=switch>)
+    endif()
 
-    check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
-    append_if(CXX_SUPPORTS_WE4062 "/we4062" CMAKE_CXX_FLAGS)
+    if(MSVC)
+      check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
+      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+    endif()
   endif()
 
   check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)
-  append_if(CXX_SUPPORTS_DOCUMENTATION_FLAG "-Wdocumentation" CMAKE_CXX_FLAGS)
+  if(CXX_SUPPORTS_DOCUMENTATION_FLAG)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wdocumentation>)
+  endif()
 
   check_cxx_compiler_flag("-Werror -Wimplicit-fallthrough" CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
-  append_if(CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG "-Wimplicit-fallthrough" CMAKE_CXX_FLAGS)
+  if(CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wimplicit-fallthrough>)
+  endif()
 
   # Check for -Wunreachable-code-aggressive instead of -Wunreachable-code, as that indicates
   # that we have the newer -Wunreachable-code implementation.
   check_cxx_compiler_flag("-Werror -Wunreachable-code-aggressive" CXX_SUPPORTS_UNREACHABLE_CODE_FLAG)
-  append_if(CXX_SUPPORTS_UNREACHABLE_CODE_FLAG "-Wunreachable-code" CMAKE_CXX_FLAGS)
+  if(CXX_SUPPORTS_UNREACHABLE_CODE_FLAG)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wunreachable-code>)
+  endif()
 
   check_cxx_compiler_flag("-Werror -Woverloaded-virtual" CXX_SUPPORTS_OVERLOADED_VIRTUAL)
-  append_if(CXX_SUPPORTS_OVERLOADED_VIRTUAL "-Woverloaded-virtual" CMAKE_CXX_FLAGS)
+  if(CXX_SUPPORTS_OVERLOADED_VIRTUAL)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Woverloaded-virtual>)
+  endif()
+
+  check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
+  if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wnested-anon-types>)
+  endif()
 
   # Check for '-fapplication-extension'.  On OS X/iOS we wish to link all
   # dynamic libraries with this flag.
@@ -344,16 +347,19 @@ macro(swift_common_cxx_warnings)
   # Disable C4068: unknown pragma. This means that MSVC doesn't report hundreds of warnings across
   # the repository for IDE features such as #pragma mark "Title".
   if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/wd4068>)
+
     check_cxx_compiler_flag("/permissive-" CXX_SUPPORTS_PERMISSIVE_FLAG)
-    append_if(CXX_SUPPORTS_PERMISSIVE_FLAG "/permissive-" CMAKE_CXX_FLAGS)
+    if(CXX_SUPPORTS_PERMISSIVE_FLAG)
+      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/permissive->)
+    endif()
   endif()
 
   # Disallow calls to objc_msgSend() with no function pointer cast.
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOBJC_OLD_DISPATCH_PROTOTYPES=0")
+  add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:OBJC_OLD_DISPATCH_PROTOTYPES=0>)
 
   if(BRIDGING_MODE STREQUAL "PURE")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPURE_BRIDGING_MODE")
+    add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:PURE_BRIDGING_MODE>)
   endif()
 endmacro()
 

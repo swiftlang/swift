@@ -485,6 +485,35 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// Return a list of applied operands of the apply without self.
+  ArrayRef<Operand> getOperandsWithoutSelf() const {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
+  MutableArrayRef<Operand> getOperandsWithoutSelf() {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
@@ -739,6 +768,25 @@ public:
   bool isIndirectResultOperand(const Operand &op) const {
     return isArgumentOperand(op)
       && (getCalleeArgIndex(op) < getNumIndirectSILResults());
+  }
+
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectErrorResultOperand(const Operand &op) const {
+    return isArgumentOperand(op)
+      && (getCalleeArgIndex(op) >= getNumIndirectSILResults())
+      && (getCalleeArgIndex(op) < getNumIndirectSILResults() + getNumIndirectSILErrorResults());
+  }
+
+  std::optional<ApplyIsolationCrossing> getIsolationCrossing() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(**this)->getIsolationCrossing();
+    case FullApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(**this)->getIsolationCrossing();
+    case FullApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(**this)->getIsolationCrossing();
+    }
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

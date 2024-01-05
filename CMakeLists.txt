@@ -270,10 +270,6 @@ option(SWIFT_BUILD_PERF_TESTSUITE
     "Create in-tree targets for building swift performance benchmarks."
     FALSE)
 
-option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
-    "Build the Swift regex parser as part of the compiler."
-    TRUE)
-
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
 option(SWIFT_INCLUDE_TEST_BINARIES
@@ -405,9 +401,10 @@ set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
 
 
 if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${SWIFT_HOST_VARIANT_SDK}" MATCHES "WINDOWS|ANDROID" OR (CMAKE_Swift_COMPILER AND CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.8))
     # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
-    # On windows to workaround a build problem.
+    # On Windows and Android, to workaround a build problem.
+    # If the host Swift version is less than 5.8, use pure mode to workaround a C++ interop compiler crash.
     set(BRIDGING_MODE "PURE")
   else()
     set(BRIDGING_MODE "INLINE")
@@ -720,6 +717,14 @@ option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
 
+option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
+    "Build the Swift regex parser as part of the compiler."
+    TRUE)
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER AND NOT SWIFT_BUILD_SWIFT_SYNTAX)
+  message(WARNING "Force setting SWIFT_BUILD_REGEX_PARSER_IN_COMPILER=OFF because Swift parser integration is disabled")
+  set(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER OFF)
+endif()
+
 set(SWIFT_BUILD_HOST_DISPATCH FALSE)
 if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Only build libdispatch for the host if the host tools are being built and
@@ -863,10 +868,11 @@ endif()
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
   # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
-  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
+  add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
@@ -1193,6 +1199,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
+  message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
   message(STATUS "")
 else()
@@ -1382,9 +1389,6 @@ if(SWIFT_INCLUDE_TOOLS)
 
   add_subdirectory(lib)
 
-  # SwiftCompilerSources must come before "tools".
-  # It adds swift module names to the global property "swift_compiler_modules"
-  # which is used in add_swift_host_tool for the lldb workaround.
   add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!

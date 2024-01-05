@@ -2,8 +2,8 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -warn-concurrency -parse-as-library -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -warn-concurrency -parse-as-library -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -1530,4 +1530,55 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
     // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a non-isolated context}}
     super.x = 10
   }
+}
+
+// expected-note@+1 2 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+class NonSendable {}
+
+actor ProtectNonSendable {
+  // expected-note@+1 {{property declared here}}
+  let ns = NonSendable()
+
+  init() {}
+
+  @MainActor init(fromMain: Void) {
+    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from the main actor; this is an error in Swift 6}}
+    _ = self.ns
+  }
+}
+
+@MainActor
+class ReferenceActor {
+  let a: ProtectNonSendable
+
+  init() async {
+    self.a = ProtectNonSendable()
+
+    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    _ = a.ns
+  }
+}
+
+actor AnotherActor {
+  let a: ProtectNonSendable
+
+  init() {
+    self.a = ProtectNonSendable()
+
+    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    _ = a.ns
+  }
+}
+
+@MainActor
+class MainActorIsolated {
+  init() {}
+
+  // expected-note@+1 {{static property declared here}}
+  static let shared = MainActorIsolated()
+}
+
+nonisolated func accessAcrossActors() {
+  // expected-warning@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+  let _ = MainActorIsolated.shared
 }

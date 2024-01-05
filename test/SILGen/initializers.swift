@@ -491,7 +491,7 @@ class FailableBaseClass {
   // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   destroy_value [[MARKED_SELF_BOX]]
@@ -511,7 +511,7 @@ class FailableBaseClass {
   // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   cond_br {{.*}}, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
@@ -545,7 +545,7 @@ class FailableBaseClass {
   // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   switch_enum [[NEW_SELF]] : $Optional<FailableBaseClass>, case #Optional.some!enumelt: [[SUCC_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB:bb[0-9]+]]
@@ -573,7 +573,7 @@ class FailableBaseClass {
   // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick FailableBaseClass.Type):
   // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK-NEXT: [[PB_BOX:%[0-9]+]] = project_box [[SELF_LIFETIME]]
   // CHECK: [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick FailableBaseClass.Type, #FailableBaseClass.init!allocator
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[DELEG_INIT]]([[SELF_META]])
@@ -619,7 +619,7 @@ class FailableDerivedClass : FailableBaseClass {
   // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableDerivedClass):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
   // CHECK-NEXT: br bb1
@@ -642,7 +642,7 @@ class FailableDerivedClass : FailableBaseClass {
     // First initialize the lvalue for self.
     // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableDerivedClass }, let, name "self"
     // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-    // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
     //
@@ -738,7 +738,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARK_UNINIT]]
   // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
@@ -781,7 +781,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARK_UNINIT]]
   // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
@@ -831,7 +831,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARK_UNINIT]]
   // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
@@ -864,7 +864,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARK_UNINIT]]
   // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
@@ -901,7 +901,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // Create our box.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[MARK_UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[MARK_UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MARK_UNINIT]]
   // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT_LIFETIME]]
   //
   // Perform the unwrap.
@@ -1038,7 +1038,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
   //
@@ -1075,7 +1075,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   try_apply {{.*}}([[SELF_META]]) : {{.*}}, normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
   //

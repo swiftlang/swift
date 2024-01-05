@@ -1,4 +1,4 @@
-//===--- OptUtils.swift - Utilities for optimizations ----------------------===//
+//===--- OptUtils.swift - Utilities for optimizations ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,36 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
 import SIL
 import OptimizerBridging
 
 extension Value {
-  var nonDebugUses: LazyFilterSequence<UseList> {
-    uses.lazy.filter { !($0.instruction is DebugValueInst) }
+  var lookThroughBorrow: Value {
+    if let beginBorrow = self as? BeginBorrowInst {
+      return beginBorrow.borrowedValue.lookThroughBorrow
+    }
+    return self
+  }
+
+  var lookThroughCopy: Value {
+    if let copy = self as? CopyValueInst {
+      return copy.fromValue.lookThroughCopy
+    }
+    return self
+  }
+
+  var lookThoughOwnershipInstructions: Value {
+    switch self {
+    case let beginBorrow as BeginBorrowInst:
+      return beginBorrow.borrowedValue.lookThoughOwnershipInstructions
+    case let copy as CopyValueInst:
+      return copy.fromValue.lookThoughOwnershipInstructions
+    case let move as MoveValueInst:
+      return move.fromValue.lookThoughOwnershipInstructions
+    default:
+      return self
+    }
   }
 
   /// Walks over all fields of an aggregate and checks if a reference count
@@ -108,6 +132,37 @@ extension Value {
     }
     return builder.createCopyValue(operand: self)
   }
+
+  /// True if this value is a valid in a static initializer, including all its operands.
+  var isValidGlobalInitValue: Bool {
+    guard let svi = self as? SingleValueInstruction else {
+      return false
+    }
+    if let beginAccess = svi as? BeginAccessInst {
+      return beginAccess.address.isValidGlobalInitValue
+    }
+    if !svi.isValidInStaticInitializerOfGlobal {
+      return false
+    }
+    for op in svi.operands {
+      if !op.value.isValidGlobalInitValue {
+        return false
+      }
+    }
+    return true
+  }
+}
+
+extension FullApplySite {
+  func isSemanticCall(_ name: StaticString, withArgumentCount: Int) -> Bool {
+    if arguments.count == withArgumentCount,
+       let callee = referencedFunction,
+       callee.hasSemanticsAttribute(name)
+    {
+      return true
+    }
+    return false
+  }
 }
 
 extension Builder {
@@ -179,7 +234,7 @@ extension Instruction {
   }
 
   var isTriviallyDeadIgnoringDebugUses: Bool {
-    if results.contains(where: { !$0.uses.isEmptyIgnoringDebugUses }) {
+    if results.contains(where: { !$0.uses.ignoreDebugUses.isEmpty }) {
       return false
     }
     return self.canBeRemovedIfNotUsed
@@ -216,7 +271,10 @@ extension StoreInst {
           builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
         }
       } else {
-        for idx in 0..<type.getNominalFields(in: parentFunction).count {
+        guard let fields = type.getNominalFields(in: parentFunction) else {
+          return
+        }
+        for idx in 0..<fields.count {
           let srcField = builder.createStructExtract(struct: source, fieldIndex: idx)
           let fieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
           builder.createStore(source: srcField, destination: fieldAddr, ownership: splitOwnership(for: srcField))
@@ -260,7 +318,10 @@ extension LoadInst {
       if type.nominal.isStructWithUnreferenceableStorage {
         return
       }
-      for idx in 0..<type.getNominalFields(in: parentFunction).count {
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return
+      }
+      for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
         let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
         elements.append(splitLoad)
@@ -289,48 +350,6 @@ extension LoadInst {
       return self.loadOwnership
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
-    }
-  }
-}
-
-
-extension UseList {
-  var singleNonDebugUse: Operand? {
-    var singleUse: Operand?
-    for use in self {
-      if use.instruction is DebugValueInst {
-        continue
-      }
-      if singleUse != nil {
-        return nil
-      }
-      singleUse = use
-    }
-    return singleUse
-  }
-
-  var isEmptyIgnoringDebugUses: Bool {
-    for use in self {
-      if !(use.instruction is DebugValueInst) {
-        return false
-      }
-    }
-    return true
-  }
-}
-
-extension SmallProjectionPath {
-  /// Returns true if the path only contains projections which can be materialized as
-  /// SIL struct or tuple projection instructions - for values or addresses.
-  var isMaterializable: Bool {
-    let (kind, _, subPath) = pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField, .tupleField:
-      return subPath.isMaterializable
-    default:
-      return false
     }
   }
 }
@@ -394,7 +413,7 @@ extension SimplifyContext {
   /// The operation is not done if it would require to insert a copy due to keep ownership correct.
   func tryReplaceRedundantInstructionPair(first: SingleValueInstruction, second: SingleValueInstruction,
                                           with replacement: Value) {
-    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.singleNonDebugUse
+    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.ignoreDebugUses.singleUse
     let canEraseFirst = singleUse?.instruction == second
 
     if !canEraseFirst && first.parentFunction.hasOwnership && replacement.ownership == .owned {
@@ -525,6 +544,28 @@ extension GlobalVariable {
         context.erase(instruction: endAccess)
       default:
         break
+      }
+    }
+  }
+}
+
+extension InstructionRange {
+  /// Adds the instruction range of a borrow-scope by transitively visiting all (potential) re-borrows.
+  mutating func insert(borrowScopeOf borrow: BorrowIntroducingInstruction, _ context: some Context) {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(borrow)
+    while let value = worklist.pop() {
+      for use in value.uses {
+        switch use.instruction {
+        case let endBorrow as EndBorrowInst:
+          self.insert(endBorrow)
+        case let branch as BranchInst:
+          worklist.pushIfNotVisited(branch.getArgument(for: use))
+        default:
+          break
+        }
       }
     }
   }

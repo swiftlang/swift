@@ -55,6 +55,10 @@ class SwiftSyntax(product.Product):
         build_cmd = [
             os.path.join(self.install_toolchain_path(target), "bin", "swift"),
             'run',
+        ]
+        if self.args.verbose_build:
+            build_cmd.append('--vv')
+        build_cmd += [
             '--package-path', script_path,
             'swift-syntax-dev-utils',
             command,
@@ -92,6 +96,10 @@ class SwiftSyntax(product.Product):
             build_cmd = [
                 os.path.join(self.install_toolchain_path(host_target), "bin", "swift"),
                 'run',
+            ]
+            if self.args.verbose_build:
+                build_cmd.append('--vv')
+            build_cmd += [
                 '--package-path', script_path,
                 'swift-syntax-dev-utils',
                 'verify-source-code',

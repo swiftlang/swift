@@ -265,6 +265,20 @@ bool swift::parseSanitizerAddressUseODRIndicator(
   return true;
 }
 
+bool swift::parseSanitizerUseStableABI(
+    const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
+    DiagnosticEngine &Diags) {
+  // Warn if ASan isn't enabled.
+  if (!(enabledSanitizers & SanitizerKind::Address)) {
+    Diags.diagnose(
+        SourceLoc(), diag::warning_option_requires_specific_sanitizer,
+        A->getOption().getPrefixedName(), toStringRef(SanitizerKind::Address));
+    return false;
+  }
+
+  return true;
+}
+
 std::string swift::getSanitizerList(const OptionSet<SanitizerKind> &Set) {
   std::string list;
   #define SANITIZER(_, kind, name, file) \

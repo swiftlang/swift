@@ -25,7 +25,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
@@ -276,13 +275,13 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
 // Called from initializeSwiftModules().
 void SILPassManager_registerModulePass(BridgedStringRef name,
                                        BridgedModulePassRunFn runFn) {
-  bridgedModulePassRunFunctions[name.get()] = runFn;
+  bridgedModulePassRunFunctions[name.unbridged()] = runFn;
   passesRegistered = true;
 }
 
 void SILPassManager_registerFunctionPass(BridgedStringRef name,
                                          BridgedFunctionPassRunFn runFn) {
-  bridgedFunctionPassRunFunctions[name.get()] = runFn;
+  bridgedFunctionPassRunFunctions[name.unbridged()] = runFn;
   passesRegistered = true;
 }
 

@@ -88,6 +88,7 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
     return true
   }
 
+#if !$Embedded
   // Finally, take a slow path through the standard library to see if the
   // current environment can accept a larger stack allocation.
   guard #available(macOS 12.3, iOS 15.4, watchOS 8.5, tvOS 15.4, *) //SwiftStdlib 5.6
@@ -95,6 +96,10 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
     return false
   }
   return swift_stdlib_isStackAllocationSafe(byteCount, alignment)
+#else
+  return false
+#endif
+
 #else
   fatalError("unsupported compiler")
 #endif

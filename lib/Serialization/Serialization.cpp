@@ -1480,6 +1480,8 @@ void Serializer::serializeGenericRequirements(
       if (layout->isKnownSizeTrivial()) {
         size = layout->getTrivialSizeInBits();
         alignment = layout->getAlignmentInBits();
+      } else if (layout->isTrivialStride()) {
+        size = layout->getTrivialStrideInBits();
       }
       LayoutRequirementKind rawKind = LayoutRequirementKind::UnknownLayout;
       switch (layout->getKind()) {
@@ -1506,6 +1508,12 @@ void Serializer::serializeGenericRequirements(
         break;
       case LayoutConstraintKind::UnknownLayout:
         rawKind = LayoutRequirementKind::UnknownLayout;
+        break;
+      case LayoutConstraintKind::BridgeObject:
+        rawKind = LayoutRequirementKind::BridgeObject;
+        break;
+      case LayoutConstraintKind::TrivialStride:
+        rawKind = LayoutRequirementKind::TrivialStride;
         break;
       }
       scratch.push_back(rawKind);
@@ -2341,20 +2349,11 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
 
 static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   switch (context) {
-#define CASE(NAME) \
-  case swift::MacroRole::NAME: \
-    return static_cast<uint8_t>(serialization::MacroRole::NAME);
-  CASE(Expression)
-  CASE(Declaration)
-  CASE(Accessor)
-  CASE(MemberAttribute)
-  CASE(Member)
-  CASE(Peer)
-  CASE(Conformance)
-  CASE(CodeItem)
-  CASE(Extension)
+#define MACRO_ROLE(Name, Description) \
+  case swift::MacroRole::Name: \
+    return static_cast<uint8_t>(serialization::MacroRole::Name);
+#include "swift/Basic/MacroRoles.def"
   }
-#undef CASE
   llvm_unreachable("bad result declaration macro kind");
 }
 
@@ -3206,6 +3205,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       }
 
       unsigned numNames = introducedDeclNames.size();
+
+      (void)evaluateOrDefault(S.getASTContext().evaluator,
+                              ResolveMacroConformances{theAttr, D}, {});
 
       unsigned numConformances = 0;
       for (auto conformance : theAttr->getConformances()) {
@@ -4490,11 +4492,14 @@ public:
     }
     uint8_t rawAccessLevel =
         getRawStableAccessLevel(opaqueDecl->getFormalAccess());
+    bool exportDetails = opaqueDecl->exportUnderlyingType();
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
     OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingSubsID, rawAccessLevel);
+                                 underlyingSubsID, rawAccessLevel,
+                                 exportDetails);
     writeGenericParams(opaqueDecl->getGenericParams());
 
     // Serialize all of the conditionally available substitutions expect the
@@ -5044,15 +5049,22 @@ static uint8_t getRawStableParameterConvention(swift::ParameterConvention pc) {
   llvm_unreachable("bad parameter convention kind");
 }
 
-/// Translate from AST SILParameterDifferentiability enum to the Serialization
+/// Translate from AST SILParameterInfo::Options enum to the Serialization
 /// enum values, which are guaranteed to be stable.
-static uint8_t
-getRawSILParameterDifferentiability(swift::SILParameterDifferentiability pd) {
-  switch (pd) {
-  SIMPLE_CASE(SILParameterDifferentiability, DifferentiableOrNotApplicable)
-  SIMPLE_CASE(SILParameterDifferentiability, NotDifferentiable)
+static std::optional<serialization::SILParameterInfoOptions>
+getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
+  serialization::SILParameterInfoOptions result;
+
+  if (options.contains(SILParameterInfo::NotDifferentiable)) {
+    options -= SILParameterInfo::NotDifferentiable;
+    result |= SILParameterInfoFlags::NotDifferentiable;
   }
-  llvm_unreachable("bad parameter differentiability kind");
+
+  // If we still have options left, this code is out of sync... return none.
+  if (bool(options))
+    return {};
+
+  return result;
 }
 
 /// Translate from the AST ResultConvention enum to the
@@ -5071,13 +5083,21 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
 
 /// Translate from AST SILResultDifferentiability enum to the Serialization enum
 /// values, which are guaranteed to be stable.
-static uint8_t
-getRawSILResultDifferentiability(swift::SILResultDifferentiability pd) {
-  switch (pd) {
-  SIMPLE_CASE(SILResultDifferentiability, DifferentiableOrNotApplicable)
-  SIMPLE_CASE(SILResultDifferentiability, NotDifferentiable)
+static std::optional<serialization::SILResultInfoOptions>
+getRawSILResultInfoOptions(swift::SILResultInfo::Options options) {
+  serialization::SILResultInfoOptions result;
+
+  if (options.contains(SILResultInfo::NotDifferentiable)) {
+    options -= SILResultInfo::NotDifferentiable;
+    result |= SILResultInfoFlags::NotDifferentiable;
   }
-  llvm_unreachable("bad result differentiability kind");
+
+  // If we still have any options set, then this code is out of sync. Signal an
+  // error by returning none!
+  if (bool(options))
+    return {};
+
+  return result;
 }
 
 #undef SIMPLE_CASE
@@ -5155,6 +5175,10 @@ public:
 
   void visitTypeVariableType(const TypeVariableType *) {
     llvm_unreachable("type variables should not escape the type checker");
+  }
+
+  void visitErrorUnionType(const ErrorUnionType *) {
+    llvm_unreachable("error union types do not persist in the AST");
   }
 
   void visitBuiltinTypeImpl(Type ty) {
@@ -5398,7 +5422,7 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst());
+          paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn());
     }
   }
 
@@ -5479,9 +5503,8 @@ public:
       variableData.push_back(S.addTypeRef(param.getInterfaceType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
-      if (fnTy->isDifferentiable())
-        variableData.push_back(TypeID(
-            getRawSILParameterDifferentiability(param.getDifferentiability())));
+      auto options = *getRawSILParameterInfoOptions(param.getOptions());
+      variableData.push_back(TypeID(options.toRaw()));
     }
     for (auto yield : fnTy->getYields()) {
       variableData.push_back(S.addTypeRef(yield.getInterfaceType()));
@@ -5492,9 +5515,8 @@ public:
       variableData.push_back(S.addTypeRef(result.getInterfaceType()));
       unsigned conv = getRawStableResultConvention(result.getConvention());
       variableData.push_back(TypeID(conv));
-      if (fnTy->isDifferentiable())
-        variableData.push_back(TypeID(
-            getRawSILResultDifferentiability(result.getDifferentiability())));
+      auto options = *getRawSILResultInfoOptions(result.getOptions());
+      variableData.push_back(TypeID(options.toRaw()));
     }
     if (fnTy->hasErrorResult()) {
       auto abResult = fnTy->getErrorResult();
@@ -5565,11 +5587,25 @@ public:
     for (auto proto : composition->getMembers())
       protocols.push_back(S.addTypeRef(proto));
 
+    bool inverseCopyable = false, inverseEscapable = false;
+    for (auto ip : composition->getInverses()) {
+      switch (ip) {
+      case InvertibleProtocolKind::Copyable:
+        inverseCopyable = true;
+        break;
+      case InvertibleProtocolKind::Escapable:
+        inverseEscapable = true;
+        break;
+      };
+    }
+
     unsigned abbrCode =
         S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         composition->hasExplicitAnyObject(),
+        inverseCopyable,
+        inverseEscapable,
         protocols);
   }
 

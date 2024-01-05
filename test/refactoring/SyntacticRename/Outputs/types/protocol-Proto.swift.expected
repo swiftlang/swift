@@ -1,8 +1,8 @@
 class /*/*class-Foo:unknown*/Foo in comment*/ /*class-Foo:def*/Foo {}
-protocol /*protocol-Proto:def*/NextProto {
+protocol /*protocol-Proto:def*/<base>Proto</base> {
 	associatedtype /*associated-Item:def*/Item
 }
-class /*class-Bar:def*/Bar : /*class-Foo*/Foo, /*protocol-Proto*/NextProto {
+class /*class-Bar:def*/Bar : /*class-Foo*/Foo, /*protocol-Proto*/<base>Proto</base> {
 	typealias /*associated-Item:def*/Item = Int
 }
 
@@ -15,9 +15,9 @@ func foo(a: /*class-Foo*/Foo, b: /*class-Bar*/Bar, c: inout /*class-Bar*/Bar) ->
 typealias /*alias-FuncType:def*/FuncType = (/*class-Foo*/Foo, /*class-Bar*/Bar) -> /*class-Bar*/Bar
 var example: /*alias-FuncType*/FuncType = {a, b in x}
 
-func bar<X:/*protocol-Proto*/NextProto, Y>(a: X, b: Y) {}
+func bar<X:/*protocol-Proto*/<base>Proto</base>, Y>(a: X, b: Y) {}
 
-class /*class-Animal:def*/Animal</*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/NextProto, /*generic-U*/U . /*associated-Item*/Item == Int {}
+class /*class-Animal:def*/Animal</*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/<base>Proto</base>, /*generic-U*/U . /*associated-Item*/Item == Int {}
 
 var anAnimal: /*class-Animal*/Animal<Int, /*class-Bar*/Bar> = /*class-Animal*/Animal()
 extension /*class-Animal:def*/Animal {

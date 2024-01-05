@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "swift-import-resolution"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -602,28 +603,9 @@ UnboundImport::UnboundImport(ImportDecl *ID)
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {
-  // Exit early if this is not a self-import.
-  auto modulePath = import.module.getModulePath();
-  if (modulePath.front().Item != SF.getParentModule()->getName() ||
-      // Overlays use an @_exported self-import to load their clang module.
-      import.options.contains(ImportFlags::Exported) ||
-      // Imports of your own submodules are allowed in cross-language libraries.
-      modulePath.size() != 1 ||
-      // SIL files self-import to get decls from the rest of the module.
-      SF.Kind == SourceFileKind::SIL)
-    return true;
-
-  ASTContext &ctx = SF.getASTContext();
-
-  StringRef filename = llvm::sys::path::filename(SF.getFilename());
-  if (filename.empty())
-    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module,
-                       modulePath.front().Item);
-  else
-    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module_with_file,
-                       filename, modulePath.front().Item);
-
-  return false;
+  return swift::dependencies::checkImportNotTautological(
+      import.module.getModulePath(), importLoc, SF,
+      import.options.contains(ImportFlags::Exported));
 }
 
 bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
@@ -769,9 +751,10 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   ASTContext &ctx = topLevelModule->getASTContext();
   if (!topLevelModule->getPackageName().empty() &&
       topLevelModule->getPackageName().str() == ctx.LangOpts.PackageName &&
-      topLevelModule->isBuiltFromInterface()) {
+      topLevelModule->isBuiltFromInterface() &&
+      !topLevelModule->getModuleSourceFilename().endswith(".package.swiftinterface")) {
       ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
-                         diag::in_package_module_not_compiled_from_source,
+                         diag::in_package_module_not_compiled_from_source_or_package_interface,
                          topLevelModule->getBaseIdentifier(),
                          ctx.LangOpts.PackageName,
                          topLevelModule->getModuleSourceFilename()
@@ -985,6 +968,58 @@ CheckInconsistentSPIOnlyImportsRequest::evaluate(
   llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> otherImports;
   findInconsistentImportsAcrossFile(SF, predicate, diagnose,
                                     matchingImports, otherImports);
+  return {};
+}
+
+evaluator::SideEffect
+CheckInconsistentAccessLevelOnImportSameFileRequest::evaluate(
+    Evaluator &evaluator, SourceFile *SF) const {
+
+  // Gather the most permissive import decl for each imported module.
+  llvm::DenseMap<ModuleDecl *, const ImportDecl *> mostPermissiveImports;
+  for (auto *topLevelDecl : SF->getTopLevelDecls()) {
+    auto *importDecl = dyn_cast<ImportDecl>(topLevelDecl);
+    if (!importDecl)
+      continue;
+
+    ModuleDecl *importedModule = importDecl->getModule();
+    if (!importedModule)
+      continue;
+
+    auto otherImportDecl = mostPermissiveImports.find(importedModule);
+    if (otherImportDecl == mostPermissiveImports.end() ||
+        otherImportDecl->second->getAccessLevel() <
+          importDecl->getAccessLevel()) {
+      mostPermissiveImports[importedModule] = importDecl;
+    }
+  }
+
+  // Report import decls that are not the most permissive.
+  auto &diags = SF->getASTContext().Diags;
+  for (auto *topLevelDecl : SF->getTopLevelDecls()) {
+    auto *importDecl = dyn_cast<ImportDecl>(topLevelDecl);
+    if (!importDecl)
+      continue;
+
+    ModuleDecl *importedModule = importDecl->getModule();
+    if (!importedModule)
+      continue;
+
+    auto otherImportDecl = mostPermissiveImports.find(importedModule);
+    if (otherImportDecl != mostPermissiveImports.end() &&
+        otherImportDecl->second != importDecl &&
+        otherImportDecl->second->getAccessLevel() >
+          importDecl->getAccessLevel()) {
+      diags.diagnose(importDecl, diag::inconsistent_import_access_levels,
+                     importedModule,
+                     otherImportDecl->second->getAccessLevel(),
+                     importDecl->getAccessLevel());
+      diags.diagnose(otherImportDecl->second,
+                     diag::inconsistent_implicit_access_level_on_import_here,
+                     otherImportDecl->second->getAccessLevel());
+    }
+  }
+
   return {};
 }
 

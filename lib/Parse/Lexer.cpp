@@ -15,13 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
-#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Confusables.h"
-#include "swift/Parse/RegexParserBridging.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -33,12 +32,6 @@
 #include "clang/Basic/CharInfo.h"
 
 #include <limits>
-
-// Regex lexing delivered via libSwift.
-static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
-void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
-  regexLiteralLexingFn = fn;
-}
 
 using namespace swift;
 
@@ -2041,9 +2034,10 @@ bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const 
 const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
                                        DiagnosticEngine *Diags,
                                        bool &CompletelyErroneous) const {
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   // We need to have experimental string processing enabled, and have the
   // parsing logic for regex literals available.
-  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+  if (!LangOpts.EnableExperimentalStringProcessing)
     return nullptr;
 
   bool IsForwardSlash = (*TokStart == '/');
@@ -2089,9 +2083,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   // - Ptr will not be advanced if this is not for a regex literal.
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
-  auto *Ptr = TokStart;
-  CompletelyErroneous = regexLiteralLexingFn(
-      &Ptr, BufferEnd, MustBeRegex, getBridgedOptionalDiagnosticEngine(Diags));
+  const char *Ptr = TokStart;
+  CompletelyErroneous =
+      swift_ASTGen_lexRegexLiteral(&Ptr, BufferEnd, MustBeRegex, Diags);
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
@@ -2179,6 +2173,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   }
   assert(Ptr > TokStart && Ptr <= BufferEnd);
   return Ptr;
+#else
+  return nullptr;
+#endif
 }
 
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
@@ -2604,7 +2601,6 @@ void Lexer::lexImpl() {
   if (DiagQueue)
     DiagQueue->clear();
 
-  const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
@@ -2616,7 +2612,7 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
+  lexTrivia();
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -2820,8 +2816,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   return L.peekNextToken();
 }
 
-StringRef Lexer::lexTrivia(bool IsForTrailingTrivia,
-                           const char *AllTriviaStart) {
+void Lexer::lexTrivia() {
   CommentStart = nullptr;
 
 Restart:
@@ -2829,13 +2824,9 @@ Restart:
 
   switch (*CurPtr++) {
   case '\n':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     goto Restart;
   case '\r':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     if (CurPtr[0] == '\n') {
       ++CurPtr;
@@ -2847,8 +2838,7 @@ Restart:
   case '\f':
     goto Restart;
   case '/':
-    if (IsForTrailingTrivia || isKeepingComments()) {
-      // Don't lex comments as trailing trivia (for now).
+    if (isKeepingComments()) {
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {
@@ -2929,15 +2919,12 @@ Restart:
     bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/false);
     if (ShouldTokenize) {
       CurPtr = Tmp;
-      size_t Length = CurPtr - AllTriviaStart;
-      return StringRef(AllTriviaStart, Length);
+      return;
     }
     goto Restart;
   }
   // Reset the cursor.
   --CurPtr;
-  size_t Length = CurPtr - AllTriviaStart;
-  return StringRef(AllTriviaStart, Length);
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {

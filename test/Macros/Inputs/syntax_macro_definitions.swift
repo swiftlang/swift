@@ -2,7 +2,7 @@ import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
 /// Replace the label of the first element in the tuple with the given
 /// new label.
@@ -917,14 +917,23 @@ public struct AddCompletionHandler: PeerMacro {
 
     // Drop the @addCompletionHandler attribute from the new declaration.
     let newAttributeList = funcDecl.attributes.filter {
-      guard case let .attribute(attribute) = $0,
-            let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
-            let nodeType = node.attributeName.as(IdentifierTypeSyntax.self)
-      else {
+      guard case let .attribute(attribute) = $0  else {
         return true
       }
 
-      return attributeType.name.text != nodeType.name.text
+      if let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
+         let nodeType = node.attributeName.as(IdentifierTypeSyntax.self) {
+        return attributeType.name.text != nodeType.name.text
+      }
+      if let attributeMemberType = attribute.attributeName.as(MemberTypeSyntax.self),
+         let attributeModuleName = attributeMemberType.baseType.as(IdentifierTypeSyntax.self),
+         let nodeMemberType = node.attributeName.as(MemberTypeSyntax.self),
+         let moduleName = nodeMemberType.baseType.as(IdentifierTypeSyntax.self) {
+        return attributeModuleName.name.text != moduleName.name.text ||
+               nodeMemberType.name.text != attributeMemberType.name.text
+      }
+
+      return true
     }
 
     var newFunc = funcDecl
@@ -2057,6 +2066,31 @@ extension RequiredDefaultInitMacro: MemberMacro {
   }
 }
 
+public struct SendableMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if protocols.isEmpty {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(type.trimmed): Sendable {
+      }
+
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -2081,4 +2115,162 @@ public struct NotMacroStruct {
   ) -> ExprSyntax {
     fatalError()
   }
+}
+
+extension FunctionParameterSyntax {
+  var parameterName: TokenSyntax? {
+    // If there were two names, the second is the parameter name.
+    if let secondName {
+      if secondName.text == "_" {
+        return nil
+      }
+
+      return secondName
+    }
+
+    if firstName.text == "_" {
+      return nil
+    }
+
+    return firstName
+  }
+}
+
+@_spi(ExperimentalLanguageFeature)
+public struct RemoteBodyMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    // FIXME: Should be able to support (de-)initializers and accessors as
+    // well, but this is a lazy implementation.
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      return []
+    }
+
+    let funcBaseName = funcDecl.name.text
+    let paramNames = funcDecl.signature.parameterClause.parameters.map { param in
+      param.parameterName ?? TokenSyntax(.wildcard, presence: .present)
+    }
+
+    let passedArgs = DictionaryExprSyntax(
+      content: .elements(
+        DictionaryElementListSyntax {
+          for paramName in paramNames {
+            DictionaryElementSyntax(
+              key: ExprSyntax("\(literal: paramName.text)"),
+              value: DeclReferenceExprSyntax(baseName: paramName)
+            )
+          }
+        }
+      )
+    )
+
+    return [
+      """
+      return try await remoteCall(function: \(literal: funcBaseName), arguments: \(passedArgs))
+      """
+    ]
+  }
+}
+
+@_spi(ExperimentalLanguageFeature)
+public struct TracedPreambleMacro: PreambleMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPreambleFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    // FIXME: Should be able to support (de-)initializers and accessors as
+    // well, but this is a lazy implementation.
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      return []
+    }
+
+    let funcBaseName = funcDecl.name
+    let paramNames = funcDecl.signature.parameterClause.parameters.map { param in
+      param.parameterName?.text ?? "_"
+    }
+
+    let passedArgs = paramNames.map { "\($0): \\(\($0))" }.joined(separator: ", ")
+
+    let entry: CodeBlockItemSyntax = """
+      log("Entering \(funcBaseName)(\(raw: passedArgs))")
+      """
+
+    let argLabels = paramNames.map { "\($0):" }.joined()
+
+    let exit: CodeBlockItemSyntax = """
+      log("Exiting \(funcBaseName)(\(raw: argLabels))")
+      """
+
+    return [
+      entry,
+      """
+      defer {
+        \(exit)
+      }
+      """,
+    ]
+  }
+}
+
+@_spi(ExperimentalLanguageFeature)
+public struct LoggerMacro: PreambleMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPreambleFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    // FIXME: Should be able to support (de-)initializers and accessors as
+    // well, but this is a lazy implementation.
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      return []
+    }
+
+    let funcBaseName = funcDecl.name
+    let paramNames = funcDecl.signature.parameterClause.parameters.map { param in
+      param.parameterName?.text ?? "_"
+    }
+
+    let passedArgs = paramNames.map { "\($0): \\(\($0))" }.joined(separator: ", ")
+
+    let entry: CodeBlockItemSyntax = """
+      logger.log(entering: "\(funcBaseName)(\(raw: passedArgs))")
+      """
+
+    let argLabels = paramNames.map { "\($0):" }.joined()
+
+    let exit: CodeBlockItemSyntax = """
+      logger.log(exiting: "\(funcBaseName)(\(raw: argLabels))")
+      """
+
+    return [
+      """
+      let logger = Logger()
+      """,
+      entry,
+      """
+      defer {
+        \(exit)
+      }
+      """,
+    ]
+  }
+}
+
+public struct AddMemberPeersMacro: MemberAttributeMacro {
+    public static func expansion(of node: AttributeSyntax, attachedTo declaration: some DeclGroupSyntax, providingAttributesFor member: some DeclSyntaxProtocol, in context: some MacroExpansionContext) throws -> [AttributeSyntax] {
+        ["@_AddPeer"]
+    }
+}
+
+public struct _AddPeerMacro: PeerMacro {
+    public static func expansion<Decl: DeclSyntaxProtocol>(of node: AttributeSyntax, providingPeersOf declaration: Decl, in context: some MacroExpansionContext) throws -> [DeclSyntax] {
+        guard let name = declaration.as(VariableDeclSyntax.self)?.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else {
+            return []
+        }
+        return ["static let \(raw: name)_special = 41"]
+    }
 }

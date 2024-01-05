@@ -89,7 +89,6 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
       C,
       /*declLoc=*/importedFieldDecl->getLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, importedFieldDecl,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
@@ -119,7 +118,6 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
       C,
       /*declLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Set, importedFieldDecl,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
@@ -406,7 +404,6 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
       C,
       /*declLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, var,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
@@ -647,7 +644,7 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
   return constructor;
 }
 
-// MARK: Struct RawValue intializers
+// MARK: Struct RawValue initializers
 
 /// Synthesizer callback for a raw value bridging constructor body.
 static std::pair<BraceStmt *, bool>
@@ -1338,7 +1335,6 @@ void SwiftDeclSynthesizer::makeEnumRawValueGetter(EnumDecl *enumDecl,
       C,
       /*declLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, rawValueDecl,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
@@ -1403,7 +1399,6 @@ AccessorDecl *SwiftDeclSynthesizer::makeStructRawValueGetter(
       C,
       /*declLoc=*/SourceLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedVar,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
@@ -1433,7 +1428,6 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       C,
       /*declLoc=*/loc,
       /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, subscript,
-      /*StaticLoc=*/SourceLoc(), subscript->getStaticSpelling(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
@@ -1477,7 +1471,6 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
       C,
       /*declLoc=*/setter->getLoc(),
       /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Set, subscript,
-      /*StaticLoc=*/SourceLoc(), subscript->getStaticSpelling(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
@@ -1496,12 +1489,36 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
 
 // MARK: C++ subscripts
 
+Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
+                                                            Type givenType,
+                                                            Type exprType,
+                                                            Expr *baseExpr) {
+  auto reinterpretCast = cast<FuncDecl>(
+      getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
+  SubstitutionMap subMap = SubstitutionMap::get(
+      reinterpretCast->getGenericSignature(), {givenType, exprType}, {});
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
+  auto reinterpretCastRef =
+      new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  FunctionType::ExtInfo info;
+  reinterpretCastRef->setType(
+      FunctionType::get({FunctionType::Param(givenType)}, exprType, info));
+
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseExpr});
+  auto reinterpreted =
+      CallExpr::createImplicit(ctx, reinterpretCastRef, argList);
+  reinterpreted->setType(exprType);
+  reinterpreted->setThrows(nullptr);
+  return reinterpreted;
+}
+
 /// Synthesizer callback for a subscript getter or a getter for a
 /// dereference property (`var pointee`). If the getter's implementation returns
 /// an UnsafePointer or UnsafeMutablePointer, it unwraps the pointer and returns
 /// the underlying value.
 static std::pair<BraceStmt *, bool>
-synthesizeUnwrappingGetterBody(AbstractFunctionDecl *afd, void *context) {
+synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
+                                              void *context, bool isAddress) {
   auto getterDecl = cast<AccessorDecl>(afd);
   auto getterImpl = static_cast<FuncDecl *>(context);
 
@@ -1525,7 +1542,8 @@ synthesizeUnwrappingGetterBody(AbstractFunctionDecl *afd, void *context) {
   // reference type. This check actually checks to see if the type is a pointer
   // type, but this does not apply to C pointers because they are Optional types
   // when imported. TODO: Use a more obvious check here.
-  if (getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind)) {
+  if (!isAddress &&
+      getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind)) {
     // `getterImpl` can return either UnsafePointer or UnsafeMutablePointer.
     // Retrieve the corresponding `.pointee` declaration.
     VarDecl *pointeePropertyDecl = ctx.getPointerPointeePropertyDecl(ptrKind);
@@ -1540,6 +1558,11 @@ synthesizeUnwrappingGetterBody(AbstractFunctionDecl *afd, void *context) {
     pointeePropertyRefExpr->setType(elementTy);
     propertyExpr = pointeePropertyRefExpr;
   }
+  // Cast an 'address' result from a mutable pointer if needed.
+  if (isAddress &&
+      getterImpl->getResultInterfaceType()->isUnsafeMutablePointer())
+    propertyExpr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+        ctx, getterImpl->getResultInterfaceType(), elementTy, propertyExpr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), propertyExpr,
                                          /*implicit*/ true);
@@ -1547,6 +1570,19 @@ synthesizeUnwrappingGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
   return {body, /*isTypeChecked*/ true};
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeUnwrappingGetterBody(AbstractFunctionDecl *afd, void *context) {
+  return synthesizeUnwrappingGetterOrAddressGetterBody(afd, context,
+                                                       /*isAddress=*/false);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeUnwrappingAddressGetterBody(AbstractFunctionDecl *afd,
+                                      void *context) {
+  return synthesizeUnwrappingGetterOrAddressGetterBody(afd, context,
+                                                       /*isAddress=*/true);
 }
 
 /// Synthesizer callback for a subscript setter or a setter for a dereference
@@ -1596,6 +1632,26 @@ synthesizeUnwrappingSetterBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked*/ true};
 }
 
+static std::pair<BraceStmt *, bool>
+synthesizeUnwrappingAddressSetterBody(AbstractFunctionDecl *afd,
+                                      void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  auto setterImpl = static_cast<FuncDecl *>(context);
+
+  ASTContext &ctx = setterDecl->getASTContext();
+
+  auto selfArg = createSelfArg(setterDecl);
+  auto *setterImplCallExpr =
+      createAccessorImplCallExpr(setterImpl, selfArg, nullptr);
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), setterImplCallExpr,
+                                         /*implicit*/ true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked*/ true};
+}
+
 SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
                                                    FuncDecl *setter) {
   assert((getter || setter) &&
@@ -1620,15 +1676,16 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
   SubscriptDecl *subscript = SubscriptDecl::createImported(
       ctx, name, getterImpl->getLoc(), bodyParams, getterImpl->getLoc(),
-      elementTy, dc, getterImpl->getClangNode());
+      elementTy, dc, getterImpl->getGenericParams(),
+      getterImpl->getClangNode());
   subscript->setAccess(AccessLevel::Public);
 
-  AccessorDecl *getterDecl = AccessorDecl::create(
-      ctx, getterImpl->getLoc(), getterImpl->getLoc(), AccessorKind::Get,
-      subscript, SourceLoc(), subscript->getStaticSpelling(),
-      /*async*/ false, SourceLoc(),
-      /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
-      bodyParams, elementTy, dc);
+  AccessorDecl *getterDecl =
+      AccessorDecl::create(ctx, getterImpl->getLoc(), getterImpl->getLoc(),
+                           AccessorKind::Get, subscript,
+                           /*async*/ false, SourceLoc(),
+                           /*throws*/ false, SourceLoc(),
+                           /*ThrownType=*/TypeLoc(), bodyParams, elementTy, dc);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
@@ -1653,7 +1710,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
 
     setterDecl = AccessorDecl::create(
         ctx, setterImpl->getLoc(), setterImpl->getLoc(), AccessorKind::Set,
-        subscript, SourceLoc(), subscript->getStaticSpelling(),
+        subscript,
         /*async*/ false, SourceLoc(),
         /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
         setterParamList, TupleType::getEmpty(ctx), dc);
@@ -1685,7 +1742,6 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                                                       FuncDecl *setter) {
   assert((getter || setter) &&
          "getter or setter required to generate a pointee property");
-
   auto &ctx = ImporterImpl.SwiftContext;
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
@@ -1697,6 +1753,11 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   const auto elementTy = rawElementTy->getAnyPointerElementType()
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
+  // Use 'address' or 'mutableAddress' accessors for non-copyable
+  // types that are returned indirectly.
+  bool isImplicit = !elementTy->isNoncopyable(dc);
+  bool useAddress =
+      rawElementTy->getAnyPointerElementType() && elementTy->isNoncopyable(dc);
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -1705,16 +1766,20 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   result->setAccess(AccessLevel::Public);
 
   AccessorDecl *getterDecl = AccessorDecl::create(
-      ctx, getterImpl->getLoc(), getterImpl->getLoc(), AccessorKind::Get,
-      result, SourceLoc(), StaticSpellingKind::None,
+      ctx, getterImpl->getLoc(), getterImpl->getLoc(),
+      useAddress ? AccessorKind::Address : AccessorKind::Get, result,
       /*async*/ false, SourceLoc(),
       /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
-      ParameterList::createEmpty(ctx), elementTy, dc);
+      ParameterList::createEmpty(ctx),
+      useAddress ? elementTy->wrapInPointer(PTK_UnsafePointer) : elementTy, dc);
   getterDecl->setAccess(AccessLevel::Public);
-  getterDecl->setImplicit();
+  if (isImplicit)
+    getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
-  getterDecl->setBodySynthesizer(synthesizeUnwrappingGetterBody,
+  getterDecl->setBodySynthesizer(useAddress
+                                     ? synthesizeUnwrappingAddressGetterBody
+                                     : synthesizeUnwrappingGetterBody,
                                  getterImpl);
 
   if (getterImpl->isMutating()) {
@@ -1733,20 +1798,28 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
     paramVarDecl->setSpecifier(ParamSpecifier::Default);
     paramVarDecl->setInterfaceType(elementTy);
 
-    auto setterParamList =
-        ParameterList::create(ctx, {paramVarDecl});
+    auto setterParamList = useAddress
+                               ? ParameterList::create(ctx, {})
+                               : ParameterList::create(ctx, {paramVarDecl});
 
     setterDecl = AccessorDecl::create(
-        ctx, setterImpl->getLoc(), setterImpl->getLoc(), AccessorKind::Set,
-        result, SourceLoc(), StaticSpellingKind::None,
+        ctx, setterImpl->getLoc(), setterImpl->getLoc(),
+        useAddress ? AccessorKind::MutableAddress : AccessorKind::Set, result,
         /*async*/ false, SourceLoc(),
         /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
-        setterParamList, TupleType::getEmpty(ctx), dc);
+        setterParamList,
+        useAddress ? elementTy->wrapInPointer(PTK_UnsafeMutablePointer)
+                   : TupleType::getEmpty(ctx),
+        dc);
     setterDecl->setAccess(AccessLevel::Public);
-    setterDecl->setImplicit();
+    if (isImplicit)
+      setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
-    setterDecl->setBodySynthesizer(synthesizeUnwrappingSetterBody, setterImpl);
+    setterDecl->setBodySynthesizer(useAddress
+                                       ? synthesizeUnwrappingAddressSetterBody
+                                       : synthesizeUnwrappingSetterBody,
+                                   setterImpl);
 
     if (setterImpl->isMutating()) {
       setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1910,9 +1983,7 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
 
 FuncDecl *
 SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
-                                   clang::CXXMethodDecl *clangOperator) {
-  clang::OverloadedOperatorKind opKind = clangOperator->getOverloadedOperator();
-
+                                   clang::OverloadedOperatorKind opKind) {
   assert(opKind != clang::OverloadedOperatorKind::OO_None &&
          "expected a C++ operator");
 
@@ -1970,7 +2041,8 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
                                              operatorMethod);
 
   // If this is a unary prefix operator (e.g. `!`), add a `prefix` attribute.
-  if (clangOperator->param_empty()) {
+  size_t numParams = operatorMethod->getParameters()->size();
+  if (numParams == 0 || (operatorMethod->isStatic() && numParams == 1)) {
     topLevelStaticFuncDecl->getAttrs().add(new (ctx) PrefixAttr(SourceLoc()));
   }
 
@@ -2037,7 +2109,6 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
 
   AccessorDecl *getterDecl = AccessorDecl::create(
       ctx, getter->getLoc(), getter->getLoc(), AccessorKind::Get, result,
-      SourceLoc(), StaticSpellingKind::None,
       /*async*/ false, SourceLoc(),
       /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
       ParameterList::createEmpty(ctx),
@@ -2064,7 +2135,6 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
 
     setterDecl = AccessorDecl::create(
         ctx, setter->getLoc(), setter->getLoc(), AccessorKind::Set, result,
-        SourceLoc(), StaticSpellingKind::None,
         /*async*/ false, SourceLoc(),
         /*throws*/ false, SourceLoc(), /*thrownType*/ TypeLoc(),
         setterParamList, setter->getResultInterfaceType(), dc);

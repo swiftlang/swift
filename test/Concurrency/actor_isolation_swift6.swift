@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -disable-availability-checking -warn-concurrency -swift-version 6 -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -warn-concurrency -swift-version 6 -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -disable-availability-checking -strict-concurrency=complete -swift-version 6 -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -strict-concurrency=complete -swift-version 6 -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -80,3 +80,16 @@ struct NoGlobalActorValueType {
 }
 
 /// -----------------------------------------------------------------
+
+@MainActor
+class MainActorIsolated {
+  init() {}
+
+  // expected-note@+1 {{static property declared here}}
+  static let shared = MainActorIsolated()
+}
+
+nonisolated func accessAcrossActors() {
+  // expected-error@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+  let _ = MainActorIsolated.shared
+}

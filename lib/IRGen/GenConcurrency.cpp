@@ -157,6 +157,20 @@ void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
   out.add(impl);
 }
 
+void irgen::emitBuildOrdinaryTaskExecutorRef(
+    IRGenFunction &IGF, llvm::Value *executor, CanType executorType,
+    ProtocolConformanceRef executorConf, Explosion &out) {
+  // The implementation word of an "ordinary" executor is
+  // just the witness table pointer with no flags set.
+  llvm::Value *identity =
+      IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
+  llvm::Value *impl = emitWitnessTableRef(IGF, executorType, executorConf);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
+
+  out.add(identity);
+  out.add(impl);
+}
+
 void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
                                                llvm::Value *executor,
                                                CanType executorType,
@@ -188,7 +202,7 @@ void irgen::emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
     emitWitnessTableRef(IGF, executorType, executorConf);
   impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
 
-  // NOTE: Refer to ExecutorRef::ExecutorKind for the flag values.
+  // NOTE: Refer to SerialExecutorRef::ExecutorKind for the flag values.
   llvm::IntegerType *IntPtrTy = IGF.IGM.IntPtrTy;
   auto complexEqualityExecutorKindFlag =
       llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),

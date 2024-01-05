@@ -2,6 +2,12 @@
 
 // REQUIRES: swift_in_compiler
 
+// Fails without optimized stdlib (rdar://119899895)
+// REQUIRES: optimized_stdlib
+
+// The `StaticString("hello").utf8Start` test fails on 32 bit
+// UNSUPPORTED: PTRSIZE=32
+
 struct MyStruct1 {
     var a, b: Int
 }
@@ -38,8 +44,14 @@ struct MyStruct5 {
 }
 @_section("__TEXT,__mysection") var g_MyStruct5: MyStruct5 = MyStruct5(q: MyStruct4(a: 42, s: MyStruct1(a: 43, b: 44)), r: MyStruct4(a: 42, s: MyStruct1(a: 43, b: 44)))
 
+@_section("__TEXT,__mysection") let utf8OfStaticString = StaticString("hello").utf8Start
+
 // CHECK: @"{{.*}}g_MyStruct1{{.*}}Vvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, %TSi <{ {{(i32|i64)}} 66 }> }>
 // CHECK: @"{{.*}}g_MyStruct2{{.*}}Vvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, <{ %TSi, %TSi }> <{ %TSi <{ {{(i32|i64)}} 66 }>, %TSi <{ {{(i32|i64)}} 67 }> }> }>
 // CHECK: @"{{.*}}g_MyStruct3{{.*}}Vvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, %TSi <{ {{(i32|i64)}} 77 }> }>
 // CHECK: @"{{.*}}g_MyStruct4{{.*}}Vvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 43 }>, %TSi <{ {{(i32|i64)}} 44 }> }> }>
 // CHECK: @"{{.*}}g_MyStruct5{{.*}}Vvp" = hidden global {{.*}} <{ {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 43 }>, %TSi <{ {{(i32|i64)}} 44 }> }> }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 43 }>, %TSi <{ {{(i32|i64)}} 44 }> }> }> }>
+
+// CHECK: [[HELLOSTR:@.*]] = private {{.*}}constant [6 x i8] c"hello\00"
+// CHECK: @"{{.*}}utf8OfStaticString{{.*}}VGvp" = hidden constant {{.*}} <{ ptr [[HELLOSTR]] }>
+

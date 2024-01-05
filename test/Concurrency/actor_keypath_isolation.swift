@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -58,7 +58,7 @@ func tryKeyPathsMisc(d : Door) {
 
 func tryKeyPathsFromAsync() async {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // okay for now
+    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in Swift 6}}
 }
 
 func tryNonSendable() {
@@ -69,7 +69,7 @@ func tryNonSendable() {
 
 func tryKeypaths() {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // okay for now
+    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in Swift 6}}
 
     _ = \Door.immutable
     _ = \Door.globActor_immutable
@@ -84,7 +84,7 @@ func tryKeypaths() {
     let _ : PartialKeyPath<Door> = \.mutable // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
     let _ : AnyKeyPath = \Door.mutable  // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
 
-    _ = \Door.globActor_mutable // okay for now
+    _ = \Door.globActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'globActor_mutable'; this is an error in Swift 6}}
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
-    _ = \Door.["hello"] // okay for now
+    _ = \Door.["hello"] // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in Swift 6}}
 }

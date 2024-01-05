@@ -153,6 +153,8 @@ public:
 
   OptionSet<SanitizerKind> SelectedSanitizers;
 
+  unsigned SanitizerUseStableABI = 0;
+
   /// Might this sort of compile have explicit primary inputs?
   /// When running a single compile for the whole module (in other words
   /// "whole-module-optimization" mode) there must be no -primary-input's and
@@ -181,7 +183,8 @@ public:
     SymbolGraph,     // swift-symbolgraph
     APIExtract,      // swift-api-extract
     APIDigester,     // swift-api-digester
-    CacheTool        // swift-cache-tool
+    CacheTool,       // swift-cache-tool
+    ParseTest,       // swift-parse-test
   };
 
   class InputInfoMap;

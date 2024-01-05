@@ -43,24 +43,10 @@ void SwiftLangSupport::expandMacroSyntactically(
     unsigned offset = req.offset;
 
     swift::MacroRoles macroRoles;
-    if (req.roles.contains(SourceKit::MacroRole::Expression))
-      macroRoles |= swift::MacroRole::Expression;
-    if (req.roles.contains(SourceKit::MacroRole::Declaration))
-      macroRoles |= swift::MacroRole::Declaration;
-    if (req.roles.contains(SourceKit::MacroRole::CodeItem))
-      macroRoles |= swift::MacroRole::CodeItem;
-    if (req.roles.contains(SourceKit::MacroRole::Accessor))
-      macroRoles |= swift::MacroRole::Accessor;
-    if (req.roles.contains(SourceKit::MacroRole::MemberAttribute))
-      macroRoles |= swift::MacroRole::MemberAttribute;
-    if (req.roles.contains(SourceKit::MacroRole::Member))
-      macroRoles |= swift::MacroRole::Member;
-    if (req.roles.contains(SourceKit::MacroRole::Peer))
-      macroRoles |= swift::MacroRole::Peer;
-    if (req.roles.contains(SourceKit::MacroRole::Conformance))
-      macroRoles |= swift::MacroRole::Conformance;
-    if (req.roles.contains(SourceKit::MacroRole::Extension))
-      macroRoles |= swift::MacroRole::Extension;
+#define MACRO_ROLE(Name, Description)                   \
+    if (req.roles.contains(SourceKit::MacroRole::Name)) \
+      macroRoles |= swift::MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
 
     MacroDefinition definition = [&] {
       if (auto *expanded =

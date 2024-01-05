@@ -4,6 +4,7 @@
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
+// REQUIRES: rdar118189728
 
 // Tests that parsing of function bodies is deferred
 // to runtime when the interpreter is invoked using

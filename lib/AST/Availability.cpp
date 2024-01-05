@@ -136,13 +136,28 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // a per-platform basis.
   std::map<PlatformKind, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
+    llvm::SmallVector<const AvailableAttr *, 8> MergedAttrs;
+
     do {
+      llvm::SmallVector<const AvailableAttr *, 8> PendingAttrs;
+
       for (const DeclAttribute *Attr : D->getAttrs()) {
         auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
         if (!AvAttr || AvAttr->isInvalid())
           continue;
 
+        // Skip an attribute from an outer declaration if it is for a platform
+        // that was already handled implicitly by an attribute from an inner
+        // declaration.
+        if (llvm::any_of(MergedAttrs,
+                         [&AvAttr](const AvailableAttr *MergedAttr) {
+                           return inheritsAvailabilityFromPlatform(
+                               AvAttr->Platform, MergedAttr->Platform);
+                         }))
+          continue;
+
         mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
+        PendingAttrs.push_back(AvAttr);
 
         if (Message.empty() && !AvAttr->Message.empty())
           Message = AvAttr->Message;
@@ -152,6 +167,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
           RenameDecl = AvAttr->RenameDecl;
         }
       }
+
+      MergedAttrs.append(PendingAttrs);
 
       // Walk up the enclosing declaration hierarchy to make sure we aren't
       // missing any inherited attributes.
@@ -529,6 +546,10 @@ AvailabilityContext ASTContext::getConcurrencyAvailability() {
   return getSwift55Availability();
 }
 
+AvailabilityContext ASTContext::getTaskExecutorAvailability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getConcurrencyDiscardingTaskGroupAvailability() {
   return getSwift59Availability();
 }
@@ -545,6 +566,10 @@ AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext ASTContext::getTypedThrowsAvailability() {
+  return getSwift511Availability();
+}
+
 AvailabilityContext ASTContext::getMultiPayloadEnumTagSinglePayload() {
   return getSwift56Availability();
 }
@@ -559,10 +584,8 @@ ASTContext::getParameterizedExistentialRuntimeAvailability() {
 }
 
 AvailabilityContext
-ASTContext::getImmortalRefCountSymbolsAvailability() {
-  // TODO: replace this with a concrete swift version once we have it.
-  // rdar://94185998
-  return getSwiftFutureAvailability();
+ASTContext::getStaticReadOnlyArraysAvailability() {
+  return getSwift511Availability();
 }
 
 AvailabilityContext
@@ -586,7 +609,7 @@ ASTContext::getInitRawStructMetadataAvailability() {
 }
 
 AvailabilityContext ASTContext::getObjCSymbolicReferencesAvailability() {
-  return getSwiftFutureAvailability();
+  return getSwift511Availability();
 }
 
 AvailabilityContext ASTContext::getSwift52Availability() {
@@ -750,6 +773,11 @@ AvailabilityContext ASTContext::getSwift59Availability() {
   } else {
     return AvailabilityContext::alwaysAvailable();
   }
+}
+
+AvailabilityContext ASTContext::getSwift511Availability() {
+  // Placeholder
+  return getSwiftFutureAvailability();
 }
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {

@@ -157,6 +157,10 @@ public:
   /// instead of just answering "batch" if there is more than one primary.
   std::string getStatsFileMangledInputName() const;
 
+  const InputFile &getFirstOutputProducingInput() const;
+
+  unsigned getIndexOfFirstOutputProducingInput() const;
+
   bool isInputPrimary(StringRef file) const;
 
   unsigned numberOfPrimaryInputsEndingWith(StringRef extension) const;
@@ -264,6 +268,7 @@ public:
   bool hasModuleSourceInfoOutputPath() const;
   bool hasModuleInterfaceOutputPath() const;
   bool hasPrivateModuleInterfaceOutputPath() const;
+  bool hasPackageModuleInterfaceOutputPath() const;
   bool hasABIDescriptorOutputPath() const;
   bool hasAPIDescriptorOutputPath() const;
   bool hasConstValuesOutputPath() const;

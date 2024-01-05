@@ -448,6 +448,10 @@ public:
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
 
+  /// Find the original expression value, looking through various
+  /// implicit conversions.
+  const Expr *findOriginalValue() const;
+
   /// Find the original type of a value, looking through various implicit
   /// conversions.
   Type findOriginalType() const;
@@ -1918,6 +1922,7 @@ public:
 /// should dynamically assert if it does.
 class ForceTryExpr final : public AnyTryExpr {
   SourceLoc ExclaimLoc;
+  Type thrownError;
 
 public:
   ForceTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc exclaimLoc,
@@ -1926,6 +1931,15 @@ public:
       ExclaimLoc(exclaimLoc) {}
 
   SourceLoc getExclaimLoc() const { return ExclaimLoc; }
+
+  /// Retrieve the type of the error thrown from the subexpression.
+  Type getThrownError() const { return thrownError; }
+
+  /// Set the type of the error thrown from the subexpression.
+  void setThrownError(Type type) {
+    assert(!thrownError || thrownError->isEqual(type));
+    thrownError = type;
+  }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::ForceTry;
@@ -1937,6 +1951,7 @@ public:
 /// Optional. If the code does throw, \c nil is produced.
 class OptionalTryExpr final : public AnyTryExpr {
   SourceLoc QuestionLoc;
+  Type thrownError;
 
 public:
   OptionalTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc questionLoc,
@@ -1945,6 +1960,15 @@ public:
       QuestionLoc(questionLoc) {}
 
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
+  /// Retrieve the type of the error thrown from the subexpression.
+  Type getThrownError() const { return thrownError; }
+
+  /// Set the type of the error thrown from the subexpression.
+  void setThrownError(Type type) {
+    assert(!thrownError || thrownError->isEqual(type));
+    thrownError = type;
+  }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::OptionalTry;
@@ -3967,6 +3991,8 @@ public:
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
+  friend class ExplicitCaughtTypeRequest;
+
 public:
   enum class BodyState {
     /// The body was parsed, but not ready for type checking because
@@ -4014,7 +4040,7 @@ private:
   /// The location of the "in", if present.
   SourceLoc InLoc;
 
-  /// The explcitly-specified thrown type.
+  /// The explicitly-specified thrown type.
   TypeExpr *ThrownType;
 
   /// The explicitly-specified result type.
@@ -4129,14 +4155,7 @@ public:
   }
 
   /// Retrieve the explicitly-thrown type.
-  Type getExplicitThrownType() const {
-    if (ThrownType)
-      return ThrownType->getInstanceType();
-
-    return nullptr;
-  }
-
-  void setExplicitThrownType(Type thrownType);
+  Type getExplicitThrownType() const;
 
   /// Retrieve the explicitly-thrown type representation.
   TypeRepr *getExplicitThrownTypeRepr() const {
@@ -4617,41 +4636,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DefaultArgument;
   }
-};
-
-// ApplyIsolationCrossing records the source and target of an isolation crossing
-// within an ApplyExpr. In particular, it stores the isolation of the caller
-// and the callee of the ApplyExpr, to be used for inserting implicit actor
-// hops for implicitly async functions and to be used for diagnosing potential
-// data races that could arise when non-Sendable values are passed to calls
-// that cross isolation domains.
-struct ApplyIsolationCrossing {
-  ActorIsolation CallerIsolation;
-  ActorIsolation CalleeIsolation;
-
-  ApplyIsolationCrossing()
-      : CallerIsolation(ActorIsolation::forUnspecified()),
-        CalleeIsolation(ActorIsolation::forUnspecified()) {}
-
-  ApplyIsolationCrossing(ActorIsolation CallerIsolation,
-                         ActorIsolation CalleeIsolation)
-      : CallerIsolation(CallerIsolation), CalleeIsolation(CalleeIsolation) {}
-
-  // If the callee is not actor isolated, then this crossing exits isolation.
-  // This method returns true iff this crossing exits isolation.
-  bool exitsIsolation() const { return !CalleeIsolation.isActorIsolated(); }
-
-  // Whether to use the isolation of the caller or callee for generating
-  // informative diagnostics depends on whether this crossing is an exit.
-  // In particular, we tend to use the callee isolation for diagnostics,
-  // but if this crossing is an exit from isolation then the callee isolation
-  // is not very informative, so we use the caller isolation instead.
-  ActorIsolation getDiagnoseIsolation() const {
-    return exitsIsolation() ? CallerIsolation : CalleeIsolation;
-  }
-
-  ActorIsolation getCallerIsolation() const { return CallerIsolation; }
-  ActorIsolation getCalleeIsolation() const {return CalleeIsolation; }
 };
 
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
@@ -6081,11 +6065,11 @@ public:
     ParsedPath = path;
   }
 
-  TypeRepr *getRootType() const {
+  TypeRepr *getExplicitRootType() const {
     assert(!isObjC() && "cannot get root type of ObjC keypath");
     return RootType;
   }
-  void setRootType(TypeRepr *rootType) {
+  void setExplicitRootType(TypeRepr *rootType) {
     assert(!isObjC() && "cannot set root type of ObjC keypath");
     RootType = rootType;
   }
@@ -6095,6 +6079,11 @@ public:
 
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
+
+  BoundGenericType *getKeyPathType() const;
+
+  Type getRootType() const;
+  Type getValueType() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPath;

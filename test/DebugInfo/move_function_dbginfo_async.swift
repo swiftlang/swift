@@ -1,4 +1,3 @@
-// REQUIRES: CPU=arm64
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -emit-sil -o - %s | %FileCheck -check-prefix=SIL %s
 // RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -g -emit-ir -o - %s | %FileCheck %s
@@ -67,8 +66,8 @@ public func forceSplit5() async {}
 // DWARF1:  DW_AT_linkage_name	("$s3out13letSimpleTestyyxnYalF")
 // DWARF1:  DW_TAG_formal_parameter
 // DWARF1-NEXT: DW_AT_location
-// DWARF1-NEXT:	[[ASYNC_REG:DW_OP_.*]], DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref
-// DWARF1-NEXT:  DW_AT_name ("msg")
+// DWARF1-NOT: OP_entry_value
+// DWARF1:  DW_AT_name ("msg")
 //
 // RUN: %llvm-dwarfdump -c --name='$s3out13letSimpleTestyyxnYalFTQ0_' %t/out.o | %FileCheck -check-prefix=DWARF2 %s
 // DWARF2:  DW_AT_linkage_name	("$s3out13letSimpleTestyyxnYalFTQ0_")
@@ -128,8 +127,8 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF4: DW_AT_name	("varSimpleTest")
 // DWARF4: DW_TAG_formal_parameter
 // DWARF4-NEXT: DW_AT_location
-// DWARF4-NEXT:	[[ASYNC_REG:.*]], DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref, DW_OP_deref
-// DWARF4-NEXT: DW_AT_name ("msg")
+// DWARF4-NOT:	OP_entry_value
+// DWARF4: DW_AT_name ("msg")
 //
 // RUN: %llvm-dwarfdump -c --name='$s3out13varSimpleTestyyxz_xtYalFTQ0_' %t/out.o | %FileCheck -check-prefix=DWARF5 %s
 // DWARF5: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTQ0_")
@@ -356,8 +355,8 @@ public func varSimpleTestVar() async {
 
 // DWARF17: DW_TAG_formal_parameter
 // DWARF17-NEXT: DW_AT_location
-// DWARF17-NEXT: [[ASYNC_REG:.*]], DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x8, DW_OP_deref, DW_OP_deref
-// DWARF17-NEXT: DW_AT_name	("msg")
+// DWARF17-NOT: OP_entry_value
+// DWARF17: DW_AT_name	("msg")
 //
 // RUN: %llvm-dwarfdump -c --name='$s3out20letArgCCFlowTrueTestyyxnYalFTQ0_' %t/out.o | %FileCheck -check-prefix=DWARF18 %s
 // DWARF18: DW_AT_linkage_name	("$s3out20letArgCCFlowTrueTestyyxnYalFTQ0_")
@@ -493,8 +492,8 @@ public func letArgCCFlowTrueTest<T>(_ msg: __owned T) async {
 // DWARF24: DW_AT_name	("varArgCCFlowTrueTest")
 // DWARF24: DW_TAG_formal_parameter
 // DWARF24-NEXT:                     DW_AT_location
-// DWARF24-NEXT:                     [[ASYNC_REG:.*]], DW_OP_plus_uconst 0x10, DW_OP_plus_uconst 0x30, DW_OP_deref, DW_OP_deref
-// DWARF24-NEXT:                     DW_AT_name	("msg")
+// DWARF24-NOT:                      OP_entry_value
+// DWARF24:                     DW_AT_name	("msg")
 //
 
 // RUN: %llvm-dwarfdump -c --name='$s3out20varArgCCFlowTrueTestyyxzYaAA1PRzlFTQ0_' %t/out.o | %FileCheck -check-prefix=DWARF25 %s

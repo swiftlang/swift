@@ -409,7 +409,7 @@ private:
   static bool findUrlStartingLoc(StringRef Text, unsigned &Start,
                                  std::regex& Regex);
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
-  bool handleAttrs(const OrigDeclAttributes &Attrs);
+  bool handleAttrs(const ParsedDeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
 
   using DeclAttributeAndRange = std::pair<const DeclAttribute *, SourceRange>;
@@ -503,7 +503,7 @@ CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
 
 static void setDecl(SyntaxStructureNode &N, Decl *D) {
   N.Dcl = D;
-  N.Attrs = D->getOriginalAttrs();
+  N.Attrs = D->getParsedAttrs();
   N.DocRange = D->getRawComment().getCharSourceRange();
 }
 
@@ -873,7 +873,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
   // attached to syntactically).
   if (!isa<EnumElementDecl>(D) &&
       !(isa<VarDecl>(D) && cast<VarDecl>(D)->getParentPatternBinding())) {
-    if (!handleAttrs(D->getOriginalAttrs()))
+    if (!handleAttrs(D->getParsedAttrs()))
       return Action::SkipChildren();
   }
 
@@ -956,7 +956,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
       passTokenNodesUntil(ArgStart, PassNodesBehavior::ExcludeNodeAtLocation);
     }
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
-    SN.Attrs = PD->getOriginalAttrs();
+    SN.Attrs = PD->getParsedAttrs();
     SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                       PD->getTypeSourceRangeForDiagnostics());
     pushStructureNode(SN, PD);
@@ -970,7 +970,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
         Contained = VD;
       });
       if (Contained) {
-        if (!handleAttrs(Contained->getOriginalAttrs()))
+        if (!handleAttrs(Contained->getParsedAttrs()))
           return Action::SkipChildren();
         break;
       }
@@ -1042,7 +1042,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     // We need to handle the special case where attributes semantically
     // attach to enum element decls while syntactically locate before enum case decl.
     if (auto *element = EnumCaseD->getFirstElement()) {
-      if (!handleAttrs(element->getOriginalAttrs()))
+      if (!handleAttrs(element->getParsedAttrs()))
         return Action::SkipChildren();
     }
     if (pushStructureNode(SN, D)) {
@@ -1240,7 +1240,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
   return false;
 }
 
-bool ModelASTWalker::handleAttrs(const OrigDeclAttributes &Attrs) {
+bool ModelASTWalker::handleAttrs(const ParsedDeclAttributes &Attrs) {
   SmallVector<DeclAttributeAndRange, 4> DeclRanges;
   for (auto *At : Attrs) {
     if (At->getRangeWithAt().isValid())

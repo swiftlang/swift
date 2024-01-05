@@ -447,6 +447,13 @@ public:
     return tp;
   }
 
+  static TypedPattern *createPropagated(ASTContext &ctx, Pattern *pattern,
+                                        TypeRepr *typeRepr) {
+    auto *TP = new (ctx) TypedPattern(pattern, typeRepr);
+    TP->setPropagatedType();
+    return TP;
+  }
+
   /// True if the type in this \c TypedPattern was propagated from a different
   /// \c TypedPattern.
   ///
@@ -566,6 +573,7 @@ public:
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
   DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
   DeclNameRef getName() const { return Name; }
 
@@ -706,6 +714,12 @@ public:
 
   DeclContext *getDeclContext() const { return DC; }
 
+  void setDeclContext(DeclContext *newDC) {
+    DC = newDC;
+    if (MatchVar)
+      MatchVar->setDeclContext(newDC);
+  }
+
   /// The match expression if it has been computed, \c nullptr otherwise.
   /// Should only be used by the ASTDumper and ASTWalker.
   Expr *getCachedMatchExpr() const { return MatchExpr; }
@@ -752,6 +766,13 @@ public:
       : Pattern(PatternKind::Binding), VarLoc(loc), SubPattern(sub) {
     setIntroducer(introducer);
   }
+
+  static BindingPattern *createParsed(ASTContext &ctx, SourceLoc loc,
+                                      VarDecl::Introducer introducer,
+                                      Pattern *sub);
+
+  /// Create implicit 'let error' pattern for 'catch' statement.
+  static BindingPattern *createImplicitCatch(DeclContext *dc, SourceLoc loc);
 
   VarDecl::Introducer getIntroducer() const {
     return VarDecl::Introducer(Bits.BindingPattern.Introducer);

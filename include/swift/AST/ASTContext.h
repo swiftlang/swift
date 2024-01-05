@@ -239,8 +239,8 @@ class ASTContext final {
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
+      );
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -257,8 +257,8 @@ public:
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
+      );
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -293,6 +293,11 @@ public:
 
   /// OutputBackend for writing outputs.
   llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
+
+  /// Set the callback function that is invoked before Swift module importing is
+  /// performed
+  void SetPreModuleImportCallback(
+      std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback);
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
@@ -404,7 +409,7 @@ private:
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
   /// An optional generic callback function invoked prior to importing a module.
-  mutable std::function<bool(llvm::StringRef ModuleName, bool IsOverlay)>
+  mutable std::function<void(llvm::StringRef ModuleName, bool IsOverlay)>
       PreModuleImportCallback;
 
 public:
@@ -514,6 +519,18 @@ public:
                                               setVector.end(),
                                               arena),
                               setVector.size());
+  }
+
+  template <typename Output, typename Range>
+  MutableArrayRef<Output> AllocateTransform(
+      Range &&input,
+      llvm::function_ref<Output(typename Range::const_reference)> transform,
+      AllocationArena arena = AllocationArena::Permanent) {
+    auto size = std::distance(std::cbegin(input), std::cend(input));
+    auto storage = AllocateUninitialized<Output>(size, arena);
+    for (auto i : indices(input))
+      new (storage.data() + i) Output(transform(input[i]));
+    return storage;
   }
 
   /// Set a new stats reporter.
@@ -899,6 +916,9 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the runtime availability of task executors.
+  AvailabilityContext getTaskExecutorAvailability();
+
   /// Get the runtime availability of the `DiscardingTaskGroup`,
   /// and supporting runtime functions function
   AvailabilityContext getConcurrencyDiscardingTaskGroupAvailability();
@@ -914,6 +934,9 @@ public:
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
+  /// Get the runtime availability of support for typed throws.
+  AvailabilityContext getTypedThrowsAvailability();
+
   /// Get the runtime availability of getters and setters of multi payload enum
   /// tag single payloads.
   AvailabilityContext getMultiPayloadEnumTagSinglePayload();
@@ -926,9 +949,9 @@ public:
   /// for extended existential types.
   AvailabilityContext getParameterizedExistentialRuntimeAvailability();
 
-  /// Get the runtime availability of immortal ref-count symbols, which are
-  /// needed to place array buffers into constant data sections.
-  AvailabilityContext getImmortalRefCountSymbolsAvailability();
+  /// Get the runtime availability of array buffers placed in constant data
+  /// sections.
+  AvailabilityContext getStaticReadOnlyArraysAvailability();
 
   /// Get the runtime availability of runtime functions for
   /// variadic generic types.
@@ -982,6 +1005,10 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift59Availability();
 
+  /// Get the runtime availability of features introduced in the Swift 5.9
+  /// compiler for the target platform.
+  AvailabilityContext getSwift511Availability();
+  
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
   AvailabilityContext
@@ -1498,6 +1525,10 @@ public:
 
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
+
+  /// The declaration for the `_diagnoseUnavailableCodeReached()` declaration
+  /// that ought to be used for the configured deployment target.
+  FuncDecl *getDiagnoseUnavailableCodeReachedDecl();
 
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 

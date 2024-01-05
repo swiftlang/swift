@@ -27,6 +27,8 @@
 #include "StructLayout.h"
 #include "Callee.h"
 #include "ConstantBuilder.h"
+#include "DebugTypeInfo.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/BLAKE3.h"
@@ -438,14 +440,12 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
       IGM.swiftImmortalRefCount = var;
     }
     if (!IGM.swiftStaticArrayMetadata) {
-
-      // Static arrays can only contain trivial elements. Therefore we can reuse
-      // the metadata of the empty array buffer. The important thing is that its
-      // deinit is a no-op and does not actually destroy any elements.
-      auto *var = new llvm::GlobalVariable(IGM.Module, IGM.TypeMetadataStructTy,
-                                        /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
-                                        /*initializer*/ nullptr, "$ss19__EmptyArrayStorageCN");
-      IGM.swiftStaticArrayMetadata = var;
+      auto *classDecl = IGM.getStaticArrayStorageDecl();
+      assert(classDecl && "no __StaticArrayStorage in stdlib");
+      CanType classTy = CanType(ClassType::get(classDecl, Type(), IGM.Context));
+      LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
+      auto *metatype = IGM.getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
+      IGM.swiftStaticArrayMetadata = cast<llvm::GlobalVariable>(metatype);
     }
     elements[0].add(llvm::ConstantStruct::get(ObjectHeaderTy, {
       IGM.swiftStaticArrayMetadata,

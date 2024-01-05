@@ -1264,26 +1264,30 @@ AbstractionPattern::getFunctionThrownErrorType(
     return llvm::None;
 
   auto &ctx = substFnInterfaceType->getASTContext();
-  auto optErrorType = substFnInterfaceType->getEffectiveThrownErrorType();
+  auto substErrorType = substFnInterfaceType->getEffectiveThrownErrorType();
 
   if (isTypeParameterOrOpaqueArchetype()) {
-    if (!optErrorType)
+    if (!substErrorType)
       return llvm::None;
 
-    if (!(*optErrorType)->isEqual(ctx.getErrorExistentialType())) {
+    if (!(*substErrorType)->isEqual(ctx.getErrorExistentialType())) {
       llvm::errs() << "unsupported reabstraction\n";
       abort();
     }
 
-    return std::make_pair(AbstractionPattern(*optErrorType),
-                          (*optErrorType)->getCanonicalType());
+    return std::make_pair(AbstractionPattern(*substErrorType),
+                          (*substErrorType)->getCanonicalType());
   }
 
-  if (!optErrorType)
-    optErrorType = ctx.getErrorExistentialType();
+  if (!substErrorType) {
+    if (optOrigErrorType->getType()->hasTypeParameter())
+      substErrorType = ctx.getNeverType();
+    else
+      substErrorType = optOrigErrorType->getType();
+  }
 
   return std::make_pair(*optOrigErrorType,
-                        (*optErrorType)->getCanonicalType());
+                        (*substErrorType)->getCanonicalType());
 }
 
 AbstractionPattern
@@ -2044,15 +2048,21 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
 
 AbstractionPattern::CallingConventionKind
 AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
-  // Tuples should be destructured.
-  if (isTuple()) {
-    return Destructured;
-  }
   switch (getKind()) {
   case Kind::Opaque:
     // Maximally abstracted values are always thrown indirectly.
     return Indirect;
 
+  case Kind::ClangType:
+  case Kind::Type:
+  case Kind::Discard:
+    // Pass according to the formal type.
+    return SILType::isFormallyThrownIndirectly(getType(),
+                                               TC,
+                                               getGenericSignatureOrNull())
+      ? Indirect : Direct;
+
+  case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::PartialCurriedObjCMethodType:
@@ -2064,20 +2074,7 @@ AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-    // Function types are always thrown directly
-    return Direct;
-
-  case Kind::ClangType:
-  case Kind::Type:
-  case Kind::Discard:
-    // Pass according to the formal type.
-    return SILType::isFormallyThrownIndirectly(getType(),
-                                               TC,
-                                               getGenericSignatureOrNull())
-      ? Indirect : Direct;
-
   case Kind::Invalid:
-  case Kind::Tuple:
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
@@ -2239,6 +2236,8 @@ public:
       // Keep these layout constraints as is.
       case LayoutConstraintKind::RefCountedObject:
       case LayoutConstraintKind::TrivialOfAtMostSize:
+      case LayoutConstraintKind::BridgeObject:
+      case LayoutConstraintKind::TrivialStride:
         break;
       
       case LayoutConstraintKind::UnknownLayout:

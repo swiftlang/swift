@@ -495,7 +495,7 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
 
 CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
     ASTContext &ctx) {
-  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReached();
+  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReachedDecl();
   auto diagnoseDeclRefExpr =
       new (ctx) DeclRefExpr(diagnoseDecl, DeclNameLoc(), true);
   diagnoseDeclRefExpr->setType(diagnoseDecl->getInterfaceType());
@@ -529,7 +529,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
       C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, property,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, property->getInterfaceType(), parentDC);

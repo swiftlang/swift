@@ -56,8 +56,9 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
-// The option should be written into a .private.swiftinterface module interface file,
-// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option should be written into a .private.swiftinterface or
+// .package.swiftinterface module interface file, and read/parsed from
+// there when reconstituting a .swiftmodule from it.
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
 
@@ -548,7 +549,7 @@ def module_abi_name : Separate<["-"], "module-abi-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"ABI name to use for the contents of this module">;
 def package_name : Separate<["-"], "package-name">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorablePrivate]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the package the module belongs to">;
 def export_as : Separate<["-"], "export-as">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -593,13 +594,20 @@ def emit_private_module_interface_path :
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
 
+def emit_package_module_interface_path :
+  Separate<["-"], "emit-package-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
+  MetaVarName<"<path>">, HelpText<"Output package module interface file to <path>">;
+
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Check that module interfaces emitted during compilation typecheck">;
 def no_verify_emitted_module_interface :
   Flag<["-"], "no-verify-emitted-module-interface">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
+        FrontendOption, ModuleInterfaceOptionIgnorable]>,
   HelpText<"Don't check that module interfaces emitted during compilation typecheck">;
 
 def avoid_emit_module_source_info :
@@ -751,6 +759,11 @@ def experimental_hermetic_seal_at_link:
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Library code can assume that all clients are visible at linktime, and aggressively strip unused code">;
 
+def experimental_package_interface_load:
+  Flag<["-"], "experimental-package-interface-load">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enables loading a package interface if in the same package specified with package-name">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -860,10 +873,18 @@ def save_optimization_record_passes :
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
+def no_allocations : Flag<["-"], "no-allocations">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Diagnose any code that needs to heap allocate (classes, closures, etc.)">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Restrict code to those available for App Extensions">;
+
+def enable_app_extension_library : Flag<["-"], "application-extension-library">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Restrict code to those available for App Extension Libraries">;
 
 def libc : Separate<["-"], "libc">,
            Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
@@ -1377,6 +1398,10 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   MetaVarName<"<type>">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
+
+def sanitize_stable_abi_EQ : Flag<["-"], "sanitize-stable-abi">,
+    Flags<[FrontendOption, NoInteractiveOption]>,
+    HelpText<"Link against the Sanitizers stable ABI.">;
 
 def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
@@ -1931,5 +1956,10 @@ def load_plugin_executable:
   HelpText<"Path to a compiler plugin executable and a comma-separated list "
            "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
+
+def disable_sandbox:
+  Flag<["-"], "disable-sandbox">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable using the sandbox when executing subprocesses">;
 
 include "FrontendOptions.td"

@@ -10,9 +10,9 @@
 // RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=missing %s -enable-testing -O
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
-// RUN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
+// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module %s -emit-tbd -emit-tbd-path %t/typecheck.tbd -tbd-install_name test
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd -tbd-install_name test
+// RUN: %llvm-readtapi --compare  %t/typecheck.tbd %t/emit-ir.tbd
 
 public protocol Public {
     func publicMethod()

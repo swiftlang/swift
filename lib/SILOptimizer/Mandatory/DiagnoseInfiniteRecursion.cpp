@@ -39,6 +39,7 @@
 
 #define DEBUG_TYPE "infinite-recursion"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/LLVMExtras.h"
@@ -90,7 +91,7 @@ static bool isRecursiveCall(FullApplySite applySite) {
     if (classDecl && classDecl->getModuleContext() != module.getSwiftModule())
       return false;
 
-    SILFunction *method = getTargetClassMethod(module, classDecl, CMI);
+    SILFunction *method = getTargetClassMethod(module, classDecl, classType, CMI);
     if (method != parentFunc)
       return false;
 

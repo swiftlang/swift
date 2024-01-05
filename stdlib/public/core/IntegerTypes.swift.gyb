@@ -1715,6 +1715,32 @@ ${operatorComment(x.operator, True)}
 
 %   end
 
+  // IMPORTANT: The following four apparently unnecessary overloads of
+  // comparison operations are necessary for literal comparands to be
+  // inferred as the desired type.
+  //
+  // Absent these, an expression like `Int8.min != 1 << 7` would have
+  // two candidates for `!=`: the heterogeneous generic operator defined
+  // on BinaryInteger, and the homogeneous generic operator defined on
+  // Equatable. The heterogeneous one is chosen because it is "more
+  // specialized," which results in `1 << 7` being given the type `Int`
+  // and the value 128, which compares not-equal to `Int8.min`.
+  //
+  // However, there is necessarily a homogeneous concrete `==` operator
+  // because it is a customization point for Equatable, so the expression
+  // `Int8.min == 1 << 7` types `1 << 7` as `Int8` with value -128, which
+  // compares equal to `Int8.min`.
+  //
+  // This inconsistency can be resolved by ensuring that we have
+  // concrete overloads of every comparison operation. It's still possible
+  // to get literal expression comparands typed Int in generic contexts,
+  // but there's also a pretty straightforward workaround (adding an
+  // explicit type).
+  @_transparent @_alwaysEmitIntoClient
+  public static func !=(lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(lhs == rhs)
+  }
+
   @_transparent
   public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return !(rhs < lhs)

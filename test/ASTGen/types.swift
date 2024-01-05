@@ -1,7 +1,9 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ASTGenTypes
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
+// rdar://116686158
+// UNSUPPORTED: asan
 
 protocol P { }
 protocol Q { }
@@ -39,3 +41,14 @@ func test13(body: (_ value: Int) -> Void, i: Int) {
 func test14() {
   _ = Array<Array<Array<Int>>>().count
 }
+
+func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
+  fatalError()
+}
+
+struct FileDescriptor: ~Copyable {
+  var fd = 1
+}
+
+// FIXME: warning for 'class'
+protocol ClassOnly: class {}

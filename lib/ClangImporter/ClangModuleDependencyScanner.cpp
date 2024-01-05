@@ -86,7 +86,7 @@ static void addSearchPathInvocationArguments(
 static std::vector<std::string> getClangDepScanningInvocationArguments(
     ASTContext &ctx, llvm::Optional<StringRef> sourceFileName = llvm::None) {
   std::vector<std::string> commandLineArgs =
-      ClangImporter::getClangArguments(ctx);
+      ClangImporter::getClangDriverArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
 
   auto sourceFilePos = std::find(
@@ -166,10 +166,6 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
-
-    // We pass the entire argument list via -Xcc, so the invocation should
-    // use extra clang options alone.
-    swiftArgs.push_back("-only-use-extra-clang-opts");
 
     auto pcmPath = moduleCacheRelativeLookupModuleOutput(
         clangModuleDep.ID, ModuleOutputKind::ModuleFile, moduleOutputPath);
@@ -259,12 +255,12 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     }
 
     if (!RootID.empty()) {
+      swiftArgs.push_back("-no-clang-include-tree");
       swiftArgs.push_back("-cas-fs");
       swiftArgs.push_back(RootID);
     }
 
     if (!IncludeTree.empty()) {
-      swiftArgs.push_back("-clang-include-tree");
       swiftArgs.push_back("-clang-include-tree-root");
       swiftArgs.push_back(IncludeTree);
     }
@@ -306,10 +302,6 @@ void ClangImporter::recordBridgingHeaderOptions(
 
   // Swift frontend action: -emit-pcm
   swiftArgs.push_back("-emit-pch");
-
-  // We pass the entire argument list via -Xcc, so the invocation should
-  // use extra clang options alone.
-  swiftArgs.push_back("-only-use-extra-clang-opts");
 
   // Ensure that the resulting PCM build invocation uses Clang frontend
   // directly
@@ -368,11 +360,11 @@ void ClangImporter::recordBridgingHeaderOptions(
   }
 
   if (auto Tree = deps.IncludeTreeID) {
-    swiftArgs.push_back("-clang-include-tree");
     swiftArgs.push_back("-clang-include-tree-root");
     swiftArgs.push_back(*Tree);
   }
   if (auto CASFS = deps.CASFileSystemRootID) {
+    swiftArgs.push_back("-no-clang-include-tree");
     swiftArgs.push_back("-cas-fs");
     swiftArgs.push_back(*CASFS);
   }
@@ -407,7 +399,7 @@ computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
 }
 
 ModuleDependencyVector
-ClangImporter::getModuleDependencies(StringRef moduleName,
+ClangImporter::getModuleDependencies(Identifier moduleName,
                                      StringRef moduleOutputPath,
                                      llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                                      const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
@@ -435,14 +427,14 @@ ClangImporter::getModuleDependencies(StringRef moduleName,
 
   auto clangModuleDependencies =
       clangScanningTool.getModuleDependencies(
-          moduleName, commandLineArgs, workingDir,
+          moduleName.str(), commandLineArgs, workingDir,
           alreadySeenClangModules, lookupModuleOutput);
   if (!clangModuleDependencies) {
     auto errorStr = toString(clangModuleDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
     // scanner will report such an error only if all of the module loaders
     // fail as well.
-    if (errorStr.find("fatal error: module '" + moduleName.str() +
+    if (errorStr.find("fatal error: module '" + moduleName.str().str() +
                       "' not found") == std::string::npos)
       ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          errorStr);

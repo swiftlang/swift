@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test -enable-experimental-feature TypedThrows
+// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test
 
 // expected-note@+1{{type declared here}}
 enum MyError: Error {
@@ -145,4 +145,48 @@ extension Either: Error where First: Error, Second: Error { }
 
 func f<E1, E2>(_ error: Either<E1, E2>) throws(Either<E1, E2>) {
   throw error
+}
+
+// Ensure that calls to 'rethrows' functions are always treated as throwing `any
+// Error`.
+func rethrowingFunc(body: () throws -> Void) rethrows { }
+
+func typedCallsRethrowingFunc<E>(body: () throws(E) -> Void) throws(E) {
+  try rethrowingFunc(body: body) // expected-error{{thrown expression type 'any Error' cannot be converted to error type 'E'}}
+}
+
+// Compatibility feature: calls from a rethrows function to a rethrows-like
+// function using typed throws are permitted.
+func rethrowsLike<E>(_ body: () throws(E) -> Void) throws(E) { }
+
+protocol P { }
+
+func notRethrowsLike1<E: P>(_ body: () throws(E) -> Void) throws(E) { }
+// expected-note@-1{{required by global function 'notRethrowsLike1' where 'E' = 'any Error'}}
+
+func notRethrowsLike2<E>(_ body: () throws(E) -> Void) throws { }
+func notRethrowsLike3<E>(_ body: () throws(E) -> Void, defaulted: () throws -> Void = {}) throws(E) { }
+
+func fromRethrows(body: () throws -> Void) rethrows {
+  try rethrowsLike(body)
+
+  try rethrowsLike(hasThrownMyError) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+  // expected-note@-1{{call is to 'rethrows' function, but argument function can throw}}
+
+  try notRethrowsLike1(body) // expected-error{{type 'any Error' cannot conform to 'P'}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+
+  try notRethrowsLike2(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+  try notRethrowsLike3(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+// Substitution involving 'any Error' or 'Never' thrown error types should
+// use untyped throws or be non-throwing.
+enum G_E<T> {
+  case tuple((x: T, y: T))
+}
+
+func testArrMap(arr: [String]) {
+  _ = mapArray(arr, body: G_E<Int>.tuple)
+  // expected-error@-1{{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(String) -> G_E<Int>'}}
 }

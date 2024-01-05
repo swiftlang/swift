@@ -302,7 +302,7 @@ bb0(%0: $*τ_0_1, %1: $*τ_0_0, %2 : $Builtin.Int64, %3 : $*τ_0_0):
 sil @throwError : $@convention(thin) <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
 bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
   copy_addr [take] %2 to [init] %0 : $*τ_0_0
-  throw %0 : $*τ_0_0
+  throw_addr
 }
 
 sil @throwError2 : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
@@ -346,13 +346,13 @@ bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
 }
 
 // CHECK: define{{.*}} swifttailcc void @throwErrorAsync(ptr swiftasync %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %3)
-// CHECK:   call ptr {{%[0-9]+}}(ptr noalias %3, ptr noalias %2, ptr %"\CF\84_0_0")
+// CHECK:   call ptr {{%[^,]+}}(ptr noalias %3, ptr noalias %2, ptr %"\CF\84_0_0")
 // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr inttoptr (i64 1 to ptr))
 
 sil @throwErrorAsync : $@convention(thin) @async <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
 bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
   copy_addr [take] %2 to [init] %0 : $*τ_0_0
-  throw %0 : $*τ_0_0
+  throw_addr
 }
 
 sil @throwError2Async : $@convention(thin) @async <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
@@ -406,12 +406,12 @@ entry(%0: $*T):
 // CHECK: define{{.*}} swiftcc void @apply_closure_generic(ptr %0, ptr %1, ptr %T, ptr %V)
 // CHECK:  [[T0:%.*]] = getelementptr inbounds ptr, ptr %T
 // CHECK:  [[T1:%.*]] = load ptr, ptr [[T0]]
-// CHECK:  [[T2:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T1]]
+// CHECK:  [[T2:%.*]] = getelementptr inbounds %swift.vwtable{{.*}}
 // CHECK:  [[T3:%.*]] = load i64, ptr [[T2]]
 // CHECK:  [[T4:%.*]] = alloca i8, i64 [[T3]]
 // CHECK:  [[V0:%.*]] = getelementptr inbounds ptr, ptr %V
 // CHECK:  [[V1:%.*]] = load ptr, ptr [[V0]]
-// CHECK:  [[V2:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[V1]]
+// CHECK:  [[V2:%.*]] = getelementptr inbounds %swift.vwtable{{.*}}
 // CHECK:  [[V3:%.*]] = load i64, ptr [[V2]]
 // CHECK:  [[V4:%.*]] = alloca i8, i64 [[V3]]
 // CHECK: call swiftcc void %0(ptr noalias sret(%swift.opaque) [[T4]], ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %swifterror, ptr [[V4]])

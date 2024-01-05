@@ -12,14 +12,12 @@
 
 import SIL
 import OptimizerBridging
-import Parse
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftAnalyses()
   registerSwiftPasses()
-  initializeSwiftParseModules()
   registerOptimizerTests()
 }
 
@@ -67,6 +65,7 @@ private func registerSwiftPasses() {
   registerPass(stackProtection, { stackProtection.run($0) })
 
   // Function passes
+  registerPass(allocVectorLowering, { allocVectorLowering.run($0) })
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
@@ -88,6 +87,7 @@ private func registerSwiftPasses() {
   registerPass(deadStoreElimination, { deadStoreElimination.run($0) })
   registerPass(redundantLoadElimination, { redundantLoadElimination.run($0) })
   registerPass(earlyRedundantLoadElimination, { earlyRedundantLoadElimination.run($0) })
+  registerPass(deinitDevirtualizer, { deinitDevirtualizer.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })

@@ -851,7 +851,6 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (loc.isInvalid())
     return nullptr;
 
-
   // Check whether this location is in a "replaced" range, in which case
   // we want to use the original source file.
   auto &sourceMgr = getASTContext().SourceMgr;
@@ -906,14 +905,10 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
   while (llvm::Optional<GeneratedSourceInfo> info =
              SM.getGeneratedSourceInfo(bufferID)) {
     switch (info->kind) {
-    case GeneratedSourceInfo::ExpressionMacroExpansion:
-    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-    case GeneratedSourceInfo::AccessorMacroExpansion:
-    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    case GeneratedSourceInfo::MemberMacroExpansion:
-    case GeneratedSourceInfo::PeerMacroExpansion:
-    case GeneratedSourceInfo::ConformanceMacroExpansion:
-    case GeneratedSourceInfo::ExtensionMacroExpansion: {
+#define MACRO_ROLE(Name, Description)  \
+    case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+    {
       // Location was within a macro expansion, return the expansion site, not
       // the insertion location.
       if (info->attachedMacroCustomAttr) {
@@ -1186,6 +1181,16 @@ ASTNode SourceFile::getMacroExpansion() const {
   return ASTNode::getFromOpaqueValue(genInfo.astNode);
 }
 
+SourceRange SourceFile::getMacroInsertionRange() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return SourceRange();
+
+  auto generatedInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  auto origRange = generatedInfo.originalSourceRange;
+  return {origRange.getStart(), origRange.getEnd()};
+}
+
 CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
@@ -1202,29 +1207,10 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   auto genInfo =
       *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
   switch (genInfo.kind) {
-  case GeneratedSourceInfo::ExpressionMacroExpansion:
-    return MacroRole::Expression;
-
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-    return MacroRole::Declaration;
-
-  case GeneratedSourceInfo::AccessorMacroExpansion:
-    return MacroRole::Accessor;
-
-  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    return MacroRole::MemberAttribute;
-
-  case GeneratedSourceInfo::MemberMacroExpansion:
-    return MacroRole::Member;
-
-  case GeneratedSourceInfo::PeerMacroExpansion:
-    return MacroRole::Peer;
-
-  case GeneratedSourceInfo::ConformanceMacroExpansion:
-    return MacroRole::Conformance;
-
-  case GeneratedSourceInfo::ExtensionMacroExpansion:
-    return MacroRole::Extension;
+#define MACRO_ROLE(Name, Description)               \
+  case GeneratedSourceInfo::Name##MacroExpansion: \
+    return MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
@@ -1233,11 +1219,12 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
-  auto macroExpansion = getMacroExpansion();
-  if (!macroExpansion)
+  if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto sourceLoc = macroExpansion.getStartLoc();
+  auto genInfo =
+      *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
+  auto sourceLoc = genInfo.originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
@@ -1591,11 +1578,12 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   if (!protocol->existentialConformsToSelf())
     return ProtocolConformanceRef::forInvalid();
 
-  // All existentials are Copyable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
+      && !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Prior to noncopyable generics, all existentials conform to Copyable.
+        return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
   }
 
   auto layout = type->getExistentialLayout();
@@ -1693,8 +1681,10 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     if (auto nominal = type->getAnyNominal()) {
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
-          getASTContext().evaluator.hasActiveRequest(request))
+          getASTContext().evaluator.hasActiveRequest(request)) {
+        assert(!getInvertibleProtocolKind(*kp));
         return ProtocolConformanceRef::forInvalid();
+      }
     }
   }
 
@@ -1753,13 +1743,35 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+using EitherFunctionType =
+    llvm::PointerUnion<const SILFunctionType *, const FunctionType *>;
+
 /// Whether the given function type conforms to Sendable.
-static bool isSendableFunctionType(const FunctionType *functionType) {
-  if (functionType->isSendable())
-    return true;
+static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
+  FunctionTypeRepresentation representation;
+
+  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+    if (silFnTy->isSendable())
+      return true;
+
+    // convert SILFunctionTypeRepresentation -> FunctionTypeRepresentation
+    auto converted = convertRepresentation(silFnTy->getRepresentation());
+    if (!converted)
+      return false;
+
+    representation = *converted;
+
+  } else {
+    auto functionType = eitherFnTy.get<const FunctionType *>();
+
+    if (functionType->isSendable())
+      return true;
+
+    representation = functionType->getExtInfo().getRepresentation();
+  }
 
   // C and thin function types have no captures, so they are Sendable.
-  switch (functionType->getExtInfo().getRepresentation()) {
+  switch (representation) {
   case FunctionTypeRepresentation::Block:
   case FunctionTypeRepresentation::Swift:
     return false;
@@ -1770,25 +1782,48 @@ static bool isSendableFunctionType(const FunctionType *functionType) {
   }
 }
 
+/// Whether the given function type conforms to Escapable.
+static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
+  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+    return !silFnTy->isNoEscape();
+  }
+
+  auto functionType = eitherFnTy.get<const FunctionType *>();
+
+  // TODO: what about autoclosures?
+  return !functionType->isNoEscape();
+}
+
 /// Synthesize a builtin function type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
-    Type type, const FunctionType *functionType, ProtocolDecl *protocol) {
+    Type type, EitherFunctionType functionType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
-  // @Sendable function types are Sendable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
-      isSendableFunctionType(functionType)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
-  }
 
-  // Functions cannot permanently destroy a move-only var/let
-  // that they capture, so it's safe to copy functions, like classes.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+  auto synthesizeConformance = [&]() -> ProtocolConformanceRef {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
+  };
+
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    switch (*kp) {
+    case KnownProtocolKind::Escapable:
+      if (isEscapableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
+    case KnownProtocolKind::Sendable:
+      // @Sendable function types are Sendable.
+      if (isSendableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
+    case KnownProtocolKind::Copyable:
+      // Functions cannot permanently destroy a move-only var/let
+      // that they capture, so it's safe to copy functions, like classes.
+      return synthesizeConformance();
+    default:
+      break;
+    }
   }
 
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
@@ -1812,12 +1847,18 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     }
   }
 
-  // All metatypes are Sendable and Copyable
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  // All metatypes are Sendable, Copyable, and Escapable.
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    switch (*kp) {
+    case KnownProtocolKind::Sendable:
+    case KnownProtocolKind::Copyable:
+    case KnownProtocolKind::Escapable:
+      return ProtocolConformanceRef(
+          ctx.getBuiltinConformance(type, protocol,
+                                    BuiltinConformanceKind::Synthesized));
+    default:
+      break;
+    }
   }
 
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
@@ -1827,13 +1868,20 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 /// appropriate.
 static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
     Type type, const BuiltinType *builtinType, ProtocolDecl *protocol) {
-  // All builtin are Sendable and Copyable
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-    ASTContext &ctx = protocol->getASTContext();
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
+  // All builtin are Sendable, Copyable, and Escapable
+  if (auto kp = protocol->getKnownProtocolKind()) {
+    switch (*kp) {
+    case KnownProtocolKind::Sendable:
+    case KnownProtocolKind::Copyable:
+    case KnownProtocolKind::Escapable: {
+      ASTContext &ctx = protocol->getASTContext();
+      return ProtocolConformanceRef(
+          ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
+    }
+    default:
+      break;
+    }
   }
 
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
@@ -1951,6 +1999,11 @@ LookupConformanceInModuleRequest::evaluate(
     return getBuiltinFunctionTypeConformance(type, functionType, protocol);
   }
 
+  // SIL function types in the AST can conform to protocols
+  if (auto silFn = type->getAs<SILFunctionType>()) {
+    return getBuiltinFunctionTypeConformance(type, silFn, protocol);
+  }
+
   // Metatypes can conform to protocols.
   if (auto metatypeType = type->getAs<AnyMetatypeType>()) {
     return getBuiltinMetaTypeTypeConformance(type, metatypeType, protocol);
@@ -1960,6 +2013,18 @@ LookupConformanceInModuleRequest::evaluate(
   if (auto builtinType = type->getAs<BuiltinType>()) {
     return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
   }
+
+#ifndef NDEBUG
+  // Ensure we haven't missed queries for the specialty SIL types
+  // in the AST in conformance to one of the invertible protocols.
+  if (auto kp = protocol->getKnownProtocolKind())
+    if (getInvertibleProtocolKind(*kp))
+      assert(!(type->is<SILFunctionType,
+                        SILBoxType,
+                        SILMoveOnlyWrappedType,
+                        SILPackType,
+                        SILTokenType>()));
+#endif
 
   auto nominal = type->getAnyNominal();
 
@@ -2012,22 +2077,24 @@ LookupConformanceInModuleRequest::evaluate(
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
-    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)
+               || protocol->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+      const auto kp = protocol->getKnownProtocolKind().value();
 
-      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
+          && kp == KnownProtocolKind::Copyable) {
         // Return an abstract conformance to maintain legacy compatability.
         // We only need to do this until we are properly dealing with or
         // omitting Copyable conformances in modules/interfaces.
 
-        if (nominal->isNoncopyable())
+        if (nominal->canBeNoncopyable())
           return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
         else
           return ProtocolConformanceRef(protocol);
       }
 
-      // Try to infer Copyable conformance.
-      ImplicitKnownProtocolConformanceRequest
-          cvRequest{nominal, KnownProtocolKind::Copyable};
+      // Try to infer the conformance.
+      ImplicitKnownProtocolConformanceRequest cvRequest{nominal, kp};
       if (auto conformance = evaluateOrDefault(
           ctx.evaluator, cvRequest, nullptr)) {
         conformances.clear();
@@ -2649,14 +2716,6 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
   return nullptr;
 }
 
-bool ModuleDecl::isExportedAs(const ModuleDecl *other) const {
-  auto clangModule = findUnderlyingClangModule();
-  if (!clangModule)
-    return false;
-
-  return other->getRealName().str() == clangModule->ExportAsModule;
-}
-
 void ModuleDecl::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   for (const FileUnit *fileUnit : getFiles()) {
@@ -2715,7 +2774,9 @@ bool ModuleDecl::isExternallyConsumed() const {
   // App extensions are special beasts because they build without entrypoints
   // like library targets, but they behave like executable targets because
   // their associated modules are not suitable for distribution.
-  if (getASTContext().LangOpts.EnableAppExtensionRestrictions) {
+  // However, app extension libraries might be consumed externally.
+  if (getASTContext().LangOpts.EnableAppExtensionRestrictions &&
+      !getASTContext().LangOpts.EnableAppExtensionLibraryRestrictions) {
     return false;
   }
 
@@ -3131,8 +3192,8 @@ void SourceFile::setImportUsedPreconcurrency(
 
 AccessLevel
 SourceFile::getMaxAccessLevelUsingImport(
-    AttributedImport<ImportedModule> import) const {
-  auto known = ImportsUseAccessLevel.find(import);
+    const ModuleDecl *mod) const {
+  auto known = ImportsUseAccessLevel.find(mod);
   if (known == ImportsUseAccessLevel.end())
     return AccessLevel::Internal;
   return known->second;
@@ -3141,11 +3202,12 @@ SourceFile::getMaxAccessLevelUsingImport(
 void SourceFile::registerAccessLevelUsingImport(
     AttributedImport<ImportedModule> import,
     AccessLevel accessLevel) {
-  auto known = ImportsUseAccessLevel.find(import);
+  auto mod = import.module.importedModule;
+  auto known = ImportsUseAccessLevel.find(mod);
   if (known == ImportsUseAccessLevel.end())
-    ImportsUseAccessLevel[import] = accessLevel;
+    ImportsUseAccessLevel[mod] = accessLevel;
   else
-    ImportsUseAccessLevel[import] = std::max(accessLevel, known->second);
+    ImportsUseAccessLevel[mod] = std::max(accessLevel, known->second);
 }
 
 bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,
@@ -3324,6 +3386,70 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   return restrictiveImport;
 }
 
+SmallVector<CharSourceRange, 2>
+IfConfigRangeInfo::getRangesWithoutActiveBody(const SourceManager &SM) const {
+  SmallVector<CharSourceRange, 2> result;
+  if (ActiveBodyRange.isValid()) {
+    // Split the whole range by the active range.
+    result.emplace_back(SM, WholeRange.getStart(), ActiveBodyRange.getStart());
+    result.emplace_back(SM, ActiveBodyRange.getEnd(), WholeRange.getEnd());
+  } else {
+    // No active body, we just return the whole range.
+    result.push_back(WholeRange);
+  }
+  return result;
+}
+
+void SourceFile::recordIfConfigRangeInfo(IfConfigRangeInfo ranges) {
+  IfConfigRanges.Ranges.push_back(ranges);
+  IfConfigRanges.IsSorted = false;
+}
+
+ArrayRef<IfConfigRangeInfo>
+SourceFile::getIfConfigsWithin(SourceRange outer) const {
+  auto &SM = getASTContext().SourceMgr;
+  assert(SM.getRangeForBuffer(BufferID).contains(outer.Start) &&
+         "Range not within this file?");
+
+  if (!IfConfigRanges.IsSorted) {
+    // Sort the ranges if we need to.
+    llvm::sort(IfConfigRanges.Ranges, [&](IfConfigRangeInfo lhs,
+                                          IfConfigRangeInfo rhs) {
+      return SM.isBeforeInBuffer(lhs.getStartLoc(), rhs.getStartLoc());
+    });
+
+    // Be defensive and eliminate duplicates in case we've parsed twice.
+    auto newEnd = std::unique(
+        IfConfigRanges.Ranges.begin(), IfConfigRanges.Ranges.end(),
+        [&](const IfConfigRangeInfo &lhs, const IfConfigRangeInfo &rhs) {
+          if (lhs.getWholeRange() != rhs.getWholeRange())
+            return false;
+
+          assert(lhs == rhs && "Active ranges changed on a re-parse?");
+          return true;
+        });
+    IfConfigRanges.Ranges.erase(newEnd, IfConfigRanges.Ranges.end());
+    IfConfigRanges.IsSorted = true;
+  }
+
+  // First let's find the first #if that is after the outer start loc.
+  auto ranges = llvm::makeArrayRef(IfConfigRanges.Ranges);
+  auto lower = llvm::lower_bound(
+      ranges, outer.Start, [&](IfConfigRangeInfo range, SourceLoc loc) {
+        return SM.isBeforeInBuffer(range.getStartLoc(), loc);
+      });
+  if (lower == ranges.end() ||
+      SM.isBeforeInBuffer(outer.End, lower->getStartLoc())) {
+    return {};
+  }
+  // Next let's find the first #if that's after the outer end loc.
+  auto upper = llvm::upper_bound(
+      ranges, outer.End, [&](SourceLoc loc, IfConfigRangeInfo range) {
+        return SM.isBeforeInBuffer(loc, range.getStartLoc());
+      });
+  return llvm::makeArrayRef(lower, upper - lower);
+}
+
 void ModuleDecl::setPackageName(Identifier name) {
   Package = PackageUnit::create(name, *this, getASTContext());
 }
@@ -3386,8 +3512,8 @@ void SourceFile::lookupImportedSPIGroups(
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
         (importedModule == import.module.importedModule ||
-         (imports.isImportedBy(importedModule, import.module.importedModule) &&
-          importedModule->isExportedAs(import.module.importedModule)))) {
+         imports.isImportedByViaSwiftOnly(importedModule,
+                                       import.module.importedModule))) {
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
@@ -3441,6 +3567,16 @@ bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
         importedModule->getUnderlyingModuleIfOverlay();
     if (module == clangModule)
       return true;
+
+    // Traverse the exported modules of this weakly-linked module to ensure
+    // that we weak-link declarations from its exported peers.
+    SmallVector<ImportedModule, 8> reexportedModules;
+    importedModule->getImportedModules(reexportedModules,
+                                       ModuleDecl::ImportFilterKind::Exported);
+    for (const ImportedModule &reexportedModule : reexportedModules) {
+      if (module == reexportedModule.importedModule)
+        return true;
+    }
   }
   return false;
 }

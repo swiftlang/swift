@@ -405,7 +405,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
     FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(),
                          SGFAccessKind::BorrowedAddressRead);
-    emitCopyLValueInto(E, std::move(lv), I);
+    emitCopyLValueInto(L ? *L : E, std::move(lv), I);
     return;
   }
 
@@ -1028,8 +1028,8 @@ RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
 
     ManagedValue noneValue;
     if (enumTy.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
-      noneValue = ManagedValue::forObjectRValueWithoutOwnership(
-          SGF.B.createEnum(E, SILValue(), noneDecl, enumTy));
+      auto *e = SGF.B.createEnum(E, SILValue(), noneDecl, enumTy);
+      noneValue = SGF.emitManagedRValueWithCleanup(e);
     } else {
       noneValue =
           SGF.B.bufferForExpr(E, enumTy, SGF.getTypeLowering(enumTy), C,
@@ -1147,14 +1147,28 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
 
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+
+  SILValue indirectError;
+  auto &errorTL = SGF.getTypeLowering(loc->getThrownError());
+  if (!errorTL.isAddressOnly()) {
+    (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
+                                      OwnershipKind::Owned);
+  } else {
+    indirectError = SGF.B.createAllocStack(loc, errorTL.getLoweredType());
+    SGF.enterDeallocStackCleanup(indirectError);
+
+  }
+
   SGF.ThrowDest = JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(),
-                           CleanupLocation(loc));
+                           CleanupLocation(loc),
+                           ThrownErrorInfo(indirectError, /*discard=*/true));
 }
 
 void SILGenFunction::ForceTryEmission::finish() {
   assert(Loc && "emission already finished");
 
   auto catchBB = SGF.ThrowDest.getBlock();
+  auto indirectError = SGF.ThrowDest.getThrownError().IndirectErrorResult;
   SGF.ThrowDest = OldThrowDest;
 
   // If there are no uses of the catch block, just drop it.
@@ -1164,16 +1178,56 @@ void SILGenFunction::ForceTryEmission::finish() {
     // Otherwise, we need to emit it.
     SILGenSavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
-    if (auto diagnoseError = SGF.getASTContext().getDiagnoseUnexpectedError()) {
-      ASTContext &ctx = SGF.getASTContext();
-      auto error = SGF.B.createTermResult(SILType::getExceptionType(ctx),
-                                          OwnershipKind::Owned);
+    ASTContext &ctx = SGF.getASTContext();
+
+    // Consume the thrown error.
+    ManagedValue error;
+    if (catchBB->getNumArguments() == 1) {
+      error = ManagedValue::forForwardedRValue(SGF, catchBB->getArgument(0));
+    } else {
+      error = ManagedValue::forForwardedRValue(SGF, indirectError);
+    }
+
+    // If we have 'any Error', use the older entrypoint that takes an
+    // existential error directly. Otherwise, use the newer generic entrypoint.
+    auto diagnoseError = error.getType().getASTType()->isErrorExistentialType()
+      ? ctx.getDiagnoseUnexpectedError()
+      : ctx.getDiagnoseUnexpectedErrorTyped();
+    if (diagnoseError) {
+      SILValue tmpBuffer;
       auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
+
+      SubstitutionMap subMap;
+      if (auto genericSig = diagnoseError->getGenericSignature()) {
+        // FIXME: The conformance of the thrown error type to the Error
+        // protocol should be provided to us by the type checker.
+        subMap = SubstitutionMap::get(
+            genericSig, [&](SubstitutableType *dependentType) {
+              return error.getType().getObjectType().getASTType();
+            }, LookUpConformanceInModule(SGF.getModule().getSwiftModule()));
+
+        // Generic errors are passed indirectly.
+        #if true
+        if (!error.getType().isAddress()) {
+          auto *tmp = SGF.B.createAllocStack(Loc,
+                                             error.getType().getObjectType(),
+                                             llvm::None);
+          error.forwardInto(SGF, Loc, tmp);
+          error = ManagedValue::forForwardedRValue(SGF, tmp);
+
+          tmpBuffer = tmp;
+        }
+        #else
+        error = SGF.emitSubstToOrigValue(Loc, error,
+                                         AbstractionPattern::getOpaque(),
+                                         error.getType().getASTType());
+        #endif
+      }
 
       SGF.emitApplyOfLibraryIntrinsic(
               Loc,
               diagnoseError,
-              SubstitutionMap(),
+              subMap,
               {
                 error,
                 args.filenameStartPointer,
@@ -1182,7 +1236,11 @@ void SILGenFunction::ForceTryEmission::finish() {
                 args.line
               },
               SGFContext());
+
+      if (tmpBuffer)
+        SGF.B.createDeallocStack(Loc, tmpBuffer);
     }
+
     SGF.B.createUnreachable(Loc);
   }
 
@@ -1233,13 +1291,22 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   if (isByAddress)
     optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
 
-  FullExpr localCleanups(SGF.Cleanups, E);
-
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+
+  // FIXME: opaque values
+  auto &errorTL = SGF.getTypeLowering(E->getThrownError());
+  if (!errorTL.isAddressOnly()) {
+    (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
+                                      OwnershipKind::Owned);
+  }
+
+  FullExpr localCleanups(SGF.Cleanups, E);
+
   llvm::SaveAndRestore<JumpDest> throwDest{
     SGF.ThrowDest,
-    JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E)};
+    JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E,
+             ThrownErrorInfo::forDiscard())};
 
   SILValue branchArg;
   if (shouldWrapInOptional) {
@@ -1294,13 +1361,14 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   else
     SGF.B.createBranch(E, contBB, branchArg);
 
-  // If control branched to the failure block, inject .None into the
+  // If control branched to the failure block, inject .none into the
   // result type.
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
-  auto *errorArg = catchBB->createPhiArgument(
-      SILType::getExceptionType(SGF.getASTContext()), OwnershipKind::Owned);
-  (void) SGF.emitManagedRValueWithCleanup(errorArg);
+
+  // Consume the thrown error.
+  if (!errorTL.isAddressOnly())
+    (void) SGF.emitManagedRValueWithCleanup(catchBB->getArgument(0));
   catchCleanups.pop();
 
   if (isByAddress) {
@@ -4113,9 +4181,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   SmallVector<KeyPathPatternComponent, 4> loweredComponents;
   auto loweredTy = SGF.getLoweredType(E->getType());
 
-  CanType rootTy = E->getType()->castTo<BoundGenericType>()->getGenericArgs()[0]
-    ->getCanonicalType();
-  
+  CanType rootTy = E->getRootType()->getCanonicalType();
+
   bool needsGenericContext = false;
   if (rootTy->hasArchetype()) {
     needsGenericContext = true;
@@ -5809,7 +5876,8 @@ public:
     // is important to ensure that the destroy of the assign is not hoisted
     // above the retain. We are doing unmanaged things here so we need to be
     // extra careful.
-    ownedMV = SGF.B.createMarkDependence(loc, ownedMV, base);
+    ownedMV = SGF.B.createMarkDependence(loc, ownedMV, base,
+                                         /*isNonEscaping*/false);
 
     // Then reassign the mark dependence into the +1 storage.
     ownedMV.assignInto(SGF, loc, base.getUnmanagedValue());
@@ -5922,6 +5990,67 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   }
 }
 
+namespace {
+/// Cleanup to insert fix_lifetime on an LValue address.
+class FixLifetimeLValueCleanup : public Cleanup {
+  friend LValueToPointerFormalAccess;
+
+  FormalEvaluationContext::stable_iterator depth;
+
+public:
+  FixLifetimeLValueCleanup() : depth() {}
+
+  LValueToPointerFormalAccess &getFormalAccess(SILGenFunction &SGF) const {
+    auto &access = *SGF.FormalEvalContext.find(depth);
+    return static_cast<LValueToPointerFormalAccess &>(access);
+  }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    getFormalAccess(SGF).finish(SGF);
+  }
+
+  SILValue getAddress(SILGenFunction &SGF) const {
+    return getFormalAccess(SGF).address;
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FixLifetimeLValueCleanup "
+                 << "State:" << getState() << " "
+                 << "Address: " << getAddress(SGF) << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+SILValue LValueToPointerFormalAccess::enter(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            SILValue address) {
+  auto &lowering = SGF.getTypeLowering(address->getType().getObjectType());
+  SILValue pointer = SGF.B.createAddressToPointer(
+    loc, address, SILType::getRawPointerType(SGF.getASTContext()),
+    /*needsStackProtection=*/ true);
+  if (!lowering.isTrivial()) {
+    assert(SGF.isInFormalEvaluationScope() &&
+           "Must be in formal evaluation scope");
+    auto &cleanup = SGF.Cleanups.pushCleanup<FixLifetimeLValueCleanup>();
+    CleanupHandle handle = SGF.Cleanups.getTopCleanup();
+    SGF.FormalEvalContext.push<LValueToPointerFormalAccess>(loc, address,
+                                                            handle);
+    cleanup.depth = SGF.FormalEvalContext.stable_begin();
+  }
+  return pointer;
+}
+
+// Address-to-pointer conversion always requires either a fix_lifetime or
+// mark_dependence. Emitting a fix_lifetime immediately after the call as
+// opposed to a mark_dependence allows the lvalue's lifetime to be optimized
+// outside of this narrow scope.
+void LValueToPointerFormalAccess::finishImpl(SILGenFunction &SGF) {
+  SGF.B.emitFixLifetime(loc, address);
+}
+
 /// Convert an l-value to a pointer type: unsafe, unsafe-mutable, or
 /// autoreleasing-unsafe-mutable.
 ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
@@ -5967,9 +6096,8 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   // Get the lvalue address as a raw pointer.
   SILValue address =
     emitAddressOfLValue(loc, std::move(lv)).getUnmanagedValue();
-  address = B.createAddressToPointer(loc, address,
-                               SILType::getRawPointerType(getASTContext()),
-              /*needsStackProtection=*/ true);
+
+  SILValue pointer = LValueToPointerFormalAccess::enter(*this, loc, address);
   
   // Disable nested writeback scopes for any calls evaluated during the
   // conversion intrinsic.
@@ -5984,7 +6112,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
                                                        getPointerProtocol());
   return emitApplyOfLibraryIntrinsic(
              loc, converter, subMap,
-             ManagedValue::forObjectRValueWithoutOwnership(address),
+             ManagedValue::forObjectRValueWithoutOwnership(pointer),
              SGFContext())
       .getAsSingleValue(*this, loc);
 }
@@ -6064,7 +6192,8 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   // Mark the dependence of the pointer on the owner value.
   auto owner = resultScalars[0];
   auto pointer = resultScalars[1].forward(*this);
-  pointer = B.createMarkDependence(loc, pointer, owner.getValue());
+  pointer = B.createMarkDependence(loc, pointer, owner.getValue(),
+                                   /*isNonEscaping*/false);
 
   // The owner's already in its own cleanup.  Return the pointer.
   return {ManagedValue::forObjectRValueWithoutOwnership(pointer), owner};
@@ -6099,7 +6228,8 @@ SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
   // Mark the dependence of the pointer on the owner value.
   auto owner = results[0];
   auto pointer = results[1].forward(*this);
-  pointer = B.createMarkDependence(loc, pointer, owner.getValue());
+  pointer = B.createMarkDependence(loc, pointer, owner.getValue(),
+                                   /*isNonEscaping*/false);
 
   return {ManagedValue::forObjectRValueWithoutOwnership(pointer), owner};
 }

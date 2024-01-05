@@ -286,6 +286,15 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
     if (isa<NominalTypeDecl>(attachedDecl))
       evaluate(attachedDecl, /*passParent=*/false, MacroRole::Extension);
   }
+  if (roles.contains(MacroRole::Preamble)) {
+    if (isa<AbstractFunctionDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Preamble);
+  }
+  if (roles.contains(MacroRole::Body)) {
+    if (isa<AbstractFunctionDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Body);
+  }
+
   return bufferIDs;
 }
 

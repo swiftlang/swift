@@ -31,6 +31,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -449,7 +450,8 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
       }
       
       // If this is a nontrivial value argument, insert the mark_dependence.
-      auto mdi = b.createMarkDependence(loc, newValue, op);
+      auto mdi = b.createMarkDependence(loc, newValue, op,
+                                        /*isNonEscaping*/false);
       if (!firstNewMDI)
         firstNewMDI = mdi;
       newValue = mdi;
@@ -833,7 +835,7 @@ struct OwnershipModelEliminator : SILFunctionTransform {
           "Found verification error when verifying before lowering "
           "ownership. Please re-run with -sil-verify-all to identify the "
           "actual pass that introduced the verification error.");
-      f->verify(getPassManager());
+      f->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     }
 
     if (stripOwnership(*f)) {

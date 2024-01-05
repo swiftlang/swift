@@ -6,6 +6,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 import Foundation
 

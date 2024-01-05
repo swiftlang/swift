@@ -509,6 +509,9 @@ namespace swift {
     void addChildNote(Diagnostic &&D);
     void insertChildNote(unsigned beforeIndex, Diagnostic &&D);
   };
+
+  /// A diagnostic that has no input arguments, so it is trivially-destructable.
+  using ZeroArgDiagnostic = Diag<>;
   
   /// Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional

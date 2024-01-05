@@ -1190,7 +1190,7 @@ public:
       return true;
     // Ignore things that don't come from this buffer.
     if (!SM.getRangeForBuffer(BufferID).contains(Range.getStart()))
-      return false;
+      return true;
 
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
@@ -1344,32 +1344,18 @@ void RequestRefactoringEditConsumer::handleDiagnostic(
   Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
-class RequestRenameRangeConsumer::Implementation {
-  CategorizedRenameRangesReceiver Receiver;
-  std::string ErrBuffer;
-  llvm::raw_string_ostream OS;
-  std::vector<CategorizedRenameRanges> CategorizedRanges;
+/// Translates a vector of \c SyntacticRenameRangeDetails to a vector of
+/// \c CategorizedRenameRanges.
+static std::vector<CategorizedRenameRanges> getCategorizedRenameRanges(
+    std::vector<SyntacticRenameRangeDetails> SyntacticRenameRanges,
+    SourceManager &SM) {
+  std::vector<CategorizedRenameRanges> Result;
 
-public:
-  PrintingDiagnosticConsumer DiagConsumer;
-
-public:
-  Implementation(CategorizedRenameRangesReceiver Receiver)
-      : Receiver(Receiver), OS(ErrBuffer), DiagConsumer(OS) {}
-
-  ~Implementation() {
-    if (DiagConsumer.didErrorOccur()) {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(OS.str()));
-      return;
-    }
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromResult(CategorizedRanges));
-  }
-
-  void accept(SourceManager &SM, RegionType RegionType,
-              ArrayRef<ide::RenameRangeDetail> Ranges) {
-    CategorizedRenameRanges Results;
-    Results.Category = SwiftLangSupport::getUIDForRegionType(RegionType);
-    for (const auto &R : Ranges) {
+  for (SyntacticRenameRangeDetails RangeDetails : SyntacticRenameRanges) {
+    CategorizedRenameRanges CategorizedRanges;
+    CategorizedRanges.Category =
+        SwiftLangSupport::getUIDForRegionType(RangeDetails.Type);
+    for (const auto &R : RangeDetails.Ranges) {
       SourceKit::RenameRangeDetail Result;
       std::tie(Result.StartLine, Result.StartColumn) =
           SM.getLineAndColumnInBuffer(R.Range.getStart());
@@ -1378,92 +1364,50 @@ public:
       Result.ArgIndex = R.Index;
       Result.Kind =
           SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
-      Results.Ranges.push_back(std::move(Result));
+      CategorizedRanges.Ranges.push_back(std::move(Result));
     }
-    CategorizedRanges.push_back(std::move(Results));
+    Result.push_back(std::move(CategorizedRanges));
   }
-};
 
-RequestRenameRangeConsumer::RequestRenameRangeConsumer(
-    CategorizedRenameRangesReceiver Receiver)
-    : Impl(*new Implementation(Receiver)) {}
-RequestRenameRangeConsumer::~RequestRenameRangeConsumer() { delete &Impl; }
-
-void RequestRenameRangeConsumer::accept(
-    SourceManager &SM, RegionType RegionType,
-    ArrayRef<ide::RenameRangeDetail> Ranges) {
-  Impl.accept(SM, RegionType, Ranges);
+  return Result;
 }
 
-void RequestRenameRangeConsumer::handleDiagnostic(SourceManager &SM,
-                                                  const DiagnosticInfo &Info) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Info);
-}
-
-static NameUsage getNameUsage(RenameType Type) {
-  switch (Type) {
-  case RenameType::Definition:
-    return NameUsage::Definition;
-  case RenameType::Reference:
-    return NameUsage::Reference;
-  case RenameType::Call:
-    return NameUsage::Call;
-  case RenameType::Unknown:
-    return NameUsage::Unknown;
-  }
-}
-
-static std::vector<RenameLoc>
-getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations);
-
-void SwiftLangSupport::
-syntacticRename(llvm::MemoryBuffer *InputBuf,
-                ArrayRef<RenameLocations> RenameLocations,
-                ArrayRef<const char*> Args,
-                CategorizedEditsReceiver Receiver) {
+CancellableResult<std::vector<CategorizedRenameRanges>>
+SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                                   ArrayRef<RenameLoc> RenameLocs,
+                                   ArrayRef<const char *> Args) {
+  using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
   CompilerInstance ParseCI;
   PrintingDiagnosticConsumer PrintDiags;
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
   if (!SF) {
-    Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
-    return;
+    return ResultType::failure(Error);
   }
 
-  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
-  RequestRefactoringEditConsumer EditConsumer(Receiver);
-  swift::ide::syntacticRename(SF, RenameLocs, EditConsumer, EditConsumer);
-}
+  auto SyntacticRenameRanges =
+      swift::ide::findSyntacticRenameRanges(SF, RenameLocs,
+                                            /*NewName=*/StringRef());
 
-void SwiftLangSupport::findRenameRanges(
-    llvm::MemoryBuffer *InputBuf, ArrayRef<RenameLocations> RenameLocations,
-    ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {
-  std::string Error;
-  CompilerInstance ParseCI;
-  PrintingDiagnosticConsumer PrintDiags;
-  ParseCI.addDiagnosticConsumer(&PrintDiags);
-  SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
-  if (!SF) {
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
-    return;
-  }
-
-  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
-  RequestRenameRangeConsumer Consumer(Receiver);
-  swift::ide::findSyntacticRenameRanges(SF, RenameLocs, Consumer, Consumer);
+  SourceManager &SM = SF->getASTContext().SourceMgr;
+  return SyntacticRenameRanges.map<std::vector<CategorizedRenameRanges>>(
+      [&SM](auto &SyntacticRenameRanges) {
+        return getCategorizedRenameRanges(SyntacticRenameRanges, SM);
+      });
 }
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
     ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     CategorizedRenameRangesReceiver Receiver) {
+  using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
   SwiftInvocationRef Invok =
       ASTMgr->getTypecheckInvocation(Args, Filename, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
+    Receiver(ResultType::failure(Error));
     return;
   }
 
@@ -1479,16 +1423,21 @@ void SwiftLangSupport::findLocalRenameRanges(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &SF = AstUnit->getPrimarySourceFile();
       swift::ide::RangeConfig Range{*SF.getBufferID(), Line, Column, Length};
-      RequestRenameRangeConsumer Consumer(std::move(Receiver));
-      swift::ide::findLocalRenameRanges(&SF, Range, Consumer, Consumer);
+      SourceManager &SM = SF.getASTContext().SourceMgr;
+      auto SyntacticRenameRanges =
+          swift::ide::findLocalRenameRanges(&SF, Range);
+      auto Result =
+          SyntacticRenameRanges.map<std::vector<CategorizedRenameRanges>>(
+              [&SM](auto &SyntacticRenameRanges) {
+                return getCategorizedRenameRanges(SyntacticRenameRanges, SM);
+              });
+      Receiver(Result);
     }
 
-    void cancelled() override {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::cancelled());
-    }
+    void cancelled() override { Receiver(ResultType::cancelled()); }
 
     void failed(StringRef Error) override {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
+      Receiver(ResultType::failure(Error.str()));
     }
   };
 
@@ -1535,19 +1484,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   if (!SF)
     Error = "Failed to determine SourceFile for input buffer";
   return SF;
-}
-
-static std::vector<RenameLoc>
-getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations) {
-  std::vector<RenameLoc> RenameLocs;
-  for(const auto &Locations: RenameLocations) {
-    for(const auto &Location: Locations.LineColumnLocs) {
-      RenameLocs.push_back({Location.Line, Location.Column,
-        getNameUsage(Location.Type), Locations.OldName, Locations.NewName,
-        Locations.IsFunctionLike, Locations.IsNonProtocolType});
-    }
-  }
-  return RenameLocs;
 }
 
 void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,

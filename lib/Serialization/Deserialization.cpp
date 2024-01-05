@@ -1184,6 +1184,8 @@ getActualLayoutConstraintKind(uint64_t rawKind) {
   CASE(Class)
   CASE(NativeClass)
   CASE(UnknownLayout)
+  CASE(BridgeObject)
+  CASE(TrivialStride)
   }
 #undef CASE
 
@@ -1243,7 +1245,8 @@ llvm::Error ModuleFile::deserializeGenericRequirementsChecked(
       ASTContext &ctx = getContext();
       LayoutConstraint layout;
       if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
-          kind != LayoutConstraintKind::TrivialOfExactSize)
+          kind != LayoutConstraintKind::TrivialOfExactSize &&
+          kind != LayoutConstraintKind::TrivialStride)
         layout = LayoutConstraint::getLayoutConstraint(kind, ctx);
       else
         layout =
@@ -2979,19 +2982,10 @@ getActualDifferentiabilityKind(uint8_t diffKind) {
 
 static llvm::Optional<swift::MacroRole> getActualMacroRole(uint8_t context) {
   switch (context) {
-#define CASE(THE_DK) \
-  case (uint8_t)serialization::MacroRole::THE_DK: \
-    return swift::MacroRole::THE_DK;
-  CASE(Expression)
-  CASE(Declaration)
-  CASE(Accessor)
-  CASE(MemberAttribute)
-  CASE(Member)
-  CASE(Peer)
-  CASE(Conformance)
-  CASE(CodeItem)
-  CASE(Extension)
-#undef CASE
+#define MACRO_ROLE(Name, Description)           \
+  case (uint8_t)serialization::MacroRole::Name: \
+    return swift::MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
   }
   return llvm::None;
 }
@@ -4052,9 +4046,9 @@ public:
                                         async, throws, thrownType,
                                         genericParams, resultType, DC);
     } else {
-      auto *accessor = AccessorDecl::createDeserialized(
-          ctx, accessorKind, storage, staticSpelling.value(), async, throws,
-          thrownType, resultType, DC);
+      auto *accessor =
+          AccessorDecl::createDeserialized(ctx, accessorKind, storage, async,
+                                           throws, thrownType, resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -4221,11 +4215,13 @@ public:
     GenericSignatureID genericSigID;
     SubstitutionMapID underlyingTypeSubsID;
     uint8_t rawAccessLevel;
+    bool exportUnderlyingType;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
                                               underlyingTypeSubsID,
-                                              rawAccessLevel);
+                                              rawAccessLevel,
+                                              exportUnderlyingType);
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSigOrErr = MF.getGenericSignatureChecked(interfaceSigID);
@@ -4261,16 +4257,25 @@ public:
     else
       opaqueDecl->setGenericSignature(GenericSignature());
 
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl);
-    if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
-        !MF.FileContext->getParentModule()->isMainModule() &&
-        AFD && AFD->getResilienceExpansion() != ResilienceExpansion::Minimal) {
+    if (!MF.FileContext->getParentModule()->isMainModule() &&
+        !exportUnderlyingType) {
       // Do not try to read the underlying type information if the function
       // is not inlinable in clients. This reflects the swiftinterface behavior
       // in where clients are only aware of the underlying type when the body
       // of the function is public.
+      LLVM_DEBUG(
+        llvm::dbgs() << "Ignoring underlying information for opaque type of '";
+        llvm::dbgs() << namingDecl->getName();
+        llvm::dbgs() << "'\n";
+        );
 
     } else if (underlyingTypeSubsID) {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Loading underlying information for opaque type of '";
+        llvm::dbgs() << namingDecl->getName();
+        llvm::dbgs() << "'\n";
+        );
+
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError) {
         // If the underlying type references internal details, ignore it.
@@ -6302,19 +6307,28 @@ getActualParameterConvention(uint8_t raw) {
   return llvm::None;
 }
 
-/// Translate from the serialization SILParameterDifferentiability enumerators,
+/// Translate from the serialization SILParameterInfoFlags enumerators,
 /// which are guaranteed to be stable, to the AST ones.
-static llvm::Optional<swift::SILParameterDifferentiability>
-getActualSILParameterDifferentiability(uint8_t raw) {
-  switch (serialization::SILParameterDifferentiability(raw)) {
-#define CASE(ID)                                                               \
-  case serialization::SILParameterDifferentiability::ID:                       \
-    return swift::SILParameterDifferentiability::ID;
-  CASE(DifferentiableOrNotApplicable)
-  CASE(NotDifferentiable)
-#undef CASE
+static std::optional<SILParameterInfo::Options>
+getActualSILParameterOptions(uint8_t raw) {
+  auto options = serialization::SILParameterInfoOptions(raw);
+  SILParameterInfo::Options result;
+
+  // Every time we resolve an option, remove it from options so we can make sure
+  // that options is empty at the end and return none.
+  if (options.contains(
+          serialization::SILParameterInfoFlags::NotDifferentiable)) {
+    options -= serialization::SILParameterInfoFlags::NotDifferentiable;
+    result |= SILParameterInfo::NotDifferentiable;
   }
-  return llvm::None;
+
+  // Check if we have any remaining options and return none if we do. We found
+  // some option that we did not understand.
+  if (bool(options)) {
+    return {};
+  }
+
+  return result;
 }
 
 /// Translate from the serialization ResultConvention enumerators,
@@ -6335,19 +6349,29 @@ getActualResultConvention(uint8_t raw) {
   return llvm::None;
 }
 
-/// Translate from the serialization SILResultDifferentiability enumerators,
+/// Translate from the serialization SILResultInfoFlags enumerators,
 /// which are guaranteed to be stable, to the AST ones.
-static llvm::Optional<swift::SILResultDifferentiability>
-getActualSILResultDifferentiability(uint8_t raw) {
-  switch (serialization::SILResultDifferentiability(raw)) {
-#define CASE(ID)                                                               \
-  case serialization::SILResultDifferentiability::ID:                          \
-    return swift::SILResultDifferentiability::ID;
-    CASE(DifferentiableOrNotApplicable)
-    CASE(NotDifferentiable)
-#undef CASE
+///
+/// If we find a flag that we did not know, return none.
+static std::optional<SILResultInfo::Options>
+getActualSILResultOptions(uint8_t raw) {
+  auto options = serialization::SILResultInfoOptions(raw);
+  SILResultInfo::Options result;
+
+  // Every time we resolve an option, remove it from options so we can make sure
+  // that options is empty at the end and return none.
+  if (options.contains(serialization::SILResultInfoFlags::NotDifferentiable)) {
+    options -= serialization::SILResultInfoFlags::NotDifferentiable;
+    result |= SILResultInfo::NotDifferentiable;
   }
-  return llvm::None;
+
+  // Check if we have any remaining options and return none if we do. We found
+  // some option that we did not understand.
+  if (bool(options)) {
+    return {};
+  }
+
+  return result;
 }
 
 Type ModuleFile::getType(TypeID TID) {
@@ -6653,13 +6677,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeConst;
+        isCompileTimeConst, hasResultDependsOn;
     bool isNoDerivative;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst);
+        isCompileTimeConst, hasResultDependsOn);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -6670,12 +6694,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     if (!paramTy)
       return paramTy.takeError();
 
-    params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
-                        ParameterTypeFlags(isVariadic, isAutoClosure,
-                                           isNonEphemeral, *ownership,
-                                           isIsolated, isNoDerivative,
-                                           isCompileTimeConst),
-                        MF.getIdentifier(internalLabelID));
+    params.emplace_back(
+        paramTy.get(), MF.getIdentifier(labelID),
+        ParameterTypeFlags(isVariadic, isAutoClosure, isNonEphemeral,
+                           *ownership, isIsolated, isNoDerivative,
+                           isCompileTimeConst, hasResultDependsOn),
+        MF.getIdentifier(internalLabelID));
   }
 
   if (!isGeneric) {
@@ -6915,11 +6939,16 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
 
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  bool hasExplicitAnyObject;
+  bool hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable;
   ArrayRef<uint64_t> rawProtocolIDs;
 
   decls_block::ProtocolCompositionTypeLayout::readRecord(
-      scratch, hasExplicitAnyObject, rawProtocolIDs);
+      scratch,
+      hasExplicitAnyObject,
+      hasInverseCopyable,
+      hasInverseEscapable,
+      rawProtocolIDs);
+
   SmallVector<Type, 4> protocols;
   for (TypeID protoID : rawProtocolIDs) {
     auto protoTy = MF.getTypeChecked(protoID);
@@ -6928,7 +6957,13 @@ Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     protocols.push_back(protoTy.get());
   }
 
-  return ProtocolCompositionType::get(MF.getContext(), protocols,
+  InvertibleProtocolSet inverses;
+  if (hasInverseCopyable)
+    inverses.insert(InvertibleProtocolKind::Copyable);
+  if (hasInverseEscapable)
+    inverses.insert(InvertibleProtocolKind::Escapable);
+
+  return ProtocolCompositionType::get(MF.getContext(), protocols, inverses,
                                       hasExplicitAnyObject);
 }
 
@@ -7156,24 +7191,20 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
 
   auto processParameter =
       [&](TypeID typeID, uint64_t rawConvention,
-          uint64_t rawDifferentiability) -> llvm::Expected<SILParameterInfo> {
+          uint64_t rawOptions) -> llvm::Expected<SILParameterInfo> {
     auto convention = getActualParameterConvention(rawConvention);
     if (!convention)
       return MF.diagnoseFatal();
     auto type = MF.getTypeChecked(typeID);
     if (!type)
       return type.takeError();
-    auto differentiability =
-        swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
-    if (diffKind != swift::DifferentiabilityKind::NonDifferentiable) {
-      auto differentiabilityOpt =
-          getActualSILParameterDifferentiability(rawDifferentiability);
-      if (!differentiabilityOpt)
-        return MF.diagnoseFatal();
-      differentiability = *differentiabilityOpt;
-    }
+    // If paramOptions is none, then we found an option that we did not know how
+    // to deserialize meaning something is out of sync... signal an error!
+    auto paramOptions = getActualSILParameterOptions(rawOptions);
+    if (!paramOptions)
+      return MF.diagnoseFatal();
     return SILParameterInfo(type.get()->getCanonicalType(), *convention,
-                            differentiability);
+                            *paramOptions);
   };
 
   auto processYield =
@@ -7190,24 +7221,21 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
 
   auto processResult =
       [&](TypeID typeID, uint64_t rawConvention,
-          uint64_t rawDifferentiability) -> llvm::Expected<SILResultInfo> {
+          uint64_t rawOptions) -> llvm::Expected<SILResultInfo> {
     auto convention = getActualResultConvention(rawConvention);
     if (!convention)
       return MF.diagnoseFatal();
     auto type = MF.getTypeChecked(typeID);
     if (!type)
       return type.takeError();
-    auto differentiability =
-        swift::SILResultDifferentiability::DifferentiableOrNotApplicable;
-    if (diffKind != swift::DifferentiabilityKind::NonDifferentiable) {
-      auto differentiabilityOpt =
-          getActualSILResultDifferentiability(rawDifferentiability);
-      if (!differentiabilityOpt)
-        return MF.diagnoseFatal();
-      differentiability = *differentiabilityOpt;
-    }
+
+    // If resultOptions is none, then we found an option that we did not know
+    // how to deserialize meaning something is out of sync... signal an error!
+    auto resultOptions = getActualSILResultOptions(rawOptions);
+    if (!resultOptions)
+      return MF.diagnoseFatal();
     return SILResultInfo(type.get()->getCanonicalType(), *convention,
-                         differentiability);
+                         *resultOptions);
   };
 
   // Bounds check.  FIXME: overflow
@@ -7227,10 +7255,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   for (unsigned i = 0; i != numParams; ++i) {
     auto typeID = variableData[nextVariableDataIndex++];
     auto rawConvention = variableData[nextVariableDataIndex++];
-    uint64_t rawDifferentiability = 0;
-    if (diffKind != swift::DifferentiabilityKind::NonDifferentiable)
-      rawDifferentiability = variableData[nextVariableDataIndex++];
-    auto param = processParameter(typeID, rawConvention, rawDifferentiability);
+    uint64_t rawOptions = variableData[nextVariableDataIndex++];
+    auto param = processParameter(typeID, rawConvention, rawOptions);
     if (!param)
       return param.takeError();
     allParams.push_back(param.get());
@@ -7254,10 +7280,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   for (unsigned i = 0; i != numResults; ++i) {
     auto typeID = variableData[nextVariableDataIndex++];
     auto rawConvention = variableData[nextVariableDataIndex++];
-    uint64_t rawDifferentiability = 0;
-    if (diffKind != swift::DifferentiabilityKind::NonDifferentiable)
-      rawDifferentiability = variableData[nextVariableDataIndex++];
-    auto result = processResult(typeID, rawConvention, rawDifferentiability);
+    uint64_t rawOptions = variableData[nextVariableDataIndex++];
+    auto result = processResult(typeID, rawConvention, rawOptions);
     if (!result)
       return result.takeError();
     allResults.push_back(result.get());
@@ -7268,9 +7292,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (hasErrorResult) {
     auto typeID = variableData[nextVariableDataIndex++];
     auto rawConvention = variableData[nextVariableDataIndex++];
-    uint64_t rawDifferentiability = 0;
-    auto maybeErrorResult =
-        processResult(typeID, rawConvention, rawDifferentiability);
+    uint64_t rawOptions = 0;
+    auto maybeErrorResult = processResult(typeID, rawConvention, rawOptions);
     if (!maybeErrorResult)
       return maybeErrorResult.takeError();
     errorResult = maybeErrorResult.get();

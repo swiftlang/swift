@@ -71,7 +71,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
 
   auto deinit = (decl && decl->getValueTypeDestructor())
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = (decl && decl->isNoncopyable())
+  auto copyable = (decl && decl->canBeNoncopyable())
     ? IsNotCopyable : IsCopyable;
 
   // Handle a raw layout specification on a struct.

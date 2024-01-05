@@ -19,8 +19,8 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -39,6 +39,10 @@ bool nodeMetatypesInitialized = false;
 // Filled in by class registration in initializeSwiftModules().
 SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
+}
+
+bool swiftModulesInitialized() {
+  return nodeMetatypesInitialized;
 }
 
 // Does return null if initializeSwiftModules() is never called.
@@ -71,7 +75,7 @@ static void setUnimplementedRange(SwiftMetatype metatype,
 /// Registers the metatype of a swift SIL class.
 /// Called by initializeSwiftModules().
 void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metatype) {
-  StringRef className = bridgedClassName.get();
+  StringRef className = bridgedClassName.unbridged();
   nodeMetatypesInitialized = true;
 
   // Handle the important non Node classes.
@@ -142,7 +146,8 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
 //===----------------------------------------------------------------------===//
 
 void registerFunctionTest(BridgedStringRef name, void *nativeSwiftInvocation) {
-  new swift::test::FunctionTest(name.get(), nativeSwiftInvocation);
+  swift::test::FunctionTest::createNativeSwiftFunctionTest(
+      name.unbridged(), nativeSwiftInvocation);
 }
 
 bool BridgedTestArguments::hasUntaken() const {
@@ -208,6 +213,9 @@ static_assert((int)BridgedFunction::EffectsKind::Custom == (int)swift::EffectsKi
 static_assert((int)BridgedFunction::PerformanceConstraints::None == (int)swift::PerformanceConstraints::None);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoAllocation == (int)swift::PerformanceConstraints::NoAllocation);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoLocks == (int)swift::PerformanceConstraints::NoLocks);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoRuntime == (int)swift::PerformanceConstraints::NoRuntime);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoExistentials == (int)swift::PerformanceConstraints::NoExistentials);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoObjCBridging == (int)swift::PerformanceConstraints::NoObjCBridging);
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
@@ -228,7 +236,7 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
 BridgedOwnedString BridgedBasicBlock::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  get()->print(os);
+  unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
 }
@@ -266,6 +274,9 @@ ArrayRef<SILValue> BridgedValueArray::getValues(SmallVectorImpl<SILValue> &stora
   return storage;
 }
 
+bool BridgedValue::findPointerEscape() const {
+  return swift::findPointerEscape(getSILValue());
+}
 
 //===----------------------------------------------------------------------===//
 //                                SILArgument
@@ -419,38 +430,63 @@ static_assert((int)BridgedInstruction::AccessKind::Deinit == (int)swift::SILAcce
 BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  get()->print(os);
+  unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
 }
 
 bool BridgedInstruction::mayAccessPointer() const {
-  return ::mayAccessPointer(get());
+  return ::mayAccessPointer(unbridged());
 }
 
 bool BridgedInstruction::mayLoadWeakOrUnowned() const {
-  return ::mayLoadWeakOrUnowned(get());
+  return ::mayLoadWeakOrUnowned(unbridged());
 }
 
 bool BridgedInstruction::maySynchronizeNotConsideringSideEffects() const {
-  return ::maySynchronizeNotConsideringSideEffects(get());
+  return ::maySynchronizeNotConsideringSideEffects(unbridged());
 }
 
 bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
-  return ::mayBeDeinitBarrierNotConsideringSideEffects(get());
+  return ::mayBeDeinitBarrierNotConsideringSideEffects(unbridged());
 }
 
 //===----------------------------------------------------------------------===//
-//                               BridgedNominalTypeDecl
+//                               BridgedBuilder
 //===----------------------------------------------------------------------===//
 
-bool BridgedNominalTypeDecl::isStructWithUnreferenceableStorage() const {
-  if (auto *structDecl = dyn_cast<swift::StructDecl>(decl)) {
-    return structDecl->hasUnreferenceableStorage();
+static llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16>
+convertCases(SILType enumTy, const void * _Nullable enumCases, SwiftInt numEnumCases) {
+  using BridgedCase = const std::pair<SwiftInt, BridgedBasicBlock>;
+  llvm::ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
+                                    (unsigned)numEnumCases);
+  llvm::SmallDenseMap<SwiftInt, swift::EnumElementDecl *> mappedElements;
+  swift::EnumDecl *enumDecl = enumTy.getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    mappedElements[elemWithIndex.index()] = elemWithIndex.value();
   }
-  return false;
+  llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16> convertedCases;
+  for (auto c : cases) {
+    assert(mappedElements.count(c.first) && "wrong enum element index");
+    convertedCases.push_back({mappedElements[c.first], c.second.unbridged()});
+  }
+  return convertedCases;
 }
 
-void writeCharToStderr(int c) {
-  putc(c, stderr);
+BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
+                                        const void * _Nullable enumCases, SwiftInt numEnumCases) const {
+  return {unbridged().createSwitchEnum(regularLoc(),
+                                       enumVal.getSILValue(),
+                                       defaultBlock.unbridged(),
+                                       convertCases(enumVal.getSILValue()->getType(), enumCases, numEnumCases))};
+}
+
+BridgedInstruction BridgedBuilder::createSwitchEnumAddrInst(BridgedValue enumAddr,
+                                                            OptionalBridgedBasicBlock defaultBlock,
+                                                            const void * _Nullable enumCases,
+                                                            SwiftInt numEnumCases) const {
+  return {unbridged().createSwitchEnumAddr(regularLoc(),
+                                           enumAddr.getSILValue(),
+                                           defaultBlock.unbridged(),
+                                           convertCases(enumAddr.getSILValue()->getType(), enumCases, numEnumCases))};
 }

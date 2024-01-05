@@ -71,7 +71,8 @@ void Witness::dump() const { dump(llvm::errs()); }
 void Witness::dump(llvm::raw_ostream &out) const {
   out << "Witness: ";
   if (auto decl = this->getDecl()) {
-    decl->print(out);
+    decl->dumpRef(out);
+    out << "\n";
   } else {
     out << "<no decl>\n";
   }
@@ -535,27 +536,48 @@ ProtocolConformance::getAssociatedConformance(Type assocType,
 ProtocolConformanceRef
 NormalProtocolConformance::getAssociatedConformance(Type assocType,
                                                  ProtocolDecl *protocol) const {
+  if (Loader)
+    resolveLazyInfo();
+
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
   llvm::Optional<ProtocolConformanceRef> result;
 
+  auto &ctx = getDeclContext()->getASTContext();
+
   forEachAssociatedConformance(
       [&](Type t, ProtocolDecl *p, unsigned index) {
         if (t->isEqual(assocType) && p == protocol) {
-          // Fill in the signature conformances, if we haven't done so yet.
-          if (!hasComputedAssociatedConformances()) {
-            const_cast<NormalProtocolConformance *>(this)
-                ->finishSignatureConformances();
+          if (!ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+            // Fill in the signature conformances, if we haven't done so yet.
+            if (!hasComputedAssociatedConformances()) {
+              const_cast<NormalProtocolConformance *>(this)
+                  ->finishSignatureConformances();
+            }
           }
 
-          result = getAssociatedConformance(index);
+          // Not strictly necessary, but avoids a bit of request evaluator
+          // overhead in the happy case.
+          if (hasComputedAssociatedConformances()) {
+            result = AssociatedConformances[index];
+            if (result)
+              return true;
+          }
+
+          result = evaluateOrDefault(ctx.evaluator,
+                                     AssociatedConformanceRequest{
+                                       const_cast<NormalProtocolConformance *>(this),
+                                       t->getCanonicalType(), p, index
+                                     }, ProtocolConformanceRef::forInvalid());
           return true;
         }
 
         return false;
       });
 
+  assert(result && "Subject type must be exactly equal to left-hand side of a"
+         "conformance requirement in protocol requirement signature");
   return *result;
 }
 
@@ -1047,7 +1069,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (isNoncopyable()) {
+    if (canBeNoncopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;
@@ -1232,8 +1254,10 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
 
-    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
       trySynthesize(KnownProtocolKind::Copyable);
+      trySynthesize(KnownProtocolKind::Escapable);
+    }
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

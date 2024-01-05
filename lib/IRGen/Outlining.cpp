@@ -208,8 +208,6 @@ static bool needsSpecialOwnershipHandling(SILType t) {
   return ref->getOwnership() != ReferenceOwnership::Strong;
 }
 
-bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type);
-
 static bool canUseValueWitnessForValueOp(IRGenModule &IGM, SILType T) {
   if (!IGM.getSILModule().isTypeMetadataForLayoutAccessible(T))
     return false;

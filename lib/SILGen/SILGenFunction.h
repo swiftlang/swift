@@ -389,7 +389,8 @@ public:
   JumpDest FailDest = JumpDest::invalid();
 
   /// The destination for throws.  The block will always be in the
-  /// postmatter and takes a BB argument of the exception type.
+  /// postmatter. For a direct error return, it takes a BB argument
+  /// of the exception type.
   JumpDest ThrowDest = JumpDest::invalid();
 
   /// Support for typed throws.
@@ -1080,6 +1081,9 @@ public:
 
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
+  ///
+  /// This hop instruction may take into account current tasks' executor
+  /// preference.
   ExecutorBreadcrumb emitHopToTargetExecutor(SILLocation loc,
                                              SILValue executor);
 
@@ -1989,7 +1993,8 @@ public:
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
                                       ExecutorBreadcrumb prevExecutor,
-                                      SILResultInfo exnResult,
+                                      SILResultInfo errorResult,
+                                      SILValue indirectErrorAddr,
                                       bool isSuppressed);
 
   /// Emit a dynamic member reference.
@@ -2271,7 +2276,8 @@ public:
   /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
-      SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr);
+      SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,
@@ -2691,6 +2697,11 @@ public:
   GenericEnvironment *
   createOpenedElementValueEnvironment(ArrayRef<SILType> packExpansionTys,
                                       ArrayRef<SILType*> eltTys);
+  GenericEnvironment *
+  createOpenedElementValueEnvironment(ArrayRef<SILType> packExpansionTys,
+                                      ArrayRef<SILType*> eltTys,
+                                      ArrayRef<CanType> formalPackExpansionTys,
+                                      ArrayRef<CanType*> formalEltTys);
 
   /// Emit a dynamic loop over a single pack-expansion component of a pack.
   ///
@@ -2721,26 +2732,24 @@ public:
   ///
   ///   This function will be called within a cleanups scope and with
   ///   InnermostPackExpansion set up properly for the context.
-  void emitDynamicPackLoop(SILLocation loc,
-                           CanPackType formalPackType,
-                           unsigned componentIndex,
-                           SILValue startingAfterIndexWithinComponent,
-                           SILValue limitWithinComponent,
-                           GenericEnvironment *openedElementEnv,
-                           bool reverse,
-                        llvm::function_ref<void(SILValue indexWithinComponent,
-                                                SILValue packExpansionIndex,
-                                                SILValue packIndex)> emitBody);
+  void emitDynamicPackLoop(
+      SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+      SILValue startingAfterIndexWithinComponent, SILValue limitWithinComponent,
+      GenericEnvironment *openedElementEnv, bool reverse,
+      llvm::function_ref<void(SILValue indexWithinComponent,
+                              SILValue packExpansionIndex, SILValue packIndex)>
+          emitBody,
+      SILBasicBlock *loopLatch = nullptr);
 
   /// A convenience version of dynamic pack loop that visits an entire
   /// pack expansion component in forward order.
-  void emitDynamicPackLoop(SILLocation loc,
-                           CanPackType formalPackType,
-                           unsigned componentIndex,
-                           GenericEnvironment *openedElementEnv,
-                        llvm::function_ref<void(SILValue indexWithinComponent,
-                                                SILValue packExpansionIndex,
-                                                SILValue packIndex)> emitBody);
+  void emitDynamicPackLoop(
+      SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+      GenericEnvironment *openedElementEnv,
+      llvm::function_ref<void(SILValue indexWithinComponent,
+                              SILValue packExpansionIndex, SILValue packIndex)>
+          emitBody,
+      SILBasicBlock *loopLatch = nullptr);
 
   /// Emit a transform on each element of a pack-expansion component
   /// of a pack, write the result into a pack-expansion component of

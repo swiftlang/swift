@@ -1,5 +1,16 @@
-import CASTBridging
-import CBasicBridging
+//===--- SourceFile.swift -------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import ASTBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
@@ -7,10 +18,10 @@ import SwiftSyntax
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
-struct ExportedSourceFile {
+public struct ExportedSourceFile {
   /// The underlying buffer within the C++ SourceManager, which is used
   /// for computations of source locations.
-  let buffer: UnsafeBufferPointer<UInt8>
+  public let buffer: UnsafeBufferPointer<UInt8>
 
   /// The name of the enclosing module.
   let moduleName: String
@@ -19,7 +30,15 @@ struct ExportedSourceFile {
   let fileName: String
 
   /// The syntax tree for the complete source file.
-  let syntax: SourceFileSyntax
+  public let syntax: SourceFileSyntax
+
+  public func position(of location: BridgedSourceLoc) -> AbsolutePosition? {
+    let sourceFileBaseAddress = UnsafeRawPointer(buffer.baseAddress!)
+    guard let opaqueValue = location.getOpaquePointerValue() else {
+      return nil
+    }
+    return AbsolutePosition(utf8Offset: opaqueValue - sourceFileBaseAddress)
+  }
 }
 
 extension Parser.ExperimentalFeatures {
@@ -33,8 +52,9 @@ extension Parser.ExperimentalFeatures {
       }
     }
     mapFeature(.ThenStatements, to: .thenStatements)
-    mapFeature(.TypedThrows, to: .typedThrows)
     mapFeature(.DoExpressions, to: .doExpressions)
+    mapFeature(.NonescapableTypes, to: .nonescapableTypes)
+    mapFeature(.TransferringArgsAndResults, to: .transferringArgsAndResults)
   }
 }
 
@@ -102,7 +122,7 @@ extension Syntax {
 /// Emit diagnostics within the given source file.
 @_cdecl("swift_ASTGen_emitParserDiagnostics")
 public func emitParserDiagnostics(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
   emitOnlyErrors: CInt,
   downgradePlaceholderErrorsToWarnings: CInt

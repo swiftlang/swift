@@ -540,9 +540,13 @@ public:
       assert(componentInit);
       assert(componentInit->canPerformPackExpansionInitialization());
 
-      auto opening = SGF.createOpenedElementValueEnvironment(packComponentTy);
-      auto openedEnv = opening.first;
-      auto eltTy = opening.second;
+      SILType eltTy;
+      CanType substEltType;
+      auto openedEnv =
+        SGF.createOpenedElementValueEnvironment({packComponentTy},
+                                                {&eltTy},
+                                                {substExpansionType},
+                                                {&substEltType});
 
       SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
                               openedEnv, [&](SILValue indexWithinComponent,
@@ -555,12 +559,6 @@ public:
           auto eltAddr =
             SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
           auto eltAddrMV = cloner.clone(eltAddr);
-
-          CanType substEltType = substExpansionType.getPatternType();
-          if (openedEnv) {
-            substEltType =
-              openedEnv->mapContextualPackTypeIntoElementContext(substEltType);
-          }
 
           auto result = handleScalar(eltAddrMV, origPatternType, substEltType,
                                      eltInit, /*inout*/ false);
@@ -1449,36 +1447,12 @@ void SILGenFunction::emitProlog(
 }
 
 SILValue SILGenFunction::emitMainExecutor(SILLocation loc) {
-  // Get main executor
-  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
-  if (!getMainExecutorFuncDecl) {
-    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
-    // up instead of crashing:
-    // @available(SwiftStdlib 5.1, *)
-    // @_silgen_name("swift_task_getMainExecutor")
-    // internal func _getMainExecutor() -> Builtin.Executor
-    auto &ctx = getASTContext();
+  auto &ctx = getASTContext();
+  auto builtinName = ctx.getIdentifier(
+      getBuiltinName(BuiltinValueKind::BuildMainActorExecutorRef));
+  auto resultType = SILType::getPrimitiveObjectType(ctx.TheExecutorType);
 
-    ParameterList *emptyParams = ParameterList::createEmpty(ctx);
-    getMainExecutorFuncDecl = FuncDecl::createImplicit(
-        ctx, StaticSpellingKind::None,
-        DeclName(
-            ctx,
-            DeclBaseName(ctx.getIdentifier("_getMainExecutor")),
-            /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
-        emptyParams, ctx.TheExecutorType,
-        getModule().getSwiftModule());
-    getMainExecutorFuncDecl->getAttrs().add(
-        new (ctx) SILGenNameAttr("swift_task_getMainExecutor", /*raw*/ false,
-                                 /*implicit*/ true));
-  }
-
-  auto fn = SGM.getFunction(
-      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
-      NotForDefinition);
-  SILValue fnRef = B.createFunctionRefFor(loc, fn);
-  return B.createApply(loc, fnRef, {}, {});
+  return B.createBuiltin(loc, builtinName, resultType, {}, {});
 }
 
 SILValue SILGenFunction::emitGenericExecutor(SILLocation loc) {
@@ -1768,14 +1742,15 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
 
   // The calling convention always uses minimal resilience expansion.
   auto errorConvType = SGF.SGM.Types.getLoweredType(
-      errorTypeInContext, TypeExpansionContext::minimal());
+      origErrorType, errorTypeInContext, TypeExpansionContext::minimal());
 
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
   if (!SILModuleConventions::isThrownIndirectlyInSIL(errorConvType,
                                                      SGF.SGM.M)) {
     if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
-        || origErrorType.getErrorConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)
+        || origErrorType.getErrorConvention(SGF.SGM.Types)
+            != AbstractionPattern::Indirect)
       return;
   }
 
@@ -1812,11 +1787,22 @@ uint16_t SILGenFunction::emitBasicProlog(
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   llvm::Optional<AbstractionPattern> origErrorType;
-  if (errorType) {
-    origErrorType = origClosureType
-      ? origClosureType->getFunctionThrownErrorType()
-      : AbstractionPattern(genericSig.getCanonicalSignature(),
-                           (*errorType)->getCanonicalType());
+  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+    CanType substClosureType = origClosureType->getType()
+        .subst(origClosureType->getGenericSubstitutions())->getCanonicalType();
+    CanAnyFunctionType substClosureFnType =
+        cast<AnyFunctionType>(substClosureType);
+    if (auto optPair = origClosureType->getFunctionThrownErrorType(substClosureFnType)) {
+      origErrorType = optPair->first;
+      errorType = optPair->second;
+    }
+  } else if (errorType) {
+    origErrorType = AbstractionPattern(genericSig.getCanonicalSignature(),
+                                       (*errorType)->getCanonicalType());
+  }
+
+  if (origErrorType && errorType &&
+      F.getConventions().hasIndirectSILErrorResults()) {
     emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
   }
 

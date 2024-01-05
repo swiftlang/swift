@@ -21,4 +21,4 @@ public class Foo {
 // CHECK-NEXT: [[@LINE-8]]:10 -> [[@LINE-4]]:4 : 0
 // CHECK-NEXT: [[@LINE-8]]:8 -> [[@LINE-8]]:17 : 0
 // CHECK-NEXT: [[@LINE-9]]:18 -> [[@LINE-7]]:6 : 1
-// CHECK-NEXT: [[@LINE-8]]:6 -> [[@LINE-7]]:4 : 0
+// CHECK-NEXT: }

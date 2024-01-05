@@ -43,6 +43,29 @@ ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl() const {
   return ConcreteDeclRef(baseDecl, subs);
 }
 
+ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl(ValueDecl *baseDecl) const {
+  auto *derivedDecl = getDecl();
+  if (baseDecl == derivedDecl) return *this;
+
+#ifndef NDEBUG
+  {
+    auto cur = derivedDecl;
+    for (; cur && cur != baseDecl; cur = cur->getOverriddenDecl()) {}
+    assert(cur && "decl is not an indirect override of baseDecl");
+  }
+#endif
+
+  if (!baseDecl->getInnermostDeclContext()->isGenericContext()) {
+    return ConcreteDeclRef(baseDecl);
+  }
+
+  auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl);
+  if (auto derivedSubs = getSubstitutions()) {
+    subs = subs.subst(derivedSubs);
+  }
+  return ConcreteDeclRef(baseDecl, subs);
+}
+
 void ConcreteDeclRef::dump(raw_ostream &os) const {
   if (!getDecl()) {
     os << "**NULL**";

@@ -24,7 +24,7 @@ import SwiftShims
 #error("Unsupported platform")
 #endif
 
-@extern(c, "swift_demangle")
+@_extern(c, "swift_demangle")
 func _stdlib_demangleImpl(
   mangledName: UnsafePointer<CChar>?,
   mangledNameLength: UInt,

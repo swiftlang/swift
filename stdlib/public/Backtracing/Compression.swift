@@ -427,9 +427,9 @@ internal struct ElfCompressedImageSource<Traits: ElfTraits>: ImageSource {
     }
   }
 
-  public func fetch<T>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    let toFetch = buffer.count * MemoryLayout<T>.stride
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    let toFetch = buffer.count
     if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
       throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
     }
@@ -474,9 +474,9 @@ internal struct ElfGNUCompressedImageSource: ImageSource {
                           uncompressedSize: uncompressedSize)
   }
 
-  public func fetch<T>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    let toFetch = buffer.count * MemoryLayout<T>.stride
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    let toFetch = buffer.count
     if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
       throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
     }
@@ -509,9 +509,9 @@ internal struct LZMACompressedImageSource: ImageSource {
                           dataBounds: bounds)
   }
 
-  public func fetch<T>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    let toFetch = buffer.count * MemoryLayout<T>.stride
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    let toFetch = buffer.count
     if addr < 0 || addr > data.count || data.count - Int(addr) < toFetch {
       throw CompressedImageSourceError.outOfRangeFetch(addr, toFetch)
     }

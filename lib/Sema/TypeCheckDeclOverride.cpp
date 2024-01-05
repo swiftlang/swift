@@ -17,6 +17,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
+#include "TypeCheckEffects.h"
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1508,6 +1509,9 @@ namespace  {
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
+    UNINTERESTING_ATTR(NoRuntime)
+    UNINTERESTING_ATTR(NoExistentials)
+    UNINTERESTING_ATTR(NoObjCBridging)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Expose)
@@ -1531,6 +1535,8 @@ namespace  {
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(RawLayout)
+    UNINTERESTING_ATTR(ResultDependsOn)
+    UNINTERESTING_ATTR(ResultDependsOnSelf)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
@@ -1620,6 +1626,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
+    UNINTERESTING_ATTR(ExtractConstantsFromMembers)
 
     UNINTERESTING_ATTR(EagerMove)
     UNINTERESTING_ATTR(NoEagerMove)
@@ -1628,6 +1635,7 @@ namespace  {
     UNINTERESTING_ATTR(LexicalLifetimes)
     UNINTERESTING_ATTR(NonEscapable)
     UNINTERESTING_ATTR(UnsafeNonEscapableResult)
+    UNINTERESTING_ATTR(StaticExclusiveOnly)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -2035,16 +2043,54 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       diags.diagnose(base, diag::overridden_here);
     }
   }
-  // If the overriding declaration is 'throws' but the base is not,
-  // complain. Do the same for 'async'
+
+  // Check effects.
   if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
-    if (overrideFn->hasThrows() &&
-        !cast<AbstractFunctionDecl>(base)->hasThrows()) {
+    // Determine the thrown errors in the base and override declarations.
+    auto baseFn = cast<AbstractFunctionDecl>(base);
+    Type overrideThrownError =
+        overrideFn->getEffectiveThrownErrorType().value_or(ctx.getNeverType());
+    Type baseThrownError =
+        baseFn->getEffectiveThrownErrorType().value_or(ctx.getNeverType());
+
+    if (baseThrownError && baseThrownError->hasTypeParameter()) {
+      auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
+      baseThrownError = baseThrownError.subst(subs);
+      baseThrownError = overrideFn->mapTypeIntoContext(baseThrownError);
+    }
+
+    if (overrideThrownError)
+      overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
+
+    // Check for a subtyping relationship.
+    switch (compareThrownErrorsForSubtyping(
+                overrideThrownError, baseThrownError, overrideFn)) {
+    case ThrownErrorSubtyping::DropsThrows:
       diags.diagnose(override, diag::override_with_more_effects,
                      override->getDescriptiveKind(), "throwing");
       diags.diagnose(base, diag::overridden_here);
+      break;
+
+    case ThrownErrorSubtyping::Mismatch:
+      diags.diagnose(override, diag::override_typed_throws,
+                     override->getDescriptiveKind(), overrideThrownError,
+                     baseThrownError);
+      diags.diagnose(base, diag::overridden_here);
+      break;
+
+    case ThrownErrorSubtyping::ExactMatch:
+    case ThrownErrorSubtyping::Subtype:
+      // Proper subtyping.
+      break;
+
+    case ThrownErrorSubtyping::Dependent:
+      // Only in already ill-formed code.
+      assert(ctx.Diags.hadAnyError());
+      break;
     }
 
+    // If the override is 'async' but the base declaration is not, we have a
+    // problem.
     if (overrideFn->hasAsync() &&
         !cast<AbstractFunctionDecl>(base)->hasAsync()) {
       diags.diagnose(override, diag::override_with_more_effects,
@@ -2070,7 +2116,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       return (prop &&
               prop->isFinal() &&
               isa<ClassDecl>(prop->getDeclContext()) &&
-              cast<ClassDecl>(prop->getDeclContext())->isActor() &&
+              cast<ClassDecl>(prop->getDeclContext())->isAnyActor() &&
               !prop->isStatic() &&
               prop->getName() == ctx.Id_unownedExecutor &&
               prop->getInterfaceType()->getAnyNominal() == ctx.getUnownedSerialExecutorDecl());

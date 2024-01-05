@@ -620,6 +620,9 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::CompileTimeConst:
     Printer.printKeyword("_const", Opts, " ");
     break;
+  case TypeReprKind::ResultDependsOn:
+    Printer.printKeyword("_resultDependsOn", Opts, " ");
+    break;
   }
   printTypeRepr(Base, Printer, Opts);
 }
@@ -651,6 +654,15 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   // TODO
   Printer.printKeyword("sil_box", Opts);
+}
+
+void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
+  if (!DelayedDiag)
+    return;
+
+  // Consume and emit the diagnostic.
+  Context.Diags.diagnose(Range.Start, *DelayedDiag).highlight(Range);
+  DelayedDiag = llvm::None;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

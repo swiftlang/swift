@@ -3225,9 +3225,10 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       refResult.isolation.isGlobalActor() ||
       requirementIsolation.isGlobalActor()) {
     // If the witness or requirement has global actor isolation, downgrade
-    // based on context.
+    // based on context. Use the witness itself as the context, because
+    // an explicitly isolated witness should not suppress diagnostics.
     behavior = SendableCheckContext(
-        Conformance->getDeclContext()).defaultDiagnosticBehavior();
+        witness->getInnermostDeclContext()).defaultDiagnosticBehavior();
   }
 
   // Complain that this witness cannot conform to the requirement due to
@@ -3288,12 +3289,6 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       } else if (requirementAbstractFunc->getThrowsLoc().isValid()) {
         // Insert before the "throws" (we only have async)".
         insertLoc = requirementAbstractFunc->getThrowsLoc();
-      } else if (auto requirementFunc =
-                     dyn_cast<FuncDecl>(requirementAbstractFunc)) {
-        // Insert before the result type, if there is one.
-        if (auto resultTypeRepr = requirementFunc->getResultTypeRepr()) {
-          insertLoc = resultTypeRepr->getStartLoc();
-        }
       }
 
       // Insert after the parentheses.
@@ -3809,21 +3804,13 @@ filterProtocolRequirements(
 
 /// Prune the set of missing witnesses for the given conformance, eliminating
 /// any requirements that do not actually need to satisfied.
-static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not remove the missing witness note here!!!
+static ArrayRef<MissingWitness> pruneMissingWitnesses(
     ConformanceChecker &checker,
     ProtocolDecl *proto,
     NormalProtocolConformance *conformance,
     ArrayRef<MissingWitness> missingWitnesses,
     SmallVectorImpl<MissingWitness> &scratch) {
   if (missingWitnesses.empty()) {
-    return missingWitnesses;
-  }
-
-  // For an @objc protocol defined in Objective-C, the Clang importer might
-  // have imported the same underlying Objective-C declaration as more than
-  // one Swift declaration. If we aren't in an imported @objc protocol, there
-  // is nothing to do.
-  if (!proto->isObjC()) {
     return missingWitnesses;
   }
 
@@ -3862,8 +3849,35 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not r
       continue;
     }
 
+    // For an @objc protocol defined in Objective-C, the Clang importer might
+    // have imported the same underlying Objective-C declaration as more than
+    // one Swift declaration. Only one of those requirements should be witnessed
+    // so if the requirement sibling is witnessed then this requirement is not
+    // missing.
+
+    // Prune requirements that come from other protocols - we don't want to
+    // attempt to diagnose those here since we won't be able to find their
+    // siblings.
+    if (proto != missingWitness.requirement->getDeclContext()->getAsDecl()) {
+      skipWitness();
+      continue;
+    }
+
+    if (!proto->isObjC()) {
+      addWitness();
+      continue;
+    }
+
     auto fnRequirement = cast<AbstractFunctionDecl>(missingWitness.requirement);
     auto key = checker.getObjCMethodKey(fnRequirement);
+
+    if (checker.getObjCRequirementSibling(
+            fnRequirement, [conformance](AbstractFunctionDecl *candidate) {
+              return static_cast<bool>(conformance->getWitness(candidate));
+            })) {
+      skipWitness();
+      continue;
+    }
 
     // If we have already reported a function with this selector as missing,
     // don't do it again.
@@ -3872,20 +3886,9 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not r
       continue;
     }
 
-    auto sibling = checker.getObjCRequirementSibling(
-        fnRequirement, [conformance](AbstractFunctionDecl *candidate) {
-          return static_cast<bool>(conformance->getWitness(candidate));
-        });
-
-    if (!sibling) {
-      alreadyReportedAsMissing.insert(key);
-      addWitness();
-      continue;
-    }
-
-    // Otherwise, there is a witness for any of the *other* requirements with
-    // this same selector, so prune it out.
-    skipWitness();
+    // There is really a missing requirement for this witness.
+    alreadyReportedAsMissing.insert(key);
+    addWitness();
   }
 
   if (removedAny) {
@@ -4435,10 +4438,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
-        // Skip diagnostics of a witness of a package protocol that is inlinalbe
-        // referenced in an interface file.
-        if (proto->skipAccessCheckIfInterface(DC, requiredAccess, protoAccessScope))
-          return;
         bool protoForcesAccess =
           requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         auto diagKind = protoForcesAccess
@@ -4726,7 +4725,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     // No move-only type can witness an associatedtype requirement.
     // Pretend the failure is a lack of Copyable conformance.
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    assert(copyable && "missing _Copyable protocol!");
+    assert(copyable && "missing Copyable protocol!");
     return CheckTypeWitnessResult::forConformance(copyable);
   }
 
@@ -5411,22 +5410,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // If this requirement is part of a pair of imported async requirements,
-    // where one has already been witnessed, we can skip it.
-    //
-    // This situation primarily arises when the ClangImporter translates an
-    // async-looking ObjC protocol method requirement into two Swift protocol
-    // requirements: an async version and a sync version. Exactly one of the two
-    // must be witnessed by the conformer.
-    if (!requirement->isImplicit() && getObjCRequirementSibling(
-            requirement, [this](AbstractFunctionDecl *cand) {
-              return !cand->getAttrs().hasAttribute<OptionalAttr>() &&
-                     !cand->isImplicit() &&
-                     this->Conformance->hasWitness(cand);
-            })) {
-      continue;
-    }
-
     // Try substituting into the requirement's interface type. If we fail,
     // either a generic requirement was not satisfied or we tripped on an
     // invalid type witness, and there's no point in resolving a witness.
@@ -5787,12 +5770,16 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 
     // First, if we have a superclass constraint, the class may conform
     // concretely.
+    //
+    // Note that `allowMissing` is not propagated here because it
+    // would result in a missing conformance if type is `& Sendable`
+    // protocol composition. It's handled for type as a whole below.
     if (auto superclass = layout.getSuperclass()) {
       auto result =
           (skipConditionalRequirements
-           ? M->lookupConformance(superclass, Proto, allowMissing)
-           : TypeChecker::conformsToProtocol(
-               superclass, Proto, M, allowMissing));
+               ? M->lookupConformance(superclass, Proto, /*allowMissing=*/false)
+               : TypeChecker::conformsToProtocol(superclass, Proto, M,
+                                                 /*allowMissing=*/false));
       if (result) {
         return result;
       }
@@ -5810,15 +5797,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         return ProtocolConformanceRef(Proto);
     }
 
-    // FIXME: Unify with shouldCreateMissingConformances
-    if (allowMissing &&
-        Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      return ProtocolConformanceRef(
-          M->getASTContext().getBuiltinConformance(
-            T, Proto, BuiltinConformanceKind::Missing));
-    }
-
-    return ProtocolConformanceRef::forInvalid();
+    return allowMissing ? ProtocolConformanceRef::forMissingOrInvalid(T, Proto)
+                        : ProtocolConformanceRef::forInvalid();
   }
 
   // For non-existential types, this is equivalent to checking conformance.
@@ -6629,6 +6609,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (NoncopyableGenerics
         && proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
       checkCopyableConformance(conformance);
+    } else if (NoncopyableGenerics
+        && proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+      checkEscapableConformance(conformance);
     }
   }
 
@@ -7265,10 +7248,11 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(proto);
 
   // Find the default for the given associated type.
-  auto findAssociatedTypeDefault = [](AssociatedTypeDecl *assocType)
+  auto findAssociatedTypeDefault = [proto](AssociatedTypeDecl *assocType)
       -> std::pair<Type, AssociatedTypeDecl *> {
     auto defaultedAssocType =
-        AssociatedTypeInference::findDefaultedAssociatedType(assocType);
+        AssociatedTypeInference::findDefaultedAssociatedType(
+            proto, proto, assocType);
     if (!defaultedAssocType)
       return {Type(), nullptr};
 

@@ -74,7 +74,7 @@ func forEachEach<each C, U>(c: repeat each C, function: (U) -> Void)
     // expected-error@-1{{same-element requirements are not yet supported}}
 
   _ = (repeat (each c).forEach(function))
-  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '(each C.Element) throws -> Void'}}
+  // expected-error@-1 {{cannot convert value of type '(U) -> Void' to expected argument type '((each C).Element) throws -> Void'}}
 }
 
 func typeReprPacks<each T: ExpressibleByIntegerLiteral>(_ t: repeat each T) {
@@ -290,10 +290,10 @@ func concrete(_: Int) {}
 
 func invalidRepeat<each T>(t: repeat each T) {
   _ = repeat each t
-  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
 
   let _: Int = repeat each t
-  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
 
   identity(identity(repeat each t))
   // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'T'}}
@@ -302,7 +302,7 @@ func invalidRepeat<each T>(t: repeat each T) {
   // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'Int'}}
 
   _ = [repeat each t]
-  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
 }
 
 // Make sure that single parameter initializers are handled correctly because
@@ -732,5 +732,15 @@ do {
       self.base = base
       // expected-error@-1 {{pack reference 'each Base' can only appear in pack expansion}}
     }
+  }
+}
+
+// Pack Iteration
+do {
+  func test<each T>(_ t: repeat each T) {
+    func nested() -> (repeat (Int, each T)) {}
+    for (x, y) in repeat each nested() {}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-2 {{immutable value 'y' was never used; consider replacing with '_' or removing it}}
   }
 }

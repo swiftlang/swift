@@ -59,7 +59,7 @@ private extension BeginCOWMutationInst {
     if !isEmptyCOWSingleton(instance) {
       return
     }
-    if uniquenessResult.nonDebugUses.isEmpty {
+    if uniquenessResult.uses.ignoreDebugUses.isEmpty {
       /// Don't create an integer_literal which would be dead. This would result
       /// in an infinite loop in SILCombine.
       return
@@ -70,15 +70,21 @@ private extension BeginCOWMutationInst {
   }
 
   func optimizeEmptyBeginEndPair(_ context: SimplifyContext) -> Bool {
-    if !uniquenessResult.nonDebugUses.isEmpty {
+    if !uniquenessResult.uses.ignoreDebugUses.isEmpty {
       return false
     }
     let buffer = instanceResult
-    if buffer.nonDebugUses.contains(where: { !($0.instruction is EndCOWMutationInst) }) {
+    guard buffer.uses.ignoreDebugUses.allSatisfy({
+        if let endCOW = $0.instruction as? EndCOWMutationInst {
+          return !endCOW.doKeepUnique
+        }
+        return false
+      }) else
+    {
       return false
     }
 
-    for use in buffer.nonDebugUses {
+    for use in buffer.uses.ignoreDebugUses {
       let endCOW = use.instruction as! EndCOWMutationInst
       endCOW.uses.replaceAll(with: instance, context)
       context.erase(instruction: endCOW)
@@ -88,13 +94,14 @@ private extension BeginCOWMutationInst {
   }
 
   func optimizeEmptyEndBeginPair(_ context: SimplifyContext) -> Bool {
-    if !uniquenessResult.nonDebugUses.isEmpty {
+    if !uniquenessResult.uses.ignoreDebugUses.isEmpty {
       return false
     }
-    guard let endCOW = instance as? EndCOWMutationInst else {
+    guard let endCOW = instance as? EndCOWMutationInst,
+          !endCOW.doKeepUnique else {
       return false
     }
-    if endCOW.nonDebugUses.contains(where: { $0.instruction != self }) {
+    if endCOW.uses.ignoreDebugUses.contains(where: { $0.instruction != self }) {
       return false
     }
 

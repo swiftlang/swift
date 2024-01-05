@@ -127,6 +127,13 @@ class SlowServerlet: SlowServer {
         return x
     }
 
+    // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}30doSomethingUnspecifiedNullably{{.*}} :
+    // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :
+    override func doSomethingUnspecifiedNullably() async throws -> String {
+      fatalError()
+    }
+
     // CHECK-LABEL: sil{{.*}}13SlowServerlet{{.*}}17doSomethingFlaggy{{.*}} :
     // CHECK:         [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
     // CHECK:         hop_to_executor [[GENERIC_EXECUTOR]] :

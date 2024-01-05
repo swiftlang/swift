@@ -83,6 +83,7 @@ entry(%0 : $AnyObject):
   // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc ptr @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
   // CHECK-NEXT: [[ERR:%.*]] = load ptr, ptr [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne ptr [[ERR]], null
+  // CHECK-NEXT: ptrtoint ptr [[ERR]] to i
   // CHECK-NEXT: br i1 [[T0]],
   %1 = function_ref @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error Error)
   try_apply %1(%0) : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error Error),

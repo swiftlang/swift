@@ -3903,6 +3903,16 @@ namespace {
       llvm_unreachable("covered switch");
     }
 
+    void addEmbeddedSuperclass(CanType classTy) {
+      CanType superclass = asImpl().getSuperclassTypeForMetadata();
+      if (!superclass) {
+        B.addNullPointer(IGM.TypeMetadataPtrTy);
+        return;
+      }
+      CanType superTy = classTy->getSuperclass()->getCanonicalType();
+      B.add(IGM.getAddrOfTypeMetadata(superTy));
+    }
+
     void addSuperclass() {
       if (asImpl().shouldAddNullSuperclass()) {
         B.addNullPointer(IGM.TypeMetadataPtrTy);
@@ -5025,7 +5035,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
 
   FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout,
                                     vtable);
-  builder.layout();
+  builder.layoutEmbedded(classTy);
   bool canBeConstant = builder.canBeConstant();
 
   StringRef section{};
@@ -6561,11 +6571,14 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator:
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
+  case KnownProtocolKind::_TaskExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:
   case KnownProtocolKind::GlobalActor:
   case KnownProtocolKind::Copyable:
+  case KnownProtocolKind::Escapable:
+  case KnownProtocolKind::BitwiseCopyable:
     return SpecialProtocol::None;
   }
 
@@ -6954,7 +6967,7 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
 
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,
                                                 CanType shapeType) {
-  auto typeLinkage = getTypeLinkage_correct(shapeType);
+  auto typeLinkage = getTypeLinkage(shapeType);
   if (typeLinkage == FormalLinkage::Private)
     return FormalLinkage::Private;
 

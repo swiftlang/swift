@@ -357,6 +357,7 @@ private:
     case Node::Kind::AutoClosureType:
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
+    case Node::Kind::BodyAttachedMacroExpansion:
     case Node::Kind::ClangType:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
@@ -486,6 +487,7 @@ private:
     case Node::Kind::PartialApplyObjCForwarder:
     case Node::Kind::PeerAttachedMacroExpansion:
     case Node::Kind::PostfixOperator:
+    case Node::Kind::PreambleAttachedMacroExpansion:
     case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
@@ -557,6 +559,7 @@ private:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
+    case Node::Kind::TypedThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
@@ -863,7 +866,7 @@ private:
 
     unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false, isThrows = false;
+    bool isSendable = false, isAsync = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
@@ -880,10 +883,15 @@ private:
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
       ++startIndex;
     }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
+
+    Node *thrownErrorNode = nullptr;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation ||
+        node->getChild(startIndex)->getKind()
+          == Node::Kind::TypedThrowsAnnotation) {
+      thrownErrorNode = node->getChild(startIndex);
       ++startIndex;
-      isThrows = true;
     }
+
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::ConcurrentFunctionType) {
       ++startIndex;
@@ -923,8 +931,9 @@ private:
     if (isAsync)
       Printer << " async";
 
-    if (isThrows)
-      Printer << " throws";
+    if (thrownErrorNode) {
+      print(thrownErrorNode, depth + 1);
+    }
 
     print(node->getChild(argIndex + 1), depth + 1);
   }
@@ -1441,46 +1450,19 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                        Node->getNumChildren() == 3? TypePrinting::WithColon
                                                   : TypePrinting::FunctionStyle,
                        /*hasName*/ true);
-  case Node::Kind::AccessorAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("accessor macro @" +
-                        nodeToString(Node->getChild(2)) + " expansion #"),
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)                \
+  case Node::Kind::Name##AttachedMacroExpansion:                           \
+    return printEntity(Node, depth, asPrefixContext,                       \
+                       TypePrinting::NoType, /*hasName*/true,              \
+                       (Description " macro @" +                           \
+                        nodeToString(Node->getChild(2)) + " expansion #"), \
                        (int)Node->getChild(3)->getIndex() + 1);
+#include "swift/Basic/MacroRoles.def"
   case Node::Kind::FreestandingMacroExpansion:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "freestanding macro expansion #",
                        (int)Node->getChild(2)->getIndex() + 1);
-  case Node::Kind::MemberAttributeAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("member attribute macro @" +
-                        nodeToString(Node->getChild(2)) + " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::MemberAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("member macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::PeerAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("peer macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::ConformanceAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("conformance macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
-  case Node::Kind::ExtensionAttachedMacroExpansion:
-    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
-                       /*hasName*/true,
-                       ("extension macro @" + nodeToString(Node->getChild(2)) +
-                        " expansion #"),
-                       (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::MacroExpansionUniqueName:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true, "unique name #",
@@ -2909,10 +2891,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
   case Node::Kind::AsyncAnnotation:
-    Printer << " async ";
+    Printer << " async";
     return nullptr;
   case Node::Kind::ThrowsAnnotation:
-    Printer << " throws ";
+    Printer << " throws";
+    return nullptr;
+  case Node::Kind::TypedThrowsAnnotation:
+    Printer << " throws(";
+    if (Node->getNumChildren() == 1)
+      print(Node->getChild(0), depth + 1);
+    Printer << ")";
     return nullptr;
   case Node::Kind::EmptyList:
     Printer << " empty-list ";

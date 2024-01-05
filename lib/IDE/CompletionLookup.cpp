@@ -83,8 +83,12 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   case CodeCompletionLiteralKind::StringLiteral:
     return Ctx.getStringType();
   case CodeCompletionLiteralKind::ArrayLiteral:
+    if (!Ctx.getArrayDecl())
+      return Type();
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
+    if (!Ctx.getDictionaryDecl())
+      return Type();
     return Ctx.getDictionaryDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::NilLiteral:
   case CodeCompletionLiteralKind::ColorLiteral:
@@ -1856,6 +1860,12 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
     case MacroRole::Peer:
       roleStrs.push_back("Peer Macro");
       break;
+    case MacroRole::Preamble:
+      roleStrs.push_back("Preamble Macro");
+      break;
+    case MacroRole::Body:
+      roleStrs.push_back("Body Macro");
+      break;
     }
   }
 
@@ -1972,10 +1982,11 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
   if (!useFunctionReference && funcTy) {
     // We know that the CodeCompletionResultType is AST-based so we can pass
     // nullptr for USRTypeContext.
-    auto maxRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
+    auto maxFuncTyRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
         &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
-    useFunctionReference =
-        maxRel >= CodeCompletionResultTypeRelation::Convertible;
+    auto maxResultTyRel = CodeCompletionResultType(funcTy->getResult()).calculateTypeRelation(
+        &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
+    useFunctionReference = maxFuncTyRel > maxResultTyRel;
   }
   if (!useFunctionReference)
     return false;

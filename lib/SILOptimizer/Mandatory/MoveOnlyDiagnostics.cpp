@@ -91,8 +91,21 @@ static void getVariableNameForValue(SILValue value2,
   // operand.
   StackList<llvm::PointerUnion<SILInstruction *, SILValue>> variableNamePath(
       value2->getFunction());
-  while (true) {
+  while (searchValue) {
     if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
+      // If the instruction itself doesn't carry any variable info, see whether
+      // it's copied from another place that does.
+      if (!allocInst->getDecl()) {
+        if (auto copy = allocInst->getSingleUserOfType<CopyAddrInst>()) {
+          if (copy->getDest() == allocInst
+              && !copy->isTakeOfSrc()
+              && copy->isInitializationOfDest()) {
+            searchValue = copy->getSrc();
+            continue;
+          }
+        }
+      }
+    
       variableNamePath.push_back(allocInst);
       break;
     }
@@ -100,6 +113,11 @@ static void getVariableNameForValue(SILValue value2,
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
       variableNamePath.push_back(globalAddrInst);
       break;
+    }
+
+    if (auto *oeInst = dyn_cast<OpenExistentialAddrInst>(searchValue)) {
+      searchValue = oeInst->getOperand();
+      continue;
     }
 
     if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {
@@ -111,6 +129,47 @@ static void getVariableNameForValue(SILValue value2,
     if (auto *fArg = dyn_cast<SILFunctionArgument>(searchValue)) {
       variableNamePath.push_back({fArg});
       break;
+    }
+    
+    auto getNamePathComponentFromCallee = [&](FullApplySite call) -> llvm::Optional<SILValue> {
+      // Use the name of the property being accessed if we can get to it.
+      if (isa<FunctionRefBaseInst>(call.getCallee())
+          || isa<MethodInst>(call.getCallee())) {
+        variableNamePath.push_back(call.getCallee()->getDefiningInstruction());
+        // Try to name the base of the property if this is a method.
+        if (call.getSubstCalleeType()->hasSelfParam()) {
+          return call.getSelfArgument();
+        } else {
+          return SILValue();
+        }
+      }
+      return llvm::None;
+    };
+
+    // Read or modify accessor.
+    if (auto bai = dyn_cast_or_null<BeginApplyInst>(searchValue->getDefiningInstruction())) {
+      if (auto selfParam = getNamePathComponentFromCallee(bai)) {
+        searchValue = *selfParam;
+        continue;
+      }
+    }
+    
+    // Addressor accessor.
+    if (auto ptrToAddr = dyn_cast<PointerToAddressInst>(stripAccessMarkers(searchValue))) {
+      // The addressor can either produce the raw pointer itself or an `UnsafePointer` stdlib type wrapping it.
+      ApplyInst *addressorInvocation;
+      if (auto structExtract = dyn_cast<StructExtractInst>(ptrToAddr->getOperand())) {
+        addressorInvocation = dyn_cast<ApplyInst>(structExtract->getOperand());
+      } else {
+        addressorInvocation = dyn_cast<ApplyInst>(ptrToAddr->getOperand());
+      }
+      
+      if (addressorInvocation) {
+        if (auto selfParam = getNamePathComponentFromCallee(addressorInvocation)) {
+          searchValue = *selfParam;
+          continue;
+        }
+      }
     }
 
     // If we do not do an exact match, see if we can find a debug_var inst. If
@@ -132,12 +191,25 @@ static void getVariableNameForValue(SILValue value2,
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
-
+    
     // If we do not pattern match successfully, just set resulting string to
     // unknown and return early.
     resultingString += "unknown";
     return;
   }
+  
+  auto nameFromDecl = [&](Decl *d) -> StringRef {
+    if (d) {
+      if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+        return accessor->getStorage()->getBaseName().userFacingName();
+      }
+      if (auto vd = dyn_cast<ValueDecl>(d)) {
+        return vd->getBaseName().userFacingName();
+      }
+    }
+    
+    return "<unknown decl>";
+  };
 
   // Walk backwards, constructing our string.
   while (true) {
@@ -148,6 +220,16 @@ static void getVariableNameForValue(SILValue value2,
         resultingString += i.getName();
       } else if (auto i = VarDeclCarryingInst(inst)) {
         resultingString += i.getName();
+      } else if (auto f = dyn_cast<FunctionRefBaseInst>(inst)) {
+        if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
+          resultingString += nameFromDecl(dc->getAsDecl());
+        } else {
+          resultingString += "<unknown decl>";
+        }
+      } else if (auto m = dyn_cast<MethodInst>(inst)) {
+        resultingString += nameFromDecl(m->getMember().getDecl());
+      } else {
+        resultingString += "<unknown decl>";      
       }
     } else {
       auto value = next.get<SILValue>();

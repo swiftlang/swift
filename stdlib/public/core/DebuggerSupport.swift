@@ -12,6 +12,41 @@
 
 import SwiftShims
 
+// Macros are disabled when Swift is built without swift-syntax.
+#if $Macros && hasAttribute(attached)
+
+/// Converts description definitions to a debugger type summary.
+///
+/// This macro converts compatible `debugDescription` (or `description`)
+/// implementations to a debugger type summary. This improves debugging in
+/// situations where expression evaluation is not performed, such as the
+/// variable list of an IDE.
+///
+/// For example, this code allows the debugger to display strings such as
+/// "Rams [11-2]" without invoking `debugDescription`:
+///
+///     @DebugDescription
+///     struct Team: CustomDebugStringConvertible {
+///        var name: String
+///        var wins, losses: Int
+///
+///        var debugDescription: String {
+///            "\(name) [\(wins)-\(losses)]"
+///        }
+///     }
+@available(SwiftStdlib 5.11, *)
+@attached(memberAttribute)
+public macro _DebugDescription() =
+  #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
+
+/// Internal-only macro. See `@_DebugDescription`.
+@available(SwiftStdlib 5.11, *)
+@attached(peer, names: named(_lldb_summary))
+public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
+  #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
+
+#endif
+
 #if SWIFT_ENABLE_REFLECTION
 
 @frozen // namespace
@@ -268,10 +303,38 @@ public func _stringForPrintObject(_ value: Any) -> String {
 
 public func _debuggerTestingCheckExpect(_: String, _: String) { }
 
+@_alwaysEmitIntoClient @_transparent
+internal func _withHeapObject<R>(
+  of object: AnyObject,
+  _ body: (UnsafeMutableRawPointer) -> R
+) -> R {
+  defer { _fixLifetime(object) }
+  let unmanaged = Unmanaged.passUnretained(object)
+  return body(unmanaged.toOpaque())
+}
+
+@_extern(c, "swift_retainCount") @usableFromInline
+internal func _swift_retainCount(_: UnsafeMutableRawPointer) -> Int
+@_extern(c, "swift_unownedRetainCount") @usableFromInline
+internal func _swift_unownedRetainCount(_: UnsafeMutableRawPointer) -> Int
+@_extern(c, "swift_weakRetainCount") @usableFromInline
+internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
+
 // Utilities to get refcount(s) of class objects.
-@_silgen_name("swift_retainCount")
-public func _getRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_unownedRetainCount")
-public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_weakRetainCount")
-public func _getWeakRetainCount(_ Value: AnyObject) -> UInt
+@backDeployed(before: SwiftStdlib 5.11)
+public func _getRetainCount(_ object: AnyObject) -> UInt {
+  let count = _withHeapObject(of: object) { _swift_retainCount($0) }
+  return UInt(bitPattern: count)
+}
+
+@backDeployed(before: SwiftStdlib 5.11)
+public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
+  let count = _withHeapObject(of: object) { _swift_unownedRetainCount($0) }
+  return UInt(bitPattern: count)
+}
+
+@backDeployed(before: SwiftStdlib 5.11)
+public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
+  let count = _withHeapObject(of: object) { _swift_weakRetainCount($0) }
+  return UInt(bitPattern: count)
+}

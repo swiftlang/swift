@@ -128,7 +128,7 @@ import Swift
 ///
 /// Note that there is nothing, other than the Task's use of `self` retaining the actor,
 /// And that the start method immediately returns, without waiting for the unstructured `Task` to finish.
-/// So once the task completes and its the closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
+/// So once the task is completed and its closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
 ///
 /// Therefore, the above call will consistently result in the following output:
 ///
@@ -596,6 +596,7 @@ func taskCreateFlags(
 }
 
 // ==== Task Creation ----------------------------------------------------------
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -719,6 +720,7 @@ extension Task where Failure == Error {
 }
 
 // ==== Detached Tasks ---------------------------------------------------------
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -908,6 +910,20 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   return try body(UnsafeCurrentTask(_task))
 }
 
+@available(SwiftStdlib 9999, *)
+public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
+  guard let _task = _getCurrentAsyncTask() else {
+    return try await body(nil)
+  }
+
+  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+  //        with "destroying a task that never completed" in the task's destroy.
+  //        How do we solve this properly?
+  Builtin.retain(_task)
+
+  return try await body(UnsafeCurrentTask(_task))
+}
+
 /// An unsafe reference to the current task.
 ///
 /// To get an instance of `UnsafeCurrentTask` for the current task,
@@ -1029,6 +1045,22 @@ internal func _asyncMainDrainQueue() -> Never
 @usableFromInline
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
+
+/// Get the default generic serial executor.
+///
+/// It is used by default used by tasks and default actors,
+/// unless other executors are specified.
+@available(SwiftStdlib 9999, *)
+@usableFromInline
+internal func _getGenericSerialExecutor() -> Builtin.Executor {
+  // The `SerialExecutorRef` to "default generic executor" is guaranteed
+  // to be a zero value;
+  //
+  // As the runtime relies on this in multiple places,
+  // so instead of a runtime call to get this executor ref, we bitcast a "zero"
+  // of expected size to the builtin executor type.
+  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
+}
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)

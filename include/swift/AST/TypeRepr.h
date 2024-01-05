@@ -19,6 +19,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -195,17 +196,35 @@ public:
 /// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
-/// The client should make sure to emit a diagnostic at the construction time
-/// (in the parser).  All uses of this type should be ignored and not
-/// re-diagnosed.
+/// The client can either emit a detailed diagnostic at the construction time
+/// (in the parser) or store a zero-arg diagnostic in this TypeRepr to be
+/// emitted after parsing, during type resolution.
+///
+/// All uses of this type should be ignored and not re-diagnosed.
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
+  llvm::Optional<ZeroArgDiagnostic> DelayedDiag;
+
+  ErrorTypeRepr(SourceRange Range, llvm::Optional<ZeroArgDiagnostic> Diag)
+      : TypeRepr(TypeReprKind::Error), Range(Range), DelayedDiag(Diag) {}
 
 public:
-  ErrorTypeRepr() : TypeRepr(TypeReprKind::Error) {}
-  ErrorTypeRepr(SourceLoc Loc) : TypeRepr(TypeReprKind::Error), Range(Loc) {}
-  ErrorTypeRepr(SourceRange Range)
-      : TypeRepr(TypeReprKind::Error), Range(Range) {}
+  static ErrorTypeRepr *
+  create(ASTContext &Context, SourceRange Range,
+         llvm::Optional<ZeroArgDiagnostic> DelayedDiag = llvm::None) {
+    assert((!DelayedDiag || Range) && "diagnostic needs a location");
+    return new (Context) ErrorTypeRepr(Range, DelayedDiag);
+  }
+
+  static ErrorTypeRepr *
+  create(ASTContext &Context, SourceLoc Loc = SourceLoc(),
+         llvm::Optional<ZeroArgDiagnostic> DelayedDiag = llvm::None) {
+    return create(Context, SourceRange(Loc), DelayedDiag);
+  }
+
+  /// If there is a delayed diagnostic stored in this TypeRepr, consumes and
+  /// emits that diagnostic.
+  void dischargeDiagnostic(ASTContext &Context);
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Error;
@@ -1073,7 +1092,8 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
-           T->getKind() == TypeReprKind::CompileTimeConst;
+           T->getKind() == TypeReprKind::CompileTimeConst ||
+           T->getKind() == TypeReprKind::ResultDependsOn;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1142,6 +1162,21 @@ public:
     return T->getKind() == TypeReprKind::CompileTimeConst;
   }
   static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+};
+
+/// A lifetime dependent type.
+/// \code
+///   x : _resultDependsOn Int
+/// \endcode
+class ResultDependsOnTypeRepr : public SpecifierTypeRepr {
+public:
+  ResultDependsOnTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+      : SpecifierTypeRepr(TypeReprKind::ResultDependsOn, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::ResultDependsOn;
+  }
+  static bool classof(const ResultDependsOnTypeRepr *T) { return true; }
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1503,6 +1538,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::ResultDependsOn:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

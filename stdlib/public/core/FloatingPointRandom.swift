@@ -108,6 +108,7 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   ///   `range` must be finite and non-empty.
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
+  @_unavailableInEmbedded
   public static func random(in range: Range<Self>) -> Self {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
@@ -208,6 +209,7 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   /// - Parameter range: The range in which to create a random value. Must be finite.
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
+  @_unavailableInEmbedded
   public static func random(in range: ClosedRange<Self>) -> Self {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 815; // nonisolated(unsafe)
+const uint16_t SWIFTMODULE_VERSION_MINOR = 831; // mark_dependence [nonescaping]
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -395,6 +395,14 @@ enum class SILParameterDifferentiability : uint8_t {
   NotDifferentiable,
 };
 
+/// These IDs must \em not be renumbered or reordered without incrementing the
+/// module version.
+enum class SILParameterInfoFlags : uint8_t {
+  NotDifferentiable = 0x1,
+};
+
+using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class ResultConvention : uint8_t {
@@ -407,12 +415,13 @@ enum class ResultConvention : uint8_t {
 };
 using ResultConventionField = BCFixed<3>;
 
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class SILResultDifferentiability : uint8_t {
-  DifferentiableOrNotApplicable = 0,
-  NotDifferentiable,
+/// These IDs must \em not be renumbered or reordered without incrementing the
+/// module version.
+enum class SILResultInfoFlags : uint8_t {
+  NotDifferentiable = 0x1,
 };
+
+using SILResultInfoOptions = OptionSet<SILResultInfoFlags>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -428,7 +437,7 @@ enum class SelfAccessKind : uint8_t {
   Mutating,
   LegacyConsuming,
   Consuming,
-  Borrowing
+  Borrowing,
 };
 using SelfAccessKindField = BCFixed<3>;
   
@@ -482,9 +491,11 @@ enum LayoutRequirementKind : uint8_t {
   RefCountedObject = 4,
   NativeRefCountedObject = 5,
   Class = 6,
-  NativeClass = 7
+  NativeClass = 7,
+  BridgeObject = 8,
+  TrivialStride = 9,
 };
-using LayoutRequirementKindField = BCFixed<3>;
+using LayoutRequirementKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -644,15 +655,8 @@ enum class GenericEnvironmentKind : uint8_t {
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class MacroRole : uint8_t {
-  Expression,
-  Declaration,
-  Accessor,
-  MemberAttribute,
-  Member,
-  Peer,
-  Conformance,
-  CodeItem,
-  Extension,
+#define MACRO_ROLE(Name, Description) Name,
+#include "swift/Basic/MacroRoles.def"
 };
 using MacroRoleField = BCFixed<4>;
 
@@ -1211,19 +1215,20 @@ namespace decls_block {
     // trailed by parameters
   );
 
-  using FunctionParamLayout = BCRecordLayout<
-    FUNCTION_PARAM,
-    IdentifierIDField,   // name
-    IdentifierIDField,   // internal label
-    TypeIDField,         // type
-    BCFixed<1>,          // vararg?
-    BCFixed<1>,          // autoclosure?
-    BCFixed<1>,          // non-ephemeral?
-    ParamDeclSpecifierField, // inout, shared or owned?
-    BCFixed<1>,          // isolated
-    BCFixed<1>,          // noDerivative?
-    BCFixed<1>           // compileTimeConst
-  >;
+  using FunctionParamLayout =
+      BCRecordLayout<FUNCTION_PARAM,
+                     IdentifierIDField,       // name
+                     IdentifierIDField,       // internal label
+                     TypeIDField,             // type
+                     BCFixed<1>,              // vararg?
+                     BCFixed<1>,              // autoclosure?
+                     BCFixed<1>,              // non-ephemeral?
+                     ParamDeclSpecifierField, // inout, shared or owned?
+                     BCFixed<1>,              // isolated
+                     BCFixed<1>,              // noDerivative?
+                     BCFixed<1>,              // compileTimeConst
+                     BCFixed<1>               // _resultDependsOn
+                     >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
     METATYPE_TYPE,
@@ -1276,6 +1281,8 @@ namespace decls_block {
   TYPE_LAYOUT(ProtocolCompositionTypeLayout,
     PROTOCOL_COMPOSITION_TYPE,
     BCFixed<1>,          // has AnyObject constraint
+    BCFixed<1>,          // has ~Copyable constraint
+    BCFixed<1>,          // has ~Escapable constraint
     BCArray<TypeIDField> // protocols
   );
 
@@ -1641,7 +1648,8 @@ namespace decls_block {
     TypeIDField, // interface type for opaque type
     GenericSignatureIDField, // generic environment
     SubstitutionMapIDField, // optional substitution map for underlying type
-    AccessLevelField // access level
+    AccessLevelField, // access level
+    BCFixed<1> // export underlying type details
     // trailed by generic parameters
     // trailed by conditional substitutions
   >;

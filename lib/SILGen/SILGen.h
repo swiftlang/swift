@@ -301,6 +301,11 @@ public:
   void visitMacroDecl(MacroDecl *d);
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
 
+  // Same as AbstractStorageDecl::visitEmittedAccessors, but skips over skipped
+  // (unavailable) decls.
+  void visitEmittedAccessors(AbstractStorageDecl *D,
+                             llvm::function_ref<void(AccessorDecl *)>);
+
   void emitEntryPoint(SourceFile *SF);
   void emitEntryPoint(SourceFile *SF, SILFunction *TopLevel);
 
@@ -578,8 +583,6 @@ public:
 
   /// Retrieve the _Concurrency._asyncMainDrainQueue intrinsic.
   FuncDecl *getAsyncMainDrainQueue();
-  /// Retrieve the _Concurrency._getMainExecutor intrinsic.
-  FuncDecl *getGetMainExecutor();
   /// Retrieve the _Concurrency._swiftJobRun intrinsic.
   FuncDecl *getSwiftJobRun();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.

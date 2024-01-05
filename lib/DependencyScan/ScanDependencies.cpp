@@ -179,7 +179,9 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
   if (cache.getScanService().hasPathMapping())
     InputPath = cache.getScanService().remapPath(InputPath);
 
-  auto key = createCompileJobCacheKeyForOutput(CAS, *base, InputPath);
+  // Module compilation commands always have only one input and the input
+  // index is always 0.
+  auto key = createCompileJobCacheKeyForOutput(CAS, *base, /*InputIndex=*/0);
   if (!key)
     return key.takeError();
 
@@ -1448,8 +1450,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, service);
 
-  // Wrap the filesystem with a caching `DependencyScanningWorkerFilesystem`
-  service.overlaySharedFilesystemCacheForCompilation(instance);
   if (service.setupCachingDependencyScanningService(instance))
     return true;
 
@@ -1520,7 +1520,6 @@ bool swift::dependencies::batchScanDependencies(
   // we have created
 
   SwiftDependencyScanningService singleUseService;
-  singleUseService.overlaySharedFilesystemCacheForCompilation(instance);
   if (singleUseService.setupCachingDependencyScanningService(instance))
     return true;
 

@@ -93,7 +93,7 @@ namespace ctypes {
       void *storage[NumWords_DefaultActor];
     };
 
-    // ExecutorRef type.
+    // SerialExecutorRef type.
     struct Be {
       HeapObject *Identity;
       uintptr_t Implementation;

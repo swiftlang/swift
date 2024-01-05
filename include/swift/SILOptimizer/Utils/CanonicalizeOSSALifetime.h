@@ -414,6 +414,8 @@ private:
   bool respectsDeinitBarriers() const {
     if (!currentDef->isLexical())
       return false;
+    if (currentDef->getFunction()->forceEnableLexicalLifetimes())
+      return true;
     auto &module = currentDef->getFunction()->getModule();
     return module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
   }

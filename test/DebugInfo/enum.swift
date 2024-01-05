@@ -9,9 +9,23 @@ enum Either {
   case First(Int64), Second(P), Neither
 // CHECK: !DICompositeType({{.*}}name: "Either",
 // CHECK-SAME:             size: {{328|168}},
+
+// DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "Either",
+// DWARF-SAME:             size: {{328|168}}, num_extra_inhabitants: 253,
+// DWARF-SAME:             identifier: "$s4enum6EitherOD")
+
+// DWARF: !DICompositeType(tag: DW_TAG_variant_part
+
+// DWARF: DIDerivedType(tag: DW_TAG_member, name: "First",
+// DWARF-NEXT: DICompositeType(tag: DW_TAG_structure_type, name: "Int64",
+
+// DWARF: DIDerivedType(tag: DW_TAG_member, name: "Second"
+// DWARF-NEXT: DICompositeType(tag: DW_TAG_structure_type, name: "P",
+
+// DWARF: DIDerivedType(tag: DW_TAG_member, name: "Neither",
+// DWARF-SAME:          baseType: null)
 }
 // CHECK: ![[EMPTY:.*]] = !{}
-// DWARF: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$sSiD"
 let E : Either = .Neither;
 
 // CHECK: !DICompositeType({{.*}}name: "Color",
@@ -19,19 +33,25 @@ let E : Either = .Neither;
 // CHECK-SAME:             identifier: "$s4enum5ColorOD"
 enum Color : UInt64 {
 // This is effectively a 2-bit bitfield:
-// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// DWARF-SAME:           baseType: ![[UINT64:[0-9]+]]
-// DWARF-SAME:           size: 64{{[,)]}}
-// DWARF: ![[UINT64]] = !DICompositeType({{.*}}identifier: "$ss6UInt64VD"
+// DWARF: DICompositeType(tag: DW_TAG_enumeration_type, name: "Color",
+// DWARF-NEXT: DICompositeType(tag: DW_TAG_structure_type, name: "UInt64"
+// DWARF: !DIEnumerator(name: "Red", value: 0)
+// DWARF-NEXT: !DIEnumerator(name: "Green", value: 0)
+// DWARF-NEXT: !DIEnumerator(name: "Blue", value: 0)
   case Red, Green, Blue
 }
 
 // CHECK: !DICompositeType({{.*}}name: "MaybeIntPair",
 // CHECK-SAME:             size: 136{{[,)]}}
 // CHECK-SAME:             identifier: "$s4enum12MaybeIntPairOD"
+
+// DWARF: DICompositeType(tag: DW_TAG_structure_type, name: "MaybeIntPair",
+// DWARF-SAME:             identifier: "$s4enum12MaybeIntPairOD"
+// DWARF: DICompositeType(tag: DW_TAG_variant_part
+
 enum MaybeIntPair {
 // DWARF: !DIDerivedType(tag: DW_TAG_member, name: "none"
-// DWARF-SAME:           baseType: ![[INT]]{{[,)]}}
+// DWARF-SAME:           baseType: null)
   case none
 // DWARF: !DIDerivedType(tag: DW_TAG_member, name: "just"
 // DWARF-SAME:           baseType: ![[INTTUP:[0-9]+]]

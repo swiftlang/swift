@@ -5,16 +5,16 @@
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
 // CHECK:      #if compiler(>=5.3) && $Extern
-// CHECK-NEXT:   @extern(c) public func externalCFunc()
+// CHECK-NEXT:   @_extern(c) public func externalCFunc()
 // CHECK-NEXT: #endif
-@extern(c) public func externalCFunc()
+@_extern(c) public func externalCFunc()
 
 // CHECK:      #if compiler(>=5.3) && $Extern
-// CHECK-NEXT:   @extern(c, "renamedCFunc") public func externalRenamedCFunc()
+// CHECK-NEXT:   @_extern(c, "renamedCFunc") public func externalRenamedCFunc()
 // CHECK-NEXT: #endif
-@extern(c, "renamedCFunc") public func externalRenamedCFunc()
+@_extern(c, "renamedCFunc") public func externalRenamedCFunc()
 
 // CHECK:      #if compiler(>=5.3) && $Extern
-// CHECK-NEXT:   @extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
+// CHECK-NEXT:   @_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
 // CHECK-NEXT: #endif
-@extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
+@_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()

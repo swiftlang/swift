@@ -246,7 +246,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   OnProtocol | UserInaccessible | LongAttribute | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   70)
 DECL_ATTR(_objcImplementation, ObjCImplementation,
-  OnExtension | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnExtension | OnAbstractFunction | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   72)
 DECL_ATTR(_optimize, Optimize,
   OnAbstractFunction | OnSubscript | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
@@ -421,7 +421,7 @@ DECL_ATTR(_section, Section,
 DECL_ATTR(_rawLayout, RawLayout,
   OnStruct | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   146)
-DECL_ATTR(extern, Extern,
+DECL_ATTR(_extern, Extern,
   OnFunc | AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   147)
 SIMPLE_DECL_ATTR(_nonEscapable, NonEscapable,
@@ -527,7 +527,27 @@ DECL_ATTR(storageRestrictions, StorageRestrictions,
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   DeclModifier | OnClass | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   102)
-
+CONTEXTUAL_SIMPLE_DECL_ATTR(_resultDependsOnSelf, ResultDependsOnSelf,
+  OnFunc | DeclModifier | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  150)
+SIMPLE_DECL_ATTR(_staticExclusiveOnly, StaticExclusiveOnly,
+  OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  151)
+SIMPLE_DECL_ATTR(extractConstantsFromMembers, ExtractConstantsFromMembers,
+  OnClass | OnEnum | OnProtocol | OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  152)
+SIMPLE_DECL_ATTR(_noRuntime, NoRuntime,
+  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  153)
+SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
+  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  154)
+SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
+  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  155)
+CONTEXTUAL_SIMPLE_DECL_ATTR(_resultDependsOn, ResultDependsOn,
+  OnParam | DeclModifier | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  156)
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

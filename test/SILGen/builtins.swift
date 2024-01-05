@@ -154,10 +154,7 @@ func assign_tuple(_ x: (Builtin.Int64, Builtin.NativeObject),
   var x = x
   var y = y
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*(Builtin.Int64, Builtin.NativeObject)
-  // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
-  // CHECK: assign {{%.*}} to [[T0]]
-  // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
-  // CHECK: assign {{%.*}} to [[T0]]
+  // CHECK: tuple_addr_constructor [assign] [[ADDR]] : $*(Builtin.Int64, Builtin.NativeObject) with
   // CHECK: destroy_value
   Builtin.assign(x, y)
 }
@@ -884,4 +881,23 @@ func assumeAlignment(_ p: Builtin.RawPointer, _ x: Builtin.Word) {
 // CHECK:   return [[PACK_LENGTH]] : $Builtin.Word
 func packCount<each T>(_ x: repeat each T) -> Builtin.Word {
   Builtin.packLength((repeat each T).self)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins10getEnumTagyBi32_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int32 {
+// CHECK: bb0([[INPUT:%.*]] : $*T):
+// CHECK-NOT: copy_addr
+// CHECK:   [[TAG:%.*]] = builtin "getEnumTag"<T>([[INPUT]] : $*T)
+// CHECK:   return [[TAG]] : $Builtin.Int32
+func getEnumTag<T>(_ x: T) -> Builtin.Int32 {
+  Builtin.getEnumTag(x)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins13injectEnumTag_3tagyxz_Bi32_tlF : $@convention(thin) <T> (@inout T, Builtin.Int32) -> () {
+// CHECK: bb0([[INPUT:%.*]] : $*T, [[TAG:%.*]] : $Builtin.Int32):
+// CHECK-NOT: copy_addr
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[INPUT]] : $*T
+// CHECK:   builtin "injectEnumTag"<T>([[ACCESS]] : $*T, [[TAG]] : $Builtin.Int32)
+// CHECK:   end_access [[ACCESS]]
+func injectEnumTag<T>(_ x: inout T, tag: Builtin.Int32) {
+  Builtin.injectEnumTag(&x, tag)
 }

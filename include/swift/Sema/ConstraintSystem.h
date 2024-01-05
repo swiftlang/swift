@@ -339,6 +339,14 @@ enum TypeVariableOptions {
   TVO_PackExpansion = 0x40,
 };
 
+enum class KeyPathMutability : uint8_t {
+  ReadOnly,
+  Writable,
+  ReferenceWritable
+};
+
+using KeyPathCapability = std::pair<KeyPathMutability, /*isSendable=*/bool>;
+
 /// The implementation object for a type variable used within the
 /// constraint-solving type checker.
 ///
@@ -485,9 +493,17 @@ public:
   /// a type of a key path expression.
   bool isKeyPathType() const;
 
+  /// Determine whether this type variable represents a root type of a key path
+  /// expression.
+  bool isKeyPathRoot() const;
+
   /// Determine whether this type variable represents a value type of a key path
   /// expression.
   bool isKeyPathValue() const;
+
+  /// Determine whether this type variable represents an index parameter of
+  /// a special `subscript(keyPath:)` subscript.
+  bool isKeyPathSubscriptIndex() const;
 
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
@@ -502,6 +518,10 @@ public:
 
   /// Determine whether this type variable represents an opened opaque type.
   bool isOpaqueType() const;
+
+  /// Determine whether this type variable represents a type of a collection
+  /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
+  bool isCollectionLiteralType() const;
 
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
@@ -978,6 +998,10 @@ enum ScoreKind: unsigned int {
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
   SK_FunctionToAutoClosureConversion,
+  /// A type with a missing conformance(s) that has be synthesized
+  /// or diagnosed later, such types are allowed to appear in
+  /// a valid solution.
+  SK_MissingSynthesizableConformance,
   /// An unapplied reference to a function. The purpose of this
   /// score bit is to prune overload choices that are functions
   /// when a solution has already been found using property.
@@ -1153,6 +1177,9 @@ struct Score {
 
     case SK_UnappliedFunction:
       return "use of overloaded unapplied function";
+
+    case SK_MissingSynthesizableConformance:
+      return "type with missing synthesizable conformance";
     }
   }
 
@@ -1413,6 +1440,34 @@ struct MatchCallArgumentResult {
   }
 };
 
+/// Describes a potential throw site in the constraint system.
+///
+/// For example, given `try f() + a[b] + x.y`, each of `f()`, `a[b]`, `x`, and
+/// `x.y` is a potential throw site.
+struct PotentialThrowSite {
+  enum Kind {
+    /// The application of a function or subscript.
+    Application,
+
+    /// An explicit 'throw'.
+    ExplicitThrow,
+
+    /// A non-exhaustive do...catch, which rethrows whatever is thrown from
+    /// inside it's `do` block.
+    NonExhaustiveDoCatch,
+
+    /// A property access that can throw an error.
+    PropertyAccess,
+  } kind;
+
+  /// The type that describes the potential throw site, such as the type of the
+  /// function being called or type being thrown.
+  Type type;
+
+  /// The locator that specifies where the throwing operation occurs.
+  ConstraintLocator *locator;
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1519,6 +1574,13 @@ public:
   /// being solved.
   llvm::MapVector<const CaseLabelItem *, CaseLabelItemInfo>
       caseLabelItems;
+
+  /// Maps catch nodes to the set of potential throw sites that will be caught
+  /// at that location.
+
+  /// The set of opened types for a given locator.
+  std::vector<std::pair<CatchNode, PotentialThrowSite>>
+      potentialThrowSites;
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
@@ -1789,14 +1851,10 @@ enum class ConstraintSystemFlags {
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x08,
 
-  /// Don't try to type check closure bodies, and leave them unchecked. This is
-  /// used for source tooling functionalities.
-  LeaveClosureBodyUnchecked = 0x10,
-
   /// If set, we are solving specifically to determine the type of a
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
-  ForCodeCompletion = 0x20,
+  ForCodeCompletion = 0x10,
 
   /// Include Clang function types when checking equality for function types.
   ///
@@ -1807,13 +1865,13 @@ enum class ConstraintSystemFlags {
   /// should be treated as semantically different, as they may have different
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
-  UseClangFunctionTypes = 0x40,
+  UseClangFunctionTypes = 0x20,
 
   /// When set, ignore async/sync mismatches
-  IgnoreAsyncSyncMismatch = 0x80,
+  IgnoreAsyncSyncMismatch = 0x40,
 
   /// Disable macro expansions.
-  DisableMacroExpansions = 0x100,
+  DisableMacroExpansions = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2015,6 +2073,9 @@ struct DeclReferenceType {
   /// (e.g.) applying the base of a member access. This is the type of the
   /// expression used to form the declaration reference.
   Type adjustedReferenceType;
+
+  /// The type that could be thrown by accessing this declaration.
+  Type thrownErrorTypeOnAccess;
 };
 
 /// Describes a system of constraints on type variables, the
@@ -2186,6 +2247,11 @@ private:
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
+
+  /// Keep track of all of the potential throw sites.
+  /// FIXME: This data structure should be replaced with something that
+  /// is, in effect, a multimap-vector.
+  std::vector<std::pair<CatchNode, PotentialThrowSite>> potentialThrowSites;
 
   /// A map of expressions to the ExprPatterns that they are being solved as
   /// a part of.
@@ -2798,6 +2864,9 @@ public:
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
 
+    /// The length of \c potentialThrowSites.
+    unsigned numPotentialThrowSites;
+
     /// The length of \c exprPatterns.
     unsigned numExprPatterns;
 
@@ -3269,6 +3338,14 @@ public:
 
     return known->second;
   }
+
+  /// Note that there is a potential throw site at the given location.
+  void recordPotentialThrowSite(
+      PotentialThrowSite::Kind kind, Type type,
+      ConstraintLocatorBuilder locator);
+
+  /// Determine the caught error type for the given catch node.
+  Type getCaughtErrorType(CatchNode node);
 
   /// Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
@@ -3743,6 +3820,24 @@ public:
                                        ConstraintLocatorBuilder locator,
                                        ConstraintFix *compatFix = nullptr);
 
+  /// Given a tuple with a single unlabeled element that represents a pack
+  /// expansion (either directly via \c PackExpansionType or through a type
+  /// variable constrained to a pack expansion), materialize the pack expansion
+  /// and return its pattern type as a result. The result is a type
+  /// variable because element of the tuple is not required to be resolved at
+  /// the time of the call and operation is delayed until the element is
+  /// sufficiently resolved (see \c simplifyMaterializePackExpansionConstraint)
+  ///
+  /// \param tupleType A tuple with a single unlabeled element that represents a
+  /// pack expansion.
+  /// \param locator The locator.
+  ///
+  /// \returns A type variable type that represents the pattern type of the pack
+  /// expansion.
+  TypeVariableType *
+  addMaterializePackExpansionConstraint(Type tupleType,
+                                        ConstraintLocatorBuilder locator);
+
   /// Add a disjunction constraint.
   void
   addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
@@ -3993,20 +4088,6 @@ public:
   /// \returns `true` if it was possible to generate constraints for
   /// the body and assign fixed type to the closure, `false` otherwise.
   bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
-                      ConstraintLocatorBuilder locator);
-
-  /// Given the fact a contextual type is now available for the type
-  /// variable representing one of the key path expressions, let's set a
-  /// pre-determined key path expression type.
-  ///
-  /// \param typeVar The type variable representing a key path expression.
-  /// \param contextualType The contextual type this key path would be
-  /// converted to.
-  /// \param locator The locator associated with contextual type.
-  ///
-  /// \returns `true` if it was possible to generate constraints for
-  /// the keyPath expression, `false` otherwise.
-  bool resolveKeyPath(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
   /// Given the fact that contextual type is now available for the type
@@ -5207,8 +5288,7 @@ public:
   /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
   /// to replace any discovered invalid member references with `ErrorExpr`.
   static bool preCheckTarget(SyntacticElementTarget &target,
-                             bool replaceInvalidRefsWithErrors,
-                             bool leaveClosureBodiesUnchecked);
+                             bool replaceInvalidRefsWithErrors);
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
@@ -5216,8 +5296,7 @@ public:
   /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
   /// to replace any discovered invalid member references with `ErrorExpr`.
   static bool preCheckExpression(Expr *&expr, DeclContext *dc,
-                                 bool replaceInvalidRefsWithErrors,
-                                 bool leaveClosureBodiesUnchecked);
+                                 bool replaceInvalidRefsWithErrors);
 
   /// Solve the system of constraints generated from provided target.
   ///
@@ -5420,6 +5499,8 @@ public:
     return range.isValid() ? range : llvm::Optional<SourceRange>();
   }
 
+  bool isPartialApplication(ConstraintLocator *locator);
+
   bool isTooComplex(size_t solutionMemory) {
     if (isAlreadyTooComplex.first)
       return true;
@@ -5512,6 +5593,25 @@ public:
   /// 'Self' or 'Self'-rooted dependent member types in non-covariant position.
   bool isMemberAvailableOnExistential(Type baseTy,
                                       const ValueDecl *member) const;
+
+  /// Attempts to infer a capability of a key path (i.e. whether it
+  /// is read-only, writable, etc.) based on the referenced members.
+  ///
+  /// \param keyPath The key path literal expression.
+  ///
+  /// \returns `bool` to indicate whether key path is valid or not,
+  /// and capability if it could be determined.
+  std::pair</*isValid=*/bool, llvm::Optional<KeyPathCapability>>
+  inferKeyPathLiteralCapability(KeyPathExpr *keyPath);
+
+  /// A convenience overload of \c inferKeyPathLiteralCapability.
+  ///
+  /// \param keyPathType The type variable that represents the key path literal.
+  ///
+  /// \returns `bool` to indicate whether key path is valid or not,
+  /// and capability if it could be determined.
+  std::pair</*isValid=*/bool, llvm::Optional<KeyPathCapability>>
+  inferKeyPathLiteralCapability(TypeVariableType *keyPathType);
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
@@ -5752,11 +5852,18 @@ llvm::Optional<MatchCallArgumentResult> matchCallArguments(
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
 /// Given a type that includes an existential type that has been opened to
-/// the given type variable, type-erase occurrences of that opened type
-/// variable and anything that depends on it to their non-dependent bounds.
+/// the given type variable, replace the opened type variable and its member
+/// types with their upper bounds.
 Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
                                          TypeVariableType *openedTypeVar,
                                          TypePosition outermostPosition);
+
+
+/// Given a type that includes opened existential archetypes derived from
+/// the given generic environment, replace the archetypes with their upper
+/// bounds.
+Type typeEraseOpenedArchetypesWithRoot(Type type,
+                                       const OpenedArchetypeType *root);
 
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.
@@ -6282,8 +6389,13 @@ public:
 };
 
 /// Determine whether given type is a known one
-/// for a key path `{Writable, ReferenceWritable}KeyPath`.
+/// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathType(Type type);
+
+/// Determine whether the given type is a PartialKeyPath and
+/// AnyKeyPath or existential type thererof, for example,
+/// `PartialKeyPath<...> & Sendable`.
+bool isTypeErasedKeyPathType(Type type);
 
 /// Determine whether given declaration is one for a key path
 /// `{Writable, ReferenceWritable}KeyPath`.

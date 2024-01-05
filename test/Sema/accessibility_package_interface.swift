@@ -12,13 +12,13 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Utils.swiftinterface) -I %t
 // RUN: %FileCheck %s --check-prefix=CHECK-PUBLIC-UTILS < %t/Utils.swiftinterface
 
-// CHECK-PUBLIC-UTILS-NOT: -package-name swift-utils.log
 // CHECK-PUBLIC-UTILS-NOT: package func packageFunc()
 // CHECK-PUBLIC-UTILS-NOT: package protocol PackageProto
 // CHECK-PUBLIC-UTILS-NOT: var pkgVar
 // CHECK-PUBLIC-UTILS-NOT: package class PackageKlass
 // CHECK-PUBLIC-UTILS-NOT: package var pkgVar
 // CHECK-PUBLIC-UTILS: -module-name Utils
+// CHECK-PUBLIC-UTILS: -package-name swift-utils.log
 // CHECK-PUBLIC-UTILS: public func publicFunc()
 // CHECK-PUBLIC-UTILS: @usableFromInline
 // CHECK-PUBLIC-UTILS: package func ufiPackageFunc()
@@ -39,7 +39,7 @@
 // CHECK-PRIVATE-UTILS-NOT: package class PackageKlass
 // CHECK-PRIVATE-UTILS-NOT: package var pkgVar
 // CHECK-PRIVATE-UTILS: -module-name Utils
-// CHECK-PRIVATE-UTILS: swift-module-flags-ignorable-private: -package-name swift-utils.log
+// CHECK-PRIVATE-UTILS: -package-name swift-utils.log
 // CHECK-PRIVATE-UTILS: public func publicFunc()
 // CHECK-PRIVATE-UTILS: @usableFromInline
 // CHECK-PRIVATE-UTILS: package func ufiPackageFunc()
@@ -64,7 +64,7 @@
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -verify
 // RUN: %FileCheck %s --check-prefix=CHECK-PUBLIC-CLIENT < %t/Client.swiftinterface
-// CHECK-PUBLIC-CLIENT-NOT: -package-name swift-utils.log
+// CHECK-PUBLIC-CLIENT: -package-name swift-utils.log
 // CHECK-PUBLIC-CLIENT: @inlinable public func clientFunc()
 // CHECK-PUBLIC-CLIENT: publicFunc()
 // CHECK-PUBLIC-CLIENT: ufiPackageFunc()

@@ -67,11 +67,18 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   }
   assert(fs.exists(InPath));
 
-  // Use the private interface file if exits.
-  auto PrivateInPath =
-      BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
-  if (fs.exists(PrivateInPath)) {
-    InPath = PrivateInPath;
+  // Use package.swiftinterface if it exists and its package-name applies to
+  // the importer module.
+  auto PkgInPath = BaseName.getPackageInterfacePathIfInSamePackage(fs, Ctx).value_or("");
+  if (!PkgInPath.empty() && fs.exists(PkgInPath)) {
+    InPath = PkgInPath;
+  } else {
+    // If not in package, use the private interface file if exits.
+    auto PrivateInPath =
+    BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
+    if (fs.exists(PrivateInPath)) {
+      InPath = PrivateInPath;
+    }
   }
   auto dependencies =
       scanInterfaceFile(InPath, IsFramework, isTestableDependencyLookup);
@@ -79,7 +86,6 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     this->dependencies = std::move(dependencies.get());
     return std::error_code();
   }
-
   return dependencies.getError();
 }
 
@@ -299,14 +305,14 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 }
 
 ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
-    StringRef moduleName, StringRef moduleOutputPath,
+    Identifier moduleName, StringRef moduleOutputPath,
     llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     InterfaceSubContextDelegate &delegate, llvm::TreePathPrefixMapper *mapper,
     bool isTestableDependencyLookup) {
-  ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
+  ImportPath::Module::Builder builder(moduleName);
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
   llvm::Optional<SwiftDependencyTracker> tracker = llvm::None;
@@ -338,7 +344,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
 
       ModuleDependencyVector moduleDependnecies;
       moduleDependnecies.push_back(
-          std::make_pair(ModuleDependencyID{moduleName.str(),
+          std::make_pair(ModuleDependencyID{moduleName.str().str(),
                                             scanner->dependencies->getKind()},
                          *(scanner->dependencies)));
       return moduleDependnecies;

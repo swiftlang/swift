@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
@@ -21,6 +21,7 @@
 import Distributed
 import FakeDistributedActorSystems
 
+@available(SwiftStdlib 5.7, *)
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 @available(SwiftStdlib 5.9, *)
@@ -43,12 +44,14 @@ distributed actor Worker {
   }
 }
 
+@available(SwiftStdlib 5.7, *)
 extension DefaultDistributedActorSystem.ActorID {
   var executorPreference: UnownedSerialExecutor? {
     MainActor.sharedUnownedExecutor
   }
 }
 
+@available(SwiftStdlib 5.9, *)
 @main struct Main {
   static func main() async {
     let worker = Worker(actorSystem: DefaultDistributedActorSystem())

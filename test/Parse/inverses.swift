@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -warn-redundant-requirements
 
 // REQUIRES: asserts
 
@@ -19,23 +19,34 @@ func more() {
 
 struct S4: ~(Copyable & Equatable) {} // expected-error {{type 'Copyable & Equatable' is not invertible}}
 
-func blah<T>(_ t: T) where T: ~Copyable,
-                           T: ~Hashable {}  // expected-error@:31 {{type 'Hashable' is not invertible}}
+func blah<T>(_ t: borrowing T) where T: ~Copyable,
+                                     T: ~Hashable {}  // expected-error@:41 {{type 'Hashable' is not invertible}}
 
 func foo<T: ~Copyable>(x: borrowing T) {}
 
-struct Buurap<T: ~Copyable> {}
+struct Buurap<T: ~Copyable> where T: ~Copyable {}
+// expected-warning@-1 {{redundant constraint 'T' : '~Copyable'}}
 
-// expected-warning@+1 {{protocol 'Foo' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
-protocol Foo: ~Copyable  // expected-note {{previous inverse constraint here}}
-         where Self: ~Copyable { // expected-error {{duplicate inverse constraint}}
+struct ExtraNoncopyStruct: ~Copyable, ~Copyable {}
+struct ExtraNoncopyEnum: ~Copyable, ~Copyable {}
+
+protocol ExtraNoncopyProto: ~Copyable, ~Copyable {}
+// expected-warning@-1 {{redundant constraint 'Self' : '~Copyable'}}
+
+protocol Foo: ~Copyable
+         where Self: ~Copyable {
+         // expected-warning@-1 {{redundant constraint 'Self' : '~Copyable'}}
+
+    associatedtype Touch : ~Copyable,
+                           ~Copyable
+    // expected-warning@-1 {{redundant constraint 'Self.Touch' : '~Copyable'}}
 
     func test<T>(_ t: T) where T: ~Self  // expected-error {{type 'Self' is not invertible}}
 }
 
 protocol Sando { func make() }
 
-class C: ~Copyable,  // expected-error {{classes cannot be noncopyable}}
+class C: ~Copyable,  // expected-error {{classes cannot be '~Copyable'}}
          ~Sando // expected-error {{type 'Sando' is not invertible}}
          {}
 
@@ -48,21 +59,26 @@ protocol Rope<Element>: Hashable, ~ Copyable {
   associatedtype Element: ~Copyable
 }
 
-extension S: ~Copyable {}
+extension S: ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
 
 struct S: ~U, // expected-error {{type 'U' is not invertible}}
           ~Copyable {}
 
-func greenBay<each T: ~Copyable>(_ r: repeat each T) {}
+func greenBay<each T: ~Copyable>(_ r: repeat each T) {} // expected-error{{cannot apply inverse '~Copyable' to type 'each T' in conformance requirement}}
 
 typealias Clone = Copyable
 func dup<D: ~Clone>(_ d: D) {}
-// expected-error@-1 {{noncopyable parameter must specify its ownership}}
+// expected-error@-1 {{parameter of noncopyable type 'D' must specify ownership}}
 // expected-note@-2 {{add 'borrowing'}}
 // expected-note@-3 {{add 'inout'}}
 // expected-note@-4 {{add 'consuming'}}
 
+// expected-error@+2 {{parameter of noncopyable type 'some ~Copyable' must specify ownership}}
+// expected-error@+1 {{parameter of noncopyable type 'some ~Clone' must specify ownership}}
 func superb(_ thing: some ~Copyable, thing2: some ~Clone) {}
+// expected-note@-1 2{{add 'borrowing'}}
+// expected-note@-2 2{{add 'inout'}}
+// expected-note@-3 2{{add 'consuming'}}
 
 func ownership1(_ t: borrowing any ~Equatable) {} // expected-error {{type 'Equatable' is not invertible}}
 

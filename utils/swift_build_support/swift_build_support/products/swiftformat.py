@@ -86,14 +86,46 @@ class SwiftFormat(product.Product):
     def build(self, host_target):
         self.run_build_script_helper('build', host_target)
         if self.args.swiftsyntax_lint:
-            self.lint_swiftsyntax()
+            self.lint_swiftsyntax(host_target)
+        if self.args.sourcekitlsp_lint:
+            self.lint_sourcekitlsp()
 
-    def lint_swiftsyntax(self):
+    def lint_swiftsyntax(self, host_target):
+        swift_exec = os.path.join(
+            self.install_toolchain_path(host_target),
+            'bin',
+            'swift'
+        )
+        swift_syntax_dev_utils_dir = os.path.join(
+            os.path.dirname(self.source_dir),
+            'swift-syntax',
+            'SwiftSyntaxDevUtils'
+        )
+        swift_format_exec = os.path.join(
+            self.build_dir,
+            self.configuration(),
+            'swift-format'
+        )
         linting_cmd = [
-            os.path.join(os.path.dirname(self.source_dir), 'swift-syntax', 'format.py'),
+            swift_exec,
+            'run',
+            '--package-path', swift_syntax_dev_utils_dir,
+            'swift-syntax-dev-utils',
+            'format',
+            '--verbose',
             '--lint',
-            '--swift-format', os.path.join(self.build_dir, self.configuration(),
-                                           'swift-format'),
+            '--swift-format', swift_format_exec
+        ]
+        shell.call(linting_cmd, env={'SWIFTCI_USE_LOCAL_DEPS': '1'})
+
+    def lint_sourcekitlsp(self):
+        linting_cmd = [
+            os.path.join(self.build_dir, self.configuration(), 'swift-format'),
+            'lint',
+            '--parallel',
+            '--strict',
+            '--recursive',
+            os.path.join(os.path.dirname(self.source_dir), 'sourcekit-lsp'),
         ]
         shell.call(linting_cmd)
 

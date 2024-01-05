@@ -102,8 +102,29 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   llvm_unreachable("bad KnownProtocolKind");
 }
 
-KnownProtocolSet swift::getInvertibleProtocols() {
-  return { KnownProtocolKind::Copyable };
+/// Maps a KnownProtocol to the set of InvertibleProtocols, if a mapping exists.
+llvm::Optional<InvertibleProtocolKind>
+    swift::getInvertibleProtocolKind(KnownProtocolKind kp) {
+  switch (kp) {
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    case KnownProtocolKind::Id: return InvertibleProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  default: return llvm::None;
+  }
+}
+
+/// Returns the KnownProtocolKind corresponding to an InvertibleProtocolKind.
+KnownProtocolKind swift::getKnownProtocolKind(InvertibleProtocolKind ip) {
+  switch (ip) {
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    case InvertibleProtocolKind::Id: return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const InvertibleProtocolKind &value) {
+  out << getProtocolName(getKnownProtocolKind(value));
 }
 
 namespace {
@@ -437,6 +458,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, InOutType*> InOutTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
+    llvm::FoldingSet<ErrorUnionType> ErrorUnionTypes;
     llvm::DenseMap<void *, PlaceholderType *> PlaceholderTypes;
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
@@ -629,8 +651,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend,
-    std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
@@ -644,7 +665,7 @@ ASTContext *ASTContext::get(
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                  ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags,
-                 std::move(OutputBackend), PreModuleImportCallback);
+                 std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -653,8 +674,8 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend,
-    std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback)
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend
+    )
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
       SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
@@ -662,15 +683,13 @@ ASTContext::ASTContext(
       TheBuiltinModule(createBuiltinModule(*this)),
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-      PreModuleImportCallback(PreModuleImportCallback),
       TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
           *this, Type(), RecursiveTypeProperties::HasError)),
       TheUnresolvedType(new(*this, AllocationArena::Permanent)
                             UnresolvedType(*this)),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
-      TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
-                                              /*HasExplicitAnyObject=*/false)),
+      TheAnyType(ProtocolCompositionType::theAnyType(*this)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -713,6 +732,11 @@ ASTContext::ASTContext(
 
 ASTContext::~ASTContext() {
   getImpl().~Implementation();
+}
+
+void ASTContext::SetPreModuleImportCallback(
+    std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback) {
+  PreModuleImportCallback = callback;
 }
 
 llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
@@ -1056,8 +1080,7 @@ CanType ASTContext::getAnyObjectConstraint() const {
   }
 
   getImpl().AnyObjectType = CanType(
-    ProtocolCompositionType::get(
-      *this, {}, /*HasExplicitAnyObject=*/true));
+    ProtocolCompositionType::theAnyObjectType(*this));
   return getImpl().AnyObjectType;
 }
 
@@ -1125,6 +1148,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
   case KnownProtocolKind::Executor:
+  case KnownProtocolKind::_TaskExecutor:
   case KnownProtocolKind::SerialExecutor:
     M = getLoadedModule(Id_Concurrency);
     break;
@@ -2991,6 +3015,50 @@ Type ErrorType::get(Type originalType) {
   return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
+void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {
+  id.AddInteger(terms.size());
+  for (auto term : terms) {
+    id.AddPointer(term.getPointer());
+  }
+}
+
+Type ErrorUnionType::get(const ASTContext &ctx, ArrayRef<Type> terms) {
+  // Peep-hole the simple cases. Error union types are always synthesized by
+  // the type checker and never written explicitly, so we have no use for
+  // extra type sugar around them.
+  switch (terms.size()) {
+  case 0: return ctx.getNeverType();
+  case 1: return terms[0];
+  default: break;
+  }
+
+  // Determine canonicality and recursive type properties.
+  bool isCanonical = true;
+  RecursiveTypeProperties properties;
+  for (Type term : terms) {
+    if (!term->isCanonical())
+      isCanonical = false;
+    properties |= term->getRecursiveProperties();
+  }
+
+  // Check whether we've seen this type before.
+  auto arena = getArena(properties);
+  void *insertPos = nullptr;
+  llvm::FoldingSetNodeID id;
+  ErrorUnionType::Profile(id, terms);
+  if (auto knownTy = ctx.getImpl().getArena(arena).ErrorUnionTypes
+          .FindNodeOrInsertPos(id, insertPos))
+    return knownTy;
+
+  // Use trailing objects for term storage.
+  auto size = totalSizeToAlloc<Type>(terms.size());
+  auto mem = ctx.Allocate(size, alignof(ErrorUnionType), arena);
+  auto unionTy = new (mem) ErrorUnionType(isCanonical ? &ctx : nullptr,
+                                          terms, properties);
+  ctx.getImpl().getArena(arena).ErrorUnionTypes.InsertNode(unionTy, insertPos);
+  return unionTy;
+}
+
 Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
   assert(originator);
 
@@ -3632,13 +3700,14 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
 
 ProtocolCompositionType *
 ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
+                               InvertibleProtocolSet Inverses,
                                bool HasExplicitAnyObject) {
-  assert(Members.size() != 1 || HasExplicitAnyObject);
+  assert(Members.size() != 1 || HasExplicitAnyObject || !Inverses.empty());
 
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ProtocolCompositionType::Profile(ID, Members, HasExplicitAnyObject);
+  ProtocolCompositionType::Profile(ID, Members, Inverses, HasExplicitAnyObject);
 
   bool isCanonical = true;
   RecursiveTypeProperties properties;
@@ -3661,6 +3730,7 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
   auto mem = C.Allocate(size, alignof(ProtocolCompositionType), arena);
   auto compTy = new (mem) ProtocolCompositionType(isCanonical ? &C : nullptr,
                                                   Members,
+                                                  Inverses,
                                                   HasExplicitAnyObject,
                                                   properties);
   C.getImpl().getArena(arena).ProtocolCompositionTypes.InsertNode(
@@ -4462,14 +4532,12 @@ SILFunctionType::SILFunctionType(
   // `@differentiable` function types.
   if (!ext.isDifferentiable()) {
     for (auto param : getParameters()) {
-      assert(param.getDifferentiability() ==
-                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+      assert(!param.hasOption(SILParameterInfo::NotDifferentiable) &&
              "non-`@differentiable` function type should not have "
              "`@noDerivative` parameter");
     }
     for (auto result : getResults()) {
-      assert(result.getDifferentiability() ==
-                 SILResultDifferentiability::DifferentiableOrNotApplicable &&
+      assert(!result.hasOption(SILResultInfo::NotDifferentiable) &&
              "non-`@differentiable` function type should not have "
              "`@noDerivative` result");
     }
@@ -6004,7 +6072,8 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
                                                       unsigned SizeInBits,
                                                       unsigned Alignment,
                                                       ASTContext &C) {
-  if (!LayoutConstraintInfo::isKnownSizeTrivial(Kind)) {
+  if (!LayoutConstraintInfo::isKnownSizeTrivial(Kind) &&
+      !LayoutConstraintInfo::isTrivialStride(Kind)) {
     assert(SizeInBits == 0);
     assert(Alignment == 0);
     return getLayoutConstraint(Kind);
@@ -6091,6 +6160,7 @@ void AbstractFunctionDecl::keepOriginalBodySourceRange() {
   auto result =
       impl.OriginalBodySourceRanges.insert({this, getBodySourceRange()});
   assert((!result.second ||
+          result.first->getSecond().isInvalid() ||
           isSourceLocInOrignalBuffer(this, result.first->getSecond().Start)) &&
          "This function must be called before setting new body range");
   (void)result;
@@ -6222,6 +6292,9 @@ BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
   if (auto *proto = getProtocol(KnownProtocolKind::Copyable))
     buildFakeExtension(proto);
 
+  if (auto *proto = getProtocol(KnownProtocolKind::Escapable))
+    buildFakeExtension(proto);
+
   return result;
 }
 
@@ -6235,6 +6308,14 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
 
   return result;
+}
+
+FuncDecl *ASTContext::getDiagnoseUnavailableCodeReachedDecl() {
+  // FIXME: Remove this with rdar://119892482
+  if (AvailabilityContext::forDeploymentTarget(*this).isContainedIn(
+      getSwift59Availability()))
+    return getDiagnoseUnavailableCodeReached();
+  return getDiagnoseUnavailableCodeReachedAEIC();
 }
 
 void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {

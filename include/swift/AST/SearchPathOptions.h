@@ -555,6 +555,8 @@ public:
   llvm::hash_code getModuleScanningHashComponents() const {
     return getPCHHashComponents();
   }
+
+  void dump(bool isDarwin) const;
 };
 }
 

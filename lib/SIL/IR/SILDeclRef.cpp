@@ -476,7 +476,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
                                      : Limit::None;
     }
     // Otherwise, regular property wrapper backing initializers (for properties)
-    // are treated just like stored property intializers.
+    // are treated just like stored property initializers.
     LLVM_FALLTHROUGH;
   }
   case Kind::StoredPropertyInitializer: {
@@ -1149,7 +1149,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       }
 
     if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
-      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @extern should be rejected by typechecker");
+      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @_extern should be rejected by typechecker");
       return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
     }
 

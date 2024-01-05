@@ -1255,6 +1255,7 @@ namespace {
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this) ||
+      isa<AllocVectorInst>(this) ||
       isa<AllocPackInst>(this) ||
       isa<AllocPackMetadataInst>(this))
     return true;
@@ -1300,7 +1301,11 @@ bool SILInstruction::isDeallocatingStack() const {
   return false;
 }
 
-bool SILInstruction::mayRequirePackMetadata() const {
+static bool typeOrLayoutInvolvesPack(SILType ty, SILFunction const &F) {
+  return ty.hasAnyPack() || ty.isOrContainsPack(F);
+}
+
+bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
   switch (getKind()) {
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::TuplePackElementAddrInst:
@@ -1312,11 +1317,11 @@ bool SILInstruction::mayRequirePackMetadata() const {
   case SILInstructionKind::TryApplyInst: {
     // Check the function type for packs.
     auto apply = ApplySite::isa(const_cast<SILInstruction *>(this));
-    if (apply.getCallee()->getType().hasAnyPack())
+    if (typeOrLayoutInvolvesPack(apply.getCallee()->getType(), F))
       return true;
     // Check the substituted types for packs.
     for (auto ty : apply.getSubstitutionMap().getReplacementTypes()) {
-      if (ty->hasAnyPack())
+      if (typeOrLayoutInvolvesPack(F.getTypeLowering(ty).getLoweredType(), F))
         return true;
     }
     return false;
@@ -1327,20 +1332,20 @@ bool SILInstruction::mayRequirePackMetadata() const {
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.
   {
-    return getOperand(0)->getType().hasAnyPack();
+    return typeOrLayoutInvolvesPack(getOperand(0)->getType(), F);
   }
   case SILInstructionKind::AllocStackInst: {
     auto *asi = cast<AllocStackInst>(this);
-    return asi->getType().hasAnyPack();
+    return typeOrLayoutInvolvesPack(asi->getType(), F);
   }
   case SILInstructionKind::MetatypeInst: {
     auto *mi = cast<MetatypeInst>(this);
-    return mi->getType().hasAnyPack();
+    return typeOrLayoutInvolvesPack(mi->getType(), F);
   }
   case SILInstructionKind::WitnessMethodInst: {
     auto *wmi = cast<WitnessMethodInst>(this);
     auto ty = wmi->getLookupType();
-    return ty->hasAnyPack();
+    return typeOrLayoutInvolvesPack(F.getTypeLowering(ty).getLoweredType(), F);
   }
   default:
     // Instructions that deallocate stack must not result in pack metadata
@@ -1358,15 +1363,15 @@ bool SILInstruction::mayRequirePackMetadata() const {
     // Check results and operands for packs.  If a pack appears, lowering the
     // instruction might result in pack metadata emission.
     for (auto result : getResults()) {
-      if (result->getType().hasAnyPack())
+      if (typeOrLayoutInvolvesPack(result->getType(), F))
         return true;
     }
     for (auto operandTy : getOperandTypes()) {
-      if (operandTy.hasAnyPack())
+      if (typeOrLayoutInvolvesPack(operandTy, F))
         return true;
     }
     for (auto &tdo : getTypeDependentOperands()) {
-      if (tdo.get()->getType().hasAnyPack())
+      if (typeOrLayoutInvolvesPack(tdo.get()->getType(), F))
         return true;
     }
 
@@ -1390,6 +1395,13 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isAllocatingStack())
     return false;
 
+  // In OSSA, partial_apply is not considered stack allocating (not handled by
+  // stack nesting fixup or verification). Nonetheless, prevent it from being
+  // cloned so OSSA lowering can directly convert it to a single allocation.
+  if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
+    return !PA->isOnStack();
+  }
+
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1406,7 +1418,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     if (MI->getMember().isForeign)
       return false;
   }
-  if (isa<ThrowInst>(this))
+  if (isa<ThrowInst>(this) || isa<ThrowAddrInst>(this))
     return false;
 
   // BeginAccess defines the access scope entry point. All associated EndAccess
@@ -1780,8 +1792,23 @@ static bool visitRecursivelyLifetimeEndingUses(
     
     // There shouldn't be any dead-end consumptions of a nonescaping
     // partial_apply that don't forward it along, aside from destroy_value.
-    assert(use->getUser()->hasResults()
-           && use->getUser()->getNumResults() == 1);
+    //
+    // On-stack partial_apply cannot be cloned, so it should never be used by a
+    // BranchInst.
+    //
+    // This is a fatal error because it performs SIL verification that is not
+    // separately checked in the verifier. It is the only check that verifies
+    // the structural requirements of on-stack partial_apply uses.
+    auto *user = use->getUser();
+    if (user->getNumResults() != 1) {
+      llvm::errs() << "partial_apply [on_stack] use:\n";
+      user->printInContext(llvm::errs());
+      if (isa<BranchInst>(user)) {
+        llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+      }
+      llvm::report_fatal_error("partial_apply [on_stack] must be directly "
+                               "forwarded to a destroy_value");
+    }
     if (!visitRecursivelyLifetimeEndingUses(use->getUser()->getResult(0),
                                             noUsers, func)) {
       return false;

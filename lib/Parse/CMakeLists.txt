@@ -9,6 +9,7 @@ endif()
 add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
+  ParseBridging.cpp
   ParseDecl.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
@@ -50,10 +51,12 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SwiftSyntaxMacros
     swiftASTGen
   )
+endif()
 
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   target_compile_definitions(swiftParse
     PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
+    SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   )
 endif()
 

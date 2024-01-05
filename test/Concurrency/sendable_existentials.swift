@@ -56,3 +56,14 @@ func testESilently(a: Any, aOpt: Any?) {
   _ = sendable
   _ = arrayOfSendable
 }
+
+func testErasure() {
+  class A {}
+  class B : A {}
+
+  func produce() -> any B & Sendable {
+    fatalError()
+  }
+
+  let _: any A & Sendable = produce() // no warning
+}

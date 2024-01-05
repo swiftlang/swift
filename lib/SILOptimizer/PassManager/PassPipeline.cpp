@@ -71,6 +71,11 @@ llvm::cl::opt<bool>
     EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(false),
                           llvm::cl::desc("Enable the DestroyHoisting pass."));
 
+llvm::cl::opt<bool>
+    EnableDeinitDevirtualizer("enable-deinit-devirtualizer", llvm::cl::init(false),
+                          llvm::cl::desc("Enable the DestroyHoisting pass."));
+
+
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -134,6 +139,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addFlowIsolation();
   P.addTransferNonSendable();
+  // Lower tuple addr constructor. Eventually this can be merged into later
+  // passes. This ensures we do not need to update later passes for something
+  // that is only needed by TransferNonSendable().
+  P.addLowerTupleAddrConstructor();
 
   // Automatic differentiation: canonicalize all differentiability witnesses
   // and `differentiable_function` instructions.
@@ -158,6 +167,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
+
+  if (EnableDeinitDevirtualizer)
+    P.addDeinitDevirtualizer();
+
   // Lower move only wrapped trivial types.
   P.addTrivialMoveOnlyTypeEliminator();
   // Check no uses after consume operator of a value in an address.
@@ -240,7 +253,19 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
+  P.addAllocVectorLowering();
   P.addInitializeStaticGlobals();
+
+  // MandatoryPerformanceOptimizations might create specializations that are not
+  // used, and by being unused they are might have unspecialized applies.
+  // Eliminate them via the DeadFunctionAndGlobalElimination in embedded Swift
+  // to avoid getting metadata/existential use errors in them. We don't want to
+  // run this pass in regular Swift: Even unused functions are expected to be
+  // available in debug (-Onone) builds for debugging and development purposes.
+  if (P.getOptions().EmbeddedSwift) {
+    P.addDeadFunctionAndGlobalElimination();
+  }
+
   P.addPerformanceDiagnostics();
 }
 

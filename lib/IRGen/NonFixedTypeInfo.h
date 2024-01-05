@@ -71,6 +71,12 @@ public:
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
+  StackAddress allocateVector(IRGenFunction &IGF, SILType T,
+                              llvm::Value *capacity,
+                              const Twine &name) const override {
+    llvm_unreachable("not implemented, yet");
+  }
+
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());

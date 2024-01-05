@@ -1522,6 +1522,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return ImportedName();
   result.effectiveContext = effectiveCtx;
 
+  // If this is a using declaration, import the name of the shadowed decl and
+  // adjust the context.
+  if (auto usingShadowDecl = dyn_cast<clang::UsingShadowDecl>(D)) {
+    auto targetDecl = usingShadowDecl->getTargetDecl();
+    if (isa<clang::CXXMethodDecl>(targetDecl)) {
+      ImportedName baseName = importName(targetDecl, version, givenName);
+      baseName.effectiveContext = effectiveCtx;
+      return baseName;
+    }
+  }
+
   // Gather information from the swift_async attribute, if there is one.
   llvm::Optional<unsigned> completionHandlerParamIndex;
   bool completionHandlerFlagIsZeroOnError = false;
@@ -2380,6 +2391,14 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
 bool ClangImporter::shouldIgnoreMacro(StringRef Name,
                                       const clang::MacroInfo *Macro) {
   return ::shouldIgnoreMacro(Name, Macro, Impl.getClangPreprocessor());
+}
+
+Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
+  auto baseName = declName.getBaseName();
+  if (!baseName.isSpecial())
+    return baseName.getIdentifier();
+
+  return ctx.getIdentifier(baseName.userFacingName());
 }
 
 Identifier

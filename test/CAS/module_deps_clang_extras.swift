@@ -7,7 +7,7 @@
 // RUN: %hmaptool write %t/hmap.json %t/empty.hmap
 
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache \
-// RUN:   %t/Test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -clang-include-tree \
+// RUN:   %t/Test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas \
 // RUN:   -Xcc -fmodule-map-file=%t/module.modulemap -Xcc -ivfsoverlay -Xcc %t/empty.yaml \
 // RUN:   -Xcc -I%t/empty.hmap
 // RUN: %validate-json %t/deps.json &>/dev/null

@@ -32,37 +32,17 @@ enum class MacroSyntax: uint8_t {
   Attached,
 };
 
+enum class MacroRoleBits: uint8_t {
+#define MACRO_ROLE(Name, Description) Name,
+#include "swift/Basic/MacroRoles.def"
+};
+
 /// The context in which a macro can be used, which determines the syntax it
 /// uses.
 enum class MacroRole: uint32_t {
-  /// An expression macro, referenced explicitly via "#stringify" or similar
-  /// in the source code.
-  Expression = 0x01,
-  /// A freestanding declaration macro.
-  Declaration = 0x02,
-  /// An attached macro that declares accessors for a variable or subscript
-  /// declaration.
-  Accessor = 0x04,
-  /// An attached macro that generates attributes for the
-  /// members inside the declaration.
-  MemberAttribute = 0x08,
-  /// An attached macro that generates synthesized members
-  /// inside the declaration.
-  Member = 0x10,
-  /// An attached macro that generates declarations that are peers
-  /// of the declaration the macro is attached to.
-  Peer = 0x20,
-  /// An attached macro that adds conformances to the declaration the
-  /// macro is attached to.
-  Conformance = 0x40,
-  /// A freestanding macro that expands to expressions, statements and
-  /// declarations in a code block.
-  CodeItem = 0x80,
-  /// An attached macro that adds extensions to the declaration the
-  /// macro is attached to.
-  Extension = 0x100,
-
-  // NOTE: When adding a new macro role, also add it to `getAllMacroRoles`.
+#define MACRO_ROLE(Name, Description) \
+    Name = 1 << static_cast<uint8_t>(MacroRoleBits::Name),
+#include "swift/Basic/MacroRoles.def"
 };
 
 /// Returns an enumeratable list of all macro roles.

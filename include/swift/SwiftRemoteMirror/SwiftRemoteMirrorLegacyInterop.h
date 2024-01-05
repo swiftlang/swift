@@ -667,7 +667,7 @@ swift_reflection_interop_createReflectionContextWithDataLayout(
     GetSymbolAddressFunction GetSymbolAddress) { 
  
   SwiftReflectionInteropContextRef ContextRef =
-    (SwiftReflectionInteropContextRef)calloc(sizeof(*ContextRef), 1);
+    (SwiftReflectionInteropContextRef)calloc(1, sizeof(*ContextRef));
   
   ContextRef->ReaderContext = ReaderContext;
   ContextRef->DataLayout = DataLayout;

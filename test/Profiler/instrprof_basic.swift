@@ -37,9 +37,10 @@ func basic(a : Int32) {
 // CHECK: sil hidden [ossa] @[[F_THROWING_NOP:.*throwing_nop.*]] :
 func throwing_nop() throws {}
 // CHECK: sil hidden [ossa] @[[F_EXCEPTIONS:.*exceptions.*]] :
-// CHECK: increment_profiler_counter 0, "{{.*}}instrprof_basic.swift:[[F_EXCEPTIONS]]", num_counters 2, hash
+// CHECK: increment_profiler_counter 0, "{{.*}}instrprof_basic.swift:[[F_EXCEPTIONS]]", num_counters 3, hash
 func exceptions() {
   do {
+    // CHECK: increment_profiler_counter
     try throwing_nop()
   } catch {
     // CHECK: increment_profiler_counter

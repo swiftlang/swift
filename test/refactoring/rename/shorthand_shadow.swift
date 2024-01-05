@@ -1,11 +1,12 @@
-// RUN: %refactor -rename -dump-text -source-filename %s -pos=%(line+2):29 -new-name=renamed | %FileCheck %s --check-prefix=OPTIONAL
-// OPTIONAL: shorthand_shadow.swift [[# @LINE+1]]:29 -> [[# @LINE+1]]:32
+// REQUIRES: swift_swift_parser
+// RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=%(line+2):29 | %FileCheck %s --check-prefix=OPTIONAL
+// OPTIONAL: func renameShorthandBinding(<base>opt</base>: Int?) {
 func renameShorthandBinding(opt: Int?) {
-  // RUN: %refactor -rename -dump-text -source-filename %s -pos=%(line+2):10 -new-name=renamed | %FileCheck %s --check-prefix=OPTIONAL
-  // OPTIONAL: shorthand_shadow.swift [[# @LINE+1]]:10 -> [[# @LINE+1]]:13
+  // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=%(line+2):10 | %FileCheck %s --check-prefix=OPTIONAL
+  // OPTIONAL: if let <base>opt</base> {
   if let opt {
-    // RUN: %refactor -rename -dump-text -source-filename %s -pos=%(line+2):9 -new-name=renamed | %FileCheck %s --check-prefix=OPTIONAL
-    // OPTIONAL: shorthand_shadow.swift [[# @LINE+1]]:9 -> [[# @LINE+1]]:12
+    // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=%(line+2):9 | %FileCheck %s --check-prefix=OPTIONAL
+    // OPTIONAL: _ = <base>opt</base>
     _ = opt
   }
 }

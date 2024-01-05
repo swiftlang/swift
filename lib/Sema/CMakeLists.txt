@@ -88,10 +88,6 @@ target_link_libraries(swiftSema PRIVATE
   swiftSerialization)
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftSema
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-  )
   target_link_libraries(swiftSema PRIVATE
     swiftASTGen)
 endif()

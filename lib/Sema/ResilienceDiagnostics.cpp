@@ -347,7 +347,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                                               const RootProtocolConformance *rootConf,
                                               const ExtensionDecl *ext,
                                               const ExportContext &where,
-                                              bool useConformanceAvailabilityErrorsOption) {
+                                              bool warnIfConformanceUnavailablePreSwift6) {
   if (!where.mustOnlyReferenceExportedDecls())
     return false;
 
@@ -390,8 +390,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      static_cast<unsigned>(*reason),
                      M->getName(),
                      static_cast<unsigned>(originKind))
-      .warnUntilSwiftVersionIf((useConformanceAvailabilityErrorsOption &&
-                                !ctx.LangOpts.EnableConformanceAvailabilityErrors &&
+      .warnUntilSwiftVersionIf((warnIfConformanceUnavailablePreSwift6 &&
                                 originKind != DisallowedOriginKind::SPIOnly &&
                                 originKind != DisallowedOriginKind::NonPublicImport) ||
                                originKind == DisallowedOriginKind::MissingImport,

@@ -366,11 +366,13 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK:   [[TUPLE_COPY:%.*]] = copy_value [[TUPLE]]
     // CHECK:   end_borrow [[TUPLE]]
     // CHECK:   ([[L:%.*]], [[R:%.*]]) = destructure_tuple [[TUPLE_COPY]]
+    // CHECK:   [[MOVED_L:%.*]] = move_value [lexical] [var_decl] [[L]]
+    // CHECK:   [[MOVED_R:%.*]] = move_value [lexical] [var_decl] [[R]]
     // CHECK:   destroy_value [[BOX]]
     guard case .Branch(left: let l, right: let r) = tree else { return }
 
-    // CHECK:   destroy_value [[R]]
-    // CHECK:   destroy_value [[L]]
+    // CHECK:   destroy_value [[MOVED_R]]
+    // CHECK:   destroy_value [[MOVED_L]]
     // CHECK:   destroy_addr [[X]]
   }
 
@@ -408,9 +410,11 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK:   [[TUPLE_COPY:%.*]] = copy_value [[TUPLE]]
     // CHECK:   end_borrow [[TUPLE]]
     // CHECK:   ([[L:%.*]], [[R:%.*]]) = destructure_tuple [[TUPLE_COPY]]
+    // CHECK:   [[MOVED_L:%.*]] = move_value [lexical] [var_decl] [[L]]
+    // CHECK:   [[MOVED_R:%.*]] = move_value [lexical] [var_decl] [[R]]
     // CHECK:   destroy_value [[BOX]]
-    // CHECK:   destroy_value [[R]]
-    // CHECK:   destroy_value [[L]]
+    // CHECK:   destroy_value [[MOVED_R]]
+    // CHECK:   destroy_value [[MOVED_L]]
     if case .Branch(left: let l, right: let r) = tree { }
   }
   // CHECK: [[NO3]]([[ORIGINAL_VALUE:%.*]] : @owned $TreeA<T>):

@@ -2,14 +2,12 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
+import class Foundation.ProcessInfo
 
 let package = Package(
     name: "swift-inspect",
     products: [
         .library(name: "SwiftInspectClient", type: .dynamic, targets: ["SwiftInspectClient"]),
-    ],
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -36,3 +34,11 @@ let package = Package(
             name: "SymbolicationShims")
     ]
 )
+
+if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
+    package.dependencies += [
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.2"),
+    ]
+} else {
+    package.dependencies += [.package(path: "../../../swift-argument-parser")]
+}

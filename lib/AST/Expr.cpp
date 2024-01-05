@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
@@ -1936,8 +1937,10 @@ Type AbstractClosureExpr::getResultType(
 }
 
 llvm::Optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
-  return getType()->castTo<AnyFunctionType>()
-      ->getEffectiveThrownErrorType();
+  if (auto fnType = getType()->getAs<AnyFunctionType>())
+    return fnType->getEffectiveThrownErrorType();
+
+  return llvm::None;
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
@@ -2045,11 +2048,14 @@ bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }
 
-void ClosureExpr::setExplicitThrownType(Type thrownType) {
-  assert(thrownType && !thrownType->hasTypeVariable() &&
-         !thrownType->hasPlaceholder());
-  assert(ThrownType);
-  ThrownType->setType(MetatypeType::get(thrownType));
+Type ClosureExpr::getExplicitThrownType() const {
+  if (getThrowsLoc().isInvalid())
+    return Type();
+  
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<ClosureExpr *>(this);
+  ExplicitCaughtTypeRequest request{&ctx, mutableThis};
+  return evaluateOrDefault(ctx.evaluator, request, Type());
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {
@@ -2443,6 +2449,35 @@ llvm::Optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   return llvm::None;
 }
 
+BoundGenericType *KeyPathExpr::getKeyPathType() const {
+  auto type = getType();
+  if (!type)
+    return nullptr;
+
+  if (auto *existentialTy = type->getAs<ExistentialType>()) {
+    auto *sendableTy =
+        existentialTy->getConstraintType()->castTo<ProtocolCompositionType>();
+    assert(sendableTy->getMembers().size() == 2);
+    type = sendableTy->getExistentialLayout().explicitSuperclass;
+    assert(type->isKeyPath() || type->isWritableKeyPath() ||
+           type->isReferenceWritableKeyPath());
+  }
+
+  return type->castTo<BoundGenericType>();
+}
+
+Type KeyPathExpr::getRootType() const {
+  auto keyPathTy = getKeyPathType();
+  assert(keyPathTy && "key path type has not been set yet");
+  return keyPathTy->getGenericArgs()[0];
+}
+
+Type KeyPathExpr::getValueType() const {
+  auto keyPathTy = getKeyPathType();
+  assert(keyPathTy && "key path type has not been set yet");
+  return keyPathTy->getGenericArgs()[1];
+}
+
 KeyPathExpr::Component KeyPathExpr::Component::forSubscript(
     ASTContext &ctx, ConcreteDeclRef subscript, ArgumentList *argList,
     Type elementType, ArrayRef<ProtocolConformanceRef> indexHashables) {
@@ -2739,10 +2774,15 @@ MacroExpansionExpr *MacroExpansionExpr::create(
 ) {
   ASTContext &ctx = dc->getASTContext();
   MacroExpansionInfo *info = new (ctx) MacroExpansionInfo{
-      sigilLoc, macroName, macroNameLoc,
-      leftAngleLoc, rightAngleLoc, genericArgs,
-      argList ? argList : ArgumentList::createImplicit(ctx, {})
-  };
+      sigilLoc,
+      /*moduleName*/ DeclNameRef(),
+      /*moduleNameLoc*/ DeclNameLoc(),
+      macroName,
+      macroNameLoc,
+      leftAngleLoc,
+      rightAngleLoc,
+      genericArgs,
+      argList ? argList : ArgumentList::createImplicit(ctx, {})};
   return new (ctx) MacroExpansionExpr(dc, info, roles, isImplicit, ty);
 }
 
@@ -2835,7 +2875,7 @@ FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
 
-Type Expr::findOriginalType() const {
+const Expr *Expr::findOriginalValue() const {
   auto *expr = this;
   do {
     expr = expr->getSemanticsProvidingExpr();
@@ -2858,6 +2898,11 @@ Type Expr::findOriginalType() const {
     break;
   } while (true);
 
+  return expr;
+}
+
+Type Expr::findOriginalType() const {
+  auto *expr = findOriginalValue();
   return expr->getType()->getRValueType();
 }
 

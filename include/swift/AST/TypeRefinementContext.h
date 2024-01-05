@@ -97,6 +97,7 @@ public:
   };
 
 private:
+  friend class ExpandChildTypeRefinementContextsRequest;
 
   /// Represents the AST node that introduced a refinement context.
   class IntroNode {
@@ -179,6 +180,11 @@ private:
 
   std::vector<TypeRefinementContext *> Children;
 
+  struct {
+    /// Whether this node has child nodes that have not yet been expanded.
+    unsigned needsExpansion : 1;
+  } LazyInfo = {};
+
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
                         const AvailabilityContext &Info,
@@ -240,6 +246,13 @@ public:
                          TypeRefinementContext *Parent,
                          const AvailabilityContext &Info);
 
+  Decl *getDeclOrNull() const {
+    auto IntroReason = getReason();
+    if (IntroReason == Reason::Decl || IntroReason == Reason::DeclImplicit)
+      return getIntroductionNode().getAsDecl();
+    return nullptr;
+  }
+
   /// Returns the reason this context was introduced.
   Reason getReason() const;
   
@@ -288,7 +301,13 @@ public:
   /// Returns the inner-most TypeRefinementContext descendant of this context
   /// for the given source location.
   TypeRefinementContext *findMostRefinedSubContext(SourceLoc Loc,
-                                                   SourceManager &SM);
+                                                   ASTContext &Ctx);
+
+  bool getNeedsExpansion() const { return LazyInfo.needsExpansion; }
+
+  void setNeedsExpansion(bool needsExpansion) {
+    LazyInfo.needsExpansion = needsExpansion;
+  }
 
   SWIFT_DEBUG_DUMPER(dump(SourceManager &SrcMgr));
   void dump(raw_ostream &OS, SourceManager &SrcMgr) const;
@@ -299,6 +318,10 @@ public:
 
 void simple_display(llvm::raw_ostream &out,
                     const TypeRefinementContext *trc);
+
+inline SourceLoc extractNearestSourceLoc(const TypeRefinementContext *TRC) {
+  return TRC->getIntroductionLoc();
+}
 
 } // end namespace swift
 

@@ -100,7 +100,8 @@ func printIntArg(@_noImplicitCopy _ x: Int) {
 // CHECK: apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
-// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX]]
+// CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
+// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX_LIFETIME]]
 // CHECK: [[Y_BOX_PROJECT_ACCESS:%.*]] = begin_access [read] [unknown] [[Y_BOX_PROJECT]]
 // CHECK: [[Y_VALUE:%.*]] = load [trivial] [[Y_BOX_PROJECT_ACCESS]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy11printIntArgyySiF : $@convention(thin) (Int) -> ()
@@ -149,7 +150,8 @@ func printIntOwnedArg(@_noImplicitCopy _ x: __owned Int) {
 // CHECK: apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
-// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX]]
+// CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
+// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX_LIFETIME]]
 // CHECK: [[Y_BOX_PROJECT_ACCESS:%.*]] = begin_access [read] [unknown] [[Y_BOX_PROJECT]]
 // CHECK: [[Y_VALUE:%.*]] = load [trivial] [[Y_BOX_PROJECT_ACCESS]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy16printIntOwnedArgyySinF : $@convention(thin) (Int) -> ()
@@ -198,7 +200,8 @@ func printIntArgThrows(@_noImplicitCopy _ x: Int) throws {
 // CHECK: try_apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
-// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX]]
+// CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
+// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX_LIFETIME]]
 // CHECK: [[Y_BOX_PROJECT_ACCESS:%.*]] = begin_access [read] [unknown] [[Y_BOX_PROJECT]]
 // CHECK: [[Y_VALUE:%.*]] = load [trivial] [[Y_BOX_PROJECT_ACCESS]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy17printIntArgThrowsyySiKF : $@convention(thin) (Int) -> @error any Error
@@ -238,7 +241,8 @@ func printIntOwnedArgThrows(@_noImplicitCopy _ x: __owned Int) throws {
 // CHECK: try_apply [[FUNC]]([[VALUE]])
 //
 // CHECK: [[Y_BOX:%.*]] = alloc_box ${ var Int }
-// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX]]
+// CHECK: [[Y_BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[Y_BOX]]
+// CHECK: [[Y_BOX_PROJECT:%.*]] = project_box [[Y_BOX_LIFETIME]]
 // CHECK: [[Y_BOX_PROJECT_ACCESS:%.*]] = begin_access [read] [unknown] [[Y_BOX_PROJECT]]
 // CHECK: [[Y_VALUE:%.*]] = load [trivial] [[Y_BOX_PROJECT_ACCESS]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s14noimplicitcopy22printIntOwnedArgThrowsyySinKF : $@convention(thin) (Int) -> @error any Error
@@ -333,9 +337,8 @@ func callClosureIntOwned() {
 // NOTE: MOW expands to MOVEONLYWRAPPED
 //
 // CHECK-LABEL: sil hidden [ossa] @$s14noimplicitcopy10printKlassyyF : $@convention(thin) () -> () {
-// CHECK:   [[X:%.*]] = begin_borrow [lexical] {{%[0-9]+}} : $Klass
-// CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
-// CHECK:   [[X_MOVEONLYWRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[X_COPY]]
+// CHECK:   [[X:%.*]] = move_value [lexical] [var_decl] {{%[0-9]+}} : $Klass
+// CHECK:   [[X_MOVEONLYWRAPPED:%.*]] = copyable_to_moveonlywrapper [owned] [[X]]
 // CHECK:   [[X_MOVEONLYWRAPPED_MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X_MOVEONLYWRAPPED]]
 // CHECK:   [[BORROWED_X_MOVEONLYWRAPPED_MARKED:%.*]] = begin_borrow [[X_MOVEONLYWRAPPED_MARKED]]
 // CHECK:   [[FUNC:%.*]] = class_method [[BORROWED_X_MOVEONLYWRAPPED_MARKED]]

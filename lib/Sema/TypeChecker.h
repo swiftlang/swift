@@ -131,16 +131,11 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x02,
 
-  /// Don't try to type check closure expression bodies, and leave them
-  /// unchecked. This is used by source tooling functionalities such as code
-  /// completion.
-  LeaveClosureBodyUnchecked = 0x04,
-
   /// Don't type check expressions for correct availability.
-  DisableExprAvailabilityChecking = 0x08,
+  DisableExprAvailabilityChecking = 0x04,
 
   /// Don't expand macros.
-  DisableMacroExpansions = 0x10,
+  DisableMacroExpansions = 0x08,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -474,7 +469,7 @@ Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
 
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-void typeCheckDecl(Decl *D, bool LeaveClosureBodiesUnchecked = false);
+void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
@@ -657,8 +652,8 @@ void checkDeclCircularity(NominalTypeDecl *decl);
 /// Type check whether an extension matches its Objective-C interface, if it
 /// has one.
 ///
-/// \param ED The extension to check.
-void checkObjCImplementation(ExtensionDecl *ED);
+/// \param D The declaration to check.
+void checkObjCImplementation(Decl *D);
 
 /// Type check whether the given switch statement exhaustively covers
 /// its domain.
@@ -1056,10 +1051,6 @@ AvailabilityContext overApproximateAvailabilityAtLocation(
 /// Walk the AST to build the hierarchy of TypeRefinementContexts
 void buildTypeRefinementContextHierarchy(SourceFile &SF);
 
-/// Walk the AST to complete the hierarchy of TypeRefinementContexts for
-/// the delayed function body of \p AFD.
-void buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, AbstractFunctionDecl *AFD);
-
 /// Build the hierarchy of TypeRefinementContexts for the entire
 /// source file, if it has not already been built. Returns the root
 /// TypeRefinementContext for the source file.
@@ -1131,7 +1122,9 @@ diagnosePotentialUnavailability(SourceRange ReferenceRange,
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 
 /// Type check a single 'distributed func' declaration.
-void checkDistributedFunc(FuncDecl *func);
+///
+/// Returns `true` if there was an error.
+bool checkDistributedFunc(FuncDecl *func);
 
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityContext Availability,
@@ -1175,19 +1168,24 @@ void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
-/// Whether the given expression can throw.
-bool canThrow(ASTContext &ctx, Expr *expr);
+/// Whether the given expression can throw, and if so, the thrown type.
+llvm::Optional<Type> canThrow(ASTContext &ctx, Expr *expr);
 
 /// Determine the error type that is thrown out of the body of the given
 /// do-catch statement.
 ///
 /// The error type is used in the catch clauses and, for a nonexhausive
 /// do-catch, is implicitly rethrown out of the do...catch block.
-Type catchErrorType(ASTContext &ctx, DoCatchStmt *stmt);
+Type catchErrorType(DeclContext *dc, DoCatchStmt *stmt);
 
 /// Given two error types, merge them into the "union" of both error types
 /// that is a supertype of both error types.
-Type errorUnion(Type type1, Type type2);
+///
+/// The \c simplifyType function is applied to any types that involve type
+/// variables, to substitute away the type variables when possible. It need
+/// not substitute all type variables, though.
+Type errorUnion(Type type1, Type type2,
+                llvm::function_ref<Type(Type)> simplifyType);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.

@@ -77,6 +77,8 @@ enum E {
   case B(Z)
 }
 
+sil @escaping_argument : $@convention(thin) (@guaranteed Y) -> ()
+
 sil @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> () {
 [%0: noescape **]
 }
@@ -799,6 +801,32 @@ bb0:
   destroy_value %8 : $E
   %9 = tuple ()
   return %9 : $()
+}
+
+// CHECK-LABEL: Escape information for test_load_borrow:
+// CHECK: global: %0 = alloc_ref $Y
+// CHECK:  -    : %1 = alloc_ref $Y
+// CHECK: End function test_load_borrow
+sil [ossa] @test_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Y
+  %2 = alloc_stack $Y
+  %3 = alloc_stack $Y
+  store %0 to [init] %2 : $*Y
+  store %1 to [init] %3 : $*Y
+  %6 = load_borrow %2 : $*Y
+  %7 = load_borrow %3 : $*Y
+  %8 = function_ref @escaping_argument : $@convention(thin) (@guaranteed Y) -> ()
+  %9 = apply %8(%6) : $@convention(thin) (@guaranteed Y) -> ()
+  end_borrow %7 : $Y
+  end_borrow %6 : $Y
+  destroy_addr %3 : $*Y
+  destroy_addr %2 : $*Y
+  dealloc_stack %3 : $*Y
+  dealloc_stack %2 : $*Y
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: Escape information for call_unknown:

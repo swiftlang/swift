@@ -88,7 +88,7 @@ public:
     // Whitelist the kinds of decls to transform.
     // TODO: Expand the set of decls visited here.
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(D))
-      return Action::VisitChildrenIf(FD->getBody());
+      return Action::VisitChildrenIf(FD->getTypecheckedBody());
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
       return Action::VisitChildrenIf(TLCD->getBody());
     if (isa<NominalTypeDecl>(D))

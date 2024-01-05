@@ -60,6 +60,11 @@ struct ImageSourceCursor {
     self.pos = offset
   }
 
+  public mutating func read(into buffer: UnsafeMutableRawBufferPointer) throws {
+    try source.fetch(from: pos, into: buffer)
+    pos += UInt64(buffer.count)
+  }
+  
   public mutating func read<T>(into buffer: UnsafeMutableBufferPointer<T>) throws {
     try source.fetch(from: pos, into: buffer)
     pos += UInt64(MemoryLayout<T>.stride * buffer.count)
@@ -138,9 +143,9 @@ struct SubImageSource<S: ImageSource>: ImageSource {
     return parent.isMappedImage
   }
 
-  public func fetch<T>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
-    let toFetch = buffer.count * MemoryLayout<T>.stride
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
+    let toFetch = buffer.count
     if addr < 0 || addr > length {
       throw SubImageSourceError.outOfRangeFetch(UInt64(addr), toFetch)
     }

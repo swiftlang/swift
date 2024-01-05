@@ -282,6 +282,9 @@ public:
   /// Are we building in embedded Swift mode?
   bool EmbeddedSwift = false;
 
+  /// Are we building in embedded Swift + -no-allocations?
+  bool NoAllocations = false;
+
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;

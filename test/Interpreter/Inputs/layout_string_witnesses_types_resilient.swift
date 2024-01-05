@@ -56,6 +56,25 @@ public enum ResilientSinglePayloadEnumSimple {
     case nonEmpty(AnyObject)
 }
 
+public enum MyString {
+    case immortal(UInt64)
+    case s(AnyObject)
+    case t(AnyObject)
+}
+
+public enum ResilientSinglePayloadEnumSimpleMultiExtraTagPayload {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case empty7
+    case empty8
+    case nonEmpty(MyString)
+}
+
 public enum ResilientSingletonEnum {
     case nonEmpty(AnyObject)
 }
@@ -90,6 +109,10 @@ public func getResilientSinglePayloadEnumSimpleEmpty0() -> ResilientSinglePayloa
 
 public func getResilientSingletonEnumNonEmpty(_ x: AnyObject) -> ResilientSingletonEnum {
     return .nonEmpty(x)
+}
+
+public func getResilientSinglePayloadEnumSimpleMultiExtraTagPayloadEmpty3() -> ResilientSinglePayloadEnumSimpleMultiExtraTagPayload {
+    return .empty3
 }
 
 public enum ResilientSinglePayloadEnum {

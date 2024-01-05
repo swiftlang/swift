@@ -62,6 +62,7 @@ using namespace swift::tbdgen;
 using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
+using SymbolFlags = llvm::MachO::SymbolFlags;
 
 TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
                              APIRecorder &recorder)
@@ -69,7 +70,7 @@ TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
                     desc.getParentModule(), desc.getOptions(), recorder) {}
 
 void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
-                                      SymbolSource source) {
+                                      SymbolSource source, SymbolFlags flags) {
   if (!source.isLinkerDirective() && Opts.LinkerDirectivesOnly)
     return;
 
@@ -82,7 +83,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
   }
 #endif
   recorder.addSymbol(name, kind, source,
-                     DeclStack.empty() ? nullptr : DeclStack.back());
+                     DeclStack.empty() ? nullptr : DeclStack.back(), flags);
 }
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
@@ -341,7 +342,7 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
     OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
     OS << name << "$";
     addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
-                      SymbolSource::forLinkerDirective());
+                      SymbolSource::forLinkerDirective(), SymbolFlags::Data);
   }
 }
 
@@ -387,13 +388,13 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
       llvm::raw_svector_ostream OS(Buffer);
       OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
       addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
-                        SymbolSource::forLinkerDirective());
+                        SymbolSource::forLinkerDirective(), SymbolFlags::Data);
     }
   }
 }
 
 void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
-                              SymbolKind kind) {
+                              SymbolFlags flags, SymbolKind kind) {
   // The linker expects to see mangled symbol names in TBD files,
   // except when being passed objective c classes,
   // so make sure to mangle before inserting the symbol.
@@ -406,7 +407,7 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
     llvm::Mangler::getNameWithPrefix(mangled, name, *DataLayout);
   }
 
-  addSymbolInternal(mangled, kind, source);
+  addSymbolInternal(mangled, kind, source, flags);
   if (previousInstallNameMap) {
     addLinkerDirectiveSymbolsLdPrevious(mangled, kind);
   } else {
@@ -434,30 +435,33 @@ void TBDGenVisitor::didVisitDecl(Decl *D) {
 }
 
 void TBDGenVisitor::addFunction(SILDeclRef declRef) {
-  addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
+  addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef),
+            SymbolFlags::Text);
 }
 
 void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
-  addSymbol(name, SymbolSource::forSILDeclRef(declRef));
+  addSymbol(name, SymbolSource::forSILDeclRef(declRef), SymbolFlags::Text);
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
   Mangle::ASTMangler mangler;
-  addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD));
+  addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD),
+            SymbolFlags::Data);
 }
 
 void TBDGenVisitor::addLinkEntity(LinkEntity entity) {
   auto linkage =
       LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
 
-  addSymbol(linkage.getName(), SymbolSource::forIRLinkEntity(entity));
+  SymbolFlags flags = entity.isData() ? SymbolFlags::Data : SymbolFlags::Text;
+  addSymbol(linkage.getName(), SymbolSource::forIRLinkEntity(entity), flags);
 }
 
 void TBDGenVisitor::addObjCInterface(ClassDecl *CD) {
   // FIXME: We ought to have a symbol source for this.
   SmallString<128> buffer;
   addSymbol(CD->getObjCRuntimeName(buffer), SymbolSource::forUnknown(),
-            SymbolKind::ObjectiveCClass);
+            SymbolFlags::Data, SymbolKind::ObjectiveCClass);
   recorder.addObjCInterface(CD);
 }
 
@@ -474,13 +478,14 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
 
   std::string decorated = Mangler.mangleWitnessThunk(C, requirementDecl);
   // FIXME: We should have a SILDeclRef SymbolSource for this.
-  addSymbol(decorated, SymbolSource::forUnknown());
+  addSymbol(decorated, SymbolSource::forUnknown(), SymbolFlags::Text);
 
   if (requirementDecl->isProtocolRequirement()) {
     ValueDecl *PWT = C->getWitness(requirementDecl).getDecl();
     if (const auto *AFD = dyn_cast<AbstractFunctionDecl>(PWT))
       if (AFD->hasAsync())
-        addSymbol(decorated + "Tu", SymbolSource::forUnknown());
+        addSymbol(decorated + "Tu", SymbolSource::forUnknown(),
+                  SymbolFlags::Text);
   }
 }
 
@@ -489,7 +494,7 @@ void TBDGenVisitor::addFirstFileSymbols() {
     // FIXME: We ought to have a symbol source for this.
     SmallString<32> buf;
     addSymbol(irgen::encodeForceLoadSymbolName(buf, Opts.ModuleLinkName),
-              SymbolSource::forUnknown());
+              SymbolSource::forUnknown(), SymbolFlags::Data);
   }
 }
 
@@ -588,7 +593,7 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
   auto &ctx = M->getASTContext();
 
   llvm::MachO::InterfaceFile file;
-  file.setFileType(llvm::MachO::FileType::TBD_V4);
+  file.setFileType(llvm::MachO::FileType::TBD_V5);
   file.setApplicationExtensionSafe(isApplicationExtensionSafe(ctx.LangOpts));
   file.setInstallName(opts.InstallName);
   file.setTwoLevelNamespace();
@@ -615,7 +620,9 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
   }
 
   auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
-                       Decl *decl) { file.addSymbol(kind, symbol, targets); };
+                       Decl *decl, SymbolFlags flags) {
+    file.addSymbol(kind, symbol, targets, flags);
+  };
   SimpleAPIRecorder recorder(addSymbol);
   TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
@@ -627,7 +634,7 @@ PublicSymbolsRequest::evaluate(Evaluator &evaluator,
                                TBDGenDescriptor desc) const {
   std::vector<std::string> symbols;
   auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
-                       Decl *decl) {
+                       Decl *decl, SymbolFlags flags) {
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
     // TextAPI ObjC Class Kinds represents two symbols.
@@ -652,7 +659,7 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
   auto desc = TBDGenDescriptor::forModule(M, opts);
   auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
-                 "YAML writing should be error-free");
+                 "TBD writing should be error-free");
 }
 
 class APIGenRecorder final : public APIRecorder {
@@ -675,7 +682,7 @@ public:
   ~APIGenRecorder() {}
 
   void addSymbol(StringRef symbol, SymbolKind kind, SymbolSource source,
-                 Decl *decl) override {
+                 Decl *decl, SymbolFlags flags) override {
     if (kind != SymbolKind::GlobalSymbol)
       return;
 
@@ -879,7 +886,7 @@ SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
   auto *SymbolSources = Ctx.Allocate<SymbolSourceMap>();
 
   auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source,
-                       Decl *decl) {
+                       Decl *decl, SymbolFlags flags) {
     SymbolSources->insert({symbol, source});
   };
 

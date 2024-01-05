@@ -1,28 +1,28 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature Extern %s | %FileCheck %s
 
 // CHECK-DAG: sil hidden_external @my_c_name : $@convention(c) (Int) -> Int
-@extern(c, "my_c_name")
+@_extern(c, "my_c_name")
 func withCName(_ x: Int) -> Int
 
 // CHECK-DAG: sil hidden_external @take_c_func_ptr : $@convention(c) (@convention(c) (Int) -> Int) -> ()
-@extern(c, "take_c_func_ptr")
+@_extern(c, "take_c_func_ptr")
 func takeCFuncPtr(_ f: @convention(c) (Int) -> Int)
 
 // CHECK-DAG: sil @public_visible : $@convention(c) (Int) -> Int
-@extern(c, "public_visible")
+@_extern(c, "public_visible")
 public func publicVisibility(_ x: Int) -> Int
 
 // CHECK-DAG: sil @private_visible : $@convention(c) (Int) -> Int
-@extern(c, "private_visible")
+@_extern(c, "private_visible")
 private func privateVisiblity(_ x: Int) -> Int
 
 // CHECK-DAG: sil hidden_external @withoutCName : $@convention(c) () -> Int
-@extern(c)
+@_extern(c)
 func withoutCName() -> Int
 
 // CHECK-DAG: sil hidden [ossa] @$s8extern_c10defaultArgyySiFfA_ : $@convention(thin) () -> Int {
 // CHECK-DAG: sil hidden_external @default_arg : $@convention(c) (Int) -> ()
-@extern(c, "default_arg")
+@_extern(c, "default_arg")
 func defaultArg(_ x: Int = 42)
 
 func main() {

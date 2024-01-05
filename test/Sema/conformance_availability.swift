@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-conformance-availability-errors
+// RUN: %target-typecheck-verify-swift -swift-version 6
 
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 public protocol Horse {}
 func takesHorse<T : Horse>(_: T) {}
@@ -245,9 +246,9 @@ public struct HasAvailableConformance1 {}
 extension HasAvailableConformance1 : Horse {}
 
 // These availability violations are errors because this test passes the
-// -enable-conformance-availability-errors flag. See the other test case
-// in test/Sema/conformance_availability_warn.swift for the same example
-// but without this flag.
+// -swift-version 6.
+// See the other test case in test/Sema/conformance_availability_warn.swift for
+// the same example for -swift-version 5.
 
 func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add @available attribute to enclosing global function}}
   takesHorse(x) // expected-error {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}

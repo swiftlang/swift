@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -46,6 +47,7 @@ class ContextualPattern;
 class ContinueStmt;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
+class DoCatchStmt;
 struct ExternalMacroDefinition;
 class ClosureExpr;
 class GenericParamList;
@@ -427,11 +429,13 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether the given declaration has any markings that would cause it
-/// to not have an implicit, unconditional conformance to Copyable.
-class HasNoncopyableAnnotationRequest
-    : public SimpleRequest<HasNoncopyableAnnotationRequest, bool(TypeDecl *),
-                           RequestFlags::SeparatelyCached> {
+/// Determine the kind of invertible protocol markings for this declaration,
+/// for example, if a conformance to IP or ~IP was written on it in the
+/// inheritance clause and/or where clause.
+class InvertibleAnnotationRequest
+    : public SimpleRequest<InvertibleAnnotationRequest,
+                           InverseMarking(TypeDecl *, InvertibleProtocolKind),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -439,19 +443,18 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, TypeDecl *decl) const;
+  InverseMarking evaluate(Evaluator &evaluator,
+                          TypeDecl *decl, InvertibleProtocolKind ip) const;
 
 public:
-  // Separate caching.
+  // Caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
 };
 
-/// Determine whether the given declaration is escapable.
+/// Determine whether the given type is Escapable.
 class IsEscapableRequest
-    : public SimpleRequest<IsEscapableRequest, bool(ValueDecl *),
-                           RequestFlags::SeparatelyCached> {
+    : public SimpleRequest<IsEscapableRequest, bool(CanType),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -459,13 +462,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, CanType) const;
 
 public:
-  // Separate caching.
+  // Caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
 };
 
 /// Determine whether the given type is noncopyable. Assumes type parameters
@@ -1779,10 +1780,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class HasStorageRequest :
-    public SimpleRequest<HasStorageRequest,
-                         bool(AbstractStorageDecl *),
-                         RequestFlags::Cached> {
+class HasStorageRequest
+    : public SimpleRequest<HasStorageRequest, bool(AbstractStorageDecl *),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1793,7 +1793,10 @@ private:
   bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
+  // Separate caching.
   bool isCached() const { return true; }
+  llvm::Optional<bool> getCachedResult() const;
+  void cacheResult(bool hasStorage) const;
 };
 
 class StorageImplInfoRequest :
@@ -2282,10 +2285,16 @@ public:
   void cacheResult(ParamSpecifier value) const;
 };
 
-/// Determines the explicitly-written thrown result type of a function.
-class ThrownTypeRequest
-    : public SimpleRequest<ThrownTypeRequest,
-                           Type(AbstractFunctionDecl *),
+/// Determines the explicitly-written caught result type for any catch node,
+/// including functions/closures and do..catch statements.
+///
+/// Returns the caught result type for the catch node, which will be
+/// `Never` if no error can be thrown from within the context (e.g., a
+/// non-throwing function). Returns a NULL type if the caught error type
+/// requires type inference.
+class ExplicitCaughtTypeRequest
+    : public SimpleRequest<ExplicitCaughtTypeRequest,
+                           Type(ASTContext *, CatchNode),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2294,11 +2303,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  Type evaluate(Evaluator &evaluator, ASTContext *, CatchNode catchNode) const;
 
 public:
   // Separate caching.
-  bool isCached() const { return true; }
+  bool isCached() const;
   llvm::Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
@@ -2327,7 +2336,7 @@ public:
 class PatternBindingEntryRequest
     : public SimpleRequest<PatternBindingEntryRequest,
                            const PatternBindingEntry *(PatternBindingDecl *,
-                                                       unsigned, bool),
+                                                       unsigned),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2336,15 +2345,35 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  const PatternBindingEntry *evaluate(Evaluator &evaluator,
-                                      PatternBindingDecl *PBD, unsigned i,
-                                      bool LeaveClosureBodiesUnchecked) const;
+  const PatternBindingEntry *
+  evaluate(Evaluator &evaluator, PatternBindingDecl *PBD, unsigned i) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
   llvm::Optional<const PatternBindingEntry *> getCachedResult() const;
   void cacheResult(const PatternBindingEntry *value) const;
+};
+
+class PatternBindingCheckedAndContextualizedInitRequest
+    : public SimpleRequest<PatternBindingCheckedAndContextualizedInitRequest,
+                           Expr *(PatternBindingDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Expr *evaluate(Evaluator &evaluator, PatternBindingDecl *PBD,
+                 unsigned i) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
 };
 
 class NamingPatternRequest
@@ -2658,7 +2687,8 @@ public:
 
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
-                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
+                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool,
+                                bool),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2667,9 +2697,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, DeclContext *DC,
-                ValueDecl *VD1, ValueDecl *VD2,
-                bool dynamic) const;
+  bool evaluate(Evaluator &evaluator, DeclContext *DC, ValueDecl *VD1,
+                ValueDecl *VD2, bool dynamic,
+                bool allowMissingConformances) const;
 
 public:
   // Caching.
@@ -3415,6 +3445,8 @@ public:
   }
 
   SourceLoc getSigilLoc() const;
+  DeclNameRef getModuleName() const;
+  DeclNameLoc getModuleNameLoc() const;
   DeclNameRef getMacroName() const;
   DeclNameLoc getMacroNameLoc() const;
   SourceRange getGenericArgsRange() const;
@@ -3661,6 +3693,25 @@ public:
 /// same file are consistently using \c @_spiOnly.
 class CheckInconsistentSPIOnlyImportsRequest
     : public SimpleRequest<CheckInconsistentSPIOnlyImportsRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+// Check that imports of the same module from the same file have the same
+// access-level.
+class CheckInconsistentAccessLevelOnImportSameFileRequest
+    : public SimpleRequest<CheckInconsistentAccessLevelOnImportSameFileRequest,
                            evaluator::SideEffect(SourceFile *),
                            RequestFlags::Cached> {
 public:
@@ -4376,6 +4427,44 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+class ExpandPreambleMacroRequest
+    : public SimpleRequest<ExpandPreambleMacroRequest,
+                           ArrayRef<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+class ExpandBodyMacroRequest
+    : public SimpleRequest<ExpandBodyMacroRequest,
+                           llvm::Optional<unsigned>(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Optional<unsigned> evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,
@@ -4463,7 +4552,7 @@ public:
 /// This is done on all of a class's implementations at once to improve diagnostics.
 class TypeCheckObjCImplementationRequest
     : public SimpleRequest<TypeCheckObjCImplementationRequest,
-                           evaluator::SideEffect(ExtensionDecl *),
+                           evaluator::SideEffect(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4473,7 +4562,7 @@ private:
 
   // Evaluation.
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, ExtensionDecl *ED) const;
+  evaluate(Evaluator &evaluator, Decl *D) const;
 
 public:
   // Separate caching.
@@ -4540,23 +4629,26 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Expand the children of the type refinement context for the given
-/// declaration.
+/// Expand the children of the given type refinement context.
 class ExpandChildTypeRefinementContextsRequest
     : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
-                           bool(Decl *, TypeRefinementContext *),
-                           RequestFlags::Cached> {
+                           std::vector<TypeRefinementContext *>(
+                               TypeRefinementContext *),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl,
-                TypeRefinementContext *parentTRC) const;
+  std::vector<TypeRefinementContext *>
+  evaluate(Evaluator &evaluator, TypeRefinementContext *parentTRC) const;
 
 public:
+  // Separate caching.
   bool isCached() const { return true; }
+  llvm::Optional<std::vector<TypeRefinementContext *>> getCachedResult() const;
+  void cacheResult(std::vector<TypeRefinementContext *> children) const;
 };
 
 class SerializeAttrGenericSignatureRequest
@@ -4598,6 +4690,46 @@ public:
   bool isCached() const { return true; }
   llvm::Optional<bool> getCachedResult() const;
   void cacheResult(bool isSkipped) const;
+};
+
+class SemanticDeclAttrsRequest
+    : public SimpleRequest<SemanticDeclAttrsRequest,
+                           DeclAttributes(const Decl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  DeclAttributes evaluate(Evaluator &evaluator, const Decl *) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<DeclAttributes> getCachedResult() const;
+  void cacheResult(DeclAttributes) const;
+};
+
+class UniqueUnderlyingTypeSubstitutionsRequest
+    : public SimpleRequest<UniqueUnderlyingTypeSubstitutionsRequest,
+                           llvm::Optional<SubstitutionMap>(
+                               const OpaqueTypeDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Optional<SubstitutionMap> evaluate(Evaluator &evaluator,
+                                           const OpaqueTypeDecl *) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<llvm::Optional<SubstitutionMap>> getCachedResult() const;
+  void cacheResult(llvm::Optional<SubstitutionMap>) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

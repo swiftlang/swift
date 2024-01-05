@@ -42,6 +42,7 @@ namespace llvm {
 
 namespace swift {
   class IdentTypeRepr;
+  class ErrorTypeRepr;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
   class IDEInspectionCallbacksFactory;
@@ -157,6 +158,10 @@ public:
   bool InInactiveClauseEnvironment = false;
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
+
+  /// This Parser is a fallback parser for ASTGen.
+  // Note: This doesn't affect anything in non-SWIFT_BUILD_SWIFT_SYNTAX envs.
+  bool IsForASTGen = false;
 
   // A cached answer to
   //     Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)
@@ -953,13 +958,12 @@ public:
   /// Options that control the parsing of declarations.
   using ParseDeclOptions = OptionSet<ParseDeclFlags>;
 
-  void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
-                   bool IsTopLevel);
+  void consumeDecl(ParserPosition BeginParserPosition, bool IsTopLevel);
 
-  ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
-                               bool IsAtStartOfLineOrPreviousHadSemi,
+  ParserResult<Decl> parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                                bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl*)> Handler);
+                               llvm::function_ref<void(Decl *)> Handler,
+                               bool fromASTGen = false);
 
   std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1095,7 +1099,7 @@ public:
   ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
                                                                 SourceLoc Loc);
 
-  /// Parse the @extern attribute.
+  /// Parse the @_extern attribute.
   bool parseExternAttribute(DeclAttributes &Attributes, bool &DiscardAttribute,
                             StringRef AttrName, SourceLoc AtLoc, SourceLoc Loc);
 
@@ -1189,29 +1193,42 @@ public:
                            tok::kw_let);
   }
 
-  ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
-                                      SourceLoc &SpecifierLoc,
-                                      SourceLoc &IsolatedLoc,
-                                      SourceLoc &ConstLoc,
-                                      TypeAttributes &Attributes) {
-    if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
-        (canHaveParameterSpecifierContextualKeyword() &&
-         (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned") ||
-          Tok.getRawText().equals("consuming") ||
-          Tok.getRawText().equals("borrowing") ||
-          Tok.isContextualKeyword("isolated") ||
-          Tok.isContextualKeyword("_const"))))
-      return parseTypeAttributeListPresent(
-          Specifier, SpecifierLoc, IsolatedLoc, ConstLoc, Attributes);
-    return makeParserSuccess();
-  }
+  struct ParsedTypeAttributeList {
+    ParamDecl::Specifier Specifier = ParamDecl::Specifier::Default;
+    SourceLoc SpecifierLoc;
+    SourceLoc IsolatedLoc;
+    SourceLoc ConstLoc;
+    SourceLoc ResultDependsOnLoc;
+    TypeAttributes Attributes;
 
-  ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                             SourceLoc &SpecifierLoc,
-                                             SourceLoc &IsolatedLoc,
-                                             SourceLoc &ConstLoc,
-                                             TypeAttributes &Attributes);
+    /// Main entry point for parsing.
+    ///
+    /// Inline we just have the fast path of failing to match. We call slowParse
+    /// that contains the outline of more complex implementation. This is HOT
+    /// code!
+    ParserStatus parse(Parser &P) {
+      auto &Tok = P.Tok;
+      if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+          (P.canHaveParameterSpecifierContextualKeyword() &&
+           (Tok.getRawText().equals("__shared") ||
+            Tok.getRawText().equals("__owned") ||
+            Tok.getRawText().equals("consuming") ||
+            Tok.getRawText().equals("borrowing") ||
+            Tok.getRawText().equals("transferring") ||
+            Tok.isContextualKeyword("isolated") ||
+            Tok.isContextualKeyword("_const") ||
+            Tok.getRawText().equals("_resultDependsOn"))))
+        return slowParse(P);
+      return makeParserSuccess();
+    }
+
+    TypeRepr *applyAttributesToType(Parser &P, TypeRepr *Type) const;
+
+  private:
+    /// An out of line implementation of the more complicated cases. This
+    /// ensures on the inlined fast path we handle the case of not matching.
+    ParserStatus slowParse(Parser &P);
+  };
 
   bool parseConventionAttributeInternal(bool justChecking,
                                         TypeAttributes::Convention &convention);
@@ -1235,11 +1252,9 @@ public:
                                 bool allowAnyObject,
                                 SourceLoc *parseTildeCopyable = nullptr);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
-                             ParseDeclOptions Options,
-                             llvm::function_ref<void(Decl*)> handler);
+                             llvm::function_ref<void(Decl *)> handler);
   std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
   parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
-                ParseDeclOptions Options, IterableDeclContext *IDC,
                 bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
@@ -1264,14 +1279,13 @@ public:
 
   bool parseAccessorAfterIntroducer(
       SourceLoc Loc, AccessorKind Kind, ParsedAccessors &accessors,
-      bool &hasEffectfulGet, ParameterList *Indices, bool &parsingLimitedSyntax,
+      bool &hasEffectfulGet, bool &parsingLimitedSyntax,
       DeclAttributes &Attributes, ParseDeclOptions Flags,
-      AbstractStorageDecl *storage, SourceLoc StaticLoc, ParserStatus &Status
-  );
+      AbstractStorageDecl *storage, ParserStatus &Status);
 
   ParserStatus parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
                            TypeRepr *ResultType, ParsedAccessors &accessors,
-                           AbstractStorageDecl *storage, SourceLoc StaticLoc);
+                           AbstractStorageDecl *storage);
   ParserResult<VarDecl> parseDeclVarGetSet(PatternBindingEntry &entry,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
@@ -1353,50 +1367,6 @@ public:
   /// Get the location for a type error.
   SourceLoc getTypeErrorLoc() const;
 
-  /// Callback function used for creating a C++ AST from the syntax node at the given source location.
-  ///
-  /// The arguments to this callback are the source file to pass into ASTGen (the exported source file)
-  /// and the source location pointer to pass into ASTGen (to find the syntax node).
-  ///
-  /// The callback returns the new AST node and the ending location of the syntax node. If the AST node
-  /// is NULL, something went wrong.
-  template<typename T>
-  using ASTFromSyntaxTreeCallback = std::pair<T*, const void *>(
-      void *sourceFile, const void *sourceLoc
-  );
-
-  /// Parse by constructing a C++ AST node from the Swift syntax tree via ASTGen.
-  template<typename T>
-  ParserResult<T> parseASTFromSyntaxTree(
-      llvm::function_ref<ASTFromSyntaxTreeCallback<T>> body
-  ) {
-    if (!Context.LangOpts.hasFeature(Feature::ASTGenTypes))
-      return nullptr;
-
-    auto exportedSourceFile = SF.getExportedSourceFile();
-    if (!exportedSourceFile)
-      return nullptr;
-
-    // Perform the translation.
-    auto sourceLoc = Tok.getLoc().getOpaquePointerValue();
-    T* astNode;
-    const void *endLocPtr;
-    std::tie(astNode, endLocPtr) = body(exportedSourceFile, sourceLoc);
-
-    if (!astNode) {
-      assert(false && "Could not build AST node from syntax tree");
-      return nullptr;
-    }
-
-    // Reset the lexer to the ending location.
-    StringRef contents =
-        SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
-    L->resetToOffset((const char *)endLocPtr - contents.data());
-    L->lex(Tok);
-
-    return makeParserResult(astNode);
-  }
-
   //===--------------------------------------------------------------------===//
   // Type Parsing
 
@@ -1413,9 +1383,10 @@ public:
       ParseTypeReason reason);
 
   ParserResult<TypeRepr> parseType();
-  ParserResult<TypeRepr> parseType(
-      Diag<> MessageID,
-      ParseTypeReason reason = ParseTypeReason::Unspecified);
+  ParserResult<TypeRepr>
+  parseType(Diag<> MessageID,
+            ParseTypeReason reason = ParseTypeReason::Unspecified,
+            bool fromASTGen = false);
 
   /// Parse a type optionally prefixed by a list of named opaque parameters. If
   /// no params present, return 'type'. Otherwise, return 'type-named-opaque'.
@@ -1485,12 +1456,6 @@ public:
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
-                                 ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc,
-                                 SourceLoc IsolatedLoc,
-                                 SourceLoc ConstLoc);
-
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
@@ -1550,6 +1515,9 @@ public:
 
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;
+
+    /// The location of the '_resultDependsOn' keyword, if present.
+    SourceLoc ResultDependsOnLoc;
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
@@ -1948,7 +1916,7 @@ public:
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);
-  ParserResult<Stmt> parseStmt();
+  ParserResult<Stmt> parseStmt(bool fromASTGen = false);
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
@@ -2075,10 +2043,17 @@ public:
   void performIDEInspectionSecondPassImpl(
       IDEInspectionDelayedDeclState &info);
 
-  /// Returns true if the caller should skip calling `parseType` afterwards.
-  bool parseLegacyTildeCopyable(SourceLoc *parseTildeCopyable,
-                                ParserStatus &Status,
-                                SourceLoc &TildeCopyableLoc);
+  //===--------------------------------------------------------------------===//
+  // ASTGen support.
+
+  /// Parse a TypeRepr from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<TypeRepr> parseTypeReprFromSyntaxTree();
+  /// Parse a Stmt from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<Stmt> parseStmtFromSyntaxTree();
+  /// Parse a Decl from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<Decl> parseDeclFromSyntaxTree();
+  /// Parse an Expr from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<Expr> parseExprFromSyntaxTree();
 };
 
 /// Describes a parsed declaration name.

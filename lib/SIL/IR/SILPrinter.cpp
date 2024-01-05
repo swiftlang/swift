@@ -164,6 +164,7 @@ struct SILValuePrinterInfo {
   bool IsCapture = false;
   bool IsReborrow = false;
   bool IsEscaping = false;
+  bool HasResultDependsOn = false;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
   SILValuePrinterInfo(ID ValueID, SILType Type)
@@ -174,10 +175,11 @@ struct SILValuePrinterInfo {
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy,
                       LifetimeAnnotation Lifetime, bool IsCapture,
-                      bool IsReborrow, bool IsEscaping)
+                      bool IsReborrow, bool IsEscaping, bool HasResultDependsOn)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
         IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
-        IsCapture(IsCapture), IsReborrow(IsReborrow), IsEscaping(IsEscaping) {}
+        IsCapture(IsCapture), IsReborrow(IsReborrow), IsEscaping(IsEscaping),
+        HasResultDependsOn(HasResultDependsOn) {}
   SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy,
                       LifetimeAnnotation Lifetime, bool IsCapture,
                       bool IsReborrow, bool IsEscaping)
@@ -526,6 +528,12 @@ static void printSILFunctionNameAndType(
     for (auto *paramTy : genSig.getGenericParams()) {
       // Get a uniqued sugared name for the generic parameter type.
       auto sugaredTy = genEnv->getGenericSignature()->getSugaredType(paramTy);
+
+      // Opaque parameter types are printed as their canonical types and not
+      // the unparseable "<anonymous>".
+      if (sugaredTy->getDecl() && sugaredTy->getDecl()->isOpaqueType())
+        continue;
+
       Identifier name = sugaredTy->getName();
       while (!usedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
@@ -659,6 +667,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(ValueOwnershipKind)
   SIMPLE_PRINTER(UUID)
   SIMPLE_PRINTER(GenericSignature)
+  SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
 
   SILPrinter &operator<<(SILValuePrinterInfo i) {
@@ -685,6 +694,8 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
       *this << "@reborrow ";
     if (i.IsEscaping)
       *this << "@pointer_escape ";
+    if (i.HasResultDependsOn)
+      *this << "@_resultDependsOn ";
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.value() << " ";
     }
@@ -735,7 +746,8 @@ public:
             arg->getLifetimeAnnotation(),
             arg->isClosureCapture(),
             arg->isReborrow(),
-            arg->hasPointerEscape()};
+            arg->hasPointerEscape(),
+            arg->hasResultDependsOn()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
@@ -1431,6 +1443,9 @@ public:
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
+  void visitAllocVectorInst(AllocVectorInst *AVI) {
+    *this << AVI->getElementType() << ", " << getIDAndType(AVI->getCapacity());
+  }
   void visitAllocPackInst(AllocPackInst *API) {
     *this << API->getType().getObjectType();
   }
@@ -1527,6 +1542,14 @@ public:
       *this << "[nothrow] ";
     if (AI->isNonAsync())
       *this << "[noasync] ";
+    if (auto isolationCrossing = AI->getIsolationCrossing()) {
+      auto callerIsolation = isolationCrossing->getCallerIsolation();
+      if (callerIsolation != ActorIsolation::Unspecified)
+        *this << "[callee_isolation=" << callerIsolation << "] ";
+      auto calleeIsolation = isolationCrossing->getCalleeIsolation();
+      if (calleeIsolation != ActorIsolation::Unspecified)
+        *this << "[caller_isolation=" << calleeIsolation << "] ";
+    }
     visitApplyInstBase(AI);
   }
 
@@ -1700,6 +1723,9 @@ public:
     }
     if (BBI->hasPointerEscape()) {
       *this << "[pointer_escape] ";
+    }
+    if (BBI->isFromVarDecl()) {
+      *this << "[var_decl] ";
     }
     *this << getIDAndType(BBI->getOperand());
   }
@@ -2074,6 +2100,8 @@ public:
       *this << "[lexical] ";
     if (I->hasPointerEscape())
       *this << "[pointer_escape] ";
+    if (I->isFromVarDecl())
+      *this << "[var_decl] ";
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2186,6 +2214,15 @@ public:
     *this << ')';
   }
 
+  void visitVectorInst(VectorInst *vi) {
+    *this << "(";
+    llvm::interleave(
+        vi->getElements(),
+        [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
+    *this << ')';
+  }
+
   void visitTupleInst(TupleInst *TI) {
     
     // Check to see if the type of the tuple can be inferred accurately from the
@@ -2215,7 +2252,25 @@ public:
       *this << ')';
     }
   }
-  
+
+  void visitTupleAddrConstructorInst(TupleAddrConstructorInst *TI) {
+    // First print out our dest.
+    if (TI->isInitializationOfDest()) {
+      *this << "[init] ";
+    } else {
+      *this << "[assign] ";
+    }
+    *this << getIDAndType(TI->getDest());
+
+    *this << " with (";
+
+    llvm::interleave(
+        TI->getElements(), [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
+
+    *this << ')';
+  }
+
   void visitEnumInst(EnumInst *UI) {
     *this << UI->getType() << ", "
           << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);
@@ -2471,6 +2526,9 @@ public:
     *this << getIDAndType(CBOI->getOperand());
   }
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
+    if (MDI->isNonEscaping()) {
+      *this << "[nonescaping] ";
+    }
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
     printForwardingOwnershipKind(MDI, MDI->getValue());
@@ -2623,6 +2681,10 @@ public:
 
   void visitThrowInst(ThrowInst *TI) {
     *this << getIDAndType(TI->getOperand());
+  }
+
+  void visitThrowAddrInst(ThrowAddrInst *TAI) {
+    // no operands
   }
 
   void visitUnwindInst(UnwindInst *UI) {
@@ -3291,9 +3353,12 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   PerformanceConstraints perf = getPerfConstraints();
   switch (perf) {
-    case PerformanceConstraints::None:         break;
-    case PerformanceConstraints::NoLocks:      OS << "[no_locks] "; break;
-    case PerformanceConstraints::NoAllocation: OS << "[no_allocation] "; break;
+    case PerformanceConstraints::None:           break;
+    case PerformanceConstraints::NoLocks:        OS << "[no_locks] "; break;
+    case PerformanceConstraints::NoAllocation:   OS << "[no_allocation] "; break;
+    case PerformanceConstraints::NoRuntime:      OS << "[no_runtime] "; break;
+    case PerformanceConstraints::NoExistentials: OS << "[no_existentials] "; break;
+    case PerformanceConstraints::NoObjCBridging: OS << "[no_objc_bridging] "; break;
   }
 
   if (getEffectsKind() == EffectsKind::ReadOnly)
@@ -3359,6 +3424,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   if (needsStackProtection())
     OS << "[stack_protection] ";
+
+  if (hasResultDependsOnSelf()) {
+    OS << "[_resultDependsOnSelf] ";
+  }
 
   llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
   printSILFunctionNameAndType(OS, this, sugaredTypeNames, &PrintCtx);
@@ -4146,7 +4215,14 @@ void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   for (auto &MR : getMappedRegions()) {
     OS << "  " << MR.StartLine << ":" << MR.StartCol << " -> " << MR.EndLine
        << ":" << MR.EndCol << " : ";
-    printCounter(OS, MR.Counter);
+    switch (MR.RegionKind) {
+    case MappedRegion::Kind::Code:
+      printCounter(OS, MR.Counter);
+      break;
+    case MappedRegion::Kind::Skipped:
+      OS << "skipped";
+      break;
+    }
     OS << "\n";
   }
   OS << "}\n\n";
@@ -4263,7 +4339,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
             Requirement ReqWithDecls(req.getKind(), FirstTy,
                                      req.getLayoutConstraint());
             auto SubPrinterCopy = SubPrinter;
-            SubPrinterCopy.PrintClassLayoutName = erased;
+            SubPrinterCopy.PrintInternalLayoutName = erased;
             ReqWithDecls.print(OS, SubPrinterCopy);
           }
         },

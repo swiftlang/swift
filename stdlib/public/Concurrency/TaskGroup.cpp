@@ -35,10 +35,6 @@
 #include <atomic>
 #include <new>
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
-#include <mutex>
-#endif
-
 #if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
@@ -310,7 +306,7 @@ protected:
   void unlock() const {}
 #else
   // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
-  mutable std::mutex mutex_;
+  mutable Mutex mutex_;
 
   void lock() const { mutex_.lock(); }
   void unlock() const { mutex_.unlock(); }
@@ -666,7 +662,7 @@ void TaskGroupBase::runWaitingTask(PreparedWaitingTask prepared) {
 #endif
   if (auto waitingTask = prepared.waitingTask) {
     // TODO: allow the caller to suggest an executor
-    waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
+    waitingTask->flagAsAndEnqueueOnExecutor(SerialExecutorRef::generic());
   }
 }
 
@@ -1812,7 +1808,7 @@ reevaluate_if_taskgroup_has_results:;
       // Run the new task on the same thread now - this should run the new task to
       // completion. All swift tasks in task-to-thread model run on generic
       // executor
-      swift_job_run(childTask, ExecutorRef::generic());
+      swift_job_run(childTask, SerialExecutorRef::generic());
       haveRunOneChildTaskInline = true;
 
       SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", childTask, oldTask);
@@ -1971,7 +1967,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
       // Run the new task on the same thread now - this should run the new task to
       // completion. All swift tasks in task-to-thread model run on generic
       // executor
-      swift_job_run(childTask, ExecutorRef::generic());
+      swift_job_run(childTask, SerialExecutorRef::generic());
       haveRunOneChildTaskInline = true;
 
       SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", childTask, oldTask);

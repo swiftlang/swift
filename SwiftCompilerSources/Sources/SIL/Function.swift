@@ -33,6 +33,19 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
+  public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
+
+  /// The lowered function type in the expansion context of self.
+  ///
+  /// Always expanding a function type means that the opaque result types
+  /// have the correct generic signature. For example:
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
+  /// is lowered to this inside its module:
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <ActualResultType>
+  /// and this outside its module
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
+  public var loweredFunctionType: BridgedASTType { bridged.getLoweredFunctionTypeInContext() }
+
   /// Returns true if the function is a definition and not only an external declaration.
   ///
   /// This is the case if the functioun contains a body, i.e. some basic blocks.
@@ -55,9 +68,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
 
-  /// The number of indirect result arguments.
   public var numIndirectResultArguments: Int { bridged.getNumIndirectFormalResults() }
-  
+  public var hasIndirectErrorArgument: Bool { bridged.hasIndirectErrorResult() }
+
   /// The number of arguments which correspond to parameters (and not to indirect results).
   public var numParameterArguments: Int { bridged.getNumParameters() }
 
@@ -66,7 +79,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// This is the sum of indirect result arguments and parameter arguments.
   /// If the function is a definition (i.e. it has at least an entry block), this is the
   /// number of arguments of the function's entry block.
-  public var numArguments: Int { numIndirectResultArguments + numParameterArguments }
+  public var numArguments: Int {
+    numIndirectResultArguments + (hasIndirectErrorArgument ? 1 : 0) + numParameterArguments
+  }
 
   public var hasSelfArgument: Bool {
     bridged.getSelfArgumentIndex() >= 0
@@ -83,8 +98,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { bridged.getSILResultType().type }
 
-  public func getArgumentConvention(for argumentIndex: Int) -> ArgumentConvention {
-    return bridged.getSILArgumentConvention(argumentIndex).convention
+  public var convention: FunctionConvention {
+    FunctionConvention(for: loweredFunctionType, in: self)
+  }
+
+  public var argumentConventions: ArgumentConventions {
+    ArgumentConventions(functionConvention: convention)
   }
 
   public var returnInstruction: ReturnInst? {
@@ -112,12 +131,16 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
-      bridged.hasSemanticsAttr(BridgedStringRef(buffer.baseAddress!, buffer.count))
+      bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
 
   public var hasUnsafeNonEscapableResult: Bool {
     return bridged.hasUnsafeNonEscapableResult()
+  }
+
+  public var hasResultDependsOnSelf: Bool {
+    return bridged.hasResultDependsOnSelf()
   }
 
   /// True if the callee function is annotated with @_semantics("programtermination_point").
@@ -201,6 +224,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case none
     case noAllocations
     case noLocks
+    case noRuntime
+    case noExistentials
+    case noObjCRuntime
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -208,6 +234,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .None: return .none
       case .NoAllocation: return .noAllocations
       case .NoLocks: return .noLocks
+      case .NoRuntime: return .noRuntime
+      case .NoExistentials: return .noExistentials
+      case .NoObjCBridging: return .noObjCRuntime
       default: fatalError("unknown performance constraint")
     }
   }
@@ -366,6 +395,23 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       { (f: BridgedFunction, observeRetains: Bool) -> BridgedMemoryBehavior in
         let e = f.function.getSideEffects()
         return e.getMemBehavior(observeRetains: observeRetains)
+      },
+      // argumentMayRead  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in
+        let argOp = Operand(bridged: bridgedArgOp)
+        let addr = bridgedAddr.value
+        let applySite = argOp.instruction as! FullApplySite
+        let addrPath = addr.accessPath
+        let calleeArgIdx = applySite.calleeArgumentIndex(of: argOp)!
+        let convention = applySite.convention(of: argOp)!
+        assert(convention.isIndirectIn || convention.isInout)
+        let argPath = argOp.value.accessPath
+        assert(!argPath.isDistinct(from: addrPath))
+        let path = argPath.getProjection(to: addrPath) ?? SmallProjectionPath()
+        let effects = f.function.getSideEffects(forArgument: argOp.value.at(path),
+                                                atIndex: calleeArgIdx,
+                                                withConvention: convention)
+        return effects.memory.read
       }
     )
   }

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 prefix operator /
 prefix operator ^/

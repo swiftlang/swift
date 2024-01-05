@@ -19,8 +19,10 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
 #include "clang/CAS/CASOptions.h"
@@ -28,7 +30,6 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -203,9 +204,6 @@ namespace swift {
     /// declarations introduced at the deployment target.
     bool WeakLinkAtTarget = false;
 
-    /// Should conformance availability violations be diagnosed as errors?
-    bool EnableConformanceAvailabilityErrors = false;
-
     /// Should the editor placeholder error be downgraded to a warning?
     bool WarnOnEditorPlaceholder = false;
 
@@ -216,8 +214,15 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
+    /// Enable loading a package interface if both client and depdency module are in the
+    /// same package determined by `package-name` flag.
+    bool EnablePackageInterfaceLoad = false;
+
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
+
+    /// Enable 'availability' restrictions for App Extension Libraries.
+    bool EnableAppExtensionLibraryRestrictions = false;
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
@@ -295,9 +300,8 @@ namespace swift {
     /// Indicates whether the playground transformation should be applied.
     bool PlaygroundTransform = false;
 
-    /// Indicates whether the playground transformation should omit
-    /// instrumentation that has a high runtime performance impact.
-    bool PlaygroundHighPerformance = false;
+    /// Indicates the specific playground transformations to apply.
+    PlaygroundOptionSet PlaygroundOptions;
 
     /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
@@ -426,7 +430,7 @@ namespace swift {
     bool EnableNewOperatorLookup = false;
 
     /// The set of features that have been enabled.
-    llvm::SmallSet<Feature, 2> Features;
+    FixedBitSet<numFeatures(), Feature> Features;
 
     /// Temporary flag to support LLDB's transition to using \c Features.
     bool EnableBareSlashRegexLiterals = false;
@@ -577,6 +581,9 @@ namespace swift {
 
     /// Enable warnings for redundant requirements in generic signatures.
     bool WarnRedundantRequirements = false;
+
+    /// Enable experimental associated type inference improvements.
+    bool EnableExperimentalAssociatedTypeInference = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
@@ -950,10 +957,6 @@ namespace swift {
     /// DWARFImporter delegate.
     bool DisableSourceImport = false;
 
-    /// When set, use ExtraArgs alone to configure clang instance because ExtraArgs
-    /// contains the full option set.
-    bool ExtraArgsOnly = false;
-
     /// When building a PCM, rely on the Swift frontend's command-line -Xcc flags
     /// to build the Clang module via Clang frontend directly,
     /// and completely bypass the Clang driver.
@@ -963,8 +966,11 @@ namespace swift {
     /// built and provided to the compiler invocation.
     bool DisableImplicitClangModules = false;
 
-    /// Enable ClangIncludeTree for explicit module builds.
+    /// Enable ClangIncludeTree for explicit module builds scanning.
     bool UseClangIncludeTree = false;
+
+    /// Using ClangIncludeTreeRoot for compilation.
+    bool HasClangIncludeTreeRoot = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
@@ -994,6 +1000,16 @@ namespace swift {
 
     std::vector<std::string> getRemappedExtraArgs(
         std::function<std::string(StringRef)> pathRemapCallback) const;
+
+    /// For a swift module dependency, interface build command generation must
+    /// inherit
+    /// `-Xcc` flags used for configuration of the building instance's
+    /// `ClangImporter`. However, we can ignore Clang search path flags because
+    /// explicit Swift module build tasks will not rely on them and they may be
+    /// source-target-context-specific and hinder module sharing across
+    /// compilation source targets.
+    std::vector<std::string>
+    getReducedExtraArgsForSwiftModuleDependency() const;
   };
 
 } // end namespace swift

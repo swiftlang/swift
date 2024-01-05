@@ -27,15 +27,21 @@ using namespace namelookup;
 
 ImportSet::ImportSet(bool hasHeaderImportModule,
                      ArrayRef<ImportedModule> topLevelImports,
-                     ArrayRef<ImportedModule> transitiveImports)
+                     ArrayRef<ImportedModule> transitiveImports,
+                     ArrayRef<ImportedModule> transitiveSwiftOnlyImports)
   : HasHeaderImportModule(hasHeaderImportModule),
     NumTopLevelImports(topLevelImports.size()),
-    NumTransitiveImports(transitiveImports.size()) {
+    NumTransitiveImports(transitiveImports.size()),
+    NumTransitiveSwiftOnlyImports(transitiveSwiftOnlyImports.size()) {
   auto buffer = getTrailingObjects<ImportedModule>();
   std::uninitialized_copy(topLevelImports.begin(), topLevelImports.end(),
                           buffer);
   std::uninitialized_copy(transitiveImports.begin(), transitiveImports.end(),
                           buffer + topLevelImports.size());
+  std::uninitialized_copy(transitiveSwiftOnlyImports.begin(),
+                          transitiveSwiftOnlyImports.end(),
+                          buffer + topLevelImports.size() +
+                          transitiveImports.size());
 
 #ifndef NDEBUG
   llvm::SmallDenseSet<ImportedModule, 8> unique;
@@ -44,6 +50,15 @@ ImportSet::ImportSet(bool hasHeaderImportModule,
     assert(result && "Duplicate imports in import set");
   }
   for (auto import : transitiveImports) {
+    auto result = unique.insert(import).second;
+    assert(result && "Duplicate imports in import set");
+  }
+
+  unique.clear();
+  for (auto import : topLevelImports) {
+    unique.insert(import);
+  }
+  for (auto import : transitiveSwiftOnlyImports) {
     auto result = unique.insert(import).second;
     assert(result && "Duplicate imports in import set");
   }
@@ -82,10 +97,14 @@ void ImportSet::dump() const {
 }
 
 static void collectExports(ImportedModule next,
-                           SmallVectorImpl<ImportedModule> &stack) {
+                           SmallVectorImpl<ImportedModule> &stack,
+                           bool onlySwiftExports) {
   SmallVector<ImportedModule, 4> exports;
   next.importedModule->getImportedModulesForLookup(exports);
   for (auto exported : exports) {
+    if (onlySwiftExports && exported.importedModule->isNonSwiftModule())
+      continue;
+
     if (next.accessPath.empty())
       stack.push_back(exported);
     else if (exported.accessPath.empty()) {
@@ -135,7 +154,7 @@ ImportCache::getImportSet(ASTContext &ctx,
 
   SmallVector<ImportedModule, 4> stack;
   for (auto next : topLevelImports) {
-    collectExports(next, stack);
+    collectExports(next, stack, /*onlySwiftExports*/false);
   }
 
   while (!stack.empty()) {
@@ -148,7 +167,26 @@ ImportCache::getImportSet(ASTContext &ctx,
     if (next.importedModule == headerImportModule)
       hasHeaderImportModule = true;
 
-    collectExports(next, stack);
+    collectExports(next, stack, /*onlySwiftExports*/false);
+  }
+
+  // Now collect transitive imports through Swift reexported imports only.
+  SmallVector<ImportedModule, 4> transitiveSwiftOnlyImports;
+  visited.clear();
+  stack.clear();
+  for (auto next : topLevelImports) {
+    if (!visited.insert(next).second)
+      continue;
+    collectExports(next, stack, /*onlySwiftExports*/true);
+  }
+
+  while (!stack.empty()) {
+    auto next = stack.pop_back_val();
+    if (!visited.insert(next).second)
+      continue;
+
+    transitiveSwiftOnlyImports.push_back(next);
+    collectExports(next, stack, /*onlySwiftExports*/true);
   }
 
   // Find the insert position again, in case the above traversal invalidated
@@ -157,12 +195,15 @@ ImportCache::getImportSet(ASTContext &ctx,
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos))
     return *result;
   
-  size_t bytes = ImportSet::totalSizeToAlloc<ImportedModule>(topLevelImports.size() + transitiveImports.size());
+  size_t bytes = ImportSet::totalSizeToAlloc<ImportedModule>(
+                            topLevelImports.size() + transitiveImports.size() +
+                            transitiveSwiftOnlyImports.size());
   void *mem = ctx.Allocate(bytes, alignof(ImportSet), AllocationArena::Permanent);
 
   auto *result = new (mem) ImportSet(hasHeaderImportModule,
                                      topLevelImports,
-                                     transitiveImports);
+                                     transitiveImports,
+                                     transitiveSwiftOnlyImports);
   ImportSets.InsertNode(result, InsertPos);
 
   return *result;
@@ -249,6 +290,36 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   return result;
 }
 
+bool ImportCache::isImportedByViaSwiftOnly(const ModuleDecl *mod,
+                                           const DeclContext *dc) {
+  dc = dc->getModuleScopeContext();
+  if (dc->getParentModule()->isNonSwiftModule())
+    return false;
+
+  auto &ctx = mod->getASTContext();
+  auto key = std::make_pair(mod, dc);
+  auto found = SwiftOnlyCache.find(key);
+  if (found != SwiftOnlyCache.end()) {
+    if (ctx.Stats)
+      ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheHit;
+    return found->second;
+  }
+
+  if (ctx.Stats)
+    ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss;
+
+  bool result = false;
+  for (auto next : getImportSet(dc).getTransitiveSwiftOnlyImports()) {
+    if (next.importedModule == mod) {
+      result = true;
+      break;
+    }
+  }
+
+  SwiftOnlyCache[key] = result;
+  return result;
+}
+
 ArrayRef<ImportPath::Access>
 ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                             const ModuleDecl *other,
@@ -307,7 +378,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
         accessPaths.push_back(next.accessPath);
     }
 
-    collectExports(next, stack);
+    collectExports(next, stack, /*onlySwiftExports*/false);
   }
 
   auto result = allocateArray(ctx, accessPaths);

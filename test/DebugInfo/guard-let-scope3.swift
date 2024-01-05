@@ -15,7 +15,7 @@ public class S {
       // CHECK: debug_value {{.*}} : $Optional<C>, let, name "x", {{.*}}, scope [[X1]]
       // CHECK: debug_value {{.*}} : $C, let, name "x", {{.*}}, scope [[X2]]
       // FIXME: This source location is a little wild.
-      // CHECK-NEXT: strong_retain{{.*}}:[[@LINE+4]]:12, scope [[X2]]
+      // CHECK-NEXT: release_value{{.*}}:[[@LINE+5]]:3, scope [[X2]]
       throw MyError()
       // CHECK: function_ref {{.*}}MyError{{.*}}:[[@LINE-1]]:13, scope [[GUARD]]
     }

@@ -363,7 +363,7 @@ func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> V
 }
 
 func testTupleLabelMismatchKeyPath() {
-  // Very Cursed.
+  // FIXME: The warning should be upgraded to an error for key paths.
   let _: KeyPath<(x: Int, y: Int), Int> = \(a: Int, b: Int).x
   // expected-warning@-1 {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
 }

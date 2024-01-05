@@ -926,6 +926,8 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'k':
     return createType(
         createWithChild(Node::Kind::NoDerivative, popTypeAndGetChild()));
+  case 'K':
+    return createWithChild(Node::Kind::TypedThrowsAnnotation, popTypeAndGetChild());
   case 't':
     return createType(
         createWithChild(Node::Kind::CompileTimeConst, popTypeAndGetChild()));
@@ -1530,7 +1532,10 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   addChild(FuncType, ClangType);
   addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
-  addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
+  addChild(FuncType, popNode([](Node::Kind kind) {
+    return kind == Node::Kind::ThrowsAnnotation ||
+      kind == Node::Kind::TypedThrowsAnnotation;
+  }));
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
@@ -1572,7 +1577,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
         == Node::Kind::DifferentiableFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
-        == Node::Kind::ThrowsAnnotation)
+        == Node::Kind::ThrowsAnnotation ||
+      FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::TypedThrowsAnnotation)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::ConcurrentFunctionType)
@@ -4021,6 +4028,8 @@ NodePointer Demangler::demangleGenericRequirement() {
       name = "D";
     } else if (c == 'T') {
       name = "T";
+    } else if (c == 'B') {
+      name = "B";
     } else if (c == 'E') {
       size = demangleIndexAsNode();
       if (!size)
@@ -4043,6 +4052,11 @@ NodePointer Demangler::demangleGenericRequirement() {
       if (!size)
         return nullptr;
       name = "m";
+    } else if (c == 'S') {
+      size = demangleIndexAsNode();
+      if (!size)
+        return nullptr;
+      name = "S";
     } else {
       // Unknown layout constraint.
       return nullptr;
@@ -4102,46 +4116,19 @@ NodePointer Demangler::demangleMacroExpansion() {
   bool isAttached;
   bool isFreestanding;
   switch (nextChar()) {
-  case 'a':
-    kind = Node::Kind::AccessorAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)    \
+  case MangledChar[0]:                                         \
+    kind = Node::Kind::Name##AttachedMacroExpansion;           \
+    isAttached = true;                                         \
+    isFreestanding = false;                                    \
     break;
-
-  case 'r':
-    kind = Node::Kind::MemberAttributeAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
+#include "swift/Basic/MacroRoles.def"
 
   case 'f':
     kind = Node::Kind::FreestandingMacroExpansion;
     isAttached = false;
     isFreestanding = true;
-    break;
-
-  case 'm':
-    kind = Node::Kind::MemberAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
-
-  case 'p':
-    kind = Node::Kind::PeerAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
-
-  case 'c':
-    kind = Node::Kind::ConformanceAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
-    break;
-
-  case 'e':
-    kind = Node::Kind::ExtensionAttachedMacroExpansion;
-    isAttached = true;
-    isFreestanding = false;
     break;
 
   case 'u':

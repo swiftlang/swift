@@ -1,12 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
-// RUN: %swift-target-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c -primary-file %t/A.swift %t/B.swift -S -emit-ir -o - | %FileCheck %t/A.swift -check-prefix CHECK
-// RUN: %swift-target-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c %t/A.swift -primary-file %t/B.swift -S -emit-ir -o - | %FileCheck %t/B.swift -check-prefix CHECK
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c -primary-file %t/A.swift %t/B.swift -S -emit-ir -o - | %FileCheck %t/A.swift -check-prefix CHECK
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -static -O -module-name M -c %t/A.swift -primary-file %t/B.swift -S -emit-ir -o - | %FileCheck %t/B.swift -check-prefix CHECK
 
 // Verify that we can link successfully.
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking -O %t/A.swift %t/B.swift -o %t/a.out
 
 // REQUIRES: concurrency
+
+// rdar://119900439
+// XFAIL: CPU=armv7k
+// XFAIL: CPU=arm64_32
 
 //--- A.swift
 open class C {

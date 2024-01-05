@@ -176,6 +176,12 @@ enum IsLexical_t : bool {
   IsLexical = true,
 };
 
+/// Does this type contain any pack-like thing.
+enum HasPack_t : bool {
+  HasNoPack = false,
+  HasPack = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -192,10 +198,12 @@ public:
       InfiniteFlag               = 1 << 5,
       HasRawPointerFlag          = 1 << 6,
       LexicalFlag                = 1 << 7,
+      HasPackFlag                = 1 << 8,
     };
     // clang-format on
 
-    uint8_t Flags;
+    uint16_t Flags;
+
   public:
     /// Construct a default RecursiveProperties, which corresponds to
     /// a trivial, loadable, fixed-layout type.
@@ -207,14 +215,15 @@ public:
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
         HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
-        IsLexical_t isLexical = IsNotLexical)
+        IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
                 (isResilient ? ResilientFlag : 0U) |
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
                 (hasRawPointer ? HasRawPointerFlag : 0U) |
-                (isLexical ? LexicalFlag : 0U)) {}
+                (isLexical ? LexicalFlag : 0U) |
+                (hasPack ? HasPackFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -236,7 +245,7 @@ public:
 
     static constexpr RecursiveProperties forOpaque() {
       return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
-              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
+              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical, HasNoPack};
     }
 
     static constexpr RecursiveProperties forResilient() {
@@ -272,6 +281,9 @@ public:
     IsLexical_t isLexical() const {
       return IsLexical_t((Flags & LexicalFlag) != 0);
     }
+    HasPack_t isOrContainsPack() const {
+      return HasPack_t((Flags & HasPackFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -285,6 +297,7 @@ public:
     void setLexical(IsLexical_t isLexical) {
       Flags = (Flags & ~LexicalFlag) | (isLexical ? LexicalFlag : 0);
     }
+    void setHasPack() { Flags |= HasPackFlag; }
   };
 
 private:
@@ -393,6 +406,11 @@ public:
   /// Should a value of this type have its lifetime tied to its lexical scope?
   bool isLexical() const {
     return Properties.isLexical();
+  }
+
+  /// Does this type feature a pack at some level of its type tree.
+  bool isOrContainsPack() const {
+    return Properties.isOrContainsPack();
   }
 
   ResilienceExpansion getResilienceExpansion() const {

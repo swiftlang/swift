@@ -290,13 +290,21 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
 
-    // Type-check macro-generated extensions.
+    // Type-check macro-generated or implicitly-synthesized extensions.
     if (auto *synthesizedSF = SF->getSynthesizedFile()) {
       for (auto *decl : synthesizedSF->getTopLevelDecls()) {
-        if (!decl->isImplicit()) {
-          assert(isa<ExtensionDecl>(decl));
-          TypeChecker::typeCheckDecl(decl);
-        }
+        auto extension = cast<ExtensionDecl>(decl);
+
+        // Limit typechecking of synthesized _impicit_ extensions to conformance
+        // checking. This is done because a conditional conformance to Copyable
+        // is synthesized as an extension, based on the markings of `~Copyable`
+        // in a value type. This call to `checkConformancesInContext` will
+        // the actual check to verify that the conditional extension is correct,
+        // as it may be an invalid conformance.
+        if (extension->isImplicit())
+          TypeChecker::checkConformancesInContext(extension);
+        else
+          TypeChecker::typeCheckDecl(extension);
       }
     }
     SF->typeCheckDelayedFunctions();
@@ -306,16 +314,20 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   diagnoseUnnecessaryPublicImports(*SF);
 
   // Check to see if there are any inconsistent imports.
+  // Whole-module @_implementationOnly imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
       {});
 
+  // Whole-module @_spiOnly imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentSPIOnlyImportsRequest{SF},
       {});
 
+  // Whole-module ambiguous bare imports defaulting to public, when other
+  // imports are marked 'internal'.
   if (!Ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
     evaluateOrDefault(
       Ctx.evaluator,
@@ -323,6 +335,13 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       {});
   }
 
+  // Per-file inconsistent access-levels on imports of the same module.
+  evaluateOrDefault(
+    Ctx.evaluator,
+    CheckInconsistentAccessLevelOnImportSameFileRequest{SF},
+    {});
+
+  // Whole-module inconsistent @_weakLinked.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
@@ -337,7 +356,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   // Playground transform knows to look out for PCMacro's changes and not
   // to playground log them.
   if (!Ctx.hadError() && Ctx.LangOpts.PlaygroundTransform)
-    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundHighPerformance);
+    performPlaygroundTransform(*SF, Ctx.LangOpts.PlaygroundOptions);
 
   return std::make_tuple<>();
 }
@@ -510,20 +529,15 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
-                                    unsigned bindingIndex,
-                                    bool leaveClosureBodiesUnchecked) {
+                                    unsigned bindingIndex) {
   assert(!PBD->isInitializerChecked(bindingIndex) &&
          PBD->getInit(bindingIndex));
 
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeCheckExprOptions options;
-  if (leaveClosureBodiesUnchecked)
-    options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex,
-                                       /*patternType=*/Type(), options);
+                                       /*patternType=*/Type());
 }
 
 bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,

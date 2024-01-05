@@ -580,7 +580,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   auto serializable = IsSerialized;
   if (fromGlobalActorBound) {
     auto globalActorLinkage = getTypeLinkage(fromGlobalActorBound);
-    serializable = globalActorLinkage >= FormalLinkage::PublicNonUnique
+    serializable = globalActorLinkage <= FormalLinkage::PublicNonUnique
       ? IsSerialized : IsNotSerialized;
   }
 

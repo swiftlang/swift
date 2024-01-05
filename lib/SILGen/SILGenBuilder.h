@@ -461,7 +461,7 @@ public:
 
   using SILBuilder::createMarkDependence;
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
-                                    ManagedValue base);
+                                    ManagedValue base, bool isNonEscaping);
 
   using SILBuilder::createBeginBorrow;
   ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
@@ -504,6 +504,19 @@ public:
   using SILBuilder::createEndLifetime;
   void createEndLifetime(SILLocation loc, ManagedValue selfValue) {
     createEndLifetime(loc, selfValue.forward(SGF));
+  }
+
+  using SILBuilder::createTupleAddrConstructor;
+
+  void createTupleAddrConstructor(SILLocation loc, SILValue destAddr,
+                                  ArrayRef<ManagedValue> elements,
+                                  IsInitialization_t isInitOfDest) {
+    SmallVector<SILValue, 8> values;
+    for (auto mv : elements) {
+      values.push_back(mv.forward(SGF));
+    }
+
+    createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
 };
 

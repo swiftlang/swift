@@ -1280,7 +1280,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (!E->isObjC()) {
-      auto rootType = E->getRootType();
+      auto rootType = E->getExplicitRootType();
       if (rootType && doIt(rootType))
         return nullptr;
     }
@@ -1813,8 +1813,8 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
   if (doIt(IS->getCond()))
     return nullptr;
 
-  if (Stmt *S2 = doIt(IS->getThenStmt()))
-    IS->setThenStmt(S2);
+  if (auto *S2 = doIt(IS->getThenStmt()))
+    IS->setThenStmt(cast<BraceStmt>(S2));
   else
     return nullptr;
 
@@ -1905,11 +1905,9 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
   //
   // If for-in is already type-checked, the type-checked version
   // of the sequence is going to be visited as part of `iteratorVar`.
-  if (S->getTypeCheckedSequence()) {
-    if (auto IteratorVar = S->getIteratorVar()) {
-      if (doIt(IteratorVar))
-        return nullptr;
-    }
+  if (auto IteratorVar = S->getIteratorVar()) {
+    if (doIt(IteratorVar))
+      return nullptr;
 
     if (auto NextCall = S->getNextCall()) {
       if ((NextCall = doIt(NextCall)))
@@ -2210,6 +2208,10 @@ bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
 }
 
 bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
+bool Traversal::visitResultDependsOnTypeRepr(ResultDependsOnTypeRepr *T) {
   return doIt(T->getBase());
 }
 

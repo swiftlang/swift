@@ -230,16 +230,12 @@ void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
 }
 
 BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
-                                 RemoteRef<BuiltinTypeDescriptor> descriptor)
-    : TypeInfo(TypeInfoKind::Builtin,
-               descriptor->Size,
-               descriptor->getAlignment(),
-               descriptor->Stride,
-               descriptor->NumExtraInhabitants,
-               descriptor->isBitwiseTakable()),
-      Name(builder.getTypeRefString(
-              builder.readTypeRef(descriptor, descriptor->TypeName)))
-{}
+                                 BuiltinTypeDescriptorBase &descriptor)
+    : TypeInfo(TypeInfoKind::Builtin, descriptor.Size,
+               descriptor.Alignment, descriptor.Stride,
+               descriptor.NumExtraInhabitants,
+               descriptor.IsBitwiseTakable),
+      Name(descriptor.getMangledTypeName()) {}
 
 bool BuiltinTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
@@ -1336,7 +1332,7 @@ class ExistentialTypeInfoBuilder {
         continue;
       }
 
-      auto FD = TC.getBuilder().getFieldTypeInfo(P);
+      auto FD = TC.getBuilder().getFieldDescriptor(P);
       if (FD == nullptr) {
         DEBUG_LOG(fprintf(stderr, "No field descriptor: "); P->dump())
         Invalid = true;
@@ -1428,7 +1424,7 @@ public:
         return;
       }
 
-      const auto &FD = TC.getBuilder().getFieldTypeInfo(T);
+      const auto &FD = TC.getBuilder().getFieldDescriptor(T);
       if (FD == nullptr) {
         DEBUG_LOG(fprintf(stderr, "No field descriptor: "); T->dump())
         Invalid = true;
@@ -1641,9 +1637,8 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
       Kind, Fields);
 }
 
-const ReferenceTypeInfo *
-TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
-                                    ReferenceCounting Refcounting) {
+const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
+    ReferenceKind Kind, ReferenceCounting Refcounting) {
   auto key = std::make_pair(unsigned(Kind), unsigned(Refcounting));
   auto found = ReferenceCache.find(key);
   if (found != ReferenceCache.end())
@@ -1664,7 +1659,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   //
   // Weak references do not have any extra inhabitants.
 
-  auto BuiltinTI = Builder.getBuiltinTypeInfo(TR);
+  auto BuiltinTI = Builder.getBuiltinTypeDescriptor(TR);
   if (BuiltinTI == nullptr) {
     DEBUG_LOG(fprintf(stderr, "No TypeInfo for reference type: "); TR->dump());
     return nullptr;
@@ -1689,7 +1684,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   }
 
   auto *TI = makeTypeInfo<ReferenceTypeInfo>(BuiltinTI->Size,
-                                             BuiltinTI->getAlignment(),
+                                             BuiltinTI->Alignment,
                                              BuiltinTI->Stride,
                                              numExtraInhabitants,
                                              bitwiseTakable,
@@ -1705,13 +1700,14 @@ TypeConverter::getThinFunctionTypeInfo() {
   if (ThinFunctionTI != nullptr)
     return ThinFunctionTI;
 
-  auto descriptor = getBuilder().getBuiltinTypeInfo(getThinFunctionTypeRef());
+  auto descriptor =
+      getBuilder().getBuiltinTypeDescriptor(getThinFunctionTypeRef());
   if (descriptor == nullptr) {
     DEBUG_LOG(fprintf(stderr, "No TypeInfo for function type\n"));
     return nullptr;
   }
 
-  ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), descriptor);
+  ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), *descriptor.get());
 
   return ThinFunctionTI;
 }
@@ -1739,13 +1735,14 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   if (AnyMetatypeTI != nullptr)
     return AnyMetatypeTI;
 
-  auto descriptor = getBuilder().getBuiltinTypeInfo(getAnyMetatypeTypeRef());
+  auto descriptor =
+      getBuilder().getBuiltinTypeDescriptor(getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
     DEBUG_LOG(fprintf(stderr, "No TypeInfo for metatype type\n"));
     return nullptr;
   }
 
-  AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), descriptor);
+  AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), *descriptor.get());
 
   return AnyMetatypeTI;
 }
@@ -2096,7 +2093,7 @@ public:
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       BitwiseTakable(true), Invalid(false) {}
 
-  const TypeInfo *build(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+  const TypeInfo *build(const TypeRef *TR, FieldDescriptorBase &FD,
                         remote::TypeInfoProvider *ExternalTypeInfo) {
     // Count various categories of cases:
     unsigned NonPayloadCases = 0; // `case a`
@@ -2245,7 +2242,7 @@ public:
 
     // Do we have a fixed layout?
     // TODO: Test whether a missing FixedDescriptor is actually relevant.
-    auto FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
+    auto FixedDescriptor = TC.getBuilder().getBuiltinTypeDescriptor(TR);
     if (!FixedDescriptor || GenericPayloadCases > 0) {
       // This is a "dynamic multi-payload enum".  For example,
       // this occurs with:
@@ -2283,9 +2280,9 @@ public:
     //  * Has at least two cases with non-zero payload size
     //  * Has a descriptor stored as BuiltinTypeInfo
     Size = FixedDescriptor->Size;
-    Alignment = FixedDescriptor->getAlignment();
+    Alignment = FixedDescriptor->Alignment;
     NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
-    BitwiseTakable = FixedDescriptor->isBitwiseTakable();
+    BitwiseTakable = FixedDescriptor->IsBitwiseTakable;
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
     if (Stride == 0)
       Stride = 1;
@@ -2395,12 +2392,12 @@ public:
 
     /// Otherwise, get the fixed layout information from reflection
     /// metadata.
-    auto descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
+    auto descriptor = TC.getBuilder().getBuiltinTypeDescriptor(B);
     if (descriptor == nullptr) {
       DEBUG_LOG(fprintf(stderr, "No TypeInfo for builtin type: "); B->dump());
       return nullptr;
     }
-    return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), descriptor);
+    return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), *descriptor.get());
   }
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
@@ -2418,13 +2415,13 @@ public:
       return nullptr;
     };
 
-    auto FD = TC.getBuilder().getFieldTypeInfo(TR);
+    auto FD = TC.getBuilder().getFieldDescriptor(TR);
     if (FD == nullptr || FD->isStruct()) {
       // Maybe this type is opaque -- look for a builtin
       // descriptor to see if we at least know its size
       // and alignment.
       if (auto ImportedTypeDescriptor =
-              TC.getBuilder().getBuiltinTypeInfo(TR)) {
+              TC.getBuilder().getBuiltinTypeDescriptor(TR)) {
         // This might be an external type we treat as opaque (like C structs),
         // the external type info provider might have better type information,
         // so ask it first.
@@ -2432,7 +2429,7 @@ public:
           return External;
 
         return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(),
-                                                ImportedTypeDescriptor);
+                                                *ImportedTypeDescriptor.get());
       }
 
       if (FD == nullptr) {
@@ -2457,7 +2454,8 @@ public:
       RecordTypeInfoBuilder builder(TC, RecordKind::Struct);
 
       std::vector<FieldTypeInfo> Fields;
-      if (!TC.getBuilder().getFieldTypeRefs(TR, FD, ExternalTypeInfo, Fields))
+      if (!TC.getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo,
+                                            Fields))
         return nullptr;
 
       for (auto Field : Fields)
@@ -2467,7 +2465,7 @@ public:
     case FieldDescriptorKind::Enum:
     case FieldDescriptorKind::MultiPayloadEnum: {
       EnumTypeInfoBuilder builder(TC);
-      return builder.build(TR, FD, ExternalTypeInfo);
+      return builder.build(TR, *FD.get(), ExternalTypeInfo);
     }
     case FieldDescriptorKind::ObjCClass:
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
@@ -2709,7 +2707,7 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
 const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     const TypeRef *TR, unsigned start,
     remote::TypeInfoProvider *ExternalTypeInfo) {
-  auto FD = getBuilder().getFieldTypeInfo(TR);
+  auto FD = getBuilder().getFieldDescriptor(TR);
   if (FD == nullptr) {
     DEBUG_LOG(fprintf(stderr, "No field descriptor: "); TR->dump());
     return nullptr;
@@ -2723,7 +2721,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
     std::vector<FieldTypeInfo> Fields;
-    if (!getBuilder().getFieldTypeRefs(TR, FD, ExternalTypeInfo, Fields))
+    if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo, Fields))
       return nullptr;
 
     // Start layout from the given instance start offset. This should

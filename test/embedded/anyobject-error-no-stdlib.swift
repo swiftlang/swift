@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-ir -parse-stdlib %s -enable-experimental-feature Embedded -verify -wmo
 
+// REQUIRES: swift_in_compiler
+
 public enum Never {}
 
 @_silgen_name("abort")
@@ -14,5 +16,4 @@ precedencegroup AssignmentPrecedence { assignment: true }
 
 public func foo(_ x: AnyObject) {
   _ = type(of: x) // expected-error {{cannot use a value of protocol type 'AnyObject' in embedded Swift}}
-  // expected-note@-1 {{called from here}}
 }

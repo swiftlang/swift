@@ -142,10 +142,10 @@ public:
     transformStmtCondition(SC, IS->getStartLoc());
     IS->setCond(SC); // FIXME: is setting required?..
 
-    if (Stmt *TS = IS->getThenStmt()) {
-      Stmt *NTS = transformStmt(TS);
+    if (auto *TS = IS->getThenStmt()) {
+      auto *NTS = transformStmt(TS);
       if (NTS != TS) {
-        IS->setThenStmt(NTS);
+        IS->setThenStmt(cast<BraceStmt>(NTS));
       }
     }
 
@@ -336,7 +336,7 @@ public:
     if (D->isImplicit())
       return D;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (BraceStmt *B = FD->getBody()) {
+      if (BraceStmt *B = FD->getTypecheckedBody()) {
         const ParameterList *PL = FD->getParameters();
         BraceStmt *NB = transformBraceStmt(B, PL);
         // Since it would look strange going straight to the first line in a

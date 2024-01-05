@@ -1150,12 +1150,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   SourceLoc SLoc;
   ApplyOptions ApplyOpts;
   ArrayRef<uint64_t> ListOfValues;
+
   SILLocation Loc = RegularLocation(SLoc);
   ValueOwnershipKind forwardingOwnership(OwnershipKind::Any);
   auto decodeValueOwnership = [](unsigned field){
     // Invalid/Any ownership is never encoded.
     return ValueOwnershipKind(field+1);
   };
+
+  unsigned ApplyCallerIsolation = unsigned(ActorIsolation::Unspecified);
+  unsigned ApplyCalleeIsolation = unsigned(ActorIsolation::Unspecified);
 
   switch (RecordKind) {
   default:
@@ -1208,6 +1212,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     forwardingOwnership = decodeValueOwnership(ownershipField);
     break;
   }
+  case SIL_ONE_TYPE_VALUES_CATEGORIES: {
+    // NOTE: This is the same as Values except we smuggle in the category in the
+    // top bit.
+    SILOneTypeValuesCategoriesLayout::readRecord(
+        scratch, RawOpCode, TyID, TyCategory, Attr, ListOfValues);
+    break;
+  }
   case SIL_TWO_OPERANDS:
     SILTwoOperandsLayout::readRecord(scratch, RawOpCode, Attr,
                                      TyID, TyCategory, ValID,
@@ -1226,8 +1237,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   case SIL_INST_APPLY: {
     unsigned Kind, RawApplyOpts;
-    SILInstApplyLayout::readRecord(scratch, Kind, RawApplyOpts, NumSubs, TyID, TyID2,
-                                   ValID, ListOfValues);
+    SILInstApplyLayout::readRecord(scratch, Kind, RawApplyOpts, NumSubs, TyID,
+                                   TyID2, ValID, ApplyCallerIsolation,
+                                   ApplyCalleeIsolation, ListOfValues);
     switch (Kind) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
@@ -1414,6 +1426,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
         Attr == 0 ? OpenedExistentialAccess::Immutable
                   : OpenedExistentialAccess::Mutable);
+    break;
+  case SILInstructionKind::AllocVectorInst:
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createAllocVector(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     break;
   case SILInstructionKind::DynamicPackIndexInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
@@ -1736,13 +1757,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                        I, Builder.getTypeExpansionContext())));
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
+    std::optional<ApplyIsolationCrossing> IsolationCrossing;
+    if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      IsolationCrossing = {caller, callee};
+    }
+
     if (OpCode == SILInstructionKind::ApplyInst) {
       ResultInst =
           Builder.createApply(Loc, getLocalValue(ValID, FnTy), Substitutions,
-                              Args, ApplyOpts);
+                              Args, ApplyOpts, nullptr, IsolationCrossing);
     } else {
       ResultInst = Builder.createBeginApply(Loc, getLocalValue(ValID, FnTy),
-                                            Substitutions, Args, ApplyOpts);
+                                            Substitutions, Args, ApplyOpts,
+                                            nullptr, IsolationCrossing);
     }
     break;
   }
@@ -1772,9 +1801,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                        I, Builder.getTypeExpansionContext())));
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
+    std::optional<ApplyIsolationCrossing> IsolationCrossing;
+    if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      IsolationCrossing = {caller, callee};
+    }
+
     ResultInst = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
                                         Substitutions, Args, normalBB, errorBB,
-                                        ApplyOpts);
+                                        ApplyOpts, nullptr, IsolationCrossing);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1943,7 +1979,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
-                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
+        /*nonEscaping*/Attr);
     break;
   }
   case SILInstructionKind::BeginDeallocRefInst: {
@@ -2146,11 +2183,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     bool isLexical = Attr & 0x1;
     bool hasPointerEscape = (Attr >> 1) & 0x1;
+    bool fromVarDecl = (Attr >> 2) & 0x1;
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
-        isLexical, hasPointerEscape);
+        isLexical, hasPointerEscape, fromVarDecl);
     break;
   }
 
@@ -2237,10 +2275,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool AllowsDiagnostics = Attr & 0x1;
     bool IsLexical = (Attr >> 1) & 0x1;
     bool IsEscaping = (Attr >> 2) & 0x1;
+    bool IsFromVarDecl = (Attr >> 3) & 0x1;
     auto *MVI = Builder.createMoveValue(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        IsLexical, IsEscaping);
+        IsLexical, IsEscaping, IsFromVarDecl);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
     break;
@@ -2563,6 +2602,44 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc, getSILType(Ty, (SILValueCategory)TyCategory, Fn), OpList);
     break;
   }
+  case SILInstructionKind::TupleAddrConstructorInst: {
+    assert(RecordKind == SIL_ONE_TYPE_VALUES_CATEGORIES);
+
+    // Format: A type followed by a list of values. A value is expressed by 2
+    // IDs: ValueID, ValueResultNumber. The type is the type of the first
+    // element (which is our dest).
+    auto Ty = MF->getType(TyID);
+    TupleType *TT = Ty->castTo<TupleType>();
+    assert(
+        TT &&
+        "Type of the DestAddr of a TupleAddrConstructor should be TupleType");
+    assert(ListOfValues.size() >= 2 &&
+           "Should have at least a dest and one element");
+
+    auto getValue = [&](Type type, uint64_t value) -> SILValue {
+      assert((value & 0xFFFFFFFF00000000) == 0 &&
+             "High bits should never be set");
+      uint32_t count = value & 0x7FFFFFFF;
+      SILValueCategory category = value & 0x80000000 ? SILValueCategory::Address
+                                                     : SILValueCategory::Object;
+      return getLocalValue(count, getSILType(type, category, Fn));
+    };
+
+    SILValue DestAddr = getValue(TT, ListOfValues[0]);
+
+    SmallVector<SILValue, 4> OpList;
+    unsigned Count = 1;
+
+    visitExplodedTupleType(DestAddr->getType(), [&](SILType eltType) {
+      OpList.push_back(getValue(eltType.getRawASTType(), ListOfValues[Count]));
+      ++Count;
+      return true;
+    });
+    auto IsInitOfDest = IsInitialization_t(Attr & 0x1);
+    ResultInst =
+        Builder.createTupleAddrConstructor(Loc, DestAddr, OpList, IsInitOfDest);
+    break;
+  }
   case SILInstructionKind::ObjectInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
@@ -2581,6 +2658,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createObject(Loc, ClassTy, elements, numBaseElements);
     break;
   }
+  case SILInstructionKind::VectorInst: {
+    auto EltTy = MF->getType(TyID);
+    SmallVector<SILValue, 4> OpList;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; ++I) {
+      OpList.push_back(
+        getLocalValue(ListOfValues[I],
+                      getSILType(EltTy, SILValueCategory::Object, Fn)));
+    }
+    ResultInst = Builder.createVector(Loc, OpList);
+    break;
+  }
+
   case SILInstructionKind::BranchInst: {
     SmallVector<SILValue, 4> Args;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3)
@@ -2997,6 +3086,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::UnwindInst: {
     ResultInst = Builder.createUnwind(Loc);
+    break;
+  }
+  case SILInstructionKind::ThrowAddrInst: {
+    ResultInst = Builder.createThrowAddr(Loc);
     break;
   }
   case SILInstructionKind::YieldInst: {

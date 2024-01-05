@@ -29,7 +29,6 @@ add_swift_host_library(swiftAST STATIC
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
-  CASTBridging.cpp
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
@@ -154,13 +153,6 @@ target_link_libraries(swiftAST INTERFACE
   clangLex
   clangAPINotes
   clangBasic)
-
-if(SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftAST
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-  )
-endif()
 
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
