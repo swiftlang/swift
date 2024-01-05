@@ -132,19 +132,8 @@ Func ContiguousArray._createNewBuffer(bufferIsUnique:minimumCapacity:growForAppe
 Func ContiguousArray._reserveCapacityImpl(minimumCapacity:growForAppend:) has been renamed to Func __specialize_class__reserveCapacityImpl(minimumCapacity:growForAppend:)
 Func ContiguousArray._reserveCapacityImpl(minimumCapacity:growForAppend:) has mangled name changing from 'Swift.ContiguousArray._reserveCapacityImpl(minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()' to 'Swift.ContiguousArray.__specialize_class__reserveCapacityImpl(minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()'
 
-// These haven't actually been changed, rather a new subscript was added.
-// But it seems the ABI checker gives a false positive here and detects
-// it as a rename instead of an addition
-Accessor MutableCollection.subscript(_:).Get() has mangled name changing from '(extension in Swift):Swift.MutableCollection.subscript.getter : (Swift.Range<A.Index>) -> Swift.Slice<A>' to '(extension in Swift):Swift.MutableCollection.subscript.getter : (Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>'
-Accessor MutableCollection.subscript(_:).Get() has parameter 0 type change from Swift.Range<τ_0_0.Index> to Swift.RangeSet<τ_0_0.Index>
-Accessor MutableCollection.subscript(_:).Get() has return type change from Swift.Slice<τ_0_0> to Swift.DiscontiguousSlice<τ_0_0>
-Accessor MutableCollection.subscript(_:).Modify() has mangled name changing from '(extension in Swift):Swift.MutableCollection.subscript.modify : (Swift.Range<A.Index>) -> Swift.Slice<A>' to '(extension in Swift):Swift.MutableCollection.subscript.modify : (Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>'
-Accessor MutableCollection.subscript(_:).Modify() has parameter 0 type change from Swift.Range<τ_0_0.Index> to Swift.RangeSet<τ_0_0.Index>
-Accessor MutableCollection.subscript(_:).Set() has mangled name changing from '(extension in Swift):Swift.MutableCollection.subscript.setter : (Swift.Range<A.Index>) -> Swift.Slice<A>' to '(extension in Swift):Swift.MutableCollection.subscript.setter : (Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>'
-Accessor MutableCollection.subscript(_:).Set() has parameter 0 type change from Swift.Slice<τ_0_0> to Swift.DiscontiguousSlice<τ_0_0>
-Accessor MutableCollection.subscript(_:).Set() has parameter 1 type change from Swift.Range<τ_0_0.Index> to Swift.RangeSet<τ_0_0.Index>
-Subscript MutableCollection.subscript(_:) has mangled name changing from '(extension in Swift):Swift.MutableCollection.subscript(Swift.Range<A.Index>) -> Swift.Slice<A>' to '(extension in Swift):Swift.MutableCollection.subscript(Swift.RangeSet<A.Index>) -> Swift.DiscontiguousSlice<A>'
-Subscript MutableCollection.subscript(_:) has parameter 0 type change from Swift.Range<τ_0_0.Index> to Swift.RangeSet<τ_0_0.Index>
-Subscript MutableCollection.subscript(_:) has return type change from Swift.Slice<τ_0_0> to Swift.DiscontiguousSlice<τ_0_0>
+// This hasn't actually been changed, but it seems the ABI checker gives a false positive here and detects
+// it as a removal with the addition of the RangeSet subscripts
+Subscript MutableCollection.subscript(_:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
