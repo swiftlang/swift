@@ -2526,6 +2526,9 @@ public:
     *this << getIDAndType(CBOI->getOperand());
   }
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
+    if (MDI->isNonEscaping()) {
+      *this << "[nonescaping] ";
+    }
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
     printForwardingOwnershipKind(MDI, MDI->getValue());

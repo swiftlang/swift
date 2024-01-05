@@ -8290,6 +8290,15 @@ public:
 /// result) have a dependence on "base" being alive. Do not allow for things
 /// that /may/ destroy base to be moved earlier than any of these uses of
 /// "value"'.
+///
+/// The dependent 'value' may be marked 'nonescaping', which guarantees that the
+/// lifetime dependence is statically enforceable. In this case, the compiler
+/// must be able to follow all values forwarded from the dependent 'value', and
+/// recognize all final (non-forwarded, non-escaping) use points. This implies
+/// that `findPointerEscape` is false. A diagnostic pass checks that the
+/// incoming SIL to verify that these use points are all initially within the
+/// 'base' lifetime. Regular 'mark_dependence' semantics ensure that
+/// optimizations cannot violate the lifetime dependence after diagnostics.
 class MarkDependenceInst
     : public InstructionBase<SILInstructionKind::MarkDependenceInst,
                              OwnershipForwardingSingleValueInstruction> {
@@ -8297,10 +8306,17 @@ class MarkDependenceInst
 
   FixedOperandList<2> Operands;
 
+  USE_SHARED_UINT8;
+
   MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
-                     ValueOwnershipKind forwardingOwnershipKind)
+                     ValueOwnershipKind forwardingOwnershipKind,
+                     bool isNonEscaping)
       : InstructionBase(DebugLoc, value->getType(), forwardingOwnershipKind),
-        Operands{this, value, base} {}
+        Operands{this, value, base} {
+    if (isNonEscaping) {
+      sharedUInt8().MarkDependenceInst.nonEscaping = true;
+    }
+  }
 
 public:
   enum { Value, Base };
@@ -8318,6 +8334,10 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  bool isNonEscaping() const {
+    return sharedUInt8().MarkDependenceInst.nonEscaping;
+  }
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply

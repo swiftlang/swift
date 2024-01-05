@@ -1680,6 +1680,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const MarkDependenceInst *MDI = cast<MarkDependenceInst>(&SI);
       operand = MDI->getValue();
       operand2 = MDI->getBase();
+      Attr = (MDI->isNonEscaping() ? 1 : 0);
     } else {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();

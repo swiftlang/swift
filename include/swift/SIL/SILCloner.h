@@ -2950,8 +2950,9 @@ void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getValue()),
                 getOpValue(Inst->getBase()),
                 getBuilder().hasOwnership()
-                    ? Inst->getForwardingOwnershipKind()
-                    : ValueOwnershipKind(OwnershipKind::None)));
+                ? Inst->getForwardingOwnershipKind()
+                : ValueOwnershipKind(OwnershipKind::None),
+                /*isNonEscaping*/false));
 }
 
 template<typename ImplClass>

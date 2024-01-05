@@ -2925,7 +2925,7 @@ private:
       if (valueTL.isTrivial()) {
         SILValue dependentValue =
           SGF.B.createMarkDependence(eval, value.forward(SGF),
-                                     owner.getValue());
+                                     owner.getValue(), /*isNonEscaping*/false);
         value = SGF.emitManagedRValueWithCleanup(dependentValue, valueTL);
       }
     }
@@ -6325,7 +6325,8 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
 
   // Add a mark_dependence between the interior pointer and the array value
   auto dependentValue = B.createMarkDependence(Loc, resultElts[1].getValue(),
-                                               resultElts[0].getValue());
+                                               resultElts[0].getValue(),
+                                               /*isNonEscaping*/false);
   return {resultElts[0], dependentValue};
 }
 

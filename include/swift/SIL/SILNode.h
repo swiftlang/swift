@@ -276,6 +276,9 @@ protected:
                  pointerEscape : 1,
                  fromVarDecl : 1);
 
+    SHARED_FIELD(MarkDependenceInst, uint8_t
+                 nonEscaping : 1);
+
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
   // clang-format on

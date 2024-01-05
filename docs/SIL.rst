@@ -5503,24 +5503,35 @@ mark_dependence
 
 ::
 
-  sil-instruction :: 'mark_dependence' sil-operand 'on' sil-operand
+  sil-instruction :: 'mark_dependence' '[nonescaping]'? sil-operand 'on' sil-operand
 
-  %2 = mark_dependence %0 : $*T on %1 : $Builtin.NativeObject
+  %2 = mark_dependence %value : $*T on %base : $Builtin.NativeObject
 
-Indicates that the validity of the first operand depends on the value
-of the second operand.  Operations that would destroy the second value
-must not be moved before any instructions which depend on the result
-of this instruction, exactly as if the address had been obviously
-derived from that operand (e.g. using ``ref_element_addr``).
+Indicates that the validity of ``%value`` depends on the value of
+``%base``. Operations that would destroy ``%base`` must not be moved
+before any instructions which depend on the result of this
+instruction, exactly as if the address had been directly derived from
+that operand (e.g. using ``ref_element_addr``).
 
-The result is always equal to the first operand.  The first operand
-will typically be an address, but it could be an address in a
-non-obvious form, such as a Builtin.RawPointer or a struct containing
-the same.  Transformations should be somewhat forgiving here.
+The result is the forwarded value of ``%value``. ``%value`` may be an
+address, but it could be an address in a non-obvious form, such as a
+Builtin.RawPointer or a struct containing the same.
 
-The second operand may have either object or address type.  In the
-latter case, the dependency is on the current value stored in the
-address.
+``%base`` may have either object or address type. In the latter case,
+the dependency is on the current value stored in the address.
+
+The optional ``nonescaping`` attribute indicates that no value derived
+from ``%value`` escapes the lifetime of ``%base``. As with escaping
+``mark_dependence``, all values transitively forwarded from ``%value``
+must be destroyed within the lifetime of ``%base``. Unlike escaping
+``mark_dependence``, this must be statically verifiable. Additionally,
+unlike escaping ``mark_dependence``, derived values include copies of
+``%value`` and values transitively forwarded from those copies. If
+``%base`` is identical to ``%value`` this simply means that copies of
+``%value`` do not outlive the original OSSA lifetime of
+``%value``. Furthermore, unlike escaping ``mark_dependence``, no value
+derived from ``%value`` may have a bitwise escape (conversion to
+UnsafePointer) or pointer escape (unknown use).
 
 is_unique
 `````````

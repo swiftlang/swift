@@ -228,7 +228,8 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
 
   // Mark the dependence of the resulting value on the actor value to
   // force the actor to stay alive.
-  executor = B.createMarkDependence(loc, unmarkedExecutor, actor);
+  executor = B.createMarkDependence(loc, unmarkedExecutor, actor,
+                                    /*isNonEscaping*/false);
 
   // Cache the non-optional result for later.
   ExecutorForActor.insert(actor, executor);

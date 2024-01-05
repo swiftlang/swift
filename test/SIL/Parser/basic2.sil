@@ -287,3 +287,17 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_mark_dependence : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: [[MD1:%.*]] = mark_dependence %1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+// CHECK: mark_dependence [nonescaping] [[MD1]] : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+// CHECK: } // end sil function 'test_mark_dependence'
+sil [ossa] @test_mark_dependence : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %md1 = mark_dependence %1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+  %md2 = mark_dependence [nonescaping] %md1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
+  destroy_value %md2 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
