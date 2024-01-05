@@ -21,6 +21,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/ThreadPool.h"
 
 using namespace llvm;
 
@@ -39,6 +40,9 @@ llvm::cl::opt<std::string> CASID("id", llvm::cl::desc("<casid>"),
                                  llvm::cl::cat(Category));
 llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file|index>"),
                                  llvm::cl::cat(Category));
+llvm::cl::opt<unsigned> Threads("threads",
+                                llvm::cl::desc("<number of threads>"),
+                                llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<Actions>
     Action("action", llvm::cl::desc("<action>"),
            llvm::cl::values(clEnumVal(compute_cache_key, "compute cache key"),
@@ -216,16 +220,27 @@ int main(int argc, char *argv[]) {
   llvm::StringSaver Saver(Alloc);
   auto Args = createArgs(SwiftCommands, Saver);
 
-  switch (Action) {
-  case compute_cache_key:
-    return action_compute_cache_key(cas, Input, Args);
-  case compute_cache_key_from_index:
-    return action_compute_cache_key_from_index(cas, Input, Args);
-  case cache_query:
-    return action_cache_query(cas, CASID.c_str());
-  case replay_result:
-    return action_replay_result(cas, CASID.c_str(), Args);
+  std::atomic<int> Ret = 0;
+  llvm::ThreadPool Pool(llvm::hardware_concurrency(Threads));
+  for (unsigned i = 0; i < Threads; ++i) {
+    Pool.async([&]() {
+      switch (Action) {
+      case compute_cache_key:
+        Ret += action_compute_cache_key(cas, Input, Args);
+        break;
+      case compute_cache_key_from_index:
+        Ret += action_compute_cache_key_from_index(cas, Input, Args);
+        break;
+      case cache_query:
+        Ret += action_cache_query(cas, CASID.c_str());
+        break;
+      case replay_result:
+        Ret += action_replay_result(cas, CASID.c_str(), Args);
+        break;
+      }
+    });
   }
+  Pool.wait();
 
-  return EXIT_SUCCESS;
+  return Ret;
 }

@@ -778,6 +778,12 @@ swiftscan_cache_replay_instance_create(int argc, const char **argv,
     return nullptr;
   }
 
+  // Clear the LLVMArgs as `llvm::cl::ParseCommandLineOptions` is not
+  // thread-safe to be called in libSwiftScan. The replay instance should not be
+  // used to do compilation so clearing `-Xllvm` should not affect replay
+  // result.
+  Instance->Invocation.getFrontendOptions().LLVMArgs.clear();
+
   return wrap(Instance);
 }
 
