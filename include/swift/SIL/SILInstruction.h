@@ -853,7 +853,7 @@ public:
 
   /// Whether IRGen lowering of this instruction may result in emitting packs of
   /// metadata or witness tables.
-  bool mayRequirePackMetadata() const;
+  bool mayRequirePackMetadata(SILFunction const &F) const;
 
   /// Create a new copy of this instruction, which retains all of the operands
   /// and other information of this one.  If an insertion point is specified,

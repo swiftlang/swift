@@ -395,6 +395,9 @@ public:
   /// Whether the type contains any flavor of pack.
   bool hasAnyPack() const { return getASTType()->hasAnyPack(); }
 
+  /// Whether the type's layout is known to include some flavor of pack.
+  bool isOrContainsPack(const SILFunction &F) const;
+
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;

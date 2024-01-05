@@ -1301,7 +1301,11 @@ bool SILInstruction::isDeallocatingStack() const {
   return false;
 }
 
-bool SILInstruction::mayRequirePackMetadata() const {
+static bool typeOrLayoutInvolvesPack(SILType ty, SILFunction const &F) {
+  return ty.hasAnyPack() || ty.isOrContainsPack(F);
+}
+
+bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
   switch (getKind()) {
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::TuplePackElementAddrInst:
@@ -1313,11 +1317,11 @@ bool SILInstruction::mayRequirePackMetadata() const {
   case SILInstructionKind::TryApplyInst: {
     // Check the function type for packs.
     auto apply = ApplySite::isa(const_cast<SILInstruction *>(this));
-    if (apply.getCallee()->getType().hasAnyPack())
+    if (typeOrLayoutInvolvesPack(apply.getCallee()->getType(), F))
       return true;
     // Check the substituted types for packs.
     for (auto ty : apply.getSubstitutionMap().getReplacementTypes()) {
-      if (ty->hasAnyPack())
+      if (typeOrLayoutInvolvesPack(F.getTypeLowering(ty).getLoweredType(), F))
         return true;
     }
     return false;
@@ -1328,20 +1332,20 @@ bool SILInstruction::mayRequirePackMetadata() const {
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.
   {
-    return getOperand(0)->getType().hasAnyPack();
+    return typeOrLayoutInvolvesPack(getOperand(0)->getType(), F);
   }
   case SILInstructionKind::AllocStackInst: {
     auto *asi = cast<AllocStackInst>(this);
-    return asi->getType().hasAnyPack();
+    return typeOrLayoutInvolvesPack(asi->getType(), F);
   }
   case SILInstructionKind::MetatypeInst: {
     auto *mi = cast<MetatypeInst>(this);
-    return mi->getType().hasAnyPack();
+    return typeOrLayoutInvolvesPack(mi->getType(), F);
   }
   case SILInstructionKind::WitnessMethodInst: {
     auto *wmi = cast<WitnessMethodInst>(this);
     auto ty = wmi->getLookupType();
-    return ty->hasAnyPack();
+    return typeOrLayoutInvolvesPack(F.getTypeLowering(ty).getLoweredType(), F);
   }
   default:
     // Instructions that deallocate stack must not result in pack metadata
@@ -1359,15 +1363,15 @@ bool SILInstruction::mayRequirePackMetadata() const {
     // Check results and operands for packs.  If a pack appears, lowering the
     // instruction might result in pack metadata emission.
     for (auto result : getResults()) {
-      if (result->getType().hasAnyPack())
+      if (typeOrLayoutInvolvesPack(result->getType(), F))
         return true;
     }
     for (auto operandTy : getOperandTypes()) {
-      if (operandTy.hasAnyPack())
+      if (typeOrLayoutInvolvesPack(operandTy, F))
         return true;
     }
     for (auto &tdo : getTypeDependentOperands()) {
-      if (tdo.get()->getType().hasAnyPack())
+      if (typeOrLayoutInvolvesPack(tdo.get()->getType(), F))
         return true;
     }
 
