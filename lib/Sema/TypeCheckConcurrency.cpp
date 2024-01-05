@@ -3303,7 +3303,7 @@ namespace {
         } else {
           if (calleeDecl) {
             auto preconcurrency = getContextIsolation().preconcurrency() ||
-            calleeDecl->preconcurrency();
+                getActorIsolation(calleeDecl).preconcurrency();
             ctx.Diags.diagnose(
                                apply->getLoc(), diag::actor_isolated_call_decl,
                                *unsatisfiedIsolation,
