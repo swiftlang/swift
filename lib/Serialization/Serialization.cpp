@@ -3829,6 +3829,8 @@ public:
 
       // Encode "unchecked" in the low bit.
       typeRef = (typeRef << 1) | (inherited.isUnchecked ? 0x01 : 0x00);
+      // Encode "preconcurrency" in the low bit.
+      typeRef = (typeRef << 1) | (inherited.isPreconcurrency ? 0x01 : 0x00);
 
       result.push_back(typeRef);
     }

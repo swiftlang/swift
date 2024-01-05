@@ -7273,9 +7273,9 @@ void SwiftDeclConverter::importObjCProtocols(
             Impl.importDecl(*cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
       inheritedTypes.push_back(
-        InheritedEntry(
-          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-          /*isUnchecked=*/false, /*isRetroactive=*/false));
+          InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+                         /*isUnchecked=*/false, /*isRetroactive=*/false,
+                         /*isPreconcurrency=*/false));
     }
   }
 
