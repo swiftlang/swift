@@ -65,7 +65,6 @@ Protocol AsyncSequence has generic signature change from <Self.AsyncIterator : _
 Struct CheckedContinuation has removed conformance to UnsafeSendable
 Protocol AsyncIteratorProtocol is now without @rethrows
 Protocol AsyncSequence is now without @rethrows
-Func AsyncIteratorProtocol.nextElement() has been added as a protocol requirement
 
 // SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations
 Func SerialExecutor.enqueue(_:) has been added as a protocol requirement

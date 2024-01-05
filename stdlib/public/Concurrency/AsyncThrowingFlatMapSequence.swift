@@ -89,6 +89,11 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
   /// The flat map sequence produces the type of element in the asynchronous
   /// sequence produced by the `transform` closure.
   public typealias Element = SegmentOfResult.Element
+  /// The type of error produced by this asynchronous sequence.
+  ///
+  /// The flat map sequence produces errors from either the base
+  /// sequence or the `transform` closure.
+  public typealias Failure = any Error
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
