@@ -664,14 +664,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_conformance_availability_errors : Flag<["-"],
-  "enable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as errors">;
-
-def disable_conformance_availability_errors : Flag<["-"],
-  "disable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as warnings">;
-
 def warn_on_potentially_unavailable_enum_case : Flag<["-"],
   "warn-on-potentially-unavailable-enum-case">,
   HelpText<"Deprecated, will be removed in future versions">;
