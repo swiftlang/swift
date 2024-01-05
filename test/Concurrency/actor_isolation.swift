@@ -1569,3 +1569,16 @@ actor AnotherActor {
     _ = a.ns
   }
 }
+
+@MainActor
+class MainActorIsolated {
+  init() {}
+
+  // expected-note@+1 {{static property declared here}}
+  static let shared = MainActorIsolated()
+}
+
+nonisolated func accessAcrossActors() {
+  // expected-warning@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context; this is an error in Swift 6}}
+  let _ = MainActorIsolated.shared
+}

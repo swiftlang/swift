@@ -14,38 +14,35 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/BridgingUtils.h"
+#include "swift/AST/CASTBridging.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/Parse/Parser.h"
 
-// Regex parser delivered via Swift modules.
-#include "swift/Parse/RegexParserBridging.h"
-static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
-void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
-  regexLiteralParsingFn = fn;
-}
+extern "C" bool swift_ASTGen_parseRegexLiteral(
+    BridgedString input, size_t * versionOut,
+    void * UnsafeMutableRawPointer, size_t captureStructureSize,
+    BridgedSourceLoc diagLoc, void * diagEngine);
 
 using namespace swift;
 
 ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(Tok.is(tok::regex_literal));
-  assert(regexLiteralParsingFn);
 
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   auto regexText = Tok.getText();
 
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
-  unsigned version = 0;
+  size_t version = 0;
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
-  bool hadError =
-      regexLiteralParsingFn(regexText.str().c_str(), &version,
-                            /*captureStructureOut*/ capturesBuf.data(),
-                            /*captureStructureSize*/ capturesBuf.size(),
-                            /*diagBaseLoc*/ Tok.getLoc(),
-                            getBridgedDiagnosticEngine(&Diags));
+  bool hadError = swift_ASTGen_parseRegexLiteral(
+      {(const unsigned char *)regexText.data(), SwiftInt(regexText.size())},
+      /*versionOut=*/&version,
+      /*captureStructureOut=*/capturesBuf.data(),
+      /*captureStructureSize=*/capturesBuf.size(),
+      /*diagBaseLoc=*/{Tok.getLoc().getOpaquePointerValue()}, &Diags);
   auto loc = consumeToken();
   SourceMgr.recordRegexLiteralStartLoc(loc);
 
@@ -55,4 +52,7 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(version >= 1);
   return makeParserResult(RegexLiteralExpr::createParsed(
       Context, loc, regexText, version, capturesBuf));
+#else
+  llvm_unreachable("Lexer should not emit tok::regex_literal");
+#endif
 }

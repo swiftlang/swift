@@ -115,9 +115,11 @@ LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros", tru
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
-UPCOMING_FEATURE(ExistentialAny, 335, 6)
+UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
+
+UPCOMING_FEATURE(ExistentialAny, 335, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)

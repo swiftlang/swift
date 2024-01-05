@@ -1217,10 +1217,11 @@ void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
     return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
   }
 
-  recordClonedInstruction(
-      Inst, getBuilder().createBeginBorrow(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()),
-                                           Inst->isLexical()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createBeginBorrow(
+                              getOpLocation(Inst->getLoc()),
+                              getOpValue(Inst->getOperand()), Inst->isLexical(),
+                              Inst->hasPointerEscape(), Inst->isFromVarDecl()));
 }
 
 template <typename ImplClass>
@@ -1930,9 +1931,9 @@ void SILCloner<ImplClass>::visitMoveValueInst(MoveValueInst *Inst) {
   if (!getBuilder().hasOwnership()) {
     return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
   }
-  auto *MVI = getBuilder().createMoveValue(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()),
-                                           Inst->isLexical());
+  auto *MVI = getBuilder().createMoveValue(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+      Inst->isLexical(), Inst->hasPointerEscape(), Inst->isFromVarDecl());
   MVI->setAllowsDiagnostics(Inst->getAllowDiagnostics());
   recordClonedInstruction(Inst, MVI);
 }

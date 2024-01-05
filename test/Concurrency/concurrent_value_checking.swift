@@ -4,8 +4,8 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
-class NotConcurrent { } // expected-note 16{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
-// expected-complete-note @-1 11{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
+class NotConcurrent { } // expected-note 18{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
+// expected-complete-note @-1 12{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations
@@ -115,10 +115,27 @@ func globalAsync(_: NotConcurrent?) async {
   globalSync(nil)
 }
 
+enum E {
+  @SomeGlobalActor static let notSafe: NotConcurrent? = nil
+}
+
 func globalTest() async {
-  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' in asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
+  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@+1 {{property access is 'async'}}
+  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
   await globalAsync(a) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
   await globalSync(a)  // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
+
+  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@+1 {{property access is 'async'}}
+  let _ = E.notSafe // expected-warning{{non-sendable type 'NotConcurrent?' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated static property 'notSafe' cannot cross actor boundary}}
+
+  // expected-error@+3 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@+2 {{call is 'async'}}
+  // expected-note@+1 {{property access is 'async'}}
+  globalAsync(E.notSafe)
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
+  // expected-warning@-2 {{non-sendable type 'NotConcurrent?' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated static property 'notSafe' cannot cross actor boundary}}
 }
 
 struct HasSubscript {
@@ -137,7 +154,9 @@ class ClassWithGlobalActorInits { // expected-note 2{{class 'ClassWithGlobalActo
 
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
-  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' in asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
+  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@+1 {{property access is 'async'}}
+  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
   await globalAsync(a) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
   await globalSync(a)  // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}
   _ = await ClassWithGlobalActorInits(nc) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent' into global actor 'SomeGlobalActor'-isolated context may introduce data races}}

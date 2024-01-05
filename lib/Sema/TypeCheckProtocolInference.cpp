@@ -160,6 +160,152 @@ static bool associatedTypesAreSameEquivalenceClass(AssociatedTypeDecl *a,
   return false;
 }
 
+namespace {
+
+/// Try to avoid situations where resolving the type of a witness calls back
+/// into associated type inference.
+struct TypeReprCycleCheckWalker : ASTWalker {
+  ASTContext &ctx;
+  llvm::SmallDenseSet<Identifier, 2> circularNames;
+  ValueDecl *witness;
+  bool found;
+
+  TypeReprCycleCheckWalker(
+      ASTContext &ctx,
+      const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved)
+    : ctx(ctx), witness(nullptr), found(false) {
+    for (auto *assocType : allUnresolved) {
+      circularNames.insert(assocType->getName());
+    }
+  }
+
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    // FIXME: Visit generic arguments.
+
+    if (auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+      // If we're inferring `Foo`, don't look at a witness mentioning `Foo`.
+      if (circularNames.count(identTyR->getNameRef().getBaseIdentifier()) > 0) {
+        // If unqualified lookup can find a type with this name without looking
+        // into protocol members, don't skip the witness, since this type might
+        // be a candidate witness.
+        auto desc = UnqualifiedLookupDescriptor(
+            identTyR->getNameRef(), witness->getDeclContext(),
+            identTyR->getLoc(), UnqualifiedLookupOptions());
+
+        auto results =
+            evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
+
+        // Ok, resolving this name would trigger associated type inference
+        // recursively. We're going to skip this witness.
+        if (results.allResults().empty()) {
+          found = true;
+          return Action::Stop();
+        }
+      }
+    }
+
+    if (auto *memberTyR = dyn_cast<MemberTypeRepr>(T)) {
+      // If we're looking at a member type`Foo.Bar`, check `Foo` recursively.
+      auto *baseTyR = memberTyR->getBaseComponent();
+      baseTyR->walk(*this);
+
+      // If we're inferring `Foo`, don't look at a witness mentioning `Self.Foo`.
+      if (auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(baseTyR)) {
+        if (identTyR->getNameRef().getBaseIdentifier() == ctx.Id_Self) {
+          // But if qualified lookup can find a type with this name without
+          // looking into protocol members, don't skip the witness, since this
+          // type might be a candidate witness.
+          SmallVector<ValueDecl *, 2> results;
+          witness->getInnermostDeclContext()->lookupQualified(
+              witness->getDeclContext()->getSelfTypeInContext(),
+              identTyR->getNameRef(), SourceLoc(), NLOptions(), results);
+
+          // Ok, resolving this member type would trigger associated type
+          // inference recursively. We're going to skip this witness.
+          if (results.empty()) {
+            found = true;
+            return Action::Stop();
+          }
+        }
+      }
+
+      return Action::SkipChildren();
+    }
+
+    return Action::Continue();
+  }
+
+  bool checkForPotentialCycle(ValueDecl *witness) {
+    // Don't do this for protocol extension members, because we have a
+    // mini "solver" that avoids similar issues instead.
+    if (witness->getDeclContext()->getSelfProtocolDecl() != nullptr)
+      return false;
+
+    // If we already have an interface type, don't bother trying to
+    // avoid a cycle.
+    if (witness->hasInterfaceType())
+      return false;
+
+    // We call checkForPotentailCycle() multiple times with
+    // different witnesses.
+    found = false;
+    this->witness = witness;
+
+    auto walkInto = [&](TypeRepr *tyR) {
+      if (tyR)
+        tyR->walk(*this);
+      return found;
+    };
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(witness)) {
+      for (auto *param : *AFD->getParameters()) {
+        if (walkInto(param->getTypeRepr()))
+          return true;
+      }
+
+      if (auto *FD = dyn_cast<FuncDecl>(witness)) {
+        if (walkInto(FD->getResultTypeRepr()))
+          return true;
+      }
+
+      return false;
+    }
+
+    if (auto *SD = dyn_cast<SubscriptDecl>(witness)) {
+      for (auto *param : *SD->getIndices()) {
+        if (walkInto(param->getTypeRepr()))
+          return true;
+      }
+
+      if (walkInto(SD->getElementTypeRepr()))
+        return true;
+
+      return false;
+    }
+
+    if (auto *VD = dyn_cast<VarDecl>(witness)) {
+      if (walkInto(VD->getTypeReprOrParentPatternTypeRepr()))
+        return true;
+
+      return false;
+    }
+
+    if (auto *EED = dyn_cast<EnumElementDecl>(witness)) {
+      for (auto *param : *EED->getParameterList()) {
+        if (walkInto(param->getTypeRepr()))
+          return true;
+      }
+
+      return false;
+    }
+
+    assert(false && "Should be exhaustive");
+    return false;
+  }
+};
+
+}
+
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                     ConformanceChecker &checker,
@@ -175,11 +321,13 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     abort();
   }
 
+  TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved);
+
   InferredAssociatedTypesByWitnesses result;
 
   auto isExtensionUsableForInference = [&](const ExtensionDecl *extension) {
     // The context the conformance being checked is declared on.
-    const auto conformanceCtx = checker.Conformance->getDeclContext();
+    const auto conformanceCtx = conformance->getDeclContext();
     if (extension == conformanceCtx)
       return true;
 
@@ -249,11 +397,17 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // If the potential witness came from an extension, and our `Self`
     // type can't use it regardless of what associated types we end up
     // inferring, skip the witness.
-    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext()))
+    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
       if (!isExtensionUsableForInference(extension)) {
         LLVM_DEBUG(llvm::dbgs() << "Extension not usable for inference\n");
         continue;
       }
+    }
+
+    if (cycleCheck.checkForPotentialCycle(witness)) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping witness to avoid request cycle\n");
+      continue;
+    }
 
     // Try to resolve the type witness via this value witness.
     auto witnessResult = inferTypeWitnessesViaValueWitness(req, witness);
@@ -788,26 +942,31 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 }
 
 AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
+                                             DeclContext *dc,
+                                             NominalTypeDecl *adoptee,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
   if (assocType->hasDefaultDefinitionType())
     return assocType;
 
-  // Look at overridden associated types.
+  // Otherwise, look for all associated types with the same name along all the
+  // protocols that the adoptee conforms to.
+  SmallVector<ValueDecl *, 4> decls;
+  auto options = NL_ProtocolMembers | NL_OnlyTypes;
+  dc->lookupQualified(adoptee, DeclNameRef(assocType->getName()),
+                      SourceLoc(), options, decls);
+
   SmallPtrSet<CanType, 4> canonicalTypes;
   SmallVector<AssociatedTypeDecl *, 2> results;
-  for (auto overridden : assocType->getOverriddenDecls()) {
-    auto overriddenDefault = findDefaultedAssociatedType(overridden);
-    if (!overriddenDefault) continue;
+  for (auto *decl : decls) {
+    if (auto *assocDecl = dyn_cast<AssociatedTypeDecl>(decl)) {
+      auto defaultType = assocDecl->getDefaultDefinitionType();
+      if (!defaultType) continue;
 
-    Type overriddenType =
-      overriddenDefault->getDefaultDefinitionType();
-    assert(overriddenType);
-    if (!overriddenType) continue;
-
-    CanType key = overriddenType->getCanonicalType();
+      CanType key = defaultType->getCanonicalType();
     if (canonicalTypes.insert(key).second)
-      results.push_back(overriddenDefault);
+      results.push_back(assocDecl);
+    }
   }
 
   // If there was a single result, return it.
@@ -868,7 +1027,8 @@ llvm::Optional<AbstractTypeWitness>
 AssociatedTypeInference::computeDefaultTypeWitness(
     AssociatedTypeDecl *assocType) const {
   // Go find a default definition.
-  auto *const defaultedAssocType = findDefaultedAssociatedType(assocType);
+  auto *const defaultedAssocType = findDefaultedAssociatedType(
+      dc, dc->getSelfNominalTypeDecl(), assocType);
   if (!defaultedAssocType)
     return llvm::None;
 

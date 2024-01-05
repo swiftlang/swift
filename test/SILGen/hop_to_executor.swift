@@ -47,7 +47,7 @@ actor MyActor {
   // CHECK:        [[BORROWED_SELF:%[0-9]+]] = begin_borrow %0 : $MyActor
   // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor 
   // CHECK:        = apply {{.*}} : $@convention(method) @async (Int, @guaranteed MyActor) -> ()
-  // CHECK-NEXT:   hop_to_executor [[BORROWED_SELF]] : $MyActor 
+  // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor
   // CHECK:      } // end sil function '$s4test7MyActorC0A22ConsumingAsyncFunctionyyYaF'
   __consuming func testConsumingAsyncFunction() async {
     await callee(p)
@@ -219,13 +219,13 @@ actor BlueActorImpl {
 // CHECK:     bb0([[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
 // CHECK:       hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK:       [[RED:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@thick RedActorImpl.Type) -> @owned RedActorImpl
-// CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [lexical] [[RED]] : $RedActorImpl
+// CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[RED]] : $RedActorImpl
 // CHECK:       [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:       [[METH:%[0-9]+]] = class_method [[REDBORROW]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
 // CHECK:       hop_to_executor [[REDBORROW]] : $RedActorImpl
 // CHECK-NEXT:  = apply [[METH]]([[INTARG]], [[REDBORROW]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
 // CHECK-NEXT:  hop_to_executor [[BLUE]] : $BlueActorImpl
-// CHECK:       end_borrow [[REDBORROW]] : $RedActorImpl
+// CHECK-NEXT:  end_borrow [[REDBORROW]] : $RedActorImpl
 // CHECK:       destroy_value [[RED]] : $RedActorImpl
 // CHECK: } // end sil function '$s4test13BlueActorImplC14createAndGreetyyYaF'
   func createAndGreet() async {
@@ -271,9 +271,9 @@ struct BlueActor {
 // CHECK:       hop_to_executor [[REDEXE]] : $RedActorImpl
       // ---- now invoke redFn, hop back to Blue, and clean-up ----
 // CHECK-NEXT:  {{%[0-9]+}} = apply [[CALLEE]]([[ARG]]) : $@convention(thin) (Int) -> ()
+// CHECK-NEXT:  end_borrow [[REDEXE]] : $RedActorImpl
+// CHECK-NEXT:  destroy_value [[R]] : $RedActorImpl
 // CHECK-NEXT:  hop_to_executor [[BLUEEXE]] : $BlueActorImpl
-// CHECK:       end_borrow [[REDEXE]] : $RedActorImpl
-// CHECK:       destroy_value [[R]] : $RedActorImpl
 // CHECK:       end_borrow [[BLUEEXE]] : $BlueActorImpl
 // CHECK:       destroy_value [[B]] : $BlueActorImpl
 // CHECK: } // end sil function '$s4test6blueFnyyYaF'
@@ -287,8 +287,9 @@ struct BlueActor {
 // CHECK:         [[BORROW:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $RedActorImpl
 // CHECK-NEXT:    hop_to_executor [[BORROW]] : $RedActorImpl
 // CHECK-NEXT:    {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(thin) (Int) -> ()
-// CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK-NEXT:    end_borrow [[BORROW]] : $RedActorImpl
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK: } // end sil function '$s4test20unspecifiedAsyncFuncyyYaF'
 func unspecifiedAsyncFunc() async {
   await redFn(200)
@@ -315,7 +316,7 @@ func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
 // CHECK: hop_to_executor [[RED:%[0-9]+]] : $RedActorImpl
 // CHECK-NEXT: begin_borrow
 // CHECK-NEXT: apply
-// CHECK-NEXT: hop_to_executor [[GENERIC_EXEC:%[0-9]+]] : $Optional<Builtin.Executor>
+// CHECK:      hop_to_executor [[GENERIC_EXEC:%[0-9]+]] : $Optional<Builtin.Executor>
 func testGlobalActorFuncValue(_ fn: @RedActor () -> Void) async {
   await fn()
 }

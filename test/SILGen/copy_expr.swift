@@ -25,7 +25,7 @@ struct ContainKlass {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr22testCopyLoadableRValueyyF : $@convention(thin) () -> () {
 // CHECK: [[X:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thin ContainKlass.Type) -> @owned ContainKlass
-// CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[X]]
+// CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[X]]
 // CHECK: [[COPY_BORROW:%.*]] = copy_value [[BORROW]]
 // CHECK: explicit_copy_value [[COPY_BORROW]]
 // CHECK: } // end sil function '$s9copy_expr22testCopyLoadableRValueyyF'
@@ -36,7 +36,7 @@ func testCopyLoadableRValue() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr25testCopyLoadableVarLValueyyF : $@convention(thin) () -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var ContainKlass }, var, name "x"
-// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]]
 //
 // CHECK:   [[FINAL_ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT_BOX]]
@@ -88,7 +88,7 @@ func testCopyAddressOnlyRValue<T : P>(_ t: T.Type) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr25testCopyAddressOnlyLValueyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : P> { var τ_0_0 } <T>, var, name "x"
-// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT_BOX]]
@@ -114,7 +114,7 @@ func testCopyAddressOnlyLValueArg<T : P>(_ x: inout T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr31testCallMethodOnLoadableLetCopyyyF : $@convention(thin) () -> () {
 // CHECK: [[ORIG_X:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thin ContainKlass.Type) -> @owned ContainKlass
-// CHECK: [[X:%.*]] = begin_borrow [lexical] [[ORIG_X]]
+// CHECK: [[X:%.*]] = begin_borrow [lexical] [var_decl] [[ORIG_X]]
 //
 // Calling consumeFunc.
 // CHECK: [[COPY_X:%.*]] = copy_value [[X]]
@@ -162,7 +162,7 @@ func testCallMethodOnLoadableLetCopy() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr31testCallMethodOnLoadableVarCopyyyF : $@convention(thin) () -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var ContainKlass }
-// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT:%.*]] = project_box [[BORROW]]
 //
 // Calling consumeFunc.
@@ -351,7 +351,7 @@ func testCallMethodOnAddressOnlyLetCopy<T : P>(_ t: T.Type) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr34testCallMethodOnAddressOnlyVarCopyyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box $
-// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT:%.*]] = project_box [[BORROW]]
 //
 // Calling consumeFunc.

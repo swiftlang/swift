@@ -5181,9 +5181,6 @@ ERROR(broken_distributed_actor_requirement,none,
 ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,
       "%kind0 is missing witness for protocol requirement %1",
       (const ValueDecl *, DeclName))
-NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
-      "protocol %0 requires function %1 with signature:\n%2",
-     (DeclName, DeclName, StringRef))
 
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
@@ -5213,8 +5210,8 @@ ERROR(conflicting_default_argument_isolation,none,
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'Distributed' module not imported, required for 'distributed actor'",
       ())
-ERROR(distributed_func_cannot_overload_on_async_only,none,
-      "ambiguous distributed func declaration %0, cannot overload distributed methods on effect only", (DeclName))
+NOTE(distributed_func_cannot_overload_on_async_only,none,
+     "%0 previously declared here, cannot overload distributed methods on effect only", (const ValueDecl *))
 NOTE(distributed_func_other_ambiguous_overload_here,none,
       "ambiguous distributed func %0 declared here", (DeclName))
 ERROR(actor_isolated_inout_state,none,
@@ -5237,8 +5234,8 @@ ERROR(concurrent_access_local,none,
         "use of local %kind0 in concurrently-executing code",
         (const ValueDecl *))
 ERROR(actor_isolated_keypath_component,none,
-      "cannot form key path to%select{| distributed}0 actor-isolated %kind1",
-      (bool, const ValueDecl *))
+      "cannot form key path to %0 %kind1",
+      (ActorIsolation, const ValueDecl *))
 ERROR(effectful_keypath_component,none,
       "cannot form key path to %0 with 'throws' or 'async'",
       (DescriptiveDeclKind))
@@ -7352,6 +7349,9 @@ ERROR(extension_macro_invalid_conformance,none,
 ERROR(macro_attached_to_invalid_decl,none,
       "'%0' macro cannot be attached to %1 (%base2)",
       (StringRef, DescriptiveDeclKind, const Decl *))
+ERROR(macro_as_default_argument, none,
+      "non-built-in macro cannot be used as default argument",
+      ())
 ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())

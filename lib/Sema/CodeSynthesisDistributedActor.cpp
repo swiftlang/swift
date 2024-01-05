@@ -842,8 +842,14 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
     if (!distributedTarget->isDistributed())
       return nullptr;
   }
-
   assert(distributedTarget);
+
+  // This evaluation type-check by now was already computed and cached;
+  // We need to check in order to avoid emitting a THUNK for a distributed func
+  // which had errors; as the thunk then may also cause un-addressable issues and confusion.
+  if (swift::checkDistributedFunction(distributedTarget)) {
+    return nullptr;
+  }
 
   auto &C = distributedTarget->getASTContext();
 

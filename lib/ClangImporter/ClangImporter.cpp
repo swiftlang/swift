@@ -892,9 +892,6 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
   invocation->getLangOpts()->CacheGeneratedPCH = true;
-  // If the underlying invocation is allowing PCH errors, then it "can be read",
-  // even if it has its error bit set. Thus, don't override
-  // `AllowPCHWithCompilerErrors`.
 
   // ClangImporter::create adds a remapped MemoryBuffer that we don't need
   // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
@@ -931,6 +928,14 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
     clang::ASTReader::ARR_Missing |
     clang::ASTReader::ARR_OutOfDate |
     clang::ASTReader::ARR_VersionMismatch;
+
+  // If a PCH was output with errors, it may not have serialized all its
+  // inputs. If there was a change to the search path or a headermap now
+  // exists where it didn't previously, it's possible those inputs will now be
+  // found. Ideally we would only rebuild in this particular case rather than
+  // any error in general, but explicit module builds are the real solution
+  // there. For now, just treat PCH with errors as out of date.
+  failureCapabilities |= clang::ASTReader::ARR_TreatModuleWithErrorsAsOutOfDate;
 
   auto result = Reader.ReadAST(PCHFilename, clang::serialization::MK_PCH,
                                clang::SourceLocation(), failureCapabilities);
@@ -1422,6 +1427,7 @@ ClangImporter::create(ASTContext &ctx,
     new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
   importedHeaderModule->setHasResolvedImports();
+  importedHeaderModule->setIsNonSwiftModule(true);
 
   importer->Impl.IsReadingBridgingPCH = false;
 
@@ -2151,7 +2157,8 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
   ASTContext &ctx = getNameImporter().getContext();
 
   // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
-  if (path.front().Item.is("std"))
+  if (path.front().Item.is("std") ||
+      path.front().Item.str().starts_with("std_"))
     return nullptr;
   if (path.front().Item == ctx.Id_CxxStdlib) {
     ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
@@ -3972,6 +3979,13 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
       // Swift modules.
       ImportPath::Module::Builder builder(M->getName());
       (void) owner.loadModule(SourceLoc(), std::move(builder).get());
+    }
+    // If this Clang module is a part of the C++ stdlib, and we haven't loaded
+    // the overlay for it so far, it is a split libc++ module (e.g. std_vector).
+    // Load the CxxStdlib overlay explicitly.
+    if (!overlay && importer::isCxxStdModule(clangModule)) {
+      ImportPath::Module::Builder builder(Ctx.Id_CxxStdlib);
+      overlay = owner.loadModule(SourceLoc(), std::move(builder).get());
     }
     auto mutableThis = const_cast<ClangModuleUnit *>(this);
     mutableThis->overlayModule.setPointerAndInt(overlay, true);
@@ -7458,7 +7472,7 @@ const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
 
 bool importer::requiresCPlusPlus(const clang::Module *module) {
   // The libc++ modulemap doesn't currently declare the requirement.
-  if (module->getTopLevelModuleName() == "std")
+  if (isCxxStdModule(module))
     return true;
 
   // Modulemaps often declare the requirement for the top-level module only.
@@ -7470,6 +7484,18 @@ bool importer::requiresCPlusPlus(const clang::Module *module) {
   return llvm::any_of(module->Requirements, [](clang::Module::Requirement req) {
     return req.first == "cplusplus";
   });
+}
+
+bool importer::isCxxStdModule(const clang::Module *module) {
+  if (module->getTopLevelModuleName() == "std")
+    return true;
+  // In recent libc++ versions the module is split into multiple top-level
+  // modules (std_vector, std_utility, etc).
+  if (module->getTopLevelModule()->IsSystem &&
+      module->getTopLevelModuleName().starts_with("std_"))
+    return true;
+
+  return false;
 }
 
 llvm::Optional<clang::QualType>

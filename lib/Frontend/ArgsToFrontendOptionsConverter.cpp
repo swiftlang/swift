@@ -383,6 +383,8 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
 
+  Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
+
   return false;
 }
 

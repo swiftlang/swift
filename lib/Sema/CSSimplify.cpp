@@ -8310,6 +8310,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (isConformanceUnavailable(conformance, loc))
       increaseScore(SK_Unavailable, locator);
 
+    unsigned numMissing = 0;
+    conformance.forEachMissingConformance(DC->getParentModule(),
+                                          [&numMissing](auto *missing) {
+                                            ++numMissing;
+                                            return false;
+                                          });
+
+    if (numMissing > 0)
+      increaseScore(SK_MissingSynthesizableConformance, locator, numMissing);
+
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
     if (conformance.isConcrete()) {
@@ -8640,7 +8650,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
 
   // First, let's check whether the type itself conforms,
   // if it does - we are done.
-  if (M->lookupConformance(resolvedTy, protocol))
+  if (M->lookupConformance(resolvedTy, protocol, /*allowMissing=*/true))
     return SolutionKind::Solved;
 
   // If the type doesn't conform, let's check whether

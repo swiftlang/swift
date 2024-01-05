@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ASTBridging
+import BasicBridging
 
 public struct SourceLoc {
   /// Points into a source file.

@@ -70,6 +70,8 @@
 #include "swift/Runtime/Atomic.h"
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
+#include "BacktracePrivate.h"
+
 namespace FatalErrorFlags {
 enum: uint32_t {
   ReportBacktrace = 1 << 0
@@ -353,7 +355,13 @@ void swift::swift_reportError(uint32_t flags,
                               const char *message) {
 #if defined(__APPLE__) && NDEBUG
   flags &= ~FatalErrorFlags::ReportBacktrace;
+#elif SWIFT_ENABLE_BACKTRACING
+  // Disable fatalError backtraces if the backtracer is enabled
+  if (runtime::backtrace::_swift_backtrace_isEnabled()) {
+    flags &= ~FatalErrorFlags::ReportBacktrace;
+  }
 #endif
+
   reportNow(flags, message);
   reportOnCrash(flags, message);
 }
@@ -388,9 +396,9 @@ swift::warningv(uint32_t flags, const char *format, va_list args)
 #pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
 #pragma GCC diagnostic pop
-  
+
   reportNow(flags, log);
-  
+
   free(log);
 }
 

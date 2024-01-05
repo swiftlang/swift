@@ -68,10 +68,10 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
 
+  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [var_decl] [[STR]]
   // CHECK-NEXT: debug_value
   // CHECK-NOT: destroy_value
 
-  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [[STR]]
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)
@@ -233,7 +233,8 @@ struct WeirdPropertyTest {
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box ${ var WeirdPropertyTest }
-  // CHECK: [[PB:%.*]] = project_box [[VBOX]]
+  // CHECK: [[VLIFETIME:%.*]] = begin_borrow [var_decl] [[VBOX]]
+  // CHECK: [[PB:%.*]] = project_box [[VLIFETIME]]
   // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
@@ -467,7 +468,8 @@ struct LetPropertyStruct {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
-// CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
+// CHECK:  [[ALIFETIME:%[0-9]+]] = begin_borrow [var_decl] [[ABOX]]
+// CHECK:  [[A:%[0-9]+]] = project_box [[ALIFETIME]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[A]]
 // CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[READ]] : $*LetPropertyStruct

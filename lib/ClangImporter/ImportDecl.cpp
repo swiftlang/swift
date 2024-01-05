@@ -3267,7 +3267,8 @@ namespace {
                     ->getTopLevelModule()
                     ->getFullModuleName() == n;
         };
-        if (topLevelModuleEq(decl, "std")) {
+        if ((decl->getOwningModule() &&
+             importer::isCxxStdModule(decl->getOwningModule()))) {
           if (isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
             return nullptr;
           }

@@ -847,6 +847,10 @@ def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Restrict code to those available for App Extensions">;
 
+def enable_app_extension_library : Flag<["-"], "application-extension-library">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Restrict code to those available for App Extension Libraries">;
+
 def libc : Separate<["-"], "libc">,
            Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
            HelpText<"libc runtime library to use">;
@@ -1880,5 +1884,10 @@ def load_plugin_executable:
   HelpText<"Path to a compiler plugin executable and a comma-separated list "
            "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
+
+def disable_sandbox:
+  Flag<["-"], "disable-sandbox">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable using the sandbox when executing subprocesses">;
 
 include "FrontendOptions.td"

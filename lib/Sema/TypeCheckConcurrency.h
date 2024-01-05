@@ -531,10 +531,31 @@ VarDecl *getReferencedParamOrCapture(
 /// \param value The value we are checking.
 /// \param isolation The actor isolation of the value.
 /// \param fromDC The context where we are performing the access.
+/// \param options The reference options, such as whether reference
+/// violations should be downgraded to warnings prior to Swift 6.
+bool isAccessibleAcrossActors(
+    ValueDecl *value, const ActorIsolation &isolation,
+    const DeclContext *fromDC,
+    ActorReferenceResult::Options &options,
+    llvm::Optional<ReferencedActor> actorInstance = llvm::None);
+
+/// Determine whether the given value can be accessed across actors
+/// without from normal synchronous code.
+///
+/// \param value The value we are checking.
+/// \param isolation The actor isolation of the value.
+/// \param fromDC The context where we are performing the access.
 bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
     const DeclContext *fromDC,
     llvm::Optional<ReferencedActor> actorInstance = llvm::None);
+
+/// Determines if the 'let' can be read from anywhere within the given module,
+/// regardless of the isolation or async-ness of the context in which
+/// the var is read.
+bool isLetAccessibleAnywhere(const ModuleDecl *fromModule,
+                             VarDecl *let,
+                             ActorReferenceResult::Options &options);
 
 /// Check whether given variable references to a potentially
 /// isolated actor.

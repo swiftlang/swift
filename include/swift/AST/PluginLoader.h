@@ -44,6 +44,7 @@ private:
 
   ASTContext &Ctx;
   DependencyTracker *DepTracker;
+  const bool disableSandbox;
 
   /// Map a module name to an plugin entry that provides the module.
   llvm::Optional<llvm::DenseMap<swift::Identifier, PluginEntry>> PluginMap;
@@ -52,8 +53,9 @@ private:
   llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();
 
 public:
-  PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker)
-      : Ctx(Ctx), DepTracker(DepTracker) {}
+  PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker,
+               bool disableSandbox = false)
+      : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {}
 
   void setRegistry(PluginRegistry *newValue);
   PluginRegistry *getRegistry();
@@ -84,6 +86,9 @@ public:
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
   LoadedExecutablePlugin *loadExecutablePlugin(llvm::StringRef path);
+
+  /// Add the specified path to the dependency tracker if needed.
+  void recordDependency(StringRef path);
 };
 
 } // namespace swift

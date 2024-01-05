@@ -325,6 +325,9 @@ initializeExecutablePlugin(ASTContext &ctx,
                          executablePlugin->getExecutablePath(), err.message());
       return nullptr;
     }
+
+    ctx.getPluginLoader().recordDependency(resolvedLibraryPath);
+
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 
@@ -503,6 +506,10 @@ ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
 ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
                                                          Decl *decl) const {
   if (decl->isImplicit())
+    return { };
+
+  // Member attribute macros do not apply to accessors.
+  if (isa<AccessorDecl>(decl))
     return { };
 
   // Member attribute macros do not apply to macro-expanded members.

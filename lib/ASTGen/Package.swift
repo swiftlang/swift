@@ -42,7 +42,8 @@ let package = Package(
         .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
-        "swiftLLVMJSON"
+        "swiftLLVMJSON",
+        "_CompilerRegexParser",
       ],
       path: "Sources/ASTGen",
       swiftSettings: swiftSetttings
@@ -51,6 +52,12 @@ let package = Package(
       name: "swiftLLVMJSON",
       dependencies: [],
       path: "Sources/LLVMJSON",
+      swiftSettings: swiftSetttings
+    ),
+    .target(
+      name: "_CompilerRegexParser",
+      dependencies: [],
+      path: "_RegexParser_Sources",
       swiftSettings: swiftSetttings
     ),
   ]

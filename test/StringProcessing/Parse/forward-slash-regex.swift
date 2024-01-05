@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
 
 prefix operator /

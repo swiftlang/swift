@@ -301,3 +301,21 @@ extension OptionalMemberLookups {
     await self.generateMaybe!()
   }
 }
+
+
+// CHECK-LABEL: sil {{.*}} @$s10objc_async12checkHotdogsySSSgx_So8NSObjectCtYaKSo16HotdogCompetitorRzlF
+// CHECK: hop_to_executor {{.*}} : $MainActor
+// CHECK: [[AUTO_REL_STR:%.*]] = apply {{.*}}<some HotdogCompetitor>({{.*}}) : $@convention(objc_method)
+// CHECK: [[UNMANAGED_OPTIONAL:%.*]] = load [trivial] {{.*}} : $*@sil_unmanaged Optional<NSError>
+// CHECK: [[MANAGED_OPTIONAL:%.*]] = unmanaged_to_ref [[UNMANAGED_OPTIONAL]] : $@sil_unmanaged Optional<NSError> to $Optional<NSError>
+// CHECK: [[RETAINED_OPTIONAL:%.*]] = copy_value [[MANAGED_OPTIONAL]] : $Optional<NSError>
+// CHECK: [[MARKED:%.*]] = mark_dependence [[RETAINED_OPTIONAL]] : $Optional<NSError> on {{.*}} : $*Optional<NSError> // user: %32
+// CHECK: assign [[MARKED]] to {{.*}} : $*Optional<NSError>
+// CHECK: destroy_value {{.*}} : $MainActor
+// CHECK: dealloc_stack {{.*}} : $*AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+// CHECK: dealloc_stack {{.*}} : $*@sil_unmanaged Optional<NSError>
+// CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+// CHECK: switch_enum
+func checkHotdogs(_ v: some HotdogCompetitor, _ timeLimit: NSObject) async throws -> String? {
+    return try await v.pileOfHotdogsToEat(withLimit: timeLimit)
+}

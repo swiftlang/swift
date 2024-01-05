@@ -208,9 +208,8 @@ PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  static const auto bridgeableProtocol
-    = &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
-  auto w = swift_conformsToProtocolCommon(T, bridgeableProtocol);
+  auto w = swift_conformsToProtocolCommon(
+      T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
   return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
 }
 

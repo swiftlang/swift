@@ -410,7 +410,7 @@ bool ConsumeOperatorCopyableValuesChecker::check() {
   for (auto &block : *fn) {
     for (auto &ii : block) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(&ii)) {
-        if (bbi->isLexical() && !bbi->getType().isMoveOnly()) {
+        if (bbi->isFromVarDecl() && !bbi->getType().isMoveOnly()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found lexical lifetime to check: " << *bbi);
           valuesToCheck.insert(bbi);

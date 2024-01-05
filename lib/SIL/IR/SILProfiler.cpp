@@ -270,6 +270,12 @@ struct MapRegionCounters : public ASTWalker {
     return LazyInitializerWalking::InAccessor;
   }
 
+  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+    // mapped as part of the wrapped value initialization.
+    return false;
+  }
+
   void mapRegion(ASTNode N) {
     mapRegion(ProfileCounterRef::node(N));
   }
@@ -346,163 +352,46 @@ struct MapRegionCounters : public ASTWalker {
   }
 };
 
-struct CounterExprStorage;
-using CounterAllocator = llvm::SpecificBumpPtrAllocator<CounterExprStorage>;
-
-/// A node in an expression tree of counters.
 class CounterExpr {
-  enum class Kind { Leaf, Add, Sub, Zero };
-  Kind K;
-  llvm::Optional<ProfileCounterRef> Counter;
-  const CounterExprStorage *Storage = nullptr;
+  llvm::coverage::Counter Counter;
 
-  CounterExpr(Kind K) : K(K) {
-    assert((K == Kind::Zero) && "only valid for Zero");
-  }
-
-  CounterExpr(Kind K, ProfileCounterRef Counter) : K(K), Counter(Counter) {
-    assert(K == Kind::Leaf && "only valid for Node");
-  }
-
-  CounterExpr(Kind K, const CounterExprStorage *Storage)
-      : K(K), Storage(Storage) {
-    assert((K == Kind::Add || K == Kind::Sub) && "only valid for operators");
-  }
+  explicit CounterExpr(llvm::coverage::Counter Counter) : Counter(Counter) {}
 
 public:
-  static CounterExpr Leaf(ProfileCounterRef Counter) {
-    return CounterExpr(Kind::Leaf, Counter);
+  static CounterExpr Concrete(unsigned Idx) {
+    return CounterExpr(llvm::coverage::Counter::getCounter(Idx));
   }
   static CounterExpr Zero() {
-    return CounterExpr(Kind::Zero);
+    return CounterExpr(llvm::coverage::Counter::getZero());
   }
 
   static CounterExpr Add(CounterExpr LHS, CounterExpr RHS,
-                         CounterAllocator &Alloc);
+                         llvm::coverage::CounterExpressionBuilder &Builder) {
+    return CounterExpr(Builder.add(LHS.getLLVMCounter(), RHS.getLLVMCounter()));
+  }
   static CounterExpr Sub(CounterExpr LHS, CounterExpr RHS,
-                         CounterAllocator &Alloc);
-
-  /// Returns true if this is a Zero node.
-  bool isZero() const { return K == Kind::Zero; }
-
-  /// For an addition or subtraction counter, retrieves the LHS counter.
-  const CounterExpr &getLHS() const;
-
-  /// For an addition or subtraction counter, retrieves the RHS counter.
-  const CounterExpr &getRHS() const;
-
-  /// Returns true if the counter is semantically a Zero node. This considers
-  /// the simplified version of the counter that has eliminated redundant
-  /// operations.
-  bool isSemanticallyZero() const {
-    // Run the counter through the counter builder to simplify it, using a dummy
-    // mapping of unique counter indices for each node reference. The value of
-    // the indices doesn't matter, but we need to ensure that e.g subtraction
-    // of a node from itself cancels out.
-    llvm::coverage::CounterExpressionBuilder Builder;
-    llvm::DenseMap<ProfileCounterRef, unsigned> DummyIndices;
-    unsigned LastIdx = 0;
-    auto Counter = expand(Builder, [&](auto Ref) {
-      if (!DummyIndices.count(Ref)) {
-        DummyIndices[Ref] = LastIdx;
-        LastIdx += 1;
-      }
-      return DummyIndices[Ref];
-    });
-    return Counter.isZero();
+                         llvm::coverage::CounterExpressionBuilder &Builder) {
+    return CounterExpr(
+        Builder.subtract(LHS.getLLVMCounter(), RHS.getLLVMCounter()));
   }
 
-  /// Expand this node into an llvm::coverage::Counter.
-  ///
-  /// Updates \c Builder with any expressions that are needed to represent this
-  /// counter.
-  llvm::coverage::Counter
-  expand(llvm::coverage::CounterExpressionBuilder &Builder,
-         llvm::function_ref<unsigned(ProfileCounterRef)> GetCounterIdx) const {
-    switch (K) {
-    case Kind::Zero:
-      return llvm::coverage::Counter::getZero();
-    case Kind::Leaf:
-      return llvm::coverage::Counter::getCounter(GetCounterIdx(*Counter));
-    case Kind::Add:
-      return Builder.add(getLHS().expand(Builder, GetCounterIdx),
-                         getRHS().expand(Builder, GetCounterIdx));
-    case Kind::Sub:
-      return Builder.subtract(getLHS().expand(Builder, GetCounterIdx),
-                              getRHS().expand(Builder, GetCounterIdx));
-    }
+  /// Returns true if this is a zero counter.
+  bool isZero() const { return Counter.isZero(); }
 
-    llvm_unreachable("Unhandled Kind in switch.");
-  }
+  llvm::coverage::Counter getLLVMCounter() const { return Counter; }
 
-  /// Expand this node into an llvm::coverage::Counter.
-  ///
-  /// Updates \c Builder with any expressions that are needed to represent this
-  /// counter.
-  llvm::coverage::Counter
-  expand(llvm::coverage::CounterExpressionBuilder &Builder,
-         const llvm::DenseMap<ProfileCounterRef, unsigned> &Counters) const {
-    return expand(Builder, [&](auto Ref) {
-      auto Result = Counters.find(Ref);
-      assert(Result != Counters.end() && "Counter not found");
-      return Result->second;
-    });
-  }
-
-  void print(raw_ostream &OS) const {
-    switch (K) {
-    case Kind::Zero:
-      OS << "zero";
-      return;
-    case Kind::Leaf:
-      OS << "leaf(";
-      Counter->dumpSimple(OS);
-      OS << ")";
-      return;
-    case Kind::Add:
-    case Kind::Sub:
-      getLHS().print(OS);
-      OS << ' ' << ((K == Kind::Add) ? '+' : '-') << ' ';
-      getRHS().print(OS);
-      return;
-    }
-    llvm_unreachable("Unhandled Kind in switch.");
+  void print(raw_ostream &OS,
+             const llvm::coverage::CounterExpressionBuilder &Builder) const {
+    SILCoverageMap::printCounter(OS, Counter, Builder.getExpressions());
   }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  LLVM_DUMP_METHOD void dump() const { print(llvm::errs()); }
+  LLVM_DUMP_METHOD
+  void dump(const llvm::coverage::CounterExpressionBuilder &Builder) const {
+    print(llvm::errs(), Builder);
+  }
 #endif
 };
-
-struct CounterExprStorage {
-  CounterExpr LHS;
-  CounterExpr RHS;
-};
-
-inline CounterExpr CounterExpr::Add(CounterExpr LHS, CounterExpr RHS,
-                                    CounterAllocator &Alloc) {
-  auto *Storage = Alloc.Allocate();
-  Storage->LHS = LHS;
-  Storage->RHS = RHS;
-  return CounterExpr(Kind::Add, Storage);
-}
-inline CounterExpr CounterExpr::Sub(CounterExpr LHS, CounterExpr RHS,
-                                    CounterAllocator &Alloc) {
-  auto *Storage = Alloc.Allocate();
-  Storage->LHS = LHS;
-  Storage->RHS = RHS;
-  return CounterExpr(Kind::Sub, Storage);
-}
-
-inline const CounterExpr &CounterExpr::getLHS() const {
-  assert(Storage && "Counter does not have an LHS");
-  return Storage->LHS;
-}
-
-inline const CounterExpr &CounterExpr::getRHS() const {
-  assert(Storage && "Counter does not have an RHS");
-  return Storage->RHS;
-}
 
 /// A region of source code that can be mapped to a counter.
 class SourceMappingRegion {
@@ -701,6 +590,12 @@ struct PGOMapping : public ASTWalker {
     return LazyInitializerWalking::InAccessor;
   }
 
+  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+    // mapped as part of the wrapped value initialization.
+    return false;
+  }
+
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
   }
@@ -805,11 +700,14 @@ private:
   /// The SIL function being profiled.
   SILDeclRef Constant;
 
-  /// Allocator for counter expressions.
-  CounterAllocator CounterAlloc;
+  /// Builder needed to produce CounterExprs.
+  llvm::coverage::CounterExpressionBuilder CounterBuilder;
 
   /// The map of statements to counter expressions.
-  llvm::DenseMap<ProfileCounterRef, CounterExpr> CounterMap;
+  llvm::DenseMap<ProfileCounterRef, CounterExpr> CounterExprs;
+
+  /// The map of counter references to their concrete counter indices.
+  const llvm::DenseMap<ProfileCounterRef, unsigned> &ConcreteCounters;
 
   /// The source mapping regions for this function.
   std::vector<SourceMappingRegion> SourceRegions;
@@ -828,7 +726,7 @@ private:
   Stmt *ImplicitTopLevelBody = nullptr;
 
   /// Return true if \c Ref has an associated counter.
-  bool hasCounter(ProfileCounterRef Ref) { return CounterMap.count(Ref); }
+  bool hasCounter(ProfileCounterRef Ref) { return CounterExprs.count(Ref); }
 
   /// Return true if \c Node has an associated counter.
   bool hasCounter(ASTNode Node) {
@@ -839,8 +737,8 @@ private:
   ///
   /// This should only be called on references that have a dedicated counter.
   CounterExpr getCounter(ProfileCounterRef Ref) {
-    auto Iter = CounterMap.find(Ref);
-    assert(Iter != CounterMap.end() && "No counter found");
+    auto Iter = CounterExprs.find(Ref);
+    assert(Iter != CounterExprs.end() && "No counter found");
     return Iter->second;
   }
 
@@ -853,7 +751,7 @@ private:
 
   /// Create a counter expression for \c Ref and add it to the map.
   void assignCounter(ProfileCounterRef Ref, CounterExpr Expr) {
-    auto Res = CounterMap.insert({Ref, Expr});
+    auto Res = CounterExprs.insert({Ref, Expr});
 
     // Overwrite an existing assignment.
     if (!Res.second)
@@ -868,7 +766,9 @@ private:
   /// Create a counter expression referencing \c Ref's own counter. This must
   /// have been previously mapped by MapRegionCounters.
   CounterExpr assignKnownCounter(ProfileCounterRef Ref) {
-    auto Counter = CounterExpr::Leaf(Ref);
+    auto Iter = ConcreteCounters.find(Ref);
+    assert(Iter != ConcreteCounters.end() && "Should have mapped this counter");
+    auto Counter = CounterExpr::Concrete(Iter->second);
     assignCounter(Ref, Counter);
     return Counter;
   }
@@ -885,7 +785,7 @@ private:
     if (Counter.isZero()) {
       Counter = std::move(Expr);
     } else {
-      Counter = CounterExpr::Add(Counter, std::move(Expr), CounterAlloc);
+      Counter = CounterExpr::Add(Counter, std::move(Expr), CounterBuilder);
     }
     assignCounter(Node, Counter);
   }
@@ -893,13 +793,16 @@ private:
   /// Subtract \c Expr from \c Node's counter.
   void subtractFromCounter(ASTNode Node, CounterExpr Expr) {
     auto Counter = getCounter(Node);
-    assert(!Counter.isZero() && "Cannot create a negative counter");
+    // FIXME: This assertion ought to be restored (rdar://100470244)
+    // assert(!Counter.isZero() && "Cannot create a negative counter");
     assignCounter(Node,
-                  CounterExpr::Sub(Counter, std::move(Expr), CounterAlloc));
+                  CounterExpr::Sub(Counter, std::move(Expr), CounterBuilder));
   }
 
   /// Return the current region's counter.
-  CounterExpr getCurrentCounter() { return getRegion().getCounter(CounterMap); }
+  CounterExpr getCurrentCounter() {
+    return getRegion().getCounter(CounterExprs);
+  }
 
   /// Get the counter from the end of the most recent scope.
   CounterExpr getExitCounter() {
@@ -914,7 +817,7 @@ private:
   llvm::Optional<CounterExpr> setExitCount(ASTNode Node) {
     ExitCounter = getCurrentCounter();
     if (hasCounter(Node) && getRegion().getNode() != Node)
-      return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterAlloc);
+      return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterBuilder);
     return llvm::None;
   }
 
@@ -942,10 +845,10 @@ private:
     auto Count = getCurrentCounter();
     // Add the counts from jumps directly to the label (such as breaks)
     if (JumpsToLabel)
-      Count = CounterExpr::Add(Count, *JumpsToLabel, CounterAlloc);
+      Count = CounterExpr::Add(Count, *JumpsToLabel, CounterBuilder);
     // Now apply any adjustments for control flow.
     if (ControlFlowAdjust)
-      Count = CounterExpr::Sub(Count, *ControlFlowAdjust, CounterAlloc);
+      Count = CounterExpr::Sub(Count, *ControlFlowAdjust, CounterBuilder);
 
     replaceCount(Count, getEndLoc(Scope));
   }
@@ -967,10 +870,10 @@ private:
   /// \c None, or the counter is semantically zero, an 'incomplete' region is
   /// formed, which is not recorded unless followed by additional AST nodes.
   void replaceCount(CounterExpr Counter, llvm::Optional<SourceLoc> Start) {
-    // If the counter is semantically zero, form an 'incomplete' region with
-    // no starting location. This prevents forming unreachable regions unless
-    // there is a following statement or expression to extend the region.
-    if (Start && Counter.isSemanticallyZero())
+    // If the counter is zero, form an 'incomplete' region with no starting
+    // location. This prevents forming unreachable regions unless there is a
+    // following statement or expression to extend the region.
+    if (Start && Counter.isZero())
       Start = llvm::None;
 
     RegionStack.emplace_back(ASTNode(), Counter, Start, llvm::None);
@@ -1044,13 +947,21 @@ private:
   }
 
 public:
-  CoverageMapping(const SourceManager &SM, SILDeclRef Constant)
-      : SM(SM), Constant(Constant) {}
+  CoverageMapping(
+      const SourceManager &SM, SILDeclRef Constant,
+      const llvm::DenseMap<ProfileCounterRef, unsigned> &ConcreteCounters)
+      : SM(SM), Constant(Constant), ConcreteCounters(ConcreteCounters) {}
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
     // We want to walk lazy initializers present in the synthesized getter for
     // a lazy variable.
     return LazyInitializerWalking::InAccessor;
+  }
+
+  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+    // mapped as part of the wrapped value initialization.
+    return false;
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -1059,14 +970,12 @@ public:
 
   /// Generate the coverage counter mapping regions from collected
   /// source regions.
-  SILCoverageMap *emitSourceRegions(
-      SILModule &M, StringRef Name, StringRef PGOFuncName, uint64_t Hash,
-      llvm::DenseMap<ProfileCounterRef, unsigned> &CounterIndices,
-      SourceFile *SF, StringRef Filename) {
+  SILCoverageMap *emitSourceRegions(SILModule &M, StringRef Name,
+                                    StringRef PGOFuncName, uint64_t Hash,
+                                    SourceFile *SF, StringRef Filename) {
     if (SourceRegions.empty())
       return nullptr;
 
-    llvm::coverage::CounterExpressionBuilder Builder;
     std::vector<SILCoverageMap::MappedRegion> Regions;
     for (const auto &Region : SourceRegions) {
       assert(Region.hasStartLoc() && "invalid region");
@@ -1076,12 +985,12 @@ public:
       auto End = SM.getLineAndColumnInBuffer(Region.getEndLoc());
       assert(Start.first <= End.first && "region start and end out of order");
 
-      auto Counter = Region.getCounter(CounterMap);
+      auto Counter = Region.getCounter(CounterExprs);
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
-                           Counter.expand(Builder, CounterIndices));
+                           Counter.getLLVMCounter());
     }
     return SILCoverageMap::create(M, SF, Filename, Name, PGOFuncName, Hash,
-                                  Regions, Builder.getExpressions());
+                                  Regions, CounterBuilder.getExpressions());
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
@@ -1129,7 +1038,7 @@ public:
       auto ThenCounter = assignKnownCounter(IS->getThenStmt());
       if (IS->getElseStmt()) {
         auto ElseCounter =
-            CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterAlloc);
+            CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterBuilder);
         assignCounter(IS->getElseStmt(), ElseCounter);
       }
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
@@ -1318,7 +1227,7 @@ public:
     if (auto *IE = dyn_cast<TernaryExpr>(E)) {
       auto ThenCounter = assignKnownCounter(IE->getThenExpr());
       auto ElseCounter =
-          CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterAlloc);
+          CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterBuilder);
       assignCounter(IE->getElseExpr(), ElseCounter);
     }
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
@@ -1408,11 +1317,10 @@ void SILProfiler::assignRegionCounters() {
   PGOFuncHash = 0x0;
 
   if (EmitCoverageMapping) {
-    CoverageMapping Coverage(SM, forDecl);
+    CoverageMapping Coverage(SM, forDecl, RegionCounterMap);
     walkNode(Root, Coverage);
-    CovMap =
-        Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName, PGOFuncHash,
-                                   RegionCounterMap, SF, CurrentFileName);
+    CovMap = Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName,
+                                        PGOFuncHash, SF, CurrentFileName);
   }
 
   if (llvm::IndexedInstrProfReader *IPR = M.getPGOReader()) {

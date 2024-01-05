@@ -526,7 +526,8 @@ func defer_mutable(_ x: Int) {
   var x = x
   // expected-warning@-1 {{variable 'x' was never mutated; consider changing to 'let' constant}}
   // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
-  // CHECK-NEXT: project_box [[BOX]]
+  // CHECK-NEXT: [[BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+  // CHECK-NEXT: project_box [[BOX_LIFETIME]]
   // CHECK-NOT: [[BOX]]
   // CHECK: function_ref @$s10statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]
@@ -603,8 +604,8 @@ func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
-  // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
-  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [var_decl] [[STR]]
+  // CHECK-NEXT:   debug_value [[BORROWED_STR]] : $String, let, name "t"
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
   // CHECK-NEXT:   destroy_value [[STR]] : $String
@@ -647,7 +648,7 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : @owned $DerivedClass):
-  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [lexical] [[PTR]]
+  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [lexical] [var_decl] [[PTR]]
   // CHECK-NEXT: debug_value [[BORROWED_PTR]] : $DerivedClass, let, name "result"
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
   // CHECK-NEXT: end_borrow [[BORROWED_PTR]]

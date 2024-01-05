@@ -88,6 +88,7 @@ set(swift_runtime_threading_sources
 
 set(swift_runtime_backtracing_sources
   Backtrace.cpp
+  BacktraceUtils.cpp
   CrashHandlerMacOS.cpp
   CrashHandlerLinux.cpp)
 
@@ -151,6 +152,7 @@ add_swift_target_library(swiftRuntime OBJECT_LIBRARY
   ${swift_runtime_threading_sources}
   C_COMPILE_FLAGS
     ${swift_runtime_library_compile_flags}
+    ${swift_enable_backtracing}
   LINK_FLAGS ${swift_runtime_linker_flags}
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install)

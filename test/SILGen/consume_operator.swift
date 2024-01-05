@@ -8,7 +8,7 @@ protocol P {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7consume15testLoadableLetyyF : $@convention(thin) () -> () {
 // CHECK: [[ORIG_VALUE:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick Klass.Type) -> @owned Klass
-// CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [lexical] [[ORIG_VALUE]]
+// CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [lexical] [var_decl] [[ORIG_VALUE]]
 // CHECK: [[COPY:%.*]] = copy_value [[BORROWED_VALUE:%.*]]
 // CHECK: move_value [allows_diagnostics] [[COPY]]
 // CHECK: } // end sil function '$s7consume15testLoadableLetyyF'
@@ -19,7 +19,7 @@ func testLoadableLet() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7consume15testLoadableVaryyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box $
-// CHECK: [[BORROW_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BORROW_BOX]]
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]
@@ -53,7 +53,7 @@ func testAddressOnlyLet<T : P>(_ t: T.Type) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7consume18testAddressOnlyVaryyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
 // CHECK: [[BOX:%.*]] = alloc_box $
-// CHECK: [[BORROW_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK: [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK: [[PROJECT:%.*]] = project_box [[BORROW_BOX]]
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[PROJECT]]

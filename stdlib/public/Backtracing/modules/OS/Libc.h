@@ -21,6 +21,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#if __has_include(<sys/mman.h>)
+#include <sys/mman.h>
+#endif
+
 #if __has_include(<dlfcn.h>)
 #include <dlfcn.h>
 #endif

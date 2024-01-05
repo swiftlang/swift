@@ -43,6 +43,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
+#include <initializer_list>
 
 using namespace swift;
 
@@ -5143,18 +5144,34 @@ bool swift::isKeywordPossibleDeclStart(const LangOptions &options,
   }
 }
 
-/// Given a current token of 'unowned', check to see if it is followed by a
-/// "(safe)" or "(unsafe)" specifier.
-static bool isParenthesizedUnowned(Parser &P) {
-  assert(P.Tok.getText() == "unowned" && P.peekToken().is(tok::l_paren) &&
+static bool
+isParenthesizedModifier(Parser &P, StringRef name,
+                        std::initializer_list<StringRef> allowedArguments) {
+  assert((P.Tok.getText() == name) && P.peekToken().is(tok::l_paren) &&
          "Invariant violated");
-  
+
   // Look ahead to parse the parenthesized expression.
   Parser::BacktrackingScope Backtrack(P);
   P.consumeToken(tok::identifier);
   P.consumeToken(tok::l_paren);
-  return P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren) &&
-          (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
+
+  const bool argumentIsAllowed =
+      std::find(allowedArguments.begin(), allowedArguments.end(),
+                P.Tok.getText()) != allowedArguments.end();
+  return argumentIsAllowed && P.Tok.is(tok::identifier) &&
+         P.peekToken().is(tok::r_paren);
+}
+
+/// Given a current token of 'unowned', check to see if it is followed by a
+/// "(safe)" or "(unsafe)" specifier.
+static bool isParenthesizedUnowned(Parser &P) {
+  return isParenthesizedModifier(P, "unowned", {"safe", "unsafe"});
+}
+
+/// Given a current token of 'nonisolated', check to see if it is followed by an
+/// "(unsafe)" specifier.
+static bool isParenthesizedNonisolated(Parser &P) {
+  return isParenthesizedModifier(P, "nonisolated", {"unsafe"});
 }
 
 static void skipAttribute(Parser &P) {
@@ -5318,6 +5335,19 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   if (Tok.getText() == "unowned" && Tok2.is(tok::l_paren) &&
       isParenthesizedUnowned(*this)) {
     Parser::BacktrackingScope Backtrack(*this);
+    consumeToken(tok::identifier);
+    consumeToken(tok::l_paren);
+    consumeToken(tok::identifier);
+    consumeToken(tok::r_paren);
+    return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                              /*hadAttrsOrModifiers=*/true);
+  }
+
+  // If this is 'nonisolated', check to see if it is valid.
+  if (Context.LangOpts.hasFeature(Feature::GlobalConcurrency) &&
+      Tok.isContextualKeyword("nonisolated") && Tok2.is(tok::l_paren) &&
+      isParenthesizedNonisolated(*this)) {
+    BacktrackingScope backtrack(*this);
     consumeToken(tok::identifier);
     consumeToken(tok::l_paren);
     consumeToken(tok::identifier);

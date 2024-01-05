@@ -329,12 +329,14 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModuleInternal(
       llvm::RestorePrettyStackState(savedInnerPrettyStackState);
     };
 
+    NullDiagnosticConsumer noopConsumer;
     llvm::Optional<DiagnosticEngine> localDiags;
     DiagnosticEngine *rebuildDiags = diags;
     if (silenceInterfaceDiagnostics) {
       // To silence diagnostics, use a local temporary engine.
       localDiags.emplace(sourceMgr);
       rebuildDiags = &*localDiags;
+      rebuildDiags->addConsumer(noopConsumer);
     }
 
     SubError = (bool)subASTDelegate.runInSubCompilerInstance(

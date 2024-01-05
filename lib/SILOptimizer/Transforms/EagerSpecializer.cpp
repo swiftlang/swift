@@ -746,7 +746,7 @@ SILValue EagerDispatch::emitArgumentConversion(
 
 namespace {
 class EagerSpecializerTransform : public SILFunctionTransform {
-  bool onlyCreatePrespecializations;
+  const bool onlyCreatePrespecializations;
 public:
   EagerSpecializerTransform(bool onlyPrespecialize)
       : onlyCreatePrespecializations(onlyPrespecialize) {}
@@ -833,6 +833,8 @@ void EagerSpecializerTransform::run() {
   // TODO: Use a decision-tree to reduce the amount of dynamic checks being
   // performed.
   SmallVector<SILSpecializeAttr *, 8> attrsToRemove;
+
+  bool onlyCreatePrespecializations = this->onlyCreatePrespecializations;
 
   for (auto *SA : F.getSpecializeAttrs()) {
     if (onlyCreatePrespecializations && !SA->isExported()) {

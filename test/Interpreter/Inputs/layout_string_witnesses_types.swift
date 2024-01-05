@@ -39,6 +39,15 @@ public struct Simple {
     }
 }
 
+public struct GenericStruct<T> {
+    let x: Int = 0
+    let y: T
+
+    public init(_ y: T) {
+        self.y = y
+    }
+}
+
 public class GenericClass<T> {
     let x: T
 
@@ -371,6 +380,12 @@ public struct MultiPayloadEnumWrapper {
     }
 }
 
+public enum MultiPayloadEnumMultiLarge {
+    case empty
+    case nonEmpty(Int, SimpleClass, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+    case nonEmpty2(SimpleClass, Int, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+}
+
 public struct MixedEnumWrapper {
     let x: SinglePayloadSimpleClassEnum
     let y: MultiPayloadEnum
@@ -397,6 +412,16 @@ public struct SinglePayloadEnumExtraTagBytesWrapper {
 
     public init(x: SinglePayloadEnumExtraTagBytes, y: SimpleClass) {
         self.x = x
+        self.y = y
+    }
+}
+
+public struct NotBitwiseTakableBridge<T> {
+    let x: Int = 0
+    let y: [T]
+    weak var z: AnyObject? = nil
+
+    public init(_ y: [T]) {
         self.y = y
     }
 }
@@ -540,6 +565,17 @@ public enum SinglePayloadEnumExistential {
     case c
 }
 
+public struct TupleLargeAlignment<T> {
+    let x: AnyObject? = nil
+    let x1: AnyObject? = nil
+    let x2: AnyObject? = nil
+    let x3: (T, SIMD4<Int64>)
+
+    public init(_ t: T) {
+        self.x3 = (t, .init(Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32))
+    }
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -568,10 +604,6 @@ public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
 }
 
 @inline(never)
-public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: UnsafeMutablePointer<T>) {
-    ptr.assign(from: x, count: 1)
-}
-
 public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
     ptr.update(from: &x, count: 1)
 }
@@ -579,6 +611,11 @@ public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
 @inline(never)
 public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
     ptr.initialize(to: x)
+}
+
+@inline(never)
+public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
+    ptr.initialize(to: consume x)
 }
 
 @inline(never)
@@ -610,4 +647,19 @@ public func testGenericInit<T>(_ ptr: __owned UnsafeMutableRawPointer, to x: T) 
 public func testGenericDestroy<T>(_ ptr: __owned UnsafeMutableRawPointer, of tpe: T.Type) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     testDestroy(ptr)
+}
+
+@inline(never)
+public func testGenericArrayDestroy<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    buffer.deinitialize()
+}
+
+@inline(never)
+public func testGenericArrayInitWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
+    _ = dest.initialize(fromContentsOf: src)
+}
+
+@inline(never)
+public func testGenericArrayAssignWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
+    _ = dest.update(fromContentsOf: src)
 }

@@ -3,3 +3,5 @@
 @interface ObjcInterface: NSObject
 @end
 
+@interface ObjcInterfaceConstInit: NSObject
+@end

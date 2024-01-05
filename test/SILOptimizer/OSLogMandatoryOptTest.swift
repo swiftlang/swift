@@ -2,6 +2,8 @@
 //
 // REQUIRES: VENDOR=apple
 
+// REQUIRES: swift_stdlib_no_asserts
+
 // Tests for the OSLogOptimization pass that performs compile-time analysis
 // and optimization of the new os log APIs. The tests here check whether specific
 // compile-time constants such as the format string, the size of the byte buffer etc. are
@@ -46,8 +48,9 @@ func testSimpleInterpolation() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
   // We need to wade through some borrows and copy values here.
+  // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
   // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -92,7 +95,8 @@ func testInterpolationWithFormatOptions() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
   // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -139,7 +143,8 @@ func testInterpolationWithFormatOptionsAndPrivacy() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
   // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -192,8 +197,9 @@ func testInterpolationWithMultipleArguments() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAYADDR]] = alloc_stack $Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>
+  // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
   // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -242,7 +248,8 @@ func testLogMessageWithoutData() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to {{.*}} 
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[ARGSARRAY:%[0-9]+]]
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
@@ -314,7 +321,8 @@ func testMessageWithTooManyArguments() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
   // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -398,7 +406,8 @@ func testDynamicStringArguments() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+  // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
   // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
   // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -450,7 +459,8 @@ func testNSObjectInterpolation() {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-    // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+    // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
     // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
     // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
     // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
@@ -497,7 +507,8 @@ func testDoubleInterpolation() {
 
     // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
     // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-    // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+    // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY3VD:%[0-9]+]] to [[ARGSARRAYADDR:%[0-9]+]]
+    // CHECK-DAG: [[ARGSARRAY3VD]] = begin_borrow [var_decl] [[ARGSARRAY3:%[0-9]+]]
     // CHECK-DAG: [[ARGSARRAY3]] = copy_value [[ARGSARRAY4:%[0-9]+]]
     // CHECK-DAG: [[ARGSARRAY4]] = begin_borrow [[FINARR:%[0-9]+]]
     // CHECK-DAG: [[FINARRFUNC:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF

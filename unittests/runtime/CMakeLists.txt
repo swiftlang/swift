@@ -106,6 +106,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Metadata.cpp
     Enum.cpp
     ExtendedExistential.cpp
+    Heap.cpp
     Refcounting.cpp
     Stdlib.cpp
     StackAllocator.cpp

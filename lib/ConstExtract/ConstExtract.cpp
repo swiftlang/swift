@@ -58,6 +58,9 @@ public:
         for (auto &Protocol : NTD->getAllProtocols())
           if (Protocols.count(Protocol->getName().str().str()) != 0)
             ConformanceTypeDecls.push_back(NTD);
+    // Visit peers expanded from macros
+    D->visitAuxiliaryDecls([&](Decl *decl) { decl->walk(*this); },
+                           /*visitFreestandingExpanded=*/false);
     return Action::Continue();
   }
 };
@@ -473,7 +476,7 @@ ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
     Properties.push_back(extractTypePropertyInfo(Property));
   }
 
-  for (auto Member : Decl->getMembers()) {
+  for (auto Member : Decl->getAllMembers()) {
     auto *VD = dyn_cast<VarDecl>(Member);
     // Ignore plain stored properties collected above,
     // instead gather up remaining static and computed properties.
@@ -483,7 +486,7 @@ ConstantValueInfoRequest::evaluate(Evaluator &Evaluator,
   }
 
   for (auto Extension: Decl->getExtensions()) {
-    for (auto Member : Extension->getMembers()) {
+    for (auto Member : Extension->getAllMembers()) {
       if (auto *VD = dyn_cast<VarDecl>(Member)) {
         Properties.push_back(extractTypePropertyInfo(VD));
       }

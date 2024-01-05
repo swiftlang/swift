@@ -592,7 +592,8 @@ SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
 
   SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);
   auto *newECM = Builder.createEndCOWMutation(ECM->getLoc(),
-                                              refCast->getOperand(0));
+                                              refCast->getOperand(0),
+                                              ECM->doKeepUnique());
   ECM->replaceAllUsesWith(refCast);
   refCast->setOperand(0, newECM);
   refCast->moveAfter(newECM);
