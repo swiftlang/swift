@@ -1986,8 +1986,10 @@ private:
 
       case EffectKind::Throws:
         if (auto thrownError = fnType->getEffectiveThrownErrorType()) {
-          return Classification::forThrows(
-              thrownError->subst(subs), conditional, reason);
+          Type thrown = *thrownError;
+          if (subs)
+            thrown = thrown.subst(subs);
+          return Classification::forThrows(thrown, conditional, reason);
         }
 
         return Classification();
