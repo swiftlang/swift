@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify -enable-experimental-feature TypedThrows
+// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
