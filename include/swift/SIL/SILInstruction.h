@@ -3009,6 +3009,10 @@ public:
     return getArguments().slice(getNumIndirectResults());
   }
 
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() const {
+    return getArgumentOperands().slice(getNumIndirectResults());
+  }
+
   /// Returns all `@inout` and `@inout_aliasable` arguments passed to the
   /// instruction.
   InoutArgumentRange getInoutArguments() const {

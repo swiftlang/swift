@@ -57,8 +57,10 @@ using namespace swift::regionanalysisimpl;
 static bool isIsolationBoundaryCrossingApply(SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
     return apply->getIsolationCrossing().has_value();
-  if (auto fas = FullApplySite::isa(inst))
-    return bool(fas.getIsolationCrossing());
+  if (auto fas = FullApplySite::isa(inst)) {
+    if (bool(fas.getIsolationCrossing()))
+      return true;
+  }
 
   // We assume that any instruction that does not correspond to an ApplyExpr
   // cannot cross an isolation domain.
@@ -249,8 +251,6 @@ static SILValue getUnderlyingTrackedValue(SILValue value) {
   UseDefChainVisitor visitor;
   SILValue base = visitor.visitAll(value);
   assert(base);
-  if (isa<GlobalAddrInst>(base))
-    return value;
   if (base->getType().isObject())
     return getUnderlyingObject(base);
   return base;
@@ -398,6 +398,38 @@ static bool isGlobalActorInit(SILFunction *fn) {
     return false;
 
   return globalDecl->getGlobalActorAttr() != std::nullopt;
+}
+
+/// Returns true if this is a function argument that is able to be transferred
+/// in the body of our function.
+static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
+  // Indirect out parameters cannot be an input transferring parameter.
+  if (arg->getArgumentConvention().isIndirectOutParameter())
+    return false;
+
+  // If we have a function argument that is closure captured by a Sendable
+  // closure, allow for the argument to be transferred.
+  //
+  // DISCUSSION: The reason that we do this is that in the case of us
+  // having an actual Sendable closure there are two cases we can see:
+  //
+  // 1. If we have an actual Sendable closure, the AST will emit an
+  // earlier error saying that we are capturing a non-Sendable value in a
+  // Sendable closure. So we want to squelch the error that we would emit
+  // otherwise. This only occurs when we are not in swift-6 mode since in
+  // swift-6 mode we will error on the earlier error... but in the case of
+  // us not being in swift 6 mode lets not emit extra errors.
+  //
+  // 2. If we have an async-let based Sendable closure, we want to allow
+  // for the argument to be transferred in the async let's statement and
+  // not emit an error.
+  if (arg->isClosureCapture() &&
+      arg->getFunction()->getLoweredFunctionType()->isSendable())
+    return true;
+
+  // Otherwise, we only allow for the argument to be transferred if it is
+  // explicitly marked as a strong transferring parameter.
+  return arg->isTransferring();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1160,31 +1192,22 @@ public:
     llvm::SmallVector<Element, 8> nonSendableSeparateIndices;
     for (SILArgument *arg : functionArguments) {
       if (auto state = tryToTrackValue(arg)) {
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ");
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
 
-        // If we have a function argument that is closure captured by a Sendable
-        // closure, allow for the argument to be transferred.
+        // If we can transfer our parameter, just add it to
+        // nonSendableSeparateIndices.
         //
-        // DISCUSSION: The reason that we do this is that in the case of us
-        // having an actual Sendable closure there are two cases we can see:
-        //
-        // 1. If we have an actual Sendable closure, the AST will emit an
-        // earlier error saying that we are capturing a non-Sendable value in a
-        // Sendable closure. So we want to squelch the error that we would emit
-        // otherwise. This only occurs when we are not in swift-6 mode since in
-        // swift-6 mode we will error on the earlier error... but in the case of
-        // us not being in swift 6 mode lets not emit extra errors.
-        //
-        // 2. If we have an async-let based Sendable closure, we want to allow
-        // for the value to be transferred and not emit an error.
-        if (!cast<SILFunctionArgument>(arg)->isClosureCapture() ||
-            !function->getLoweredFunctionType()->isSendable()) {
-          addNeverTransferredValueID(state->getID());
-          nonSendableJoinedIndices.push_back(state->getID());
-        } else {
+        // NOTE: We do not support today the ability to have multiple parameters
+        // transfer together as part of the same region.
+        if (isTransferrableFunctionArgument(cast<SILFunctionArgument>(arg))) {
           nonSendableSeparateIndices.push_back(state->getID());
+          continue;
         }
-        LLVM_DEBUG(llvm::dbgs() << *arg);
+
+        // Otherwise, it is one of our merged parameters. Add it to the never
+        // transfer list and to the region join list.
+        valueMap.addNeverTransferredValueID(state->getID());
+        nonSendableJoinedIndices.push_back(state->getID());
       }
     }
 
@@ -1464,42 +1487,88 @@ public:
     translateSILMultiAssign(applyResults, pai->getOperandValues(), options);
   }
 
-  void translateSILApply(SILInstruction *inst) {
-    if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
-      if (auto kind = bi->getBuiltinKind()) {
-        if (kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
-          return translateAsyncLetStart(bi);
+  void translateSILBuiltin(BuiltinInst *bi) {
+    if (auto kind = bi->getBuiltinKind()) {
+      if (kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+        return translateAsyncLetStart(bi);
+      }
+    }
+
+    // If we do not have a special builtin, just do a multi-assign. Builtins do
+    // not cross async boundaries.
+    return translateSILMultiAssign(bi->getResults(), bi->getOperandValues(),
+                                   {});
+  }
+
+  void translateNonIsolationCrossingSILApply(FullApplySite fas) {
+    SILMultiAssignOptions options;
+    if (fas.hasSelfArgument()) {
+      if (auto self = fas.getSelfArgument()) {
+        if (self->getType().isActor())
+          options |= SILMultiAssignFlags::PropagatesActorSelf;
+      }
+    }
+
+    // For non-self parameters, gather all of the transferring parameters and
+    // gather our non-transferring parameters.
+    SmallVector<SILValue, 8> nonTransferringParameters;
+    if (fas.getNumArguments()) {
+      // NOTE: We want to process indirect parameters as if they are
+      // parameters... so we process them in nonTransferringParameters.
+      for (auto &op : fas.getOperandsWithoutSelf()) {
+        if (!fas.getArgumentConvention(op).isIndirectOutParameter() &&
+            fas.getArgumentParameterInfo(op).hasOption(
+                SILParameterInfo::Transferring)) {
+          if (auto value = tryToTrackValue(op.get())) {
+            builder.addTransfer(value->getRepresentative().getValue(), &op);
+          }
+        } else {
+          nonTransferringParameters.push_back(op.get());
         }
       }
     }
 
-    if (auto fas = FullApplySite::isa(inst)) {
-      if (auto *f = fas.getCalleeFunction()) {
-        // Check against the actual SILFunction.
-        if (f->getName() == "swift_asyncLet_get") {
-          return translateAsyncLetGet(cast<ApplyInst>(*fas));
+    // If our self parameter was transferring, transfer it. Otherwise, just
+    // stick it in the non seld operand values array and run multiassign on
+    // it.
+    if (fas.hasSelfArgument()) {
+      auto &selfOperand = fas.getSelfArgumentOperand();
+      if (fas.getArgumentParameterInfo(selfOperand)
+              .hasOption(SILParameterInfo::Transferring)) {
+        if (auto value = tryToTrackValue(selfOperand.get())) {
+          builder.addTransfer(value->getRepresentative().getValue(),
+                              &selfOperand);
         }
+      } else {
+        nonTransferringParameters.push_back(selfOperand.get());
+      }
+    }
+
+    SmallVector<SILValue, 8> applyResults;
+    getApplyResults(*fas, applyResults);
+    return translateSILMultiAssign(applyResults, nonTransferringParameters,
+                                   options);
+  }
+
+  void translateSILApply(SILInstruction *inst) {
+    if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
+      return translateSILBuiltin(bi);
+    }
+
+    auto fas = FullApplySite::isa(inst);
+    assert(bool(fas) && "Builtins should be handled above");
+
+    if (auto *f = fas.getCalleeFunction()) {
+      // Check against the actual SILFunction.
+      if (f->getName() == "swift_asyncLet_get") {
+        return translateAsyncLetGet(cast<ApplyInst>(*fas));
       }
     }
 
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
-    if (!isIsolationBoundaryCrossingApply(inst)) {
-      SILMultiAssignOptions options;
-      if (auto fas = FullApplySite::isa(inst)) {
-        if (fas.hasSelfArgument()) {
-          if (auto self = fas.getSelfArgument()) {
-            if (self->getType().isActor())
-              options |= SILMultiAssignFlags::PropagatesActorSelf;
-          }
-        }
-      }
-
-      SmallVector<SILValue, 8> applyResults;
-      getApplyResults(inst, applyResults);
-      return translateSILMultiAssign(applyResults, inst->getOperandValues(),
-                                     options);
-    }
+    if (!isIsolationBoundaryCrossingApply(inst))
+      return translateNonIsolationCrossingSILApply(fas);
 
     if (auto cast = dyn_cast<ApplyInst>(inst))
       return translateIsolationCrossingSILApply(cast);
@@ -1521,7 +1590,7 @@ public:
            "only ApplyExpr's should cross isolation domains");
 
     // require all operands
-    for (auto op : applySite->getOperandValues())
+    for (auto op : applySite.getArguments())
       if (auto value = tryToTrackValue(op))
         builder.addRequire(value->getRepresentative().getValue());
 
