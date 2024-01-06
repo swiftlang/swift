@@ -90,6 +90,7 @@ public protocol AsyncIteratorProtocol<Element, Failure> {
   associatedtype Element
 
   /// The type of failure produced by iteration.
+  @available(SwiftStdlib 5.11, *)
   associatedtype Failure: Error = any Error
 
   /// Asynchronously advances to the next element and returns it, or ends the

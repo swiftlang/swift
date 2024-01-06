@@ -74,6 +74,7 @@ extension AsyncSequence {
   @preconcurrency 
   @_alwaysEmitIntoClient
   @inlinable
+  @available(SwiftStdlib 5.11, *)
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult>
@@ -110,6 +111,7 @@ extension AsyncSequence {
   @preconcurrency 
   @_alwaysEmitIntoClient
   @inlinable
+  @available(SwiftStdlib 5.11, *)
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult>
@@ -146,6 +148,7 @@ extension AsyncSequence {
   @preconcurrency 
   @_alwaysEmitIntoClient
   @inlinable
+  @available(SwiftStdlib 5.11, *)
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult>
