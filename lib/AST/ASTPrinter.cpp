@@ -3876,12 +3876,12 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) { return false; }
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-  case Feature::FeatureName:                                          \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  case Feature::FeatureName:                                                   \
     llvm_unreachable("not a suppressible feature");
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName:                                          \
-    suppressingFeature##FeatureName(options, action);                 \
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  case Feature::FeatureName:                                                   \
+    suppressingFeature##FeatureName(options, action);                          \
     return;
 #include "swift/Basic/Features.def"
   }
@@ -3952,12 +3952,12 @@ public:
   void collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
     // Go through each of the features, checking whether the
     // declaration uses that feature.
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-    if (usesFeature##FeatureName(decl))                               \
-      collectRequiredFeature(Feature::FeatureName, operation);
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-    if (usesFeature##FeatureName(decl))                               \
-      collectSuppressibleFeature(Feature::FeatureName, operation);
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  if (usesFeature##FeatureName(decl))                                          \
+    collectRequiredFeature(Feature::FeatureName, operation);
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  if (usesFeature##FeatureName(decl))                                          \
+    collectSuppressibleFeature(Feature::FeatureName, operation);
 #include "swift/Basic/Features.def"
   }
 };

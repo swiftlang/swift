@@ -556,25 +556,13 @@ public:
 
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     auto Name = getDeclRefStr(E);
+    if (Name.empty())
+      return false;
 
-    // Check whether this is any one of the known compiler features.
-    const auto &langOpts = Ctx.LangOpts;
-#if SWIFT_BUILD_SWIFT_SYNTAX
-    const bool hasSwiftSwiftParser = true;
-#else
-    const bool hasSwiftSwiftParser = false;
-#endif
-    bool isKnownFeature = llvm::StringSwitch<bool>(Name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-        .Case("$" #FeatureName, Option)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
-#include "swift/Basic/Features.def"
-        .Default(false);
-
-    if (isKnownFeature)
+    if (Name.startswith("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;
-    
-    return langOpts.isCustomConditionalCompilationFlagSet(Name);
+
+    return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
   }
 
   bool visitCallExpr(CallExpr *E) {

@@ -4361,13 +4361,13 @@ int main(int argc, char *argv[]) {
 
   for (const auto &featureArg : options::EnableExperimentalFeatures) {
     if (auto feature = getExperimentalFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
+      InitInvok.getLangOptions().enableFeature(*feature);
     }
   }
 
   for (const auto &featureArg : options::EnableUpcomingFeatures) {
     if (auto feature = getUpcomingFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
+      InitInvok.getLangOptions().enableFeature(*feature);
     }
   }
 
@@ -4435,10 +4435,10 @@ int main(int argc, char *argv[]) {
   }
 
   if (options::EnableExperimentalNamedOpaqueTypes) {
-    InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
+    InitInvok.getLangOptions().enableFeature(Feature::NamedOpaqueTypes);
   }
   if (options::EnableBareSlashRegexLiterals) {
-    InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
+    InitInvok.getLangOptions().enableFeature(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 

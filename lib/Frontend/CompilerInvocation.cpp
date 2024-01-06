@@ -627,28 +627,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.ForceWorkaroundBrokenModules
     |= Args.hasArg(OPT_force_workaround_broken_modules);
 
-  // Whether '/.../' regex literals are enabled. This implies experimental
-  // string processing.
-  if (Args.hasArg(OPT_enable_bare_slash_regex)) {
-    Opts.EnableBareSlashRegexLiterals = true;
-    Opts.EnableExperimentalStringProcessing = true;
-  }
-
   // Either the env var and the flag has to be set to enable package interface load
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
-
-  // Experimental string processing.
-  if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,
-                               OPT_disable_experimental_string_processing)) {
-    Opts.EnableExperimentalStringProcessing =
-        A->getOption().matches(OPT_enable_experimental_string_processing);
-
-    // When experimental string processing is explicitly disabled, also disable
-    // forward slash regex `/.../`.
-    if (!Opts.EnableExperimentalStringProcessing)
-      Opts.EnableBareSlashRegexLiterals = false;
-  }
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
@@ -787,11 +768,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.addCustomConditionalCompilationFlag(A->getValue());
   }
 
-  // Determine whether string processing is enabled
-  Opts.EnableExperimentalStringProcessing =
-    Args.hasFlag(OPT_enable_experimental_string_processing,
-                 OPT_disable_experimental_string_processing, /*Default=*/true);
-
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
@@ -800,7 +776,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         return;
     }
 
-    Opts.Features.insert(feature);
+    Opts.enableFeature(feature);
   };
 
   // Map historical flags over to future features.
@@ -808,6 +784,22 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     addFutureFeatureIfNotImplied(Feature::ConciseMagicFile);
   if (Args.hasArg(OPT_enable_bare_slash_regex))
     addFutureFeatureIfNotImplied(Feature::BareSlashRegexLiterals);
+
+  // Experimental string processing. If explicitly enabled/disabled, use that.
+  // Otherwise if bare slash regex literals were enabled, also enable string
+  // processing.
+  if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,
+                               OPT_disable_experimental_string_processing)) {
+    Opts.EnableExperimentalStringProcessing =
+        A->getOption().matches(OPT_enable_experimental_string_processing);
+
+    // When experimental string processing is explicitly disabled, also disable
+    // forward slash regex `/.../`.
+    if (!Opts.EnableExperimentalStringProcessing)
+      Opts.disableFeature(Feature::BareSlashRegexLiterals);
+  } else if (Opts.hasFeature(Feature::BareSlashRegexLiterals)) {
+    Opts.EnableExperimentalStringProcessing = true;
+  }
 
   for (const Arg *A : Args.filtered(OPT_enable_experimental_feature)) {
     // Allow StrictConcurrency to have a value that corresponds to the
@@ -828,7 +820,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         }
 
         if (handled) {
-          Opts.Features.insert(Feature::StrictConcurrency);
+          Opts.enableFeature(Feature::StrictConcurrency);
           continue;
         }
       }
@@ -843,10 +835,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                        A->getValue());
         HadError = true;
       } else {
-        Opts.Features.insert(*feature);
+        Opts.enableFeature(*feature);
       }
 #else
-      Opts.Features.insert(*feature);
+      Opts.enableFeature(*feature);
 #endif
     }
 
@@ -881,43 +873,43 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
 
     // Add the feature.
-    Opts.Features.insert(*feature);
+    Opts.enableFeature(*feature);
   }
 
   // CompleteConcurrency enables all data-race safety upcoming features.
   if (Opts.hasFeature(Feature::CompleteConcurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-    Opts.Features.insert(Feature::DisableOutwardActorInference);
+    Opts.enableFeature(Feature::DisableOutwardActorInference);
   }
 
   // Map historical flags over to experimental features. We do this for all
   // compilers because that's how existing experimental feature flags work.
   if (Args.hasArg(OPT_enable_experimental_static_assert))
-    Opts.Features.insert(Feature::StaticAssert);
+    Opts.enableFeature(Feature::StaticAssert);
   if (Args.hasArg(OPT_enable_experimental_named_opaque_types))
-    Opts.Features.insert(Feature::NamedOpaqueTypes);
+    Opts.enableFeature(Feature::NamedOpaqueTypes);
   if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
-    Opts.Features.insert(Feature::FlowSensitiveConcurrencyCaptures);
+    Opts.enableFeature(Feature::FlowSensitiveConcurrencyCaptures);
   if (Args.hasArg(OPT_enable_experimental_move_only)) {
     // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
-    Opts.Features.insert(Feature::MoveOnly);
-    Opts.Features.insert(Feature::NoImplicitCopy);
-    Opts.Features.insert(Feature::OldOwnershipOperatorSpellings);
+    Opts.enableFeature(Feature::MoveOnly);
+    Opts.enableFeature(Feature::NoImplicitCopy);
+    Opts.enableFeature(Feature::OldOwnershipOperatorSpellings);
   }
   if (Args.hasArg(OPT_experimental_one_way_closure_params))
-    Opts.Features.insert(Feature::OneWayClosureParameters);
+    Opts.enableFeature(Feature::OneWayClosureParameters);
   if (Args.hasArg(OPT_enable_experimental_forward_mode_differentiation))
-    Opts.Features.insert(Feature::ForwardModeDifferentiation);
+    Opts.enableFeature(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
-    Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
-  
+    Opts.enableFeature(Feature::AdditiveArithmeticDerivedConformances);
+
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
-    Opts.Features.insert(Feature::OpaqueTypeErasure);
+    Opts.enableFeature(Feature::OpaqueTypeErasure);
 
   if (Args.hasArg(OPT_enable_builtin_module))
-    Opts.Features.insert(Feature::BuiltinModule);
+    Opts.enableFeature(Feature::BuiltinModule);
 
-  Opts.Features.insert(Feature::LayoutPrespecialization);
+  Opts.enableFeature(Feature::LayoutPrespecialization);
 
   Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
@@ -1410,8 +1402,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   /// rdar://118013482 Use this flag to disable round trip through the new
   /// Swift parser for such cases.
   if (!Args.hasArg(OPT_disable_experimental_parser_round_trip)) {
-    Opts.Features.insert(Feature::ParserRoundTrip);
-    Opts.Features.insert(Feature::ParserValidation);
+    Opts.enableFeature(Feature::ParserRoundTrip);
+    Opts.enableFeature(Feature::ParserValidation);
   }
 #endif
   return HadError || UnsupportedOS || UnsupportedArch;
