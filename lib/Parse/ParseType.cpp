@@ -1800,7 +1800,6 @@ bool Parser::isAtFunctionTypeArrow() {
     if (isEffectsSpecifier(peekToken())) {
       BacktrackingScope backtrack(*this);
       consumeToken();
-      consumeToken();
       return isAtFunctionTypeArrow();
     }
     // Don't look for '->' in code completion. The user may write it later.
