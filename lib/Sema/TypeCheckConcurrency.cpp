@@ -3341,7 +3341,7 @@ namespace {
         } else {
           if (calleeDecl) {
             auto preconcurrency = getContextIsolation().preconcurrency() ||
-            calleeDecl->preconcurrency();
+                getActorIsolation(calleeDecl).preconcurrency();
             ctx.Diags.diagnose(
                                apply->getLoc(), diag::actor_isolated_call_decl,
                                *unsatisfiedIsolation,
@@ -5135,7 +5135,8 @@ bool swift::contextRequiresStrictConcurrencyChecking(
       // features.
       if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
         auto *nominal = extension->getExtendedNominal();
-        if (nominal && hasExplicitIsolationAttribute(nominal))
+        if (nominal && hasExplicitIsolationAttribute(nominal) &&
+            !getActorIsolation(nominal).preconcurrency())
           return true;
       }
 
