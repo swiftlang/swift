@@ -852,3 +852,19 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @classify_bridge_object_test : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+
+  %value2 = unchecked_ref_cast %value : $NonSendableKlass to $Builtin.BridgeObject
+  %1 = classify_bridge_object %value2 : $Builtin.BridgeObject // expected-note {{access here could race}}
+  destroy_value %value2 : $Builtin.BridgeObject
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
