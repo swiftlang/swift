@@ -1607,7 +1607,8 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
     }
 
     // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive) {
+    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive ||
+        Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Everything) {
       return false;
     }
 
