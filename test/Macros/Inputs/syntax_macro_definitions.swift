@@ -2274,3 +2274,13 @@ public struct _AddPeerMacro: PeerMacro {
         return ["static let \(raw: name)_special = 41"]
     }
 }
+
+public struct WrapperMacro: PeerMacro {
+  public static func expansion(
+      of node: SwiftSyntax.AttributeSyntax,
+      providingPeersOf declaration: some SwiftSyntax.DeclSyntaxProtocol,
+      in context: some SwiftSyntaxMacros.MacroExpansionContext
+  ) throws -> [SwiftSyntax.DeclSyntax] {
+    []
+  }
+}

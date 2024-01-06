@@ -895,7 +895,7 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   case MacroRole::MemberAttribute: {
     SourceLoc startLoc;
     if (auto valueDecl = dyn_cast<ValueDecl>(target.get<Decl *>()))
-      startLoc = valueDecl->getAttributeInsertionLoc(/*forModifier=*/false);
+      startLoc = valueDecl->getAttributeInsertionLoc(/*forModifier=*/true);
     else
       startLoc = target.getStartLoc();
 
