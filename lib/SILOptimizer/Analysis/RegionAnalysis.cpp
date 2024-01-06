@@ -212,6 +212,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::RefToUnownedInst:
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UnownedCopyValueInst:
   case SILInstructionKind::UnownedToRefInst:
   case SILInstructionKind::UpcastInst:
     return true;
@@ -2056,6 +2057,7 @@ CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
 CONSTANT_TRANSLATION(ProjectBlockStorageInst, LookThrough)
 CONSTANT_TRANSLATION(RefToUnownedInst, LookThrough)
 CONSTANT_TRANSLATION(UnownedToRefInst, LookThrough)
+CONSTANT_TRANSLATION(UnownedCopyValueInst, LookThrough)
 
 //===---
 // Store
@@ -2149,7 +2151,6 @@ CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ValueToBridgeObjectInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
