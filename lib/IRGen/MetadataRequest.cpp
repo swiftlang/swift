@@ -1641,7 +1641,7 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
 
   default:
     assert((!params.empty() || type->isDifferentiable() ||
-            type->getGlobalActor()) &&
+            type->getGlobalActor() || type->getThrownError()) &&
            "0 parameter case should be specialized unless it is a "
            "differentiable function or has a global actor");
 
