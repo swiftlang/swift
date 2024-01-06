@@ -542,3 +542,6 @@ SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
               llvm::Optional<SubstitutionMap>(const Decl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
+              ArrayRef<TypeDecl *>(SourceFile *),
+              Cached, NoLocationInfo)

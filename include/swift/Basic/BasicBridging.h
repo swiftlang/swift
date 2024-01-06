@@ -178,8 +178,7 @@ void BridgedData_free(BridgedData data);
 //===----------------------------------------------------------------------===//
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)           \
-  FeatureName,
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) FeatureName,
 #include "swift/Basic/Features.def"
 };
 

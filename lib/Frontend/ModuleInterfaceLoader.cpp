@@ -1624,8 +1624,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   });
 
   if (LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
-    genericSubInvocation.getLangOptions().Features.insert(
-      Feature::LayoutPrespecialization);
+    genericSubInvocation.getLangOptions().enableFeature(
+        Feature::LayoutPrespecialization);
   }
 
   // Validate Clang modules once per-build session flags must be consistent

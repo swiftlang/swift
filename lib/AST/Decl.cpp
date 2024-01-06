@@ -9398,12 +9398,8 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
   BodyRange = bodyRange;
   setBodyKind(BodyKind::Unparsed);
 
-  // Remove local type decls from the source file.
   if (auto SF = getParentSourceFile()) {
-    SF->LocalTypeDecls.remove_if([&](TypeDecl *TD) {
-      auto dc = TD->getDeclContext();
-      return dc == this || dc->isChildContextOf(this);
-    });
+    SF->getASTContext().evaluator.clearCachedOutput(LocalTypeDeclsRequest{SF});
   }
 }
 

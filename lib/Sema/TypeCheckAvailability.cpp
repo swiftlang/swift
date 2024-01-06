@@ -3874,10 +3874,16 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   DeclAvailabilityFlags flags;
 
   bool checkIdentTypeRepr(IdentTypeRepr *ITR) {
+    ArrayRef<AssociatedTypeDecl *> primaryAssociatedTypes;
+
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
       if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
         return true;
+
+      if (auto protocol = dyn_cast<ProtocolDecl>(typeDecl)) {
+        primaryAssociatedTypes = protocol->getPrimaryAssociatedTypes();
+      }
     }
 
     bool foundAnyIssues = false;
@@ -3889,6 +3895,17 @@ class TypeReprAvailabilityWalker : public ASTWalker {
       for (auto *genericArg : GTR->getGenericArgs()) {
         if (diagnoseTypeReprAvailability(genericArg, where, genericFlags))
           foundAnyIssues = true;
+
+        // The associated type that is being specified must be available as
+        // well.
+        if (!primaryAssociatedTypes.empty()) {
+          auto primaryAssociatedType = primaryAssociatedTypes.front();
+          primaryAssociatedTypes = primaryAssociatedTypes.drop_front();
+          if (diagnoseDeclAvailability(
+                  primaryAssociatedType, genericArg->getSourceRange(),
+                  nullptr, where, genericFlags))
+            foundAnyIssues = true;
+        }
       }
     }
 

@@ -108,7 +108,7 @@ DECL_ATTR(_silgen_name, SILGenName,
   OnAbstractFunction | OnVar | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   0)
 DECL_ATTR(available, Available,
-  OnAbstractFunction | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnMacro | OnExtension | AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnAssociatedType | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnMacro | OnExtension | AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   1)
 DECL_ATTR(objc, ObjC,
   OnAbstractFunction | OnClass | OnProtocol | OnExtension | OnVar | OnSubscript | OnEnum | OnEnumElement | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,

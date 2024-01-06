@@ -177,6 +177,11 @@ testFileID(a: 1, b: 2)
 @freestanding(expression) macro stringifyAndTry<T>(_ value: T) -> (T, String) =
     #externalMacro(module: "MacroDefinition", type: "StringifyAndTryMacro")
 
+enum Angle {
+case degrees(Double)
+case radians(Double)
+}
+
 func testStringify(a: Int, b: Int) {
   let s = #stringify(a + b)
   print(s)
@@ -196,6 +201,14 @@ func testStringify(a: Int, b: Int) {
   // CHECK-AST: tuple_expr type='(Double, String)' location=Macro expansion of #stringify
 
   _ = (b, b2, s2, s3)
+
+  let angle = Angle.degrees(17)
+  switch angle {
+  case .degrees(let value):
+    _ = #stringify(value)
+  case .radians(let value):
+    _ = #stringify(value)
+  }
 }
 
 func testAssert(a: Int, b: Int) {

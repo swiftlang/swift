@@ -29,3 +29,8 @@ func testMissingError() throws() { }
 
 func testRethrowsWithThrownType() rethrows(MyError) { }
 // expected-error@-1{{'rethrows' cannot be combined with a specific thrown error type}}
+
+struct S<Element, Failure: Error> {
+  init(produce: @escaping () async throws(Failure) -> Element?) {
+  }
+}
