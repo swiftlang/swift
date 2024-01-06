@@ -284,9 +284,13 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
     case MacroRole::Extension:
     case MacroRole::Member:
     case MacroRole::Peer:
-    case MacroRole::Preamble:
-      parentLoc = SF->getMacroInsertionRange().End;;
+    case MacroRole::Preamble: {
+      auto insertionRange = SF->getMacroInsertionRange();
+      parentLoc = insertionRange.End;
+      if (insertionRange.Start != insertionRange.End)
+        parentLoc = parentLoc.getAdvancedLoc(-1);
       break;
+    }
     case MacroRole::Body: {
       // Use the end location of the function decl itself as the parentLoc
       // for the new function body scope. This is different from the end
