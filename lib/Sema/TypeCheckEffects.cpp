@@ -1468,13 +1468,11 @@ public:
         ConditionalEffectKind::Always,
         PotentialEffectReason::forApply());
 
-    // Use the conformance to AsyncSequence to determine whether (and what)
-    // is thrown.
-    auto conformance = stmt->getSequenceConformance();
-    Type sequenceType = stmt->getSequenceType();
-    result.merge(
-        classifyConformance(
-          sequenceType, conformance, EffectKind::Throws));
+    if (!stmt->getNextCall())
+      return Classification::forInvalidCode();
+
+    // Merge the thrown result from the next/nextElement call.
+    result.merge(classifyExpr(stmt->getNextCall(), EffectKind::Throws));
 
     return result;
   }
@@ -3501,11 +3499,9 @@ private:
       if (throwsKind != ConditionalEffectKind::None)
         Flags.set(ContextFlags::HasAnyThrowSite);
 
-      if (!CurContext.handlesThrows(throwsKind))
-        CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
-
-      // Note: we don't need to check the thrown error type specifically,
-      // because we will also be checking the nextElement call.
+      // Note: we don't need to check whether the throw error is handled,
+      // because we will also be checking the generated next/nextElement
+      // call.
     }
 
     return ShouldRecurse;

@@ -15,8 +15,7 @@ func missingAsync<T : AsyncSequence>(_ seq: T) throws {
 @available(SwiftStdlib 5.1, *)
 func missingThrows<T : AsyncSequence>(_ seq: T) async {
   for try await _ in seq { } 
-  // expected-error@-1 {{error is not handled because the enclosing function is not declared 'throws'}}
-  // expected-error@-2 {{errors thrown from here are not handled}}
+  // expected-error@-1 {{errors thrown from here are not handled}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -37,7 +36,6 @@ func missingTryInBlock<T : AsyncSequence>(_ seq: T) {
     for await _ in seq { } 
     // expected-error@-1{{call can throw, but the error is not handled}}
     // expected-error@-2{{errors thrown from here are not handled}}
-    // expected-error@-3{{error is not handled because the enclosing function is not declared 'throws'}}
   }
 }
 
