@@ -1467,8 +1467,11 @@ public protocol NoAvailableProtoWithAssoc { // expected-note 3 {{add @available 
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
 }
 
 @available(macOS 10.9, *)
@@ -1477,8 +1480,11 @@ public protocol BeforeInliningTargetProtoWithAssoc {
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
 }
 
 @available(macOS 10.10, *)
@@ -1487,8 +1493,11 @@ public protocol AtInliningTargetProtoWithAssoc {
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
 }
 
 @available(macOS 10.14.5, *)
@@ -1498,7 +1507,9 @@ public protocol BetweenTargetsProtoWithAssoc {
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
 }
 
 @available(macOS 10.15, *)
@@ -1509,6 +1520,7 @@ public protocol AtDeploymentTargetProtoWithAssoc {
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
 }
 
 @available(macOS 11, *)
@@ -1529,6 +1541,7 @@ public protocol UnavailableProtoWithAssoc {
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
   associatedtype G: UnavailableProto
 }
 
@@ -1540,6 +1553,7 @@ public protocol SPINoAvailableProtoWithAssoc { // expected-note 1 {{add @availab
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
+  // expected-note@-1{{add @available attribute to enclosing associated type}}
 }
 
 // MARK: - Type aliases
