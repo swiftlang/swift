@@ -829,12 +829,12 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
           conformance.getConcrete())->isMissing());
 }
 
-/// Find the import that makes the given nominal declaration available.
+/// Find the import that makes the given declaration available.
 static llvm::Optional<AttributedImport<ImportedModule>>
-findImportFor(NominalTypeDecl *nominal, const DeclContext *fromDC) {
-  // If the nominal type is from the current module, there's no import.
-  auto nominalModule = nominal->getParentModule();
-  if (nominalModule == fromDC->getParentModule())
+findImportFor(const DeclContext *dc, const DeclContext *fromDC) {
+  // If the type is from the current module, there's no import.
+  auto module = dc->getParentModule();
+  if (module == fromDC->getParentModule())
     return llvm::None;
 
   auto fromSourceFile = fromDC->getParentSourceFile();
@@ -843,16 +843,16 @@ findImportFor(NominalTypeDecl *nominal, const DeclContext *fromDC) {
 
   // Look to see if the owning module was directly imported.
   for (const auto &import : fromSourceFile->getImports()) {
-    if (import.module.importedModule == nominalModule)
+    if (import.module.importedModule == module)
       return import;
   }
 
   // Now look for transitive imports.
-  auto &importCache = nominal->getASTContext().getImportCache();
+  auto &importCache = dc->getASTContext().getImportCache();
   for (const auto &import : fromSourceFile->getImports()) {
     auto &importSet = importCache.getImportSet(import.module.importedModule);
     for (const auto &transitive : importSet.getTransitiveImports()) {
-      if (transitive.importedModule == nominalModule) {
+      if (transitive.importedModule == module) {
         return import;
       }
     }
@@ -2931,7 +2931,8 @@ namespace {
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
-      switch (value->getASTContext().LangOpts.StrictConcurrencyLevel) {
+      auto &ctx = value->getASTContext();
+      switch (ctx.LangOpts.StrictConcurrencyLevel) {
       case StrictConcurrency::Minimal:
       case StrictConcurrency::Targeted:
         // Never diagnose.
@@ -2954,7 +2955,8 @@ namespace {
         return false;
 
       // If it's actor-isolated, it's already been dealt with.
-      if (getActorIsolation(value).isActorIsolated())
+      const auto isolation = getActorIsolation(value);
+      if (isolation.isActorIsolated())
         return false;
 
       if (auto attr = value->getAttrs().getAttribute<NonisolatedAttr>();
@@ -2962,8 +2964,23 @@ namespace {
         return false;
       }
 
-      ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value);
+      const auto import =
+          findImportFor(var->getDeclContext(), getDeclContext());
+      const bool isPreconcurrencyImport =
+          import && import->options.contains(ImportFlags::Preconcurrency);
+      const auto isPreconcurrencyUnspecifiedIsolation =
+          isPreconcurrencyImport && isolation.isUnspecified();
+      ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value)
+          .warnUntilSwiftVersionIf(!isPreconcurrencyUnspecifiedIsolation, 6)
+          .limitBehaviorIf(isPreconcurrencyImport, DiagnosticBehavior::Warning)
+          .limitBehaviorIf(!ctx.isSwiftVersionAtLeast(6) &&
+                               isPreconcurrencyUnspecifiedIsolation,
+                           DiagnosticBehavior::Ignore);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
+      if (const auto sourceFile = getDeclContext()->getParentSourceFile();
+          sourceFile && isPreconcurrencyImport) {
+        sourceFile->setImportUsedPreconcurrency(*import);
+      }
       return true;
     }
 
