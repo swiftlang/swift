@@ -832,3 +832,23 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @debug_step_test : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %unowned = ref_to_unowned %value : $NonSendableKlass to $@sil_unowned NonSendableKlass
+  %ref = unowned_to_ref %unowned : $@sil_unowned NonSendableKlass to $NonSendableKlass
+  %refCopy = copy_value %ref : $NonSendableKlass
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%refCopy) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  // Just make sure the pass sees the instruction
+  debug_step
+
+  destroy_value %refCopy : $NonSendableKlass
+  destroy_value %value : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
