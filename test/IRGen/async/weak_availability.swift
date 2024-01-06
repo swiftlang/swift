@@ -9,5 +9,5 @@ public func f<S: AsyncSequence>(_ s: S) async throws -> Any.Type {
   return Fn.self
 }
 
-// MAYBE-AVAILABLE: @"$sScI11nextElement0B0QzSgyYa7FailureQzYKFTjTu" = extern_weak global
+// MAYBE-AVAILABLE: @"$sScI{{.*next.*}}YaKFTjTu" = extern_weak global
 // MAYBE-AVAILABLE: declare{{.*}} extern_weak{{.*}} @swift_getFunctionTypeMetadataGlobalActor

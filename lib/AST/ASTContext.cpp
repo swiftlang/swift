@@ -287,6 +287,9 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncIteratorProtocol.next()'.
   FuncDecl *AsyncIteratorNext = nullptr;
 
+  /// The declaration of 'AsyncIteratorProtocol.nextElement()'.
+  FuncDecl *AsyncIteratorNextElement = nullptr;
+
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
 
@@ -957,13 +960,25 @@ FuncDecl *ASTContext::getAsyncIteratorNext() const {
   if (!proto)
     return nullptr;
 
-  if (auto *func = lookupRequirement(proto, Id_nextElement)) {
+  if (auto *func = lookupRequirement(proto, Id_next)) {
     getImpl().AsyncIteratorNext = func;
     return func;
   }
 
-  if (auto *func = lookupRequirement(proto, Id_next)) {
-    getImpl().AsyncIteratorNext = func;
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getAsyncIteratorNextElement() const {
+  if (getImpl().AsyncIteratorNextElement) {
+    return getImpl().AsyncIteratorNextElement;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_nextElement)) {
+    getImpl().AsyncIteratorNextElement = func;
     return func;
   }
 

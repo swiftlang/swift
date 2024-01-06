@@ -4592,8 +4592,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // Now, result type of `.makeIterator()` is used to form a call to
   // `.next()`. `next()` is called on each iteration of the loop.
   {
-    FuncDecl *nextFn = isAsync ? ctx.getAsyncIteratorNext()
-                               : ctx.getIteratorNext();
+    FuncDecl *nextFn = 
+        TypeChecker::getForEachIteratorNextFunction(dc, stmt->getForLoc(), isAsync);
     Identifier nextId = nextFn ? nextFn->getName().getBaseIdentifier()
                                : ctx.Id_next;
     auto *nextRef = UnresolvedDotExpr::createImplicit(

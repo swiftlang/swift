@@ -10712,8 +10712,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         bool isAsync = iteratorProto->getKnownProtocolKind() ==
                        KnownProtocolKind::AsyncIteratorProtocol;
 
-        auto *next =
-            isAsync ? ctx.getAsyncIteratorNext() : ctx.getIteratorNext();
+        auto loc = locator->getAnchor().getStartLoc();
+        auto *next = TypeChecker::getForEachIteratorNextFunction(DC, loc, isAsync);
 
         return simplifyValueWitnessConstraint(
             ConstraintKind::ValueWitness, baseTy, next, memberTy, useDC,
