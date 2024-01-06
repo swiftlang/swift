@@ -465,7 +465,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     emitGlobalDecl(decl);
   for (auto *decl : SF.getHoistedDecls())
     emitGlobalDecl(decl);
-  for (auto *localDecl : SF.LocalTypeDecls)
+  for (auto *localDecl : SF.getLocalTypeDecls())
     emitGlobalDecl(localDecl);
   for (auto *opaqueDecl : SF.getOpaqueReturnTypeDecls())
     maybeEmitOpaqueTypeDecl(opaqueDecl);

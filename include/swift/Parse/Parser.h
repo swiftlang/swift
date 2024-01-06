@@ -1015,8 +1015,6 @@ public:
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
 
-  void recordLocalType(TypeDecl *TD);
-
   /// Skip an `#if` configuration block containing only attributes.
   ///
   /// \returns true if the skipping was successful, false otherwise.

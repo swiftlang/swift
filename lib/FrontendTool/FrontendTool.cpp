@@ -280,7 +280,7 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
   C.NumDecls += SF->getTopLevelDecls().size();
-  C.NumLocalTypeDecls += SF->LocalTypeDecls.size();
+  C.NumLocalTypeDecls += SF->getLocalTypeDecls().size();
   C.NumObjCMethods += SF->ObjCMethods.size();
 
   SmallVector<OperatorDecl *, 2> operators;

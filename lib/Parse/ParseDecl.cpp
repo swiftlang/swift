@@ -5728,15 +5728,6 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, bool IsTopLevel) {
   }
 }
 
-void Parser::recordLocalType(TypeDecl *TD) {
-  // If we're not in a local context, this is unnecessary.
-  if (!TD->getDeclContext()->isLocalContext())
-    return;
-
-  if (!InInactiveClauseEnvironment && !InFreestandingMacroArgument)
-    SF.getOutermostParentSourceFile()->LocalTypeDecls.insert(TD);
-}
-
 /// Set the original declaration in `@differentiable` attributes.
 ///
 /// Necessary because `Parser::parseNewDeclAttribute` (which calls
@@ -7200,7 +7191,6 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
                                           genericParams, CurDeclContext);
-  recordLocalType(TAD);
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
@@ -8885,7 +8875,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
                                         { }, GenericParams, CurDeclContext);
-  recordLocalType(ED);
   ED->getAttrs() = Attributes;
 
   ContextChange CC(*this, ED);
@@ -9152,7 +9141,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             { },
                                             GenericParams,
                                             CurDeclContext);
-  recordLocalType(SD);
   SD->getAttrs() = Attributes;
 
   ContextChange CC(*this, SD);
@@ -9246,7 +9234,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, GenericParams, CurDeclContext,
                                           isExplicitActorDecl);
-  recordLocalType(CD);
   CD->getAttrs() = Attributes;
 
   // Parsed classes never have missing vtable entries.
@@ -9425,7 +9412,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
                    Context.AllocateCopy(PrimaryAssociatedTypeNames),
                    Context.AllocateCopy(InheritedProtocols), TrailingWhere);
-  recordLocalType(Proto);
 
   Proto->getAttrs() = Attributes;
   if (whereClauseHadCodeCompletion && CodeCompletionCallbacks)
