@@ -36,7 +36,6 @@ extension Parser.ExperimentalFeatures {
       }
     }
     mapFeature(.ThenStatements, to: .thenStatements)
-    mapFeature(.GlobalConcurrency, to: .globalConcurrency)
   }
 }
 

@@ -6596,10 +6596,9 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     if (var->hasStorage()) {
-      const bool isUnsafeGlobal = attr->isUnsafe() && var->isGlobalStorage();
-
-      // 'nonisolated' can not be applied to mutable stored properties.
-      if (var->supportsMutation() && !isUnsafeGlobal) {
+      // 'nonisolated' can not be applied to mutable stored properties unless
+      // qualified as 'unsafe'.
+      if (var->supportsMutation() && !attr->isUnsafe()) {
         diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
         return;
       }
@@ -6641,8 +6640,9 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       return;
     }
 
-    // nonisolated can not be applied to local properties.
-    if (dc->isLocalContext()) {
+    // nonisolated can not be applied to local properties unless qualified as
+    // 'unsafe'.
+    if (dc->isLocalContext() && !attr->isUnsafe()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_local_var);
       return;
     }

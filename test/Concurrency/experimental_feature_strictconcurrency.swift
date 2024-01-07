@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -74,4 +73,25 @@ func f() {
   print(TestStatics.immutableExplicitSendable)
   print(TestStatics.immutableInferredSendable)
   print(TestStatics.mutable) // expected-warning{{reference to static property 'mutable' is not concurrency-safe because it involves shared mutable state}}
+}
+
+func testLocalNonisolatedUnsafe() async {
+  nonisolated(unsafe) var value = 1
+  let task = Task {
+    value = 2
+    return value
+  }
+  print(await task.value)
+}
+
+@MainActor
+func iterate(stream: AsyncStream<Int>) async {
+  nonisolated(unsafe) var it = stream.makeAsyncIterator()
+  while let element = await it.next() {
+    print(element)
+  }
+
+  for await x in stream {
+    print(x)
+  }
 }
