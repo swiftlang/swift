@@ -81,7 +81,7 @@ class C_56501 {
   }
 }
 
-public class TestImplicitSelfForWeakSelfCapture {
+public final class TestImplicitSelfForWeakSelfCapture: Sendable {
   static let staticOptional: TestImplicitSelfForWeakSelfCapture? = .init()
   func method() { }
   
