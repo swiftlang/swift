@@ -1,6 +1,3 @@
-// FIXME: Disabled due to https://github.com/apple/swift/issues/69485
-// REQUIRES: issue_69485
-
 // Tests that under -enable-llvm-wme + -internalize-at-link, cross-module
 // witness method calls are done via thunks and LLVM GlobalDCE is able to remove
 // unused witness methods from a library based on a list of used symbols by a
