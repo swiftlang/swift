@@ -1882,25 +1882,48 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   if (!substitutions.empty())
     fieldTy = fieldTy.subst(substitutions);
 
+  auto *initAccessor = field->getOpaqueAccessor(AccessorKind::Init);
+
   // Emit the init accessor function partially applied to the base.
   SILValue initFRef = emitGlobalFunctionRef(
-      loc, getAccessorDeclRef(field->getOpaqueAccessor(AccessorKind::Init)));
+      loc, getAccessorDeclRef(initAccessor));
 
   auto initTy = initFRef->getType().castTo<SILFunctionType>();
 
-  if (!substitutions.empty()) {
-    // If there are substitutions we need to emit partial apply to
-    // apply substitutions to the init accessor reference type.
-    initTy = initTy->substGenericArgs(SGM.M, substitutions,
-                                      getTypeExpansionContext());
+  // If there are substitutions we need to emit partial apply to
+  // apply substitutions to the init accessor reference type.
+  initTy = initTy->substGenericArgs(SGM.M, substitutions,
+                                    getTypeExpansionContext());
 
-    // Emit partial apply without argument to produce a substituted
-    // init accessor reference.
-    PartialApplyInst *initPAI =
-        B.createPartialApply(loc, initFRef, substitutions, ArrayRef<SILValue>(),
-                             ParameterConvention::Direct_Guaranteed);
-    initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
+  // Emit partial apply with self metatype argument to produce a substituted
+  // init accessor reference.
+  auto selfTy = selfValue.getType().getASTType();
+  auto metatypeTy = MetatypeType::get(selfTy);
+
+  SILValue selfMetatype;
+  if (selfTy->getClassOrBoundGenericClass()) {
+    selfMetatype = B.createValueMetatype(loc, getLoweredType(metatypeTy),
+                                         selfValue).getValue();
+  } else {
+    selfMetatype = B.createMetatype(loc, getLoweredType(metatypeTy));
   }
+
+  auto expectedSelfTy = initAccessor->getDeclContext()->getSelfInterfaceType()
+      .subst(substitutions);
+
+  // This should only happen in the invalid case where we attempt to initialize
+  // superclass storage from a subclass initializer. However, we shouldn't
+  // crash, so emit the appropriate cast so that we can recover and diagnose
+  // later.
+  if (!expectedSelfTy->isEqual(selfTy)) {
+    selfMetatype = B.createUpcast(loc, selfMetatype,
+                             getLoweredType(MetatypeType::get(expectedSelfTy)));
+  }
+  PartialApplyInst *initPAI =
+      B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
+                           ParameterConvention::Direct_Guaranteed,
+                           PartialApplyInst::OnStackKind::OnStack);
+  initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
 
   // Check whether value is supposed to be passed indirectly and
   // materialize if required.

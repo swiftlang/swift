@@ -91,29 +91,23 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF,
 }
 
 static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
-                                           ValueDecl *ctor) {
+                                           ValueDecl *decl) {
   // In addition to the declared arguments, the constructor implicitly takes
   // the metatype as its first argument, like a static function.
-  auto ctorFnType = ctor->getInterfaceType()->castTo<AnyFunctionType>();
-  assert(ctorFnType->getParams().size() == 1 &&
-         "more than one self parameter?");
-  auto param = ctorFnType->getParams()[0];
-  assert(!param.isVariadic() && !param.isInOut());
-  Type metatype = param.getPlainType();
-  auto *DC = ctor->getInnermostDeclContext();
-  auto &AC = SGF.getASTContext();
+  auto metatypeTy = MetatypeType::get(
+      decl->getDeclContext()->getSelfInterfaceType());
+  auto *DC = decl->getInnermostDeclContext();
+  auto &ctx = SGF.getASTContext();
   auto VD =
-      new (AC) ParamDecl(SourceLoc(), SourceLoc(),
-                         AC.getIdentifier("$metatype"), SourceLoc(),
-                         AC.getIdentifier("$metatype"), DC);
+      new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
+                          ctx.getIdentifier("$metatype"), SourceLoc(),
+                          ctx.getIdentifier("$metatype"), DC);
   VD->setSpecifier(ParamSpecifier::Default);
-  VD->setInterfaceType(metatype);
+  VD->setInterfaceType(metatypeTy);
 
-  SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
-      SGF.getLoweredTypeForFunctionArgument(DC->mapTypeIntoContext(metatype)),
+  return SGF.F.begin()->createFunctionArgument(
+      SGF.getLoweredTypeForFunctionArgument(DC->mapTypeIntoContext(metatypeTy)),
       VD);
-
-  return SGF.AllocatorMetatype;
 }
 
 // FIXME: Consolidate this with SILGenProlog
@@ -273,7 +267,8 @@ static RValue maybeEmitPropertyWrapperInitFromValue(
 static void
 emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
                         AccessorDecl *accessor, SILValue selfValue,
-                        SILType selfTy, RValue &&initialValue) {
+                        Type selfIfaceTy, SILType selfTy,
+                        RValue &&initialValue) {
   SmallVector<SILValue> arguments;
 
   auto emitFieldReference = [&](VarDecl *field, bool forInit = false) {
@@ -296,6 +291,10 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
   for (auto *property : accessor->getAccessedProperties()) {
     arguments.push_back(emitFieldReference(property));
   }
+
+  // The `self` metatype.
+  auto metatypeTy = MetatypeType::get(accessor->mapTypeIntoContext(selfIfaceTy));
+  arguments.push_back(SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy)));
 
   SubstitutionMap subs;
   if (auto *env =
@@ -387,7 +386,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           loweredParams));
   }
 
-  emitConstructorMetatypeArg(SGF, ctor);
+  SGF.AllocatorMetatype = emitConstructorMetatypeArg(SGF, ctor);
   (void) loweredParams.claimNext();
   loweredParams.finish();
 
@@ -418,8 +417,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           assert(elti != eltEnd &&
                  "number of args does not match number of fields");
 
-          emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot, selfTy,
-                                  std::move(*elti));
+          emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot,
+                                  selfIfaceTy, selfTy, std::move(*elti));
           ++elti;
           continue;
         }
@@ -666,7 +665,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                   ctor->getEffectiveThrownErrorType(),
                   ctor->getThrowsLoc(),
                   /*ignored parameters*/ 1);
-  emitConstructorMetatypeArg(*this, ctor);
+  AllocatorMetatype = emitConstructorMetatypeArg(*this, ctor);
 
   // Make sure we've hopped to the right global actor, if any.
   if (ctor->hasAsync()) {
@@ -897,7 +896,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   }
 
   // Emit the metatype argument.
-  emitConstructorMetatypeArg(*this, element);
+  AllocatorMetatype = emitConstructorMetatypeArg(*this, element);
   (void) loweredParams.claimNext();
   loweredParams.finish();
 
@@ -957,7 +956,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   if (ctor->requiresUnavailableDeclABICompatibilityStubs())
     emitApplyOfUnavailableCodeReached();
 
-  SILValue selfMetaValue = emitConstructorMetatypeArg(*this, ctor);
+  AllocatorMetatype = emitConstructorMetatypeArg(*this, ctor);
+  SILValue selfMetaValue = AllocatorMetatype;
 
   // Allocate the "self" value.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
@@ -1758,24 +1758,29 @@ void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
 
   // Emit `newValue` argument.
   emitBasicProlog(accessor,
-                  accessor->getParameters(), /*selfParam=*/nullptr,
+                  accessor->getParameters(),
+                  /*selfParam=*/nullptr,
                   TupleType::getEmpty(F.getASTContext()),
                   /*errorType=*/llvm::None,
                   /*throwsLoc=*/SourceLoc(),
                   /*ignored parameters*/
-                  accessedProperties.size());
+                  accessedProperties.size() + 1);
 
   // Emit arguments for all `accesses` properties.
   if (!accessedProperties.empty()) {
     auto propertyIter = accessedProperties.begin();
     auto propertyArgs = accessorTy->getParameters().slice(
-        accessorTy->getNumParameters() - accessedProperties.size());
+        accessorTy->getNumParameters() - accessedProperties.size() - 1,
+        accessedProperties.size());
 
     for (const auto &argument : propertyArgs) {
       createArgument(*propertyIter, getSILTypeInContext(argument, accessorTy));
       ++propertyIter;
     }
   }
+
+  // Emit `self` argument.
+  emitConstructorMetatypeArg(*this, accessor);
 
   prepareEpilog(accessor,
                 accessor->getResultInterfaceType(),
