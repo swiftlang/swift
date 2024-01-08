@@ -439,6 +439,10 @@ bool swift::isLetAddress(SILValue address) {
 bool swift::mayAccessPointer(SILInstruction *instruction) {
   if (!instruction->mayReadOrWriteMemory())
     return false;
+  if (isa<BuiltinInst>(instruction)) {
+    // Consider all builtins that read/write memory to access pointers.
+    return true;
+  }
   bool retval = false;
   visitAccessedAddress(instruction, [&retval](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
