@@ -505,12 +505,12 @@ extension String {
   ///
   ///     let validUTF8: [UInt8] = [67, 97, 0, 102, 195, 169]
   ///     let valid = String(validating: validUTF8, as: UTF8.self)
-  ///     print(valid)
-  ///     // Prints "Optional("Café")"
+  ///     print(valid ?? "nil")
+  ///     // Prints "Café"
   ///
   ///     let invalidUTF16: [UInt16] = [0x41, 0x42, 0xd801]
   ///     let invalid = String(validating: invalidUTF16, as: UTF16.self)
-  ///     print(invalid)
+  ///     print(invalid ?? "nil")
   ///     // Prints "nil"
   ///
   /// - Parameters:
@@ -567,12 +567,12 @@ extension String {
   ///
   ///     let validUTF8: [Int8] = [67, 97, 0, 102, -61, -87]
   ///     let valid = String(validating: validUTF8, as: UTF8.self)
-  ///     print(valid)
-  ///     // Prints "Optional("Café")"
+  ///     print(valid ?? "nil")
+  ///     // Prints "Café"
   ///
   ///     let invalidASCII: [Int8] = [67, 97, -5]
   ///     let invalid = String(validating: invalidASCII, as: Unicode.ASCII.self)
-  ///     print(invalid)
+  ///     print(invalid ?? "nil")
   ///     // Prints "nil"
   ///
   /// - Parameters:
