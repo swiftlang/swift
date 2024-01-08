@@ -324,7 +324,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
   CustomImmutableNSArray.timesCountWasCalled = 0
   TestBridgedValueTy.bridgeOperations = 0
   let a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
-  //FIXME: Why is this copied?
+  // FIXME: Why is this copied?
   expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
   expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
   expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
