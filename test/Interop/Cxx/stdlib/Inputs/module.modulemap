@@ -33,3 +33,8 @@ module StdUniquePtr {
   header "std-unique-ptr.h"
   requires cplusplus
 }
+
+module StdFunction {
+  header "std-function.h"
+  requires cplusplus
+}
