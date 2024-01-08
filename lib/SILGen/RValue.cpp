@@ -579,11 +579,22 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
   assert(destAddr->getType().castTo<TupleType>()->getNumElements() ==
          srcTupleType->getNumElements());
 
-  // If we do have any srcMvValues, then emit a TupleAddrConstructor. If we do
-  // not have any, then our tuple must consist only of empty tuples.
-  if (srcMvValues.size())
-    SGF.B.createTupleAddrConstructor(loc, destAddr, srcMvValues,
-                                     IsNotInitialization);
+  // If there are sourced managed values, initialize the address with a tuple.
+  if (srcMvValues.size()) {
+    if (SGF.useLoweredAddresses()) {
+      // Without opaque values, a tuple_addr_constructor is used to initialize
+      // the memory all at once.
+      SGF.B.createTupleAddrConstructor(loc, destAddr, srcMvValues,
+                                       IsNotInitialization);
+    } else {
+      // With opaque values, a tuple can always be formed and assigned to the
+      // memory.
+      auto tupleTy = destAddr->getType().getObjectType();
+      auto tuple = SGF.B.createTuple(loc, tupleTy, srcMvValues);
+      SGF.B.createAssign(loc, tuple.forward(SGF), destAddr,
+                         AssignOwnershipQualifier::Unknown);
+    }
+  }
   srcMvValues = ArrayRef<ManagedValue>();
 }
 
