@@ -13,7 +13,6 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
-import _StringProcessing // for String.contains(_:)
 
 public enum DebugDescriptionMacro {}
 public enum _DebugDescriptionPropertyMacro {}
@@ -48,18 +47,6 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
     }
 
     guard DESCRIPTION_PROPERTIES.contains(propertyName) else {
-      return []
-    }
-
-    // Expansion is performed multiple times. Exit early to avoid emitting duplicate macros,
-    // which leads to duplicate symbol errors. To distinguish been invocations, inspect the
-    // current mangled name. This ignores the invocation that adds a "__vg" suffix to the member
-    // name, ex "description__vg". See https://github.com/apple/swift/pull/65559.
-    let mangledName = context.makeUniqueName("").text
-    let substring = "\(propertyName)__vg"
-    // Ex: "15description__vg"
-    let runlengthSubstring = "\(substring.count)\(substring)"
-    guard !mangledName.hasSubstring(runlengthSubstring) else {
       return []
     }
 
@@ -499,20 +486,5 @@ extension Collection {
   /// multiple elements, nil is returned.
   fileprivate var only: Element? {
     count == 1 ? first : nil
-  }
-}
-
-extension String {
-  fileprivate func hasSubstring(_ substring: String) -> Bool {
-    if #available(macOS 13, *) {
-      return self.contains(substring)
-    }
-
-    for index in self.indices {
-      if self.suffix(from: index).hasPrefix(substring) {
-        return true
-      }
-    }
-    return false
   }
 }
