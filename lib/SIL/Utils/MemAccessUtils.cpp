@@ -437,6 +437,8 @@ bool swift::isLetAddress(SILValue address) {
 //===----------------------------------------------------------------------===//
 
 bool swift::mayAccessPointer(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
   if (!instruction->mayReadOrWriteMemory())
     return false;
   if (isa<BuiltinInst>(instruction)) {
@@ -455,6 +457,8 @@ bool swift::mayAccessPointer(SILInstruction *instruction) {
 }
 
 bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
   if (isa<BuiltinInst>(instruction)) {
     return instruction->mayReadOrWriteMemory();
   }
@@ -467,16 +471,19 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
 bool swift::maySynchronize(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
   if (isa<BuiltinInst>(instruction)) {
     return instruction->mayReadOrWriteMemory();
   }
-  return FullApplySite::isa(instruction) 
-      || isa<EndApplyInst>(instruction)
-      || isa<AbortApplyInst>(instruction)
-      || isa<HopToExecutorInst>(instruction);
+  return isa<HopToExecutorInst>(instruction);
 }
 
 bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
+  if (FullApplySite::isa(instruction) || isa<EndApplyInst>(instruction) ||
+      isa<AbortApplyInst>(instruction)) {
+    return true;
+  }
   bool retval = mayAccessPointer(instruction)
              || mayLoadWeakOrUnowned(instruction)
              || maySynchronize(instruction);
