@@ -91,12 +91,6 @@ static bool EncodeToUTF8(unsigned CharValue,
   return false;
 }
 
-
-/// CLO8 - Return the number of leading ones in the specified 8-bit value.
-static unsigned CLO8(unsigned char C) {
-  return llvm::countl_one(uint32_t(C) << 24);
-}
-
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
 /// character, which will be of the form 0b10XXXXXX
 static bool isStartOfUTF8Character(unsigned char C) {
@@ -129,14 +123,14 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   
   // Read the number of high bits set, which indicates the number of bytes in
   // the character.
-  unsigned EncodedBytes = CLO8(CurByte);
+  unsigned char EncodedBytes = llvm::countl_one(CurByte);
   assert((EncodedBytes >= 2 && EncodedBytes <= 4));
   
   // Drop the high bits indicating the # bytes of the result.
   unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
   
   // Read and validate the continuation bytes.
-  for (unsigned i = 1; i != EncodedBytes; ++i) {
+  for (unsigned char i = 1; i != EncodedBytes; ++i) {
     if (Ptr >= End)
       return ~0U;
     CurByte = *Ptr;
