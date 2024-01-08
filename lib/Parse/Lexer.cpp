@@ -117,19 +117,20 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   if (CurByte < 0x80)
     return CurByte;
   
-  // Read the number of high bits set, which indicates the number of bytes in
-  // the character.
-  unsigned EncodedBytes = CLO8(CurByte);
-  
-  // If this is 0b10XXXXXX, then it is a continuation character.
-  if (EncodedBytes == 1 ||
-      !isStartOfUTF8Character(CurByte)) {
+  // If this is not the start of a UTF8 character,
+  // then it is either a continuation byte or an invalid UTF8 code point.
+  if (!isStartOfUTF8Character(CurByte)) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
     while (Ptr < End && !isStartOfUTF8Character(*Ptr))
       ++Ptr;
     return ~0U;
   }
+  
+  // Read the number of high bits set, which indicates the number of bytes in
+  // the character.
+  unsigned EncodedBytes = CLO8(CurByte);
+  assert((EncodedBytes >= 2 && EncodedBytes <= 4));
   
   // Drop the high bits indicating the # bytes of the result.
   unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
