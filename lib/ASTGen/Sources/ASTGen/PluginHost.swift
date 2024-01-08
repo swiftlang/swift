@@ -386,11 +386,9 @@ extension PluginMessage.Syntax {
     }
 
     let source = syntax.description
-    let sourceStr = String(decoding: sourceFilePtr.pointee.buffer, as: UTF8.self)
     let fileName = sourceFilePtr.pointee.fileName
     let fileID = "\(sourceFilePtr.pointee.moduleName)/\(sourceFilePtr.pointee.fileName.basename)"
-    let converter = SourceLocationConverter(file: fileName, source: sourceStr)
-    let loc = converter.location(for: syntax.position)
+    let loc = sourceFilePtr.pointee.sourceLocationConverter.location(for: syntax.position)
 
     self.init(
       kind: kind,
