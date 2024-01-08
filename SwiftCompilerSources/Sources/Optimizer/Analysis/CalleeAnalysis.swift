@@ -112,7 +112,7 @@ extension Instruction {
     if let site = self as? FullApplySite {
       return site.isBarrier(analysis)
     }
-    return maySynchronizeNotConsideringSideEffects
+    return maySynchronize
   }
 
   /// Whether lifetime ends of lexical values may safely be hoisted over this

@@ -463,7 +463,7 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
 
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
-bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction) {
+bool swift::maySynchronize(SILInstruction *instruction) {
   return FullApplySite::isa(instruction) 
       || isa<EndApplyInst>(instruction)
       || isa<AbortApplyInst>(instruction)
@@ -473,7 +473,7 @@ bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction)
 bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
   bool retval = mayAccessPointer(instruction)
              || mayLoadWeakOrUnowned(instruction)
-             || maySynchronizeNotConsideringSideEffects(instruction);
+             || maySynchronize(instruction);
   assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
   return retval;
 }
