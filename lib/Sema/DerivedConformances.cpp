@@ -496,6 +496,7 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
 CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
     ASTContext &ctx) {
   FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReachedDecl();
+  assert(diagnoseDecl);
   auto diagnoseDeclRefExpr =
       new (ctx) DeclRefExpr(diagnoseDecl, DeclNameLoc(), true);
   diagnoseDeclRefExpr->setType(diagnoseDecl->getInterfaceType());
@@ -937,6 +938,12 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
     return nullptr;
 
   if (!availableAttr->isUnconditionallyUnavailable())
+    return nullptr;
+
+  // If the stdlib isn't new enough to contain the helper function for
+  // diagnosing execution of unavailable code then just synthesize this case
+  // normally.
+  if (!C.getDiagnoseUnavailableCodeReachedDecl())
     return nullptr;
 
   auto createElementPattern = [&]() -> EnumElementPattern * {
