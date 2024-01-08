@@ -1247,3 +1247,14 @@ do {
 
 
 }
+
+do {
+  func test(_: Int, _: Int) {}
+  // expected-note@-1 {{closure passed to parameter of type 'Int' that does not accept a closure}}
+  func test(_: Int, _: String) {}
+  // expected-note@-1 {{closure passed to parameter of type 'String' that does not accept a closure}}
+
+  test(42) { // expected-error {{no exact matches in call to local function 'test'}}
+    print($0)
+  }
+}

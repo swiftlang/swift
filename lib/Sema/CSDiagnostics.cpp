@@ -7346,10 +7346,15 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 bool ArgumentMismatchFailure::diagnoseAsNote() {
   auto *locator = getLocator();
   if (auto *callee = getCallee()) {
-    emitDiagnosticAt(callee, diag::candidate_has_invalid_argument_at_position,
-                     getToType(), getParamPosition(),
-                     locator->isLastElement<LocatorPathElt::LValueConversion>(),
-                     getFromType());
+    if (isExpr<ClosureExpr>(getAnchor())) {
+      emitDiagnosticAt(callee, diag::candidate_has_invalid_closure_at_position,
+                       getToType());
+    } else {
+      emitDiagnosticAt(callee, diag::candidate_has_invalid_argument_at_position,
+                       getToType(), getParamPosition(),
+                       locator->isLastElement<LocatorPathElt::LValueConversion>(),
+                       getFromType());
+    }
     return true;
   }
 
