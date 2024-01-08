@@ -56,9 +56,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
 
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
-    if (!ctx.LangOpts.EnableSwift3ObjCInference)
-      return DiagnosticBehavior::Unspecified;
-    return DiagnosticBehavior::Ignore;
+    return DiagnosticBehavior::Unspecified;
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
     return ctx.LangOpts.getAccessNoteFailureLimit();
@@ -1500,52 +1498,6 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       return ObjCReason::witnessToObjC(requirements.front());
   }
 
-  ASTContext &ctx = VD->getASTContext();
-
-  // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
-  if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
-    bool isGetterOrSetter =
-      isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
-
-    if (ctx.LangOpts.EnableSwift3ObjCInference) {
-      // If we've been asked to warn about deprecated @objc inference, do so
-      // now.
-      if (ctx.LangOpts.WarnSwift3ObjCInference !=
-            Swift3ObjCInferenceWarnings::None &&
-          !isGetterOrSetter) {
-        VD->diagnose(diag::objc_inference_swift3_dynamic)
-          .highlight(attr->getLocation())
-          .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
-                      "@objc ");
-      }
-
-      return ObjCReason(ObjCReason::ExplicitlyDynamic, attr);
-    }
-  }
-
-  // If we aren't provided Swift 3's @objc inference rules, we're done.
-  if (!ctx.LangOpts.EnableSwift3ObjCInference)
-    return llvm::None;
-
-  // Infer '@objc' for valid, non-implicit, non-operator, members of classes
-  // (and extensions thereof) whose class hierarchies originate in Objective-C,
-  // e.g., which derive from NSObject, so long as the members have internal
-  // access or greater.
-  if (!canInferImplicitObjC(/*allowAnyAccess*/false))
-    return llvm::None;
-
-  // If this declaration is part of a class with implicitly @objc members,
-  // make it implicitly @objc. However, if the declaration cannot be represented
-  // as @objc, don't diagnose.
-  if (auto classDecl = VD->getDeclContext()->getSelfClassDecl()) {
-    // One cannot define @objc members of any foreign classes.
-    if (classDecl->isForeign())
-      return llvm::None;
-
-    if (classDecl->checkAncestry(AncestryFlags::ObjC))
-      return ObjCReason(ObjCReason::MemberOfObjCSubclass);
-  }
-
   return llvm::None;
 }
 
@@ -1692,24 +1644,6 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   // If this declaration should not be exposed to Objective-C, we're done.
   if (!isObjC)
     return false;
-
-  if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
-    auto storage = accessor->getStorage();
-    if (auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc on the storage declaration was inferred using a
-      // deprecated rule, but this accessor is @objc in its own right,
-      // complain.
-      ASTContext &ctx = dc->getASTContext();
-      auto behavior = behaviorLimitForObjCReason(*isObjC, ctx);
-      if (storageObjCAttr && storageObjCAttr->isSwift3Inferred()) {
-        storage->diagnose(diag::accessor_swift3_objc_inference, storage,
-                          accessor->isSetter())
-          .fixItInsert(storage->getAttributeInsertionLoc(/*forModifier=*/false),
-                       "@objc ")
-          .limitBehavior(behavior);
-      }
-    }
-  }
 
   // If needed, check whether this declaration is representable in Objective-C.
   llvm::Optional<ForeignAsyncConvention> asyncConvention;
@@ -2072,33 +2006,10 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     // FIXME: We should have a class-based table to check for conflicts.
   }
 
-  // Special handling for Swift 3 @objc inference rules that are no longer
-  // present in later versions of Swift.
-  if (reason == ObjCReason::MemberOfObjCSubclass) {
-    // If we've been asked to unconditionally warn about these deprecated
-    // @objc inference rules, do so now. However, we don't warn about
-    // accessors---just the main storage declarations.
-    if (ctx.LangOpts.WarnSwift3ObjCInference ==
-          Swift3ObjCInferenceWarnings::Complete &&
-        !(isa<AccessorDecl>(D) && cast<AccessorDecl>(D)->isGetterOrSetter())) {
-      D->diagnose(diag::objc_inference_swift3_objc_derived);
-      D->diagnose(diag::objc_inference_swift3_addobjc)
-        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                     "@objc ");
-      D->diagnose(diag::objc_inference_swift3_addnonobjc)
-        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                     "@nonobjc ");
-    }
-
-    // Mark the attribute as having used Swift 3 inference, or create an
-    // implicit @objc for that purpose.
-    auto attr = D->getAttrs().getAttribute<ObjCAttr>();
-    if (!attr) {
-      attr = ObjCAttr::createUnnamedImplicit(ctx);
-      D->getAttrs().add(attr);
-    }
-    attr->setSwift3Inferred();
-  }
+  // MemberOfObjCSubclass should have only been encountered when using Swift 3
+  // @objc inference rules that are no longer supported in later versions of
+  // Swift.
+  assert(reason != ObjCReason::MemberOfObjCSubclass);
 }
 
 /// Compute the information used to describe an Objective-C redeclaration.

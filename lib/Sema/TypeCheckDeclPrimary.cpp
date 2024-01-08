@@ -2443,26 +2443,6 @@ public:
     
     checkForEmptyOptionSet(VD);
 
-    // Under the Swift 3 inference rules, if we have @IBInspectable or
-    // @GKInspectable but did not infer @objc, warn that the attribute is
-    auto &DE = getASTContext().Diags;
-    if (!VD->isObjC() &&
-        VD->getASTContext().LangOpts.EnableSwift3ObjCInference) {
-      if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
-        DE.diagnose(attr->getLocation(),
-                    diag::attribute_meaningless_when_nonobjc,
-                    attr->getAttrName())
-            .fixItRemove(attr->getRange());
-      }
-
-      if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
-        DE.diagnose(attr->getLocation(),
-                    diag::attribute_meaningless_when_nonobjc,
-                    attr->getAttrName())
-            .fixItRemove(attr->getRange());
-      }
-    }
-
     // Now check all the accessors.
     VD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
@@ -2473,6 +2453,7 @@ public:
     //
     // NOTE: We do this here instead of TypeCheckAttr since types are not
     // completely type checked at that point.
+    auto &DE = getASTContext().Diags;
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
         if (nom->canBeNoncopyable()) {

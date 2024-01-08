@@ -5540,7 +5540,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       case decls_block::ObjC_DECL_ATTR: {
         bool isImplicit;
         bool isImplicitName;
-        bool isSwift3Inferred;
+        bool isSwift3Inferred; // FIXME: Remove, unused
         uint64_t numArgs;
         ArrayRef<uint64_t> rawPieceIDs;
         serialization::decls_block::ObjCDeclAttrLayout::readRecord(
@@ -5557,7 +5557,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
                                   isImplicitName);
         Attr->setImplicit(isImplicit);
-        cast<ObjCAttr>(Attr)->setSwift3Inferred(isSwift3Inferred);
         break;
       }
 

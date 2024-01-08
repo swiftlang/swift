@@ -51,19 +51,6 @@ namespace swift {
 #include "swift/AST/PlatformConditionKinds.def"
   };
 
-  /// Describes which Swift 3 Objective-C inference warnings should be
-  /// emitted.
-  enum class Swift3ObjCInferenceWarnings {
-    /// No warnings; this is the default.
-    None,
-    /// "Minimal" warnings driven by uses of declarations that make use of
-    /// the Objective-C entry point directly.
-    Minimal,
-    /// "Complete" warnings that add "@objc" for every entry point that
-    /// Swift 3 would have inferred as "@objc" but Swift 4 will not.
-    Complete,
-  };
-
   /// Describes how strict concurrency checking should be.
   enum class StrictConcurrency {
     /// Enforce Sendable constraints where it has been explicitly adopted and
@@ -439,20 +426,11 @@ namespace swift {
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
 
-    /// Whether to enable Swift 3 @objc inference, e.g., for members of
-    /// Objective-C-derived classes and 'dynamic' members.
-    bool EnableSwift3ObjCInference = false;
-
     /// Access or distribution level of the whole module being parsed.
     LibraryLevel LibraryLevel = LibraryLevel::Other;
 
     /// The name of the package this module belongs to.
     std::string PackageName;
-
-    /// Warn about cases where Swift 3 would infer @objc but later versions
-    /// of Swift do not.
-    Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
-      Swift3ObjCInferenceWarnings::None;
 
     /// Diagnose implicit 'override'.
     bool WarnImplicitOverrides = false;
