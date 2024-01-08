@@ -5580,6 +5580,12 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = solution.simplifyType(solution.getType(unaryArg));
   auto paramType = fnType->getParams()[1].getPlainType();
 
+  if (isExpr<ClosureExpr>(unaryArg) && argType->is<UnresolvedType>()) {
+    auto unwrappedParamTy = paramType->lookThroughAllOptionalTypes();
+    if (unwrappedParamTy->is<FunctionType>() || unwrappedParamTy->isAny())
+      return true;
+  }
+
   return TypeChecker::isConvertibleTo(argType, paramType, solution.getDC());
 }
 
