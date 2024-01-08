@@ -3289,12 +3289,17 @@ namespace {
               KnownProtocolKind::Actor);
         }
 
-        unsatisfiedIsolation =
-            ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
+        // FIXME: Also allow 'Optional.none'
+        if (dyn_cast<NilLiteralExpr>(arg->findOriginalValue())) {
+          mayExitToNonisolated = true;
+        } else {
+          unsatisfiedIsolation =
+              ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
+          mayExitToNonisolated = false;
+        }
 
         if (!fnType->getExtInfo().isAsync())
           callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
-        mayExitToNonisolated = false;
 
         break;
       }
@@ -4613,7 +4618,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
       }
     }
 
-    if (auto actor = paramType->getAnyActor())
+    Type actorType;
+    if (auto wrapped = paramType->getOptionalObjectType()) {
+      actorType = wrapped;
+    } else {
+      actorType = paramType;
+    }
+    if (auto actor = actorType->getAnyActor())
       return ActorIsolation::forActorInstanceParameter(actor, *paramIdx);
   }
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature OptionalIsolatedParameters %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-
+// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature OptionalIsolatedParameters %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -357,3 +357,41 @@ func isolated_generic_bad_3<T: AnyActor>(_ t: isolated T) {}
 // expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
 
 func isolated_generic_ok_1<T: Actor>(_ t: isolated T) {}
+
+class NotSendable {} // expected-complete-note 5 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+func optionalIsolated(_ ns: NotSendable, to actor: isolated (any Actor)?) async {}
+func optionalIsolatedSync(_ ns: NotSendable, to actor: isolated (any Actor)?) {}
+
+nonisolated func callFromNonisolated(ns: NotSendable) async {
+  await optionalIsolated(ns, to: nil)
+
+  optionalIsolatedSync(ns, to: nil)
+
+  let myActor = A()
+
+  await optionalIsolated(ns, to: myActor)
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+
+  optionalIsolatedSync(ns, to: myActor)
+  // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-2 {{calls to global function 'optionalIsolatedSync(_:to:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+}
+
+@MainActor func callFromMainActor(ns: NotSendable) async {
+  await optionalIsolated(ns, to: nil)
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' outside of main actor-isolated context may introduce data races}}
+
+  optionalIsolatedSync(ns, to: nil)
+
+  let myActor = A()
+
+  await optionalIsolated(ns, to: myActor)
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+
+  optionalIsolatedSync(ns, to: myActor)
+  // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-2 {{calls to global function 'optionalIsolatedSync(_:to:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+}
