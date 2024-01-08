@@ -455,6 +455,9 @@ bool swift::mayAccessPointer(SILInstruction *instruction) {
 }
 
 bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  if (isa<BuiltinInst>(instruction)) {
+    return instruction->mayReadOrWriteMemory();
+  }
   return isa<LoadWeakInst>(instruction) 
       || isa<LoadUnownedInst>(instruction) 
       || isa<StrongCopyUnownedValueInst>(instruction)
@@ -464,6 +467,9 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
 bool swift::maySynchronize(SILInstruction *instruction) {
+  if (isa<BuiltinInst>(instruction)) {
+    return instruction->mayReadOrWriteMemory();
+  }
   return FullApplySite::isa(instruction) 
       || isa<EndApplyInst>(instruction)
       || isa<AbortApplyInst>(instruction)
