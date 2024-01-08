@@ -1550,9 +1550,9 @@ ERROR(extra_argument_to_nullary_call,none,
 ERROR(extra_trailing_closure_in_call,none,
       "extra trailing closure passed in "
       "%select{call|subscript|macro expansion}0", (unsigned))
-ERROR(trailing_closure_bad_param,none,
-      "trailing closure passed to parameter of type %0 that does not "
-      "accept a closure", (Type))
+ERROR(closure_bad_param,none,
+      "%select{|trailing }1closure passed to parameter of type %0 that does not "
+      "accept a closure", (Type, bool))
 WARNING(unlabeled_trailing_closure_deprecated,Deprecation,
         "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
         (Identifier))

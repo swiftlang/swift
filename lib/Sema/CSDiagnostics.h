@@ -2118,9 +2118,9 @@ public:
   /// or now deprecated `init(initialValue:)`.
   bool diagnosePropertyWrapperMismatch() const;
 
-  /// Tailored diagnostics for argument mismatches associated with trailing
+  /// Tailored diagnostics for argument mismatches associated with (trailing)
   /// closures being passed to non-closure parameters.
-  bool diagnoseTrailingClosureMismatch() const;
+  bool diagnoseClosureMismatch() const;
 
   /// Tailored key path as function diagnostics for argument mismatches where
   /// argument is a keypath expression that has a root type that matches a

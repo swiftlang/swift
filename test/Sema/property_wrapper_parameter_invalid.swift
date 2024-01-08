@@ -262,12 +262,12 @@ struct ProjectionWrapper<Value> {
 
 func testInvalidWrapperInference() {
   struct S<V> {
-    static func test(_ keyPath: KeyPath<V, String>) {} // expected-note {{'test' declared here}}
+    static func test(_ keyPath: KeyPath<V, String>) {} // expected-note 2 {{'test' declared here}}
   }
 
   // expected-error@+1 {{trailing closure passed to parameter of type 'KeyPath<Int, String>' that does not accept a closure}}
   S<Int>.test { $value in }
-  // expected-error@+1 {{cannot convert value of type '(_) -> ()' to expected argument type 'KeyPath<Int, String>'}}
+  // expected-error@+1 {{closure passed to parameter of type 'KeyPath<Int, String>' that does not accept a closure}}
   S<Int>.test({ $value in })
 
   func testGenericClosure<T>(_ closure: T) {}

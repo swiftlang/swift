@@ -7292,7 +7292,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseAttemptedRegexBuilder())
     return true;
 
-  if (diagnoseTrailingClosureMismatch())
+  if (diagnoseClosureMismatch())
     return true;
 
   if (diagnoseKeyPathAsFunctionResultMismatch())
@@ -7638,15 +7638,16 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   return true;
 }
 
-bool ArgumentMismatchFailure::diagnoseTrailingClosureMismatch() const {
-  if (!Info.isTrailingClosure())
+bool ArgumentMismatchFailure::diagnoseClosureMismatch() const {
+  if (!isExpr<ClosureExpr>(getAnchor()))
     return false;
 
   auto paramType = getToType();
   if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
     return false;
 
-  emitDiagnostic(diag::trailing_closure_bad_param, paramType)
+  emitDiagnostic(diag::closure_bad_param, paramType,
+                 Info.isTrailingClosure())
       .highlight(getSourceRange());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
