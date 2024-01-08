@@ -102,7 +102,7 @@ static unsigned CLO8(unsigned char C) {
 static bool isStartOfUTF8Character(unsigned char C) {
   // RFC 2279: The octet values FE and FF never appear.
   // RFC 3629: The octet values C0, C1, F5 to FF never appear.
-  return C <= 0x80 || (C >= 0xC2 && C < 0xF5);
+  return C < 0x80 || (C >= 0xC2 && C < 0xF5);
 }
 
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
