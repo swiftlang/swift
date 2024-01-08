@@ -204,6 +204,16 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     assert(req && "Concurrency library broken");
     SILDeclRef fn(req, SILDeclRef::Kind::Func);
 
+    // FIXME: Handle optional
+
+    // Open an existential actor type.
+    if (actorType->isExistentialType()) {
+      actorType = OpenedArchetypeType::get(
+          actorType, F->getGenericSignature())->getCanonicalType();
+      SILType loweredActorType = F->getLoweredType(actorType);
+      actor = B.createOpenExistentialRef(loc, actor, loweredActorType);
+    }
+
     auto actorConf = module->lookupConformance(actorType, actorProtocol);
     assert(actorConf &&
            "hop_to_executor with actor that doesn't conform to Actor or DistributedActor");
