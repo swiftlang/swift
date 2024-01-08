@@ -3,10 +3,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
-// SceneKit has two protocols sections, which clang treats as an error now
-// rdar://113874614
-// XFAIL: *
-
 import SceneKit
 import Foundation
 
