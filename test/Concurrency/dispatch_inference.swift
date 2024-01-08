@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -warn-concurrency %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 // RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -warn-concurrency %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
+// https://github.com/apple/swift/issues/70759
+// REQUIRES: GH70759
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: asserts
