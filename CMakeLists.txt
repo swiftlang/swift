@@ -784,11 +784,17 @@ if (CMAKE_Swift_COMPILER)
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
+
+set(THREADS_PREFER_PTHREAD_FLAG YES)
+include(FindThreads)
+
 if(SWIFT_PATH_TO_CMARK_BUILD)
   execute_process(COMMAND ${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark --version
     OUTPUT_VARIABLE _CMARK_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
+elseif(SWIFT_INCLUDE_TOOLS)
+  find_package(cmark-gfm CONFIG REQUIRED)
 endif()
 message(STATUS "")
 
