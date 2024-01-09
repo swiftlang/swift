@@ -272,6 +272,9 @@ EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 // Allow for the 'transferring' keyword to be applied to arguments and results.
 EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
 
+// Enable module selector syntax.
+EXPERIMENTAL_FEATURE(ModuleSelectors, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
