@@ -920,6 +920,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_swift3_objc_inference,
                  OPT_disable_swift3_objc_inference, false);
 
+  if (Args.hasArg(OPT_enable_swift3_objc_inference))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-enable-swift3-objc-inference");
+
+  if (Args.hasArg(OPT_disable_swift3_objc_inference))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-disable-swift3-objc-inference");
+
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
     if (contents == "api") {
@@ -982,6 +990,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
     }
   }
+
+  if (Args.hasArg(OPT_warn_swift3_objc_inference_minimal))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-warn-swift3-objc-inference-minimal");
+
+  if (Args.hasArg(OPT_warn_swift3_objc_inference_complete))
+    Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
+                   "-warn-swift3-objc-inference-complete");
 
   // Swift 6+ uses the strictest concurrency level.
   if (Opts.isSwiftVersionAtLeast(6)) {
