@@ -100,30 +100,50 @@ public struct CalleeAnalysis {
   }
 }
 
-extension FullApplySite {
+extension Value {
   fileprivate func isBarrier(_ analysis: CalleeAnalysis) -> Bool {
-    guard let callees = analysis.getCallees(callee: callee) else {
+    guard let callees = analysis.getCallees(callee: self) else {
       return true
     }
     return callees.contains { $0.isDeinitBarrier }
   }
 }
 
-extension Instruction {
-  public final func maySynchronize(_ analysis: CalleeAnalysis) -> Bool {
-    if let site = self as? FullApplySite {
-      return site.isBarrier(analysis)
-    }
-    return maySynchronizeNotConsideringSideEffects
+extension FullApplySite {
+  fileprivate func isBarrier(_ analysis: CalleeAnalysis) -> Bool {
+    return callee.isBarrier(analysis)
   }
+}
 
+extension EndApplyInst {
+  fileprivate func isBarrier(_ analysis: CalleeAnalysis) -> Bool {
+    return (operand.value.definingInstruction as! FullApplySite).isBarrier(analysis)
+  }
+}
+
+extension AbortApplyInst {
+  fileprivate func isBarrier(_ analysis: CalleeAnalysis) -> Bool {
+    return (operand.value.definingInstruction as! FullApplySite).isBarrier(analysis)
+  }
+}
+
+extension Instruction {
   /// Whether lifetime ends of lexical values may safely be hoisted over this
   /// instruction.
   ///
   /// Deinitialization barriers constrain variable lifetimes. Lexical
   /// end_borrow, destroy_value, and destroy_addr cannot be hoisted above them.
   public final func isDeinitBarrier(_ analysis: CalleeAnalysis) -> Bool {
-    return mayAccessPointer || mayLoadWeakOrUnowned || maySynchronize(analysis)
+    if let site = self as? FullApplySite {
+      return site.isBarrier(analysis)
+    }
+    if let eai = self as? EndApplyInst {
+      return eai.isBarrier(analysis)
+    }
+    if let aai = self as? AbortApplyInst {
+      return aai.isBarrier(analysis)
+    }
+    return mayAccessPointer || mayLoadWeakOrUnowned || maySynchronize
   }
 }
 

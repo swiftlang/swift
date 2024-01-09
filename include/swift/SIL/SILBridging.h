@@ -687,7 +687,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool maySuspend() const;
   bool mayAccessPointer() const;
   bool mayLoadWeakOrUnowned() const;
-  bool maySynchronizeNotConsideringSideEffects() const;
+  bool maySynchronize() const;
   bool mayBeDeinitBarrierNotConsideringSideEffects() const;
 
   // =========================================================================//

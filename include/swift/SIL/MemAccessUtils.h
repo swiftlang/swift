@@ -247,7 +247,7 @@ bool mayLoadWeakOrUnowned(SILInstruction* instruction);
 
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
-bool maySynchronizeNotConsideringSideEffects(SILInstruction* instruction);
+bool maySynchronize(SILInstruction* instruction);
 
 /// Conservatively, whether this instruction could be a barrier to hoisting
 /// destroys.

@@ -119,8 +119,8 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.mayLoadWeakOrUnowned()
   }
 
-  public final var maySynchronizeNotConsideringSideEffects: Bool {
-    return bridged.maySynchronizeNotConsideringSideEffects()
+  public final var maySynchronize: Bool {
+    return bridged.maySynchronize()
   }
 
   public final var mayBeDeinitBarrierNotConsideringSideEffects: Bool {
