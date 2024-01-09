@@ -135,7 +135,7 @@ func testDisablingTaskExecutorPreference(_ firstExecutor: MyTaskExecutor,
   await _withTaskExecutor(firstExecutor) {
     dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
-    await _withTaskExecutor(nil) {
+    await _withTaskExecutor(.default) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))

@@ -29,8 +29,50 @@ import Swift
 /// Passing `nil` as executor means disabling any preference preference (if it was set) and the task hierarchy
 /// will execute without any executor preference until a different preference is set.
 ///
+/// ### Example
+///
+///     Task {
+///       // case 0) "no task executor preference"
+///
+///       // default task executor
+///       // ...
+///       await SomeDefaultActor().hello() // default executor
+///       await ActorWithCustomExecutor().hello() // 'hello' executes on actor's custom executor
+///
+///       // child tasks execute on default executor:
+///       async let x = ...
+///       await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///
+///       await withTaskExecutor(specific) {
+///         // case 1) 'specific' task executor preference
+///
+///         // 'specific' task executor
+///         // ...
+///         await SomeDefaultActor().hello() // 'hello' executes on 'specific' executor
+///         await ActorWithCustomExecutor().hello() // 'hello' executes on actor's custom executor (same as case 0)
+///
+///         // child tasks execute on 'specific' task executor:
+///         async let x = ...
+///         await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///
+///         // disable the task executor preference:
+///         await withTaskExecutor(.default) {
+///           // equivalent to case 0) preference is "default"
+///
+///           // default task executor
+///           // ...
+///           await SomeDefaultActor().hello() // default executor (same as case 0)
+///           await ActorWithCustomExecutor().hello() // 'hello' executes on actor's custom executor (same as case 0)
+///
+///           // child tasks execute on default executor (same as case 0):
+///           async let x = ...
+///           await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///         }
+///       }
+///     }
+///
 /// - Parameters:
-///   - executor: the task executor to use as preferred task executor; if `nil` it is interpreted as "no preference"
+///   - executorPreference: the task executor to use as preferred task executor; if `nil` it is interpreted as "no preference"
 ///   - operation: the operation to execute on the passed executor; if the executor was `nil`, this will execute on the default global concurrent executor.
 /// - Returns: the value returned from the `operation` closure
 /// - Throws: if the operation closure throws
@@ -39,22 +81,11 @@ import Swift
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
 public func _withTaskExecutor<T: Sendable>(
-  _ executor: (any _TaskExecutor)?,
+  _ taskExecutorPreference: any _TaskExecutor,
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
   let taskExecutorBuiltin: Builtin.Executor =
-    if let executor {
-      // We need to go through the asUnowned... for serial executors,
-      // because they encode certain behavior in the reference bits,
-      // so we cannot just cast and assume it'll be correct.
-      executor.asUnownedTaskExecutor().executor
-    } else {
-      // we must push a "no preference" record onto the task
-      // because there may be other records issuing a preference already,
-      // so by pushing this "no preference" (undefined task executor),
-      // we turn off the task executor preference for the scope of `operation`.
-      _getUndefinedTaskExecutor()
-    }
+    taskExecutorPreference.asUnownedTaskExecutor().executor
 
   let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
@@ -67,7 +98,45 @@ public func _withTaskExecutor<T: Sendable>(
   return try await operation()
 }
 
-/// Task with specified executor ----------------------------------------------
+/// Default global concurrent pool TaskExecutor --------------------------------
+
+@available(SwiftStdlib 9999, *)
+extension _TaskExecutor where Self == DefaultConcurrentExecutor {
+
+  /// The default executor preference, setting it using ``withTaskExecutor(_:)``
+  /// is equivalent to disabling an existing task executor preference, or
+  /// stating that task now has "no task executor preference".
+  @available(SwiftStdlib 9999, *)
+  public static var `default`: DefaultConcurrentExecutor {
+    DefaultConcurrentExecutor.shared
+  }
+
+}
+
+/// A task executor which enqueues all work on the default global concurrent
+/// thread pool that is used as the default executor for Swift concurrency
+/// tasks.
+@available(SwiftStdlib 9999, *)
+public final class DefaultConcurrentExecutor: _TaskExecutor {
+  public static let shared: DefaultConcurrentExecutor = .init()
+
+  private init() {}
+
+  public func enqueue(_ job: consuming ExecutorJob) {
+    _enqueueJobGlobal(job.context)
+  }
+
+  public func asUnownedTaskExecutor() {
+    // The "default global concurrent executor" is simply the "undefined" one.
+    // We represent it as the `(0, 0)` ExecutorRef and it is handled properly
+    // by the runtime, without having to call through to the
+    // `DefaultConcurrentExecutor` declared in Swift.
+    UnownedTaskExecutor(_getUndefinedTaskExecutor())
+  }
+
+}
+
+/// Task with specified executor -----------------------------------------------
 
 @available(SwiftStdlib 9999, *)
 extension Task where Failure == Never {
