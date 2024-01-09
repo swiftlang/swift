@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -disable-availability-checking
 
 // https://github.com/apple/swift/issues/70776
-// UNSUPPORTED: DARWIN_SIMULATOR=ios
-// UNSUPPORTED: DARWIN_SIMULATOR=tvos
-// UNSUPPORTED: DARWIN_SIMULATOR=watchos
+// UNSUPPORTED: OS=macOS && CPU=x86_64
 
 @_extern(wasm, module: "m1", name: "f1")
 func f1(x: Int) -> Int
