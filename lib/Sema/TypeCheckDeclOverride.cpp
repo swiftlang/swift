@@ -548,8 +548,6 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
 
   switch (attempt) {
   case OverrideCheckingAttempt::PerfectMatch:
-    diags.diagnose(decl, diag::override_multiple_decls_base,
-                   decl->getName());
     break;
   case OverrideCheckingAttempt::MismatchedSendability: {
     SendableCheckContext fromContext(decl->getDeclContext(),
@@ -598,6 +596,21 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
                                matchDecl);
     if (attempt == OverrideCheckingAttempt::BaseName) {
       fixDeclarationName(diag, decl, matchDecl->getName());
+    }
+  }
+
+  // Special case: Try to correct no-args FuncDecls to VarDecls and vice-versa
+  if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
+    if (auto funcDecl = dyn_cast<FuncDecl>(decl)) {
+      if (funcDecl->getParameters()->size() == 0) {
+        diags.diagnose(decl, diag::override_fixit_change_to_vardecl)
+          .fixItReplace(funcDecl->getSourceRange(), "var");
+      }
+    } else if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+      if (varDecl->getParameters()->size() > 0) {
+        diags.diagnose(decl, diag::override_fixit_change_to_funcdecl)
+          .fixItReplace(varDecl->getSourceRange(), "func");
+      }
     }
   }
 }
