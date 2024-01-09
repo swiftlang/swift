@@ -5540,12 +5540,10 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       case decls_block::ObjC_DECL_ATTR: {
         bool isImplicit;
         bool isImplicitName;
-        bool isSwift3Inferred; // FIXME: Remove, unused
         uint64_t numArgs;
         ArrayRef<uint64_t> rawPieceIDs;
         serialization::decls_block::ObjCDeclAttrLayout::readRecord(
-          scratch, isImplicit, isSwift3Inferred, isImplicitName, numArgs,
-          rawPieceIDs);
+            scratch, isImplicit, isImplicitName, numArgs, rawPieceIDs);
 
         SmallVector<Identifier, 4> pieces;
         for (auto pieceID : rawPieceIDs)
