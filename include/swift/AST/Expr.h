@@ -3393,6 +3393,10 @@ class ErasureExpr final : public ImplicitConversionExpr,
     Bits.ErasureExpr.NumArgumentConversions = argConversions.size();
     std::uninitialized_copy(argConversions.begin(), argConversions.end(),
                             getTrailingObjects<ConversionPair>());
+
+    assert(llvm::all_of(conformances, [](ProtocolConformanceRef ref) {
+      return !ref.isInvalid();
+    }));
   }
 
 public:
