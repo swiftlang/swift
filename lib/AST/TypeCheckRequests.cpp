@@ -1029,13 +1029,13 @@ ExprPatternMatchRequest::getCachedResult() const {
   if (!EP->MatchVar)
     return llvm::None;
 
-  return ExprPatternMatchResult(EP->MatchVar, EP->MatchExpr);
+  return ExprPatternMatchResult(EP->MatchVar, EP->getCachedMatchExpr());
 }
 
 void ExprPatternMatchRequest::cacheResult(ExprPatternMatchResult result) const {
   auto *EP = std::get<0>(getStorage());
   EP->MatchVar = result.getMatchVar();
-  EP->MatchExpr = result.getMatchExpr();
+  EP->MatchExprAndOperandOwnership.setPointer(result.getMatchExpr());
 }
 
 //----------------------------------------------------------------------------//

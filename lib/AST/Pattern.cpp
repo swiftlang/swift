@@ -16,6 +16,7 @@
 
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -569,6 +570,49 @@ VarDecl *ExprPattern::getMatchVar() const {
       .getMatchVar();
 }
 
+void ExprPattern::updateMatchExpr(Expr *e) const {
+  class FindMatchOperatorDeclRef: public ASTWalker {
+  public:
+    ValueOwnership Ownership = ValueOwnership::Default;
+  
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      // See if this is the reference to the ~= operator used.
+      auto declRef = dyn_cast<DeclRefExpr>(E);
+      if (!declRef) {
+        return Action::Continue(E);
+      }
+      auto decl = declRef->getDecl();
+      auto declName = decl->getName();
+      if (!declName.isOperator()) {
+        return Action::Continue(E);
+      }
+      
+      if (!declName.getBaseIdentifier().is("~=")) {
+        return Action::Continue(E);
+      }
+      
+      // We found a `~=` declref. Get the value ownership from the parameter.
+      auto fnTy = decl->getInterfaceType()->castTo<AnyFunctionType>();
+      if (decl->isStatic()) {
+        fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+      }
+      // Subject value is the right-hand operand to the operator.
+      assert(fnTy->getParams().size() == 2);
+      Ownership = fnTy->getParams()[1].getValueOwnership();
+      // Operators are always normal functions or methods, so their default
+      // parameter ownership is always borrowing.
+      if (Ownership == ValueOwnership::Default) {
+        Ownership = ValueOwnership::Shared;
+      }
+      return Action::Stop();
+    }
+  };
+  FindMatchOperatorDeclRef walker;
+  e->walk(walker);
+
+  MatchExprAndOperandOwnership = {e, walker.Ownership};
+}
+  
 SourceLoc EnumElementPattern::getStartLoc() const {
   return (ParentType && !ParentType->isImplicit())
              ? ParentType->getSourceRange().Start
@@ -679,4 +723,90 @@ void swift::simple_display(llvm::raw_ostream &out, const Pattern *pattern) {
 
 SourceLoc swift::extractNearestSourceLoc(const Pattern *pattern) {
   return pattern->getLoc();
+}
+
+ValueOwnership
+Pattern::getOwnership(
+  SmallVectorImpl<Pattern *> *mostRestrictiveSubpatterns) const
+{
+  class GetPatternOwnership: public PatternVisitor<GetPatternOwnership, void> {
+  public:
+    ValueOwnership Ownership = ValueOwnership::Shared;
+    SmallVectorImpl<Pattern *> *RestrictingPatterns = nullptr;
+
+    void increaseOwnership(ValueOwnership newOwnership, Pattern *p) {
+      // If the new ownership is stricter than the current ownership, then
+      // clear the restricting patterns we'd collected and start over with the
+      // new stricter ownership.
+      if (newOwnership > Ownership) {
+        Ownership = newOwnership;
+        if (RestrictingPatterns) {
+          RestrictingPatterns->clear();
+        }
+      }
+      
+      if (RestrictingPatterns
+          && newOwnership == Ownership
+          && Ownership > ValueOwnership::Shared) {
+        RestrictingPatterns->push_back(p);
+      }
+    }
+
+#define USE_SUBPATTERN(Kind) \
+    void visit##Kind##Pattern(Kind##Pattern *pattern) { \
+      return visit(pattern->getSubPattern());            \
+    }
+
+    USE_SUBPATTERN(Paren)
+    USE_SUBPATTERN(Typed)
+    USE_SUBPATTERN(Binding)
+#undef USE_SUBPATTERN
+    void visitTuplePattern(TuplePattern *p) {
+      for (auto &element : p->getElements()) {
+        visit(element.getPattern());
+      }
+    }
+    
+    void visitNamedPattern(NamedPattern *p) {
+      // `var` and `let` bindings consume the matched value.
+      // TODO: borrowing/mutating/consuming parameters
+      increaseOwnership(ValueOwnership::Owned, p);
+    }
+    
+    void visitAnyPattern(AnyPattern *p) {
+      /* no change */
+    }
+    void visitBoolPattern(BoolPattern *p) {
+      /* no change */
+    }
+    
+    void visitIsPattern(IsPattern *p) {
+      // Casting currently always consumes.
+      // TODO: Sometimes maybe it doesn't need to be.
+      increaseOwnership(ValueOwnership::Owned, p);
+    }
+    
+    void visitEnumElementPattern(EnumElementPattern *p) {
+      if (p->hasSubPattern()) {
+        visit(p->getSubPattern());
+      }
+    }
+    
+    void visitOptionalSomePattern(OptionalSomePattern *p) {
+      visit(p->getSubPattern());
+    }
+    
+    void visitExprPattern(ExprPattern *p) {
+      // We can't get the ownership reliably if the pattern hasn't been resolved.
+      if (!p->isResolved()) {
+        return;
+      }
+      increaseOwnership(p->getMatchOperandOwnership(), p);
+    }
+  };
+  
+  GetPatternOwnership visitor;
+  visitor.RestrictingPatterns = mostRestrictiveSubpatterns;
+  visitor.visit(const_cast<Pattern *>(this));
+  return visitor.Ownership;
 }

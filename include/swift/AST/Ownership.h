@@ -118,14 +118,22 @@ optionalityOf(ReferenceOwnership ownership) {
 }
 
 /// Different kinds of value ownership supported by Swift.
+///
+/// The order of these constants is significant. Ascending order indicates
+/// stricter requirements on the value to be used with the given ownership
+/// kind: any value can be accessed with a shared borrow (so long as there
+/// are no exclusive accesses overlapping). An exclusive `inout` borrow is
+/// only possible for mutable values which the caller already has exclusive
+/// access to or ownership of. Consumption of an owned value requires sole
+/// ownership of that value.
 enum class ValueOwnership : uint8_t {
   /// the context-dependent default ownership (sometimes shared,
   /// sometimes owned)
   Default,
-  /// an 'inout' exclusive, mutating borrow
-  InOut,
   /// a 'borrowing' nonexclusive, usually nonmutating borrow
   Shared,
+  /// an 'inout' exclusive, mutating borrow
+  InOut,
   /// a 'consuming' ownership transfer
   Owned,
 
