@@ -358,3 +358,35 @@ func conflict15<T, C, E>(_ t: T, _ c: C, _ e: borrowing E)
     C: ~Escapable,  // expected-error {{'C' required to be 'Escapable' but is marked with '~Escapable'}}
     C == T.HasE
   {}
+
+
+// Class bounds and AnyObject
+
+class Soup {}
+func checkClassBound1<T>(_ t: T) where T: ~Copyable, T: Soup {}
+// expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+
+// expected-note@+2 3{{add}}
+// expected-error@+1 {{parameter of noncopyable type 'T' must specify ownership}}
+func checkClassBound2<T>(_ t: T) where T: ~Escapable, T: AnyObject, T: ~Copyable {}
+// expected-error@-1 {{'T' required to be 'Escapable' but is marked with '~Escapable'}}
+// expected-error@-2 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
+
+func checkClassBound3<T>(_ t: T) where T: Soup & ~Copyable & ~Escapable {}
+// expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
+
+public func checkAnyObjInv1<Result: AnyObject>(_ t: borrowing Result) where Result: ~Copyable {}
+// expected-error@-1 {{'Result' required to be 'Copyable' but is marked with '~Copyable'}}
+
+public func checkAnyObjInv2<Result: AnyObject>(_ t: borrowing Result) where Result: ~Escapable {}
+// expected-error@-1 {{'Result' required to be 'Escapable' but is marked with '~Escapable'}}
+
+public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {
+    checkCopyable(t)
+}
+
+func checkExistentialAndClasses(
+    _ a: any AnyObject & ~Copyable, // expected-error {{composition involving 'AnyObject' cannot contain '~Copyable'}}
+    _ b: any Soup & Copyable & ~Escapable & ~Copyable, // expected-error {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
+    _ c: some (~Escapable & Removed) & Soup // expected-error {{composition involving class requirement 'Soup' cannot contain '~Escapable'}}
+    ) {}
