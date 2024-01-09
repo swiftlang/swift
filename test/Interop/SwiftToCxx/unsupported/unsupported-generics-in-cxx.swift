@@ -35,7 +35,24 @@ public enum unsupportedGenericEnum<T: Proto> {
     case B(T)
 }
 
+public struct Struct1<IntType: FixedWidthInteger> {
+  private var value: IntType
+
+  public init(rawValue: IntType) {
+    self.value = rawValue
+  }
+}
+
+public class Class1 {
+  public var index1: Struct1<UInt32> { .init(rawValue: 123) }
+}
+
 // CHECK: supported
+
+// CHECK: class SWIFT_SYMBOL("s:5Decls6Class1C") Class1 : public swift::_impl::RefCountedClass {
+// CHECK: 'index1' cannot be printed
+
+// CHECK: class Struct1 { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'Struct1' can not yet be represented in C++");
 
 // CHECK: // Unavailable in C++: Swift global function 'unsupportedFunc(_:)'.
 

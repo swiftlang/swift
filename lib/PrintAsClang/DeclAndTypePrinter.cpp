@@ -248,7 +248,9 @@ private:
       if (isa<AccessorDecl>(VD))
         continue;
       if (!AllowDelayed && owningPrinter.delayedMembers.count(VD)) {
-        os << "// '" << VD->getName() << "' below\n";
+        os << "// '" << VD->getName()
+           << ((outputLang == OutputLanguageMode::Cxx) ? "' cannot be printed\n"
+                                                       : "' below\n");
         continue;
       }
       if (VD->getAttrs().hasAttribute<OptionalAttr>() !=

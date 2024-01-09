@@ -796,16 +796,18 @@ public:
       }
     }
 
-    if (!delayedMembers.empty()) {
-      auto groupBegin = delayedMembers.begin();
-      for (auto i = groupBegin, e = delayedMembers.end(); i != e; ++i) {
-        if ((*i)->getDeclContext() != (*groupBegin)->getDeclContext()) {
-          printer.printAdHocCategory(make_range(groupBegin, i));
-          groupBegin = i;
+    if (outputLangMode == OutputLanguageMode::ObjC)
+      if (!delayedMembers.empty()) {
+        auto groupBegin = delayedMembers.begin();
+        for (auto i = groupBegin, e = delayedMembers.end(); i != e; ++i) {
+          if ((*i)->getDeclContext() != (*groupBegin)->getDeclContext()) {
+            printer.printAdHocCategory(make_range(groupBegin, i));
+            groupBegin = i;
+          }
         }
+        printer.printAdHocCategory(
+            make_range(groupBegin, delayedMembers.end()));
       }
-      printer.printAdHocCategory(make_range(groupBegin, delayedMembers.end()));
-    }
 
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
