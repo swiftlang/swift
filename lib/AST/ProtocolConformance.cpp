@@ -338,6 +338,11 @@ bool NormalProtocolConformance::isResilient() const {
   return getDeclContext()->getParentModule()->isResilient();
 }
 
+bool NormalProtocolConformance::isPreconcurrency() const {
+  // The conformance is explicitly marked as `@preconcurrency`.
+  return ContextAndBits.getInt() & PreconcurrencyFlag;
+}
+
 llvm::Optional<ArrayRef<Requirement>>
 ProtocolConformance::getConditionalRequirementsIfAvailable() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirementsIfAvailable, ());

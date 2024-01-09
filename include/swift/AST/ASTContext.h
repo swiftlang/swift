@@ -1282,7 +1282,8 @@ public:
                        SourceLoc loc,
                        DeclContext *dc,
                        ProtocolConformanceState state,
-                       bool isUnchecked);
+                       bool isUnchecked,
+                       bool isPreconcurrency);
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *

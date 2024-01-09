@@ -811,7 +811,8 @@ addDistributedActorCodableConformance(
       actor->getDeclaredInterfaceType(), proto,
       actor->getLoc(), /*dc=*/actor,
       ProtocolConformanceState::Incomplete,
-      /*isUnchecked=*/false);
+      /*isUnchecked=*/false,
+      /*isPreconcurrency=*/false);
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
