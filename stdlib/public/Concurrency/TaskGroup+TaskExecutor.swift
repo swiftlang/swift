@@ -33,7 +33,7 @@ extension TaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -70,7 +70,7 @@ extension TaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
@@ -118,7 +118,7 @@ extension ThrowingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
@@ -155,7 +155,7 @@ extension ThrowingTaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
@@ -203,7 +203,7 @@ extension DiscardingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
@@ -241,7 +241,7 @@ extension DiscardingTaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Void
   ) -> Bool {
@@ -289,7 +289,7 @@ extension ThrowingDiscardingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
@@ -327,7 +327,7 @@ extension ThrowingDiscardingTaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: any _TaskExecutor,
+    on taskExecutorPreference: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) -> Bool {

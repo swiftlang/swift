@@ -53,7 +53,10 @@ import Swift
 ///
 ///         // child tasks execute on 'specific' task executor:
 ///         async let x = ...
-///         await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///         await withTaskGroup(of: Int.self) { group in
+///           group.addTask { 7 } // child task executes on 'specific' executor
+///           group.addTask(on: .default) { 13 } // child task executes on default executor
+///         }
 ///
 ///         // disable the task executor preference:
 ///         await withTaskExecutor(.default) {
@@ -81,7 +84,7 @@ import Swift
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
 public func _withTaskExecutor<T: Sendable>(
-  _ taskExecutorPreference: any _TaskExecutor,
+  _ taskExecutorPreference: some _TaskExecutor,
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
   let taskExecutorBuiltin: Builtin.Executor =
@@ -173,7 +176,7 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    _on executor: any _TaskExecutor,
+    _on executor: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) {
@@ -201,7 +204,7 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    _on executor: any _TaskExecutor,
+    _on executor: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) {
@@ -233,7 +236,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func _detached(
-    on executor: any _TaskExecutor,
+    on executor: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) -> Task<Success, Failure> {
@@ -264,7 +267,7 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func _detached(
-    on executor: any _TaskExecutor,
+    on executor: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) -> Task<Success, Failure> {
@@ -296,7 +299,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func _detached(
-    on executor: any _TaskExecutor,
+    on executor: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
@@ -329,7 +332,7 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func _detached(
-    on executor: any _TaskExecutor,
+    on executor: some _TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
