@@ -2603,62 +2603,25 @@ public:
   }
 };
 
-/// The @_dynamicReplacement(for:) attribute.
+/// The @_distributedThunkTarget(for:) attribute.
 class DistributedThunkTargetAttr final
     : public DeclAttribute {
 
-//  DeclNameRef TargetFunctionName;
   AbstractFunctionDecl *TargetFunction;
-//  LazyMemberLoader *Resolver = nullptr;
-//  uint64_t ResolverContextData;
-
-//  /// Create an @_distributedThunkTarget(<the func decl>) attribute
-//  DistributedThunkTargetAttr(SourceLoc atLoc, SourceRange baseRange,
-//                         DeclNameRef targetFunctionName,
-//                         SourceRange parenRange);
 
 public:
   DistributedThunkTargetAttr(AbstractFunctionDecl *target)
-      : DeclAttribute(DAK_DistributedThunkTarget, SourceLoc(), SourceRange(),
+      : DeclAttribute(DeclAttrKind::DistributedThunkTarget, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
         TargetFunction(target)
-//        ,
-//        Resolver(nullptr), ResolverContextData(0)
   {}
-
-//  DistributedThunkTargetAttr(DeclNameRef targetFunctionName,
-//                         LazyMemberLoader *Resolver = nullptr,
-//                         uint64_t Data = 0)
-//      : DeclAttribute(DAK_DistributedThunkTarget, SourceLoc(), SourceRange(),
-//                      /*Implicit=*/false),
-//        TargetFunctionName(targetFunctionName),
-//        Resolver(Resolver), ResolverContextData(Data) {
-//  }
-
-//  static DistributedThunkTargetAttr *
-//  create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
-//         SourceLoc LParenLoc, DeclNameRef targetFunc, SourceLoc RParenLoc);
-//
-//  static DistributedThunkTargetAttr *create(ASTContext &ctx,
-//                                        DeclNameRef replacedFunction,
-//                                        AbstractFunctionDecl *targetFunc);
-
-//  DeclNameRef getTargetFunctionName() const {
-//    return TargetFunctionName;
-//  }
 
   AbstractFunctionDecl *getTargetFunction() const {
     return TargetFunction;
   }
 
-//  /// Retrieve the location of the opening parentheses, if there is one.
-//  SourceLoc getLParenLoc() const;
-//
-//  /// Retrieve the location of the closing parentheses, if there is one.
-//  SourceLoc getRParenLoc() const;
-
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_DistributedThunkTarget;
+    return DA->getKind() == DeclAttrKind::DistributedThunkTarget;
   }
 };
 

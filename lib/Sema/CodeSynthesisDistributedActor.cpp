@@ -12,11 +12,13 @@
 
 #include "TypeCheckDistributed.h"
 
+#include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -672,6 +674,72 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   return {body, /*isTypeChecked=*/false};
 }
 
+/// Create a new FuncDecl that has the same signature as the passed in func.
+/// This is used both to create stub witnesses as well as distributed thunks.
+///
+/// \param DC The declaration context of the newly created function
+static FuncDecl*
+createSameSignatureFunctionDecl(DeclContext *DC,
+                                FuncDecl *func,
+                                llvm::Optional<DeclName> nameOverride,
+                                bool forceAsync, bool forceThrows) {
+  auto &C = func->getASTContext();
+
+  // --- Prepare generic parameters
+  GenericParamList *genericParamList = nullptr;
+  if (auto genericParams = func->getGenericParams()) {
+    genericParamList = genericParams->clone(DC);
+  }
+
+  GenericSignature baseSignature = func->getGenericSignature();
+
+  // --- Prepare parameters
+  auto funcParams = func->getParameters();
+  SmallVector<ParamDecl*, 2> paramDecls;
+  for (unsigned i : indices(*func->getParameters())) {
+    auto funcParam = funcParams->get(i);
+
+    auto paramName = funcParam->getParameterName();
+    // If internal name is empty it could only mean either
+    // `_:` or `x _: ...`, so let's auto-generate a name
+    // to be used in the body of a thunk.
+    if (paramName.empty()) {
+      paramName = C.getIdentifier("p" + llvm::utostr(i));
+    }
+
+    auto paramDecl = new (C)
+        ParamDecl(SourceLoc(),
+                  /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
+                  /*parameterNameLoc=*/SourceLoc(), paramName, DC);
+
+    paramDecl->setImplicit(true);
+    paramDecl->setSpecifier(funcParam->getSpecifier());
+    paramDecl->setInterfaceType(funcParam->getInterfaceType());
+
+    paramDecls.push_back(paramDecl);
+  }
+  ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
+
+  DeclName funcName = nameOverride.value_or(func->getName());
+
+  FuncDecl *copy = FuncDecl::createImplicit(
+      C, swift::StaticSpellingKind::None, funcName, SourceLoc(),
+      /*async=*/forceAsync || func->hasAsync(),
+      /*throws=*/forceThrows || func->hasThrows(),
+      /*thrownType=*/Type(), genericParamList, params,
+      func->getResultInterfaceType(), DC);
+
+  copy->setSynthesized(true);
+
+  if (isa<ClassDecl>(DC))
+    copy->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
+
+  copy->setGenericSignature(baseSignature);
+  copy->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
+
+  return copy;
+}
+
 static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   auto &C = func->getASTContext();
   auto DC = func->getDeclContext();
@@ -698,46 +766,9 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
     thunkName = func->getName();
   }
 
-  // --- Prepare generic parameters
-  GenericParamList *genericParamList = nullptr;
-  if (auto genericParams = func->getGenericParams()) {
-    genericParamList = genericParams->clone(DC);
-  }
-
-  GenericSignature baseSignature = func->getGenericSignature();
-
-  // --- Prepare parameters
-  auto funcParams = func->getParameters();
-  SmallVector<ParamDecl*, 2> paramDecls;
-  for (unsigned i : indices(*func->getParameters())) {
-    auto funcParam = funcParams->get(i);
-
-    auto paramName = funcParam->getParameterName();
-    // If internal name is empty it could only mean either
-    // `_:` or `x _: ...`, so let's auto-generate a name
-    // to be used in the body of a thunk.
-    if (paramName.empty()) {
-      paramName = C.getIdentifier("p" + llvm::utostr(i));
-    }
-
-    auto paramDecl = new (C)
-         ParamDecl(SourceLoc(),
-                   /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
-                   /*parameterNameLoc=*/SourceLoc(), paramName, DC);
-
-    paramDecl->setImplicit(true);
-    paramDecl->setSpecifier(funcParam->getSpecifier());
-    paramDecl->setInterfaceType(funcParam->getInterfaceType());
-
-    paramDecls.push_back(paramDecl);
-  }
-  ParameterList *params = ParameterList::create(C, paramDecls); // = funcParams->clone(C);
-
-  FuncDecl *thunk = FuncDecl::createImplicit(
-      C, swift::StaticSpellingKind::None, thunkName, SourceLoc(),
-      /*async=*/true, /*throws=*/true, /*thrownType=*/Type(),
-      genericParamList, params, func->getResultInterfaceType(), DC);
-
+  FuncDecl *thunk = createSameSignatureFunctionDecl(
+      DC, func, thunkName,
+      /*forceAsync=*/true, /*forceThrows=*/true);
   assert(thunk && "couldn't create a distributed thunk");
 
   thunk->setSynthesized(true);
@@ -745,31 +776,16 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
   thunk->getAttrs().add(
       new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
-  if (isa<ClassDecl>(DC))
-    thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
-
-  thunk->setGenericSignature(baseSignature);
-  thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
   thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
 
-//  auto witnessedDistributedReqs =
-//      func->getDistributedMethodWitnessedProtocolRequirements();
-//  if (witnessedDistributedReqs.size() == 1) {
-//    auto distributedRequirement = witnessedDistributedReqs.front();
-      fprintf(stderr, "[%s:%d](%s) THE FUNC [%s] WITNESS OF PROTOCOL FUNC:\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              func->getNameStr().str().c_str());
-//      distributedRequirement->dump();
-      thunk->getAttrs().add(
-          new (C) DistributedThunkTargetAttr(func));
-//  }
-
-  for (auto a : thunk->getAttrs()) {
-    fprintf(stderr, "[%s:%d](%s) attributes after setting: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              a->getAttrName().str().c_str());
-  }
+  /// Record which function this is a thunk for, we'll need this to link back
+  /// calls in case this is a distributed requirement witness.
+  thunk->getAttrs().add(
+      new (C) DistributedThunkTargetAttr(func));
 
   return thunk;
 }
+
 
 /******************************************************************************/
 /*********************** CODABLE CONFORMANCE **********************************/
@@ -841,6 +857,42 @@ addDistributedActorCodableConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
   return conformance;
+}
+
+/******************************************************************************/
+/******************************************************************************/
+
+void swift::assertRequiredSynthesizedPropertyOrder(
+    ASTContext &Context,
+    NominalTypeDecl *nominal) {
+#ifndef NDEBUG
+  if (auto id = nominal->getDistributedActorIDProperty()) {
+    if (auto system = nominal->getDistributedActorSystemProperty()) {
+      if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
+          int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
+          int idx = 0;
+          for (auto member: nominal->getMembers()) {
+            if (auto binding = dyn_cast<PatternBindingDecl>(member)) {
+              if (binding->getSingleVar()->getName() == Context.Id_id) {
+                idIdx = idx;
+              } else if (binding->getSingleVar()->getName() == Context.Id_actorSystem) {
+                actorSystemIdx = idx;
+              } else if (binding->getSingleVar()->getName() == Context.Id_unownedExecutor) {
+                unownedExecutorIdx = idx;
+              }
+              idx += 1;
+            }
+          }
+          if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
+            // we have found all the necessary fields, let's assert their order
+            assert(idIdx < actorSystemIdx < unownedExecutorIdx && "order of fields MUST be exact.");
+          }
+        }
+      }
+    }
+  }
+#endif
 }
 
 /******************************************************************************/
@@ -1006,3 +1058,4 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
   return addDistributedActorCodableConformance(classDecl,
                                                C.getProtocol(protoKind));
 }
+

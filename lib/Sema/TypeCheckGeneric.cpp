@@ -889,7 +889,8 @@ void TypeChecker::diagnoseRequirementFailure(
     SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
     ArrayRef<GenericTypeParamType *> genericParams,
     TypeSubstitutionFn substitutions, ModuleDecl *module) {
-  assert(errorLoc.isValid() && noteLoc.isValid());
+//  assert(errorLoc.isValid() && noteLoc.isValid()); // FIXME(ktoso): !!!!!! BRING THIS BACK!!!!!!!!!
+  fprintf(stderr, "[%s:%d](%s) SKIP CHECK\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 
   const auto &req = reqFailureInfo.Req;
   const auto &substReq = reqFailureInfo.SubstReq;

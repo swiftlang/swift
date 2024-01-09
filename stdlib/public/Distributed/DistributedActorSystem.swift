@@ -1017,3 +1017,24 @@ public struct DistributedActorCodingError: DistributedActorSystemError {
     .init(message: "Missing DistributedActorSystem userInfo while decoding")
   }
 }
+
+/// Invoked when a distributed "stub" method would be incorrectly invoked on a
+/// local instance of the synthesized stub. Generally this should not be possible
+/// as a stub always should be used as "remote" and therefore no local calls
+/// are performed on them. Seeing this fatal error means a problem in the Swift
+/// Distributed runtime, please report an issue.
+@available(SwiftStdlib 9999, *)
+public // COMPILER_INTRINSIC
+func _diagnoseDistributedStubMethodCalled(
+  className: StaticString,
+  funcName: StaticString = #function,
+  file: StaticString = #file,
+  line: UInt = #line,
+  column: UInt = #column
+) -> Never {
+  #if !$Embedded
+  fatalError("invoked distributed stub '\(className).\(funcName)'", file: file, line: line)
+  #else
+  Builtin.int_trap()
+  #endif
+}

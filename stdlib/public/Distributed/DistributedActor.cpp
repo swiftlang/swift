@@ -144,12 +144,6 @@ void swift_distributed_execute_target(
     size_t numWitnessTables,
     Metadata *decoderType,
     Metadata *actorType,
-  std::string targetName(targetNameStart, targetNameLength);
-
-  auto actorTy = swift_getObjectType(actor);
-  auto actorTyNamePair = swift_getMangledTypeName(actorTy);
-  std::string actorTyName = actorTyNamePair.data;
-
     void **decoderWitnessTable,
     void **actorWitnessTable) {
   std::string targetName(targetNameStart, targetNameLength);
