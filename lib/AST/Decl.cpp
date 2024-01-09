@@ -6414,14 +6414,12 @@ bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
 }
 
-bool ProtocolDecl::isInvertibleProtocol() const {
-  if (auto kp = getKnownProtocolKind()) {
-    if (getInvertibleProtocolKind(*kp)) {
-      assert(isMarkerProtocol());
-      return true;
-    }
-  }
-  return false;
+llvm::Optional<InvertibleProtocolKind>
+ProtocolDecl::getInvertibleProtocolKind() const {
+  if (auto kp = getKnownProtocolKind())
+    return ::getInvertibleProtocolKind(*kp);
+
+  return llvm::None;
 }
 
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
@@ -6563,11 +6561,38 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   if (this == super)
     return false;
 
+  if (auto ip = super->getInvertibleProtocolKind())
+    return requiresInvertible(*ip);
+
   return walkInheritedProtocols([super](ProtocolDecl *inherited) {
     if (inherited == super)
       return TypeWalker::Action::Stop;
 
     return TypeWalker::Action::Continue;
+  });
+}
+
+bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
+  // HACK: until we enable Feature::NoncopyableGenerics in the stdlib,
+  // hardcode the fact that an invertible protocol does not require any other!
+  if (getInvertibleProtocolKind())
+    return false;
+
+  auto kp = ::getKnownProtocolKind(ip);
+  return walkInheritedProtocols([kp, ip](ProtocolDecl *proto) {
+    if (proto->isSpecificProtocol(kp))
+      return TypeWalker::Action::Stop; // it is required.
+
+    switch (proto->getMarking(ip).getInverse().getKind()) {
+    case InverseMarking::Kind::None:
+      return TypeWalker::Action::Stop; // it is required.
+
+    case InverseMarking::Kind::LegacyExplicit:
+    case InverseMarking::Kind::Explicit:
+    case InverseMarking::Kind::Inferred:
+      // the implicit requirement was suppressed on this protocol, keep looking.
+      return TypeWalker::Action::Continue;
+    }
   });
 }
 

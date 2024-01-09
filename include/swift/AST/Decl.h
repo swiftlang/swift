@@ -5171,6 +5171,10 @@ public:
   /// Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
+
+  /// Determine whether this protocol requires conformance to `IP`, without
+  /// querying a generic signature.
+  bool requiresInvertible(InvertibleProtocolKind ip) const;
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
@@ -5216,9 +5220,9 @@ public:
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
 
-  /// Determine whether this is an invertible protocol,
-  /// i.e., for a protocol P, the inverse constraint ~P exists.
-  bool isInvertibleProtocol() const;
+  /// Determine if this is an invertible protocol and return its kind,
+  /// i.e., for a protocol P, returns the kind if inverse constraint ~P exists.
+  llvm::Optional<InvertibleProtocolKind> getInvertibleProtocolKind() const;
 
 private:
   void computeKnownProtocolKind() const;

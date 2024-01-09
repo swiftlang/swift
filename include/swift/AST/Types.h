@@ -5873,6 +5873,7 @@ class ProtocolCompositionType final : public TypeBase,
     private llvm::TrailingObjects<ProtocolCompositionType, Type> {
   friend TrailingObjects;
 
+  // The inverse constraints `& ~IP` that are part of this composition.
   InvertibleProtocolSet Inverses;
   
 public:

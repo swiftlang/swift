@@ -345,8 +345,11 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
 }
 
 /// Adds the inferred default protocols for an ExistentialLayout with respect
-/// to that existential's inverses. For example, if an inverse ~P exists, then
-/// P will not be added to the protocols list.
+/// to that existential's inverses and existing protocols. For example, if an
+/// inverse ~P exists, then P will not be added to the protocols list.
+///
+/// Similarly, if the protocols list has a protocol Q that already implies
+/// Copyable, then we will not add `Copyable` to the protocols list.
 ///
 /// \param inverses the inverses '& ~P' that are in the existential's type.
 /// \param protocols the output vector of protocols for an ExistentialLayout
@@ -360,9 +363,23 @@ static void expandDefaultProtocols(
   if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
     return;
 
-  // Try to add all invertible protocols, unless an inverse was provided.
+  // Try to add all invertible protocols, unless:
+  //  - an inverse was provided
+  //  - an existing protocol already requires it
   for (auto ip : InvertibleProtocolSet::full()) {
     if (inverses.contains(ip))
+      continue;
+
+    // This matches with `lookupExistentialConformance`'s use of 'inheritsFrom'.
+    bool alreadyRequired = false;
+    for (auto proto : protocols) {
+      if (proto->requiresInvertible(ip)) {
+        alreadyRequired = true;
+        break;
+      }
+    }
+
+    if (alreadyRequired)
       continue;
 
     auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
