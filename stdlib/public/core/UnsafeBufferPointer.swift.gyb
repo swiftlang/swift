@@ -305,16 +305,15 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 
   @inlinable // unsafe-performance
   public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
-    // NOTE: In release mode, this method is a no-op for performance reasons.
-    _debugPrecondition(index >= bounds.lowerBound)
-    _debugPrecondition(index < bounds.upperBound)
+    _boundsCheckPrecondition(index >= bounds.lowerBound && index < bounds.upperBound)
   }
 
   @inlinable // unsafe-performance
   public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
-    // NOTE: In release mode, this method is a no-op for performance reasons.
-    _debugPrecondition(range.lowerBound >= bounds.lowerBound)
-    _debugPrecondition(range.upperBound <= bounds.upperBound)
+    _boundsCheckPrecondition(
+      range.lowerBound >= bounds.lowerBound &&
+      range.upperBound <= bounds.upperBound
+    )
   }
 
   @inlinable // unsafe-performance
@@ -366,14 +365,14 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   @inlinable // unsafe-performance
   public subscript(i: Int) -> Element {
     get {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _boundsCheckPrecondition(i >= 0)
+      _boundsCheckPrecondition(i < endIndex)
       return _position._unsafelyUnwrappedUnchecked[i]
     }
 %if Mutable:
     nonmutating _modify {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
+      _boundsCheckPrecondition(i >= 0)
+      _boundsCheckPrecondition(i < endIndex)
       yield &_position._unsafelyUnwrappedUnchecked[i]
     }
 %end
@@ -439,16 +438,16 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     -> Slice<Unsafe${Mutable}BufferPointer<Element>>
   {
     get {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
+      _boundsCheckPrecondition(bounds.lowerBound >= startIndex)
+      _boundsCheckPrecondition(bounds.upperBound <= endIndex)
       return Slice(
         base: self, bounds: bounds)
     }
 %  if Mutable:
     nonmutating set {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
-      _debugPrecondition(bounds.count == newValue.count)
+      _boundsCheckPrecondition(bounds.lowerBound >= startIndex)
+      _boundsCheckPrecondition(bounds.upperBound <= endIndex)
+      _boundsCheckPrecondition(bounds.count == newValue.count)
 
       // FIXME: swift-3-indexing-model: tests.
       if !newValue.isEmpty {
@@ -473,8 +472,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   @inlinable // unsafe-performance
   public func swapAt(_ i: Int, _ j: Int) {
     guard i != j else { return }
-    _debugPrecondition(i >= 0 && j >= 0)
-    _debugPrecondition(i < endIndex && j < endIndex)
+    _boundsCheckPrecondition(i >= 0 && j >= 0)
+    _boundsCheckPrecondition(i < endIndex && j < endIndex)
     let pi = (_position! + i)
     let pj = (_position! + j)
     let tmp = pi.move()
@@ -555,7 +554,7 @@ extension Unsafe${Mutable}BufferPointer {
     // We only do this in debug builds to prevent a measurable performance
     // degradation wrt passing around pointers not wrapped in a BufferPointer
     // construct.
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
       "Invalid slice")
     let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
@@ -1030,7 +1029,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func initializeElement(at index: Index, to value: Element) {
-    _debugPrecondition(startIndex <= index && index < endIndex)
+    _boundsCheckPrecondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     p.initialize(to: value)
   }
@@ -1048,7 +1047,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func moveElement(from index: Index) -> Element {
-    _debugPrecondition(startIndex <= index && index < endIndex)
+    _boundsCheckPrecondition(startIndex <= index && index < endIndex)
     return baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index).move()
   }
 
@@ -1063,7 +1062,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func deinitializeElement(at index: Index) {
-    _debugPrecondition(startIndex <= index && index < endIndex)
+    _boundsCheckPrecondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     p.deinitialize(count: 1)
   }
