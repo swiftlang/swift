@@ -20,7 +20,7 @@ protocol GreeterP_UnknownSystem: DistributedActor {
   distributed func greet() -> String
 }
 
-// start of @Proxy output =======
+// TODO: remove manual stubs code
 extension GreeterP_UnknownSystem where Self == GreeterP_UnknownSystem_FakeRoundtripActorSystem_Stub {
   static func resolve(
     id: ID, using system: ActorSystem
@@ -31,6 +31,7 @@ extension GreeterP_UnknownSystem where Self == GreeterP_UnknownSystem_FakeRoundt
   }
 }
 
+// TODO: remove manual stubs code
 distributed actor GreeterP_UnknownSystem_FakeRoundtripActorSystem_Stub: GreeterP_UnknownSystem {
   typealias ActorSystem = FakeRoundtripActorSystem
 
@@ -40,9 +41,8 @@ distributed actor GreeterP_UnknownSystem_FakeRoundtripActorSystem_Stub: GreeterP
     return message
   }
 }
-// end of @Proxy output =======
 
-// start of @Proxy output =======
+// TODO: remove manual stubs code
 extension GreeterP_UnknownSystem where Self == GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub {
   static func resolve(
     id: Self.ID, using system: Self.ActorSystem
@@ -53,6 +53,7 @@ extension GreeterP_UnknownSystem where Self == GreeterP_UnknownSystem_LocalTesti
   }
 }
 
+// TODO: remove manual stubs code
 distributed actor GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub: GreeterP_UnknownSystem {
   typealias ActorSystem = LocalTestingDistributedActorSystem
 
@@ -62,7 +63,6 @@ distributed actor GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub
     return message
   }
 }
-// end of @Proxy output =======
 
 // ==== ------------------------------------------------------------------------
 
@@ -91,7 +91,7 @@ distributed actor DAL {
     print("resolved on \(localTestingSystem): \(type(of: gl))")
     // CHECK: resolved on Distributed.LocalTestingDistributedActorSystem: GreeterP_UnknownSystem_LocalTestingDistributedActorSystem_Stub
 
-    print("ok") // CHECK: NEIN
+    print("ok") // CHECK: ok
   }
 }
 

@@ -65,9 +65,19 @@ using namespace swift;
 /******************************************************************************/
 
 // TODO(distributed): make into a request
-Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) {
-  auto &C = member->getASTContext();
-  auto *DC = member->getDeclContext();
+Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *anyValue) {
+  auto &C = anyValue->getASTContext();
+
+  // FIXME(distributed): clean this up, we want a method that gets us AS type
+  // given any value, but is this the best way?
+  DeclContext *DC;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(anyValue)) {
+    DC = nominal;
+  } else if (auto extension = dyn_cast<ExtensionDecl>(anyValue)) {
+    DC = extension->getExtendedNominal();
+  } else {
+    DC = anyValue->getDeclContext();
+  }
   auto DA = C.getDistributedActorDecl();
 
   // === When declared inside an actor, we can get the type directly
@@ -75,10 +85,12 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
     return getDistributedActorSystemType(classDecl);
   }
 
+  DC->getSelfProtocolDecl()->dump();
+
   /// === Maybe the value is declared in a protocol?
   if (auto protocol = DC->getSelfProtocolDecl()) {
     GenericSignature signature;
-    if (auto *genericContext = member->getAsGenericContext()) {
+    if (auto *genericContext = anyValue->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
     } else {
       signature = DC->getGenericSignatureOfContext();

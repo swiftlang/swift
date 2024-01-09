@@ -4701,8 +4701,6 @@ void IRGenModule::emitAccessibleFunction(
 
   llvm::Constant *funcAddr = nullptr;
   if (func->isDistributed()) {
-    fprintf(stderr, "[%s:%d](%s) EMIT FUNCTION: mangledRecordName: %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            mangledRecordName.c_str());
     funcAddr = getAddrOfAsyncFunctionPointer(
         LinkEntity::forDistributedTargetAccessor(func));
   } else if (func->isAsync()) {

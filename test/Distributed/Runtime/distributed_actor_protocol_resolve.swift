@@ -18,46 +18,35 @@ import FakeDistributedActorSystems
 // ==== Known actor system -----------------------------------------------------
 
 // @DistributedRemotelyJustViaProxyAccessible
-protocol GreeterP_ConcreteSystem: DistributedActor where ActorSystem == FakeRoundtripActorSystem {
+protocol GreeterDefinedSystemProtocol: DistributedActor where ActorSystem == FakeRoundtripActorSystem {
   distributed func greet() -> String
 }
 
 // start of @Proxy output =======
-extension GreeterP_ConcreteSystem where Self == GreeterP_ConcreteSystem_Stub {
+extension GreeterDefinedSystemProtocol where Self == GreeterDefinedSystemProtocol_Stub {
   static func resolve(
     id: ID, using system: ActorSystem
-  ) throws -> any GreeterP_ConcreteSystem {
-    print("\(Self.self).\(#function) -> return \(GreeterP_ConcreteSystem_Stub.self)")
+  ) throws -> any GreeterDefinedSystemProtocol {
+    print("\(Self.self).\(#function) -> return \(GreeterDefinedSystemProtocol_Stub.self)")
 
-    return try GreeterP_ConcreteSystem_Stub.resolve(id: id, using: system)
+    return try GreeterDefinedSystemProtocol_Stub.resolve(id: id, using: system)
   }
 }
 
-distributed actor GreeterP_ConcreteSystem_Stub: GreeterP_ConcreteSystem {
+distributed actor GreeterDefinedSystemProtocol_Stub: GreeterDefinedSystemProtocol {
   typealias ActorSystem = FakeRoundtripActorSystem
-  let hint: String
   init(actorSystem: ActorSystem) {
-    self.hint = ""
-    self.actorSystem = actorSystem
-  }
-  init(hint: String, actorSystem: ActorSystem) {
-    self.hint = hint
     self.actorSystem = actorSystem
   }
 
   distributed func greet() -> String {
-    let message = "STUB[\(self.hint)]:\(Self.self).\(#function)"
-    print(message)
-    return message
-  }
-
-  func call_greet<Act: GreeterP_ConcreteSystem>(actor: Act/*, ... params ... */) async throws -> String {
-    try await actor.greet()
+    fatalError("Stub implementation")
   }
 }
 // end of @Proxy output =======
 
-distributed actor GreeterImpl: GreeterP_ConcreteSystem {
+/// A concrete implementation done on the "server" side of a non-symmetric application
+distributed actor GreeterImpl: GreeterDefinedSystemProtocol {
   typealias ActorSystem = FakeRoundtripActorSystem
 
   distributed func greet() -> String {
@@ -67,21 +56,20 @@ distributed actor GreeterImpl: GreeterP_ConcreteSystem {
 
 // ==== ------------------------------------------------------------------------
 
-
 @main struct Main {
   static func main() async throws {
     let roundtripSystem = FakeRoundtripActorSystem()
     let localTestingSystem = LocalTestingDistributedActorSystem()
 
-    let real: any GreeterP_ConcreteSystem = GreeterImpl(actorSystem: roundtripSystem)
+    let real: any GreeterDefinedSystemProtocol = GreeterImpl(actorSystem: roundtripSystem)
     let realGreeting = try await real.greet()
     print("local call greeting: \(realGreeting)")
     // CHECK: local call greeting: [IMPL]:Hello from GreeterImpl
 
-    let proxy: any GreeterP_ConcreteSystem = try .resolve(id: real.id, using: roundtripSystem)
+    let proxy: any GreeterDefinedSystemProtocol = try .resolve(id: real.id, using: roundtripSystem)
     let greeting = try await proxy.greet()
-    // CHECK: >> remoteCall: on:main.GreeterP_ConcreteSystem_Stub, target:greet(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
-    // CHECK: > execute distributed target: greet(), identifier: $s4main23GreeterP_ConcreteSystemP5greetSSyFTE
+    // CHECK: >> remoteCall: on:main.GreeterDefinedSystemProtocol_Stub, target:greet(), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: > execute distributed target: greet(), identifier: $s4main28GreeterDefinedSystemProtocolP5greetSSyFTE
 
     // CHECK: << remoteCall return: [IMPL]:Hello from GreeterImpl
 

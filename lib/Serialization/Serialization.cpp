@@ -3024,7 +3024,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.addDeclRef(afd), pieces.size(), pieces);
       return;
     }
-    case DAK_DistributedThunkTarget: {
+    case DeclAttrKind::DistributedThunkTarget: {
       assert(false && "not implemented");
     }
 
