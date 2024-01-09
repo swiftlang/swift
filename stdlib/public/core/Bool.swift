@@ -143,6 +143,7 @@ public struct Bool: Sendable {
 
 extension Bool: _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
   @_transparent
+  @_semantics("bool.literal_init")
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
   }
