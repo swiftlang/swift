@@ -2840,6 +2840,8 @@ public:
     DeclAttrs = Chain;
   }
 
+  DeclAttribute *getRawAttributeChain() const { return DeclAttrs; }
+
   SourceLoc getStartLoc(bool forModifiers = false) const;
 };
 

@@ -117,7 +117,6 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
       return nil
     }
 
-
     // Find the node's offset relative to its root.
     let rawPosition: AbsolutePosition
     switch position {
