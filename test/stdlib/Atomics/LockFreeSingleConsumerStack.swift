@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(%import-libdispatch)
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
+// REQUIRES: synchronization
 
 import Synchronization
 import StdlibUnittest
