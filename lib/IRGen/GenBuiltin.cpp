@@ -322,20 +322,25 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor) {
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor) {
 
     auto flags = args.claimNext();
     auto taskGroup =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
             ? args.claimNext()
             : nullptr;
 
     // ExecutorRef is two pointers: {Identity, Implementation}
     std::pair<llvm::Value *, llvm::Value *> executorRef =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
             ? std::pair(args.claimNext(), args.claimNext())
             : std::pair(nullptr, nullptr);
 
@@ -343,6 +348,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // actual value.
     llvm::Value *futureResultType =
         llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    // FIXME: We pass a metatype of result type even if it's statically known to
+    // be discarded (`Void`) just to keep the existing behavior.
     if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       futureResultType = args.claimNext();
     }

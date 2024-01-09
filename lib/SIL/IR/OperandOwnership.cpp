@@ -912,8 +912,10 @@ OperandOwnershipBuiltinClassifier
 
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;
+const int PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_FUTURE_FUNCTION = 3;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_WITH_EXECUTOR_FUNCTION = 3;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION = 4;
+const int PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_WITH_EXECUTOR_FUNCTION = 4;
 
 OperandOwnership OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(
     BuiltinInst *bi, StringRef attr, int paramIndex) {
@@ -939,6 +941,14 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroup(BuiltinInst *bi,
 }
 
 OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncDiscardingTaskInGroup(
+    BuiltinInst *bi, StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr,
+      PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_FUTURE_FUNCTION);
+}
+
+OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskWithExecutor(
     BuiltinInst *bi, StringRef attr) {
   return visitCreateAsyncTask(
@@ -950,6 +960,13 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroupWithExecutor(
     BuiltinInst *bi, StringRef attr) {
   return visitCreateAsyncTask(
       bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION);
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncDiscardingTaskInGroupWithExecutor(
+    BuiltinInst *bi, StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_DISCARDING_TASK_GROUP_WITH_EXECUTOR_FUNCTION);
 }
 
 OperandOwnership OperandOwnershipBuiltinClassifier::

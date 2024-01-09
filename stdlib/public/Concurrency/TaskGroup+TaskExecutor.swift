@@ -238,7 +238,7 @@ extension DiscardingTaskGroup {
       }
 
     // Create the task in this group with an executor preference.
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #else
     fatalError("Unsupported Swift compiler")
     #endif
@@ -286,7 +286,7 @@ extension DiscardingTaskGroup {
     }
 
     // Create the task in this group with an executor preference.
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     return true
     #else
     fatalError("Unsupported Swift compiler")
@@ -332,7 +332,7 @@ extension ThrowingDiscardingTaskGroup {
     }
 
     // Create the task in this group with an executor preference.
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #else
     fatalError("Unsupported Swift compiler")
     #endif
@@ -380,7 +380,7 @@ extension ThrowingDiscardingTaskGroup {
     }
 
     // Create the task in this group with an executor preference.
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     return true
     #else
     fatalError("Unsupported Swift compiler")
