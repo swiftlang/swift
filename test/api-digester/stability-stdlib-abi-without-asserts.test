@@ -60,22 +60,12 @@ Func _swift_retainCount(_:) is a new API without @available attribute
 Func _swift_unownedRetainCount(_:) is a new API without @available attribute
 Func _swift_weakRetainCount(_:) is a new API without @available attribute
 
-Func Collection.removingSubranges(_:) has been removed
-Func Collection.subranges(of:) has been removed
-Func Collection.subranges(where:) has been removed
-Func MutableCollection.moveSubranges(_:to:) has been removed
-Func MutableCollection.removeSubranges(_:) has been removed
-Func RangeReplaceableCollection.removeSubranges(_:) has been removed
 Struct AnyHashable has added a conformance to an existing protocol _HasCustomAnyHashableRepresentation
 Class AnyKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class KeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class PartialKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class ReferenceWritableKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Class WritableKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
-Struct DiscontiguousSlice has been removed
-Struct RangeSet has been removed
-Subscript Collection.subscript(_:) has been removed
-Subscript MutableCollection.subscript(_:) has been removed
 Protocol CodingKey has added inherited protocol Sendable
 Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible, Self : Swift.Sendable>
 Protocol Error has added inherited protocol Sendable
@@ -141,5 +131,9 @@ Func ContiguousArray._createNewBuffer(bufferIsUnique:minimumCapacity:growForAppe
 Func ContiguousArray._createNewBuffer(bufferIsUnique:minimumCapacity:growForAppend:) has mangled name changing from 'Swift.ContiguousArray._createNewBuffer(bufferIsUnique: Swift.Bool, minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()' to 'Swift.ContiguousArray.__specialize_class__createNewBuffer(bufferIsUnique: Swift.Bool, minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()'
 Func ContiguousArray._reserveCapacityImpl(minimumCapacity:growForAppend:) has been renamed to Func __specialize_class__reserveCapacityImpl(minimumCapacity:growForAppend:)
 Func ContiguousArray._reserveCapacityImpl(minimumCapacity:growForAppend:) has mangled name changing from 'Swift.ContiguousArray._reserveCapacityImpl(minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()' to 'Swift.ContiguousArray.__specialize_class__reserveCapacityImpl(minimumCapacity: Swift.Int, growForAppend: Swift.Bool) -> ()'
+
+// This hasn't actually been changed, but it seems the ABI checker gives a false positive here and detects
+// it as a removal with the addition of the RangeSet subscripts
+Subscript MutableCollection.subscript(_:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
