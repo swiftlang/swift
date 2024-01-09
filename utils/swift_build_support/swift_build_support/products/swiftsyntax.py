@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 import os
+import platform
 
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
@@ -89,29 +90,38 @@ class SwiftSyntax(product.Product):
     def should_build(self, host_target):
         return True
 
+    def run_swift_syntax_dev_utils(self, host_target, command, arguments=[]):
+        swift_syntax_dev_utils = os.path.join(self.source_dir, 'SwiftSyntaxDevUtils')
+
+        run_cmd = [
+            os.path.join(self.install_toolchain_path(host_target), "bin", "swift"),
+            'run',
+        ]
+        if self.args.verbose_build:
+            run_cmd.append('--vv')
+        run_cmd += [
+            '--package-path', swift_syntax_dev_utils,
+            'swift-syntax-dev-utils',
+            command
+        ]
+        run_cmd += arguments
+        if self.args.verbose_build:
+            run_cmd.append('--verbose')
+
+        env = dict(os.environ)
+        env["SWIFTCI_USE_LOCAL_DEPS"] = "1"
+
+        shell.call(run_cmd, env=env)
+
     def build(self, host_target):
         if self.args.swiftsyntax_verify_generated_files:
-            script_path = os.path.join(self.source_dir, 'SwiftSyntaxDevUtils')
-
-            build_cmd = [
-                os.path.join(self.install_toolchain_path(host_target), "bin", "swift"),
-                'run',
-            ]
-            if self.args.verbose_build:
-                build_cmd.append('--vv')
-            build_cmd += [
-                '--package-path', script_path,
-                'swift-syntax-dev-utils',
-                'verify-source-code',
-                '--toolchain', self.install_toolchain_path(host_target)
-            ]
-            if self.args.verbose_build:
-                build_cmd.append('--verbose')
-
-            env = dict(os.environ)
-            env["SWIFTCI_USE_LOCAL_DEPS"] = "1"
-
-            shell.call(build_cmd, env=env)
+            self.run_swift_syntax_dev_utils(
+                host_target,
+                "verify-source-code",
+                ['--toolchain', self.install_toolchain_path(host_target)]
+            )
+            if platform.system() == 'Darwin':
+                self.run_swift_syntax_dev_utils(host_target, "verify-documentation", [])
 
         self.run_swiftsyntax_build_script(target=host_target,
                                           command='build')
