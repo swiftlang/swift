@@ -133,6 +133,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
+  P.addBooleanLiteralFolding();
   addDefiniteInitialization(P);
 
   P.addAddressLowering();

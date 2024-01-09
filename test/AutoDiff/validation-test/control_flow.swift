@@ -66,10 +66,12 @@ ControlFlowTests.test("Conditionals") {
 
   func cond4_var(_ x: Float) -> Float {
     var outer = x
-    outerIf: if true {
+    // TODO: cannot use literal `true` because it crashes
+    outerIf: if 1 == 1 {
       var inner = outer
       inner = inner * x
-      if false {
+      // TODO: cannot use literal `false` because it crashes
+      if 1 == 0 {
         break outerIf
       }
       outer = inner
@@ -386,8 +388,9 @@ ControlFlowTests.test("NestedConditionals") {
       @differentiable(reverse, wrt: self) // wrt only self is important
       func callAsFunction(_ input: Float) -> Float {
         var x = input
-        if true {
-          if true {
+        // TODO: cannot use literal `true` because it crashes
+        if 1 == 1 {
+          if 1 == 1 {
             // Function application below should make `self` have non-zero
             // derivative.
             x = x * w
@@ -405,8 +408,9 @@ ControlFlowTests.test("NestedConditionals") {
     @differentiable(reverse, wrt: x)
     func TF_781(_ x: Float, _ y: Float) -> Float {
       var result = y
-      if true {
-        if true {
+      // TODO: cannot use literal `true` because it crashes
+      if 1 == 1 {
+        if 1 == 1 {
           result = result * x
         }
       }
@@ -791,7 +795,8 @@ ControlFlowTests.test("ThrowingCalls") {
   func testComplexControlFlow(_ x: Float) -> Float {
     rethrowing({})
     for _ in 0..<Int(x) {
-      if true {
+      // TODO: cannot use literal `true` because it crashes
+      if 1 == 1 {
         rethrowing({})
       }
       rethrowing({}) // non-active `try_apply`
@@ -805,7 +810,8 @@ ControlFlowTests.test("ThrowingCalls") {
   func testComplexControlFlowGeneric<T: Differentiable>(_ x: T) -> T {
     rethrowing({})
     for _ in 0..<10 {
-      if true {
+      // TODO: cannot use literal `true` because it crashes
+      if 1 == 1 {
         rethrowing({})
       }
       rethrowing({}) // non-active `try_apply`

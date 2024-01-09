@@ -1772,7 +1772,7 @@ public struct SimpleCodeItemMacro: CodeItemMacro {
       }
       """)),
       .init(item: .stmt("""
-      if false {
+      if 1 == 0 {
         print("impossible")
       }
       """)),
