@@ -853,11 +853,11 @@ function Build-CMark($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13" `
-    -InstallTo "$LibraryRoot\cmark-0.29.0.gfm.13\usr" `
+    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -BuildTargets default `
     -Defines @{
-      BUILD_SHARED_LIBS = "NO";
+      BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
       CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP = "YES";
     }
@@ -913,8 +913,7 @@ function Build-Compilers() {
 
   Isolate-EnvVars {
     if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
-      $LibdispatchBinDir = "$BinaryCache\1\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin"
-      $env:Path = "$LibdispatchBinDir;$BinaryCache\1\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
+      $env:Path = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$BinaryCache\1\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$BinaryCache\1\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
       $Targets = @()
       $TestingDefines = @{
         SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
@@ -1159,7 +1158,7 @@ function Build-Runtime($Arch) {
   $LLVMBinaryCache = Get-ProjectBinaryCache $Arch 0
 
   Isolate-EnvVars {
-    $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
+    $env:Path = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
     Build-CMakeProject `
       -Src $SourceCache\swift `
@@ -1167,10 +1166,11 @@ function Build-Runtime($Arch) {
       -InstallTo "$($Arch.SDKInstallRoot)\usr" `
       -Arch $Arch `
       -CacheScript $SourceCache\swift\cmake\caches\Runtime-Windows-$($Arch.LLVMName).cmake `
-      -UseBuiltCompilers C,CXX `
+      -UseBuiltCompilers C,CXX,Swift `
       -BuildTargets default `
       -Defines @{
         CMAKE_Swift_COMPILER_TARGET = $Arch.LLVMTarget;
+        CMAKE_Swift_COMPILER_WORKS = "YES";
         LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
@@ -1606,10 +1606,45 @@ function Build-PackageManager($Arch) {
     }
 }
 
+function Build-Markdown($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-markdown `
+    -Bin $BinaryCache\13 `
+    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -UseBuiltCompilers Swift `
+    -SwiftSDK $SDKInstallRoot `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      ArgumentParser_DIR = "$BinaryCache\6\cmake\modules";
+      "cmark-gfm_DIR" = "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13";
+    }
+}
+
+function Build-Format($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-format `
+    -Bin $BinaryCache\14 `
+    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -UseMSVCCompilers C `
+    -UseBuiltCompilers Swift `
+    -SwiftSDK $SDKInstallRoot `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      ArgumentParser_DIR = "$BinaryCache\6\cmake\modules";
+      SwiftSyntax_DIR = "$BinaryCache\1\cmake\modules";
+      "cmark-gfm_DIR" = "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13";
+      SwiftMarkdown_DIR = "$BinaryCache\13\cmake\modules";
+    }
+}
+
 function Build-IndexStoreDB($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\indexstore-db `
-    -Bin $BinaryCache\13 `
+    -Bin $BinaryCache\15 `
     -Arch $Arch `
     -UseBuiltCompilers C,CXX,Swift `
     -SwiftSDK $SDKInstallRoot `
@@ -1624,7 +1659,7 @@ function Build-IndexStoreDB($Arch) {
 function Build-SourceKitLSP($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\sourcekit-lsp `
-    -Bin $BinaryCache\14 `
+    -Bin $BinaryCache\16 `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -UseBuiltCompilers C,Swift `
@@ -1639,7 +1674,7 @@ function Build-SourceKitLSP($Arch) {
       SwiftCrypto_DIR = "$BinaryCache\8\cmake\modules";
       SwiftCollections_DIR = "$BinaryCache\9\cmake\modules";
       SwiftPM_DIR = "$BinaryCache\12\cmake\modules";
-      IndexStoreDB_DIR = "$BinaryCache\13\cmake\modules";
+      IndexStoreDB_DIR = "$BinaryCache\15\cmake\modules";
     }
 }
 
@@ -1672,18 +1707,6 @@ function Build-Inspect() {
       -Bin $OutDir `
       -Arch $HostArch `
       -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib"
-  }
-}
-
-function Build-Format() {
-  $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-format
-
-  Isolate-EnvVars {
-    $env:SWIFTCI_USE_LOCAL_DEPS=1
-    Build-SPMProject `
-      -Src $SourceCache\swift-format `
-      -Bin $OutDir `
-      -Arch $HostArch
   }
 }
 
@@ -1813,6 +1836,8 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-ASN1 $HostArch
   Invoke-BuildStep Build-Certificates $HostArch
   Invoke-BuildStep Build-PackageManager $HostArch
+  Invoke-BuildStep Build-Markdown $HostArch
+  Invoke-BuildStep Build-Format $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
 }
@@ -1821,7 +1846,6 @@ Install-HostToolchain
 
 if (-not $SkipBuild) {
   Invoke-BuildStep Build-Inspect $HostArch
-  Invoke-BuildStep Build-Format $HostArch
   Invoke-BuildStep Build-DocC $HostArch
 }
 

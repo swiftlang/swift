@@ -1042,7 +1042,8 @@ function(_compile_swift_files
   if (NOT SWIFTFILE_IS_MAIN)
     add_custom_command_target(
         module_dependency_target
-        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
+        COMMAND
+          "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND

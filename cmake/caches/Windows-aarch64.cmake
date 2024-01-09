@@ -6,7 +6,6 @@ set(LLVM_ENABLE_PROJECTS
     CACHE STRING "")
 
 set(LLVM_EXTERNAL_PROJECTS
-      cmark
       swift
     CACHE STRING "")
 
