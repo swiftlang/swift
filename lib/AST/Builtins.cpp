@@ -3092,6 +3092,27 @@ BuiltinTypeKind BuiltinType::getBuiltinTypeKind() const {
   return BuiltinTypeKind(std::underlying_type<TypeKind>::type(getKind()));
 }
 
+bool BuiltinType::isBitwiseCopyable() const {
+  switch (getBuiltinTypeKind()) {
+  case BuiltinTypeKind::BuiltinInteger:
+  case BuiltinTypeKind::BuiltinIntegerLiteral:
+  case BuiltinTypeKind::BuiltinFloat:
+  case BuiltinTypeKind::BuiltinPackIndex:
+  case BuiltinTypeKind::BuiltinRawPointer:
+  case BuiltinTypeKind::BuiltinVector:
+  case BuiltinTypeKind::BuiltinExecutor:
+  case BuiltinTypeKind::BuiltinJob:
+  case BuiltinTypeKind::BuiltinRawUnsafeContinuation:
+    return true;
+  case BuiltinTypeKind::BuiltinNativeObject:
+  case BuiltinTypeKind::BuiltinBridgeObject:
+  case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
+  case BuiltinTypeKind::BuiltinDefaultActorStorage:
+  case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
+    return false;
+  }
+}
+
 StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
                                    bool prependBuiltinNamespace) const {
 #ifdef MAYBE_GET_NAMESPACED_BUILTIN

@@ -1808,6 +1808,34 @@ static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   return !functionType->isNoEscape();
 }
 
+static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
+  SILFunctionTypeRepresentation representation;
+  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+    representation = silFnTy->getRepresentation();
+  } else {
+    auto fnTy = eitherFnTy.get<const FunctionType *>();
+    representation = convertRepresentation(fnTy->getRepresentation());
+  }
+
+  switch (representation) {
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::Block:
+    return false;
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::CXXMethod:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::WitnessMethod:
+  case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+  case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+  case SILFunctionTypeRepresentation::KeyPathAccessorHash:
+    return true;
+  }
+}
+
 /// Synthesize a builtin function type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
@@ -1835,6 +1863,10 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
       // Functions cannot permanently destroy a move-only var/let
       // that they capture, so it's safe to copy functions, like classes.
       return synthesizeConformance();
+    case KnownProtocolKind::BitwiseCopyable:
+      if (isBitwiseCopyableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     default:
       break;
     }
@@ -1861,12 +1893,13 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     }
   }
 
-  // All metatypes are Sendable, Copyable, and Escapable.
+  // All metatypes are Sendable, Copyable, Escapable, and BitwiseCopyable.
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
+    case KnownProtocolKind::BitwiseCopyable:
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                     BuiltinConformanceKind::Synthesized));
@@ -1880,11 +1913,12 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 
 /// Synthesize a builtin type conformance to the given protocol, if
 /// appropriate.
-static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
-    Type type, const BuiltinType *builtinType, ProtocolDecl *protocol) {
-  // All builtin are Sendable, Copyable, and Escapable
+static ProtocolConformanceRef
+getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
+                                 ProtocolDecl *protocol) {
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
+    // All builtin types are Sendable, Copyable, and Escapable.
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable: {
@@ -1892,6 +1926,15 @@ static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
+    }
+    // Some builtin types are BitwiseCopyable.
+    case KnownProtocolKind::BitwiseCopyable: {
+      if (builtinType->isBitwiseCopyable()) {
+        ASTContext &ctx = protocol->getASTContext();
+        return ProtocolConformanceRef(ctx.getBuiltinConformance(
+            type, protocol, BuiltinConformanceKind::Synthesized));
+      }
+      break;
     }
     default:
       break;
@@ -2111,6 +2154,18 @@ LookupConformanceInModuleRequest::evaluate(
       ImplicitKnownProtocolConformanceRequest cvRequest{nominal, kp};
       if (auto conformance = evaluateOrDefault(
           ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (protocol->isSpecificProtocol(
+                   KnownProtocolKind::BitwiseCopyable)) {
+      // Try to infer BitwiseCopyable conformance.
+      ImplicitKnownProtocolConformanceRequest request{
+          nominal, KnownProtocolKind::BitwiseCopyable};
+      if (auto conformance =
+              evaluateOrDefault(ctx.evaluator, request, nullptr)) {
         conformances.clear();
         conformances.push_back(conformance);
       } else {

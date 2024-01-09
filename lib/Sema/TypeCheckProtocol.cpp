@@ -20,6 +20,7 @@
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckBitwise.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckEffects.h"
@@ -39,8 +40,8 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PotentialMacroExpansions.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
@@ -6595,6 +6596,11 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (NoncopyableGenerics
         && proto->isSpecificProtocol(KnownProtocolKind::Escapable)) {
       checkEscapableConformance(conformance);
+    } else if (Context.LangOpts.hasFeature(Feature::BitwiseCopyable) &&
+               proto->isSpecificProtocol(KnownProtocolKind::BitwiseCopyable)) {
+      checkBitwiseCopyableConformance(
+          conformance, /*isImplicit=*/conformance->getSourceKind() ==
+                           ConformanceEntryKind::Synthesized);
     }
   }
 

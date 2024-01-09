@@ -65,6 +65,7 @@ import Foundation
 // expected-member {{Swift.Hashable.callAsFunction}}
 // expected-member {{Swift.Encodable.callAsFunction}}
 // expected-member {{Swift.Decodable.callAsFunction}}
+// expected-member {{Swift._BitwiseCopyable.callAsFunction}}
 
 // expected-member {{Swift.Hashable._rawHashValue}}
 // expected-member {{ObjectiveC.NSObject.hash}}
