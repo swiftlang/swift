@@ -188,6 +188,9 @@ bool IsDistributedActorRequest::evaluate(
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
     auto *distributedActorProtocol = ctx.getDistributedActorDecl();
+    if (!distributedActorProtocol)
+      return false;
+
     return (protocol == distributedActorProtocol ||
             protocol->inheritsFrom(distributedActorProtocol));
   }

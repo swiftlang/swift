@@ -165,6 +165,9 @@ bool IsActorRequest::evaluate(
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
     auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+    if (!actorProtocol)
+      return false;
+
     return (protocol == actorProtocol ||
             protocol->inheritsFrom(actorProtocol));
   }

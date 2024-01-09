@@ -6558,6 +6558,8 @@ bool ProtocolDecl::walkInheritedProtocols(
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
+  assert(super);
+
   if (this == super)
     return false;
 
