@@ -629,6 +629,21 @@ SequenceTypeTests.test("allSatisfy/Predicate") {
 }
 
 //===----------------------------------------------------------------------===//
+// count(where:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("count/Predicate") {
+  for test in predicateCountTests {
+    let s = MinimalSequence<OpaqueValue<Int>>(
+      elements: test.sequence.map { OpaqueValue($0) })
+    expectEqual(
+      test.expected,
+      s.count(where: { test.includeElement($0.value) }),
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//
 

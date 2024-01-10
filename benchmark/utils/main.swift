@@ -52,10 +52,7 @@ import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
-import CreateObjects
-import CxxSetToCollection
-import CxxStringConversion
-import CxxVectorSum
+import CountAlgo
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -244,6 +241,7 @@ register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
+register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
 register(CxxSetToCollection.benchmarks)
