@@ -3182,8 +3182,9 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     }
   }
 
-  // If we aren't missing anything, do a Sendable check and move on.
-  if (!missingOptions) {
+  // If we aren't missing anything or this is a witness to a `@preconcurrency`
+  // conformance, do a Sendable check and move on.
+  if (!missingOptions || Conformance->isPreconcurrency()) {
     // FIXME: Disable Sendable checking when the witness is an initializer
     // that is explicitly marked nonisolated.
     if (isa<ConstructorDecl>(witness) &&
@@ -3210,9 +3211,15 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     if (isAccessibleAcrossActors(witness, refResult.isolation, DC))
       return llvm::None;
 
-    if (refResult.isolation.isActorIsolated() && isAsyncDecl(requirement) &&
-        !isAsyncDecl(witness))
-      return refResult.isolation;
+    if (refResult.isolation.isActorIsolated()) {
+      if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
+        return refResult.isolation;
+
+      // Always treat `@preconcurrency` witnesses as isolated.
+      if (Conformance->isPreconcurrency() &&
+          missingOptions.contains(MissingFlags::RequirementAsync))
+        return refResult.isolation;
+    }
 
     return llvm::None;
   }
