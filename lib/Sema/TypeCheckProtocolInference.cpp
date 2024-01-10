@@ -212,7 +212,8 @@ struct TypeReprCycleCheckWalker : ASTWalker {
 
       // If we're inferring `Foo`, don't look at a witness mentioning `Self.Foo`.
       if (auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(baseTyR)) {
-        if (identTyR->getNameRef().getBaseIdentifier() == ctx.Id_Self) {
+        if (identTyR->getNameRef().getBaseIdentifier() == ctx.Id_Self &&
+            circularNames.count(memberTyR->getNameRef().getBaseIdentifier()) > 0) {
           // But if qualified lookup can find a type with this name without
           // looking into protocol members, don't skip the witness, since this
           // type might be a candidate witness.

@@ -131,3 +131,19 @@ public struct LogTypes: OptionSet {
 
   public let rawValue: Int
 }
+
+// rdar://120743365
+public struct G<T> {}
+
+public protocol HasAlias {
+  typealias A = G<Self>
+  associatedtype B
+
+  func f1(_: Self.A, _: Self.B)
+  func f2(_: Self.A, _: Self.B)
+}
+
+public struct ConformsHasAlias: HasAlias {
+  public func f1(_: Self.A, _: Self.B) {}
+  public func f2(_: Self.A, _: Int) {}
+}
