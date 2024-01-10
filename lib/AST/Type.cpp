@@ -177,7 +177,9 @@ static bool alwaysNoncopyable(Type ty) {
   return false; // otherwise, the conservative assumption is it's copyable.
 }
 
-static CanType preprocessType(GenericEnvironment *env, Type orig) {
+/// Preprocesses a type before querying whether it conforms to an invertible.
+static CanType preprocessTypeForInvertibleQuery(GenericEnvironment *env,
+                                                Type orig) {
   Type type = orig;
 
   // Always strip off SILMoveOnlyWrapper.
@@ -196,7 +198,7 @@ static CanType preprocessType(GenericEnvironment *env, Type orig) {
 
 /// \returns true iff this type lacks conformance to Copyable.
 bool TypeBase::isNoncopyable(GenericEnvironment *env) {
-  auto canType = preprocessType(env, this);
+  auto canType = preprocessTypeForInvertibleQuery(env, this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
@@ -208,7 +210,7 @@ bool TypeBase::isNoncopyable(GenericEnvironment *env) {
 }
 
 bool TypeBase::isEscapable(GenericEnvironment *env) {
-  auto canType = preprocessType(env, this);
+  auto canType = preprocessTypeForInvertibleQuery(env, this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Escapable
