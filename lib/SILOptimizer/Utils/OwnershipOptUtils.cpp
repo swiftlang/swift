@@ -386,6 +386,11 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
   if (m->getStage() == SILStage::Raw)
     return false;
 
+  // OSSA rauw can create copies. Bail out if we have move only values.
+  if (newValue->getType().isMoveOnly()) {
+    return false;
+  }
+
   return true;
 }
 

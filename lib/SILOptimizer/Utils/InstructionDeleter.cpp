@@ -62,17 +62,27 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     return false;
   }
 
-  // If inst has any owned move-only value as a result, deleting it may shorten
-  // that value's lifetime which is illegal according to language rules.
-  //
-  // In particular, this check is needed before returning true when
-  // getSingleValueCopyOrCast returns true.  That function returns true for
-  // move_value instructions.  And `move_value %moveOnlyValue` must not be
-  // deleted.
   for (auto result : inst->getResults()) {
+    // If inst has any owned move-only value as a result, deleting it may
+    // shorten that value's lifetime which is illegal according to language
+    // rules.
+    //
+    // In particular, this check is needed before returning true when
+    // getSingleValueCopyOrCast returns true.  That function returns true for
+    // move_value instructions.  And `move_value %moveOnlyValue` must not be
+    // deleted.
     if (result->getType().getASTType()->isNoncopyable() &&
         result->getOwnershipKind() == OwnershipKind::Owned) {
       return false;
+    }
+
+    // If result was lexical, lifetime shortening maybe observed, return.
+    if (result->isLexical()) {
+      auto resultTy = result->getType().getAs<SILFunctionType>();
+      // Allow deleted dead lexical values when they are trivial no escape types.
+      if (!resultTy || !resultTy->isTrivialNoEscape()) {
+        return false;
+      }
     }
   }
 

@@ -213,7 +213,7 @@ public func usePrespecializedThrowsEntryPoints() throws {
 // OPT-macosx:   [[R9:%.*]] = unchecked_addr_cast [[R7]] : $*Array<Int> to $*Builtin.BridgeObject
 // OPT-macosx:   [[A3:%.*]] = unchecked_bitwise_cast [[P4]] : $Array<Int> to $Builtin.BridgeObject
 // OPT-macosx:   [[A4:%.*]] = unchecked_bitwise_cast [[P5]] : $Array<Float> to $Builtin.BridgeObject
-// OPT-macosx:   [[F2]]([[R8]], [[R9]], [[A3]], [[A4]], [[P3]]) : $@convention(thin) (@guaranteed Builtin.BridgeObject, @guaranteed Builtin.BridgeObject, Int64) -> (@out Builtin.BridgeObject, Int64, @out Builtin.BridgeObject) // user: %38
+// OPT-macosx:   [[F2]]([[R8]], [[R9]], [[A3]], [[A4]], [[P3]]) : $@convention(thin) (@guaranteed Builtin.BridgeObject, @guaranteed Builtin.BridgeObject, Int64) -> (@out Builtin.BridgeObject, Int64, @out Builtin.BridgeObject)
 // OPT: } // end sil function '$s22pre_specialize_layouts40usePresepcializedMultipleIndirectResults___2xs2ysy0a20_specialized_module_C09SomeClassC_AA0m5OtherN0Cs5Int64VSaySiGSaySfGtF'
 public final class SomeOtherClass {}
 public func usePresepcializedMultipleIndirectResults(_ c: SomeClass, _ d: SomeOtherClass, _ x: Int64, xs: [Int], ys: [Float]) {

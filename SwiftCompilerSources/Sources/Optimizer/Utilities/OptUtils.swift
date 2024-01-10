@@ -510,6 +510,14 @@ extension FullApplySite {
        !calleeFunction.isSerialized {
       return false
     }
+
+    // Cannot inline a non-ossa function into an ossa function
+    if parentFunction.hasOwnership,
+      let calleeFunction = referencedFunction,
+      !calleeFunction.hasOwnership {
+      return false
+    }
+
     return true
   }
 

@@ -61,12 +61,6 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
-
-llvm::cl::opt<bool> SILDisableLateOMEByDefault(
-    "sil-disable-late-ome-by-default", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Disable late OME for non-transparent functions by default"));
-
 llvm::cl::opt<bool>
     EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(false),
                           llvm::cl::desc("Enable the DestroyHoisting pass."));
@@ -452,16 +446,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
 
-  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    if (SILPrintFinalOSSAModule) {
-      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
-    }
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
-
   addSimplifyCFGSILCombinePasses(P);
 
   P.addArrayElementPropagation();
@@ -506,13 +490,21 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addARCSequenceOpts();
 
-  if (P.getOptions().EnableOSSAModules) {
-    // We earlier eliminated ownership if we are not compiling the stdlib. Now
-    // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
-    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
-      P.addCopyPropagation();
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+  if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+    P.addCopyPropagation();
+  }
+  P.addSemanticARCOpts();
+
+  if (!P.getOptions().EnableOSSAModules) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
+
+    if (SILPrintFinalOSSAModule) {
+      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
     }
-    P.addSemanticARCOpts();
+    P.addNonTransparentFunctionOwnershipModelEliminator();
   }
 
   switch (OpLevel) {
@@ -640,16 +632,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // This unblocks many other passes' optimizations (e.g. inlining) and this is
   // not blocked by any other passes' optimizations, so do it early.
   P.addDifferentiabilityWitnessDevirtualizer();
-
-  if (!P.getOptions().EnableOSSAModules && SILDisableLateOMEByDefault) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    if (SILPrintFinalOSSAModule) {
-      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
-    }
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
 
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
