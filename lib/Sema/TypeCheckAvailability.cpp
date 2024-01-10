@@ -2824,6 +2824,10 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   if (isInsideCompatibleUnavailableDeclaration(ext, where, attr))
     return false;
 
+  // Invertible protocols are never unavailable.
+  if (rootConf->getProtocol()->getInvertibleProtocolKind())
+    return false;
+
   ASTContext &ctx = ext->getASTContext();
   auto &diags = ctx.Diags;
 
