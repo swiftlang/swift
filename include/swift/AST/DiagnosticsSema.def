@@ -1244,8 +1244,8 @@ ERROR(single_value_stmt_branch_must_end_in_result,none,
 ERROR(cannot_jump_in_single_value_stmt,none,
       "cannot '%0' in '%1' when used as expression",
       (StmtKind, StmtKind))
-ERROR(effect_marker_on_single_value_stmt,none,
-      "'%0' may not be used on '%1' expression", (StringRef, StmtKind))
+WARNING(effect_marker_on_single_value_stmt,none,
+      "'%0' has no effect on '%1' expression", (StringRef, StmtKind))
 ERROR(out_of_place_then_stmt,none,
       "'then' may only appear as the last statement in an 'if' or 'switch' "
       "expression", ())

@@ -548,7 +548,7 @@ func stmts() {
 
   if try if .random() { true } else { false } {}
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-  // expected-error@-2 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-2 {{'try' has no effect on 'if' expression}}
 
   // expected-error@+1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
   guard if .random() { true } else { false } else {
@@ -988,28 +988,28 @@ func return4() throws -> Int {
 
 func tryIf1() -> Int {
   try if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
 }
 
 func tryIf2() -> Int {
   let x = try if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   return x
 }
 
 func tryIf3() -> Int {
   return try if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
 }
 
 func tryIf4() throws -> Int {
   return try if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
 }
 
 func tryIf5() throws -> Int {
   return try if .random() { tryIf4() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   // expected-error@-2 {{call can throw but is not marked with 'try'}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
@@ -1018,7 +1018,7 @@ func tryIf5() throws -> Int {
 
 func tryIf6() throws -> Int {
   try if .random() { tryIf4() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   // expected-error@-2 {{call can throw but is not marked with 'try'}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
@@ -1027,7 +1027,7 @@ func tryIf6() throws -> Int {
 
 func tryIf7() throws -> Int {
   let x = try if .random() { tryIf4() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   // expected-error@-2 {{call can throw but is not marked with 'try'}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
@@ -1037,23 +1037,23 @@ func tryIf7() throws -> Int {
 
 func tryIf8() throws -> Int {
   return try if .random() { try tryIf4() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
 }
 
 func tryIf9() throws -> Int {
   try if .random() { try tryIf4() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
 }
 
 func tryIf10() throws -> Int {
   let x = try if .random() { try tryIf4() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   return x
 }
 
 func tryIf11() throws -> Int {
   let x = try if .random() { try tryIf4() } else { tryIf4() }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   // expected-error@-2 {{call can throw but is not marked with 'try'}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
@@ -1063,7 +1063,7 @@ func tryIf11() throws -> Int {
 
 func tryIf12() throws -> Int {
   let x = try if .random() { tryIf4() } else { tryIf4() }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   // expected-error@-2 2{{call can throw but is not marked with 'try'}}
   // expected-note@-3 2{{did you mean to use 'try'?}}
   // expected-note@-4 2{{did you mean to handle error as optional value?}}
@@ -1072,7 +1072,7 @@ func tryIf12() throws -> Int {
 }
 
 func tryIf13() throws -> Int {
-  let x = try if .random() { // expected-error {{'try' may not be used on 'if' expression}}
+  let x = try if .random() { // expected-warning {{'try' has no effect on 'if' expression}}
     tryIf4() // expected-warning {{result of call to 'tryIf4()' is unused}}
     // expected-error@-1 {{call can throw but is not marked with 'try'}}
     // expected-note@-2 {{did you mean to use 'try'?}}
@@ -1104,7 +1104,7 @@ func throwsBool() throws -> Bool { true }
 
 func tryIf14() throws -> Int {
   try if throwsBool() { 0 } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
   // expected-error@-2 {{call can throw but is not marked with 'try'}}
   // expected-note@-3 {{did you mean to use 'try'?}}
   // expected-note@-4 {{did you mean to handle error as optional value?}}
@@ -1113,7 +1113,7 @@ func tryIf14() throws -> Int {
 
 func tryIf15() throws -> Int {
   try if try throwsBool() { 0 } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
 }
 
 func tryIf16() throws -> Int {
@@ -1223,42 +1223,42 @@ func tryIf29(_ fn: () throws -> Int) rethrows -> Int {
 
 func awaitIf1() async -> Int {
   await if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
 }
 
 func awaitIf2() async -> Int {
   let x = await if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   return x
 }
 
 func awaitIf3() async -> Int {
   return await if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
 }
 
 func awaitIf4() async -> Int {
   return await if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
 }
 
 func awaitIf5() async -> Int {
   return await if .random() { awaitIf4() } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   // expected-error@-2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-3 {{call is 'async'}}
 }
 
 func awaitIf6() async -> Int {
   await if .random() { awaitIf4() } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   // expected-error@-2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-3 {{call is 'async'}}
 }
 
 func awaitIf7() async -> Int {
   let x = await if .random() { awaitIf4() } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   // expected-error@-2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-3 {{call is 'async'}}
   return x
@@ -1266,23 +1266,23 @@ func awaitIf7() async -> Int {
 
 func awaitIf8() async -> Int {
   return await if .random() { await awaitIf4() } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
 }
 
 func awaitIf9() async -> Int {
   await if .random() { await awaitIf4() } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
 }
 
 func awaitIf10() async -> Int {
   let x = await if .random() { await awaitIf4() } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   return x
 }
 
 func awaitIf11() async -> Int {
   let x = await if .random() { await awaitIf4() } else { awaitIf4() }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   // expected-error@-2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-3 {{call is 'async'}}
   return x
@@ -1290,14 +1290,14 @@ func awaitIf11() async -> Int {
 
 func awaitIf12() async -> Int {
   let x = await if .random() { awaitIf4() } else { awaitIf4() }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   // expected-error@-2 2{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-3 2{{call is 'async'}}
   return x
 }
 
 func awaitIf13() async throws -> Int {
-  let x = await if .random() { // expected-error {{'await' may not be used on 'if' expression}}
+  let x = await if .random() { // expected-warning {{'await' has no effect on 'if' expression}}
     awaitIf4() // expected-warning {{result of call to 'awaitIf4()' is unused}}
     // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
     // expected-note@-2 {{call is 'async'}}
@@ -1325,14 +1325,14 @@ func asyncBool() async -> Bool { true }
 
 func awaitIf14() async -> Int {
   await if asyncBool() { 0 } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
   // expected-error@-2 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-3 {{call is 'async'}}
 }
 
 func awaitIf15() async -> Int {
   await if await asyncBool() { 0 } else { 1 }
-  // expected-error@-1 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'await' has no effect on 'if' expression}}
 }
 
 func awaitIf16() async -> Int {
@@ -1364,20 +1364,20 @@ func awaitIf20() async -> Int {
 
 func tryAwaitIf1() async throws -> Int {
   try await if .random() { 0 } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
 }
 
 func tryAwaitIf2() async throws -> Int {
   try await if .random() { 0 } else { 1 } as Int
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
 }
 
 func tryAwaitIf3() async throws -> Int {
   try await if .random() { tryAwaitIf2() } else { 1 } as Int
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
   // expected-error@-3 {{call can throw but is not marked with 'try'}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1388,16 +1388,16 @@ func tryAwaitIf3() async throws -> Int {
 
 func tryAwaitIf4() async throws -> Int {
   try await if .random() { try tryAwaitIf2() } else { 1 } as Int
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
   // expected-error@-3 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-4 {{call is 'async'}}
 }
 
 func tryAwaitIf5() async throws -> Int {
   try await if .random() { await tryAwaitIf2() } else { 1 } as Int
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
   // expected-error@-3 {{call can throw but is not marked with 'try'}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1406,14 +1406,14 @@ func tryAwaitIf5() async throws -> Int {
 
 func tryAwaitIf6() async throws -> Int {
   try await if .random() { try await tryAwaitIf2() } else { 1 } as Int
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
 }
 
 func tryAwaitIf7() async throws -> Int {
   try await if .random() { tryAwaitIf2() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
   // expected-error@-3 {{call can throw but is not marked with 'try'}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1424,16 +1424,16 @@ func tryAwaitIf7() async throws -> Int {
 
 func tryAwaitIf8() async throws -> Int {
   try await if .random() { try tryAwaitIf2() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
   // expected-error@-3 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-4 {{call is 'async'}}
 }
 
 func tryAwaitIf9() async throws -> Int {
   try await if .random() { await tryAwaitIf2() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
   // expected-error@-3 {{call can throw but is not marked with 'try'}}
   // expected-note@-4 {{did you mean to use 'try'?}}
   // expected-note@-5 {{did you mean to handle error as optional value?}}
@@ -1442,8 +1442,8 @@ func tryAwaitIf9() async throws -> Int {
 
 func tryAwaitIf10() async throws -> Int {
   try await if .random() { try await tryAwaitIf2() } else { 1 }
-  // expected-error@-1 {{'try' may not be used on 'if' expression}}
-  // expected-error@-2 {{'await' may not be used on 'if' expression}}
+  // expected-warning@-1 {{'try' has no effect on 'if' expression}}
+  // expected-warning@-2 {{'await' has no effect on 'if' expression}}
 }
 
 func tryAwaitIf11(_ fn: () async throws -> Int) async rethrows -> Int {
