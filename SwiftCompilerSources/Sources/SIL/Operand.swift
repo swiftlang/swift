@@ -134,6 +134,10 @@ extension Sequence where Element == Operand {
 
   public var isSingleUse: Bool { singleUse != nil }
 
+  public var ignoreTypeDependence: LazyFilterSequence<Self> {
+    self.lazy.filter({!$0.isTypeDependent})
+  }
+
   public var ignoreDebugUses: LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is DebugValueInst) }
   }
