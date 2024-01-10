@@ -3376,7 +3376,7 @@ private:
 
   void diagnoseRedundantTry(AnyTryExpr *E) const {
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
-      // For an if/switch expression, produce an error instead of a warning.
+      // For an if/switch expression, produce a tailored warning.
       Ctx.Diags.diagnose(E->getTryLoc(),
                          diag::effect_marker_on_single_value_stmt,
                          "try", SVE->getStmt()->getKind())
@@ -3388,7 +3388,7 @@ private:
 
   void diagnoseRedundantAwait(AwaitExpr *E) const {
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
-      // For an if/switch expression, produce an error instead of a warning.
+      // For an if/switch expression, produce a tailored warning.
       Ctx.Diags.diagnose(E->getAwaitLoc(),
                          diag::effect_marker_on_single_value_stmt,
                          "await", SVE->getStmt()->getKind())
