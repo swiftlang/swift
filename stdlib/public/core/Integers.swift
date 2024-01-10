@@ -3749,6 +3749,7 @@ extension SignedInteger where Self: FixedWidthInteger {
     return self % other == 0
   }
   
+  @_alwaysEmitIntoClient
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Magnitude)
   ) -> (quotient: Self, remainder: Self) {
