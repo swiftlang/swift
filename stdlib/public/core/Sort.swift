@@ -710,4 +710,45 @@ extension UnsafeMutableBufferPointer {
       _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }
   }
+
+  /// Sorts `self[range]` according to `areInIncreasingOrder`. Stable.
+  ///
+  /// - Precondition: `sortedEnd != range.lowerBound`
+  /// - Precondition: `elements[..<sortedEnd]` are already in order.
+  @inlinable
+  internal mutating func _insertionSort(
+    within range: Range<Index>,
+    sortedEnd: Index,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
+    _precondition(sortedEnd > range.lowerBound && sortedEnd <= range.upperBound)
+    var sortedEnd = sortedEnd
+
+    // Continue sorting until the sorted elements cover the whole range.
+    while sortedEnd != range.upperBound {
+      var i = sortedEnd
+      // Look backwards for `self[i]`'s position in the sorted sequence,
+      // moving each element forward to make room.
+      repeat {
+        let j = index(before: i)
+
+        let pi = (_position._unsafelyUnwrappedUnchecked + i)
+        let pj = (_position._unsafelyUnwrappedUnchecked + j)
+
+        // If `self[i]` doesn't belong before `self[j]`, we've found
+        // its position.
+        if try !areInIncreasingOrder(pi.pointee, pj.pointee) {
+          break
+        }
+
+        let tmp = pi.move()
+        pi.moveInitialize(from: pj, count: 1)
+        pj.initialize(to: consume tmp)
+
+        i = j
+      } while i != range.lowerBound
+
+      formIndex(after: &sortedEnd)
+    }
+  }
 }
