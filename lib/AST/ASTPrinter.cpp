@@ -73,8 +73,6 @@
 
 using namespace swift;
 
-#pragma clang optimize off
-
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
     PrintOptions::defaultPrintExtensionContentAsMembers
