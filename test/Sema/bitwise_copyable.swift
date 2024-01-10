@@ -154,6 +154,36 @@ func passAnyAny(_ a: any Any) { take3(a) } // expected-error {{type_does_not_con
 func passString(_ s: String) { take3(s) } // expected-error    {{type_does_not_conform_decl_owner}}
                                           // expected-note@-17 {{where_requirement_failure_one_subst}}
 
+extension Optional {
+  struct Some : _BitwiseCopyable {
+    var wrapped: Wrapped // expected-error {{non_bitwise_copyable_type_member}}
+  }
+}
+
+extension Optional where Wrapped : _BitwiseCopyable {
+  struct Some2 : _BitwiseCopyable {
+    var wrapped: Wrapped
+  }
+}
+
+struct S_Explicit_With_Generic_Optional<T> : _BitwiseCopyable {
+  var o: Optional<T> // expected-error {{non_bitwise_copyable_type_member}}
+}
+
+struct S_Explicit_With_2_Generic_Optionals<T> : _BitwiseCopyable {
+  var o1: Optional<T> // expected-error {{non_bitwise_copyable_type_member}}
+  var o2: T? // expected-error {{non_bitwise_copyable_type_member}}
+}
+
+struct S_Explicit_With_BitwiseCopyable_Generic_Optional<T : _BitwiseCopyable> : _BitwiseCopyable {
+  var o: Optional<T>
+}
+
+struct S_Explicit_With_2_BitwiseCopyable_Generic_Optional<T : _BitwiseCopyable> : _BitwiseCopyable {
+  var o: Optional<T>
+  var o2: T?
+}
+
 //==============================================================================
 //==========================STDLIB-DEPENDENCY TESTS=(BEGIN)==================={{
 //==============================================================================
