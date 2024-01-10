@@ -1153,7 +1153,7 @@ struct R_76250381<Result, Failure: Error> {
 func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
   if let a = argA ?? false, if let b = argB ?? {
     // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
-    // expected-error@-2 {{cannot convert value of type '() -> ()' to expected argument type 'Bool?'}}
+    // expected-error@-2 {{closure passed to parameter of type 'Bool?' that does not accept a closure}}
     // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
   } // expected-error {{expected '{' after 'if' condition}}
 }
@@ -1246,4 +1246,15 @@ do {
   }
 
 
+}
+
+do {
+  func test(_: Int, _: Int) {}
+  // expected-note@-1 {{closure passed to parameter of type 'Int' that does not accept a closure}}
+  func test(_: Int, _: String) {}
+  // expected-note@-1 {{closure passed to parameter of type 'String' that does not accept a closure}}
+
+  test(42) { // expected-error {{no exact matches in call to local function 'test'}}
+    print($0)
+  }
 }

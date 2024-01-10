@@ -11554,6 +11554,28 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     return true;
   };
 
+  // If contextual type is not a function type or `Any` and this
+  // closure is used as an argument, let's skip resolution.
+  //
+  // Doing so improves performance if closure is passed as an argument
+  // to a (heavily) overloaded declaration, avoid unrelated errors,
+  // propagate holes, and record a more impactful fix.
+  if (!contextualType->isTypeVariableOrMember() &&
+      !(contextualType->is<FunctionType>() || contextualType->isAny()) &&
+      locator.endsWith<LocatorPathElt::ApplyArgToParam>()) {
+    if (!shouldAttemptFixes())
+      return false;
+
+    assignFixedType(typeVar, PlaceholderType::get(getASTContext(), typeVar),
+                    closureLocator);
+    recordTypeVariablesAsHoles(inferredClosureType);
+
+    return !recordFix(
+        AllowArgumentMismatch::create(*this, typeVar, contextualType,
+                                      getConstraintLocator(locator)),
+        /*impact=*/15);
+  }
+
   // Determine whether a result builder will be applied.
   auto resultBuilderType = getOpenedResultBuilderTypeFor(*this, locator);
 

@@ -5580,6 +5580,12 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = solution.simplifyType(solution.getType(unaryArg));
   auto paramType = fnType->getParams()[1].getPlainType();
 
+  if (isExpr<ClosureExpr>(unaryArg) && argType->is<UnresolvedType>()) {
+    auto unwrappedParamTy = paramType->lookThroughAllOptionalTypes();
+    if (unwrappedParamTy->is<FunctionType>() || unwrappedParamTy->isAny())
+      return true;
+  }
+
   return TypeChecker::isConvertibleTo(argType, paramType, solution.getDC());
 }
 
@@ -7292,7 +7298,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseAttemptedRegexBuilder())
     return true;
 
-  if (diagnoseTrailingClosureMismatch())
+  if (diagnoseClosureMismatch())
     return true;
 
   if (diagnoseKeyPathAsFunctionResultMismatch())
@@ -7346,10 +7352,15 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 bool ArgumentMismatchFailure::diagnoseAsNote() {
   auto *locator = getLocator();
   if (auto *callee = getCallee()) {
-    emitDiagnosticAt(callee, diag::candidate_has_invalid_argument_at_position,
-                     getToType(), getParamPosition(),
-                     locator->isLastElement<LocatorPathElt::LValueConversion>(),
-                     getFromType());
+    if (isExpr<ClosureExpr>(getAnchor())) {
+      emitDiagnosticAt(callee, diag::candidate_has_invalid_closure_at_position,
+                       getToType());
+    } else {
+      emitDiagnosticAt(callee, diag::candidate_has_invalid_argument_at_position,
+                       getToType(), getParamPosition(),
+                       locator->isLastElement<LocatorPathElt::LValueConversion>(),
+                       getFromType());
+    }
     return true;
   }
 
@@ -7633,15 +7644,16 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   return true;
 }
 
-bool ArgumentMismatchFailure::diagnoseTrailingClosureMismatch() const {
-  if (!Info.isTrailingClosure())
+bool ArgumentMismatchFailure::diagnoseClosureMismatch() const {
+  if (!isExpr<ClosureExpr>(getAnchor()))
     return false;
 
   auto paramType = getToType();
   if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
     return false;
 
-  emitDiagnostic(diag::trailing_closure_bad_param, paramType)
+  emitDiagnostic(diag::closure_bad_param, paramType,
+                 Info.isTrailingClosure())
       .highlight(getSourceRange());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
