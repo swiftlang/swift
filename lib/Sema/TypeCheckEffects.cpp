@@ -1709,9 +1709,10 @@ public:
   }
 
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
-                                  const PotentialEffectReason &reason) {
+                                  const Classification &classification) {
     auto &Diags = ctx.Diags;
     auto message = diag::throwing_call_without_try;
+    const auto &reason = classification.getThrowReason();
     auto reasonKind = reason.getKind();
 
     bool suggestTryFixIt = reasonKind == PotentialEffectReason::Kind::Apply;
@@ -1751,7 +1752,8 @@ public:
       }
     }
 
-    Diags.diagnose(loc, message).highlight(highlight);
+    Diags.diagnose(loc, message).highlight(highlight)
+      .warnUntilSwiftVersionIf(classification.shouldDowngradeToWarning(), 6);
     maybeAddRethrowsNote(Diags, loc, reason);
 
     // If this is a call without expected 'try[?|!]', like this:
@@ -2054,6 +2056,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
       /// Are we in an 'async let' initializer context?
       InAsyncLet = 0x100,
+
+      /// Does an enclosing 'if' or 'switch' expr have a 'try'?
+      StmtExprCoversTry = 0x200,
+
+      /// Does an enclosing 'if' or 'switch' expr have an 'await'?
+      StmtExprCoversAwait = 0x400,
     };
   private:
     unsigned Bits;
@@ -2221,6 +2229,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.reset();
       Self.MaxThrowingKind = ConditionalEffectKind::None;
 
+      Self.Flags.mergeFrom(ContextFlags::StmtExprCoversTry, OldFlags);
+      Self.Flags.mergeFrom(ContextFlags::StmtExprCoversAwait, OldFlags);
+
       // Suppress 'try' coverage checking within a single level of
       // do/catch in debugger functions.
       if (OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction))
@@ -2241,6 +2252,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     void setCoverageForSingleValueStmtExpr() {
       resetCoverage();
       Self.Flags.mergeFrom(ContextFlags::InAsyncLet, OldFlags);
+
+      if (OldFlags.has(ContextFlags::IsTryCovered))
+        Self.Flags.set(ContextFlags::StmtExprCoversTry);
+
+      if (OldFlags.has(ContextFlags::IsAsyncCovered))
+        Self.Flags.set(ContextFlags::StmtExprCoversAwait);
     }
 
     void preserveCoverageFromSingleValueStmtExpr() {
@@ -2556,11 +2573,11 @@ private:
         effects.push_back(EffectKind::Async);
       }
 
+      auto classification = Classification::forEffect(effects,
+          ConditionalEffectKind::Always,
+          getKindOfEffectfulProp(member));
       bool requiresTry = getter->hasThrows();
-      checkThrowAsyncSite(E, requiresTry,
-                          Classification::forEffect(effects,
-                                  ConditionalEffectKind::Always,
-                                  getKindOfEffectfulProp(member)));
+      checkThrowAsyncSite(E, requiresTry, classification);
 
     } else {
       EffectList effects;
@@ -2600,10 +2617,10 @@ private:
         effects.push_back(EffectKind::Async);
       }
 
-      checkThrowAsyncSite(E, getter->hasThrows(),
-                          Classification::forEffect(effects,
-                                  ConditionalEffectKind::Always,
-                                  PotentialEffectReason::forPropertyAccess()));
+      auto classification = Classification::forEffect(effects,
+          ConditionalEffectKind::Always,
+          PotentialEffectReason::forPropertyAccess());
+      checkThrowAsyncSite(E, getter->hasThrows(), classification);
 
     } else if (E->isImplicitlyAsync()) {
       auto classification =  Classification::forUnconditional(
@@ -2713,7 +2730,7 @@ private:
   }
 
   void checkThrowAsyncSite(ASTNode E, bool requiresTry,
-                           const Classification &classification) {
+                           Classification &classification) {
     // Suppress all diagnostics when there's an un-analyzable throw/async site.
     if (classification.isInvalid()) {
       Flags.set(ContextFlags::HasAnyThrowSite);
@@ -2746,6 +2763,8 @@ private:
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
                                     CurContext.isWithinInterpolatedString());
+        if (Flags.has(ContextFlags::StmtExprCoversAwait))
+          classification.setDowngradeToWarning(true);
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
         uncoveredAsync[anchor].emplace_back(
@@ -2784,8 +2803,10 @@ private:
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowReason());
       } else if (!isTryCovered) {
+        if (Flags.has(ContextFlags::StmtExprCoversTry))
+          classification.setDowngradeToWarning(true);
         CurContext.diagnoseUncoveredThrowSite(Ctx, E, // we want this one to trigger
-                                              classification.getThrowReason());
+                                              classification);
       }
       break;
     }
