@@ -2051,6 +2051,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       
       /// Do we have any 'await's in this context?
       HasAnyAwait = 0x80,
+
+      /// Are we in an 'async let' initializer context?
+      InAsyncLet = 0x100,
     };
   private:
     unsigned Bits;
@@ -2196,8 +2199,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     }
 
     void enterAsyncLet() {
-      Self.Flags.set(ContextFlags::IsTryCovered);
-      Self.Flags.set(ContextFlags::IsAsyncCovered);
+      Self.Flags.set(ContextFlags::InAsyncLet);
     }
 
     void refineLocalContext(Context newContext) {
@@ -2234,6 +2236,11 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // "await" doesn't work this way; the "await" needs to be part of
       // the autoclosure expression itself, and the autoclosure must be
       // 'async'.
+    }
+
+    void setCoverageForSingleValueStmtExpr() {
+      resetCoverage();
+      Self.Flags.mergeFrom(ContextFlags::InAsyncLet, OldFlags);
     }
 
     void preserveCoverageFromSingleValueStmtExpr() {
@@ -2393,7 +2400,7 @@ private:
     // For an if/switch expression, we reset coverage such that a 'try'/'await'
     // does not cover the branches.
     ContextScope scope(*this, /*newContext*/ llvm::None);
-    scope.resetCoverage();
+    scope.setCoverageForSingleValueStmtExpr();
     SVE->getStmt()->walk(*this);
     scope.preserveCoverageFromSingleValueStmtExpr();
     return ShouldNotRecurse;
@@ -2734,7 +2741,8 @@ private:
                                               classification.getAsyncReason());
       }
       // Diagnose async calls that are outside of an await context.
-      else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
+      else if (!(Flags.has(ContextFlags::IsAsyncCovered) ||
+                 Flags.has(ContextFlags::InAsyncLet))) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
                                     CurContext.isWithinInterpolatedString());
@@ -2770,7 +2778,8 @@ private:
             break;
 
       bool isTryCovered =
-        (!requiresTry || Flags.has(ContextFlags::IsTryCovered));
+        (!requiresTry || Flags.has(ContextFlags::IsTryCovered) ||
+         Flags.has(ContextFlags::InAsyncLet));
       if (!CurContext.handlesThrows(throwsKind)) {
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowReason());
