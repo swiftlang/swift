@@ -2285,9 +2285,64 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
   return true;
 }
 
+llvm::Optional<Located<Identifier>>
+Parser::parseModuleSelector(ModuleSelectorReason reason,
+                            StringRef declKindName) {
+  if (!Context.LangOpts.hasFeature(Feature::ModuleSelectors))
+    return llvm::None;
+
+  // Also allow the current token to be colon_colon, for diagnostics.
+  if (peekToken().isNot(tok::colon_colon) && Tok.isNot(tok::colon_colon))
+    return llvm::None;
+
+  // Leave these paired tokens to be diagnosed by a future call to
+  // `parseModuleSelector()` at the next token, rather than consuming them as
+  // malformed module names and causing more errors later in the parser.
+  if (Tok.isAny(tok::l_paren, tok::l_brace, tok::l_angle, tok::l_square,
+                tok::r_paren, tok::r_brace, tok::r_angle, tok::r_square))
+    return llvm::None;
+
+  // We will parse the selector whether or not it's allowed, then early return
+  // if it's disallowed, then diagnose any other errors in what we parsed. This
+  // will make sure we always consume the module selector's tokens, but don't
+  // complain about a malformed selector when it's not supposed to be there at
+  // all.
+  SourceLoc nameLoc;
+  Identifier moduleName;
+  if (Tok.is(tok::identifier)) {
+    nameLoc = consumeIdentifier(moduleName, /*diagnoseDollarPrefix=*/true);
+  } else if (Tok.is(tok::colon_colon))
+    // Let nameLoc and colonColonLoc both point to the tok::colon_colon.
+    nameLoc = Tok.getLoc();
+  else
+    nameLoc = consumeToken();
+
+  auto colonColonLoc = consumeToken(tok::colon_colon);
+
+  if (reason != ModuleSelectorReason::Allowed) {
+    diagnose(colonColonLoc, diag::module_selector_not_allowed, (uint8_t)reason,
+             declKindName);
+
+    diagnose(nameLoc, diag::fixit_remove_module_selector)
+        .fixItRemove({nameLoc, colonColonLoc});
+
+    return llvm::None;
+  }
+
+  return Located<Identifier>(moduleName, nameLoc);
+}
+
 DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
                                      const Diagnostic &diag,
                                      DeclNameOptions flags) {
+  // Consume the module selector, if present.
+  SourceLoc moduleSelectorLoc;
+  Identifier moduleSelector;
+  if (auto locatedModule = parseModuleSelector(ModuleSelectorReason::Allowed)) {
+    moduleSelectorLoc = locatedModule->Loc;
+    moduleSelector = locatedModule->Item;
+  }
+
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;

@@ -1680,6 +1680,9 @@ bool Parser::canParseType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
+  // Parse a module selector, if present.
+  parseModuleSelector(ModuleSelectorReason::Allowed);
+
   // Parse an identifier.
   //
   // FIXME: We should expect e.g. 'X.var'. Almost any keyword is a valid member component.

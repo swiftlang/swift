@@ -6550,6 +6550,8 @@ static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
                         StringRef DeclKindName,
                         llvm::function_ref<bool(const Token &)> canRecover) {
+  P.parseModuleSelector(Parser::ModuleSelectorReason::NameInDecl, DeclKindName);
+
   if (P.Tok.is(tok::identifier)) {
     Loc = P.consumeIdentifier(Result, /*diagnoseDollarPrefix=*/true);
 

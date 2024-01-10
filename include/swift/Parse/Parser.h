@@ -1757,6 +1757,45 @@ public:
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
 
+  /// The reason we are trying to parse a module selector. Other than
+  /// \c Allowed all reasons indicate an error should be emitted.
+  enum class ModuleSelectorReason : uint8_t {
+    /// Use of a module selector is allowed.
+    Allowed,
+
+    /// Not allowed; this is the name of a declaration. The string parameter
+    /// describes the declaration in question (e.g. a class, struct, etc.).
+    ///
+    /// If a Decl subclass also cannot have its name prefixed at its use sites
+    /// (like ParamDecls), it will have a separate reason from this one.
+    NameInDecl,
+  };
+
+  /// Attempts to parse a \c module-selector if one is present.
+  ///
+  /// \verbatim
+  ///   module-selector: identifier '::'
+  /// \endverbatim
+  ///
+  /// At most use sites, this is actually called to parse a module selector
+  /// which should \em not be present in the source code, but which users might
+  /// plausibly write incorrectly. The \p reason argument indicates what the
+  /// name that is about to be parsed is, and therefore why there should not be
+  /// a module selector there.
+  ///
+  /// \param reason If not \c Allowed, gives a reason why a \c module-selector
+  ///        should not be present in the source here.
+  /// \param declKindName For \c ModuleSelectorReason::NameInDecl, the kind of
+  ///        declaration whose name we are parsing. Otherwise unused.
+  ///
+  /// \return \c None if no selector is present or a selector is present but
+  ///         is not allowed; an instance with an empty \c Identifier if a
+  ///         selector is present but has no valid identifier; an instance with
+  ///         a valid \c Identifier if a selector is present and includes a
+  ///         module name.
+  llvm::Optional<Located<Identifier>>
+  parseModuleSelector(ModuleSelectorReason reason, StringRef declKindName = "");
+
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
     AllowOperators = 1 << 0,
