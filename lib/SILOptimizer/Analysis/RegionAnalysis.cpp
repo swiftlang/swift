@@ -433,6 +433,53 @@ static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
 }
 
 //===----------------------------------------------------------------------===//
+//                            MARK: TrackableValue
+//===----------------------------------------------------------------------===//
+
+bool TrackableValue::isTransferringParameter() const {
+  // First get our alloc_stack.
+  //
+  // TODO: We should just put a flag on the alloc_stack, so we /know/ 100% that
+  // it is from a consuming parameter. We don't have that so we pattern match.
+  auto *asi =
+      dyn_cast_or_null<AllocStackInst>(representativeValue.maybeGetValue());
+  if (!asi)
+    return false;
+
+  if (asi->getParent() != asi->getFunction()->getEntryBlock())
+    return false;
+
+  // See if we are initialized from a transferring parameter and are the only
+  // use of the parameter.
+  for (auto *use : asi->getUses()) {
+    auto *user = use->getUser();
+
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      // Check if our store inst is from a function argument that is
+      // transferring. If not, then this isn't the consuming parameter
+      // alloc_stack.
+      auto *fArg = dyn_cast<SILFunctionArgument>(si->getSrc());
+      if (!fArg || !fArg->isTransferring())
+        return false;
+      return fArg->getSingleUse();
+    }
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
+      // Check if our store inst is from a function argument that is
+      // transferring. If not, then this isn't the consuming parameter
+      // alloc_stack.
+      auto *fArg = dyn_cast<SILFunctionArgument>(copyAddr->getSrc());
+      if (!fArg || !fArg->isTransferring())
+        return false;
+      return fArg->getSingleUse();
+    }
+  }
+
+  // Otherwise, this isn't a consuming parameter.
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
 //                      MARK: Partial Apply Reachability
 //===----------------------------------------------------------------------===//
 
@@ -1701,13 +1748,52 @@ public:
     return translateSILMerge(dest, TinyPtrVector<SILValue>(src));
   }
 
-  /// If tgt is known to be unaliased (computed thropugh a combination of
+  void translateSILAssignmentToTransferringParameter(TrackableValue destRoot,
+                                                     Operand *destOperand,
+                                                     TrackableValue srcRoot,
+                                                     Operand *srcOperand) {
+    assert(isa<AllocStackInst>(destRoot.getRepresentative().getValue()) &&
+           "Destination should always be an alloc_stack");
+
+    // Transfer src. This ensures that we cannot use src again locally in this
+    // function... which makes sense since its value is now in the transferring
+    // parameter.
+    builder.addTransfer(srcRoot.getRepresentative().getValue(), srcOperand);
+
+    // Then check if we are assigning into an aggregate projection. In such a
+    // case, we want to ensure that we keep tracking the elements already in the
+    // region of transferring. This is more conservative than we need to be
+    // (since we could forget anything reachable from the aggregate
+    // field)... but being more conservative is ok.
+    if (isProjectedFromAggregate(destOperand->get()))
+      return;
+
+    // If we are assigning over the entire value though, we perform an assign
+    // fresh since we are guaranteed that any value that could be referenced via
+    // the old value is gone.
+    builder.addAssignFresh(destRoot.getRepresentative().getValue());
+  }
+
+  /// If \p dest is known to be unaliased (computed through a combination of
   /// AccessStorage's inUniquelyIdenfitied check and a custom search for
-  /// captures by applications), then these can be treated as assignments of tgt
-  /// to src. If the tgt could be aliased, then we must instead treat them as
-  /// merges, to ensure any aliases of tgt are also updated.
-  void translateSILStore(SILValue dest, SILValue src) {
-    if (auto nonSendableTgt = tryToTrackValue(dest)) {
+  /// captures by applications), then these can be treated as assignments of \p
+  /// dest to src. If the \p dest could be aliased, then we must instead treat
+  /// them as merges, to ensure any aliases of \p dest are also updated.
+  void translateSILStore(Operand *dest, Operand *src) {
+    SILValue destValue = dest->get();
+    SILValue srcValue = src->get();
+
+    if (auto nonSendableDest = tryToTrackValue(destValue)) {
+      // Before we do anything check if we have an assignment into an
+      // alloc_stack for a consuming transferring parameter... in such a case,
+      // we need to handle this specially.
+      if (nonSendableDest->isTransferringParameter()) {
+        if (auto nonSendableSrc = tryToTrackValue(srcValue)) {
+          return translateSILAssignmentToTransferringParameter(
+              *nonSendableDest, dest, *nonSendableSrc, src);
+        }
+      }
+
       // In the following situations, we can perform an assign:
       //
       // 1. A store to unaliased storage.
@@ -1719,11 +1805,12 @@ public:
       // specifically in this projection... but that is better than
       // miscompiling. For memory like this, we probably need to track it on a
       // per field basis to allow for us to assign.
-      if (nonSendableTgt.value().isNoAlias() && !isProjectedFromAggregate(dest))
-        return translateSILAssign(dest, src);
+      if (nonSendableDest.value().isNoAlias() &&
+          !isProjectedFromAggregate(destValue))
+        return translateSILAssign(destValue, srcValue);
 
       // Stores to possibly aliased storage must be treated as merges.
-      return translateSILMerge(dest, src);
+      return translateSILMerge(destValue, srcValue);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -1859,8 +1946,9 @@ public:
       return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
 
     case TranslationSemantics::Store:
-      return translateSILStore(inst->getOperand(CopyLikeInstruction::Dest),
-                               inst->getOperand(CopyLikeInstruction::Src));
+      return translateSILStore(
+          &inst->getAllOperands()[CopyLikeInstruction::Dest],
+          &inst->getAllOperands()[CopyLikeInstruction::Src]);
 
     case TranslationSemantics::Special:
       return;
