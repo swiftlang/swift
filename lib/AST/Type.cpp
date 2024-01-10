@@ -182,6 +182,9 @@ static CanType preprocessTypeForInvertibleQuery(GenericEnvironment *env,
                                                 Type orig) {
   Type type = orig;
 
+  // Strip off any StorageType wrapper.
+  type = type->getReferenceStorageReferent();
+
   // Always strip off SILMoveOnlyWrapper.
   if (auto wrapper = type->getAs<SILMoveOnlyWrappedType>())
     type = wrapper->getInnerType();

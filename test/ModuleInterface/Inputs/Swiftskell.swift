@@ -109,3 +109,8 @@ public func isJust<A: ~Copyable>(_ m: borrowing Maybe<A>) -> Bool {
 public func isNothing<A: ~Copyable>(_ m: borrowing Maybe<A>) -> Bool {
   return !isJust(m)
 }
+
+public struct UnownedRef<Instance: AnyObject> {
+  @usableFromInline
+  internal unowned(unsafe) var _value: Instance
+}
