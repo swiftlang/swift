@@ -1492,6 +1492,16 @@ func tryAwaitIf15(_ fn: () async throws -> Int) async rethrows -> Int {
   }
 }
 
+func asyncLetIf(cond: Bool, _ fn: () async throws -> Int) async throws -> Int {
+  async let x = if cond {
+    fn()
+  } else {
+    0
+  }
+
+  return try await x
+}
+
 struct AnyEraserP: EraserP {
   init<T: EraserP>(erasing: T) {}
 }
