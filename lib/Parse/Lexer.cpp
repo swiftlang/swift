@@ -91,18 +91,12 @@ static bool EncodeToUTF8(unsigned CharValue,
   return false;
 }
 
-
-/// CLO8 - Return the number of leading ones in the specified 8-bit value.
-static unsigned CLO8(unsigned char C) {
-  return llvm::countl_one(uint32_t(C) << 24);
-}
-
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
 /// character, which will be of the form 0b10XXXXXX
 static bool isStartOfUTF8Character(unsigned char C) {
   // RFC 2279: The octet values FE and FF never appear.
   // RFC 3629: The octet values C0, C1, F5 to FF never appear.
-  return C <= 0x80 || (C >= 0xC2 && C < 0xF5);
+  return C < 0x80 || (C >= 0xC2 && C < 0xF5);
 }
 
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
@@ -117,13 +111,9 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   if (CurByte < 0x80)
     return CurByte;
   
-  // Read the number of high bits set, which indicates the number of bytes in
-  // the character.
-  unsigned EncodedBytes = CLO8(CurByte);
-  
-  // If this is 0b10XXXXXX, then it is a continuation character.
-  if (EncodedBytes == 1 ||
-      !isStartOfUTF8Character(CurByte)) {
+  // If this is not the start of a UTF8 character,
+  // then it is either a continuation byte or an invalid UTF8 code point.
+  if (!isStartOfUTF8Character(CurByte)) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
     while (Ptr < End && !isStartOfUTF8Character(*Ptr))
@@ -131,11 +121,16 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
     return ~0U;
   }
   
+  // Read the number of high bits set, which indicates the number of bytes in
+  // the character.
+  unsigned char EncodedBytes = llvm::countl_one(CurByte);
+  assert((EncodedBytes >= 2 && EncodedBytes <= 4));
+  
   // Drop the high bits indicating the # bytes of the result.
   unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
   
   // Read and validate the continuation bytes.
-  for (unsigned i = 1; i != EncodedBytes; ++i) {
+  for (unsigned char i = 1; i != EncodedBytes; ++i) {
     if (Ptr >= End)
       return ~0U;
     CurByte = *Ptr;
