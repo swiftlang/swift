@@ -736,9 +736,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
 static bool isRightBound(const char *tokEnd, bool isLeftBound,
                          const char *codeCompletionPtr) {
   switch (*tokEnd) {
+  case ':': // ':' is an expression separator; '::' is not
+    return tokEnd[1] == ':';
+
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
-  case ',': case ';': case ':':              // expression separators
+  case ',': case ';':                        // expression separators
     return false;
 
   case '\0':
@@ -2679,8 +2682,14 @@ void Lexer::lexImpl() {
 
   case ',': return formToken(tok::comma, TokStart);
   case ';': return formToken(tok::semi, TokStart);
-  case ':': return formToken(tok::colon, TokStart);
   case '\\': return formToken(tok::backslash, TokStart);
+
+  case ':':
+    if (CurPtr[0] == ':') {
+      CurPtr++;
+      return formToken(tok::colon_colon, TokStart);
+    }
+    return formToken(tok::colon, TokStart);
 
   case '#': {
     // Try lex a raw string literal.
