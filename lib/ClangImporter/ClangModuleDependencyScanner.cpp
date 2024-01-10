@@ -25,6 +25,7 @@
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Path.h"
@@ -265,17 +266,34 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
       swiftArgs.push_back(IncludeTree);
     }
 
+    // Ensure we get the external path to the modulemap because it is used as an
+    // explicit input for the resulting compilation task.
+    auto moduleMapFile =
+        getClangInstance().getFileManager().getFileRef(
+            clangModuleDep.ClangModuleMapFile);
+    StringRef externalModuleMapPath;
+    if (auto E = moduleMapFile.takeError()) {
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::clang_dependency_no_modulemap_fileref,
+                         clangModuleDep.ClangModuleMapFile,
+                         llvm::toString(std::move(E)));
+      externalModuleMapPath = clangModuleDep.ClangModuleMapFile;
+    } else
+      externalModuleMapPath = moduleMapFile.get().getName();
+
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencyInfo::forClangModule(
-        pcmPath, clangModuleDep.ClangModuleMapFile,
-        clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, capturedPCMArgs,
-        RootID, IncludeTree, /*module-cache-key*/ "");
+        pcmPath, externalModuleMapPath.str(), clangModuleDep.ID.ContextHash,
+        swiftArgs, fileDeps, capturedPCMArgs, RootID, IncludeTree,
+        /*module-cache-key*/ "");
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleImport(moduleName.ModuleName, &alreadyAddedModules);
-      // It is safe to assume that all dependencies of a Clang module are Clang modules.
-      // Doing this allows us to skip "resolving" Clang modules down the line.
-      dependencies.addModuleDependency({moduleName.ModuleName, ModuleDependencyKind::Clang});
+      // It is safe to assume that all dependencies of a Clang module are Clang
+      // modules. Doing this allows us to skip "resolving" Clang modules down
+      // the line.
+      dependencies.addModuleDependency(
+          {moduleName.ModuleName, ModuleDependencyKind::Clang});
     }
     dependencies.setIsResolved(true);
 
