@@ -24,6 +24,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 
+#include "clang/AST/DeclObjC.h"
+
 using namespace swift;
 
 SILValue swift::lookThroughOwnershipInsts(SILValue v) {
@@ -915,7 +917,17 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     auto as = ApplySite(inst);
 
     switch (as.getSubstCalleeType()->getRepresentation()) {
-    case SILFunctionTypeRepresentation::ObjCMethod:
+    case SILFunctionTypeRepresentation::ObjCMethod: {
+      if (auto *callee = as.getCalleeFunction()) {
+        if (auto *clangDecl = callee->getClangDecl()) {
+          if (auto clangMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+            if (clangMethodDecl->isDirectMethod()) {
+              break;
+            }
+          }
+        }
+      }
+    }
     case SILFunctionTypeRepresentation::Block:
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
