@@ -418,6 +418,8 @@ public:
   static bool disablePassesForFunction(SILFunction *function);
 
 private:
+  void parsePassCount(StringRef countsStr);
+
   bool doPrintBefore(SILTransform *T, SILFunction *F);
 
   bool doPrintAfter(SILTransform *T, SILFunction *F, bool PassChangedSIL);
