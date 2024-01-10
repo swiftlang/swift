@@ -209,6 +209,7 @@ normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
+normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 # Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
@@ -403,6 +404,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
           list(APPEND LIT_ARGS "--param" "observation")
+        endif()
+
+        if(SWIFT_ENABLE_SYNCHRONIZATION)
+          list(APPEND LIT_ARGS "--param" "synchronization")
         endif()
 
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")

@@ -1342,6 +1342,10 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift observation.')
 
+    option('--enable-synchronization', toggle_true,
+           default=True,
+           help='Enable Swift Synchronization.')
+
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
 

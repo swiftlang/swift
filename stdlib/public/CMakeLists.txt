@@ -252,6 +252,10 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
   if(SWIFT_ENABLE_BACKTRACING)
     add_subdirectory(Backtracing)
   endif()
+
+  if(SWIFT_ENABLE_SYNCHRONIZATION)
+    add_subdirectory(Synchronization)
+  endif()
 endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)
