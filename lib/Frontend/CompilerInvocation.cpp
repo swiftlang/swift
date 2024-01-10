@@ -976,6 +976,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.StrictConcurrencyLevel = StrictConcurrency::Minimal;
   }
 
+  // StrictConcurrency enables all data-race safety upcoming features.
+  if (Opts.hasFeature(Feature::StrictConcurrency)) {
+    Opts.Features.insert(Feature::GlobalConcurrency);
+  }
+
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 
