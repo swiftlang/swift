@@ -3097,7 +3097,7 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
                                                 NotForDefinition).getAddress();
   // We don't need to initialize the global object if it's never used for
   // something which can access the object header.
-  if (!i->isBare() && !IGM.canMakeStaticObjectsReadOnly()) {
+  if (!i->isBare() && !IGM.canMakeStaticObjectReadOnly(var->getLoweredType())) {
     auto ClassType = loweredTy.getASTType();
     llvm::Value *Metadata =
       emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata,

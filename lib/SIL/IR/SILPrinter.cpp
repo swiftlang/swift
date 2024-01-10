@@ -1644,6 +1644,9 @@ public:
       *this << "<<placeholder>>";
     }
     *this << " : " << GAI->getType();
+    if (SILValue token = GAI->getDependencyToken()) {
+      *this << " depends_on " <<  Ctx.getID(token);
+    }
   }
 
   void visitGlobalValueInst(GlobalValueInst *GVI) {

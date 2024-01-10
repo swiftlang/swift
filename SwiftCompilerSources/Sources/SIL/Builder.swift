@@ -305,8 +305,8 @@ public struct Builder {
     return notifyNew(vectorInst.getAs(VectorInst.self))
   }
 
-  public func createGlobalAddr(global: GlobalVariable) -> GlobalAddrInst {
-    return notifyNew(bridged.createGlobalAddr(global.bridged).getAs(GlobalAddrInst.self))
+  public func createGlobalAddr(global: GlobalVariable, dependencyToken: Value?) -> GlobalAddrInst {
+    return notifyNew(bridged.createGlobalAddr(global.bridged, dependencyToken.bridged).getAs(GlobalAddrInst.self))
   }
 
   public func createGlobalValue(global: GlobalVariable, isBare: Bool) -> GlobalValueInst {

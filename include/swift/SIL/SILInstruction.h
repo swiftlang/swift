@@ -4176,7 +4176,10 @@ class GlobalAddrInst
   friend SILBuilder;
 
   GlobalAddrInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global,
+                 SILValue dependencyToken,
                  TypeExpansionContext context);
+
+  llvm::Optional<FixedOperandList<1>> dependencyToken;
 
 public:
   // FIXME: This constructor should be private but is currently used
@@ -4185,6 +4188,31 @@ public:
   /// Create a placeholder instruction with an unset global reference.
   GlobalAddrInst(SILDebugLocation DebugLoc, SILType Ty)
       : InstructionBase(DebugLoc, Ty, nullptr) {}
+
+  SILValue getDependencyToken() const {
+    if (hasOperand())
+      return getOperand();
+    return SILValue();
+  }
+
+  void clearToken() {
+    dependencyToken = llvm::None;
+  }
+
+  bool hasOperand() const { return dependencyToken.has_value(); }
+  SILValue getOperand() const { return dependencyToken->asValueArray()[0]; }
+
+  Operand &getOperandRef() { return dependencyToken->asArray()[0]; }
+  const Operand &getOperandRef() const { return dependencyToken->asArray()[0]; }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return dependencyToken ? dependencyToken->asArray() : ArrayRef<Operand>{};
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return dependencyToken
+      ? dependencyToken->asArray() : MutableArrayRef<Operand>{};
+  }
 };
 
 /// Creates a base address for offset calculations.

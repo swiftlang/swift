@@ -2804,7 +2804,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     if (initVal) {
       gvar->setInitializer(initVal);
       if (var->isLet() ||
-          (var->isInitializedObject() && canMakeStaticObjectsReadOnly())) {
+          (var->isInitializedObject() && canMakeStaticObjectReadOnly(var->getLoweredType()))) {
         gvar->setConstant(true);
       }
     } else {
@@ -2814,7 +2814,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   }
 
   llvm::Constant *addr = gvar;
-  if (var->isInitializedObject() && !canMakeStaticObjectsReadOnly()) {
+  if (var->isInitializedObject() && !canMakeStaticObjectReadOnly(var->getLoweredType())) {
     // Project out the object from the container.
     llvm::Constant *Indices[2] = {
       llvm::ConstantExpr::getIntegerValue(Int32Ty, APInt(32, 0)),
@@ -2842,7 +2842,7 @@ llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
     StructLayout *layout = StaticObjectLayouts[var].get();
     ObjectInst *oi = cast<ObjectInst>(var->getStaticInitializerValue());
     llvm::Constant *initVal = emitConstantObject(*this, oi, layout);
-    if (!canMakeStaticObjectsReadOnly()) {
+    if (!canMakeStaticObjectReadOnly(var->getLoweredType())) {
       // A statically initialized object must be placed into a container struct
       // because the swift_initStaticObject needs a swift_once_t at offset -1:
       //     struct Container {

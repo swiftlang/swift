@@ -1,4 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -object-outliner | %FileCheck %s
+// RUN: %sil-opt -enable-sil-verify-all %s -object-outliner | %FileCheck %s
+
+// Note: Intentionally not using %target-sil-opt, because we need at least a
+//       swift 5.1 deployment target.
 
 // REQUIRES: swift_in_compiler
 
@@ -17,6 +20,9 @@ sil_global [let] @g1 : $Int32 = {
   %0 = integer_literal $Builtin.Int32, 1
   %initval = struct $Int32 (%0 : $Builtin.Int32)
 }
+
+sil_global [let] @gobj : $Obj
+sil_global @gobj_var : $Obj
 
 // CHECK-LABEL: sil_global private @outline_global_simpleTv_ : $Obj = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
@@ -59,6 +65,12 @@ sil_global [let] @g1 : $Int32 = {
 // CHECK-NEXT:    %3 = address_to_pointer %2 : $*Int32 to $Builtin.RawPointer
 // CHECK-NEXT:    %4 = struct $UnsafePointer<Int32> (%3 : $Builtin.RawPointer)
 // CHECK-NEXT:    %initval = object $Obj (%1 : $Int64, [tail_elems] %4 : $UnsafePointer<Int32>)
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_global private @init_gobjTv_ : $Obj = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 27
+// CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK-NEXT:    %initval = object $Obj (%1 : $Int64)
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil @outline_global_simple
@@ -146,6 +158,27 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @outline_global_with_move_value : 
+// CHECK: global_value
+// CHECK: } // end sil function 'outline_global_with_move_value'
+sil [ossa] @outline_global_with_move_value : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %8 = move_value %7 : $Obj
+  %9 = begin_borrow %8 : $Obj
+  %10 = ref_element_addr %9 : $Obj, #Obj.value
+  store %4 to [trivial] %10 : $*Int64
+  end_borrow %9 : $Obj
+  %11 = end_cow_mutation %8 : $Obj
+  %12 = begin_dealloc_ref %11 : $Obj of %7 : $Obj
+  dealloc_ref %12 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @outline_global_tailelems
 // CHECK: [[G:%[0-9]+]] = global_value @outline_global_tailelemsTv_ : $Obj
 // CHECK: strong_retain [[G]] : $Obj
@@ -197,18 +230,35 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_outline_without_tail_elems
+// CHECK-LABEL: sil @dont_outline_without_end_cow_mutation
 // CHECK: alloc_ref
 // CHECK: store
 // CHECK: return
-sil @dont_outline_without_tail_elems : $@convention(thin) () -> () {
+sil @dont_outline_without_end_cow_mutation : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int64, 1
   %4 = struct $Int64 (%1 : $Builtin.Int64)
   %7 = alloc_ref $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  %10 = end_cow_mutation %7 : $Obj
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_keep_unique
+// CHECK:         alloc_ref
+// CHECK:         store
+// CHECK:       } // end sil function 'dont_outline_keep_unique'
+sil @dont_outline_keep_unique : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = end_cow_mutation [keep_unique] %7 : $Obj
   strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
@@ -447,4 +497,45 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [global_init_once_fn] @init_gobj :
+// CHECK:         [[A:%.*]] = global_addr @gobj : $*Obj
+// CHECK:         [[G:%[0-9]+]] = global_value @init_gobjTv_ : $Obj
+// CHECK:         strong_retain [[G]] : $Obj
+// CHECK:         store [[G]] to [[A]]
+// CHECK:       } // end sil function 'init_gobj'
+sil [global_init_once_fn] @init_gobj : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @gobj
+  %2 = global_addr @gobj : $*Obj
+  %3 = integer_literal $Builtin.Int64, 27
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref $Obj
+  %8 = end_init_let_ref %5 : $Obj
+  %9 = ref_element_addr %8 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  store %8 to %2 : $*Obj
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [global_init_once_fn] @init_gobj_var :
+// CHECK:         alloc_ref
+// CHECK-NOT:     global_value
+// CHECK:       } // end sil function 'init_gobj_var'
+sil [global_init_once_fn] @init_gobj_var : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @gobj_var
+  %2 = global_addr @gobj_var : $*Obj
+  %3 = integer_literal $Builtin.Int64, 27
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref $Obj
+  %8 = end_init_let_ref %5 : $Obj
+  %9 = ref_element_addr %8 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  store %8 to %2 : $*Obj
+  %12 = tuple ()
+  return %12 : $()
+}
+
 

@@ -171,6 +171,7 @@ struct BridgedPassContext {
 
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getModuleDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedChangeNotificationHandler asNotificationHandler() const;
+  BRIDGED_INLINE void notifyDependencyOnBodyOf(BridgedFunction otherFunction) const;
   BRIDGED_INLINE SILStage getSILStage() const;
   BRIDGED_INLINE bool hadError() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;

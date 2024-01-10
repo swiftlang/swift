@@ -925,7 +925,7 @@ public:
 
   bool shouldPrespecializeGenericMetadata();
   
-  bool canMakeStaticObjectsReadOnly();
+  bool canMakeStaticObjectReadOnly(SILType objectType);
 
   ClassDecl *getStaticArrayStorageDecl();
 

@@ -107,7 +107,6 @@ SHOULD_NEVER_VISIT_INST(FunctionRef)
 SHOULD_NEVER_VISIT_INST(DebugStep)
 SHOULD_NEVER_VISIT_INST(DynamicFunctionRef)
 SHOULD_NEVER_VISIT_INST(PreviousDynamicFunctionRef)
-SHOULD_NEVER_VISIT_INST(GlobalAddr)
 SHOULD_NEVER_VISIT_INST(GlobalValue)
 SHOULD_NEVER_VISIT_INST(BaseAddrForOffset)
 SHOULD_NEVER_VISIT_INST(HasSymbol)
@@ -207,6 +206,7 @@ OPERAND_OWNERSHIP(TrivialUse, PackPackIndex)
 OPERAND_OWNERSHIP(TrivialUse, PackElementGet)
 OPERAND_OWNERSHIP(TrivialUse, PackElementSet)
 OPERAND_OWNERSHIP(TrivialUse, TuplePackElementAddr)
+OPERAND_OWNERSHIP(TrivialUse, GlobalAddr)
 
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).

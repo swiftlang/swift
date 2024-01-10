@@ -5671,7 +5671,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           parseSILIdentifier(GlobalName, IdLoc,
                              diag::expected_sil_value_name) ||
           P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-          parseSILType(Ty) || parseSILDebugLocation(InstLoc, B))
+          parseSILType(Ty))
         return true;
 
       // Go through list of global variables in the SILModule.
@@ -5680,6 +5680,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         P.diagnose(IdLoc, diag::sil_global_variable_not_found, GlobalName);
         return true;
       }
+
+      SILValue dependencyToken;
+      if (Opcode == SILInstructionKind::GlobalAddrInst && P.Tok.isContextualKeyword("depends_on")) {
+        P.consumeToken();
+        if (parseValueRef(dependencyToken, SILType::getSILTokenType(P.Context),
+                          RegularLocation(P.Tok.getLoc()), B)) {
+          return true;
+        }
+      }
+
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
 
       SILType expectedType = (Opcode == SILInstructionKind::GlobalAddrInst
                                   ? global->getLoweredType().getAddressType()
@@ -5692,7 +5704,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
 
       if (Opcode == SILInstructionKind::GlobalAddrInst) {
-        ResultVal = B.createGlobalAddr(InstLoc, global);
+        ResultVal = B.createGlobalAddr(InstLoc, global, dependencyToken);
       } else {
         ResultVal = B.createGlobalValue(InstLoc, global, isBare);
       }

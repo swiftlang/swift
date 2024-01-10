@@ -1281,21 +1281,31 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addUniquedStringRef(G->getName()));
     break;
   }
-  case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::GlobalValueInst: {
     // Format: Name and type. Use SILOneOperandLayout.
-    const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
-    auto *G = GI->getReferencedGlobal();
+    auto *gv = cast<GlobalValueInst>(&SI);
+    auto *G = gv->getReferencedGlobal();
     addReferencedGlobalVariable(G);
-    bool isBare = false;
-    if (auto *gv = dyn_cast<GlobalValueInst>(&SI))
-      isBare = gv->isBare();
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
-        (unsigned)SI.getKind(), isBare ? 1 : 0,
-        S.addTypeRef(GI->getType().getRawASTType()),
-        (unsigned)GI->getType().getCategory(),
+        (unsigned)SI.getKind(), gv->isBare() ? 1 : 0,
+        S.addTypeRef(gv->getType().getRawASTType()),
+        (unsigned)gv->getType().getCategory(),
         S.addUniquedStringRef(G->getName()));
+    break;
+  }
+  case SILInstructionKind::GlobalAddrInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    auto *ga = cast<GlobalAddrInst>(&SI);
+    auto *G = ga->getReferencedGlobal();
+    addReferencedGlobalVariable(G);
+    SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord,
+      SILAbbrCodes[SILOneValueOneOperandLayout::Code],
+      (unsigned)SI.getKind(), 0,
+      S.addUniquedStringRef(G->getName()),
+      S.addTypeRef(ga->getType().getRawASTType()),
+      (unsigned)ga->getType().getCategory(),
+      addValueRef(ga->getDependencyToken()));
     break;
   }
   case SILInstructionKind::BaseAddrForOffsetInst: {

@@ -101,6 +101,8 @@ private extension BuiltinInst {
     guard let callee = calleeOfOnce, callee.isDefinition else {
       return
     }
+    context.notifyDependency(onBodyOf: callee)
+
     // If the callee is side effect-free we can remove the whole builtin "once".
     // We don't use the callee's memory effects but instead look at all callee instructions
     // because memory effects are not computed in the Onone pipeline, yet.
@@ -108,6 +110,10 @@ private extension BuiltinInst {
     // or contains the side-effect instruction `alloc_global` right at the beginning.
     if callee.instructions.contains(where: hasSideEffectForBuiltinOnce) {
       return
+    }
+    for use in uses {
+      let ga = use.instruction as! GlobalAddrInst
+      ga.clearToken(context)
     }
     context.erase(instruction: self)
   }
