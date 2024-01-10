@@ -139,7 +139,8 @@ func tupleExpansion<each T, each U>(
   _ = zip(repeat each tuple1, with: repeat each tuple1.element) // legacy syntax
 
   _ = zip(repeat each tuple1, with: repeat each tuple2)
-  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'repeat each T' and 'repeat each U' have the same shape}}
+  // expected-error@-1 {{global function 'zip(_:with:)' requires the type packs 'each T' and 'each U' have the same shape}}
+  // expected-error@-2 {{pack expansion requires that 'each U' and 'each T' have the same shape}}
 
   _ = forward(repeat each tuple3)
 }
@@ -349,37 +350,36 @@ func test_pack_expansions_with_closures() {
 func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
   struct Data<each T> {
     init(_: repeat each T) {} // expected-note 4 {{'init(_:)' declared here}}
-    init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
-    init<each U>(x: Int, _: repeat each T, y: repeat each U) {} // expected-note 3 {{'init(x:_:y:)' declared here}}
+    init(vals: repeat each T) {}
+    init<each U>(x: Int, _: repeat each T, y: repeat each U) {}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
   _ = Data<Int>(0) // Ok
   _ = Data<Int, String>(42, "") // Ok
-  _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
+  _ = Data<Int>(42, "") // expected-error {{pack expansion requires that 'Int' and 'Int, String' have the same shape}}
   _ = Data<Int, String>((42, ""))
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
+  // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
   _ = Data<Int, String, Float>(vals: (42, "", 0))
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{38-39=}} {{48-49=}}
+  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
   _ = Data<Int, String, Float>((vals: 42, "", 0))
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
+  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
   _ = Data<Int, String, Float>(tuple)
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+  // expected-error@-1 {{initializer expects 3 separate arguments}}
   _ = Data<Int, String, Float>(x: 42, tuple)
-  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
   _ = Data<Int, String, Float>(x: 42, tuple, y: 1, 2, 3)
-  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}}
+  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
   _ = Data<Int, String, Float>(x: 42, (42, "", 0), y: 1, 2, 3)
-  // expected-error@-1 {{value pack expansion at parameter #1 expects 3 separate arguments}} {{39-40=}} {{49-50=}}
+  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
 
   struct Ambiguity<each T> {
     func test(_: repeat each T) -> Int { 42 }
-    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
+    // expected-note@-1 {{'test' declared here}}
     func test(_: repeat each T) -> String { "" }
-    // expected-note@-1 {{value pack expansion at parameter #0 expects 3 separate arguments}}
   }
 
-  _ = Ambiguity<Int, String, Float>().test(tuple) // expected-error {{no exact matches in call to instance method 'test'}}
+  _ = Ambiguity<Int, String, Float>().test(tuple) // expected-error {{instance method 'test' expects 3 separate arguments}}
 }
 
 // rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
@@ -621,44 +621,40 @@ do {
 // https://github.com/apple/swift/issues/66393
 do {
   struct S<each T> {
-    var property: (repeat each T) -> Void { // expected-note 4 {{'property' declared here}}
+    var property: (repeat each T) -> Void {
       get {}
     }
 
-    func method(_: repeat each T) {} // expected-note 4 {{'method' declared here}}
+    func method(_: repeat each T) {}
   }
   S<Int, Bool>().method((5, true))
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{pack expansion requires that 'Int, Bool' and '(Int, Bool)' have the same shape}}
 
   S<Int, Bool>().method((5, true, 6))
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{pack expansion requires that 'Int, Bool' and '(Int, Bool, Int)' have the same shape}}
 
   S<Int, Bool>().property((5, true))
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'repeat each T'}}
 
   S<Int, Bool>().property((5, true, 6))
-  // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'repeat each T'}}
 
   func foo<each U>(u: repeat each U) {
     S<repeat each U>().property((3, 4, 5))
-    // expected-error@-1 {{value pack expansion at parameter #0 expects 1 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'repeat each T'}}
 
     // FIXME: The count of 'repeat each U' is not statically known, but error suggests that it is 1.
     S<repeat each U>().method((3, 4, 5))
-    // expected-error@-1 {{value pack expansion at parameter #0 expects 1 separate arguments; remove extra parentheses to change tuple into separate arguments}}
-    // FIXME: Bad diagnostics
-    // expected-error@-3 {{pack expansion requires that 'each U' and '_' have the same shape}}
-    // expected-error@-4 {{pack expansion requires that 'each U' and '_.RawValue' have the same shape}}
+    // expected-error@-1 {{pack expansion requires that 'each U' and '(Int, Int, Int)' have the same shape}}
 
     // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
     S<(Int, Int), repeat each U>().method((3, 4))
-    // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
-    // FIXME: Duplicate diagnostics
-    // expected-error@-3 2 {{pack expansion requires that 'each U' and '' have the same shape}}
+    // expected-error@-1 {{pack expansion requires that '(Int, Int), repeat each U' and '(Int, Int)' have the same shape}}
+    // expected-error@-2 {{pack expansion requires that '' and 'each U' have the same shape}}
 
     // FIXME: The count of '(Int, Int), repeat each U' is not statically known, but error suggests that it is 2.
     S<(Int, Int), repeat each U>().property((3, 4))
-    // expected-error@-1 {{value pack expansion at parameter #0 expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+    // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'repeat each T'}}
   }
 }
 

@@ -449,7 +449,9 @@ class SameShapeExpansionFailure final : public FailureDiagnostic {
 public:
   SameShapeExpansionFailure(const Solution &solution, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), lhs(lhs), rhs(rhs) {}
+      : FailureDiagnostic(solution, locator),
+        lhs(resolveType(lhs)),
+        rhs(resolveType(rhs)) {}
 
   bool diagnoseAsError() override;
 };
