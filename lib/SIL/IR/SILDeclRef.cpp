@@ -1041,11 +1041,42 @@ bool SILDeclRef::isBackDeploymentThunk() const {
 }
 
 /// Use the Clang importer to mangle a Clang declaration.
-static void mangleClangDecl(raw_ostream &buffer,
-                            const clang::NamedDecl *clangDecl,
-                            ASTContext &ctx) {
+static void mangleClangDeclViaImporter(raw_ostream &buffer,
+                                       const clang::NamedDecl *clangDecl,
+                                       ASTContext &ctx) {
   auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   importer->getMangledName(buffer, clangDecl);
+}
+
+static std::string mangleClangDecl(Decl *decl, bool isForeign) {
+  auto clangDecl = decl->getClangDecl();
+
+  if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
+    if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
+      std::string s(1, '\01');
+      s += asmLabel->getLabel();
+      return s;
+    } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>() ||
+               decl->getASTContext().LangOpts.EnableCXXInterop) {
+      std::string storage;
+      llvm::raw_string_ostream SS(storage);
+      mangleClangDeclViaImporter(SS, namedClangDecl, decl->getASTContext());
+      return SS.str();
+    }
+    return namedClangDecl->getName().str();
+  } else if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+    if (objcDecl->isDirectMethod() && isForeign) {
+      std::string storage;
+      llvm::raw_string_ostream SS(storage);
+      clang::ASTContext &ctx = clangDecl->getASTContext();
+      std::unique_ptr<clang::MangleContext> mangler(ctx.createMangleContext());
+      mangler->mangleObjCMethodName(objcDecl, SS, /*includePrefixByte=*/true,
+                                    /*includeCategoryNamespace=*/false);
+      return SS.str();
+    }
+  }
+
+  return "";
 }
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
@@ -1073,32 +1104,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   // As a special case, Clang functions and globals don't get mangled at all
   // - except \c objc_direct decls.
   if (hasDecl()) {
-    if (auto clangDecl = getDecl()->getClangDecl()) {
+    if (getDecl()->getClangDecl()) {
       if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
-        if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
-          if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-            std::string s(1, '\01');
-            s += asmLabel->getLabel();
-            return s;
-          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>() ||
-                     getDecl()->getASTContext().LangOpts.EnableCXXInterop) {
-            std::string storage;
-            llvm::raw_string_ostream SS(storage);
-            mangleClangDecl(SS, namedClangDecl, getDecl()->getASTContext());
-            return SS.str();
-          }
-          return namedClangDecl->getName().str();
-        } else if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-          if (objcDecl->isDirectMethod() && isForeign) {
-            std::string storage;
-            llvm::raw_string_ostream SS(storage);
-            clang::ASTContext &ctx = clangDecl->getASTContext();
-            std::unique_ptr<clang::MangleContext> mangler(ctx.createMangleContext());
-            mangler->mangleObjCMethodName(objcDecl, SS, /*includePrefixByte=*/true,
-                                          /*includeCategoryNamespace=*/false);
-            return SS.str();
-          }
-        }
+        auto clangMangling = mangleClangDecl(getDecl(), isForeign);
+        if (!clangMangling.empty())
+          return clangMangling;
       }
     }
   }
@@ -1156,6 +1166,13 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use a given cdecl name for native-to-foreign thunks.
     if (auto CDeclA = getDecl()->getAttrs().getAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {
+        // If this is an @implementation @_cdecl, mangle it like the clang
+        // function it implements.
+        if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {
+          auto clangMangling = mangleClangDecl(objcInterface, isForeign);
+          if (!clangMangling.empty())
+            return clangMangling;
+        }
         return CDeclA->Name.str();
       }
 
