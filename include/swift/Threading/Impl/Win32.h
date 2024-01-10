@@ -66,9 +66,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 using lazy_mutex_handle = SWIFT_SRWLOCK;
 
 // We don't need to be lazy here because Win32 has SRWLOCK_INIT.
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return SRWLOCK_INIT;
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER SRWLOCK_INIT
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
