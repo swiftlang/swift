@@ -260,3 +260,33 @@ bb0(%0 : @guaranteed $Optional<MyActor>):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @optional_existential_actor :
+sil [ossa] @optional_existential_actor : $@async (@guaranteed Optional<any Actor>) -> () {
+bb0(%0 : @guaranteed $Optional<any Actor>):
+// CHECK:      bb0(%0 : @guaranteed $Optional<any Actor>):
+// CHECK-NEXT: switch_enum %0 : $Optional<any Actor>, case #Optional.some!enumelt: bb1, default bb2
+
+// CHECK: bb1([[ACTOR:%.*]] : @guaranteed $any Actor):
+// CHECK-NEXT: [[OPENED:%.*]] = open_existential_ref [[ACTOR]] : $any Actor to $@opened("[[ID:.*]]", any Actor) Self
+// CHECK-NEXT: [[WITNESS:%.*]] = witness_method $@opened("[[ID]]", any Actor) Self, #Actor.unownedExecutor!getter : <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor
+// CHECK-NEXT: [[SERIAL_EXEC:%.*]] = apply [[WITNESS]]<@opened("[[ID]]", any Actor) Self>([[OPENED]])
+// CHECK-NEXT: [[EXECUTOR:%.*]] = struct_extract [[SERIAL_EXEC]] : $UnownedSerialExecutor, #UnownedSerialExecutor.executor
+// CHECK-NEXT: [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[EXECUTOR]] : $Builtin.Executor
+// CHECK-NEXT: br bb3([[SOME]] : $Optional<Builtin.Executor>)
+
+// CHECK: bb2:
+// CHECK-NEXT: [[NONE:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT: br bb3([[NONE]] : $Optional<Builtin.Executor>)
+
+// CHECK: bb3([[OPT_EXEC:%.*]] : $Optional<Builtin.Executor>):
+// CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[OPT_EXEC]] : $Optional<Builtin.Executor> on %0 : $Optional<any Actor>
+// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Optional<Builtin.Executor>
+// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Optional<Builtin.Executor>
+// CHECK-NEXT:   [[RET:%.*]] = tuple ()
+// CHECK-NEXT:   return [[RET]] : $()
+  hop_to_executor %0 : $Optional<any Actor>
+  hop_to_executor %0 : $Optional<any Actor>
+  %r = tuple ()
+  return %r : $()
+}
