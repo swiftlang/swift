@@ -663,34 +663,18 @@ class TransferNonSendable : public SILFunctionTransform {
   void run() override {
     SILFunction *function = getFunction();
 
-    if (!function->getASTContext().LangOpts.hasFeature(
-            Feature::RegionBasedIsolation))
+    auto *functionInfo = getAnalysis<RegionAnalysis>()->get(function);
+    if (!functionInfo->isSupportedFunction()) {
+      LLVM_DEBUG(llvm::dbgs() << "===> SKIPPING UNSUPPORTED FUNCTION: "
+                              << function->getName() << '\n');
+
       return;
+    }
 
     LLVM_DEBUG(llvm::dbgs()
                << "===> PROCESSING: " << function->getName() << '\n');
 
-    // If this function does not correspond to a syntactic declContext and it
-    // doesn't have a parent module, don't check it since we cannot check if a
-    // type is sendable.
-    if (!function->getDeclContext() && !function->getParentModule()) {
-      LLVM_DEBUG(llvm::dbgs() << "No Decl Context! Skipping!\n");
-      return;
-    }
-
-    if (!function->hasOwnership()) {
-      LLVM_DEBUG(llvm::dbgs() << "Only runs on Ownership SSA, skipping!\n");
-      return;
-    }
-
-    // The sendable protocol should /always/ be available if TransferNonSendable
-    // is enabled. If not, there is a major bug in the compiler and we should
-    // fail loudly.
-    if (!function->getASTContext().getProtocol(KnownProtocolKind::Sendable))
-      llvm::report_fatal_error("Sendable protocol not available!");
-
-    auto *analysis = this->getAnalysis<RegionAnalysis>()->get(function);
-    emitDiagnostics(analysis);
+    emitDiagnostics(functionInfo);
   }
 };
 

@@ -2472,11 +2472,44 @@ void BlockPartitionState::print(llvm::raw_ostream &os) const {
 //                         MARK: Dataflow Entrypoint
 //===----------------------------------------------------------------------===//
 
+static bool canComputeRegionsForFunction(SILFunction *fn) {
+  if (!fn->getASTContext().LangOpts.hasFeature(Feature::RegionBasedIsolation))
+    return false;
+
+  // If this function does not correspond to a syntactic declContext and it
+  // doesn't have a parent module, don't check it since we cannot check if a
+  // type is sendable.
+  if (!fn->getDeclContext() && !fn->getParentModule()) {
+    return false;
+  }
+
+  if (!fn->hasOwnership()) {
+    LLVM_DEBUG(llvm::dbgs() << "Only runs on Ownership SSA, skipping!\n");
+    return false;
+  }
+
+  // The sendable protocol should /always/ be available if TransferNonSendable
+  // is enabled. If not, there is a major bug in the compiler and we should
+  // fail loudly.
+  if (!fn->getASTContext().getProtocol(KnownProtocolKind::Sendable))
+    return false;
+
+  return true;
+}
+
 RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     SILFunction *fn, PostOrderFunctionInfo *pofi)
-    : allocator(), fn(fn),
-      translator(new(allocator) PartitionOpTranslator(fn, pofi, valueMap)),
-      ptrSetFactory(allocator), blockStates(), pofi(pofi), solved(false) {
+    : allocator(), fn(fn), translator(), ptrSetFactory(allocator),
+      blockStates(), pofi(pofi), solved(false), supportedFunction(true) {
+  // Before we do anything, make sure that we support processing this function.
+  //
+  // NOTE: See documentation on supportedFunction for criteria.
+  if (!canComputeRegionsForFunction(fn)) {
+    supportedFunction = false;
+    return;
+  }
+
+  translator = new (allocator) PartitionOpTranslator(fn, pofi, valueMap);
   blockStates.emplace(fn, [this](SILBasicBlock *block) -> BlockPartitionState {
     return BlockPartitionState(block, *translator, ptrSetFactory);
   });
@@ -2491,12 +2524,18 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
 }
 
 RegionAnalysisFunctionInfo::~RegionAnalysisFunctionInfo() {
+  // If we had a non-supported function, we didn't create a translator, so we do
+  // not need to tear anything down.
+  if (!supportedFunction)
+    return;
+
   // Tear down translator before we tear down the allocator.
   translator->~PartitionOpTranslator();
 }
 
 bool RegionAnalysisFunctionInfo::isClosureCaptured(SILValue value,
                                                    Operand *op) {
+  assert(supportedFunction && "Unsupported Function?!");
   return translator->isClosureCaptured(value, op->getUser());
 }
 

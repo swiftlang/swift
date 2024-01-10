@@ -358,7 +358,15 @@ class RegionAnalysisFunctionInfo {
 
   PostOrderFunctionInfo *pofi;
 
+  /// Set to true if we have already processed our regions.
   bool solved;
+
+  /// Set to true if this is a function that we know how to process regions for.
+  ///
+  /// DISCUSSION: We do not support if the correct features are not enabled, if
+  /// the function doesn't have a parent module, or if the function doesn't have
+  /// ownership.
+  bool supportedFunction;
 
 public:
   using LazyType = LazyFunctionInfo<RegionAnalysis, RegionAnalysisFunctionInfo>;
@@ -367,6 +375,8 @@ public:
   ~RegionAnalysisFunctionInfo();
 
   BlockPartitionState &getPartitionState(SILBasicBlock *block) const {
+    assert(supportedFunction &&
+           "Cannot getPartitionState for a non-supported function");
     // Lazily run the dataflow.
     if (!solved)
       const_cast<RegionAnalysisFunctionInfo *>(this)->runDataflow();
@@ -375,20 +385,46 @@ public:
 
   SILFunction *getFunction() const { return fn; }
 
+  bool isSupportedFunction() const { return supportedFunction; }
+
   using iterator = BasicBlockData::iterator;
   using const_iterator = BasicBlockData::const_iterator;
   using reverse_iterator = BasicBlockData::reverse_iterator;
   using const_reverse_iterator = BasicBlockData::const_reverse_iterator;
 
-  iterator begin() { return blockStates->begin(); }
-  iterator end() { return blockStates->end(); }
-  const_iterator begin() const { return blockStates->begin(); }
-  const_iterator end() const { return blockStates->end(); }
+  iterator begin() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->begin();
+  }
+  iterator end() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->end();
+  }
+  const_iterator begin() const {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->begin();
+  }
+  const_iterator end() const {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->end();
+  }
 
-  reverse_iterator rbegin() { return blockStates->rbegin(); }
-  reverse_iterator rend() { return blockStates->rend(); }
-  const_reverse_iterator rbegin() const { return blockStates->rbegin(); }
-  const_reverse_iterator rend() const { return blockStates->rend(); }
+  reverse_iterator rbegin() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->rbegin();
+  }
+  reverse_iterator rend() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->rend();
+  }
+  const_reverse_iterator rbegin() const {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->rbegin();
+  }
+  const_reverse_iterator rend() const {
+    assert(supportedFunction && "Unsupported Function?!");
+    return blockStates->rend();
+  }
 
   using range = llvm::iterator_range<iterator>;
   using const_range = llvm::iterator_range<const_iterator>;
@@ -401,10 +437,14 @@ public:
   const_reverse_range getReverseRange() const { return {rbegin(), rend()}; }
 
   TransferringOperandSetFactory &getOperandSetFactory() {
+    assert(supportedFunction && "Unsupported Function?!");
     return ptrSetFactory;
   }
 
-  RegionAnalysisValueMap &getValueMap() { return valueMap; }
+  RegionAnalysisValueMap &getValueMap() {
+    assert(supportedFunction && "Unsupported Function?!");
+    return valueMap;
+  }
 
   bool isClosureCaptured(SILValue value, Operand *op);
 
