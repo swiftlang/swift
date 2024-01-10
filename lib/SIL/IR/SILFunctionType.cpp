@@ -2434,6 +2434,16 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
                                       ParameterConvention::Indirect_Inout));
   }
 
+  // Make a new 'self' parameter.
+  auto selfInterfaceType = MetatypeType::get(
+      accessor->getDeclContext()->getSelfInterfaceType());
+  AbstractionPattern origSelfType(genericSig,
+                                  selfInterfaceType->getCanonicalType());
+  auto loweredSelfType = TC.getLoweredType(
+      origSelfType, selfInterfaceType->getCanonicalType(), context);
+  inputs.push_back(SILParameterInfo(loweredSelfType.getASTType(),
+                                    ParameterConvention::Direct_Unowned));
+
   SmallVector<SILResultInfo, 8> results;
 
   // initialized properties appear as `@out` results because they are
