@@ -2786,23 +2786,6 @@ MacroExpansionExpr *MacroExpansionExpr::create(
   return new (ctx) MacroExpansionExpr(dc, info, roles, isImplicit, ty);
 }
 
-unsigned MacroExpansionExpr::getDiscriminator() const {
-  if (getRawDiscriminator() != InvalidDiscriminator)
-    return getRawDiscriminator();
-
-  auto mutableThis = const_cast<MacroExpansionExpr *>(this);
-  auto dc = getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  auto discriminatorContext =
-      MacroDiscriminatorContext::getParentOf(mutableThis);
-  mutableThis->setDiscriminator(
-      ctx.getNextMacroDiscriminator(
-          discriminatorContext, getMacroName().getBaseName()));
-
-  assert(getRawDiscriminator() != InvalidDiscriminator);
-  return getRawDiscriminator();
-}
-
 MacroExpansionDecl *MacroExpansionExpr::createSubstituteDecl() {
   auto dc = DC;
   if (auto *tlcd = dyn_cast_or_null<TopLevelCodeDecl>(dc->getAsDecl()))
