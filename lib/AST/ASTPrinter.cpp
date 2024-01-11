@@ -3284,6 +3284,10 @@ static bool usesFeatureBuiltinCreateAsyncTaskInGroupWithExecutor(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinCreateAsyncDiscardingTaskInGroup(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinCreateAsyncTaskWithExecutor(Decl *decl) {
   return false;
 }
