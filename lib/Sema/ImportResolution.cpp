@@ -779,16 +779,29 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   if (topLevelModule.get() == ctx.TheBuiltinModule)
     return;
 
+  Identifier importerName = SF.getParentModule()->getName(),
+             targetName = topLevelModule.get()->getName();
+
   // @_implementationOnly is only supported when used from modules built with
   // library-evolution. Otherwise it can lead to runtime crashes from a lack
   // of memory layout information when building clients unaware of the
   // dependency. The missing information is provided at run time by resilient
   // modules.
+  // We exempt some imports using @_implementationOnly in a safe way from
+  // packages that cannot be resilient.
   if (import.options.contains(ImportFlags::ImplementationOnly) &&
-      !SF.getParentModule()->isResilient() && topLevelModule) {
+      !SF.getParentModule()->isResilient() && topLevelModule &&
+      !(((targetName.str() == "CCryptoBoringSSL" ||
+          targetName.str() == "CCryptoBoringSSLShims") &&
+         (importerName.str() == "Crypto" ||
+          importerName.str() == "_CryptoExtras" ||
+          importerName.str() == "CryptoBoringWrapper")) ||
+        ((targetName.str() == "CNIOBoringSSL" ||
+          targetName.str() == "CNIOBoringSSLShims") &&
+         importerName.str() == "NIOSSL"))) {
     ctx.Diags.diagnose(import.importLoc,
                        diag::implementation_only_requires_library_evolution,
-                       SF.getParentModule()->getName());
+                       importerName);
   }
 
   if (import.options.contains(ImportFlags::ImplementationOnly) ||
@@ -801,8 +814,7 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
 
   auto inFlight = ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                                      diag::module_not_compiled_with_library_evolution,
-                                     topLevelModule.get()->getName(),
-                                     SF.getParentModule()->getName());
+                                     targetName, importerName);
 
   if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
     // This will catch Swift 6 language mode as well where
