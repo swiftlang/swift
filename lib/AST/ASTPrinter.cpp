@@ -3296,6 +3296,11 @@ static bool usesFeatureBuiltinCreateAsyncTaskWithExecutor(Decl *decl) {
   return false;
 }
 
+static bool
+usesFeatureBuiltinCreateAsyncDiscardingTaskInGroupWithExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinCopy(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }

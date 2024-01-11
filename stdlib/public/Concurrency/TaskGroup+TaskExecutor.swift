@@ -223,7 +223,7 @@ extension DiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -265,7 +265,7 @@ extension DiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Void
   ) -> Bool {
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -317,7 +317,7 @@ extension ThrowingDiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
@@ -359,7 +359,7 @@ extension ThrowingDiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) -> Bool {
-    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
