@@ -150,6 +150,7 @@ set(SWIFT_INSTALL_COMPONENTS
       editor-integration
       tools
       sourcekit-inproc
+      static-mirror-lib
       swift-remote-mirror
       swift-remote-mirror-headers
       swift-syntax-lib
