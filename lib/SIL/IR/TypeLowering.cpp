@@ -2941,6 +2941,13 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
+  verifyLexicalLowering(lowering, origType, substType, forExpansion);
+}
+
+void TypeConverter::verifyLexicalLowering(const TypeLowering &lowering,
+                                          AbstractionPattern origType,
+                                          CanType substType,
+                                          TypeExpansionContext forExpansion) {
   // Non-trivial lowerings should always be lexical unless all non-trivial
   // fields are eager move.
   if (!lowering.isTrivial() && !lowering.isLexical()) {

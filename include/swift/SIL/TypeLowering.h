@@ -1282,6 +1282,9 @@ private:
   void verifyLowering(const TypeLowering &, AbstractionPattern origType,
                       CanType origSubstType,
                       TypeExpansionContext forExpansion);
+  void verifyLexicalLowering(const TypeLowering &, AbstractionPattern origType,
+                             CanType origSubstType,
+                             TypeExpansionContext forExpansion);
   bool visitAggregateLeaves(
       Lowering::AbstractionPattern origType, CanType substType,
       TypeExpansionContext context,
