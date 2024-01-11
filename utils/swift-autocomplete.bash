@@ -8,6 +8,10 @@ _swift_complete()
   local tool currentWord prevWord
 
   tool="${COMP_WORDS[0]}"
+  if alias "$tool" >/dev/null; then
+    tool=`alias "$tool" | sed "s/.*'\\(.*\\)'.*/\\1/"`
+  fi
+  
   currentWord="${COMP_WORDS[COMP_CWORD]}"
   prevWord="${COMP_WORDS[COMP_CWORD-1]}"
 
@@ -92,6 +96,7 @@ _swift_complete()
       -sil-lower-agg-instrs-expand-all \
       -sil-merge-stack-slots \
       -sil-opt-pass-count \
+      -sil-pass-count-config-file \
       -sil-opt-remark-ignore-always-infer \
       -sil-optimized-access-markers \
       -sil-ownership-verifier-enable-testing \
