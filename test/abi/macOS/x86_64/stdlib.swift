@@ -240,3 +240,7 @@ Added: _$sSMsSmRzrlE15removeSubrangesyys8RangeSetVy5IndexSlQzGF
 Added: _$sSMsE13moveSubranges_2toSny5IndexQzGs8RangeSetVyADG_ADtF
 
 // Runtime Symbols
+Added: __swift_pod_copy
+Added: __swift_pod_destroy
+Added: __swift_pod_direct_initializeBufferWithCopyOfBuffer
+Added: __swift_pod_indirect_initializeBufferWithCopyOfBuffer

@@ -32,7 +32,9 @@ using Metadata = TargetMetadata<InProcess>;
 
 template <typename Runtime> struct TargetEnumMetadata;
 using EnumMetadata = TargetEnumMetadata<InProcess>;
-struct TypeLayout;
+template <typename Runtime>
+struct TargetTypeLayout;
+using TypeLayout = TargetTypeLayout<InProcess>;
 
 /// Initialize the type metadata for a single-case enum type.
 ///

@@ -24,6 +24,7 @@
 #include "MetadataCache.h"
 #include "BytecodeLayouts.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -395,6 +396,18 @@ namespace {
                                   const TypeContextDescriptor *description,
                                              const void * const *arguments) {
       return true;
+    }
+
+    void verifyBuiltMetadata(const Metadata *original,
+                             const Metadata *candidate) {}
+
+    void verifyBuiltMetadata(const Metadata *original,
+                             const TypeContextDescriptor *description,
+                             const void *const *arguments) {
+      if (swift::runtime::environment::
+              SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER())
+        validateExternalGenericMetadataBuilder(original, description,
+                                               arguments);
     }
 
     MetadataStateWithDependency tryInitialize(Metadata *metadata,
@@ -811,7 +824,6 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
          (extraDataSize == (pattern->getExtraDataPattern()->OffsetInWords +
                             pattern->getExtraDataPattern()->SizeInWords) *
                                sizeof(void *)));
-
   size_t totalSize = sizeof(FullMetadata<ValueMetadata>) + extraDataSize;
 
   auto bytes = (char*) MetadataAllocator(GenericValueMetadataTag)
@@ -2117,10 +2129,6 @@ static constexpr TypeLayout getInitialLayoutForHeapObject() {
           0};
 }
 
-static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
-  return (size + alignMask) & ~alignMask;
-}
-
 /// Perform basic sequential layout given a vector of metadata pointers,
 /// calling a functor with the offset of each field, and returning the
 /// final layout characteristics of the type.
@@ -2594,8 +2602,9 @@ static constexpr Out pointer_function_cast(In *function) {
   return pointer_function_cast_impl<Out>::perform(function);
 }
 
-static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_indirect_initializeBufferWithCopyOfBuffer(
+    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
   auto wtable = self->getValueWitnesses();
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
@@ -2609,19 +2618,21 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
 }
 
-static void pod_destroy(OpaqueValue *object, const Metadata *self) {}
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_pod_destroy(OpaqueValue *object, const Metadata *self) {}
 
-static OpaqueValue *pod_copy(OpaqueValue *dest, OpaqueValue *src,
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_copy(OpaqueValue *dest, OpaqueValue *src,
                              const Metadata *self) {
   memcpy(dest, src, self->getValueWitnesses()->size);
   return dest;
 }
 
-static OpaqueValue *pod_direct_initializeBufferWithCopyOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-  return pod_copy(reinterpret_cast<OpaqueValue*>(dest),
-                  reinterpret_cast<OpaqueValue*>(src),
-                  self);
+SWIFT_RUNTIME_STDLIB_SPI
+OpaqueValue *_swift_pod_direct_initializeBufferWithCopyOfBuffer(
+    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+  return _swift_pod_copy(reinterpret_cast<OpaqueValue *>(dest),
+                         reinterpret_cast<OpaqueValue *>(src), self);
 }
 
 static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
@@ -2646,16 +2657,16 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
       // size and alignment.
       if (flags.isInlineStorage()) {
         vwtable->initializeBufferWithCopyOfBuffer =
-          pod_direct_initializeBufferWithCopyOfBuffer;
+            _swift_pod_direct_initializeBufferWithCopyOfBuffer;
       } else {
         vwtable->initializeBufferWithCopyOfBuffer =
-          pod_indirect_initializeBufferWithCopyOfBuffer;
+            _swift_pod_indirect_initializeBufferWithCopyOfBuffer;
       }
-      vwtable->destroy = pod_destroy;
-      vwtable->initializeWithCopy = pod_copy;
-      vwtable->initializeWithTake = pod_copy;
-      vwtable->assignWithCopy = pod_copy;
-      vwtable->assignWithTake = pod_copy;
+      vwtable->destroy = _swift_pod_destroy;
+      vwtable->initializeWithCopy = _swift_pod_copy;
+      vwtable->initializeWithTake = _swift_pod_copy;
+      vwtable->assignWithCopy = _swift_pod_copy;
+      vwtable->assignWithTake = _swift_pod_copy;
       // getEnumTagSinglePayload and storeEnumTagSinglePayload are not
       // interestingly optimizable based on POD-ness.
       return;
@@ -2694,7 +2705,7 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
   
   if (flags.isBitwiseTakable()) {
     // Use POD value witnesses for operations that do an initializeWithTake.
-    vwtable->initializeWithTake = pod_copy;
+    vwtable->initializeWithTake = _swift_pod_copy;
     return;
   }
 

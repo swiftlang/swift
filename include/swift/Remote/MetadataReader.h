@@ -24,6 +24,7 @@
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ExternalUnion.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/TypeIdentity.h"
@@ -3418,11 +3419,6 @@ private:
 #   undef tryFindAndReadSymbolWithDefault
 
     return finish(TaggedPointerEncodingKind::Extended);
-  }
-
-  template <class T>
-  static constexpr T roundUpToAlignment(T offset, T alignment) {
-    return (offset + alignment - 1) & ~(alignment - 1);
   }
 };
 

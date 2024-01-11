@@ -584,6 +584,10 @@ public:
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
 
+  void validateExternalGenericMetadataBuilder(
+      const Metadata *original, const TypeContextDescriptor *description,
+      const void *arguments);
+
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
                              llvm::ArrayRef<NodePointer> demangledGenerics,
