@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -emit-sil -verify -o /dev/null %s
-// RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking -emit-sil -verify -o /dev/null %s
-// RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking -emit-sil -verify -o /dev/null %s -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking -emit-sil -verify -o /dev/null %s -verify-additional-prefix complete-
+// RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking -emit-sil -verify -o /dev/null %s -enable-experimental-feature SendNonSendable -verify-additional-prefix complete-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -8,14 +8,18 @@
 @available(SwiftStdlib 5.1, *)
 struct TL {
   @TaskLocal
-  static var number: Int = 0
+  static var number: Int = 0 // expected-complete-warning {{static property 'number' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+  // expected-complete-note@-1 {{isolate 'number' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 
   @TaskLocal
-  static var someNil: Int?
+  static var someNil: Int? // expected-complete-warning {{static property 'someNil' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+  // expected-complete-note@-1 {{isolate 'someNil' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 
   @TaskLocal
   static var noValue: Int // expected-error{{'static var' declaration requires an initializer expression or an explicitly stated getter}}
   // expected-note@-1{{add an initializer to silence this error}}
+  // expected-complete-warning@-2 {{static property 'noValue' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+  // expected-complete-note@-3 {{isolate 'noValue' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 
   @TaskLocal
   var notStatic: String? // expected-error{{property 'notStatic', must be static because property wrapper 'TaskLocal<String?>' can only be applied to static properties}}

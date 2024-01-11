@@ -81,7 +81,7 @@ func testElsewhere(x: X) {
 }
 
 func testCalls(x: X) {
-  // expected-complete-tns-note @-1 2{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
+  // expected-complete-sns-note @-1 2{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
 
   unsafelyMainActorClosure {
     onMainActor()
@@ -108,7 +108,7 @@ func testCalls(x: X) {
   let c = MyModelClass()
 
   // okay with minimal/targeted... an error with complete.
-  c.f() // expected-complete-tns-warning {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  c.f() // expected-complete-sns-error {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
 }
 
 func testCallsWithAsync() async {
@@ -117,10 +117,10 @@ func testCallsWithAsync() async {
 
   let _: () -> Void = onMainActorAlways // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-minimal-targeted-warning{{expression is 'async' but is not marked with 'await'}}
+  let c = MyModelClass() // expected-minimal-targeted-error{{expression is 'async' but is not marked with 'await'}}
   // expected-minimal-targeted-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 
-  c.f() // expected-warning{{expression is 'async' but is not marked with 'await'}}
+  c.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }
 
