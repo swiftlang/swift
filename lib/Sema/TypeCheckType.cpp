@@ -4485,6 +4485,14 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
 
   // isolated parameters must be of actor type
   if (!type->hasTypeParameter() && !type->isActorType() && !type->hasError()) {
+    // Optional actor types are fine - `nil` represents `nonisolated`.
+    auto wrapped = type->getOptionalObjectType();
+    auto allowOptional = getASTContext().LangOpts
+        .hasFeature(Feature::OptionalIsolatedParameters);
+    if (allowOptional && wrapped && wrapped->isActorType()) {
+      return type;
+    }
+
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(), diag::isolated_parameter_not_actor, type);
     return ErrorType::get(type);

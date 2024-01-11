@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "insert-hop-to-executor"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Dominance.h"
@@ -51,11 +52,18 @@ class LowerHopToActor {
   SILFunction *F;
   DominanceInfo *Dominance;
 
-  /// A map from an actor value to the executor we've derived for it.
-  llvm::ScopedHashTable<SILValue, SILValue> ExecutorForActor;
+  /// A map from an actor value to the dominating instruction that
+  /// will derive the executor.
+  llvm::ScopedHashTable<SILValue, SILInstruction *>
+      ExecutorDerivationForActor;
 
-  bool processHop(HopToExecutorInst *hop);
-  bool processExtract(ExtractExecutorInst *extract);
+  /// A multi-map from a dominating {hop_to_|extract_}executor instruction
+  /// to other reachable {hop_to_|extract_}executor instructions.
+  SmallFrozenMultiMap<SILInstruction *, SILInstruction *, 4>
+      DominatingActorHops;
+
+  void recordDominatingInstFor(SILInstruction *inst);
+  void rewriteInstructions();
 
   SILValue emitGetExecutor(SILBuilderWithScope &B,
                            SILLocation loc,
@@ -73,21 +81,24 @@ public:
 };
 
 bool LowerHopToActor::run() {
-  bool changed = false;
-
+  // Record all actor operands to hop_to_executor and extract_executor
+  // and the dominating instruction that will derive the executor.
   auto runOnBlock = [&](SILBasicBlock *block) {
     for (auto ii = block->begin(), ie = block->end(); ii != ie; ) {
       SILInstruction *inst = &*ii++;
-      if (auto *hop = dyn_cast<HopToExecutorInst>(inst)) {
-        changed |= processHop(hop);
-      } else if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
-        changed |= processExtract(extract);
-      }
+      recordDominatingInstFor(inst);
     }
   };
-  runInDominanceOrderWithScopes(Dominance, runOnBlock, ExecutorForActor);
+  runInDominanceOrderWithScopes(Dominance, runOnBlock,
+                                ExecutorDerivationForActor);
 
-  return changed;
+  // If we didn't record any dominating actor hops that need
+  // transformation, we're done.
+  if (DominatingActorHops.empty())
+    return false;
+
+  rewriteInstructions();
+  return true;
 }
 
 static bool isOptionalBuiltinExecutor(SILType type) {
@@ -96,49 +107,73 @@ static bool isOptionalBuiltinExecutor(SILType type) {
   return false;
 }
 
-/// Search for hop_to_executor instructions with actor-typed operands.
-bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
-  auto actor = hop->getTargetExecutor();
-
-  // Ignore hops that are already to Optional<Builtin.Executor>.
-  if (isOptionalBuiltinExecutor(actor->getType()))
-    return false;
-
-  SILBuilderWithScope B(hop);
-  SILValue executor;
-  if (actor->getType().is<BuiltinExecutorType>()) {
-    // IRGen expects an optional Builtin.Executor, not a Builtin.Executor
-    // but we can wrap it nicely
-    executor = B.createOptionalSome(
-        hop->getLoc(), actor,
-        SILType::getOptionalType(actor->getType()));
+void LowerHopToActor::recordDominatingInstFor(SILInstruction *inst) {
+  SILValue actor;
+  if (auto *hop = dyn_cast<HopToExecutorInst>(inst)) {
+    actor = hop->getTargetExecutor();
+    // If hop_to_executor was emitted with an optional executor operand,
+    // there's nothing to derive.
+    if (isOptionalBuiltinExecutor(actor->getType())) {
+      return;
+    }
+  } else if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
+    actor = extract->getExpectedExecutor();
   } else {
-    // Get the dominating executor value for this actor, if available,
-    // or else emit code to derive it.
-    executor = emitGetExecutor(B, hop->getLoc(), actor, /*optional*/true);
+    return;
   }
-  assert(executor && "executor not set");
 
-  B.createHopToExecutor(hop->getLoc(), executor, /*mandatory*/ false);
+  if (isOptionalBuiltinExecutor(actor->getType()))
+    return;
 
-  hop->eraseFromParent();
+  auto *dominatingInst = ExecutorDerivationForActor.lookup(actor);
+  if (dominatingInst) {
+    DominatingActorHops.insert(dominatingInst, inst);
+  } else {
+    DominatingActorHops.insert(inst, inst);
+    ExecutorDerivationForActor.insert(actor, inst);
+  }
 
-  return true;
+  return;
 }
 
-bool LowerHopToActor::processExtract(ExtractExecutorInst *extract) {
-  // Dig out the executor.
-  auto executor = extract->getExpectedExecutor();
-  if (!isOptionalBuiltinExecutor(executor->getType())) {
-    SILBuilderWithScope B(extract);
-    executor =
-        emitGetExecutor(B, extract->getLoc(), executor, /*optional*/ false);
-  }
+void LowerHopToActor::rewriteInstructions() {
+  // Lower the actor operands to executors. Dominating instructions
+  // will perform the derivation, and the result will be reused in
+  // all reachable instructions.
+  DominatingActorHops.setFrozen();
+  for (auto domInst : DominatingActorHops.getRange()) {
+    auto derivationInst = domInst.first;
 
-  // Unconditionally replace the extract with the executor.
-  extract->replaceAllUsesWith(executor);
-  extract->eraseFromParent();
-  return true;
+    SILValue actor;
+    bool makeOptional;
+    if (auto *hop = dyn_cast<HopToExecutorInst>(derivationInst)) {
+      actor = hop->getTargetExecutor();
+      makeOptional = true;
+    } else if (auto *extract = dyn_cast<ExtractExecutorInst>(derivationInst)) {
+      actor = extract->getExpectedExecutor();
+      makeOptional = false;
+    } else {
+      continue;
+    }
+
+    // Emit the executor derivation at the dominating instruction.
+    SILBuilderWithScope builder(derivationInst);
+    auto executor = emitGetExecutor(
+        builder, derivationInst->getLoc(), actor, makeOptional);
+    derivationInst->setOperand(0, executor);
+
+    // Set the executor value as the operand for all reachable instructions.
+    auto reachableInsts = domInst.second;
+    for (auto inst : reachableInsts) {
+      if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
+        extract->replaceAllUsesWith(executor);
+        extract->eraseFromParent();
+        continue;
+      }
+
+      inst->setOperand(0, executor);
+    }
+  }
 }
 
 static bool isDefaultActorType(CanType actorType, ModuleDecl *M,
@@ -162,40 +197,40 @@ static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
 SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
                                           SILLocation loc, SILValue actor,
                                           bool makeOptional) {
-  // Get the dominating executor value for this actor, if available,
-  // or else emit code to derive it.
-  SILValue executor = ExecutorForActor.lookup(actor);
-  if (executor) {
-    if (makeOptional)
-      executor = B.createOptionalSome(loc, executor,
-                           SILType::getOptionalType(executor->getType()));
-    return executor;
-  }
-
   // This is okay because actor types have to be classes and so never
   // have multiple abstraction patterns.
   CanType actorType = actor->getType().getASTType();
 
+  // If the operand is already a BuiltinExecutorType, just wrap it
+  // in an optional.
+  if (makeOptional && actor->getType().is<BuiltinExecutorType>()) {
+    return B.createOptionalSome(
+        loc, actor,
+        SILType::getOptionalType(actor->getType()));
+  }
+
   auto &ctx = F->getASTContext();
-  auto resultType = SILType::getPrimitiveObjectType(ctx.TheExecutorType);
+  auto executorType = SILType::getPrimitiveObjectType(ctx.TheExecutorType);
+  auto optionalExecutorType = SILType::getOptionalType(executorType);
 
-  // If the actor type is a default actor, go ahead and devirtualize here.
-  auto module = F->getModule().getSwiftModule();
-  SILValue unmarkedExecutor;
+  /// Emit the instructions to derive an executor value from an actor value.
+  auto getExecutorFor = [&](SILValue actor) -> SILValue {
+    // If the actor type is a default actor, go ahead and devirtualize here.
+    auto module = F->getModule().getSwiftModule();
+    CanType actorType = actor->getType().getASTType();
 
-  // Determine if the actor is a "default actor" in which case we'll build a default
-  // actor executor ref inline, rather than calling out to the user-provided executor function.
-  if (isDefaultActorType(actorType, module, F->getResilienceExpansion())) {
-    auto builtinName = ctx.getIdentifier(
-      getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
-    auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
-    auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
-                                     {actorType}, {});
-    unmarkedExecutor =
-      B.createBuiltin(loc, builtinName, resultType, subs, {actor});
+    // Determine if the actor is a "default actor" in which case we'll build a default
+    // actor executor ref inline, rather than calling out to the user-provided executor function.
+    if (isDefaultActorType(actorType, module, F->getResilienceExpansion())) {
+      auto builtinName = ctx.getIdentifier(
+        getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
+      auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
+      auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                                       {actorType}, {});
+      return B.createBuiltin(loc, builtinName, executorType, subs, {actor});
+    }
 
     // Otherwise, go through (Distributed)Actor.unownedExecutor.
-  } else {
     auto actorKind = actorType->isDistributedActor() ?
                      KnownProtocolKind::DistributedActor :
                      KnownProtocolKind::Actor;
@@ -203,6 +238,14 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     auto req = getUnownedExecutorGetter(ctx, actorProtocol);
     assert(req && "Concurrency library broken");
     SILDeclRef fn(req, SILDeclRef::Kind::Func);
+
+    // Open an existential actor type.
+    if (actorType->isExistentialType()) {
+      actorType = OpenedArchetypeType::get(
+          actorType, F->getGenericSignature())->getCanonicalType();
+      SILType loweredActorType = F->getLoweredType(actorType);
+      actor = B.createOpenExistentialRef(loc, actor, loweredActorType);
+    }
 
     auto actorConf = module->lookupConformance(actorType, actorProtocol);
     assert(actorConf &&
@@ -222,22 +265,64 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     auto executorDecl = ctx.getUnownedSerialExecutorDecl();
     auto executorProps = executorDecl->getStoredProperties();
     assert(executorProps.size() == 1);
-    unmarkedExecutor =
-      B.createStructExtract(loc, witnessCall, executorProps[0]);
+    return B.createStructExtract(loc, witnessCall, executorProps[0]);
+  };
+
+  SILValue unmarkedExecutor;
+  if (auto wrappedActor = actorType->getOptionalObjectType()) {
+    assert(makeOptional);
+
+    // Unwrap the optional and call 'unownedExecutor'.
+    auto *someDecl = B.getASTContext().getOptionalSomeDecl();
+    auto *curBB = B.getInsertionPoint()->getParent();
+    auto *contBB = curBB->split(B.getInsertionPoint());
+    auto *someBB = B.getFunction().createBasicBlockAfter(curBB);
+    auto *noneBB = B.getFunction().createBasicBlockAfter(someBB);
+
+    unmarkedExecutor = contBB->createPhiArgument(
+        optionalExecutorType, actor->getOwnershipKind());
+
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> caseBBs;
+    caseBBs.push_back(std::make_pair(someDecl, someBB));
+    B.setInsertionPoint(curBB);
+    auto *switchEnum = B.createSwitchEnum(loc, actor, noneBB, caseBBs);
+
+    SILValue unwrappedActor;
+    if (B.hasOwnership()) {
+      unwrappedActor = switchEnum->createOptionalSomeResult();
+      B.setInsertionPoint(someBB);
+    } else {
+      B.setInsertionPoint(someBB);
+      unwrappedActor = B.createUncheckedEnumData(loc, actor, someDecl);
+    }
+
+    // Call 'unownedExecutor' in the some block and wrap the result into
+    // an optional.
+    SILValue unwrappedExecutor = getExecutorFor(unwrappedActor);
+    SILValue someValue =
+        B.createOptionalSome(loc, unwrappedExecutor, optionalExecutorType);
+    B.createBranch(loc, contBB, {someValue});
+
+    // In the none case, create a nil executor value, which represents
+    // the generic executor.
+    B.setInsertionPoint(noneBB);
+    SILValue noneValue = B.createOptionalNone(loc, optionalExecutorType);
+    B.createBranch(loc, contBB, {noneValue});
+    B.setInsertionPoint(contBB->begin());
+  } else {
+    unmarkedExecutor = getExecutorFor(actor);
+
+    // Inject the result into an optional if requested.
+    if (makeOptional) {
+      unmarkedExecutor = B.createOptionalSome(loc, unmarkedExecutor,
+          SILType::getOptionalType(unmarkedExecutor->getType()));
+    }
   }
 
   // Mark the dependence of the resulting value on the actor value to
   // force the actor to stay alive.
-  executor = B.createMarkDependence(loc, unmarkedExecutor, actor,
-                                    /*isNonEscaping*/false);
-
-  // Cache the non-optional result for later.
-  ExecutorForActor.insert(actor, executor);
-
-  // Inject the result into an optional if requested.
-  if (makeOptional)
-    executor = B.createOptionalSome(loc, executor,
-                           SILType::getOptionalType(executor->getType()));
+  SILValue executor = B.createMarkDependence(loc, unmarkedExecutor, actor,
+                                             /*isNonEscaping*/false);
 
   return executor;
 }
@@ -250,7 +335,7 @@ class LowerHopToActorPass : public SILFunctionTransform {
     auto domTree = getAnalysis<DominanceAnalysis>()->get(fn);
     LowerHopToActor pass(getFunction(), domTree);
     if (pass.run())
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
   }
 };
 

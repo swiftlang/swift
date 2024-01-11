@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature OptionalIsolatedParameters %s -module-name test -swift-version 5 | %FileCheck %s
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
@@ -31,7 +31,37 @@ public func testClosureWithIsolatedParam() {
 public func testIsolatedExistential(_ a: isolated Actor) async {
   // CHECK: [[ACTOR_COPY:%.*]] = copy_value [[ACTOR]] : $any Actor
   // CHECK: [[ACTOR_BORROW:%.*]] = begin_borrow [[ACTOR_COPY]] : $any Actor
-  // CHECK: [[ACTOR_OPENED:%.*]] = open_existential_ref [[ACTOR_BORROW]] : $any Actor to $@opened("{{.*}}", any Actor) Self
-  // CHECK: hop_to_executor [[ACTOR_OPENED]] : $@opened("{{.*}}", any Actor) Self
+  // CHECK: hop_to_executor [[ACTOR_BORROW]] : $any Actor
+  // CHECK: return
+}
+
+@available(SwiftStdlib 5.1, *)
+nonisolated func suspend() async {}
+
+// CHECK-LABEL: sil{{.*}} [ossa] @$s4test0A16OptionalIsolatedyyAA1ACSgYiYaF
+// CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<A>)
+@available(SwiftStdlib 5.1, *)
+public func testOptionalIsolated(_ a: isolated A?) async {
+  await suspend()
+  // CHECK: [[ACTOR_COPY:%.*]] = copy_value [[ACTOR]] : $Optional<A>
+  // CHECK: [[ACTOR_BORROW:%.*]] = begin_borrow [[ACTOR_COPY]] : $Optional<A>
+  // CHECK: hop_to_executor [[ACTOR_BORROW]] : $Optional<A>
+  // CHECK: [[SUSPEND:%.*]] = function_ref @$s4test7suspendyyYaF : $@convention(thin) @async () -> ()
+  // CHECK: apply [[SUSPEND]]() : $@convention(thin) @async () -> ()
+  // CHECK: hop_to_executor [[ACTOR_BORROW]] : $Optional<A>
+  // CHECK: return
+}
+
+// CHECK-LABEL: sil{{.*}} [ossa] @$s4test0A27OptionalIsolatedExistentialyyScA_pSgYiYaF
+// CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>)
+@available(SwiftStdlib 5.1, *)
+public func testOptionalIsolatedExistential(_ a: isolated (any Actor)?) async {
+  await suspend()
+  // CHECK: [[ACTOR_COPY:%.*]] = copy_value [[ACTOR]] : $Optional<any Actor>
+  // CHECK: [[ACTOR_BORROW:%.*]] = begin_borrow [[ACTOR_COPY]] : $Optional<any Actor>
+  // CHECK: hop_to_executor [[ACTOR_BORROW]] : $Optional<any Actor>
+  // CHECK: [[SUSPEND:%.*]] = function_ref @$s4test7suspendyyYaF : $@convention(thin) @async () -> ()
+  // CHECK: apply [[SUSPEND]]() : $@convention(thin) @async () -> ()
+  // CHECK: hop_to_executor [[ACTOR_BORROW]] : $Optional<any Actor>
   // CHECK: return
 }

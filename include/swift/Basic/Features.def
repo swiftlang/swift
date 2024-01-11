@@ -254,6 +254,9 @@ EXPERIMENTAL_FEATURE(Extern, true)
 // global functions and key paths.
 EXPERIMENTAL_FEATURE(InferSendableFromCaptures, false)
 
+// Allow optional isolated parameters.
+EXPERIMENTAL_FEATURE(OptionalIsolatedParameters, true)
+
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
