@@ -323,6 +323,34 @@ public:
   void cacheResult(bool value) const;
 };
 
+class CollectExistentialConformancesRequest
+    : public SimpleRequest<CollectExistentialConformancesRequest,
+                           ArrayRef<ProtocolConformanceRef>(ModuleDecl*,
+                                                            CanType,
+                                                            CanType,
+                                                            bool,
+                                                            bool),
+                           RequestFlags::Uncached> { // TODO: maybe cache this?
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolConformanceRef>
+      evaluate(Evaluator &evaluator,
+               ModuleDecl *module,
+               CanType fromType,
+               CanType existential,
+               bool skipConditionalRequirements,
+               bool allowMissing) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Determine whether an existential type conforming to this protocol
 /// requires the \c any syntax.
 class HasSelfOrAssociatedTypeRequirementsRequest :

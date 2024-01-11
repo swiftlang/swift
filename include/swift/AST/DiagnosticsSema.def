@@ -7586,6 +7586,10 @@ WARNING(redundant_inverse_constraint,none,
 ERROR(inverse_on_class, none,
       "classes cannot be '~%0'",
       (StringRef))
+ERROR(inverse_with_class_constraint, none,
+      "composition involving %select{class requirement %2|'AnyObject'}0 "
+      "cannot contain '~%1'",
+      (bool, StringRef, Type))
 ERROR(inverse_extension, none,
       "cannot apply inverse %0 to extension",
       (Type))

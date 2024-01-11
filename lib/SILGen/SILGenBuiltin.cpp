@@ -1557,11 +1557,16 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
   }
   CanType anyTypeType =
       ExistentialMetatypeType::get(ctx.TheAnyType)->getCanonicalType();
+
+  auto module = SGF.getModule().getSwiftModule();
+  auto conformances = module->collectExistentialConformances(futureResultType,
+                                                             anyTypeType);
+
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
   auto &futureResultTL = SGF.getTypeLowering(futureResultType);
   auto futureResultMetadata =
       SGF.emitExistentialErasure(
-             loc, futureResultType, futureResultTL, anyTypeTL, {}, C,
+             loc, futureResultType, futureResultTL, anyTypeTL, conformances, C,
              [&](SGFContext C) -> ManagedValue {
                return ManagedValue::forObjectRValueWithoutOwnership(
                    SGF.B.createMetatype(loc,

@@ -31,6 +31,22 @@ public extension Eq where Self: Equatable {
   }
 }
 
+/// MARK: Result
+public enum Either<Success, Failure: Error> {
+  case success(Success)
+  case failure(Failure)
+}
+
+extension Either where Failure == Swift.Error {
+  public init(catching body: () throws -> Success) {
+    do {
+      self = .success(try body())
+    } catch {
+      self = .failure(error)
+    }
+  }
+}
+
 /// MARK: Iteration
 
 public protocol Generator: ~Copyable {
@@ -92,4 +108,9 @@ public func isJust<A: ~Copyable>(_ m: borrowing Maybe<A>) -> Bool {
 @inlinable
 public func isNothing<A: ~Copyable>(_ m: borrowing Maybe<A>) -> Bool {
   return !isJust(m)
+}
+
+public struct UnownedRef<Instance: AnyObject> {
+  @usableFromInline
+  internal unowned(unsafe) var _value: Instance
 }

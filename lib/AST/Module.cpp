@@ -1568,6 +1568,19 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive
 #endif
 }
 
+ArrayRef<ProtocolConformanceRef>
+ModuleDecl::collectExistentialConformances(CanType fromType,
+                                           CanType existential,
+                                           bool skipConditionalRequirements,
+                                           bool allowMissing) {
+  CollectExistentialConformancesRequest request{this,
+                                                fromType,
+                                                existential,
+                                                skipConditionalRequirements,
+                                                allowMissing};
+  return evaluateOrDefault(getASTContext().evaluator, request, /*default=*/{});
+}
+
 ProtocolConformanceRef
 ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   ASTContext &ctx = getASTContext();
@@ -1696,7 +1709,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   // replace the result with an "invalid" result.
   if (!allowMissing &&
       shouldCreateMissingConformances(type, protocol) &&
-      result.hasMissingConformance(this))
+      result.hasMissingConformance())
     return ProtocolConformanceRef::forInvalid();
 
   return result;

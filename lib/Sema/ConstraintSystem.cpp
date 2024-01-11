@@ -7672,7 +7672,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
             auto conformance = lookupConformance(argTy, sendable);
             isSendable &=
                 bool(conformance) &&
-                !conformance.hasMissingConformance(DC->getParentModule());
+                !conformance.hasMissingConformance();
           }
         }
       }

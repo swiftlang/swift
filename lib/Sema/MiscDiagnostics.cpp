@@ -415,7 +415,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
-        if (proto->isMarkerProtocol() && !proto->isInvertibleProtocol()) {
+        if (proto->isMarkerProtocol() && !proto->getInvertibleProtocolKind()) {
           // can't conditionally cast to a marker protocol
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());

@@ -240,25 +240,6 @@ namespace {
   };
 } // end anonymous namespace
 
-
-static ArrayRef<ProtocolConformanceRef>
-collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) {
-  assert(!fromType.isAnyExistentialType());
-
-  auto layout = toType.getExistentialLayout();
-  auto protocols = layout.getProtocols();
-  
-  SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (auto proto : protocols) {
-    auto conformance =
-      M->lookupConformance(fromType, proto, /*allowMissing=*/true);
-    assert(conformance);
-    conformances.push_back(conformance);
-  }
-  
-  return M->getASTContext().AllocateCopy(conformances);
-}
-
 static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                                              SILLocation loc,
                                              ManagedValue input,
@@ -292,10 +273,13 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
       ->getExistentialInstanceType()->getCanonicalType();
   }
 
+  assert(!fromInstanceType.isAnyExistentialType());
   ArrayRef<ProtocolConformanceRef> conformances =
-      collectExistentialConformances(SGF.SGM.M.getSwiftModule(),
+      SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
                                      fromInstanceType,
-                                     toInstanceType);
+                                     toInstanceType,
+                                     /*skipConditionalRequirements=*/true,
+                                     /*allowMissing=*/true);
 
   // Build result existential
   AbstractionPattern opaque = AbstractionPattern::getOpaque();

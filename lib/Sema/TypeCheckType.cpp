@@ -4993,6 +4993,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   Type SuperclassType;
   SmallVector<Type, 4> Members;
   InvertibleProtocolSet Inverses;
+  bool HasAnyObject = false;
 
   // Whether we saw at least one protocol. A protocol composition
   // must either be empty (in which case it is Any or AnyObject),
@@ -5050,6 +5051,8 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
             continue;
         if (!layout.getProtocols().empty())
           HasProtocol = true;
+        if (layout.hasExplicitAnyObject)
+          HasAnyObject = true;
 
         Inverses.insertAll(pct->getInverses());
         Members.push_back(ty);
@@ -5063,6 +5066,17 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
     IsInvalid = true;
   }
+
+  // Cannot combine inverses with Superclass or AnyObject in a composition.
+  if ((SuperclassType || HasAnyObject) && !Inverses.empty()) {
+    diagnose(repr->getStartLoc(),
+             diag::inverse_with_class_constraint,
+             HasAnyObject,
+             getProtocolName(getKnownProtocolKind(*Inverses.begin())),
+             SuperclassType);
+    IsInvalid = true;
+  }
+
 
   if (IsInvalid) {
     repr->setInvalid();
