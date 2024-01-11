@@ -2220,9 +2220,10 @@ public:
   }
 
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
-                                  const PotentialEffectReason &reason) {
+                                  const Classification &classification) {
     auto &Diags = ctx.Diags;
     auto message = diag::throwing_call_without_try;
+    const auto &reason = classification.getThrowReason();
     auto reasonKind = reason.getKind();
 
     bool suggestTryFixIt = reasonKind == PotentialEffectReason::Kind::Apply;
@@ -2262,7 +2263,8 @@ public:
       }
     }
 
-    Diags.diagnose(loc, message).highlight(highlight);
+    Diags.diagnose(loc, message).highlight(highlight)
+      .warnUntilSwiftVersionIf(classification.shouldDowngradeToWarning(), 6);
     maybeAddRethrowsNote(Diags, loc, reason);
 
     // If this is a call without expected 'try[?|!]', like this:
@@ -2562,6 +2564,15 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       
       /// Do we have any 'await's in this context?
       HasAnyAwait = 0x80,
+
+      /// Are we in an 'async let' initializer context?
+      InAsyncLet = 0x100,
+
+      /// Does an enclosing 'if' or 'switch' expr have a 'try'?
+      StmtExprCoversTry = 0x200,
+
+      /// Does an enclosing 'if' or 'switch' expr have an 'await'?
+      StmtExprCoversAwait = 0x400,
     };
   private:
     unsigned Bits;
@@ -2707,8 +2718,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     }
 
     void enterAsyncLet() {
-      Self.Flags.set(ContextFlags::IsTryCovered);
-      Self.Flags.set(ContextFlags::IsAsyncCovered);
+      Self.Flags.set(ContextFlags::InAsyncLet);
     }
 
     void refineLocalContext(Context newContext) {
@@ -2730,6 +2740,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.reset();
       Self.MaxThrowingKind = ConditionalEffectKind::None;
 
+      Self.Flags.mergeFrom(ContextFlags::StmtExprCoversTry, OldFlags);
+      Self.Flags.mergeFrom(ContextFlags::StmtExprCoversAwait, OldFlags);
+
       // Suppress 'try' coverage checking within a single level of
       // do/catch in debugger functions.
       if (OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction))
@@ -2745,6 +2758,17 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // "await" doesn't work this way; the "await" needs to be part of
       // the autoclosure expression itself, and the autoclosure must be
       // 'async'.
+    }
+
+    void setCoverageForSingleValueStmtExpr() {
+      resetCoverage();
+      Self.Flags.mergeFrom(ContextFlags::InAsyncLet, OldFlags);
+
+      if (OldFlags.has(ContextFlags::IsTryCovered))
+        Self.Flags.set(ContextFlags::StmtExprCoversTry);
+
+      if (OldFlags.has(ContextFlags::IsAsyncCovered))
+        Self.Flags.set(ContextFlags::StmtExprCoversAwait);
     }
 
     void preserveCoverageFromSingleValueStmtExpr() {
@@ -2918,7 +2942,7 @@ private:
     // For an if/switch expression, we reset coverage such that a 'try'/'await'
     // does not cover the branches.
     ContextScope scope(*this, /*newContext*/ llvm::None);
-    scope.resetCoverage();
+    scope.setCoverageForSingleValueStmtExpr();
     SVE->getStmt()->walk(*this);
     scope.preserveCoverageFromSingleValueStmtExpr();
     return ShouldNotRecurse;
@@ -3145,7 +3169,7 @@ private:
 
   ThrownErrorDestination
   checkThrowAsyncSite(ASTNode E, bool requiresTry,
-                      const Classification &classification) {
+                      Classification &classification) {
     // Suppress all diagnostics when there's an un-analyzable throw/async site.
     if (classification.isInvalid()) {
       Flags.set(ContextFlags::HasAnyThrowSite);
@@ -3173,10 +3197,13 @@ private:
                                               classification.getAsyncReason());
       }
       // Diagnose async calls that are outside of an await context.
-      else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
+      else if (!(Flags.has(ContextFlags::IsAsyncCovered) ||
+                 Flags.has(ContextFlags::InAsyncLet))) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
                                     CurContext.isWithinInterpolatedString());
+        if (Flags.has(ContextFlags::StmtExprCoversAwait))
+          classification.setDowngradeToWarning(true);
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
         uncoveredAsync[anchor].emplace_back(
@@ -3209,13 +3236,16 @@ private:
             break;
 
       bool isTryCovered =
-        (!requiresTry || Flags.has(ContextFlags::IsTryCovered));
+        (!requiresTry || Flags.has(ContextFlags::IsTryCovered) ||
+         Flags.has(ContextFlags::InAsyncLet));
       if (!CurContext.handlesThrows(throwsKind)) {
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowReason());
       } else if (!isTryCovered) {
+        if (Flags.has(ContextFlags::StmtExprCoversTry))
+          classification.setDowngradeToWarning(true);
         CurContext.diagnoseUncoveredThrowSite(Ctx, E, // we want this one to trigger
-                                              classification.getThrowReason());
+                                              classification);
       } else {
         return checkThrownErrorType(
             E.getStartLoc(), classification.getThrownError());
@@ -3367,7 +3397,7 @@ private:
 
   void diagnoseRedundantTry(AnyTryExpr *E) const {
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
-      // For an if/switch expression, produce an error instead of a warning.
+      // For an if/switch expression, produce a tailored warning.
       Ctx.Diags.diagnose(E->getTryLoc(),
                          diag::effect_marker_on_single_value_stmt,
                          "try", SVE->getStmt()->getKind())
@@ -3379,7 +3409,7 @@ private:
 
   void diagnoseRedundantAwait(AwaitExpr *E) const {
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
-      // For an if/switch expression, produce an error instead of a warning.
+      // For an if/switch expression, produce a tailored warning.
       Ctx.Diags.diagnose(E->getAwaitLoc(),
                          diag::effect_marker_on_single_value_stmt,
                          "await", SVE->getStmt()->getKind())
