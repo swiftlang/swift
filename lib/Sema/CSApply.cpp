@@ -5721,25 +5721,6 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType) {
     new (ctx) DerivedToBaseExpr(expr, toType));
 }
 
-/// Collect the conformances for all the protocols of an existential type.
-/// If the source type is also existential, we don't want to check conformance
-/// because most protocols do not conform to themselves -- however we still
-/// allow the conversion here, except the ErasureExpr ends up with trivial
-/// conformances.
-static ArrayRef<ProtocolConformanceRef>
-collectExistentialConformances(Type fromType, Type toType,
-                               ModuleDecl *module) {
-  auto layout = toType->getExistentialLayout();
-
-  SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (auto proto : layout.getProtocols()) {
-    conformances.push_back(TypeChecker::containsProtocol(
-        fromType, proto, module, false, /*allowMissing=*/true));
-  }
-
-  return toType->getASTContext().AllocateCopy(conformances);
-}
-
 /// Given that the given expression is an implicit conversion added
 /// to the target by coerceToType, find out how many OptionalEvaluationExprs
 /// it includes and the target.
@@ -6729,9 +6710,17 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   ASTContext &ctx = cs.getASTContext();
 
+  /// Collect the conformances for all the protocols of an existential type.
+  /// If the source type is also existential, we don't want to check conformance
+  /// because most protocols do not conform to themselves -- however we still
+  /// allow the conversion here, except the ErasureExpr ends up with trivial
+  /// conformances.
   auto conformances =
-    collectExistentialConformances(fromInstanceType, toInstanceType,
-                                   dc->getParentModule());
+      dc->getParentModule()
+        ->collectExistentialConformances(fromInstanceType->getCanonicalType(),
+                                         toInstanceType->getCanonicalType(),
+                                         /*skipConditionalRequirements=*/false,
+                                         /*allowMissing=*/true);
 
   // Use the requirements of any parameterized protocols to build out fake
   // argument conversions that can be used to infer opaque types.
