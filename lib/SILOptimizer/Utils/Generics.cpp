@@ -500,6 +500,11 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 
 static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
                                 SubstitutionMap Subs = {}) {
+  // Ignore "do not specialize" markers in embedded Swift -- specialization is
+  // mandatory.
+  if (Callee->getModule().getOptions().EmbeddedSwift)
+    return false;
+
   if (Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER))
     return true;
 
