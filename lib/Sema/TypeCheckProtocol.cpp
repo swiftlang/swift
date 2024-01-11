@@ -1359,9 +1359,9 @@ WitnessChecker::WitnessChecker(ASTContext &ctx, ProtocolDecl *proto,
                                Type adoptee, DeclContext *dc)
     : Context(ctx), Proto(proto), Adoptee(adoptee), DC(dc) {}
 
-void
-WitnessChecker::lookupValueWitnessesViaImplementsAttr(
-    ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
+static void
+lookupValueWitnessesViaImplementsAttr(
+    DeclContext *DC, ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
 
   auto name = req->createNameRef();
   auto *nominal = DC->getSelfNominalTypeDecl();
@@ -1411,7 +1411,7 @@ static bool contextMayExpandOperator(
 }
 
 SmallVector<ValueDecl *, 4>
-WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
+swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   assert(req->isProtocolRequirement());
 
@@ -1419,7 +1419,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
 
   // Do an initial check to see if there are any @_implements remappings
   // for this requirement.
-  lookupValueWitnessesViaImplementsAttr(req, witnesses);
+  lookupValueWitnessesViaImplementsAttr(DC, req, witnesses);
 
   auto reqName = req->createNameRef();
   auto reqBaseName = reqName.withoutArgumentLabels();
@@ -1441,7 +1441,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     for (auto candidate : lookup) {
       auto decl = candidate.getValueDecl();
       if (!isa<ProtocolDecl>(decl->getDeclContext()) &&
-          swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
+          swift::isMemberOperator(cast<FuncDecl>(decl), DC->getSelfInterfaceType())) {
         witnesses.push_back(decl);
       }
     }
@@ -1515,7 +1515,7 @@ bool WitnessChecker::findBestWitness(
     SmallVector<ValueDecl *, 4> witnesses;
     switch (attempt) {
     case Regular:
-      witnesses = lookupValueWitnesses(requirement, ignoringNames);
+      witnesses = lookupValueWitnesses(DC, requirement, ignoringNames);
       break;
     case OperatorsFromOverlay: {
       // If we have a Clang declaration, the matching operator might be in the
@@ -2924,29 +2924,26 @@ ConformanceChecker::~ConformanceChecker() {
             !getASTContext().hasDelayedConformanceErrors(Conformance));
 }
 
-ArrayRef<AssociatedTypeDecl *>
-ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
-  // Check whether we've already cached this information.
-  auto known = ReferencedAssociatedTypes.find(req);
-  if (known != ReferencedAssociatedTypes.end())
-    return known->second;
 
+TinyPtrVector<AssociatedTypeDecl *>
+ReferencedAssociatedTypesRequest::evaluate(Evaluator &eval,
+                                           ValueDecl *req) const {
   // Collect the set of associated types rooted on Self in the
   // signature. Note that for references to nested types, we only
   // want to consider the outermost dependent member type.
   //
   // For example, a requirement typed '(Iterator.Element) -> ()'
   // is not considered to reference the associated type 'Iterator'.
-  auto &assocTypes = ReferencedAssociatedTypes[req];
+  TinyPtrVector<AssociatedTypeDecl *> assocTypes;
 
   class Walker : public TypeWalker {
     ProtocolDecl *Proto;
-    llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes;
+    llvm::TinyPtrVector<AssociatedTypeDecl *> &assocTypes;
     llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
 
   public:
     Walker(ProtocolDecl *Proto,
-           llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes)
+           llvm::TinyPtrVector<AssociatedTypeDecl *> &assocTypes)
       : Proto(Proto), assocTypes(assocTypes) {}
 
     Action walkToTypePre(Type type) override {
@@ -2963,7 +2960,7 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
     }
   };
 
-  Walker walker(Proto, assocTypes);
+  Walker walker(cast<ProtocolDecl>(req->getDeclContext()), assocTypes);
 
   // This dance below is to avoid calling getCanonicalType() on a
   // GenericFunctionType, which creates a GenericSignatureBuilder, which
@@ -4301,7 +4298,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // If any of the type witnesses was erroneous, don't bother to check
   // this value witness: it will fail.
-  for (auto assocType : getReferencedAssociatedTypes(requirement)) {
+  auto referenced = evaluateOrDefault(getASTContext().evaluator,
+                                      ReferencedAssociatedTypesRequest{requirement},
+                                      TinyPtrVector<AssociatedTypeDecl *>());
+  for (auto assocType : referenced) {
     if (Conformance->getTypeWitness(assocType)->hasError()) {
       return ResolveWitnessResult::ExplicitFailed;
     }

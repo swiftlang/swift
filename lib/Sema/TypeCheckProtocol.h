@@ -636,6 +636,19 @@ struct RequirementMatch {
   swift::Witness getWitness(ASTContext &ctx) const;
 };
 
+/// Gather the value witnesses for the given requirement.
+///
+/// \param DC A nominal type or extension context where the conformance
+/// was declared.
+/// \param req A member of a protocol that DC conforms to.
+/// \param ignoringNames If non-null and there are no value
+/// witnesses with the correct full name, the results will reflect
+/// lookup for just the base name and the pointee will be set to
+/// \c true.
+SmallVector<ValueDecl *, 4> lookupValueWitnesses(DeclContext *DC,
+                                                 ValueDecl *req,
+                                                 bool *ignoringNames);
+
 struct RequirementCheck;
 
 class WitnessChecker {
@@ -675,15 +688,6 @@ protected:
            "must check access first using getRequiredAccessScope");
     return RequiredAccessScopeAndUsableFromInline.value().second;
   }
-
-  /// Gather the value witnesses for the given requirement.
-  ///
-  /// \param ignoringNames If non-null and there are no value
-  /// witnesses with the correct full name, the results will reflect
-  /// lookup for just the base name and the pointee will be set to
-  /// \c true.
-  SmallVector<ValueDecl *, 4> lookupValueWitnesses(ValueDecl *req,
-                                                   bool *ignoringNames);
 
   void lookupValueWitnessesViaImplementsAttr(ValueDecl *req,
                                              SmallVector<ValueDecl *, 4>
@@ -774,11 +778,6 @@ private:
   /// Witnesses that are currently being resolved.
   llvm::SmallPtrSet<ValueDecl *, 4> ResolvingWitnesses;
 
-  /// Caches the set of associated types that are referenced in each
-  /// requirement.
-  llvm::DenseMap<ValueDecl *, llvm::SmallVector<AssociatedTypeDecl *, 2>>
-    ReferencedAssociatedTypes;
-
   /// Keep track of missing witnesses, either type or value, for later
   /// diagnosis emits. This may contain witnesses that are external to the
   /// protocol under checking.
@@ -803,10 +802,6 @@ private:
 
   /// Whether objcMethodRequirements has been computed.
   bool computedObjCMethodRequirements = false;
-
-  /// Retrieve the associated types that are referenced by the given
-  /// requirement with a base of 'Self'.
-  ArrayRef<AssociatedTypeDecl *> getReferencedAssociatedTypes(ValueDecl *req);
 
   /// Record a (non-type) witness for the given requirement.
   void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -1132,13 +1127,11 @@ private:
 
   /// Infer associated type witnesses for the given value requirement.
   InferredAssociatedTypesByWitnesses inferTypeWitnessesViaValueWitnesses(
-                   ConformanceChecker &checker,
                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    ValueDecl *req);
 
   /// Infer associated type witnesses for the given associated type.
   InferredAssociatedTypesByWitnesses inferTypeWitnessesViaAssociatedType(
-                   ConformanceChecker &checker,
                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType);
 
@@ -1147,7 +1140,6 @@ private:
   /// \param assocTypes The set of associated types we're interested in.
   InferredAssociatedTypes
   inferTypeWitnessesViaValueWitnesses(
-    ConformanceChecker &checker,
     const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
 
   /// Compute a "fixed" type witness for an associated type, e.g.,
@@ -1255,8 +1247,7 @@ private:
   ///   involving multiple files/modules, and not in tests within the Swift
   ///   project itself.
   bool canAttemptEagerTypeWitnessDerivation(
-      ConformanceChecker &checker,
-      AssociatedTypeDecl *assocType);
+      DeclContext *DC, AssociatedTypeDecl *assocType);
 
 public:
   /// Describes a mapping from associated type declarations to their

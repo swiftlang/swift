@@ -2829,6 +2829,25 @@ public:
   void cacheResult(TypeWitnessAndDecl value) const;
 };
 
+class ReferencedAssociatedTypesRequest
+    : public SimpleRequest<ReferencedAssociatedTypesRequest,
+                           TinyPtrVector<AssociatedTypeDecl *>(ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  TinyPtrVector<AssociatedTypeDecl *>
+  evaluate(Evaluator &evaluator, ValueDecl *req) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class ValueWitnessRequest
     : public SimpleRequest<ValueWitnessRequest,
                            Witness(NormalProtocolConformance *, ValueDecl *),
