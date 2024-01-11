@@ -337,7 +337,7 @@ macro(swift_common_cxx_warnings)
 
   check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
   if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wnested-anon-types>)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types>)
   endif()
 
   # Check for '-fapplication-extension'.  On OS X/iOS we wish to link all
