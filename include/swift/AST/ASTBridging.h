@@ -43,7 +43,7 @@ class BridgedASTContext;
 
 class BridgedIdentifier {
 public:
-  SWIFT_UNAVAILABLE("Use '.raw' instead")
+  SWIFT_NAME("Use '.raw' instead")
   const void *_Nullable Raw;
 
   BridgedIdentifier() : Raw(nullptr) {}
@@ -159,10 +159,10 @@ class BridgedASTContext {
 
 public:
 #ifdef USED_IN_CPP_SOURCE
-  SWIFT_UNAVAILABLE("Use init(raw:) instead")
+  SWIFT_NAME("Use init(raw:) instead")
   BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
 
-  SWIFT_UNAVAILABLE("Use '.raw' instead")
+  SWIFT_NAME("Use '.raw' instead")
   swift::ASTContext &unbridged() const { return *Ctx; }
 #endif
 };
@@ -343,13 +343,13 @@ class BridgedDiagnostic {
 public:
   struct Impl;
 
-  SWIFT_UNAVAILABLE("Unavailable in Swift")
+  SWIFT_NAME("Unavailable in Swift")
   Impl *_Nonnull Raw;
 
-  SWIFT_UNAVAILABLE("Unavailable in Swift")
+  SWIFT_NAME("Unavailable in Swift")
   BridgedDiagnostic(Impl *_Nonnull raw) : Raw(raw) {}
 
-  SWIFT_UNAVAILABLE("Unavailable in Swift")
+  SWIFT_NAME("Unavailable in Swift")
   Impl *_Nonnull unbridged() const { return Raw; }
 };
 
