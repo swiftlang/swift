@@ -486,6 +486,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
     // The argument is +0, so we can use the address of the param in
     // the context directly.
     arguments.add(resultAddr);
+    LoadedArguments.push_back(std::make_pair(resultValue.getAddress(), argumentType));
     break;
   }
 
