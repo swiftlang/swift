@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
 
@@ -437,13 +437,15 @@ actor WrapperActorBad2<Wrapped: Sendable> {
 struct WrapperWithMainActorDefaultInit {
   var wrappedValue: Int { fatalError() }
 
-  @MainActor init() {} // expected-note 2 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  @MainActor init() {} // expected-note {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  // expected-minimal-targeted-note@-1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 }
 
 actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
-  @WrapperWithMainActorDefaultInit var property: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
+  @WrapperWithMainActorDefaultInit var property: Int // expected-minimal-targeted-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
+  // expected-complete-tns-error@-1 {{main actor-isolated default value in a actor-isolated context}}
   func f() {
     _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced on a different actor instance}}
     _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced on a different actor instance}}
@@ -557,8 +559,9 @@ struct WrapperOnUnsafeActor<Wrapped> {
   }
 }
 
+// HasWrapperOnUnsafeActor gets an inferred @MainActor attribute.
 struct HasWrapperOnUnsafeActor {
-  @WrapperOnUnsafeActor var synced: Int = 0
+  @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-tns-error {{global actor 'OtherGlobalActor'-isolated default value in a main actor-isolated context}}
   // expected-note @-1 3{{property declared here}}
   // expected-complete-tns-note @-2 3{{property declared here}}
 
@@ -643,11 +646,11 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 
 // defer bodies inherit global actor-ness
 @MainActor
-var statefulThingy: Bool = false // expected-note {{var declared here}}
+var statefulThingy: Bool = false // expected-minimal-targeted-note {{var declared here}}
 // expected-complete-tns-error @-1 {{top-level code variables cannot have a global actor}}
 
 @MainActor
-func useFooInADefer() -> String { // expected-note {{calls to global function 'useFooInADefer()' from outside of its actor context are implicitly asynchronous}}
+func useFooInADefer() -> String { // expected-minimal-targeted-note {{calls to global function 'useFooInADefer()' from outside of its actor context are implicitly asynchronous}}
   defer {
     statefulThingy = true
   }
@@ -677,9 +680,11 @@ class Cutter {
 
 @SomeGlobalActor
 class Butter {
-  var a = useFooInADefer() // expected-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+  var a = useFooInADefer() // expected-minimal-targeted-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+  // expected-complete-tns-error@-1 {{main actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context}}
 
-  nonisolated let b = statefulThingy // expected-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
+  nonisolated let b = statefulThingy // expected-minimal-targeted-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
+  // expected-complete-tns-error@-1 {{main actor-isolated default value in a nonisolated context}}
 
   var c: Int = {
     return getGlobal7()

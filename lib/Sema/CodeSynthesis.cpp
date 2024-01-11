@@ -337,7 +337,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   ctor->setSynthesized();
   ctor->setAccess(accessLevel);
 
-  if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues)) {
+  if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues) &&
+      !decl->isActor()) {
     // If any of the type's actor-isolated properties:
     //   1. Have non-Sendable type, or
     //   2. Have an isolated initial value

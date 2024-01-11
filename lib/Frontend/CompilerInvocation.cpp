@@ -880,6 +880,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.hasFeature(Feature::CompleteConcurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
     Opts.enableFeature(Feature::DisableOutwardActorInference);
+    Opts.enableFeature(Feature::IsolatedDefaultValues);
     Opts.enableFeature(Feature::GlobalConcurrency);
   }
 
@@ -1017,6 +1018,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   } else {
     // Default to minimal checking in Swift 5.x.
     Opts.StrictConcurrencyLevel = StrictConcurrency::Minimal;
+  }
+
+  // StrictConcurrency::Complete enables all data-race safety features.
+  if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
+    Opts.enableFeature(Feature::IsolatedDefaultValues);
   }
 
   Opts.WarnImplicitOverrides =

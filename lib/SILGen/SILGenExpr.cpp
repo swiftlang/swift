@@ -2647,24 +2647,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
                captures);
 
-  // The default argument might require the callee's isolation. If so,
-  // make sure to emit an actor hop.
-  //
-  // FIXME: Instead of hopping back and forth for each individual isolated
-  // default argument, we should emit one hop for all default arguments if
-  // any of them are isolated, and immediately enter the function after.
-  llvm::Optional<ActorIsolation> implicitActorHopTarget = llvm::None;
-  if (implicitlyAsync) {
-    auto *param = getParameterAt(defaultArgsOwner.getDecl(), destIndex);
-    auto isolation = param->getInitializerIsolation();
-    if (isolation.isActorIsolated()) {
-      implicitActorHopTarget = isolation;
-    }
-  }
-
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   captures, calleeTypeInfo, ApplyOptions(), C,
-                   implicitActorHopTarget);
+                   captures, calleeTypeInfo, ApplyOptions(), C, llvm::None);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
