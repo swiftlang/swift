@@ -3,6 +3,30 @@
 > **Note**\
 > This is in reverse chronological order, so newer entries are added to the top.
 
+## Swift 5.10
+
+* [SE-0411][]:
+
+  Default value expressions can now have the same isolation as the enclosing
+  function or the corresponding stored property:
+
+  ```swift
+  @MainActor
+  func requiresMainActor() -> Int { ... }
+
+  class C {
+    @MainActor
+    var x: Int = requiresMainActor()
+  }
+
+  @MainActor func defaultArg(value: Int = requiresMainActor()) { ... }
+  ```
+
+  For isolated default values of stored properties, the implicit initialization
+  only happens in the body of an `init` with the same isolation. This closes
+  an important data-race safety hole where global-actor-isolated default values
+  could inadvertently run synchronously from outside the actor.
+
 ## Swift 5.9.2
 
 * [SE-0407][]:
@@ -9846,6 +9870,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0394]: https://github.com/apple/swift-evolution/blob/main/proposals/0394-swiftpm-expression-macros.md
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
+[SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
