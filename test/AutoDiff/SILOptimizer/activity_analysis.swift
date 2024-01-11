@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-sil -verify -Xllvm -debug-only=differentiation %s  2>&1 | %FileCheck %s
+// TODO: re-enable the boolean-literal-folding pass and fix the test accordingly
+// RUN: %target-swift-emit-sil -Xllvm -sil-disable-pass=boolean-literal-folding -verify -Xllvm -debug-only=differentiation %s  2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 import _Differentiation

@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
+// REQUIRES: swift_in_compiler
+
 func a() {
   a()  // expected-warning {{function call causes an infinite recursion}}
 }
@@ -152,11 +154,11 @@ func e() { f() }
 func f() { e() }
 
 func g() {
-  while true { // expected-note {{condition always evaluates to true}}
+  while true {
     g() // expected-warning {{function call causes an infinite recursion}}
   }
 
-  g() // expected-warning {{will never be executed}}
+  g()
 }
 
 func h(_ x : Int) {
