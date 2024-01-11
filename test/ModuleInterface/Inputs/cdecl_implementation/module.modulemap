@@ -1,0 +1,4 @@
+module cdecl_implementation {
+  header "cdecl_implementation.h"
+  export *
+}
