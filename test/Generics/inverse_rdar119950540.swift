@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-silgen -enable-experimental-feature NoncopyableGenerics > /dev/null
 
+// For -enable-experimental-feature NoncopyableGenerics
+// REQUIRES: asserts
+
 public protocol MyIteratorProtocol<Element> {
   associatedtype Element
   mutating func next() -> Element?
