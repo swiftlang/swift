@@ -701,7 +701,7 @@ bool swift::isSendableType(ModuleDecl *module, Type type) {
     return false;
 
   // Look for missing Sendable conformances.
-  return !conformance.forEachMissingConformance(module,
+  return !conformance.forEachMissingConformance(
       [](BuiltinProtocolConformance *missing) {
         return missing->getProtocol()->isSpecificProtocol(
             KnownProtocolKind::Sendable);
@@ -1082,7 +1082,7 @@ bool swift::diagnoseNonSendableTypes(
 
   // Walk the conformance, diagnosing any missing Sendable conformances.
   bool anyMissing = false;
-  conformance.forEachMissingConformance(module,
+  conformance.forEachMissingConformance(
       [&](BuiltinProtocolConformance *missing) {
         if (diagnoseSingleNonSendableType(
                 missing->getType(), fromContext,
@@ -1281,7 +1281,7 @@ namespace {
           return true;
 
         // Look for missing Sendable conformances.
-        return conformance.forEachMissingConformance(module,
+        return conformance.forEachMissingConformance(
             [&](BuiltinProtocolConformance *missing) {
               // For anything other than Sendable, fail.
               if (missing->getProtocol() != sendableProto)

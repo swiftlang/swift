@@ -128,7 +128,7 @@ public:
   /// Determine whether this conformance (or a conformance it depends on)
   /// involves a "missing" conformance anywhere. Such conformances
   /// cannot be depended on to always exist.
-  bool hasMissingConformance(ModuleDecl *module) const;
+  bool hasMissingConformance() const;
 
   /// Enumerate the missing conformances in this conformance.
   ///
@@ -140,7 +140,6 @@ public:
   /// \returns \c true if any invocation of \c fn returned true,
   /// \c false otherwise.
   bool forEachMissingConformance(
-      ModuleDecl *module,
       llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const;
 
   using OpaqueValue = void*;

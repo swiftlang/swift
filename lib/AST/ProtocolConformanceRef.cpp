@@ -319,22 +319,21 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
   return false;
 }
 
-bool ProtocolConformanceRef::hasMissingConformance(ModuleDecl *module) const {
-  return forEachMissingConformance(module,
+bool ProtocolConformanceRef::hasMissingConformance() const {
+  return forEachMissingConformance(
       [](BuiltinProtocolConformance *builtin) {
         return true;
       });
 }
 
 bool ProtocolConformanceRef::forEachMissingConformance(
-    ModuleDecl *module,
     llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const {
   if (isInvalid() || isAbstract())
     return false;
 
   if (isPack()) {
     for (auto conformance : getPack()->getPatternConformances()) {
-      if (conformance.forEachMissingConformance(module, fn))
+      if (conformance.forEachMissingConformance(fn))
         return true;
     }
 
@@ -352,7 +351,7 @@ bool ProtocolConformanceRef::forEachMissingConformance(
   // Check conformances that are part of this conformance.
   auto subMap = concreteConf->getSubstitutionMap();
   for (auto conformance : subMap.getConformances()) {
-    if (conformance.forEachMissingConformance(module, fn))
+    if (conformance.forEachMissingConformance(fn))
       return true;
   }
 

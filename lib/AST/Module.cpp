@@ -1696,7 +1696,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   // replace the result with an "invalid" result.
   if (!allowMissing &&
       shouldCreateMissingConformances(type, protocol) &&
-      result.hasMissingConformance(this))
+      result.hasMissingConformance())
     return ProtocolConformanceRef::forInvalid();
 
   return result;

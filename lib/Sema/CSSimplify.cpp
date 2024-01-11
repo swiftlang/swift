@@ -8414,8 +8414,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       increaseScore(SK_Unavailable, locator);
 
     unsigned numMissing = 0;
-    conformance.forEachMissingConformance(DC->getParentModule(),
-                                          [&numMissing](auto *missing) {
+    conformance.forEachMissingConformance([&numMissing](auto *missing) {
                                             ++numMissing;
                                             return false;
                                           });
