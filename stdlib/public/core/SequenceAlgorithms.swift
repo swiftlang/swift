@@ -602,15 +602,13 @@ extension Sequence {
   ///   the element should be included in the count.
   /// - Returns: The number of elements in the sequence that satisfy the given
   ///   predicate.
-  @inlinable
+  @_alwaysEmitIntoClient
   public func count(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Int {
     var count = 0
     for e in self {
-      if try predicate(e) {
-        count += 1
-      }
+      count += try predicate(e) ? 1 : 0
     }
     return count
   }

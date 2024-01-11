@@ -172,7 +172,7 @@ func rdar21080030() {
   var s = "Hello"
   // https://github.com/apple/swift/issues/50141
   // This should be 'cannot_call_non_function_value'.
-  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}} {{13-15=}}
+  if s.count() == 0 {} // expected-error{{missing argument for parameter 'where' in call}} {{13-15=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -1534,7 +1534,7 @@ func issue63746() {
 
 func rdar86611718(list: [Int]) {
   String(list.count())
-  // expected-error@-1 {{cannot call value of non-function type 'Int'}}
+  // expected-error@-1 {{missing argument for parameter 'where' in call}}
 }
 
 // rdar://108977234 - failed to produce diagnostic when argument to AnyHashable parameter doesn't conform to Hashable protocol
