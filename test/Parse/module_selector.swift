@@ -129,7 +129,70 @@ extension GoodStruct {
 }
 
 struct InvalidModuleSelectors {
+  var a: ::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var b: (::Int)
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var c: *::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var d: _::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
   var e: Self::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var f: self::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var g: inout::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var h: Any::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var aArray: [::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var bArray: [(::Int)]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var cArray: [*::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var dArray: [_::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var eArray: [Self::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var fArray: [self::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var gArray: [inout::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var hArray: [Any::Int]
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var aIndex: String.::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var bIndex: String._::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var cIndex: String.Self::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var dIndex: String.self::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var eIndex: String.inout::Index
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  var fIndex: String.Any::Index
   // expected-error@-1 {{expected identifier in module selector}}
 
   func inExpr(_ s: GoodStruct) {

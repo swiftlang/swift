@@ -604,6 +604,9 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 /// fallback, so do not attempt a callback to ASTGen.
 ParserResult<TypeRepr>
 Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
+  // If we have an invalid module selector, consume that first.
+  parseModuleSelector(ModuleSelectorReason::InvalidOnly);
+
   ParserResult<TypeRepr> ty;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
