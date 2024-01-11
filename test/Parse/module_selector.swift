@@ -17,6 +17,10 @@ enum GoodEnum {
 extension GoodStruct: Swift::Equatable {}
 
 extension Swift::Int {
+  var magnitude: Swift::Int {
+    Swift::abs(self)
+  }
+
   init(goodStruct: main::GoodStruct) {
     self.init(goodStruct.x)
   }
@@ -122,4 +126,38 @@ extension GoodStruct {
   typealias main::BadNestedTypealias = Bool
   // expected-error@-1 {{name in typealias declaration cannot be qualified with a module selector}}
   // expected-note@-2 {{remove module selector from this name}} {{13-19=}}
+}
+
+struct InvalidModuleSelectors {
+  var e: Self::Int
+  // expected-error@-1 {{expected identifier in module selector}}
+
+  func inExpr(_ s: GoodStruct) {
+    _ = s.::x
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = (1.::magnitude)
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    Self::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    self::print()
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1._::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.Self::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.inout::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+
+    _ = 1.Any::magnitude
+    // expected-error@-1 {{expected identifier in module selector}}
+  }
 }

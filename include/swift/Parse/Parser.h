@@ -1758,10 +1758,15 @@ public:
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
 
   /// The reason we are trying to parse a module selector. Other than
-  /// \c Allowed all reasons indicate an error should be emitted.
+  /// \c Allowed and \c InvalidOnly, all reasons indicate an error should be
+  /// emitted.
   enum class ModuleSelectorReason : uint8_t {
     /// Use of a module selector is allowed.
     Allowed,
+
+    /// Only parse (and diagnose) invalid module selectors here; if the module
+    /// selector is valid, return \c None and leave it for later.
+    InvalidOnly,
 
     /// Not allowed; this is the name of a declaration. The string parameter
     /// describes the declaration in question (e.g. a class, struct, etc.).

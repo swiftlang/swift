@@ -2310,6 +2310,11 @@ Parser::parseModuleSelector(ModuleSelectorReason reason,
   SourceLoc nameLoc;
   Identifier moduleName;
   if (Tok.is(tok::identifier)) {
+    // If we are only supposed to consume invalid selectors, leave this for
+    // later.
+    if (reason == ModuleSelectorReason::InvalidOnly)
+      return llvm::None;
+
     nameLoc = consumeIdentifier(moduleName, /*diagnoseDollarPrefix=*/true);
   } else if (Tok.is(tok::colon_colon))
     // Let nameLoc and colonColonLoc both point to the tok::colon_colon.
@@ -2319,7 +2324,8 @@ Parser::parseModuleSelector(ModuleSelectorReason reason,
 
   auto colonColonLoc = consumeToken(tok::colon_colon);
 
-  if (reason != ModuleSelectorReason::Allowed) {
+  if (reason != ModuleSelectorReason::Allowed &&
+      reason != ModuleSelectorReason::InvalidOnly) {
     diagnose(colonColonLoc, diag::module_selector_not_allowed, (uint8_t)reason,
              declKindName);
 
@@ -2328,6 +2334,9 @@ Parser::parseModuleSelector(ModuleSelectorReason reason,
 
     return llvm::None;
   }
+
+  if (moduleName.empty())
+    diagnose(nameLoc, diag::expected_identifier_in_module_selector);
 
   return Located<Identifier>(moduleName, nameLoc);
 }
