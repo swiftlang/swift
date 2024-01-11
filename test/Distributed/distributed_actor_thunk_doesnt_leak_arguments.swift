@@ -24,6 +24,52 @@ struct S<T> : Codable {
   var data: SomeClass<T>
 }
 
+
+class Sentinel {
+  let str: String = ""
+}
+
+struct InnerStruct1 {
+  let sentinel: Sentinel
+  let innerStruct2: InnerStruct2
+
+  init() {
+    self.sentinel = Sentinel()
+    self.innerStruct2 = InnerStruct2()
+  }
+}
+
+struct InnerStruct2 {
+  let sentinel: Sentinel
+
+  init() {
+    self.sentinel = Sentinel()
+  }
+}
+
+enum InnerEnum {
+  case v1(String)
+  case v2(InnerStruct1)
+}
+
+struct ArgumentType: Codable {
+  let sentinel: Sentinel
+  let value: Int
+  let innerEnum: InnerEnum
+
+  init() {
+    self.sentinel = Sentinel()
+    self.value = 100
+    self.innerEnum = .v2(InnerStruct1())
+  }
+
+  init(from decoder: Decoder) throws {
+    fatalError("Not implemented")
+  }
+
+  func encode(to encoder: Encoder) throws {}
+}
+
 distributed actor Greeter {
   // CHECK-LABEL: define linkonce_odr hidden swifttailcc void @"$s15no_to_arg_leaks7GreeterC5test1yyAA9SomeClassCyxGYaKlFTETF"
   // CHECK: call void {{.*}}(ptr noalias [[PARAM:%.*]], ptr %arg_type)
@@ -35,6 +81,11 @@ distributed actor Greeter {
   // CHECK: call void {{.*}}(ptr noalias [[PARAM:%.*]], ptr %arg_type)
   // CHECK-NEXT: call swiftcc void @swift_task_dealloc(ptr [[PARAM]])
   distributed func test2<T>(_: S<T>) {}
+
+  // CHECK-LABEL: define linkonce_odr hidden swifttailcc void @"$s15no_to_arg_leaks7GreeterC5test3yyAA12ArgumentTypeVYaKFTETF"
+  // CHECK: call void {{.*}}(ptr noalias [[PARAM:%.*]], ptr %arg_type)
+  // CHECK-NEXT: call swiftcc void @swift_task_dealloc(ptr [[PARAM]])
+  distributed func test3(_: ArgumentType) {}
 }
 
 func test() async throws {
@@ -45,4 +96,5 @@ func test() async throws {
 
   try await ref.test1(SomeClass<Int>())
   try await ref.test2(S(data: SomeClass<Int>()))
+  try await ref.test3(.init())
 }
