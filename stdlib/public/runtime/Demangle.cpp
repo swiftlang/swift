@@ -516,7 +516,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 #endif
 
       auto protocolNode =
-          _buildDemanglingForContext(protocol.getSwiftProtocol(), { }, Dem);
+          _buildDemanglingForContext(protocol.getSwiftProtocol(), {}, Dem);
       if (!protocolNode)
         return nullptr;
 

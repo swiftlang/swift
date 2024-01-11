@@ -1092,6 +1092,10 @@ def create_argument_parser():
            default=True,
            help='Build Remote Mirror')
 
+    option('--build-swift-external-generic-metadata-builder', toggle_true,
+           default=True,
+           help='Build External Generic Metadata Builder')
+
     option('--build-swift-libexec', toggle_true,
            default=True,
            help='build auxiliary executables')

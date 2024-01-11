@@ -264,6 +264,8 @@ public:
   // Only to be used by the demangler parsers.
   void removeChildAt(unsigned Pos);
 
+  void replaceChild(unsigned Pos, NodePointer Child);
+
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
 

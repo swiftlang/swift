@@ -526,6 +526,8 @@ ManglingError Remangler::mangleAnyNominalType(Node *node, unsigned depth) {
     return mangleAnyGenericType(node, "XY", depth);
   case Node::Kind::TypeAlias:
     return mangleAnyGenericType(node, "a", depth);
+  case Node::Kind::TypeSymbolicReference:
+    return mangleTypeSymbolicReference(node, depth);
   default:
     return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
   }
@@ -598,6 +600,10 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
       NodePointer unboundType = node->getChild(0);
       DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, node);
       NodePointer nominalType = unboundType->getChild(0);
+      if (nominalType->getKind() == Node::Kind::TypeSymbolicReference) {
+          NodePointer resolvedUnboundType = Resolver(SymbolicReferenceKind::Context, (const void *)nominalType->getIndex());
+          nominalType = resolvedUnboundType->getChild(0);
+      }
       NodePointer parentOrModule = nominalType->getChild(0);
       RETURN_IF_ERROR(mangleGenericArgs(parentOrModule, Separator, depth + 1,
                                         fullSubstitutionMap));

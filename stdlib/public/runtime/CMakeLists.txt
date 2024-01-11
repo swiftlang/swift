@@ -64,6 +64,7 @@ set(swift_runtime_sources
     SymbolInfo.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
+    LibPrespecialized.cpp
     Metadata.cpp
     MetadataLookup.cpp
     Numeric.cpp

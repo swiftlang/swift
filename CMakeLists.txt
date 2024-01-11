@@ -215,6 +215,10 @@ option(SWIFT_BUILD_REMOTE_MIRROR
     "Build the Swift Remote Mirror Library"
     TRUE)
 
+option(SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER
+    "Build the Swift External Generic Metadata Builder Library"
+    TRUE)
+
 option(SWIFT_BUILD_DYNAMIC_STDLIB
     "Build dynamic variants of the Swift standard library"
     TRUE)
@@ -222,11 +226,11 @@ option(SWIFT_BUILD_DYNAMIC_STDLIB
 option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library"
     FALSE)
-    
+
 option(SWIFT_STDLIB_STATIC_PRINT
     "Build compile-time evaluated vprintf()"
     FALSE)
-    
+
 option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     "Include Unicode data files in the standard library.
     NOTE: Disabling this will cause many String methods to crash."
@@ -1242,6 +1246,11 @@ endif()
 
 if(SWIFT_BUILD_REMOTE_MIRROR)
   message(STATUS "Building Swift Remote Mirror for SDKs: ${SWIFT_SDKS}")
+  message(STATUS "")
+endif()
+
+if(SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
+  message(STATUS "Building Swift External Generic Metadata Builder for SDKs: ${SWIFT_SDKS}")
   message(STATUS "")
 endif()
 

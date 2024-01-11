@@ -451,6 +451,24 @@ void Node::removeChildAt(unsigned Pos) {
   }
 }
 
+void Node::replaceChild(unsigned Pos, NodePointer Child) {
+  switch (NodePayloadKind) {
+    case PayloadKind::OneChild:
+      assert(Pos == 0);
+      InlineChildren[0] = Child;
+      break;
+    case PayloadKind::TwoChildren:
+      assert(Pos < 2);
+      InlineChildren[Pos] = Child;
+      break;
+    case PayloadKind::ManyChildren:
+      Children.Nodes[Pos] = Child;
+      break;
+    default:
+      assert(false && "cannot remove child");
+  }
+}
+
 void Node::reverseChildren(size_t StartingAt) {
   assert(StartingAt <= getNumChildren());
   switch (NodePayloadKind) {

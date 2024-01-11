@@ -63,7 +63,8 @@ struct RuntimeTarget<8> {
 };
 
 namespace reflection {
-  class FieldDescriptor;
+  template <typename Runtime>
+  class TargetFieldDescriptor;
 }
 
 /// In-process native runtime target.

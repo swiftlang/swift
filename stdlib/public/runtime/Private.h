@@ -586,7 +586,7 @@ public:
 
   void validateExternalGenericMetadataBuilder(
       const Metadata *original, const TypeContextDescriptor *description,
-      const void *arguments);
+      const void * const *arguments);
 
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,

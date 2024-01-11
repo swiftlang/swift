@@ -20,7 +20,7 @@
 #include "swift/Runtime/Config.h"
 
 namespace swift {
-  
+
 struct OpaqueValue;
 struct InProcess;
 
@@ -139,7 +139,7 @@ void swift_initEnumMetadataMultiPayloadWithLayoutString(EnumMetadata *enumType,
 SWIFT_RUNTIME_EXPORT
 unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                        const EnumMetadata *enumType);
-  
+
 /// Store the tag value for the given case into a multi-payload enum,
 ///        whose associated payload (if any) has already been initialized.
 SWIFT_RUNTIME_EXPORT

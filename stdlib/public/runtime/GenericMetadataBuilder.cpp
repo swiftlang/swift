@@ -32,7 +32,7 @@
 using namespace swift;
 
 #define LOG(fmt, ...)                                                          \
-  log(__FILE_NAME__, __LINE__, __func__, fmt __VA_OPT__(, ) __VA_ARGS__)
+  log(METADATA_BUILDER_LOG_FILE_NAME, __LINE__, __func__, fmt, __VA_ARGS__)
 
 /// A ReaderWriter (as used by GenericMetadataBuilder) that works in-process.
 /// Pointer writing and pointer resolution are just raw pointer operations. Type
@@ -43,7 +43,7 @@ public:
 
   using Size = typename Runtime::StoredSize;
   using StoredPointer = typename Runtime::StoredPointer;
-  using GenericArgument = void *;
+  using GenericArgument = const void *;
 
   /// A typed buffer which wraps a value, or values, of type T.
   template <typename T>
@@ -269,9 +269,9 @@ public:
 
   bool isLoggingEnabled() { return true; }
 
-  [[gnu::format(printf, 5, 6)]] void log(const char *filename, unsigned line,
-                                         const char *function, const char *fmt,
-                                         ...) {
+  SWIFT_FORMAT(5, 6)
+  void log(const char *filename, unsigned line, const char *function,
+           const char *fmt, ...) {
     if (swift::runtime::environment::
             SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER() < 2)
       return;
@@ -288,18 +288,17 @@ public:
 };
 
 static BuilderErrorOr<ValueMetadata *> allocateGenericValueMetadata(
-    const ValueTypeDescriptor *description, const void *arguments,
+    const ValueTypeDescriptor *description, llvm::ArrayRef<InProcessReaderWriter::GenericArgument> arguments,
     const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
   InProcessReaderWriter readerWriter;
   GenericMetadataBuilder builder{readerWriter};
-  auto result = ERROR_CHECK(builder.buildGenericValueMetadata(
-      {description},
-      reinterpret_cast<const InProcessReaderWriter::GenericArgument *>(
-          arguments),
-      {pattern}, extraDataSize));
+  auto result = builder.buildGenericValueMetadata({description}, arguments,
+                                                  {pattern}, extraDataSize);
+  if (!result)
+    return *result.getError();
 
-  char *base = reinterpret_cast<char *>(result.data.ptr);
-  return reinterpret_cast<ValueMetadata *>(base + result.offset);
+  char *base = reinterpret_cast<char *>(result->data.ptr);
+  return reinterpret_cast<ValueMetadata *>(base + result->offset);
 }
 
 static bool initializeGenericValueMetadata(Metadata *metadata) {
@@ -324,8 +323,8 @@ genericValueDataExtraSize(const ValueTypeDescriptor *description,
   return builder.extraDataSize({description}, {pattern});
 }
 
-[[gnu::format(printf, 2, 3)]] static void
-validationLog(bool isValidationFailure, const char *fmt, ...) {
+SWIFT_FORMAT(2, 3)
+static void validationLog(bool isValidationFailure, const char *fmt, ...) {
   if (!isValidationFailure &&
       swift::runtime::environment::
               SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER() < 2)
@@ -342,7 +341,7 @@ validationLog(bool isValidationFailure, const char *fmt, ...) {
   va_end(args);
 }
 
-[[gnu::format(printf, 1, 2)]] static void printToStderr(const char *fmt, ...) {
+SWIFT_FORMAT(1, 2) static void printToStderr(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
 
@@ -394,7 +393,7 @@ static bool equalVWTs(const ValueWitnessTable *a, const ValueWitnessTable *b) {
 
 void swift::validateExternalGenericMetadataBuilder(
     const Metadata *original, const TypeContextDescriptor *description,
-    const void *arguments) {
+    const void * const *arguments) {
   if (auto valueDescriptor = dyn_cast<ValueTypeDescriptor>(description)) {
     if (valueDescriptor->isGeneric()) {
       auto pattern = reinterpret_cast<GenericValueMetadataPattern *>(
@@ -407,8 +406,13 @@ void swift::validateExternalGenericMetadataBuilder(
         return;
       }
 
+      const auto &genericContext = *description->getGenericContext();
+      const auto &header = genericContext.getGenericContextHeader();
+      auto argsCount = header.NumKeyArguments;
+      llvm::ArrayRef argsArray{arguments, argsCount};
+
       auto maybeNewMetadata = allocateGenericValueMetadata(
-          valueDescriptor, arguments, pattern, *extraDataSize.getValue());
+          valueDescriptor, argsArray, pattern, *extraDataSize.getValue());
       if (auto *error = maybeNewMetadata.getError()) {
         validationLog(false, "error allocating metadata: %s", error->cStr());
         return;
