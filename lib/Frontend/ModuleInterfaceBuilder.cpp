@@ -275,10 +275,12 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
       !Invocation.getIRGenOptions().ForceLoadSymbolName.empty();
   SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
   SerializationOpts.AllowableClients = FEOpts.AllowableClients;
-
-  // Record any non-SDK module interface files for the debug info.
   StringRef SDKPath = Instance.getASTContext().SearchPathOpts.getSDKPath();
-  if (!getRelativeDepPath(InPath, SDKPath))
+
+  auto SDKRelativePath = getRelativeDepPath(InPath, SDKPath);
+  if (SDKRelativePath.has_value())
+    SerializationOpts.ModuleInterface = SDKRelativePath.value();
+  else
     SerializationOpts.ModuleInterface = InPath;
 
   SerializationOpts.SDKName = Instance.getASTContext().LangOpts.SDKName;
