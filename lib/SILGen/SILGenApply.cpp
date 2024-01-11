@@ -2718,6 +2718,28 @@ public:
     return LV().Loc;
   }
 
+  bool isDefaultArg() const {
+    return Kind == DefaultArgument;
+  }
+
+  SILLocation getDefaultArgLoc() const {
+    assert(isDefaultArg());
+    auto storage = Value.get<DefaultArgumentStorage>(Kind);
+    return storage.loc;
+  }
+
+  llvm::Optional<ActorIsolation> getIsolation() const {
+    if (!isDefaultArg())
+      return llvm::None;
+
+    auto storage = Value.get<DefaultArgumentStorage>(Kind);
+    if (!storage.implicitlyAsync)
+      return llvm::None;
+
+    auto callee = storage.defaultArgsOwner.getDecl();
+    return getActorIsolation(callee);
+  }
+
   void emit(SILGenFunction &SGF, SmallVectorImpl<ManagedValue> &args,
             size_t &argIndex) {
     switch (Kind) {
@@ -2943,6 +2965,31 @@ static void emitDelayedArguments(SILGenFunction &SGF,
                          MutableArrayRef<SmallVector<ManagedValue, 4>> args) {
   assert(!delayedArgs.empty());
 
+  // If any of the delayed arguments are isolated default arguments,
+  // argument evaluation happens in the following order:
+  //
+  //   1. Left-to-right evalution of explicit r-value arguments
+  //   2. Left-to-right evaluation of formal access arguments
+  //   3. Hop to the callee's isolation domain
+  //   4. Left-to-right evaluation of default arguments
+
+  // So, if any delayed arguments are isolated, all default arguments
+  // are collected during the first pass over the delayed arguments,
+  // and emitted separately after a hop to the callee's isolation domain.
+
+  llvm::Optional<ActorIsolation> defaultArgIsolation;
+  for (auto &arg : delayedArgs) {
+    if (auto isolation = arg.getIsolation()) {
+      defaultArgIsolation = isolation;
+      break;
+    }
+  }
+
+  SmallVector<std::tuple<
+      /*delayedArgIt*/decltype(delayedArgs)::iterator,
+      /*siteArgsIt*/decltype(args)::iterator,
+      /*index*/size_t>, 2> isolatedArgs;
+
   SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
   auto delayedNext = delayedArgs.begin();
 
@@ -2951,7 +2998,8 @@ static void emitDelayedArguments(SILGenFunction &SGF,
   // wherever there's a delayed argument to insert.
   //
   // Note that this also begins the formal accesses in evaluation order.
-  for (auto &siteArgs : args) {
+  for (auto argsIt = args.begin(); argsIt != args.end(); ++argsIt) {
+    auto &siteArgs = *argsIt;
     // NB: siteArgs.size() may change during iteration
     for (size_t i = 0; i < siteArgs.size(); ) {
       auto &siteArg = siteArgs[i];
@@ -2963,6 +3011,15 @@ static void emitDelayedArguments(SILGenFunction &SGF,
 
       assert(delayedNext != delayedArgs.end());
       auto &delayedArg = *delayedNext;
+
+      if (defaultArgIsolation && delayedArg.isDefaultArg()) {
+        isolatedArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
+        if (++delayedNext == delayedArgs.end()) {
+          goto done;
+        } else {
+          continue;
+        }
+      }
 
       // Emit the delayed argument and replace it in the arguments array.
       delayedArg.emit(SGF, siteArgs, i);
@@ -2983,6 +3040,45 @@ static void emitDelayedArguments(SILGenFunction &SGF,
   llvm_unreachable("ran out of null arguments before we ran out of inouts");
 
 done:
+
+  if (defaultArgIsolation) {
+    assert(SGF.F.isAsync());
+    assert(!isolatedArgs.empty());
+
+    auto &firstArg = *std::get<0>(isolatedArgs[0]);
+    auto loc = firstArg.getDefaultArgLoc();
+
+    SILValue executor;
+    switch (*defaultArgIsolation) {
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      executor = SGF.emitLoadGlobalActorExecutor(
+          defaultArgIsolation->getGlobalActor());
+      break;
+
+    case ActorIsolation::ActorInstance:
+      llvm_unreachable("default arg cannot be actor instance isolated");
+
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+      llvm_unreachable("Not isolated");
+    }
+
+    // Hop to the target isolation domain once to evaluate all
+    // default arguments.
+    SGF.emitHopToTargetExecutor(loc, executor);
+
+    size_t argsEmitted = 0;
+    for (auto &isolatedArg : isolatedArgs) {
+      auto &delayedArg = *std::get<0>(isolatedArg);
+      auto &siteArgs = *std::get<1>(isolatedArg);
+      auto argIndex = std::get<2>(isolatedArg) + argsEmitted;
+      auto origIndex = argIndex;
+      delayedArg.emit(SGF, siteArgs, argIndex);
+      argsEmitted += (argIndex - origIndex);
+    }
+  }
 
   // Check to see if we have multiple inout arguments which obviously
   // alias.  Note that we could do this in a later SILDiagnostics pass
