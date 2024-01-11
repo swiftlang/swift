@@ -32,18 +32,18 @@ extension SerialExecutor {
   /// * In `-O` builds (the default for Xcode's Release configuration), stops
   ///   program execution.
   ///
-  /// - Note: This check is performed against the actor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
   ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
-  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   check will succeed. From a concurrency safety perspective, the
   ///   serial executor guarantees mutual exclusion of those two actors.
   ///
   /// - Parameters:
   ///   - message: The message to print if the assertion fails.
-  ///   - file: The file name to print if the assertion fails. The default is
-  ///           where this method was called.
-  ///   - line: The line number to print if the assertion fails The default is
-  ///           where this method was called.
+  ///   - file: The file name to print if the assertion fails. The default value is
+  ///           the file where this method was called.
+  ///   - line: The line number to print if the assertion fails The default value is
+  ///           the line where this method was called.
   @available(SwiftStdlib 5.1, *)
   #if !$Embedded
   @backDeployed(before: SwiftStdlib 5.9)
@@ -304,7 +304,7 @@ extension Actor {
   /// Assume that the current task is executing on this actor's serial executor,
   /// or stop program execution otherwise.
   ///
-  /// This method allows to *assume and verify* that the currently
+  /// You call this method to *assume and verify* that the currently
   /// executing synchronous function is actually executing on the serial
   /// executor of this actor.
   ///
