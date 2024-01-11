@@ -95,9 +95,8 @@ struct lazy_mutex_handle {
   std::int32_t once; // -1 = initialized, 0 = uninitialized, 1 = initializing
 };
 
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return (lazy_mutex_handle){};
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER ((lazy_mutex_handle){})
+
 inline void lazy_mutex_init(lazy_mutex_handle &handle) {
   // Sadly, we can't use call_once() for this as it doesn't have a context
   if (std::atomic_load_explicit((std::atomic<std::int32_t> *)&handle.once,
