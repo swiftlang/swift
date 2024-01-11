@@ -2472,6 +2472,10 @@ public:
     }
 
     void verifyChecked(MacroExpansionExpr *expansion) {
+      // If there is a substitute decl, we'll end up checking that instead.
+      if (expansion->getSubstituteDecl())
+        return;
+
       MacroExpansionDiscriminatorKey key{
         MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
         expansion->getMacroName().getBaseName().getIdentifier()

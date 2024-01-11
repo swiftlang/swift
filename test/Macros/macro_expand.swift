@@ -71,7 +71,7 @@ struct MemberNotCovered {
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
 
   // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_.swift
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf_.swift
   // CHECK-DIAGS: var value: Int
   // CHECK-DIAGS: END CONTENTS OF FILE
 }
@@ -137,7 +137,7 @@ macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "Fa
 func invalidDeclarationMacro() {
   #accidentalCodeItem
   // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF18accidentalCodeItemfMf0_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
 
   @AccidentalCodeItem struct S {}
   // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
@@ -373,7 +373,7 @@ func testNestedDeclInExpr() {
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
 
 // Freestanding macros are not in inlined scopes.
-// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf0_.swift"{{.*}} -> Int }
+// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo2L_V25defineDeclsWithKnownNamesfMf_.swift"{{.*}} -> Int }
 
 // FIXME: Macros producing arbitrary names are not supported yet
 #if false
@@ -436,10 +436,10 @@ func testFreestandingMacroExpansion() {
   struct Foo3 {
     #bitwidthNumberedStructs("BUG", blah: false)
     // expected-note@-1 4{{in expansion of macro 'bitwidthNumberedStructs' here}}
-    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf0_.swift
+    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_.swift
     // CHECK-DIAGS: struct BUG {
-    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf0_6methodfMu_()
-    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf0_6methodfMu0{{_?}}()
+    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu_()
+    // CHECK-DIAGS:   func $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0{{_?}}()
   }
   #endif
 

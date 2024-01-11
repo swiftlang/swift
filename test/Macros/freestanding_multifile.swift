@@ -11,4 +11,4 @@ macro anonymousTypes(public: Bool, _: () -> String) = #externalMacro(module: "Ma
 // CHECK-IR: $s9MacroUser33{{.*}}14anonymousTypesfMf_4namefMu_
 // CHECK-IR-NOT: $s9MacroUser33{{.*}}14anonymousTypesfMf0_4namefMu_
 // CHECK-IR: $s9MacroUser33{{.*}}14anonymousTypesfMf_4namefMu_
-// CHECK-IR: $s9MacroUser33{{.*}}14anonymousTypesfMf0_4namefMu_
+// CHECK-IR-NOT: $s9MacroUser33{{.*}}14anonymousTypesfMf0_4namefMu_
