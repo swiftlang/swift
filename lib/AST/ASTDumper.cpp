@@ -445,6 +445,7 @@ static unsigned getDumpString(unsigned value) {
 static size_t getDumpString(size_t value) {
   return value;
 }
+static void *getDumpString(void *value) { return value; }
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
