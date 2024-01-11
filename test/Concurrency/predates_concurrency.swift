@@ -73,13 +73,15 @@ func testElsewhere(x: X) {
 // expected-complete-tns-note @-1 {{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
 
 @preconcurrency @MainActor class MyModelClass {
-  // expected-complete-tns-note @-1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+
+  // default init() is 'nonisolated' in '-strict-concurrency=complete'
+
   func f() { }
   // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }
 
 func testCalls(x: X) {
-  // expected-complete-tns-note @-1 3{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
+  // expected-complete-tns-note @-1 2{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
   unsafelyMainActorClosure {
     onMainActor()
   }
@@ -102,8 +104,9 @@ func testCalls(x: X) {
   // Ok with minimal/targeted concurrency, Not ok with complete.
   let _: () -> Void = onMainActorAlways // expected-complete-tns-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  // both okay with minimal/targeted... an error with complete.
-  let c = MyModelClass() // expected-complete-tns-warning {{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
+  let c = MyModelClass()
+
+  // okay with minimal/targeted... an error with complete.
   c.f() // expected-complete-tns-warning {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
 }
 
@@ -113,8 +116,9 @@ func testCallsWithAsync() async {
 
   let _: () -> Void = onMainActorAlways // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-warning{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  let c = MyModelClass() // expected-minimal-targeted-warning{{expression is 'async' but is not marked with 'await'}}
+  // expected-minimal-targeted-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+
   c.f() // expected-warning{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }
