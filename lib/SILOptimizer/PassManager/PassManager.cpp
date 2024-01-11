@@ -71,7 +71,7 @@ llvm::cl::opt<std::string> SILNumOptPassesToRun(
 
 // Read pass counts for each module from a config file.
 // Config file format:
-//   <module-name>:<pass-count>(.<sub-pass-count>)
+//   <module-name>:<pass-count>(.<sub-pass-count>)?
 //
 // This is useful for bisecting passes in large projects:
 //   1. create a config file from a full build log. E.g. with

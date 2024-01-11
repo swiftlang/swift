@@ -738,6 +738,11 @@ it's quite easy to do this manually:
    the sub-pass number. The option `-Xllvm -sil-opt-pass-count=<n>.<m>`
    can be used for that, where `m` is the sub-pass number.
 
+For bisecting pass counts in large projects, the pass counts can be read from
+a configuration file using the `-Xllvm -sil-pass-count-config-file=<file>`
+option. For details see the comment for `SILPassCountConfigFile` in the pass
+manager sources.
+
 ### Using git-bisect in the presence of branch forwarding/feature branches
 
 `git-bisect` is a useful tool for finding where a regression was
