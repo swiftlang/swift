@@ -172,7 +172,7 @@ func rdar21080030() {
   var s = "Hello"
   // https://github.com/apple/swift/issues/50141
   // This should be 'cannot_call_non_function_value'.
-  if s.count() == 0 {} // expected-error{{missing argument for parameter 'where' in call}} {{13-15=}}
+  if s.count() == 0 {} // expected-error{{missing argument for parameter 'where' in call}} {{14-14=where: <#(String.Element) throws -> Bool#>}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
