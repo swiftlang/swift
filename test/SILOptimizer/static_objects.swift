@@ -9,6 +9,7 @@
 // REQUIRES: CPU=arm64 || CPU=x86_64
 // REQUIRES: swift_in_compiler
 
+// REQUIRES: rdar120802375
 
 public class C {
   var x: Int
