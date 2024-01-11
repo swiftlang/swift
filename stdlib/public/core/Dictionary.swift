@@ -1284,9 +1284,7 @@ extension Dictionary {
 
   /// A view of a dictionary's keys.
   @frozen
-  public struct Keys
-    : Collection, Equatable,
-      CustomStringConvertible, CustomDebugStringConvertible {
+  public struct Keys: Collection, Equatable {
     public typealias Element = Key
     public typealias SubSequence = Slice<Dictionary.Keys>
 
@@ -1399,20 +1397,11 @@ extension Dictionary {
 
       return true
     }
-
-    public var description: String {
-      return _makeCollectionDescription()
-    }
-
-    public var debugDescription: String {
-      return _makeCollectionDescription(withTypeName: "Dictionary.Keys")
-    }
   }
 
   /// A view of a dictionary's values.
   @frozen
-  public struct Values
-    : MutableCollection, CustomStringConvertible, CustomDebugStringConvertible {
+  public struct Values: MutableCollection {
     public typealias Element = Value
 
     @usableFromInline
@@ -1482,14 +1471,6 @@ extension Dictionary {
       return count == 0
     }
 
-    public var description: String {
-      return _makeCollectionDescription()
-    }
-
-    public var debugDescription: String {
-      return _makeCollectionDescription(withTypeName: "Dictionary.Values")
-    }
-
     @inlinable
     public mutating func swapAt(_ i: Index, _ j: Index) {
       guard i != j else { return }
@@ -1504,6 +1485,30 @@ extension Dictionary {
       let b = native.validatedBucket(for: j)
       _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
+  }
+}
+
+@_unavailableInEmbedded
+extension Dictionary.Keys
+  : CustomStringConvertible, CustomDebugStringConvertible {
+  public var description: String {
+    return _makeCollectionDescription()
+  }
+
+  public var debugDescription: String {
+    return _makeCollectionDescription(withTypeName: "Dictionary.Keys")
+  }
+}
+
+@_unavailableInEmbedded
+extension Dictionary.Values
+  : CustomStringConvertible, CustomDebugStringConvertible {
+  public var description: String {
+    return _makeCollectionDescription()
+  }
+
+  public var debugDescription: String {
+    return _makeCollectionDescription(withTypeName: "Dictionary.Values")
   }
 }
 
@@ -1614,6 +1619,7 @@ extension Dictionary: Hashable where Value: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension Dictionary: _HasCustomAnyHashableRepresentation
 where Value: Hashable {
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
@@ -1621,6 +1627,7 @@ where Value: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
   : _AnyHashableBox {
   internal let _value: Dictionary<Key, Value>
@@ -1673,6 +1680,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
   }
 }
 
+@_unavailableInEmbedded
 extension Collection {
   // Utility method for KV collections that wish to implement
   // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
@@ -1706,6 +1714,7 @@ extension Collection {
   }
 }
 
+@_unavailableInEmbedded
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the dictionary.
   public var description: String {
