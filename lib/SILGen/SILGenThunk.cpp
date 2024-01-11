@@ -163,14 +163,22 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   }
 
   auto f = SGM.getFunction(constant, NotForDefinition);
-#ifndef NDEBUG
+
   auto constantFnTypeInContext =
-    SGM.Types.getLoweredType(constantInfo.SILFnType,
-                             B.getTypeExpansionContext())
-             .castTo<SILFunctionType>();
-  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext())
-          == constantFnTypeInContext);
-#endif
+      SGM.Types
+          .getLoweredType(constantInfo.SILFnType, B.getTypeExpansionContext())
+          .castTo<SILFunctionType>();
+  auto existingType =
+      f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext());
+  if (existingType != constantFnTypeInContext) {
+    // This can happen for example when using @_silgen_name or @_extern(c)
+    // attributes
+    SGM.diagnose(loc.getSourceLoc(), diag::function_type_mismatch, existingType,
+                 constantFnTypeInContext);
+    SGM.diagnose(f->getLocation().getSourceLoc(), diag::function_declared_here);
+    return SILUndef::get(constantInfo.getSILType(), F);
+  }
+
   if (callPreviousDynamicReplaceableImpl)
     return B.createPreviousDynamicFunctionRef(loc, f);
   else

@@ -121,6 +121,11 @@ ERROR(unsupported_variadic_function_abstraction,none,
       "convention; try wrapping it in a struct",
       (Type))
 
+ERROR(function_type_mismatch,none,
+      "function type mismatch, declared as %0 but used as %1", (Type, Type))
+NOTE(function_declared_here,none,
+     "function declared here", ())
+
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))
