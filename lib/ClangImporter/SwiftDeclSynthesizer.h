@@ -18,6 +18,8 @@
 
 namespace swift {
 
+class CallExpr;
+
 enum class MakeStructRawValuedFlags {
   /// whether to also create an unlabeled init
   MakeUnlabeledValueInit = 0x01,
@@ -293,6 +295,10 @@ public:
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);
+
+  CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
+                                const swift::Type &swiftParamTy,
+                                SourceLoc paramLoc);
 
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);

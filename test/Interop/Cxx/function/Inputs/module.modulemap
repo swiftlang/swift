@@ -1,0 +1,4 @@
+module DefaultArguments {
+  header "default-arguments.h"
+  export *
+}
