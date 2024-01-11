@@ -5219,22 +5219,29 @@ static bool checkSendableInstanceStorage(
 
     /// Handle a stored property.
     bool operator()(VarDecl *property, Type propertyType) override {
-      // Classes with mutable properties are not Sendable.
+      // Classes with mutable properties are not Sendable unless property is
+      // actor-isolated
       if (property->supportsMutation() && isa<ClassDecl>(nominal)) {
-        if (isImplicitSendableCheck(check)) {
-          invalid = true;
+        ActorIsolation isolation = getActorIsolation(property);
+
+        if (isolation.getKind() == ActorIsolation::Kind::Nonisolated ||
+            isolation.getKind() == ActorIsolation::Kind::Unspecified) {
+          if (isImplicitSendableCheck(check)) {
+            invalid = true;
+            return true;
+          }
+
+          auto behavior =
+              SendableCheckContext(dc, check).defaultDiagnosticBehavior();
+          if (behavior != DiagnosticBehavior::Ignore) {
+            property
+                ->diagnose(diag::concurrent_value_class_mutable_property,
+                           property->getName(), nominal)
+                .limitBehavior(behavior);
+          }
+          invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
           return true;
         }
-
-        auto behavior = SendableCheckContext(
-            dc, check).defaultDiagnosticBehavior();
-        if (behavior != DiagnosticBehavior::Ignore) {
-          property->diagnose(diag::concurrent_value_class_mutable_property,
-                             property->getName(), nominal)
-              .limitBehavior(behavior);
-        }
-        invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
-        return true;
       }
 
       // Check that the property type is Sendable.
