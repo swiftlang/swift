@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
@@ -8,8 +8,6 @@
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: CPU=arm64 || CPU=x86_64
 // REQUIRES: swift_in_compiler
-
-// REQUIRES: rdar120802375
 
 public class C {
   var x: Int
