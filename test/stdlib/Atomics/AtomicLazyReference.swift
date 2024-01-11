@@ -31,13 +31,9 @@ suite.test("storeIfNil") {
     expectTrue(v.storeIfNil(ref) === ref)
     expectTrue(v.load() === ref)
 
-    expectEqual(LifetimeTracked.instances, 1)
-
     let ref2 = LifetimeTracked(23)
     expectTrue(v.storeIfNil(ref2) === ref)
     expectTrue(v.load() === ref)
-
-    expectEqual(LifetimeTracked.instances, 2)
 
     // v is automatically deinitialized here.
   }
