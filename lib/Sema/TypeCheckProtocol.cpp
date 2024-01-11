@@ -3094,6 +3094,14 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       getDeclRefInContext(witness), witness->getLoc(), DC, llvm::None,
       llvm::None, llvm::None, requirementIsolation);
   bool sameConcurrencyDomain = false;
+  // If the requirement is isolated (explicitly or implicitly) or
+  // explicitly marked as `nonisolated` it means that the protocol
+  // has adopted concurrency and `@preconcurrency` doesn't apply.
+  bool isPreconcurrency =
+      Conformance->isPreconcurrency() &&
+      !(requirementIsolation.isActorIsolated() ||
+        requirement->getAttrs().hasAttribute<NonisolatedAttr>());
+
   switch (refResult) {
   case ActorReferenceResult::SameConcurrencyDomain:
     // If the witness has distributed-actor isolation, we have extra
@@ -3184,7 +3192,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
   // If we aren't missing anything or this is a witness to a `@preconcurrency`
   // conformance, do a Sendable check and move on.
-  if (!missingOptions || Conformance->isPreconcurrency()) {
+  if (!missingOptions || isPreconcurrency) {
     // FIXME: Disable Sendable checking when the witness is an initializer
     // that is explicitly marked nonisolated.
     if (isa<ConstructorDecl>(witness) &&
@@ -3216,7 +3224,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
         return refResult.isolation;
 
       // Always treat `@preconcurrency` witnesses as isolated.
-      if (Conformance->isPreconcurrency() &&
+      if (isPreconcurrency &&
           missingOptions.contains(MissingFlags::RequirementAsync))
         return refResult.isolation;
     }

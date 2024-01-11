@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-experimental-feature PreconcurrencyConformances -strict-concurrency=complete -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-experimental-feature PreconcurrencyConformances -strict-concurrency=complete -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -103,4 +103,53 @@ struct TestConditional<T> {}
 
 extension TestConditional : @preconcurrency WithAssoc where T == Int {
   @MainActor func test() -> T { 42 } // Ok
+}
+
+@globalActor
+struct GlobalActor {
+  static var shared: MyActor = MyActor()
+}
+
+protocol WithIndividuallyIsolatedRequirements {
+  @MainActor var a: Int { get set }
+  @GlobalActor var b: Int { get set }
+  // expected-note@-1 {{'b' declared here}}
+
+  @GlobalActor func test()
+  // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
+}
+
+do {
+  @MainActor
+  struct TestExplicitGlobalActorAttrs : @preconcurrency WithIndividuallyIsolatedRequirements {
+    var a: Int = 42
+
+    @MainActor var b: Int {
+      // expected-warning@-1 {{main actor-isolated property 'b' cannot be used to satisfy global actor 'GlobalActor'-isolated protocol requirement}}
+      get { 0 }
+      set {}
+    }
+
+    @MainActor func test() {
+      // expected-warning@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy global actor 'GlobalActor'-isolated protocol requirement}}
+    }
+  }
+}
+
+@MainActor
+protocol WithNonIsolated {
+  var prop: Int { get set }
+  // expected-note@-1 {{'prop' declared here}}
+  nonisolated func test()
+  // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
+}
+
+do {
+  class TestExplicitOtherIsolation : @preconcurrency WithNonIsolated {
+    @GlobalActor var prop: Int = 42
+    // expected-warning@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot be used to satisfy main actor-isolated protocol requirement}}
+
+    @MainActor func test() {}
+    // expected-warning@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy nonisolated protocol requirement}}
+  }
 }
