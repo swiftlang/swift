@@ -11,6 +11,9 @@
 import OtherActors // expected-remark{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
 
 let immutableGlobal: String = "hello"
+
+// expected-warning@+2 {{var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+// expected-note@+1 {{isolate 'mutableGlobal' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
 @available(SwiftStdlib 5.1, *)
@@ -765,7 +768,6 @@ actor LocalFunctionIsolatedActor {
 @available(SwiftStdlib 5.1, *)
 actor LazyActor {
     var v: Int = 0
-    // expected-note@-1 6 {{property declared here}}
 
     let l: Int = 0
 
@@ -773,7 +775,7 @@ actor LazyActor {
     lazy var l12: Int = v
     lazy var l13: Int = { self.v }()
     lazy var l14: Int = self.v
-    lazy var l15: Int = { [unowned self] in self.v }() // expected-error{{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    lazy var l15: Int = { [unowned self] in self.v }()
 
     lazy var l21: Int = { l }()
     lazy var l22: Int = l
@@ -782,15 +784,15 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
     nonisolated lazy var l32: Int = v
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
     nonisolated lazy var l34: Int = self.v
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
 
     nonisolated lazy var l41: Int = { l }()
     nonisolated lazy var l42: Int = l

@@ -271,7 +271,8 @@ typealias CF = @Sendable () -> NotConcurrent?
 typealias BadGenericCF<T> = @Sendable () -> T?
 typealias GoodGenericCF<T: Sendable> = @Sendable () -> T? // okay
 
-var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil
+var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+// expected-note@-1 {{isolate 'concurrentFuncVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on @Sendable closures.

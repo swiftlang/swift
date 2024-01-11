@@ -2001,6 +2001,16 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
       if (Expr *argExpr = arg.getExpr()) {
         checkSendable = shouldCheckSendable(argExpr);
         argType = argExpr->findOriginalType();
+
+        // If this is a default argument expression, don't check Sendability
+        // if the argument is evaluated in the callee's isolation domain.
+        if (auto *defaultExpr = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+          auto argIsolation = defaultExpr->getRequiredIsolation();
+          auto calleeIsolation = isolationCrossing->getCalleeIsolation();
+          if (argIsolation == calleeIsolation) {
+            continue;
+          }
+        }
       }
     }
 
@@ -2260,8 +2270,10 @@ namespace {
       // recieve isolation from its decl context), then the expression cannot
       // require a different isolation.
       for (auto *dc : contextStack) {
-        if (!infersIsolationFromContext(dc))
+        if (!infersIsolationFromContext(dc)) {
+          requiredIsolation.clear();
           return false;
+        }
 
         // To refine the required isolation, the existing requirement
         // must either be 'nonisolated' or exactly the same as the
@@ -2275,6 +2287,7 @@ namespace {
               requiredIsolationLoc,
               diag::conflicting_default_argument_isolation,
               isolation->second, refinedIsolation);
+          requiredIsolation.clear();
           return true;
         }
       }
@@ -2285,8 +2298,8 @@ namespace {
     void checkDefaultArgument(DefaultArgumentExpr *expr) {
       // Check the context isolation against the required isolation for
       // evaluating the default argument synchronously. If the default
-      // argument must be evaluated asynchronously, it must be written
-      // explicitly in the argument list with 'await'.
+      // argument must be evaluated asynchronously, record that in the
+      // expression node.
       auto requiredIsolation = expr->getRequiredIsolation();
       auto contextIsolation = getInnermostIsolatedContext(
           getDeclContext(), getClosureActorIsolation);
@@ -2308,10 +2321,7 @@ namespace {
         break;
       }
 
-      auto &ctx = getDeclContext()->getASTContext();
-      ctx.Diags.diagnose(
-          expr->getLoc(), diag::isolated_default_argument,
-          requiredIsolation, contextIsolation);
+      expr->setImplicitlyAsync();
     }
 
     /// Check closure captures for Sendable violations.
@@ -3178,7 +3188,10 @@ namespace {
       if (!unsatisfiedIsolation)
         return false;
 
-      if (refineRequiredIsolation(*unsatisfiedIsolation))
+      bool onlyArgsCrossIsolation = callOptions.contains(
+          ActorReferenceResult::Flags::OnlyArgsCrossIsolation);
+      if (!onlyArgsCrossIsolation &&
+          refineRequiredIsolation(*unsatisfiedIsolation))
         return false;
 
       // At this point, we know a jump is made to the callee that yields
@@ -4798,14 +4811,19 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
 
   Initializer *dc = nullptr;
   Expr *initExpr = nullptr;
+  ActorIsolation enclosingIsolation;
 
   if (auto *pbd = var->getParentPatternBinding()) {
     if (!var->isParentInitialized())
       return ActorIsolation::forUnspecified();
 
     auto i = pbd->getPatternEntryIndexForVarDecl(var);
+    if (!pbd->isInitializerChecked(i))
+      TypeChecker::typeCheckPatternBinding(pbd, i);
+
     dc = cast<Initializer>(pbd->getInitContext(i));
-    initExpr = var->getParentInitializer();
+    initExpr = pbd->getInit(i);
+    enclosingIsolation = getActorIsolation(var);
   } else if (auto *param = dyn_cast<ParamDecl>(var)) {
     // If this parameter corresponds to a stored property for a
     // memberwise initializer, the default argument is the default
@@ -4823,13 +4841,27 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
 
     dc = param->getDefaultArgumentInitContext();
     initExpr = param->getTypeCheckedDefaultExpr();
+    enclosingIsolation =
+        getActorIsolationOfContext(param->getDeclContext());
   }
 
   if (!dc || !initExpr)
     return ActorIsolation::forUnspecified();
 
+  // If the default argument has isolation, it must match the
+  // isolation of the decl context.
   ActorIsolationChecker checker(dc);
-  return checker.computeRequiredIsolation(initExpr);
+  auto requiredIsolation = checker.computeRequiredIsolation(initExpr);
+  if (requiredIsolation.isActorIsolated()) {
+    if (enclosingIsolation != requiredIsolation) {
+      var->diagnose(
+          diag::isolated_default_argument_context,
+          requiredIsolation, enclosingIsolation);
+      return ActorIsolation::forUnspecified();
+    }
+  }
+
+  return requiredIsolation;
 }
 
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
@@ -5945,8 +5977,8 @@ bool swift::isAccessibleAcrossActors(
 }
 
 ActorReferenceResult ActorReferenceResult::forSameConcurrencyDomain(
-    ActorIsolation isolation) {
-  return ActorReferenceResult{SameConcurrencyDomain, llvm::None, isolation};
+    ActorIsolation isolation, Options options) {
+  return ActorReferenceResult{SameConcurrencyDomain, options, isolation};
 }
 
 ActorReferenceResult ActorReferenceResult::forEntersActor(
@@ -5955,8 +5987,8 @@ ActorReferenceResult ActorReferenceResult::forEntersActor(
 }
 
 ActorReferenceResult ActorReferenceResult::forExitsActorToNonisolated(
-    ActorIsolation isolation) {
-  return ActorReferenceResult{ExitsActorToNonisolated, llvm::None, isolation};
+    ActorIsolation isolation, Options options) {
+  return ActorReferenceResult{ExitsActorToNonisolated, options, isolation};
 }
 
 // Determine if two actor isolation contexts are considered to be equivalent.
@@ -5992,10 +6024,24 @@ ActorReferenceResult ActorReferenceResult::forReference(
       declIsolation = declIsolation.subst(declRef.getSubstitutions());
   }
 
+  // Determine what adjustments we need to perform for cross-actor
+  // references.
+  Options options = llvm::None;
+
+  // FIXME: Actor constructors are modeled as isolated to the actor
+  // so that Sendable checking is applied to their arguments, but the
+  // call itself does not hop to another executor.
+  if (auto ctor = dyn_cast<ConstructorDecl>(declRef.getDecl())) {
+    if (auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl()) {
+      if (nominal->isAnyActor())
+        options |= Flags::OnlyArgsCrossIsolation;
+    }
+  }
+
   // If the entity we are referencing is not a value, we're in the same
   // concurrency domain.
   if (isNonValueReference(declRef.getDecl()))
-    return forSameConcurrencyDomain(declIsolation);
+    return forSameConcurrencyDomain(declIsolation, options);
 
   // Compute the isolation of the context, if not provided.
   ActorIsolation contextIsolation = ActorIsolation::forUnspecified();
@@ -6014,11 +6060,11 @@ ActorReferenceResult ActorReferenceResult::forReference(
     if (isAsyncDecl(declRef) && contextIsolation.isActorIsolated() &&
         !declRef.getDecl()->getAttrs()
             .hasAttribute<UnsafeInheritExecutorAttr>())
-      return forExitsActorToNonisolated(contextIsolation);
+      return forExitsActorToNonisolated(contextIsolation, options);
 
     // Otherwise, we stay in the same concurrency domain, whether on an actor
     // or in a task.
-    return forSameConcurrencyDomain(declIsolation);
+    return forSameConcurrencyDomain(declIsolation, options);
   }
 
   // The declaration we are accessing is actor-isolated. First, check whether
@@ -6027,11 +6073,11 @@ ActorReferenceResult ActorReferenceResult::forReference(
       declIsolation.getActorInstanceParameter() == 0) {
     // If this instance is isolated, we're in the same concurrency domain.
     if (actorInstance->isIsolated())
-      return forSameConcurrencyDomain(declIsolation);
+      return forSameConcurrencyDomain(declIsolation, options);
   } else if (equivalentIsolationContexts(declIsolation, contextIsolation)) {
     // The context isolation matches, so we are in the same concurrency
     // domain.
-    return forSameConcurrencyDomain(declIsolation);
+    return forSameConcurrencyDomain(declIsolation, options);
   }
 
   // Initializing an actor isolated stored property with a value effectively
@@ -6051,7 +6097,8 @@ ActorReferenceResult ActorReferenceResult::forReference(
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the
         // Swift 5.9 compiler.
-        return forEntersActor(declIsolation, Flags::Preconcurrency);
+        options |= Flags::Preconcurrency;
+        return forEntersActor(declIsolation, options);
       }
     }
   }
@@ -6061,7 +6108,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
   if (actorInstance &&
       checkedByFlowIsolation(
           fromDC, *actorInstance, declRef.getDecl(), declRefLoc, useKind))
-    return forSameConcurrencyDomain(declIsolation);
+    return forSameConcurrencyDomain(declIsolation, options);
 
   // If we are delegating to another initializer, treat them as being in the
   // same concurrency domain.
@@ -6070,7 +6117,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
   if (actorInstance && actorInstance->isSelf() &&
       isa<ConstructorDecl>(declRef.getDecl()) &&
       isa<ConstructorDecl>(fromDC))
-    return forSameConcurrencyDomain(declIsolation);
+    return forSameConcurrencyDomain(declIsolation, options);
 
   // If there is an instance that corresponds to 'self',
   // we are in a constructor or destructor, and we have a stored property of
@@ -6080,18 +6127,14 @@ ActorReferenceResult ActorReferenceResult::forReference(
       isNonInheritedStorage(declRef.getDecl(), fromDC) &&
       declIsolation.isGlobalActor() &&
       (isa<ConstructorDecl>(fromDC) || isa<DestructorDecl>(fromDC)))
-    return forSameConcurrencyDomain(declIsolation);
-
-  // Determine what adjustments we need to perform for cross-actor
-  // references.
-  Options options = llvm::None;
+    return forSameConcurrencyDomain(declIsolation, options);
 
   // At this point, we are accessing the target from outside the actor.
   // First, check whether it is something that can be accessed directly,
   // without any kind of promotion.
   if (isAccessibleAcrossActors(
           declRef.getDecl(), declIsolation, fromDC, options, actorInstance))
-    return forEntersActor(declIsolation, llvm::None);
+    return forEntersActor(declIsolation, options);
 
   // This is a cross-actor reference.
 

@@ -2,8 +2,8 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -enable-experimental-feature IsolatedDefaultValues -parse-as-library -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-experimental-feature IsolatedDefaultValues -enable-experimental-feature SendNonSendable %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature IsolatedDefaultValues -parse-as-library -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-experimental-feature SendNonSendable %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -19,11 +19,11 @@ func requiresMainActor() -> Int { 0 }
 @SomeGlobalActor
 func requiresSomeGlobalActor() -> Int { 0 }
 
-struct S1 {
+class C1 {
   // expected-note@+1 2 {{'self.x' not initialized}}
-  var x = requiresMainActor()
+  @MainActor var x = requiresMainActor()
   // expected-note@+1 2 {{'self.y' not initialized}}
-  var y = requiresSomeGlobalActor()
+  @SomeGlobalActor var y = requiresSomeGlobalActor()
   var z = 10
 
   // expected-error@+1 {{return from initializer without initializing all stored properties}}
@@ -36,9 +36,9 @@ struct S1 {
   @SomeGlobalActor init(c: Int) {}
 }
 
-struct S2 {
-  var x = requiresMainActor()
-  var y = requiresSomeGlobalActor()
+class C2 {
+  @MainActor var x = requiresMainActor()
+  @SomeGlobalActor var y = requiresSomeGlobalActor()
   var z = 10
 
   nonisolated init(x: Int, y: Int) {

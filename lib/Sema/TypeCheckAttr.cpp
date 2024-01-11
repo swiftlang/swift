@@ -6636,7 +6636,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     // backing storage is a stored 'var' that is part of the internal state
     // of the actor which could only be accessed in actor's isolation context.
     if (var->hasAttachedPropertyWrapper()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property);
+      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property)
+        .warnUntilSwiftVersionIf(attr->isImplicit(), 6);
       return;
     }
 

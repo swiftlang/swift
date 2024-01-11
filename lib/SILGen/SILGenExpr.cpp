@@ -2533,6 +2533,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                                                ConcreteDeclRef defaultArgsOwner,
                                                unsigned destIndex,
                                                CanType resultType,
+                                               bool implicitlyAsync,
                                                SGFContext C) {
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),

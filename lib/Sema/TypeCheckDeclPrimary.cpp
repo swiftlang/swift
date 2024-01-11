@@ -1085,6 +1085,9 @@ static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
+
+    // If the default argument has isolation, it must match the
+    // isolation of the decl context.
     (void)param->getInitializerIsolation();
 
     if (!ifacety->hasPlaceholder()) {
@@ -2162,6 +2165,7 @@ public:
     (void) VD->getPropertyWrapperAuxiliaryVariables();
     (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
+    (void) getActorIsolation(VD);
 
     // Visit auxiliary decls first
     VD->visitAuxiliaryDecls([&](VarDecl *var) {

@@ -117,7 +117,7 @@ struct HasWrapperOnActor {
     synced = 17
   }
 
-  @WrapperActor var actorSynced: Int = 0
+  @WrapperActor var actorSynced: Int = 0 // expected-error{{'nonisolated' is not supported on properties with property wrappers}}
 
   func testActorSynced() {
     _ = actorSynced
