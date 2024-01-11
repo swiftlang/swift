@@ -15,7 +15,19 @@ struct NonSendableStruct {
 
 func useValue<T>(_ t: T) {}
 func getAny() -> Any { fatalError() }
+
+actor Custom {
+}
+
+@globalActor
+struct CustomActor {
+    static var shared: Custom {
+        return Custom()
+    }
+}
+
 @MainActor func transferToMain<T>(_ t: T) {}
+@CustomActor func transferToCustom<T>(_ t: T) {}
 
 func transferArg(_ x: transferring Klass) {
 }
@@ -122,10 +134,26 @@ actor MyActor {
   globalKlass = x
 }
 
+@MainActor func canAssignTransferringIntoGlobalActor2(_ x: transferring Klass) async {
+  globalKlass = x
+  await transferToCustom(x) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+}
+
+@MainActor func canAssignTransferringIntoGlobalActor3(_ x: transferring Klass) async {
+  await transferToCustom(globalKlass) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+}
+
 func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
   let _ = x
   await transferToMain(x)
 }
+
+func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
+  let _ = x
+  await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'Klass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  let _ = x // expected-note {{access here could race}}
+}
+
 
 //////////////////////////////////////
 // MARK: Transferring is "var" like //

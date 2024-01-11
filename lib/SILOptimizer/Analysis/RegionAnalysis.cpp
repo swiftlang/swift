@@ -2924,6 +2924,17 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
           iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
         }
       }
+
+      // See if the memory base is a global_addr from a global actor protected global.
+      if (auto *ga = dyn_cast<GlobalAddrInst>(storage.base)) {
+        if (auto *global = ga->getReferencedGlobal()) {
+          if (auto *globalDecl = global->getDecl()) {
+            if (getActorIsolation(globalDecl).isGlobalActor()) {
+              iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+            }
+          }
+        }
+      }
     }
   }
 
