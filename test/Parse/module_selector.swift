@@ -224,3 +224,24 @@ struct InvalidModuleSelectors {
     // expected-error@-1 {{expected identifier in module selector}}
   }
 }
+
+/*
+func inExpr(_ s: GoodStruct) {
+  ::print()
+  (::print())
+  *::print()
+  _::print()
+  inout::print()
+  Any::print()
+  // FIXME: This gets interpreted as a single `.*` operator; may not be ideal.
+  _ = 1.*::magnitude
+  _ = 1.self::magnitude
+}
+*/
+
+/*
+struct InvalidModuleSelectors {
+ // FIXME: This gets interpreted as a single `.*` operator; may not be ideal.
+ var gIndex: String.*::Index
+}
+*/
