@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-membehavior"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILVisitor.h"

@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-existential-specializer"
 #include "ExistentialTransform.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"

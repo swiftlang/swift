@@ -136,6 +136,7 @@
 
 #include "PhiStorageOptimizer.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"

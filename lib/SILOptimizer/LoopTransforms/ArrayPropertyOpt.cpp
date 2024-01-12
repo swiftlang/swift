@@ -53,6 +53,7 @@
 #define DEBUG_TYPE "array-property-opt"
 
 #include "ArrayOpt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"

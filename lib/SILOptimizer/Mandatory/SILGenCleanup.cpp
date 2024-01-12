@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "silgen-cleanup"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OSSALifetimeCompletion.h"

@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILGlobalVariable.h"
 

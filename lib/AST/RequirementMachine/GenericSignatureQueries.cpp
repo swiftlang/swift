@@ -37,6 +37,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include <vector>
 #include "NameLookup.h"
 #include "RequirementMachine.h"

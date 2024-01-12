@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/DistributedDecl.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

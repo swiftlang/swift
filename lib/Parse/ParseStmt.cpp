@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"

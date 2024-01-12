@@ -57,6 +57,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>

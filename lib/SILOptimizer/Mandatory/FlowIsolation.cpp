@@ -16,6 +16,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/Concurrency.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BitDataflow.h"

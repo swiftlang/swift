@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"

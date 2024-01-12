@@ -63,6 +63,7 @@
 
 #include "PropertyMap.h"
 #include "RewriteSystem.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace rewriting;

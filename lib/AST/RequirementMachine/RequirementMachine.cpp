@@ -198,6 +198,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Requirement.h"
+#include "swift/Basic/Assertions.h"
 #include "RequirementLowering.h"
 #include "RuleBuilder.h"
 

@@ -24,6 +24,7 @@
 
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"

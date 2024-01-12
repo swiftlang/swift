@@ -93,6 +93,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "TupleGenerators.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"

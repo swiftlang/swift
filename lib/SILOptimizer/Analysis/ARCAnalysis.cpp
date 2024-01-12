@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"

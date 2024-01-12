@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Basic/StringExtras.h"

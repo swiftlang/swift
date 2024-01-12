@@ -58,6 +58,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 void ASTWalker::anchor() {}
