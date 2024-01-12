@@ -90,7 +90,7 @@ func buildPrinter(
     makeCaller()
 }
 
-// CHECK: macro@MacroUser/macro_default_argument_enabled.swift#[[# @LINE + 1]]
+// CHECK: macro@MacroUser/macro_default_argument_source_location.swift#[[# @LINE + 1]]
 let printWithFileLine = buildPrinter { }
 
 @main struct Main {
@@ -119,9 +119,9 @@ let printWithFileLine = buildPrinter { }
         printCurrentLineDefinedAtAnotherModule()
         // CHECK: MacroUser/with_macro_default_arg_same_module.swift
         printAnotherFileName()
-        // CHECK: MacroUser/macro_default_argument_enabled.swift
+        // CHECK: MacroUser/macro_default_argument_source_location.swift
         printCurrentFileDefinedAtAnotherFile()
-        // CHECK: MacroUser/macro_default_argument_enabled.swift
+        // CHECK: MacroUser/macro_default_argument_source_location.swift
         printCurrentFileDefinedInAnotherModuleInterface()
         // CHECK: true
         sameFileID()
