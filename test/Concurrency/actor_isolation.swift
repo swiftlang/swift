@@ -11,6 +11,9 @@
 import OtherActors // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
 
 let immutableGlobal: String = "hello"
+
+// expected-warning@+2 {{var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+// expected-note@+1 {{isolate 'mutableGlobal' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
 @available(SwiftStdlib 5.1, *)

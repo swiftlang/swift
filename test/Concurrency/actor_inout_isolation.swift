@@ -43,7 +43,7 @@ actor TestActor {
 }
 
 @available(SwiftStdlib 5.1, *)
-func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
+@Sendable func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
 @available(SwiftStdlib 5.1, *)
 enum Container {
   static let modifyAsyncValue = modifyAsynchronously
