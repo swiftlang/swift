@@ -1351,7 +1351,6 @@ endif()
 add_subdirectory(include)
 
 if(SWIFT_INCLUDE_TOOLS)
-
   # TODO Remove this once release/5.9 is done and we can finish migrating Swift
   #      off of `llvm::None`/`llvm::Optional`, and `llvm::makeArrayRef`.
   # This is to silence the avalanche of deprecation warnings from LLVM headers
@@ -1359,38 +1358,6 @@ if(SWIFT_INCLUDE_TOOLS)
   # better than losing context due to the sheer number in-actionable deprecation
   # warnings or the massive number of merge-conflicts we would get otherwise.
   add_definitions(-DSWIFT_TARGET)
-
-  # Include 'swift-syntax'.
-  # This is a function because we want to set some 'CMAKE_*' variables temporarily.'
-  # TODO: Replace this with 'block()' after CMake 3.25
-  function(include_swift_syntax)
-    if(NOT SWIFT_BUILD_SWIFT_SYNTAX)
-      return()
-    endif()
-    if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
-      message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
-      return()
-    endif()
-
-    set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
-    set(BUILD_SHARED_LIBS ON)
-    # All libraries in 'swift-syntax' goes to 'lib/swift/host'.
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
-    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
-      set(SWIFT_HOST_LIBRARIES_RPATH "$ORIGIN;$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-    endif()
-    # Add unique ABI prefix to swift-syntax libraries so that compiler libraries (e.g. sourcekitdInProc)
-    # can be used from tools that has its own swift-syntax libraries as SwiftPM dependencies.
-    set(SWIFT_MODULE_ABI_NAME_PREFIX "Compiler")
-
-    file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
-    FetchContent_Declare(SwiftSyntax
-      SOURCE_DIR "${swift_syntax_path}"
-    )
-    FetchContent_MakeAvailable(SwiftSyntax)
-  endfunction()
-  include_swift_syntax()
 
   add_subdirectory(lib)
 
