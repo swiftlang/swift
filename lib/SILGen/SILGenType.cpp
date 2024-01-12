@@ -307,7 +307,7 @@ public:
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !theClass->hasPackageAccess() && !isResilient)
+    if (classIsPublic && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -1093,7 +1093,7 @@ void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
   auto serialized = IsSerialized_t::IsNotSerialized;
   bool nomIsPublic = nom->getEffectiveAccess() >= AccessLevel::Public;
   // We only serialize the deinit if the type is public and not resilient.
-  if (nomIsPublic && !nom->hasPackageAccess() && !nom->isResilient())
+  if (nomIsPublic && !nom->isResilient())
     serialized = IsSerialized;
   SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
 }

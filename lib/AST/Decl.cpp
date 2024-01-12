@@ -4157,17 +4157,7 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
   case AccessLevel::Open:
-    break;
   case AccessLevel::Package:
-    if (getModuleContext()->isTestingEnabled() ||
-        getModuleContext()->arePrivateImportsEnabled()) {
-        effectiveAccess = getMaximallyOpenAccessFor(this);
-    } else {
-        // Package declarations are effectively public within their
-        // package unit.
-        effectiveAccess = AccessLevel::Public;
-    }
-    break;
   case AccessLevel::Public:
   case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled() ||
@@ -5900,9 +5890,9 @@ bool ClassDecl::hasResilientMetadata() const {
   if (!getModuleContext()->isResilient())
     return false;
 
-  // If the class is not public, we can't use it outside the module at all.
+  // If the class is not public or package, we can't use it outside the module at all.
   // Take enable testing into account.
-  if (getEffectiveAccess() < AccessLevel::Public)
+  if (getEffectiveAccess() < AccessLevel::Package)
     return false;
 
   // Otherwise we access metadata members, such as vtable entries, resiliently.

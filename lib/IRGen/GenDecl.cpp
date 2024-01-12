@@ -5955,7 +5955,7 @@ bool IRGenModule::hasResilientMetadata(ClassDecl *D,
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == getSwiftModule() &&
-      decl->getEffectiveAccess() < AccessLevel::Public)
+      decl->getEffectiveAccess() < AccessLevel::Package)
     return ResilienceExpansion::Maximal;
   return ResilienceExpansion::Minimal;
 }

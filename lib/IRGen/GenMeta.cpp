@@ -1883,7 +1883,7 @@ namespace {
       // Emit method dispatch thunk if the class is resilient.
       auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
 
-      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Public) ||
+      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Package) ||
           IGM.getOptions().VirtualFunctionElimination) {
         IGM.emitDispatchThunk(fn);
       }
@@ -6922,7 +6922,7 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
   auto originatingClass =
     cast<ClassDecl>(method.getOverriddenVTableEntry().getDecl()->getDeclContext());
 
-  if (originatingClass->getEffectiveAccess() >= AccessLevel::Public) {
+  if (originatingClass->getEffectiveAccess() >= AccessLevel::Package) {
     // If the class is public,
     // and it's either marked fragile or part of a non-resilient module, then
     // other modules will directly address vtable offsets and we can't remove
@@ -6932,7 +6932,7 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
                               << vtable->getClass()->getName()
                               << " for ";
                  method.print(llvm::dbgs());
-                 llvm::dbgs() << " originates from a public fragile class\n");
+                 llvm::dbgs() << " originates from a public/package fragile class\n");
       return true;
     }
   }

@@ -2880,7 +2880,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
   // Do not emit vtables for non-public classes unless everything has to be
   // serialized.
   if (!ShouldSerializeAll &&
-      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
+      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Package)
     return;
 
   if (vt.isSpecialized())
@@ -2924,7 +2924,7 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
   // Do not emit deinit for non-public nominal types unless everything has to be
   // serialized.
   if (!ShouldSerializeAll && deinit.getNominalDecl()->getEffectiveAccess() <
-                                 swift::AccessLevel::Public)
+                                 swift::AccessLevel::Package)
     return;
 
   SILFunction *impl = deinit.getImplementation();
