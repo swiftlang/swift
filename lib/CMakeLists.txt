@@ -94,15 +94,9 @@ file(GENERATE
 #include \"swift/SILOptimizer/OptimizerBridging.h\"
 ")
 add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
-
-# When building unified, we need to make sure all the Clang headers are
-# generated before we try to use them.
-# When building Swift against an already compiled LLVM/Clang, like
-# build-script does, this target does not exist, but the headers
-# are already completely generated at that point.
-if(TARGET clang-tablegen-targets)
-  add_dependencies(importedHeaderDependencies clang-tablegen-targets)
-endif()
+# Respect LLVM_COMMON_DEPENDS as well as `add_swift_X` does to ensure
+# all prerequisites like TableGen'ed headers are generated before.
+add_dependencies(importedHeaderDependencies ${LLVM_COMMON_DEPENDS})
 
 add_subdirectory(APIDigester)
 add_subdirectory(AST)
