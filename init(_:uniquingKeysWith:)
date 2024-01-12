@@ -1,3 +1,8 @@
+init<S>(
+    _ keysAndValues: S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+) rethrows where S : Sequence, S.Element == (Key, Value)
+
 let pairsWithDuplicateKeys = [("a", 1), ("b", 2), ("a", 3), ("b", 4)]
 
 
