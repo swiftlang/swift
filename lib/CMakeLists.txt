@@ -76,6 +76,28 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
          EXPORT_LINK_INTERFACE_LIBRARIES)
 endif()
 
+# Create a library that depends on all tool headers defined in include/module.modulemap
+#
+# TODO: generate this dynamically through the modulemap; this cannot use `sed`
+# as that is not available on all platforms (e.g. Windows).
+file(GENERATE
+  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+  CONTENT "
+#define COMPILED_WITH_SWIFT
+#define SWIFT_TARGET
+
+#include \"swift/Basic/BasicBridging.h\"
+#include \"swift/AST/ASTBridging.h\"
+#include \"swift/IDE/IDEBridging.h\"
+#include \"swift/Parse/ParseBridging.h\"
+#include \"swift/SIL/SILBridging.h\"
+#include \"swift/SILOptimizer/OptimizerBridging.h\"
+")
+add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
+# Respect LLVM_COMMON_DEPENDS as well as `add_swift_X` does to ensure
+# all prerequisites like TableGen'ed headers are generated before.
+add_dependencies(importedHeaderDependencies ${LLVM_COMMON_DEPENDS})
+
 add_subdirectory(APIDigester)
 add_subdirectory(AST)
 add_subdirectory(ASTGen)
