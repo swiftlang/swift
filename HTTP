@@ -5,3 +5,19 @@ var responseMessages = [200: "OK",
 
 print(responseMessages[200])
 // Prints "Optional("OK")"
+
+let httpResponseCodes = [200, 403, 301]
+for code in httpResponseCodes {
+    if let message = responseMessages[code] {
+        print("Response \(code): \(message)")
+    } else {
+        print("Unknown response \(code)")
+    }
+}
+// Prints "Response 200: OK"
+// Prints "Response 403: Access forbidden"
+// Prints "Unknown response 301"
+
+responseMessages[301] = "Moved permanently"
+print(responseMessages[301])
+// Prints "Optional("Moved permanently")"
