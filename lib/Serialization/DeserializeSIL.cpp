@@ -314,7 +314,9 @@ SILValue SILDeserializer::getLocalValue(ValueID Id,
     Entry = ::new PlaceholderValue(Type);
   }
   // If this value was already defined, check it to make sure types match.
-  assert(Entry->getType() == Type && "Value Type mismatch?");
+  assert((Entry->getType() == Type ||
+          Entry->getType().isEqualWithOpaqueReturnTypes(Type)) &&
+         "Value Type mismatch?");
   return Entry;
 }
 

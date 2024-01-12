@@ -949,7 +949,8 @@ public:
 
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
-    _require(type1 == type2, complaint,
+    _require(type1 == type2 || type1.isEqualWithOpaqueReturnTypes(type2),
+             complaint,
              [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
   }
 
@@ -6106,7 +6107,8 @@ public:
       ++argI;
       if (bbarg->getType() != mappedTy &&
           bbarg->getType() != F.getLoweredType(mappedTy.getASTType())
-                                  .getCategoryType(mappedTy.getCategory())) {
+                                  .getCategoryType(mappedTy.getCategory()) &&
+          !bbarg->getType().isEqualWithOpaqueReturnTypes(mappedTy)) {
         llvm::errs() << what << " type mismatch!\n";
         llvm::errs() << "  argument: "; bbarg->dump();
         llvm::errs() << "  expected: "; mappedTy.dump();

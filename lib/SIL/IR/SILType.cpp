@@ -19,6 +19,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
@@ -1252,4 +1253,61 @@ SILType::conformsToProtocol(SILFunction *fn, ProtocolDecl *protocol) const {
 
 bool SILType::isSendable(SILFunction *fn) const {
   return getASTType()->isSendableType(fn->getParentModule());
+}
+
+class IsEqualWithOpaqueReturnTypes
+    : public CanTypeDifferenceVisitor<IsEqualWithOpaqueReturnTypes> {
+
+  static CanType replaceWithUnderlying(CanType type) {
+    if (auto primary = type->getAs<PrimaryArchetypeType>()) {
+      // Unwrap generic args.
+      return primary->getInterfaceType()->getCanonicalType();
+    }
+    auto opaque = type->getAs<OpaqueTypeArchetypeType>();
+    if (!opaque) {
+      return type;
+    }
+    OpaqueTypeDecl *decl = opaque->getDecl();
+    SubstitutionMap map;
+    if (auto maybeMap = decl->getUniqueUnderlyingTypeSubstitutions()) {
+      map = *maybeMap;
+    }
+    if (map.empty()) {
+      return type;
+    }
+    auto replacementTypes =
+        static_cast<const SubstitutionMap &>(map).getReplacementTypes();
+    CanType result = type;
+    auto genericSig = map.getGenericSignature();
+    auto genericParams = genericSig.getGenericParams();
+    // The opaque return type comes at the last.
+    unsigned genericParamIdx = genericParams.size() - 1;
+    Type replacementType = replacementTypes[genericParamIdx];
+    if (replacementType) {
+      result = replacementType->getCanonicalType();
+    }
+    return result;
+  }
+
+public:
+  bool visit(CanType t1, CanType t2) {
+    CanType t1_ = replaceWithUnderlying(t1);
+    CanType t2_ = replaceWithUnderlying(t2);
+    return CanTypeDifferenceVisitor<
+        IsEqualWithOpaqueReturnTypes>::template visit(t1_, t2_);
+  }
+
+  bool equal(CanType t1, CanType t2) { return !visit(t1, t2); };
+};
+
+bool SILType::isEqualWithOpaqueReturnTypes(SILType rhs) const {
+  const SILType *lhs = this;
+  if (*lhs == rhs) {
+    return true;
+  }
+  CanType lhsType = lhs->getRawASTType(), rhsType = rhs.getRawASTType();
+  if (lhsType == rhsType) {
+    return true;
+  }
+  return IsEqualWithOpaqueReturnTypes().equal(lhsType, rhsType);
 }

@@ -947,6 +947,10 @@ public:
     return value.getOpaqueValue() != rhs.value.getOpaqueValue();
   }
 
+  // Returns true if the SILTypes are equal with the opaque return
+  // types being considered to be equal to their underlying types.
+  bool isEqualWithOpaqueReturnTypes(SILType rhs) const;
+
   /// Return the mangled name of this type, ignoring its prefix. Meant for
   /// diagnostic purposes.
   std::string getMangledName() const;
