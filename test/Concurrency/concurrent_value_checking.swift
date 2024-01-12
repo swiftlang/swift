@@ -343,17 +343,22 @@ class C9: Sendable { } // expected-warning{{non-final class 'C9' cannot conform 
 
 @globalActor
 struct SomeActor {
-  static var shared = A1()
+  static let shared = A1()
 }
+
+class NotSendable {}
+
 // actor-isolated mutable properties are valid
 final class C10: Sendable {
   @MainActor var x = 0
-  @SomeActor var y = 1
+  @MainActor var ns1 : NotSendable?
+  @MainActor let ns : NotSendable? = nil
 }
 
-// 'nonisolated (unsafe)' mutable properties are valid
-final class C13: Sendable {
-  nonisolated (unsafe) var z = 2
+final class C14: Sendable {
+  @SomeActor var y = 1
+  @SomeActor var nc = NotConcurrent()
+  @SomeActor let nc1 = NotConcurrent()
 }
 
 extension NotConcurrent {
