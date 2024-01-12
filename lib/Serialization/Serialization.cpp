@@ -4818,6 +4818,9 @@ public:
         case BuiltinMacroKind::ExternalMacro:
           builtinID = 1;
           break;
+        case BuiltinMacroKind::IsolationMacro:
+          builtinID = 2;
+          break;
         }
         break;
       }
