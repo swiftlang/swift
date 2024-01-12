@@ -5281,6 +5281,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 }
 
 void ConformanceChecker::resolveValueWitnesses() {
+  bool usesPreconcurrencyConformance = false;
   for (auto *requirement : Proto->getProtocolRequirements()) {
     // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
@@ -5299,6 +5300,15 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Check actor isolation. If we need to enter into the actor's
       // isolation within the witness thunk, record that.
       if (auto enteringIsolation = checkActorIsolation(requirement, witness)) {
+        // Only @preconcurrency conformances allow entering isolation
+        // when neither requirement nor witness are async by adding a
+        // runtime precondition that witness is always called on the
+        // expected executor.
+        if (Conformance->isPreconcurrency()) {
+          usesPreconcurrencyConformance =
+              !isAsyncDecl(requirement) && !isAsyncDecl(witness);
+        }
+
         Conformance->overrideWitness(
             requirement,
             Conformance->getWitnessUncached(requirement)
@@ -5430,6 +5440,12 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Let it get diagnosed later.
       break;
     }
+  }
+
+  if (Conformance->isPreconcurrency() && !usesPreconcurrencyConformance) {
+    DC->getASTContext().Diags.diagnose(
+        Conformance->getLoc(), diag::preconcurrency_conformance_not_used,
+        Proto->getDeclaredInterfaceType());
   }
 
   // Finally, check some ad-hoc protocol requirements.

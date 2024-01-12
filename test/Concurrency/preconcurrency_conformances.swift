@@ -10,6 +10,8 @@ do {
   class K {}
 
   struct A : @preconcurrency Q {} // Ok
+  // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Q' has no effect}}
+
   struct B : @preconcurrency K {
     // expected-error@-1 {{'preconcurrency' attribute cannot apply to non-protocol type 'K'}}
     var x: @preconcurrency Int
@@ -29,6 +31,7 @@ protocol InvalidUseOfPreconcurrencyAttr : @preconcurrency Q {
 
 struct TestPreconcurrencyAttr {}
 extension TestPreconcurrencyAttr : @preconcurrency Q { // Ok
+  // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Q' has no effect}}
 }
 
 class NonSendable {}
@@ -91,6 +94,7 @@ protocol Initializable {
 }
 
 final class K : @preconcurrency Initializable {
+  // expected-warning@-1 {{@preconcurrency attribute on conformance to 'Initializable' has no effect}}
   init() {} // Ok
 }
 
@@ -122,6 +126,8 @@ protocol WithIndividuallyIsolatedRequirements {
 do {
   @MainActor
   struct TestExplicitGlobalActorAttrs : @preconcurrency WithIndividuallyIsolatedRequirements {
+    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithIndividuallyIsolatedRequirements' has no effect}}
+
     var a: Int = 42
 
     @MainActor var b: Int {
@@ -146,10 +152,20 @@ protocol WithNonIsolated {
 
 do {
   class TestExplicitOtherIsolation : @preconcurrency WithNonIsolated {
+    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}
+
     @GlobalActor var prop: Int = 42
     // expected-warning@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot be used to satisfy main actor-isolated protocol requirement}}
 
     @MainActor func test() {}
     // expected-warning@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy nonisolated protocol requirement}}
+  }
+}
+
+do {
+  class InferredGlobalActorAttrs : @preconcurrency WithNonIsolated {
+    // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}
+    var prop: Int = 42
+    func test() {}
   }
 }
