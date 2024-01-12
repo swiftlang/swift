@@ -108,7 +108,7 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
   JobQueueMerger merger(JobQueue);
   merger.insert(job);
-  JobQueue = merger.release();
+  JobQueue = std::get<0>(merger.release());
 }
 
 /// Enqueues a task on the main executor.
@@ -202,7 +202,7 @@ static void recognizeReadyDelayedJobs() {
     nextDelayedJob = next;
   }
 
-  JobQueue = readyJobs.release();
+  JobQueue = std::get<0>(readyJobs.release());
   DelayedJobQueue = nextDelayedJob;
 }
 
