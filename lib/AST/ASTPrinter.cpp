@@ -3890,6 +3890,14 @@ static bool usesFeatureExtern(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExternAttr>();
 }
 
+static void suppressingFeatureExtern(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DAK_Extern);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 static bool usesFeatureStaticExclusiveOnly(Decl *decl) {
   return decl->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>();
 }

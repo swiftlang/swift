@@ -113,6 +113,7 @@ LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros")
 SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ExtensionMacroAttr, 0, "@attached(extension)")
 LANGUAGE_FEATURE(TypedThrows, 413, "Typed throws")
+SUPPRESSIBLE_LANGUAGE_FEATURE(Extern, 0, "@_extern")
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -246,9 +247,6 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
 EXPERIMENTAL_FEATURE(NonescapableTypes, false)
-
-/// Enable the `@_extern` attribute.
-EXPERIMENTAL_FEATURE(Extern, true)
 
 // Infer Sendability of unapplied and partial applied methods,
 // global functions and key paths.
