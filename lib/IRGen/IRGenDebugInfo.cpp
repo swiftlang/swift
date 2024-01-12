@@ -2570,11 +2570,18 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (FnTy && (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables))
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
       GenericContextScope scope(IGM, FnTy->getInvocationGenericSignature());
+      CanType errorResultTy = ErrorInfo->getReturnValueType(
+          IGM.getSILModule(), FnTy,
+          IGM.getMaximalTypeExpansionContext());
       SILType SILTy = IGM.silConv.getSILType(
           *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext());
+
+      errorResultTy = SILFn->mapTypeIntoContext(errorResultTy)
+          ->getCanonicalType();
+      SILTy = SILFn->mapTypeIntoContext(SILTy);
+
       auto DTI = DebugTypeInfo::getFromTypeInfo(
-          ErrorInfo->getReturnValueType(IGM.getSILModule(), FnTy,
-                                        IGM.getMaximalTypeExpansionContext()),
+          errorResultTy,
           IGM.getTypeInfo(SILTy), IGM, false);
       Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
     }
