@@ -345,10 +345,6 @@ private:
                CanType existential,
                bool skipConditionalRequirements,
                bool allowMissing) const;
-
-public:
-  // Caching.
-  bool isCached() const { return true; }
 };
 
 /// Determine whether an existential type conforming to this protocol
