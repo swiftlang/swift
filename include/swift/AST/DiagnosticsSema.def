@@ -2605,7 +2605,7 @@ WARNING(add_predates_concurrency_import,none,
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
 WARNING(remove_predates_concurrency_import,none,
-     "'@preconcurrency' attribute on module %0 is unused", (Identifier))
+     "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (const ModuleDecl *))
