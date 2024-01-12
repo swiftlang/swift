@@ -369,11 +369,6 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(MacroExpansionExpr, Expr, (16-NumExprBits)+16,
-    : 16 - NumExprBits, // Align and leave room for subclasses
-    Discriminator : 16
-  );
-
   } Bits;
   // clang-format on
 
@@ -6309,7 +6304,6 @@ public:
       : Expr(ExprKind::MacroExpansion, isImplicit, ty),
         FreestandingMacroExpansion(FreestandingMacroKind::Expr, info), DC(dc),
         Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
-    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
   }
 
   static MacroExpansionExpr *
@@ -6332,24 +6326,6 @@ public:
 
   DeclContext *getDeclContext() const { return DC; }
   void setDeclContext(DeclContext *dc) { DC = dc; }
-
-  /// Returns a discriminator which determines this macro expansion's index
-  /// in the sequence of macro expansions within the current function.
-  unsigned getDiscriminator() const;
-
-  /// Retrieve the raw discriminator, which may not have been computed yet.
-  ///
-  /// Only use this for queries that are checking for (e.g.) reentrancy or
-  /// intentionally do not want to initiate verification.
-  unsigned getRawDiscriminator() const {
-    return Bits.MacroExpansionExpr.Discriminator;
-  }
-
-  void setDiscriminator(unsigned discriminator) {
-    assert(getRawDiscriminator() == InvalidDiscriminator);
-    assert(discriminator != InvalidDiscriminator);
-    Bits.MacroExpansionExpr.Discriminator = discriminator;
-  }
 
   SourceRange getSourceRange() const {
     return getExpansionInfo()->getSourceRange();

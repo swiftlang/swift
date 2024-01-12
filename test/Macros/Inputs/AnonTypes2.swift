@@ -1,0 +1,1 @@
+#anonymousTypes(public: true) { "hello" }

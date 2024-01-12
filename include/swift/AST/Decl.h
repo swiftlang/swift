@@ -792,10 +792,6 @@ protected:
     NumberOfVTableEntries : 2
   );
 
-  SWIFT_INLINE_BITFIELD(MacroExpansionDecl, Decl, 16,
-    Discriminator : 16
-  );
-
   } Bits;
   // Turn back on clang-format now that we have defined our inline bitfields.
   // clang-format on
@@ -9008,8 +9004,6 @@ public:
 class MacroExpansionDecl : public Decl, public FreestandingMacroExpansion {
 
 public:
-  enum : unsigned { InvalidDiscriminator = 0xFFFF };
-
   MacroExpansionDecl(DeclContext *dc, MacroExpansionInfo *info);
 
   static MacroExpansionDecl *create(DeclContext *dc, SourceLoc poundLoc,
@@ -9028,24 +9022,6 @@ public:
 
   /// Enumerate the nodes produced by expanding this macro expansion.
   void forEachExpandedNode(llvm::function_ref<void(ASTNode)> callback) const;
-
-  /// Returns a discriminator which determines this macro expansion's index
-  /// in the sequence of macro expansions within the current function.
-  unsigned getDiscriminator() const;
-
-  /// Retrieve the raw discriminator, which may not have been computed yet.
-  ///
-  /// Only use this for queries that are checking for (e.g.) reentrancy or
-  /// intentionally do not want to initiate verification.
-  unsigned getRawDiscriminator() const {
-    return Bits.MacroExpansionDecl.Discriminator;
-  }
-
-  void setDiscriminator(unsigned discriminator) {
-    assert(getRawDiscriminator() == InvalidDiscriminator);
-    assert(discriminator != InvalidDiscriminator);
-    Bits.MacroExpansionDecl.Discriminator = discriminator;
-  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;
