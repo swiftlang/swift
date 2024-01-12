@@ -88,6 +88,14 @@ Func AnySequence.map(_:) has been renamed to Func __rethrows_map(_:)
 Func AnySequence.map(_:) has mangled name changing from 'Swift.AnySequence.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnySequence.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
 Func AnySequence.map(_:) is now without @rethrows
 
+// These are using
+Func Sequence.map(_:) has been renamed to Func __rethrows_map(_:)
+Func Sequence.map(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Sequence.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
+Func Sequence.map(_:) is now without @rethrows
+Func Collection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func Collection.map(_:) has mangled name changing from '(extension in Swift):Swift.Collection.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Collection.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
+Func Collection.map(_:) is now without @rethrows
+
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
 // break because the symbols are still present, and is not a source break
