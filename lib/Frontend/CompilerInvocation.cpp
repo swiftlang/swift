@@ -808,20 +808,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (value.startswith("StrictConcurrency")) {
       auto decomposed = value.split("=");
       if (decomposed.first == "StrictConcurrency") {
-        bool handled;
         if (decomposed.second == "") {
           Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-          handled = true;
         } else if (auto level = parseStrictConcurrency(decomposed.second)) {
           Opts.StrictConcurrencyLevel = *level;
-          handled = true;
-        } else {
-          handled = false;
-        }
-
-        if (handled) {
-          Opts.enableFeature(Feature::StrictConcurrency);
-          continue;
         }
       }
     }
@@ -874,14 +864,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     // Add the feature.
     Opts.enableFeature(*feature);
-  }
-
-  // CompleteConcurrency enables all data-race safety upcoming features.
-  if (Opts.hasFeature(Feature::CompleteConcurrency)) {
-    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-    Opts.enableFeature(Feature::DisableOutwardActorInference);
-    Opts.enableFeature(Feature::IsolatedDefaultValues);
-    Opts.enableFeature(Feature::GlobalConcurrency);
   }
 
   // Map historical flags over to experimental features. We do this for all
@@ -1001,7 +983,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    "-warn-swift3-objc-inference-complete");
 
   // Swift 6+ uses the strictest concurrency level.
-  if (Opts.isSwiftVersionAtLeast(6)) {
+  if (Opts.hasFeature(Feature::StrictConcurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
     if (auto value = parseStrictConcurrency(A->getValue()))
@@ -1012,17 +994,24 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-  } else if (Opts.hasFeature(Feature::CompleteConcurrency) ||
-             Opts.hasFeature(Feature::StrictConcurrency)) {
-    // Already set above.
   } else {
     // Default to minimal checking in Swift 5.x.
-    Opts.StrictConcurrencyLevel = StrictConcurrency::Minimal;
+  }
+
+  // Make sure StrictConcurrency, StrictConcurrency=complete and
+  // -strict-concurrency=complete all mean the same thing.
+  //
+  // The compiler implementation should standardize on StrictConcurrencyLevel,
+  // but if there is any check for `Feature::StrictConcurrency`, the result
+  // should be the same regardless of which flag was used to enable it.
+  if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
+    Opts.enableFeature(Feature::StrictConcurrency);
   }
 
   // StrictConcurrency::Complete enables all data-race safety features.
   if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
     Opts.enableFeature(Feature::IsolatedDefaultValues);
+    Opts.enableFeature(Feature::GlobalConcurrency);
   }
 
   Opts.WarnImplicitOverrides =

@@ -3483,10 +3483,6 @@ static bool usesFeatureForwardTrailingClosures(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureCompleteConcurrency(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
   return false;
 }
