@@ -522,6 +522,12 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)
     return llvm::None;
+  // The bridging function must have the correct parent module set. This ensures
+  // that IRGen sets correct linkage when this function comes from the same
+  // module as being compiled.
+  if (!bridgedFunc->getDeclContext())
+    bridgedFunc->setParentModule(
+        resultDecl->getDeclContext()->getParentModule());
 
   if (dynamicCast.getFunction()->isSerialized() &&
       !bridgedFunc->hasValidLinkageForFragileRef())
