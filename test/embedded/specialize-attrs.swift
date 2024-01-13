@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift(%S/Inputs/print.swift -parse-as-library -Onone -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop -Xlinker -dead_strip) | %FileCheck %s
-// RUN: %target-run-simple-swift(%S/Inputs/print.swift -parse-as-library -O -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop -Xlinker -dead_strip) | %FileCheck %s
-// RUN: %target-run-simple-swift(%S/Inputs/print.swift -parse-as-library -Osize -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop -Xlinker -dead_strip) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Onone -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop -Xlinker -dead_strip) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -O -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop -Xlinker -dead_strip) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Osize -enable-experimental-feature Embedded -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop -Xlinker -dead_strip) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
