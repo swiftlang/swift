@@ -203,6 +203,41 @@ func passesClosureWithReabstractionToRethrowing(count: Int) {
 }
 
 
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws13throwAndCatchyyyyxYKXExYKs5ErrorRzlF : $@convention(thin) <E where E : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>) -> @error_indirect E {
+func throwAndCatch<E: Error>(_ body: () throws(E) -> Void) throws(E) {
+  do {
+    // CHECK: [[OUTER_ERR:%.*]] = alloc_stack $E
+    // CHECK: try_apply [[FN:%.*]]([[ERROR_ARG:%.*]]) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>, normal [[NORMAL_BB:bb.*]], error [[ERROR_BB:bb.*]] //
+    try body()
+  } catch {
+    // CHECK: [[ERROR_BB]]:
+    // CHECK-NEXT: copy_addr [take] [[ERROR_ARG]] to [init] [[OUTER_ERR]] : $*E
+    // CHECK: dealloc_stack [[ERROR_ARG]] : $*E
+    print(error)
+  }
+}
+
+enum HomeworkError: Error {
+case dogAteIt
+case forgot
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws25throwAndPatternMatchCatchyyyyxYKXExYKs5ErrorRzlF : $@convention(thin) <E where E : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>) -> @error_indirect E {
+func throwAndPatternMatchCatch<E: Error>(_ body: () throws(E) -> Void) throws(E) {
+  do {
+    // CHECK: [[OUTER_ERR:%.*]] = alloc_stack $E
+    // CHECK: try_apply [[FN:%.*]]([[ERROR_ARG:%.*]]) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>, normal [[NORMAL_BB:bb.*]], error [[ERROR_BB:bb.*]] //
+    try body()
+  } catch let he as HomeworkError where he == .dogAteIt {
+    // CHECK: copy_addr [take] [[ERROR_ARG]] to [init] [[OUTER_ERR]] : $*E
+    // CHECK: [[HOMEWORK_ERR:%.*]] = alloc_stack $HomeworkError
+    // CHECK: checked_cast_addr_br copy_on_success E in [[OUTER_ERR]] : $*E to HomeworkError in [[HOMEWORK_ERR]] : $*HomeworkError
+
+    // bad dog
+  } catch {
+  }
+}
+
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
 // CHECK-NEXT:  #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKFAA0C5ClassCADyyKFTV [override]

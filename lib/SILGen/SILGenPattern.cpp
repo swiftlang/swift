@@ -3189,13 +3189,14 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
 
   Scope stmtScope(Cleanups, CleanupLocation(S));
 
-  assert(exn.getType().isObject() &&
-         "Error is special and should always be an object");
+  auto consumptionKind = exn.getType().isObject()
+      ? CastConsumptionKind::BorrowAlways
+      : CastConsumptionKind::CopyOnSuccess;
+
   // Our model is that sub-cases get the exception at +0 and the throw (if we
   // need to rethrow the exception) gets the exception at +1 since we need to
   // trampoline it's ownership to our caller.
-  ConsumableManagedValue subject = {exn.borrow(*this, S),
-                                    CastConsumptionKind::BorrowAlways};
+  ConsumableManagedValue subject = {exn.borrow(*this, S), consumptionKind};
 
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
