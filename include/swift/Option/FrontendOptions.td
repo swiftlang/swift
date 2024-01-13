@@ -1166,6 +1166,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
 
+def disable_sil_opaque_values : Flag<["-"], "disable-sil-opaque-values">,
+  HelpText<"Disable SIL Opaque Values">;
+
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
