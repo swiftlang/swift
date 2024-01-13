@@ -921,7 +921,7 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
       break;
     }
     case GeneratedSourceInfo::DefaultArgument:
-      // TODO: ApolloZhu
+      // No original location as it's not actually in any source file
     case GeneratedSourceInfo::ReplacedFunctionBody:
       // There's not really any "original" location for locations within
       // replaced function bodies. The body is actually different code to the
