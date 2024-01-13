@@ -788,12 +788,12 @@ def continue_building_after_errors : Flag<["-"], "continue-building-after-errors
 def warn_swift3_objc_inference_complete :
   Flag<["-"], "warn-swift3-objc-inference-complete">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def warn_swift3_objc_inference_minimal :
   Flag<["-"], "warn-swift3-objc-inference-minimal">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_actor_data_race_checks :
   Flag<["-"], "enable-actor-data-race-checks">,

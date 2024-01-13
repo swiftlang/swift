@@ -677,12 +677,12 @@ def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
 
 def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,

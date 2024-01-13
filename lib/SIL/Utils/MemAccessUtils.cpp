@@ -2623,7 +2623,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::Unreachable:
     case BuiltinValueKind::CondUnreachable:
     case BuiltinValueKind::DestroyArray:
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:

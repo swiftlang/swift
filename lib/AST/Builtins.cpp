@@ -2983,11 +2983,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TSanInoutAccess:
     return getTSanInoutAccess(Context, Id);
 
-  case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
-    return getBuiltinFunction(Id,
-                              {},
-                              TupleType::getEmpty(Context));
-
   case BuiltinValueKind::TypePtrAuthDiscriminator:
     return getTypePtrAuthDiscriminator(Context, Id);
     

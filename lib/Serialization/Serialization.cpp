@@ -2897,10 +2897,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         }
       }
       auto abbrCode = S.DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
-      ObjCDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     theAttr->isImplicit(),
-                                     theAttr->isSwift3Inferred(),
-                                     theAttr->isNameImplicit(), numArgs, pieces);
+      ObjCDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          theAttr->isNameImplicit(), numArgs, pieces);
       return;
     }
 

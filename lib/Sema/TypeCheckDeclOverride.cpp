@@ -1665,39 +1665,7 @@ namespace  {
       }
     }
 
-    void visitObjCAttr(ObjCAttr *attr) {
-      // Checking for overrides of declarations that are implicitly @objc
-      // and occur in class extensions, because overriding will no longer be
-      // possible under the Swift 4 rules.
-
-      // We only care about the storage declaration.
-      if (isa<AccessorDecl>(Override)) return;
-
-      // If @objc was explicit or handled elsewhere, nothing to do.
-      if (!attr->isSwift3Inferred()) return;
-
-      // If we aren't warning about Swift 3 @objc inference, we're done.
-      if (Override->getASTContext().LangOpts.WarnSwift3ObjCInference ==
-            Swift3ObjCInferenceWarnings::None)
-        return;
-
-      // If 'dynamic' was implicit, we'll already have warned about this.
-      if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>()) {
-        if (!dynamicAttr->isImplicit()) return;
-      }
-
-      // The overridden declaration needs to be in an extension.
-      if (!isa<ExtensionDecl>(Base->getDeclContext())) return;
-
-      // Complain.
-      Diags.diagnose(Override, diag::override_swift3_objc_inference,
-                     Override, Base->getDeclContext()
-                                 ->getSelfNominalTypeDecl()
-                                 ->getName());
-      Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
-        .fixItInsert(Base->getAttributeInsertionLoc(false),
-                     "@objc ");
-    }
+    void visitObjCAttr(ObjCAttr *attr) {}
   };
 } // end anonymous namespace
 
