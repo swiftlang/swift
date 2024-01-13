@@ -497,9 +497,8 @@ static bool accessIsConcurrencySafe(ModuleDecl *module,
                                     RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
 
-  // must be accessible from nonisolated and Sendable
-  return isLetAccessibleAnywhere(module, var)
-      && var->getTypeInContext()->isSendableType();
+  // must be accessible from nonisolated.
+  return isLetAccessibleAnywhere(module, var);
 }
 
 /// \returns true iff the ref_element_addr instruction is only used

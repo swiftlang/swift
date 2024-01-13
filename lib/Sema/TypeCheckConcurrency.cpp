@@ -543,8 +543,22 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
         return false;
     }
 
+    bool accessWithinModule =
+        (fromModule == var->getDeclContext()->getParentModule());
+
+    // If the type is not 'Sendable', it's unsafe
+    if (!var->getTypeInContext()->isSendableType()) {
+      // Compiler versions <= 5.10 treated this variable as nonisolated,
+      // so downgrade async access errors in the effects checker to
+      // warnings prior to Swift 6.
+      if (accessWithinModule)
+        options = ActorReferenceResult::Flags::Preconcurrency;
+
+      return false;
+    }
+
     // If it's actor-isolated but in the same module, then it's OK too.
-    return (fromModule == var->getDeclContext()->getParentModule());
+    return accessWithinModule;
   }
 }
 
@@ -3642,33 +3656,25 @@ namespace {
             LLVM_FALLTHROUGH;
           }
 
-          case ActorIsolation::ActorInstance:
-            // If this entity is always accessible across actors, just check
-            // Sendable.
+          case ActorIsolation::ActorInstance: {
+            ActorReferenceResult::Options options = llvm::None;
             if (isAccessibleAcrossActors(decl, isolation, getDeclContext(),
-                                         llvm::None)) {
-              if (diagnoseNonSendableTypes(
-                             component.getComponentType(), getDeclContext(),
-                             /*inDerivedConformance*/Type(),
-                             component.getLoc(),
-                             diag::non_sendable_keypath_access)) {
-                diagnosed = true;
-              }
+                                         options)) {
               break;
             }
 
-            {
-              auto diagnostic = ctx.Diags.diagnose(
-                  component.getLoc(), diag::actor_isolated_keypath_component,
-                  isolation, decl);
+            bool downgrade = isolation.isGlobalActor() ||
+              options.contains(
+                  ActorReferenceResult::Flags::Preconcurrency);
 
-              if (isolation == ActorIsolation::ActorInstance)
-                diagnosed = true;
-              else
-                diagnostic.warnUntilSwiftVersion(6);
-            }
+            ctx.Diags.diagnose(
+                component.getLoc(), diag::actor_isolated_keypath_component,
+                isolation, decl)
+              .warnUntilSwiftVersionIf(downgrade, 6);
 
+            diagnosed = !downgrade;
             break;
+          }
           }
         }
 

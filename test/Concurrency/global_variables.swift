@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables -parse-as-library -strict-concurrency=minimal -swift-version 5 %S/Inputs/GlobalVariables.swift
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -swift-version 6 -I %t %s -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -43,6 +43,7 @@ struct TestStatics {
   static let immutableNonsendable = TestNonsendable() // expected-error{{static property 'immutableNonsendable' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor}}
   static nonisolated(unsafe) let immutableNonisolatedUnsafe = TestNonsendable()
   static nonisolated let immutableNonisolated = TestNonsendable() // expected-error{{static property 'immutableNonisolated' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor}}
+  // expected-error@-1 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'TestNonsendable'}}
   static let immutableInferredSendable = 0
   static var mutable = 0 // expected-error{{static property 'mutable' is not concurrency-safe because it is non-isolated global shared mutable state}}
   // expected-note@-1{{isolate 'mutable' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}

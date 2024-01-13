@@ -1040,6 +1040,7 @@ class ApplyClassifier {
 
 public:
   ASTContext &Ctx;
+  DeclContext *DC = nullptr;
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
 
@@ -1083,9 +1084,12 @@ public:
 
     if (auto *var = dyn_cast<VarDecl>(decl)) {
       ActorReferenceResult::Options options = llvm::None;
-      // The newly-diagnosed cases are invalid regardless of the module context
-      // of the caller, i.e. isolated static and global 'let' variables.
-      auto *module = var->getDeclContext()->getParentModule();
+      ModuleDecl *module;
+      if (DC != nullptr) {
+        module = DC->getParentModule();
+      } else {
+        module = var->getDeclContext()->getParentModule();
+      }
       if (!isLetAccessibleAnywhere(module, var, options)) {
         return options.contains(ActorReferenceResult::Flags::Preconcurrency);
       }
@@ -3064,6 +3068,7 @@ private:
 
   ApplyClassifier getApplyClassifier() const {
     ApplyClassifier classifier(Ctx);
+    classifier.DC = CurContext.getDeclContext();
     classifier.RethrowsDC = RethrowsDC;
     classifier.ReasyncDC = ReasyncDC;
     return classifier;
