@@ -44,18 +44,14 @@ func printCharacters(_ buf: UnsafeBufferPointer<UInt8>) {
 }
 
 extension BinaryInteger {
-  func writeToStdout(radix: Int = 10) {
+  func writeToStdout() {
     if self == (0 as Self) {
       print("0", terminator: "")
       return
     }
-    
+
     func _ascii(_ digit: UInt8) -> UInt8 {
-      if digit < 10 {
-        UInt8(("0" as Unicode.Scalar).value) + digit
-      } else {
-        UInt8(("a" as Unicode.Scalar).value) + (digit - 10)
-      }
+      UInt8(("0" as Unicode.Scalar).value) + digit
     }
     let isNegative = Self.isSigned && self < (0 as Self)
     var value = magnitude
@@ -70,7 +66,7 @@ extension BinaryInteger {
     var index = buffer.count - 1
     while value != 0 {
       let (quotient, remainder) =
-          value.quotientAndRemainder(dividingBy: Magnitude(radix))
+          value.quotientAndRemainder(dividingBy: Magnitude(10))
       buffer[index] = _ascii(UInt8(truncatingIfNeeded: remainder))
       index -= 1
       value = quotient
