@@ -59,26 +59,35 @@ extension BinaryInteger {
     }
     let isNegative = Self.isSigned && self < (0 as Self)
     var value = magnitude
-    withUnsafeTemporaryAllocation(byteCount: 64, alignment: 1) { buffer in
-      var index = buffer.count - 1
-      while value != 0 {
-        let (quotient, remainder) =
-            value.quotientAndRemainder(dividingBy: Magnitude(radix))
-        buffer[index] = _ascii(UInt8(truncatingIfNeeded: remainder))
-        index -= 1
-        value = quotient
-      }
-      if isNegative {
-        buffer[index] = UInt8(("-" as Unicode.Scalar).value)
-        index -= 1
-      }
-      let start = index + 1
-      let end = buffer.count - 1
-      let count = end - start + 1
 
-      let pointerToPrint = buffer.baseAddress?.advanced(by: start).assumingMemoryBound(to: UInt8.self)
-      printCharacters(UnsafeBufferPointer(start: pointerToPrint, count: count))
+    // Avoid withUnsafeTemporaryAllocation which is not typed-throws ready yet
+    let byteCount = 64
+    let stackBuffer = Builtin.stackAlloc(byteCount._builtinWordValue,
+         1._builtinWordValue, 1._builtinWordValue)
+    let buffer = UnsafeMutableRawBufferPointer(start: .init(stackBuffer),
+        count: byteCount)
+
+    var index = buffer.count - 1
+    while value != 0 {
+      let (quotient, remainder) =
+          value.quotientAndRemainder(dividingBy: Magnitude(radix))
+      buffer[index] = _ascii(UInt8(truncatingIfNeeded: remainder))
+      index -= 1
+      value = quotient
     }
+    if isNegative {
+      buffer[index] = UInt8(("-" as Unicode.Scalar).value)
+      index -= 1
+    }
+    let start = index + 1
+    let end = buffer.count - 1
+    let count = end - start + 1
+
+    let pointerToPrint = buffer.baseAddress?.advanced(by: start)
+        .assumingMemoryBound(to: UInt8.self)
+    printCharacters(UnsafeBufferPointer(start: pointerToPrint, count: count))
+
+    Builtin.stackDealloc(stackBuffer)
   }
 }
 

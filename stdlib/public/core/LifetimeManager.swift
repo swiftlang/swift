@@ -99,6 +99,7 @@ public func _withUnprotectedUnsafeMutablePointer<T, Result>(
 #endif
 }
 
+#if !$Embedded
 /// Invokes the given closure with a pointer to the given argument.
 ///
 /// The `withUnsafePointer(to:_:)` function is useful for calling Objective-C
@@ -127,6 +128,17 @@ public func withUnsafePointer<T, Result>(
 {
   return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
+#else
+// TODO: This should be unified with non-embedded Swift.
+@inlinable
+public func withUnsafePointer<T, E, Result>(
+  to value: T,
+  _ body: (UnsafePointer<T>) throws(E) -> Result
+) throws(E) -> Result
+{
+  return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
+}
+#endif
 
 /// Invokes the given closure with a pointer to the given argument.
 ///
