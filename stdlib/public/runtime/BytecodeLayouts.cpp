@@ -396,7 +396,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>();
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
@@ -616,7 +616,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>(); // numEmptyCases
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
@@ -1655,7 +1655,7 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>(); // numEmptyCases
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
