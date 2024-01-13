@@ -4838,6 +4838,12 @@ ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
+ERROR(implicit_throws_super_init,none,
+      "missing call to superclass's initializer; "
+      "'super.init' is a throwing initializer and requires either an explicit "
+      "call or that this initializer is also marked as 'throws'",
+      ())
+
 ERROR(implicit_async_super_init,none,
       "missing call to superclass's initializer; "
       "'super.init' is 'async' and requires an explicit call",
