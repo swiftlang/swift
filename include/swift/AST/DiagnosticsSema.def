@@ -7530,8 +7530,8 @@ ERROR(conformance_macro,none,
 ERROR(macro_as_default_argument, none,
       "non-built-in macro cannot be used as default argument",
       ())
-ERROR(macro_as_default_argument_has_arguments, none,
-      "macro used as default argument cannot have arguments",
+ERROR(macro_as_default_argument_arguments_must_be_literal, none,
+      "argument to macro used as default argument must be literal",
       ())
 
 ERROR(macro_resolve_circular_reference, none,

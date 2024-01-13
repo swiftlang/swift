@@ -1019,6 +1019,33 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   }
 }
 
+static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
+  assert(param->getDefaultArgumentKind() ==
+         DefaultArgumentKind::ExpressionMacro);
+  auto &ctx = param->getASTContext();
+  auto *initExpr = param->getStructuralDefaultExpr();
+  assert(initExpr);
+
+  // Prohibit default argument that is a non-built-in macro to avoid confusion,
+  // unless the experimental feature flag is set.
+  if (!ctx.LangOpts.hasFeature(Feature::ExpressionMacroDefaultArguments)) {
+    ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_as_default_argument);
+    return false;
+  }
+
+  auto macroExpansionExpr = cast<MacroExpansionExpr>(initExpr);
+  // only allow arguments that are literals
+  auto args = macroExpansionExpr->getArgs();
+  for (auto arg : *args)
+    if (!dyn_cast<LiteralExpr>(arg.getExpr())) {
+      ctx.Diags.diagnose(
+          arg.getExpr()->getLoc(),
+          diag::macro_as_default_argument_arguments_must_be_literal);
+      return false;
+    }
+  return true;
+}
+
 void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
                                                   Type inferredType) {
   assert(writtenType && inferredType &&
@@ -1132,20 +1159,12 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
-  // Prohibit default argument that is a non-built-in macro to avoid confusion,
-  auto macroExpansionExpr = dyn_cast<MacroExpansionExpr>(initExpr);
-  if (macroExpansionExpr) {
-    // unless the experimental feature flag is set.
-    if (!ctx.LangOpts.hasFeature(Feature::ExpressionMacroDefaultArguments)) {
-      ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_as_default_argument);
-      return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
-    }
-    auto args = macroExpansionExpr->getArgs();
-    if (!args->empty()) {
-      ctx.Diags.diagnose(args->getLoc(), diag::macro_as_default_argument_has_arguments);
-      return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
-    }
-  }
+  auto isMacroExpansionExpr =
+      param->getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro;
+
+  if (isMacroExpansionExpr &&
+      !checkExpressionMacroDefaultValueRestrictions(param))
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
 
   // If the param has an error type, there's no point type checking the default
   // expression, unless we are type checking for code completion, in which case
@@ -1163,7 +1182,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   }
 
   // Expression macro default arguments are checked at caller side
-  if (macroExpansionExpr)
+  if (isMacroExpansionExpr)
     return initExpr;
 
   // Walk the checked initializer and contextualize any closures
