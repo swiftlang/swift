@@ -7929,7 +7929,6 @@ void Parser::parseExpandedMemberList(SmallVectorImpl<ASTNode> &items) {
     consumeTokenWithoutFeedingReceiver();
 
   auto *decl = CurDeclContext->getAsDecl();
-  auto *idc = dyn_cast<IterableDeclContext>(decl);
   bool previousHadSemi = true;
 
   SourceLoc startingLoc = Tok.getLoc();

@@ -917,7 +917,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     auto as = ApplySite(inst);
 
     switch (as.getSubstCalleeType()->getRepresentation()) {
-    case SILFunctionTypeRepresentation::ObjCMethod: {
+    case SILFunctionTypeRepresentation::ObjCMethod:
       if (auto *callee = as.getCalleeFunction()) {
         if (auto *clangDecl = callee->getClangDecl()) {
           if (auto clangMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
@@ -927,7 +927,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
           }
         }
       }
-    }
+      LLVM_FALLTHROUGH;
     case SILFunctionTypeRepresentation::Block:
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
