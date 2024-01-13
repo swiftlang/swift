@@ -1624,44 +1624,6 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
   }
 
-  // If the '@objc' was inferred due to deprecated rules,
-  // emit a Builtin.swift3ImplicitObjCEntrypoint().
-  //
-  // However, don't do so for 'dynamic' members, which must use Objective-C
-  // dispatch and therefore create many false positives.
-  if (thunk.hasDecl()) {
-    auto decl = thunk.getDecl();
-
-    // For an accessor, look at the storage declaration's attributes.
-    if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-      decl = accessor->getStorage();
-    }
-
-    if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc was inferred based on the Swift 3 @objc inference rules, emit
-      // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
-      // logging of the uses of such entrypoints.
-      if (attr->isSwift3Inferred() && !decl->shouldUseObjCDispatch()) {
-        // Get the starting source location of the declaration so we can say
-        // exactly where to stick '@objc'.
-        SourceLoc objcInsertionLoc =
-          decl->getAttributeInsertionLoc(/*modifier*/ false);
-
-        auto objcInsertionLocArgs
-          = emitSourceLocationArgs(objcInsertionLoc, loc);
-        
-        B.createBuiltin(loc,
-          getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
-          getModule().Types.getEmptyTupleType(), { }, {
-            objcInsertionLocArgs.filenameStartPointer.forward(*this),
-            objcInsertionLocArgs.filenameLength.forward(*this),
-            objcInsertionLocArgs.line.forward(*this),
-            objcInsertionLocArgs.column.forward(*this)
-          });
-      }
-    }
-  }
-
   // Now, enter a cleanup used for bridging the arguments. Note that if we
   // have an indirect result, it must be outside of this scope, otherwise
   // we will deallocate it too early.

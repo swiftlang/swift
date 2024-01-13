@@ -1201,6 +1201,15 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
                                           SKind);
 
   case SILDeclRef::Kind::Allocator:
+    // As a special case, initializers can have manually mangled names.
+    // Use the SILGen name only for the original non-thunked, non-curried entry
+    // point.
+    if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>()) {
+      if (!NameA->Name.empty() && !isThunk()) {
+        return NameA->Name.str();
+      }
+    }
+
     return mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                            /*allocating*/ true,
                                            SKind);

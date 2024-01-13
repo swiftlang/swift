@@ -51,3 +51,17 @@ private  func PlainPrivate()  { }
 // CHECK: define hidden void @cdecl_internal
 // CHECK: define hidden swiftcc void @"$s7asmname13CDeclInternal
 // CHECK: define internal void @cdecl_private()
+
+// silgen_name on enum constructors
+public enum X {
+case left(Int64)
+case right(Int64)
+}
+
+extension X {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i8 } @blah_X_constructor
+  @_silgen_name("blah_X_constructor")
+  public init(blah: Int64) {
+    self = .left(blah)
+  }
+}

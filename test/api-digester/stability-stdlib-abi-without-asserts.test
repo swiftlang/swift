@@ -76,6 +76,30 @@ Enum Never has added a conformance to an existing protocol Decodable
 Enum Never has added a conformance to an existing protocol Encodable
 Enum Never has added a conformance to an existing protocol Identifiable
 
+// These functions haven't actually changed ABI, but are using @_silgen_name tricks to maintain the old ABI while moving to typed throws.
+Func AnyBidirectionalCollection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnyBidirectionalCollection.map(_:) has mangled name changing from 'Swift.AnyBidirectionalCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyBidirectionalCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnyBidirectionalCollection.map(_:) is now without @rethrows
+Func AnyCollection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnyCollection.map(_:) has mangled name changing from 'Swift.AnyCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnyCollection.map(_:) is now without @rethrows
+Func AnyRandomAccessCollection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnyRandomAccessCollection.map(_:) has mangled name changing from 'Swift.AnyRandomAccessCollection.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnyRandomAccessCollection.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnyRandomAccessCollection.map(_:) is now without @rethrows
+Func AnySequence.map(_:) has been renamed to Func __rethrows_map(_:)
+Func AnySequence.map(_:) has mangled name changing from 'Swift.AnySequence.map<A>((A) throws -> A1) throws -> Swift.Array<A1>' to 'Swift.AnySequence.__rethrows_map<A>((A) throws -> A1) throws -> Swift.Array<A1>'
+Func AnySequence.map(_:) is now without @rethrows
+Func Sequence.map(_:) has been renamed to Func __rethrows_map(_:)
+Func Sequence.map(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Sequence.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
+Func Sequence.map(_:) is now without @rethrows
+Func Collection.map(_:) has been renamed to Func __rethrows_map(_:)
+Func Collection.map(_:) has mangled name changing from '(extension in Swift):Swift.Collection.map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>' to '(extension in Swift):Swift.Collection.__rethrows_map<A>((A.Element) throws -> A1) throws -> Swift.Array<A1>'
+Func Collection.map(_:) is now without @rethrows
+Constructor Result.init(__abi_catching:) is a new API without @available attribute
+Constructor Result.init(catching:) has been removed
+Func Result.get() has been renamed to Func __abi_get()
+Func Result.get() has mangled name changing from 'Swift.Result.get() throws -> A' to 'Swift.Result.__abi_get() throws -> A'
+
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
 // break because the symbols are still present, and is not a source break
@@ -100,6 +124,11 @@ Func UnsafeBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has been removed
 Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
+Func _AnySequenceBox._map(_:) is now without @rethrows
+Func _BidirectionalCollectionBox._map(_:) is now without @rethrows
+Func _CollectionBox._map(_:) is now without @rethrows
+Func _RandomAccessCollectionBox._map(_:) is now without @rethrows
+Func _SequenceBox._map(_:) is now without @rethrows
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableBufferPointer.assign(repeating:) has been removed

@@ -899,10 +899,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
   Opts.EnableAppExtensionRestrictions |= Opts.EnableAppExtensionLibraryRestrictions;
 
-  Opts.EnableSwift3ObjCInference =
-    Args.hasFlag(OPT_enable_swift3_objc_inference,
-                 OPT_disable_swift3_objc_inference, false);
-
   if (Args.hasArg(OPT_enable_swift3_objc_inference))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-enable-swift3-objc-inference");
@@ -962,17 +958,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
-
-  if (Opts.EnableSwift3ObjCInference) {
-    if (const Arg *A = Args.getLastArg(
-                                   OPT_warn_swift3_objc_inference_minimal,
-                                   OPT_warn_swift3_objc_inference_complete)) {
-      if (A->getOption().getID() == OPT_warn_swift3_objc_inference_minimal)
-        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Minimal;
-      else
-        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
-    }
-  }
 
   if (Args.hasArg(OPT_warn_swift3_objc_inference_minimal))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
@@ -2301,7 +2286,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
-  Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
+  Opts.EnableSILOpaqueValues = Args.hasFlag(
+      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(

@@ -644,10 +644,6 @@ ERROR(expression_unused_keypath_result,NoUsage,
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (Identifier))
-WARNING(expr_keypath_swift3_objc_inference,Deprecation,
-        "argument of '#keyPath' refers to property %0 in %1 that depends on "
-        "'@objc' inference deprecated in Swift 4",
-        (Identifier, Identifier))
 ERROR(expr_keypath_type_of_property,none,
       "cannot refer to type member %0 within instance of type %1",
       (DeclNameRef, Type))
@@ -755,10 +751,6 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
-WARNING(expr_selector_swift3_objc_inference,Deprecation,
-        "argument of '#selector' refers to %kind0 in %1 that depends on "
-        "'@objc' inference deprecated in Swift 4",
-        (const ValueDecl *, const ValueDecl *))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -2132,11 +2124,6 @@ ERROR(missing_unimplemented_init_runtime,none,
 ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
 
-WARNING(expr_dynamic_lookup_swift3_objc_inference,Deprecation,
-        "reference to %kind0 of %1 depends on '@objc' inference "
-        "deprecated in Swift 4",
-        (const ValueDecl *, Identifier))
-
 ERROR(inherited_default_value_not_in_designated_constructor,none,
       "default value inheritance via 'super' is only valid on the parameters of "
       "designated initializers", ())
@@ -2605,7 +2592,7 @@ WARNING(add_predates_concurrency_import,none,
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
 WARNING(remove_predates_concurrency_import,none,
-     "'@preconcurrency' attribute on module %0 is unused", (Identifier))
+     "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (const ModuleDecl *))
@@ -3449,11 +3436,6 @@ WARNING(implicitly_final_cannot_be_open_swift4,none,
         "%select{'let' properties|members of 'final' classes|"
         "static declarations}0 are implicitly 'final'; use 'public' instead of "
         "'open'", (unsigned))
-
-WARNING(override_swift3_objc_inference,Deprecation,
-        "override of %kind0 from extension of %1 depends on deprecated "
-        "inference of '@objc'",
-        (const ValueDecl *, Identifier))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,
@@ -4856,6 +4838,12 @@ ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
+ERROR(implicit_throws_super_init,none,
+      "missing call to superclass's initializer; "
+      "'super.init' is a throwing initializer and requires either an explicit "
+      "call or that this initializer is also marked as 'throws'",
+      ())
+
 ERROR(implicit_async_super_init,none,
       "missing call to superclass's initializer; "
       "'super.init' is 'async' and requires an explicit call",
@@ -6126,18 +6114,6 @@ ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
       "@objc protocols must not have operator requirements", ())
-WARNING(objc_inference_swift3_dynamic,Deprecation,
-        "inference of '@objc' for 'dynamic' members is deprecated", ())
-WARNING(objc_inference_swift3_objc_derived,Deprecation,
-        "inference of '@objc' for members of Objective-C-derived classes is "
-        "deprecated", ())
-
-NOTE(objc_inference_swift3_addobjc,none,
-     "add '@objc' to continue exposing an Objective-C entry point (Swift 3 "
-     "behavior)", ())
-NOTE(objc_inference_swift3_addnonobjc,none,
-     "add '@nonobjc' to suppress the Objective-C entry point (Swift 4 "
-     "behavior)", ())
 
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
@@ -6153,10 +6129,6 @@ ERROR(objc_setter_for_nonobjc_property,none,
       "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
-WARNING(accessor_swift3_objc_inference,Deprecation,
-        "%kind0 with '@objc' %select{getter|setter}1 depends on "
-        "deprecated inference of '@objc'",
-        (const AbstractStorageDecl *, bool))
 
 ERROR(objc_enum_generic,none,
       "'@objc' enum cannot be generic", ())
@@ -6186,10 +6158,6 @@ ERROR(objc_extension_not_class,none,
 
 // If you change this, also change enum ObjCReason
 #define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @_objcImplementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
-
-WARNING(attribute_meaningless_when_nonobjc,none,
-        "'@%0' attribute is meaningless on a property that cannot be "
-        "represented in Objective-C", (StringRef))
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -6249,10 +6217,6 @@ NOTE(objc_overriding_objc_decl,none,
 NOTE(objc_witness_objc_requirement,none,
      "satisfying requirement for %kind0 in protocol %1",
      (const ValueDecl *, const ProtocolDecl *))
-WARNING(witness_swift3_objc_inference,Deprecation,
-        "use of %kind0 to satisfy a requirement of protocol %1 depends on "
-        "'@objc' inference deprecated in Swift 4",
-        (const ValueDecl *, Type))
 
 ERROR(no_opaque_return_type_of,none,
       "unable to resolve type for _opaqueReturnTypeOf attribute", ())

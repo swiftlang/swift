@@ -118,17 +118,13 @@ protected:
       AddedByAccessNote : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1+1,
+    SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1,
       /// Whether this attribute has location information that trails the main
       /// record, which contains the locations of the parentheses and any names.
       HasTrailingLocationInfo : 1,
 
       /// Whether the name is implicit, produced as the result of caching.
-      ImplicitName : 1,
-
-      /// Whether the @objc was inferred using Swift 3's deprecated inference
-      /// rules.
-      Swift3Inferred : 1
+      ImplicitName : 1
     );
 
     SWIFT_INLINE_BITFIELD(DynamicReplacementAttr, DeclAttribute, 1,
@@ -823,7 +819,6 @@ class ObjCAttr final : public DeclAttribute,
         NameData(nullptr) {
     Bits.ObjCAttr.HasTrailingLocationInfo = false;
     Bits.ObjCAttr.ImplicitName = implicitName;
-    Bits.ObjCAttr.Swift3Inferred = false;
 
     if (name) {
       NameData = name->getOpaqueValue();
@@ -931,18 +926,6 @@ public:
 
     NameData = name.getOpaqueValue();
     Bits.ObjCAttr.ImplicitName = implicit;
-  }
-
-  /// Determine whether this attribute was inferred based on Swift 3's
-  /// deprecated @objc inference rules.
-  bool isSwift3Inferred() const {
-    return Bits.ObjCAttr.Swift3Inferred;
-  }
-
-  /// Set whether this attribute was inferred based on Swift 3's deprecated
-  /// @objc inference rules.
-  void setSwift3Inferred(bool inferred = true) {
-    Bits.ObjCAttr.Swift3Inferred = inferred;
   }
 
   /// Retrieve the source locations for the names in a non-implicit

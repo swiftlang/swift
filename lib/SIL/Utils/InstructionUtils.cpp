@@ -917,7 +917,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     auto as = ApplySite(inst);
 
     switch (as.getSubstCalleeType()->getRepresentation()) {
-    case SILFunctionTypeRepresentation::ObjCMethod: {
+    case SILFunctionTypeRepresentation::ObjCMethod:
       if (auto *callee = as.getCalleeFunction()) {
         if (auto *clangDecl = callee->getClangDecl()) {
           if (auto clangMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
@@ -927,7 +927,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
           }
         }
       }
-    }
+      LLVM_FALLTHROUGH;
     case SILFunctionTypeRepresentation::Block:
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
@@ -1008,8 +1008,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
       return RuntimeEffect::RefCounting | RuntimeEffect::Deallocating;
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
-      return RuntimeEffect::ObjectiveC | RuntimeEffect::Allocating;
     case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
