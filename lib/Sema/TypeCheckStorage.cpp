@@ -784,8 +784,8 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  auto *dc = storage->getDeclContext();
-  if (storage->getValueInterfaceType()->isNoncopyable(dc))
+  auto *env = storage->getDeclContext()->getGenericEnvironmentOfContext();
+  if (isInterfaceTypeNoncopyable(storage->getValueInterfaceType(), env))
     return usesBorrowed(DiagKind::NoncopyableType);
 
   return OpaqueReadOwnership::Owned;

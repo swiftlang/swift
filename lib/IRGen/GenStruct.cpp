@@ -1693,7 +1693,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
                                             TypeExpansionContext::minimal())
             .getRecursiveProperties().isInfinite()) {
-    auto copyable = D->canBeNoncopyable()
+    auto copyable = !D->canBeCopyable()
       ? IsNotCopyable : IsCopyable;
     auto structAccessible =
       IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));

@@ -1070,13 +1070,15 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
+  const bool haveNoncopyableGenerics =
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   auto addSynthesized = [&](ProtocolDecl *proto) {
     if (!proto)
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (canBeNoncopyable()) {
+    if (!haveNoncopyableGenerics && !canBeCopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;

@@ -97,6 +97,10 @@ struct NeverCopyableDeinit<T: ~Copyable>: ~Copyable {
   deinit {}
 }
 
+protocol Test: ~Copyable {
+  init?() // expected-error {{noncopyable types cannot have failable initializers yet}}
+}
+
 /// ---------------
 
 // expected-note@+2 {{consider adding '~Copyable' to generic enum 'Maybe'}}
@@ -106,7 +110,6 @@ enum Maybe<Wrapped: ~Copyable> {
   case none
 
   deinit {} // expected-error {{deinitializer cannot be declared in generic enum 'Maybe' that conforms to 'Copyable'}}
-  // expected-error@-1 {{deinitializers are not yet supported on noncopyable enums}}
 }
 
 // expected-note@+4{{requirement specified as 'NC' : 'Copyable'}}

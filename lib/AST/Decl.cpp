@@ -4930,14 +4930,52 @@ InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
   );
 }
 
-bool TypeDecl::canBeNoncopyable() const {
-  auto copyable = getMarking(InvertibleProtocolKind::Copyable);
-  return bool(copyable.getInverse()) && !copyable.getPositive();
+static TypeDecl::CanBeInvertibleResult
+conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
+  auto *proto = decl->getASTContext().getProtocol(getKnownProtocolKind(ip));
+  assert(proto);
+
+  // Handle protocols specially, without building a GenericSignature.
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl))
+    return protoDecl->requiresInvertible(ip)
+         ? TypeDecl::CBI_Always
+         : TypeDecl::CBI_Never;
+
+  Type selfTy = decl->getDeclaredInterfaceType();
+  assert(selfTy);
+
+  auto conformance = decl->getModuleContext()->lookupConformance(selfTy, proto,
+      /*allowMissing=*/false);
+
+  if (conformance.isInvalid())
+    return TypeDecl::CBI_Never;
+
+  if (!conformance.getConditionalRequirements().empty())
+    return TypeDecl::CBI_Conditionally;
+
+  return TypeDecl::CBI_Always;
 }
 
-bool TypeDecl::isEscapable() const {
-  auto escapable = getMarking(InvertibleProtocolKind::Escapable);
-  return !escapable.getInverse() || bool(escapable.getPositive());
+TypeDecl::CanBeInvertibleResult TypeDecl::canBeCopyable() const {
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    auto copyable = getMarking(InvertibleProtocolKind::Copyable);
+    return !copyable.getInverse() || bool(copyable.getPositive())
+         ? CBI_Always
+         : CBI_Never;
+  }
+
+  return conformanceExists(this, InvertibleProtocolKind::Copyable);
+}
+
+TypeDecl::CanBeInvertibleResult TypeDecl::canBeEscapable() const {
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    auto escapable = getMarking(InvertibleProtocolKind::Escapable);
+    return !escapable.getInverse() || bool(escapable.getPositive())
+         ? CBI_Always
+         : CBI_Never;
+  }
+
+  return conformanceExists(this, InvertibleProtocolKind::Escapable);
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

@@ -161,7 +161,7 @@ bool TypeBase::isMarkerExistential() {
 /// that does not rely on conformances.
 static bool alwaysNoncopyable(Type ty) {
   if (auto *nominal = ty->getNominalOrBoundGenericNominal())
-    return nominal->canBeNoncopyable();
+    return !nominal->canBeCopyable();
 
   if (auto *expansion = ty->getAs<PackExpansionType>()) {
     return alwaysNoncopyable(expansion->getPatternType());
@@ -219,7 +219,7 @@ bool TypeBase::isEscapable(GenericEnvironment *env) {
   // for legacy-mode queries that are not dependent on conformances to Escapable
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     if (auto nom = canType.getAnyNominal())
-      return nom->isEscapable();
+      return nom->canBeEscapable();
     else
       return true;
   }
