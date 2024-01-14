@@ -1571,6 +1571,41 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   }
 }
 
+bool swift::shouldIgnoreDeprecationOfConcurrencyDecl(const Decl *decl,
+                                                     DeclContext *declContext) {
+  auto &ctx = decl->getASTContext();
+  auto concurrencyModule = ctx.getLoadedModule(ctx.Id_Concurrency);
+
+  // Only suppress these diagnostics in the implementation of _Concurrency.
+  if (declContext->getParentModule() != concurrencyModule)
+    return false;
+
+  // Only suppress deprecation diagnostics for decls defined in _Concurrency.
+  if (decl->getDeclContext()->getParentModule() != concurrencyModule)
+    return false;
+
+  auto *legacyJobDecl = ctx.getJobDecl();
+  auto *unownedJobDecl = ctx.getUnownedJobDecl();
+
+  if (decl == legacyJobDecl)
+    return true;
+
+  if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
+    auto enqueueDeclName =
+        DeclName(ctx, DeclBaseName(ctx.Id_enqueue), {Identifier()});
+
+    if (funcDecl->getName() == enqueueDeclName &&
+        funcDecl->getParameters()->size() == 1) {
+      auto paramTy = funcDecl->getParameters()->front()->getInterfaceType();
+      if (paramTy->isEqual(legacyJobDecl->getDeclaredInterfaceType()) ||
+          paramTy->isEqual(unownedJobDecl->getDeclaredInterfaceType()))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// Determine whether this is the main actor type.
 static bool isMainActor(Type type) {
   if (auto nominal = type->getAnyNominal())

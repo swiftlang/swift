@@ -151,7 +151,7 @@ extension GlobalActor {
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
-    try Self.shared.preconditionIsolated(message(), file: file, line: line)
+    Self.shared.preconditionIsolated(message(), file: file, line: line)
   }
 }
 
@@ -292,7 +292,7 @@ extension GlobalActor {
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
-    try Self.shared.assertIsolated(message(), file: file, line: line)
+    Self.shared.assertIsolated(message(), file: file, line: line)
   }
 }
 

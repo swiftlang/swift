@@ -2646,6 +2646,9 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     }
   }
 
+  if (shouldIgnoreDeprecationOfConcurrencyDecl(DeprecatedDecl, ReferenceDC))
+    return;
+
   StringRef Platform = Attr->prettyPlatformString();
   llvm::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
