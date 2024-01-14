@@ -102,7 +102,9 @@ Func Result.get() has mangled name changing from 'Swift.Result.get() throws -> A
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
 Func withoutActuallyEscaping(_:do:) is now without @rethrows
-
+Func _openExistential(_:do:) has been renamed to Func __abi_openExistential(_:do:)
+Func _openExistential(_:do:) has mangled name changing from 'Swift._openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C' to 'Swift.__abi_openExistential<A, B, C>(_: A, do: (B) throws -> C) throws -> C'
+Func _openExistential(_:do:) is now without @rethrows
 
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
