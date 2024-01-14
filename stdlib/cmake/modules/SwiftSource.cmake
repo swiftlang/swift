@@ -599,10 +599,6 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-disable-standard-substitutions-in-reflection-mangling")
   endif()
 
-  if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
-    list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
-  endif()
-
   if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
     list(APPEND swift_flags "-Xfrontend" "-disable-objc-interop")
   endif()

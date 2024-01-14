@@ -704,6 +704,21 @@ getCatchNode(const ASTScopeImpl *scope) {
   return { CatchNode(), nullptr };
 }
 
+/// Check whether the given location precedes the start of the catch location
+/// despite being technically within the catch node's source range.
+static bool locationIsPriorToStartOfCatchScope(SourceLoc loc, CatchNode node) {
+  auto closure = node.dyn_cast<ClosureExpr *>();
+  if (!closure)
+    return false;
+
+  SourceManager &sourceMgr = closure->getASTContext().SourceMgr;
+  SourceLoc inLoc = closure->getInLoc();
+  if (inLoc.isValid())
+    return sourceMgr.isBefore(loc, inLoc);
+
+  return sourceMgr.isAtOrBefore(loc, closure->getStartLoc());
+}
+
 CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   auto sourceFile = module->getSourceFileContainingLocation(loc);
   if (!sourceFile)
@@ -721,7 +736,8 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
     // If we are at a catch node and in the body of the region from which that
     // node catches thrown errors, we have our result.
     auto caught = getCatchNode(scope);
-    if (caught.first && caught.second == innerBodyScope) {
+    if (caught.first && caught.second == innerBodyScope &&
+        !locationIsPriorToStartOfCatchScope(loc, caught.first)) {
       return caught.first;
     }
 

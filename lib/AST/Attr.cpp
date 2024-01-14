@@ -1775,7 +1775,6 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   }
 
   Bits.ObjCAttr.ImplicitName = false;
-  Bits.ObjCAttr.Swift3Inferred = false;
 }
 
 ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
@@ -1853,7 +1852,6 @@ SourceLoc ObjCAttr::getRParenLoc() const {
 
 ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
-  attr->setSwift3Inferred(isSwift3Inferred());
   attr->setAddedByAccessNote(getAddedByAccessNote());
   return attr;
 }

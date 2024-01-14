@@ -660,14 +660,14 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
   }
 }
 
-// CHECK: sil {{.*}} [ossa] @$sS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR
+// CHECK: sil {{.*}} [ossa] @$sS4SIgggoo_S2Ss11AnyHashableVypIegggrr_TR
 // CHECK:  [[TUPLE:%.*]] = apply %4(%2, %3) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
 // CHECK:  ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[TUPLE]]
 // CHECK:  [[ADDR:%.*]] = alloc_stack $String
 // CHECK:  store [[LHS]] to [init] [[ADDR]] : $*String
 // CHECK:  [[CVT:%.*]] = function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
 // CHECK:  apply [[CVT]]<String>(%0, [[ADDR]])
-// CHECK: } // end sil function '$sS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR'
+// CHECK: } // end sil function '$sS4SIgggoo_S2Ss11AnyHashableVypIegggrr_TR'
 
 func dontCrash() {
   let userInfo = ["hello": "world"]

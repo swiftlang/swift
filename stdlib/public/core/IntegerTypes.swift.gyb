@@ -1569,12 +1569,17 @@ ${assignmentOperatorComment(x.operator, True)}
   #endif
 %   end
 
+%   if bits == 64:
+  #if _pointerBitWidth(_64) || arch(arm64_32)
+  //  On 32b architectures we fall back on the generic implementation,
+  //  because LLVM doesn't know how to codegen the 128b divide we use.
+%   end
   /// Returns a tuple containing the quotient and remainder of dividing the
   /// given value by this value.
   ///
   /// The resulting quotient must be representable within the bounds of the
   /// type. If the quotient of dividing `dividend` by this value is too large
-  /// to represent in the type, a runtime error may occur.
+  /// to represent in the type, a runtime error will occur.
   ///
   /// - Parameter dividend: A tuple containing the high and low parts of a
   ///   double-width integer. The `high` component of the value carries the
@@ -1585,34 +1590,58 @@ ${assignmentOperatorComment(x.operator, True)}
   public func dividingFullWidth(
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
-    // FIXME(integers): tests
-%   # 128-bit types are not provided by the 32-bit LLVM
-%   if word_bits == 32 and bits == 64:
-%   # FIXME(integers): uncomment the above after using the right conditional
-%   # compilation block to exclude 64-bit Windows, which does not support
-%   # 128-bit operations
-    fatalError("Operation is not supported")
-%   else:
-    // FIXME(integers): handle division by zero and overflows
     _precondition(self != 0, "Division by zero")
+%    if not signed:
+    _precondition(self > dividend.high, "Quotient is not representable")
+%    end
+%    if dbits <= 64:
+%     DoubleType = ('Int' if signed else 'UInt') + str(dbits)
+    let a = ${DoubleType}(dividend.high) &<< ${bits} |
+            ${DoubleType}(dividend.low)
+    let b = ${DoubleType}(self)
+    let (q, r) = a.quotientAndRemainder(dividingBy: b)
+%     if signed:
+    // remainder is guaranteed representable, but the quotient might not be
+    // so we need to use a conversion that will check for us:
+    guard let quotient = ${Self}(exactly: q) else {
+      _preconditionFailure("Quotient is not representable")
+    }
+    return (quotient, ${Self}(truncatingIfNeeded: r))
+%     else:
+    // quotient and remainder are both guaranteed to be representable by
+    // the precondition we enforced above and the definition of division.
+    return (${Self}(truncatingIfNeeded: q), ${Self}(truncatingIfNeeded: r))
+%     end
+%    else:
     let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(dividend.high._value)
     let shift = Builtin.zextOrBitCast_Int8_Int${dbits}(UInt8(${bits})._value)
     let lhsHighShifted = Builtin.shl_Int${dbits}(lhsHigh, shift)
     let lhsLow = Builtin.zext_Int${bits}_Int${dbits}(dividend.low._value)
-    let lhs_ = Builtin.or_Int${dbits}(lhsHighShifted, lhsLow)
-    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
+    let a = Builtin.or_Int${dbits}(lhsHighShifted, lhsLow)
+    let b = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
+    
+    let q = Builtin.${u}div_Int${dbits}(a, b)
+    let r = Builtin.${u}rem_Int${dbits}(a, b)
 
-    let quotient_ = Builtin.${u}div_Int${dbits}(lhs_, rhs_)
-    let remainder_ = Builtin.${u}rem_Int${dbits}(lhs_, rhs_)
+%     if signed:
+    // remainder is guaranteed representable, but the quotient might not be
+    // so we need to check that the conversion succeeds:
+    let (quotient, overflow) =
+      Builtin.s_to_s_checked_trunc_Int${dbits}_Int${bits}(q)
+    _precondition(!Bool(overflow), "Quotient is not representable")
+%     else:
+    // quotient and remainder are both guaranteed to be representable by
+    // the precondition we enforced above and the definition of division.
+    let quotient = Builtin.truncOrBitCast_Int${dbits}_Int${bits}(q)
+%     end
+    let remainder = Builtin.truncOrBitCast_Int${dbits}_Int${bits}(r)
 
-    let quotient = ${Self}(
-      Builtin.truncOrBitCast_Int${dbits}_Int${bits}(quotient_))
-    let remainder = ${Self}(
-      Builtin.truncOrBitCast_Int${dbits}_Int${bits}(remainder_))
-
-    return (quotient: quotient, remainder: remainder)
-%   end
+    return (quotient: Self(quotient), remainder: Self(remainder))
+%    end
   }
+%   if bits == 64:
+  #endif
+%   end
 
   /// A representation of this integer with the byte order swapped.
   @_transparent

@@ -764,9 +764,6 @@ BUILTIN_MISC_OPERATION(COWBufferForReading, "COWBufferForReading", "n", Special)
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
-// Swift3ImplicitObjCEntrypoint has type () -> ()
-BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
-
 /// willThrow: Error -> ()
 BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 

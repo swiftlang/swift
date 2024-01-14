@@ -677,12 +677,12 @@ def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
 
 def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Deprecated">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -1165,6 +1165,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
+
+def disable_sil_opaque_values : Flag<["-"], "disable-sil-opaque-values">,
+  HelpText<"Disable SIL Opaque Values">;
 
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,

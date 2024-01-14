@@ -208,7 +208,7 @@ How to specify files:
         if not new_files:
             sizes = collections.defaultdict(int)
             for file in old_files:
-                read_sizes(sizes, file, True, False)
+                read_sizes(sizes, [], file, True, False)
             print(os.linesep.join(list_function_sizes(sizes.items())))
         else:
             compare_function_sizes(old_files, new_files, csv=csv_out)

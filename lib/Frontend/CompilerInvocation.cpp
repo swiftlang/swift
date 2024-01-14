@@ -808,20 +808,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (value.startswith("StrictConcurrency")) {
       auto decomposed = value.split("=");
       if (decomposed.first == "StrictConcurrency") {
-        bool handled;
         if (decomposed.second == "") {
           Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-          handled = true;
         } else if (auto level = parseStrictConcurrency(decomposed.second)) {
           Opts.StrictConcurrencyLevel = *level;
-          handled = true;
-        } else {
-          handled = false;
-        }
-
-        if (handled) {
-          Opts.enableFeature(Feature::StrictConcurrency);
-          continue;
         }
       }
     }
@@ -876,14 +866,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(*feature);
   }
 
-  // CompleteConcurrency enables all data-race safety upcoming features.
-  if (Opts.hasFeature(Feature::CompleteConcurrency)) {
-    Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-    Opts.enableFeature(Feature::DisableOutwardActorInference);
-    Opts.enableFeature(Feature::IsolatedDefaultValues);
-    Opts.enableFeature(Feature::GlobalConcurrency);
-  }
-
   // Map historical flags over to experimental features. We do this for all
   // compilers because that's how existing experimental feature flags work.
   if (Args.hasArg(OPT_enable_experimental_static_assert))
@@ -916,10 +898,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
   Opts.EnableAppExtensionRestrictions |= Opts.EnableAppExtensionLibraryRestrictions;
-
-  Opts.EnableSwift3ObjCInference =
-    Args.hasFlag(OPT_enable_swift3_objc_inference,
-                 OPT_disable_swift3_objc_inference, false);
 
   if (Args.hasArg(OPT_enable_swift3_objc_inference))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
@@ -981,17 +959,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
 
-  if (Opts.EnableSwift3ObjCInference) {
-    if (const Arg *A = Args.getLastArg(
-                                   OPT_warn_swift3_objc_inference_minimal,
-                                   OPT_warn_swift3_objc_inference_complete)) {
-      if (A->getOption().getID() == OPT_warn_swift3_objc_inference_minimal)
-        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Minimal;
-      else
-        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
-    }
-  }
-
   if (Args.hasArg(OPT_warn_swift3_objc_inference_minimal))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
                    "-warn-swift3-objc-inference-minimal");
@@ -1001,7 +968,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    "-warn-swift3-objc-inference-complete");
 
   // Swift 6+ uses the strictest concurrency level.
-  if (Opts.isSwiftVersionAtLeast(6)) {
+  if (Opts.hasFeature(Feature::StrictConcurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
   } else if (const Arg *A = Args.getLastArg(OPT_strict_concurrency)) {
     if (auto value = parseStrictConcurrency(A->getValue()))
@@ -1012,17 +979,24 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   } else if (Args.hasArg(OPT_warn_concurrency)) {
     Opts.StrictConcurrencyLevel = StrictConcurrency::Complete;
-  } else if (Opts.hasFeature(Feature::CompleteConcurrency) ||
-             Opts.hasFeature(Feature::StrictConcurrency)) {
-    // Already set above.
   } else {
     // Default to minimal checking in Swift 5.x.
-    Opts.StrictConcurrencyLevel = StrictConcurrency::Minimal;
+  }
+
+  // Make sure StrictConcurrency, StrictConcurrency=complete and
+  // -strict-concurrency=complete all mean the same thing.
+  //
+  // The compiler implementation should standardize on StrictConcurrencyLevel,
+  // but if there is any check for `Feature::StrictConcurrency`, the result
+  // should be the same regardless of which flag was used to enable it.
+  if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
+    Opts.enableFeature(Feature::StrictConcurrency);
   }
 
   // StrictConcurrency::Complete enables all data-race safety features.
   if (Opts.StrictConcurrencyLevel == StrictConcurrency::Complete) {
     Opts.enableFeature(Feature::IsolatedDefaultValues);
+    Opts.enableFeature(Feature::GlobalConcurrency);
   }
 
   Opts.WarnImplicitOverrides =
@@ -2312,7 +2286,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
-  Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
+  Opts.EnableSILOpaqueValues = Args.hasFlag(
+      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(

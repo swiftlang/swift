@@ -6,6 +6,10 @@
 // The builder doesn't yet know how to look up symbols on Windows.
 // UNSUPPORTED: OS=windows-msvc
 
+// REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 struct ConcreteEmpty {}
 
 struct ConcreteFields {

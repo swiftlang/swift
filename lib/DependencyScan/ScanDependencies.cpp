@@ -421,6 +421,8 @@ std::string quote(StringRef unquoted) {
   for (const auto ch : unquoted) {
     if (ch == '\\')
       os << '\\';
+    if (ch == '"')
+      os << '\\';
     os << ch;
   }
   return buffer.str().str();

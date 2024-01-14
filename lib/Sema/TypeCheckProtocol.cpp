@@ -5378,23 +5378,6 @@ void ConformanceChecker::resolveValueWitnesses() {
           Conformance->setInvalid();
           return;
         }
-
-        // If the @objc on the witness was inferred using the deprecated
-        // Swift 3 rules, warn if asked.
-        if (auto attr = witness->getAttrs().getAttribute<ObjCAttr>()) {
-          if (attr->isSwift3Inferred() &&
-              getASTContext().LangOpts.WarnSwift3ObjCInference ==
-                  Swift3ObjCInferenceWarnings::Minimal) {
-            C.Diags.diagnose(
-                Conformance->getLoc(), diag::witness_swift3_objc_inference,
-                witness,
-                Conformance->getProtocol()->getDeclaredInterfaceType());
-            witness
-                ->diagnose(diag::make_decl_objc, witness->getDescriptiveKind())
-                .fixItInsert(witness->getAttributeInsertionLoc(false),
-                             "@objc ");
-          }
-        }
       }
     };
 
