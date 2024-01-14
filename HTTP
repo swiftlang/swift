@@ -252,3 +252,18 @@ print(responseMessages[301])
     ]
   }
 }
+
+// Octokit.js
+// https://github.com/octokit/core.js#readme
+const octokit = new Octokit({
+  auth: 'YOUR-TOKEN'
+})
+
+await octokit.request('GET /repos/{owner}/{repo}/commits/{ref}/status', {
+  owner: 'OWNER',
+  repo: 'REPO',
+  ref: 'REF',
+  headers: {
+    'X-GitHub-Api-Version': '2022-11-28'
+  }
+})
