@@ -33,14 +33,14 @@ option(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
        "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default}")
 
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
-  set(SWIFT_STDLIB_HAS_ASL_default TRUE)
+  set(SWIFT_STDLIB_HAS_OS_LOG_default TRUE)
 else()
-  set(SWIFT_STDLIB_HAS_ASL_default FALSE)
+  set(SWIFT_STDLIB_HAS_OS_LOG_default FALSE)
 endif()
 
-option(SWIFT_STDLIB_HAS_ASL
-       "Build stdlib assuming we can use the asl_log API."
-       "${SWIFT_STDLIB_HAS_ASL_default}")
+option(SWIFT_STDLIB_HAS_OS_LOG
+       "Build stdlib assuming we can use the os_log API."
+       "${SWIFT_STDLIB_HAS_OS_LOG_default}")
 
 if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
   set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)

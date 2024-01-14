@@ -382,8 +382,8 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=0")
   endif()
 
-  if(SWIFT_STDLIB_HAS_ASL)
-    list(APPEND result "-DSWIFT_STDLIB_HAS_ASL")
+  if(SWIFT_STDLIB_HAS_OS_LOG)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_OS_LOG")
   endif()
 
   if(SWIFT_STDLIB_HAS_STDIN)

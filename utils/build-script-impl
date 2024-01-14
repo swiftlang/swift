@@ -1976,10 +1976,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_STDLIB_HAS_ASL}" ]] ; then
+                if [[ "${SWIFT_STDLIB_HAS_OS_LOG}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_STDLIB_HAS_ASL:BOOL=$(true_false "${SWIFT_STDLIB_HAS_ASL}")
+                        -DSWIFT_STDLIB_HAS_OS_LOG:BOOL=$(true_false "${SWIFT_STDLIB_HAS_OS_LOG}")
                     )
                 fi
 
