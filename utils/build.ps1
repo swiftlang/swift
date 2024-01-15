@@ -922,6 +922,7 @@ function Build-Compilers() {
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
       -Bin $BinaryCache\1 `
+      -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
       -Arch $Arch `
       -UseMSVCCompilers C,CXX `
       -BuildTargets $Targets `
@@ -929,7 +930,6 @@ function Build-Compilers() {
       -Defines ($TestingDefines + @{
         CLANG_TABLEGEN = "$BinaryCache\0\bin\clang-tblgen.exe";
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = "$BinaryCache\0\bin\clang-tidy-confusable-chars-gen.exe";
-        CMAKE_INSTALL_PREFIX = "$($Arch.ToolchainInstallRoot)\usr";
         CMAKE_Swift_COMPILER = (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "swiftc.exe");
         CMAKE_Swift_FLAGS = @("-sdk", (Get-PinnedToolchainSDK));
         LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
@@ -1176,11 +1176,11 @@ function Build-Dispatch($Arch, [switch]$Test = $false) {
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-libdispatch `
     -Bin (Get-ProjectBinaryCache $Arch 2) `
+    -InstallTo "$($Arch.SDKInstallRoot)\usr" `
     -Arch $Arch `
     -UseBuiltCompilers C,CXX,Swift `
     -BuildTargets $Targets `
     -Defines @{
-      CMAKE_INSTALL_PREFIX = "$($Arch.SDKInstallRoot)\usr";
       CMAKE_SYSTEM_NAME = "Windows";
       CMAKE_SYSTEM_PROCESSOR = $Arch.CMakeName;
       ENABLE_SWIFT = "YES";
@@ -1211,11 +1211,11 @@ function Build-Foundation($Arch, [switch]$Test = $false) {
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin $FoundationBinaryCache `
+      -InstallTo "$($Arch.SDKInstallRoot)\usr" `
       -Arch $Arch `
       -UseBuiltCompilers ASM,C,Swift `
       -BuildTargets $Targets `
       -Defines (@{
-        CMAKE_INSTALL_PREFIX = "$($Arch.SDKInstallRoot)\usr";
         CMAKE_SYSTEM_NAME = "Windows";
         CMAKE_SYSTEM_PROCESSOR = $Arch.CMakeName;
         # Turn off safeseh for lld as it has safeseh enabled by default
@@ -1263,11 +1263,11 @@ function Build-XCTest($Arch, [switch]$Test = $false) {
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin $XCTestBinaryCache `
+      -InstallTo "$($Arch.XCTestInstallRoot)\usr" `
       -Arch $Arch `
       -UseBuiltCompilers Swift `
       -BuildTargets $Targets `
       -Defines (@{
-        CMAKE_INSTALL_PREFIX = "$($Arch.XCTestInstallRoot)\usr";
         CMAKE_SYSTEM_NAME = "Windows";
         CMAKE_SYSTEM_PROCESSOR = $Arch.CMakeName;
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
@@ -1434,13 +1434,13 @@ function Build-LLBuild($Arch, [switch]$Test = $false) {
     Build-CMakeProject `
       -Src $SourceCache\llbuild `
       -Bin $BinaryCache\4 `
+      -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
       -Arch $Arch `
       -UseMSVCCompilers CXX `
       -UseBuiltCompilers Swift `
       -SwiftSDK $SDKInstallRoot `
       -BuildTargets $Targets `
       -Defines ($TestingDefines + @{
-        CMAKE_INSTALL_PREFIX = "$($Arch.ToolchainInstallRoot)\usr";
         BUILD_SHARED_LIBS = "YES";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
         SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
