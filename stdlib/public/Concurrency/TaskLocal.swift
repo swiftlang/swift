@@ -24,16 +24,22 @@ import Swift
 /// Task locals must be declared as static properties (or global properties,
 /// once property wrappers support these), like this:
 ///
-///     enum TracingExample {
+///     enum Example {
 ///         @TaskLocal
 ///         static let traceID: TraceID?
 ///     }
 ///
 /// ### Default values
-/// Task local values of optional types default to `nil`. It is possible to define
-/// not-optional task-local values, and an explicit default value must then be
-/// defined instead.
+/// Reading a task local value when no value was bound to it results in returning
+/// its default value. For a task local declared as optional (such as e.g. `TraceID?`),
+/// this defaults to nil, however a different default value may be defined at declaration
+/// site of the task local, like this:
 ///
+///     enum Example { 
+///         @TaskLocal
+///         static let traceID: TraceID = TraceID.default
+///     }
+/// 
 /// The default value is returned whenever the task-local is read
 /// from a context which either: has no task available to read the value from
 /// (e.g. a synchronous function, called without any asynchronous function in its call stack),
@@ -43,19 +49,14 @@ import Swift
 /// Reading task local values is simple and looks the same as-if reading a normal
 /// static property:
 ///
-///     guard let traceID = TracingExample.traceID else {
+///     guard let traceID = Example.traceID else {
 ///       print("no trace id")
 ///       return
 ///     }
 ///     print(traceID)
 ///
 /// It is possible to perform task-local value reads from either asynchronous
-/// or synchronous functions. Within asynchronous functions, as a "current" task
-/// is always guaranteed to exist, this will perform the lookup in the task local context.
-///
-/// A lookup made from the context of a synchronous function, that is not called
-/// from an asynchronous function (!), will immediately return the task-local's
-/// default value.
+/// or synchronous functions. 
 ///
 /// ### Binding task-local values
 /// Task local values cannot be `set` directly and must instead be bound using
@@ -67,28 +68,74 @@ import Swift
 /// the `Task { ... }` initializer do inherit task-locals by copying them to the
 /// new asynchronous task, even though it is an un-structured task.
 ///
+/// ### Using task local values outside of tasks
+/// It is possible to bind and read task local values outside of tasks.
+///
+/// This comes in handy within synchronous functions which are not guaranteed 
+/// to be called from within a task. When binding a task-local value from 
+/// outside of a task, the runtime will set a thread-local in which the same 
+/// storage mechanism as used within tasks will be used. This means that you 
+/// can reliably bind and read task local values without having to worry
+/// about the specific calling context, e.g.:
+///
+///     func enter() {
+///         Example.$traceID.withValue("1234") {
+///             read() // always "1234", regardless if enter() was called from inside a task or not:
+///     }
+///    
+///     func read() -> String {
+///         if let value = Self.traceID {
+///             "\(value)" 
+///         } else { 
+///             "<no value>"
+///         }
+///     }
+///
+///     // 1) Call `enter` from non-Task code
+///     //    e.g. synchronous main() or non-Task thread (e.g. a plain pthread)
+///     enter()
+///
+///     // 2) Call 'enter' from Task
+///     Task { 
+///         enter()
+///     }
+///
+/// In either cases listed above, the binding and reading of the task-local value works as expected.
+///
 /// ### Examples
 ///
-///     @TaskLocal
-///     static var traceID: TraceID?
 ///
-///     print("traceID: \(traceID)") // traceID: nil
+///     enum Example {
+///         @TaskLocal
+///         static var traceID: TraceID?
+///     }
+///     
+///     func read() -> String {
+///         if let value = Self.traceID {
+///             "\(value)" 
+///         } else { 
+///             "<no value>"
+///         }
+///     }
 ///
-///     $traceID.withValue(1234) { // bind the value
-///       print("traceID: \(traceID)") // traceID: 1234
-///       call() // traceID: 1234
+///     await Example.$traceID.withValue(1234) { // bind the value
+///       print("traceID: \(Example.traceID)") // traceID: 1234
+///       read() // traceID: 1234
+///
+///       async let id = read() // async let child task, traceID: 1234
+///
+///       await withTaskGroup(of: String.self) { group in 
+///           group.addTask { read() } // task group child task, traceID: 1234
+///           return await group.next()!
+///       }
 ///
 ///       Task { // unstructured tasks do inherit task locals by copying
-///         call() // traceID: 1234
+///         read() // traceID: 1234
 ///       }
 ///
 ///       Task.detached { // detached tasks do not inherit task-local values
-///         call() // traceID: nil
+///         read() // traceID: nil
 ///       }
-///     }
-///
-///     func call() {
-///       print("traceID: \(traceID)") // 1234
 ///     }
 @propertyWrapper
 @available(SwiftStdlib 5.1, *)
