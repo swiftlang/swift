@@ -87,7 +87,7 @@ import Swift
 ///       async let x = ...
 ///       await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
 ///
-///       await withTaskExecutor(specific) {
+///       await withTaskExecutorPreference(specific) {
 ///         // case 1) 'specific' task executor preference
 ///
 ///         // 'specific' task executor
@@ -103,8 +103,8 @@ import Swift
 ///         }
 ///
 ///         // disable the task executor preference:
-///         await withTaskExecutor(.default) {
-///           // equivalent to case 0) preference is "default"
+///         await withTaskExecutorPreference(globalConcurrentExecutor) {
+///           // equivalent to case 0) preference is globalConcurrentExecutor
 ///
 ///           // default task executor
 ///           // ...
