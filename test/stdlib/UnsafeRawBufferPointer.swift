@@ -164,7 +164,10 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).overflow") {
 #endif
 
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).exact") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 24, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3*MemoryLayout<Int64>.stride,
+    alignment: MemoryLayout<Int64>.alignment
+  )
   defer { buffer.deallocate() }
   let source: [Int64] = [5, 4, 3]
   var (it,bound) = buffer.initializeMemory(as: Int64.self, from: source)
