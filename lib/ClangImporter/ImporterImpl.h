@@ -216,6 +216,12 @@ enum class ImportTypeAttr : uint8_t {
   CFUnretainedOutParameter = 1 << 5,
 };
 
+/// Find and iterate over swift attributes embedded in the type
+/// without looking through typealiases.
+void findSwiftAttributes(
+    clang::QualType type,
+    llvm::function_ref<void(const clang::SwiftAttrAttr *)> callback);
+
 /// Attributes which were set on the declaration and affect how its type is
 /// imported.
 ///

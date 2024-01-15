@@ -1633,15 +1633,9 @@ static ImportedType adjustTypeForConcreteImport(
   return {importedType, isIUO};
 }
 
-void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
-                                ImportTypeKind importKind,
-                                ImportTypeAttrs &attrs, clang::QualType type) {
-  bool isMainActor = false;
-  bool isSendable =
-      SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
-      importKind == ImportTypeKind::CompletionHandlerParameter;
-  bool isNonSendable = false;
-
+void swift::findSwiftAttributes(
+    clang::QualType type,
+    llvm::function_ref<void(const clang::SwiftAttrAttr *)> callback) {
   std::function<clang::QualType(clang::QualType)> skipUnrelatedSugar =
       [&](clang::QualType type) -> clang::QualType {
     if (auto *MQT = dyn_cast<clang::MacroQualifiedType>(type))
@@ -1660,19 +1654,33 @@ void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
   while (const auto *AT = dyn_cast<clang::AttributedType>(type)) {
     if (auto swiftAttr =
             dyn_cast_or_null<clang::SwiftAttrAttr>(AT->getAttr())) {
-      if (isMainActorAttr(swiftAttr)) {
-        isMainActor = true;
-        isNonSendable =
-            importKind == ImportTypeKind::Parameter ||
-            importKind == ImportTypeKind::CompletionHandlerParameter;
-      } else if (swiftAttr->getAttribute() == "@Sendable")
-        isSendable = true;
-      else if (swiftAttr->getAttribute() == "@_nonSendable")
-        isNonSendable = true;
+      callback(swiftAttr);
     }
-
     type = skipUnrelatedSugar(AT->getEquivalentType());
   }
+}
+
+void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
+                                ImportTypeKind importKind,
+                                ImportTypeAttrs &attrs, clang::QualType type) {
+  bool isMainActor = false;
+  bool isSendable =
+      SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
+      importKind == ImportTypeKind::CompletionHandlerParameter;
+  bool isNonSendable = false;
+
+  // Consider only immediate attributes, don't look through the typerefs
+  // because they are imported separately.
+  findSwiftAttributes(type, [&](const clang::SwiftAttrAttr *attr) {
+    if (isMainActorAttr(attr)) {
+      isMainActor = true;
+      isNonSendable = importKind == ImportTypeKind::Parameter ||
+                      importKind == ImportTypeKind::CompletionHandlerParameter;
+    } else if (attr->getAttribute() == "@Sendable")
+      isSendable = true;
+    else if (attr->getAttribute() == "@_nonSendable")
+      isNonSendable = true;
+  });
 
   if (isMainActor)
     attrs |= ImportTypeAttr::MainActor;

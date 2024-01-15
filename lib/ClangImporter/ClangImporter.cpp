@@ -7196,36 +7196,40 @@ static bool isForeignReferenceType(const clang::QualType type) {
   return hasImportAsRefAttr(pointeeType->getDecl());
 }
 
+static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
+  if (decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [&](auto *A) {
+        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(A))
+          return swiftAttr->getAttribute() == attr;
+        return false;
+      }))
+    return true;
+
+  if (auto *P = dyn_cast<clang::ParmVarDecl>(decl)) {
+    bool found = false;
+    findSwiftAttributes(P->getOriginalType(),
+                        [&](const clang::SwiftAttrAttr *swiftAttr) {
+                          found |= swiftAttr->getAttribute() == attr;
+                        });
+    return found;
+  }
+
+  return false;
+}
+
 static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_owned";
-           return false;
-         });
+  return hasSwiftAttribute(decl, "import_owned");
 }
 
 bool importer::hasUnsafeAPIAttr(const clang::Decl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_unsafe";
-           return false;
-         });
+  return hasSwiftAttribute(decl, "import_unsafe");
 }
 
 static bool hasIteratorAPIAttr(const clang::Decl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_iterator";
-           return false;
-         });
+  return hasSwiftAttribute(decl, "import_iterator");
 }
 
 static bool hasNonCopyableAttr(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "~Copyable";
-           return false;
-         });
+  return hasSwiftAttribute(decl, "~Copyable");
 }
 
 /// Recursively checks that there are no pointers in any fields or base classes.
