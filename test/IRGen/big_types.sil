@@ -28,6 +28,16 @@ sil @use_big_struct : $@convention(thin) (BigStruct) -> ()
 
 sil @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
 
+typealias Invocation = @convention(thin) (BigStruct) -> ()
+
+struct InvocationWrapper {
+  let invocation: Invocation
+}
+
+sil_global hidden [let] @invocation : $InvocationWrapper
+
+sil @invocationClosure : $@convention(thin) (BigStruct) -> ()
+
 // CHECK-LABEL: sil_global @globalWithClosureInStruct : $ContainsClosure = {
 // CHECK:         %0 = function_ref @make_big_struct : $@convention(thin) () -> @out BigStruct
 // CHECK-NEXT:    %1 = thin_to_thick_function %0 : $@convention(thin) () -> @out BigStruct to $@callee_guaranteed () -> @out BigStruct
@@ -157,4 +167,19 @@ sil private @testLoadableCaptureClosure : $@convention(thin) (BigStruct) -> () {
 bb0(%0 : @closureCapture $BigStruct):
   %2 = tuple ()
   return %2 : $()
+}
+
+// Test a rewritten function_ref stored in a struct property.
+// CHECK-LABEL: sil [global_init_once_fn] @test_invocation : $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK: [[F:%[0-9]+]] = function_ref @invocationClosure : $@convention(thin) (@in_guaranteed BigStruct) -> ()
+// CHECK: = struct $InvocationWrapper ([[F]] : $@convention(thin) (@in_guaranteed BigStruct) -> ())
+sil [global_init_once_fn] @test_invocation : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @invocation
+  %g = global_addr @invocation : $*InvocationWrapper
+  %f = function_ref @invocationClosure : $@convention(thin) (BigStruct) -> ()
+  %s = struct $InvocationWrapper (%f : $@convention(thin) (BigStruct) -> ())
+  store %s to %g : $*InvocationWrapper
+  %r = tuple ()
+  return %r : $()
 }
