@@ -975,3 +975,39 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   defer { boundary.deinitialize() }
   print(boundary)
 }
+
+// Print the uses of an address.
+struct AddressUsePrinter: AddressUseVisitor {
+  let _context: Context
+
+  mutating func leafUse(address: Operand) -> WalkResult {
+    print("Leaf use: \(address)")
+    return .continueWalk
+  }
+
+  mutating func pointerEscape(address: Operand) -> WalkResult {
+    print("Pointer escape: \(address)")
+    return .continueWalk
+  }
+
+  mutating func unknown(address: Operand) -> WalkResult {
+    print("Unknown: \(address)")
+    return .continueWalk
+  }
+
+  mutating func dependent(value: Value, dependsOn address: Operand)
+    -> WalkResult {
+    print("Dependent: \(value) on \(address)")
+    return .continueWalk
+  }
+}
+
+let addressUseTest = FunctionTest("address_use_test") {
+    function, arguments, context in
+  let address = arguments.takeValue()
+  assert(address.type.isAddress)
+  print(function)
+  print("Uses of address: \(address)")
+  var printer = AddressUsePrinter(_context: context)
+  printer.walkDownUses(ofAddress: address)
+}
