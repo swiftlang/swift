@@ -11,3 +11,13 @@ func open(existential: P, mutExistential: inout P) {
   _openExistential(mutExistential, do: foo)
   _openExistential(type(of: mutExistential), do: bar)
 }
+
+enum HomeworkError: Error {
+case dogAteIt
+}
+
+func fooThrowing<T: P>(_: T) throws(HomeworkError) {}
+
+func openMaybeThrow(existential: P) throws(HomeworkError) {
+  try _openExistential(existential, do: fooThrowing)
+}

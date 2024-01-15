@@ -3145,11 +3145,14 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
+    auto thrownError = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
+        0);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
-                                             .withThrows(true, /*FIXME:*/Type())
+                                             .withThrows(true, thrownError)
                                              .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
@@ -3159,7 +3162,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto refType = FunctionType::get(args, result,
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
-                                         .withThrows(true, /*FIXME:*/Type())
+                                         .withThrows(true, thrownError)
                                          .withAsync(true)
                                          .build());
     return {refType, refType, refType, refType, Type()};
