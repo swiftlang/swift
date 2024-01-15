@@ -7368,12 +7368,6 @@ static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasCustomCopyOrMoveConstructor(const clang::CXXRecordDecl *decl) {
-  // std::pair and std::tuple might have copy and move constructors, but that
-  // doesn't mean they are safe to use from Swift, e.g. std::pair<UnsafeType, T>
-  if (decl->isInStdNamespace() &&
-      (decl->getName() == "pair" || decl->getName() == "tuple")) {
-    return false;
-  }
   return decl->hasUserDeclaredCopyConstructor() ||
          decl->hasUserDeclaredMoveConstructor();
 }
@@ -7489,6 +7483,13 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
 }
 
 bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
+  // std::pair and std::tuple might have copy and move constructors, or base
+  // classes with copy and move constructors, but they are not self-contained
+  // types, e.g. `std::pair<UnsafeType, T>`.
+  if (decl->isInStdNamespace() &&
+      (decl->getName() == "pair" || decl->getName() == "tuple"))
+    return false;
+
   if (!decl->getDefinition())
     return false;
 
