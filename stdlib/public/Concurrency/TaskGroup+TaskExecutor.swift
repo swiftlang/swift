@@ -23,10 +23,9 @@ extension TaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
-  ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
-  ///                   and it will be inherited automatically.
+  ///      Explicitly passing `nil` as the executor preference is equivalent to
+  ///      calling the `addTask` method without a preference, and effectively
+  ///      means to inherit the outer context's executor preference.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
@@ -37,6 +36,9 @@ extension TaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
+    guard let taskExecutor else {
+      return self.addTask(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -45,11 +47,7 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-    if let taskExecutor {
       taskExecutor.asUnownedTaskExecutor().executor
-    } else {
-      globalConcurrentExecutor.asUnownedTaskExecutor().executor
-    }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -78,6 +76,9 @@ extension TaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
+    guard let taskExecutor else {
+      return self.addTaskUnlessCancelled(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -92,11 +93,7 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-      if let taskExecutor {
-        taskExecutor.asUnownedTaskExecutor().executor
-      } else {
-        globalConcurrentExecutor.asUnownedTaskExecutor().executor
-      }
+      taskExecutor.asUnownedTaskExecutor().executor
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -130,6 +127,9 @@ extension ThrowingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
+    guard let taskExecutor else {
+      return self.addTask(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -138,11 +138,7 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-      if let taskExecutor {
-        taskExecutor.asUnownedTaskExecutor().executor
-      } else {
-        globalConcurrentExecutor.asUnownedTaskExecutor().executor
-      }
+      taskExecutor.asUnownedTaskExecutor().executor
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -155,10 +151,6 @@ extension ThrowingTaskGroup {
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
-  ///                   will be ignored. In order to inherit the parent task's executor preference
-  ///                   invoke `_addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
-  ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
@@ -171,6 +163,9 @@ extension ThrowingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
+    guard let taskExecutor else {
+      return self.addTaskUnlessCancelled(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -185,11 +180,7 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-      if let taskExecutor {
-        taskExecutor.asUnownedTaskExecutor().executor
-      } else {
-        globalConcurrentExecutor.asUnownedTaskExecutor().executor
-      }
+      taskExecutor.asUnownedTaskExecutor().executor
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -221,8 +212,11 @@ extension DiscardingTaskGroup {
   public mutating func _addTask(
     executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Void
+    operation: __owned @Sendable @escaping () async -> Void
   ) {
+    guard let taskExecutor else {
+      return self.addTask(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -231,11 +225,7 @@ extension DiscardingTaskGroup {
       isDiscardingTask: true)
 
     let executorBuiltin: Builtin.Executor =
-      if let taskExecutor {
-        taskExecutor.asUnownedTaskExecutor().executor
-      } else {
-        globalConcurrentExecutor.asUnownedTaskExecutor().executor
-      }
+      taskExecutor.asUnownedTaskExecutor().executor
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -265,6 +255,9 @@ extension DiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Void
   ) -> Bool {
+    guard let taskExecutor else {
+      return self.addTaskUnlessCancelled(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -279,11 +272,7 @@ extension DiscardingTaskGroup {
     )
 
     let executorBuiltin: Builtin.Executor =
-      if let taskExecutor {
-        taskExecutor.asUnownedTaskExecutor().executor
-      } else {
-        globalConcurrentExecutor.asUnownedTaskExecutor().executor
-      }
+      taskExecutor.asUnownedTaskExecutor().executor
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -317,6 +306,9 @@ extension ThrowingDiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
+    guard let taskExecutor else {
+      return self.addTask(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
@@ -325,11 +317,7 @@ extension ThrowingDiscardingTaskGroup {
       isDiscardingTask: true)
 
     let executorBuiltin: Builtin.Executor =
-      if let taskExecutor {
-        taskExecutor.asUnownedTaskExecutor().executor
-      } else {
-        globalConcurrentExecutor.asUnownedTaskExecutor().executor
-      }
+      taskExecutor.asUnownedTaskExecutor().executor
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -359,6 +347,9 @@ extension ThrowingDiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) -> Bool {
+    guard let taskExecutor else {
+      return self.addTaskUnlessCancelled(priority: priority, operation: operation)
+    }
     #if $BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
@@ -373,11 +364,7 @@ extension ThrowingDiscardingTaskGroup {
     )
 
     let executorBuiltin: Builtin.Executor =
-      if let taskExecutor {
-        taskExecutor.asUnownedTaskExecutor().executor
-      } else {
-        globalConcurrentExecutor.asUnownedTaskExecutor().executor
-      }
+      taskExecutor.asUnownedTaskExecutor().executor
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)

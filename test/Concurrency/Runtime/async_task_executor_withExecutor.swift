@@ -137,13 +137,11 @@ func testDisablingTaskExecutorPreference(_ firstExecutor: MyTaskExecutor,
     dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
     await _withTaskExecutorPreference(globalConcurrentExecutor) {
       dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
-      dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
       print("OK: _withTaskExecutorPreference(globalConcurrentExecutor) { ... }")
     } // on second
-    await _withTaskExecutorPreference(nil) {
-      dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
-      dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
+    await _withTaskExecutorPreference(nil) { // no specific preference == okey to inherit
+      dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
       dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
       print("OK: _withTaskExecutorPreference(nil) { ... }")
     } // on second
