@@ -29,6 +29,50 @@ import Swift
 /// Passing `nil` as executor means disabling any preference preference (if it was set) and the task hierarchy
 /// will execute without any executor preference until a different preference is set.
 ///
+/// ### Asynchronous function execution semantics in presence of task executor preferences
+/// The following diagram illustrates on which executor an `async` function will
+/// execute, in presence (or lack thereof) a task executor preference.
+///
+/// ```
+/// [ func / closure ] - /* where should it execute? */
+///                               |
+///                     +--------------+          +===========================+
+///           +-------- | is isolated? | - yes -> | actor has unownedExecutor |
+///           |         +--------------+          +===========================+
+///           |                                       |                |
+///           |                                      yes               no
+///           |                                       |                |
+///           |                                       v                v
+///           |                  +=======================+    /* task executor preference? */
+///           |                  | on specified executor |        |                   |
+///           |                  +=======================+       yes                  no
+///           |                                                   |                   |
+///           |                                                   |                   v
+///           |                                                   |    +==========================+
+///           |                                                   |    | default (actor) executor |
+///           |                                                   v    +==========================+
+///           v                                     +==============================+
+///  /* task executor preference? */ ---- yes ----> | on Task's preferred executor |
+///           |                                     +==============================+
+///           no
+///           |
+///           v
+///  +===============================+
+///  | on global concurrent executor |
+///  +===============================+
+/// ```
+///
+/// In short, without a task executor preference, `nonisolated async` functions
+/// will execute on the global concurrent executor. If a task executor preference
+/// is present, such `nonisolated async` functions will execute on the preferred
+/// task executor.
+///
+/// Isolated functions semantically execute on the actor they are isolated to,
+/// however if such actor does not declare a custom executor (it is a "default
+/// actor") in presence of a task executor preference, tasks executing on this
+/// actor will use the preferred executor as source of threads to run the task,
+/// while isolated on the actor.
+///
 /// ### Example
 ///
 ///     Task {
@@ -55,7 +99,7 @@ import Swift
 ///         async let x = ...
 ///         await withTaskGroup(of: Int.self) { group in
 ///           group.addTask { 7 } // child task executes on 'specific' executor
-///           group.addTask(on: .default) { 13 } // child task executes on default executor
+///           group.addTask(executorPreference: globalConcurrentExecutor) { 13 } // child task executes on default executor
 ///         }
 ///
 ///         // disable the task executor preference:
@@ -75,7 +119,7 @@ import Swift
 ///     }
 ///
 /// - Parameters:
-///   - executorPreference: the task executor to use as preferred task executor; if `nil` it is interpreted as "no preference"
+///   - preferredTaskExecutor: the task executor to use as preferred task executor; if `nil` it is interpreted as "no preference"
 ///   - operation: the operation to execute on the passed executor; if the executor was `nil`, this will execute on the default global concurrent executor.
 /// - Returns: the value returned from the `operation` closure
 /// - Throws: if the operation closure throws
@@ -83,12 +127,16 @@ import Swift
 @_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
-public func _withTaskExecutor<T: Sendable>(
-  _ taskExecutorPreference: some _TaskExecutor,
+public func _withTaskExecutorPreference<T: Sendable>(
+  _ taskExecutor: (any _TaskExecutor)?,
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
   let taskExecutorBuiltin: Builtin.Executor =
-    taskExecutorPreference.asUnownedTaskExecutor().executor
+    if let taskExecutor {
+      taskExecutor.asUnownedTaskExecutor().executor
+    } else {
+      globalConcurrentExecutor.asUnownedTaskExecutor().executor
+    }
 
   let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
@@ -99,44 +147,6 @@ public func _withTaskExecutor<T: Sendable>(
   // the operation, its enqueue will respect the attached executor preference.
 
   return try await operation()
-}
-
-/// Default global concurrent pool TaskExecutor --------------------------------
-
-@available(SwiftStdlib 9999, *)
-extension _TaskExecutor where Self == DefaultConcurrentExecutor {
-
-  /// The default executor preference, setting it using ``withTaskExecutor(_:)``
-  /// is equivalent to disabling an existing task executor preference, or
-  /// stating that task now has "no task executor preference".
-  @available(SwiftStdlib 9999, *)
-  public static var `default`: DefaultConcurrentExecutor {
-    DefaultConcurrentExecutor.shared
-  }
-
-}
-
-/// A task executor which enqueues all work on the default global concurrent
-/// thread pool that is used as the default executor for Swift concurrency
-/// tasks.
-@available(SwiftStdlib 9999, *)
-public final class DefaultConcurrentExecutor: _TaskExecutor {
-  public static let shared: DefaultConcurrentExecutor = .init()
-
-  private init() {}
-
-  public func enqueue(_ job: consuming ExecutorJob) {
-    _enqueueJobGlobal(job.context)
-  }
-
-  public func asUnownedTaskExecutor() {
-    // The "default global concurrent executor" is simply the "undefined" one.
-    // We represent it as the `(0, 0)` ExecutorRef and it is handled properly
-    // by the runtime, without having to call through to the
-    // `DefaultConcurrentExecutor` declared in Swift.
-    UnownedTaskExecutor(_getUndefinedTaskExecutor())
-  }
-
 }
 
 /// Task with specified executor -----------------------------------------------
@@ -150,7 +160,7 @@ extension Task where Failure == Never {
   /// This overload allows specifying a preferred ``_TaskExecutor`` on which
   /// the `operation`, as well as all child tasks created from this task will be
   /// executing whenever possible. Refer to ``_TaskExecutor`` for a detailed discussion
-  // of the effect of task executors on execution semantics of asynchronous code.
+  /// of the effect of task executors on execution semantics of asynchronous code.
   ///
   /// Use this function when creating asynchronous work
   /// that operates on behalf of the synchronous function that calls it.
@@ -169,14 +179,14 @@ extension Task where Failure == Never {
   /// it only makes it impossible for you to explicitly cancel the task.
   ///
   /// - Parameters:
-  ///   - executor: the preferred task executor for this task, and any child tasks created by it
+  ///   - taskExecutor: the preferred task executor for this task, and any child tasks created by it
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the priority from `Task.currentPriority`.
   ///   - operation: The operation to perform.
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    _on executor: some _TaskExecutor,
+    _executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) {
@@ -189,9 +199,15 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let executorBuiltin: Builtin.Executor =
+    if let taskExecutor {
+      taskExecutor.asUnownedTaskExecutor().executor
+    } else {
+      globalConcurrentExecutor.asUnownedTaskExecutor().executor
+    }
+
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, taskExecutorRef.executor, operation)
+      flags, executorBuiltin, operation)
     self._task = task
     #else
     fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor")
@@ -204,7 +220,7 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    _on executor: some _TaskExecutor,
+    _executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) {
@@ -217,9 +233,14 @@ extension Task where Failure == Error {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let executorBuiltin: Builtin.Executor =
+    if let taskExecutor {
+      taskExecutor.asUnownedTaskExecutor().executor
+    } else {
+      globalConcurrentExecutor.asUnownedTaskExecutor().executor
+    }
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, taskExecutorRef.executor, operation)
+      flags, executorBuiltin, operation)
     self._task = task
     #else
     fatalError("Unsupported Swift compiler, missing support for $BuiltinCreateAsyncTaskWithExecutor")
@@ -236,7 +257,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func _detached(
-    on executor: some _TaskExecutor,
+    _executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) -> Task<Success, Failure> {
@@ -267,7 +288,7 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func _detached(
-    on executor: some _TaskExecutor,
+    _executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) -> Task<Success, Failure> {
@@ -280,9 +301,14 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let executorBuiltin: Builtin.Executor =
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, taskExecutorRef.executor, operation)
+      flags, executorBuiltin, operation)
 
     return Task(task)
     #else
@@ -299,7 +325,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func _detached(
-    on executor: some _TaskExecutor,
+    _executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
@@ -332,7 +358,7 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func _detached(
-    on executor: some _TaskExecutor,
+    _executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
@@ -345,10 +371,14 @@ extension Task where Failure == Error {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-    // Create the asynchronous task.
-    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let executorBuiltin: Builtin.Executor =
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, taskExecutorRef.executor, operation)
+      flags, executorBuiltin, operation)
 
     return Task(task)
     #else

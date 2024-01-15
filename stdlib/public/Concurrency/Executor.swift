@@ -113,8 +113,8 @@ public protocol SerialExecutor: Executor {
 /// requirements.
 ///
 /// By setting a task executor preference, either with a
-/// ``_withTaskExecutor(_:operation:)``, creating a task with a preference
-/// (`Task(_on:)`, or `group.addTask(on:)`), the task and all of its child
+/// ``_withTaskExecutorPreference(_:operation:)``, creating a task with a preference
+/// (`Task(_executorPreference:)`, or `group.addTask(executorPreference:)`), the task and all of its child
 /// tasks (unless a new preference is set) will be preferring to execute on
 /// the provided task executor.
 ///
@@ -375,9 +375,8 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 @_unavailableInEmbedded
 @available(SwiftStdlib 9999, *)
 @_silgen_name("_task_executor_getTaskExecutorRef")
-internal func _task_executor_getTaskExecutorRef<E>(_ executor: E) -> Builtin.Executor
-    where E: _TaskExecutor {
-  return executor.asUnownedTaskExecutor().executor
+internal func _task_executor_getTaskExecutorRef(_ taskExecutor: any _TaskExecutor) -> Builtin.Executor {
+  return taskExecutor.asUnownedTaskExecutor().executor
 }
 
 // Used by the concurrency runtime

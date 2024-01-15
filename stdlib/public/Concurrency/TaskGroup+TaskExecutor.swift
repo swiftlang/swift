@@ -22,7 +22,7 @@ extension TaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
@@ -33,7 +33,7 @@ extension TaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -45,7 +45,11 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-      taskExecutorPreference.asUnownedTaskExecutor().executor
+    if let taskExecutor {
+      taskExecutor.asUnownedTaskExecutor().executor
+    } else {
+      globalConcurrentExecutor.asUnownedTaskExecutor().executor
+    }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -57,7 +61,7 @@ extension TaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
@@ -70,7 +74,7 @@ extension TaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
@@ -88,7 +92,11 @@ extension TaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-        taskExecutorPreference.asUnownedTaskExecutor().executor
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -107,7 +115,7 @@ extension ThrowingTaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
@@ -118,7 +126,7 @@ extension ThrowingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
@@ -130,7 +138,11 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-        taskExecutorPreference.asUnownedTaskExecutor().executor
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -142,7 +154,7 @@ extension ThrowingTaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
@@ -155,7 +167,7 @@ extension ThrowingTaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
@@ -173,7 +185,11 @@ extension ThrowingTaskGroup {
       isDiscardingTask: false)
 
     let executorBuiltin: Builtin.Executor =
-        taskExecutorPreference.asUnownedTaskExecutor().executor
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -192,7 +208,7 @@ extension DiscardingTaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
@@ -203,7 +219,7 @@ extension DiscardingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
@@ -215,7 +231,11 @@ extension DiscardingTaskGroup {
       isDiscardingTask: true)
 
     let executorBuiltin: Builtin.Executor =
-        taskExecutorPreference.asUnownedTaskExecutor().executor
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -228,7 +248,7 @@ extension DiscardingTaskGroup {
   /// unless the group has been canceled.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
@@ -241,7 +261,7 @@ extension DiscardingTaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Void
   ) -> Bool {
@@ -259,7 +279,11 @@ extension DiscardingTaskGroup {
     )
 
     let executorBuiltin: Builtin.Executor =
-        taskExecutorPreference.asUnownedTaskExecutor().executor
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -278,7 +302,7 @@ extension ThrowingDiscardingTaskGroup {
   /// Adds a child task to the group and set it up with the passed in task executor preference.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
@@ -289,7 +313,7 @@ extension ThrowingDiscardingTaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func _addTask(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
@@ -301,7 +325,11 @@ extension ThrowingDiscardingTaskGroup {
       isDiscardingTask: true)
 
     let executorBuiltin: Builtin.Executor =
-      taskExecutorPreference.asUnownedTaskExecutor().executor
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
@@ -314,7 +342,7 @@ extension ThrowingDiscardingTaskGroup {
   /// unless the group has been canceled.
   ///
   /// - Parameters:
-  ///   - taskExecutorPreference: The task executor that the child task should be started on and keep using.
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
   ///                   will be ignored. In order to inherit the parent task's executor preference
   ///                   invoke `_addTask()` without passing a value to the `taskExecutor` parameter,
@@ -327,7 +355,7 @@ extension ThrowingDiscardingTaskGroup {
   ///   otherwise `false`.
   @_alwaysEmitIntoClient
   public mutating func _addTaskUnlessCancelled(
-    on taskExecutorPreference: some _TaskExecutor,
+    executorPreference taskExecutor: (any _TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) -> Bool {
@@ -345,7 +373,11 @@ extension ThrowingDiscardingTaskGroup {
     )
 
     let executorBuiltin: Builtin.Executor =
-        taskExecutorPreference.asUnownedTaskExecutor().executor
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        globalConcurrentExecutor.asUnownedTaskExecutor().executor
+      }
 
     // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncDiscardingTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)

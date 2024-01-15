@@ -22,7 +22,7 @@ final class NaiveQueueExecutor: _TaskExecutor, SerialExecutor {
     let job = UnownedJob(_job)
     queue.async {
       job.runSynchronously(
-        isolated: self.asUnownedSerialExecutor(),
+        isolatedTo: self.asUnownedSerialExecutor(),
         taskExecutor: self.asUnownedTaskExecutor())
     }
   }
@@ -83,7 +83,7 @@ actor Worker {
     let queue = DispatchQueue(label: "example-queue")
     let executor = NaiveQueueExecutor(queue)
 
-    await Task(_on: executor) {
+    await Task(_executorPreference: executor) {
       let worker = Worker(on: executor)
       await worker.test(executor)
     }.value
