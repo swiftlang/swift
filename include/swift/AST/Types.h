@@ -922,6 +922,9 @@ public:
   /// Determines whether this type is an actor type.
   bool isActorType();
 
+  /// Determines whether this type is an any actor type.
+  bool isAnyActorType();
+
   /// Returns true if this type is a Sendable type.
   bool isSendableType(DeclContext *declContext);
 

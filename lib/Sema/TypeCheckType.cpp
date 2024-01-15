@@ -4484,12 +4484,12 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
   Type type = resolveType(repr->getBase(), options);
 
   // isolated parameters must be of actor type
-  if (!type->hasTypeParameter() && !type->isActorType() && !type->hasError()) {
+  if (!type->hasTypeParameter() && !type->isAnyActorType() && !type->hasError()) {
     // Optional actor types are fine - `nil` represents `nonisolated`.
     auto wrapped = type->getOptionalObjectType();
     auto allowOptional = getASTContext().LangOpts
         .hasFeature(Feature::OptionalIsolatedParameters);
-    if (allowOptional && wrapped && wrapped->isActorType()) {
+    if (allowOptional && wrapped && wrapped->isAnyActorType()) {
       return type;
     }
 

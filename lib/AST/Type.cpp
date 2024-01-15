@@ -574,6 +574,12 @@ bool TypeBase::isActorType() {
   return false;
 }
 
+bool TypeBase::isAnyActorType() {
+  if (auto actor = getAnyActor())
+    return actor->isAnyActor();
+  return false;
+}
+
 bool TypeBase::isSendableType(DeclContext *ctx) {
   return isSendableType(ctx->getParentModule());
 }
