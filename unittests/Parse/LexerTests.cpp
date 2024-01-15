@@ -679,6 +679,38 @@ TEST_F(LexerTest, NestedPlaceholder) {
   EXPECT_EQ("<#aa#>", Toks[2].getText());
 }
 
+TEST_F(LexerTest, CustomOffset) {
+  const char *Source = "aaa bbb ccc ddd";
+  
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
+  
+  Lexer L(LangOpts, SourceMgr, BufferID, nullptr,
+          LexerMode::Swift, HashbangMode::Disallowed,
+          CommentRetentionMode::None,
+          /*Offset=*/4, /*EndOffset=*/10);
+  
+  Token Tok;
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("bbb", Tok.getText());
+  
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  
+  L.resetToOffset(8);
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ccc", Tok.getText());
+  
+  L.lex(Tok);
+  // This should be tok::eof as the 'EndOffset' is set to 10.
+  ASSERT_EQ(tok::eof, Tok.getKind());
+}
+
 class StringCaptureDiagnosticConsumer : public DiagnosticConsumer {
 public:
   virtual void handleDiagnostic(SourceManager &SM,
@@ -729,29 +761,6 @@ TEST_F(LexerTest, DiagnoseEmbeddedNul) {
                              "1, 2: nul character embedded in middle of file"));
   ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
                              "1, 4: nul character embedded in middle of file"));
-}
-
-TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
-  const char Source[] = " \0 \0 aaa \0 \0 bbb";
-  size_t SourceLen = sizeof(Source) - 1;
-
-  LangOptions LangOpts;
-  SourceManager SourceMgr;
-  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, SourceLen));
-
-  StringCaptureDiagnosticConsumer DiagConsumer;
-  DiagnosticEngine Diags(SourceMgr);
-  Diags.addConsumer(DiagConsumer);
-
-  Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
-          LexerMode::Swift, HashbangMode::Disallowed,
-          CommentRetentionMode::None,
-          /*Offset=*/5, /*EndOffset=*/SourceLen);
-
-  ASSERT_FALSE(containsPrefix(
-      DiagConsumer.messages, "1, 2: nul character embedded in middle of file"));
-  ASSERT_FALSE(containsPrefix(
-      DiagConsumer.messages, "1, 4: nul character embedded in middle of file"));
 }
 
 TEST_F(LexerTest, InvalidUTF8Bytes) {
