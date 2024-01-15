@@ -2127,7 +2127,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
     Impl.SyntaxMap = std::move(NewMap);
 
     // Recording an affected length of 0 still results in the client updating
-    // its copy of the syntax map (by clearning all tokens on the line of the
+    // its copy of the syntax map (by clearing all tokens on the line of the
     // affected offset). We need to not record it at all to signal a no-op.
     if (SawChanges)
       Consumer.recordAffectedRange(Impl.AffectedRange->Offset,
