@@ -9,6 +9,7 @@
 // RUN:   -module-name main -I %t -verify
 
 // REQUIRES: objc_interop
+// REQUIRES: asserts
 
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
