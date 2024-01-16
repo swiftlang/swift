@@ -156,7 +156,7 @@ struct S3 {
 }
 
 struct S4 {
-  // expected-error@+1 {{main actor-isolated default value in a nonisolated context}}
+  // expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
   var x: Int = requiresMainActor()
 }
 
