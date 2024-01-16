@@ -7963,9 +7963,9 @@ bool constraints::isResultBuilderMethodReference(ASTContext &ctx,
   if (!(UDE && UDE->isImplicit()))
     return false;
 
-  SmallVector<Identifier, 4> builderMethods(
+  SmallVector<Identifier, 5> builderMethods(
       {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
-       ctx.Id_buildFinalResult});
+       ctx.Id_buildFinalResult, ctx.Id_buildIf});
 
   return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
     return UDE->getName().compare(DeclNameRef(methodId)) == 0;
