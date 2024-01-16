@@ -40,7 +40,9 @@
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Attr.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Basic/AttributeCommonInfo.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -7616,6 +7618,44 @@ public:
 
     // Unknown kind?
     return nullptr;
+  }
+
+  const clang::Attr *readAttr() {
+    auto rawKind = readUInt32();
+    if (!rawKind)
+      return nullptr;
+
+    clang::attr::Kind attrKind = static_cast<clang::attr::Kind>(rawKind - 1);
+    auto name = readIdentifier();
+    auto scopeName = readIdentifier();
+
+    auto rangeStart = readSourceLocation();
+    auto rangeEnd = readSourceLocation();
+    auto scopeLoc = readSourceLocation();
+
+    auto parsedKind = readEnum<clang::AttributeCommonInfo::Kind>();
+    auto syntax = readEnum<clang::AttributeCommonInfo::Syntax>();
+    unsigned spellingListIndex = readUInt64();
+
+    bool isRegularKeywordAttribute = readBool();
+
+    clang::AttributeCommonInfo info(
+        name, scopeName, {rangeStart, rangeEnd}, scopeLoc, parsedKind,
+        {syntax, spellingListIndex, /*IsAlignas=*/false,
+         isRegularKeywordAttribute});
+
+    bool isInherited = readBool();
+    bool isImplicit = readBool();
+    bool isPackExpansion = readBool();
+    StringRef attribute = MF.getIdentifierText(readUInt64());
+
+    auto *attr =
+        clang::SwiftAttrAttr::Create(getASTContext(), attribute.str(), info);
+    cast<clang::InheritableAttr>(attr)->setInherited(isInherited);
+    attr->setImplicit(isImplicit);
+    attr->setPackExpansion(isPackExpansion);
+
+    return attr;
   }
 };
 

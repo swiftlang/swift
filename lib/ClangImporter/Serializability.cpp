@@ -315,6 +315,8 @@ namespace {
       if (loc.isValid())
         IsSerializable = false;
     }
+
+    void writeAttr(const clang::Attr *attr) {}
   };
 }
 
