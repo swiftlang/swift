@@ -2,7 +2,7 @@
 // REQUIRES: OS=macosx || OS=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // rdar://problem/65399527
-// XFAIL: OS=ios && CPU=armv7s
+// UNSUPPORTED: OS=ios
 //
 // RUN: %empty-directory(%t)
 //
