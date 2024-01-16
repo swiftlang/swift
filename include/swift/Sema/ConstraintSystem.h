@@ -6448,6 +6448,9 @@ bool containsPackExpansionType(TupleType *tuple);
 /// \returns null if \c type is not a single unlabeled pack expansion tuple.
 Type getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type);
 
+/// Check whether this is a reference to one of the special result builder
+/// methods prefixed with `build*` i.e. `buildBlock`, `buildExpression` etc.
+bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 } // end namespace constraints
 
 template<typename ...Args>

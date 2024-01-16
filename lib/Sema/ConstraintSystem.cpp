@@ -5496,21 +5496,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // Aggregate all requirement fixes that belong to the same callee
   // and attempt to diagnose possible ambiguities.
   {
-    auto isResultBuilderMethodRef = [&](ASTNode node) {
-      auto *UDE = getAsExpr<UnresolvedDotExpr>(node);
-      if (!(UDE && UDE->isImplicit()))
-        return false;
-
-      auto &ctx = getASTContext();
-      SmallVector<Identifier, 4> builderMethods(
-          {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
-           ctx.Id_buildFinalResult});
-
-      return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
-        return UDE->getName().compare(DeclNameRef(methodId)) == 0;
-      });
-    };
-
     // Aggregates fixes fixes attached to `buildExpression` and `buildBlock`
     // methods at the particular source location.
     llvm::MapVector<SourceLoc, SmallVector<FixInContext, 4>>
@@ -5526,7 +5511,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
       auto *calleeLoc = entry.first->getCalleeLocator(fix->getLocator());
 
-      if (isResultBuilderMethodRef(calleeLoc->getAnchor())) {
+      auto *UDE = getAsExpr<UnresolvedDotExpr>(calleeLoc->getAnchor());
+      if (UDE && isResultBuilderMethodReference(getASTContext(), UDE)) {
         auto *anchor = castToExpr<Expr>(calleeLoc->getAnchor());
         builderMethodRequirementFixes[anchor->getLoc()].push_back(entry);
       } else {
@@ -7970,4 +7956,18 @@ void constraints::dumpAnchor(ASTNode anchor, SourceManager *SM,
     }
   }
   // TODO(diagnostics): Implement the rest of the cases.
+}
+
+bool constraints::isResultBuilderMethodReference(ASTContext &ctx,
+                                                 UnresolvedDotExpr *UDE) {
+  if (!(UDE && UDE->isImplicit()))
+    return false;
+
+  SmallVector<Identifier, 4> builderMethods(
+      {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
+       ctx.Id_buildFinalResult});
+
+  return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
+    return UDE->getName().compare(DeclNameRef(methodId)) == 0;
+  });
 }
