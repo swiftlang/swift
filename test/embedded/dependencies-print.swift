@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded %s -c -o %t/a.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -no-allocations %s -c -o %t/a.o
 
 // RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
 
@@ -13,10 +13,10 @@
 
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
-// DEP: _free
+// DEP: ___divti3
+// DEP: ___modti3
 // DEP: _memset
 // DEP: _putchar
-// DEP: _posix_memalign
 
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
@@ -28,43 +28,6 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
-@_silgen_name("putchar")
-@discardableResult
-func putchar(_: CInt) -> CInt
-
-public func print(_ s: StaticString, terminator: StaticString = "\n") {
-  var p = s.utf8Start
-  while p.pointee != 0 {
-    putchar(CInt(p.pointee))
-    p += 1
-  }
-  p = terminator.utf8Start
-  while p.pointee != 0 {
-    putchar(CInt(p.pointee))
-    p += 1
-  }
-}
-
-class MyClass {
-  func foo() { print("MyClass.foo") }
-}
-
-class MySubClass: MyClass {
-  override func foo() { print("MySubClass.foo") }
-}
-
-@main
-struct Main {
-  static var objects: [MyClass] = []
-  static func main() {
-    print("Hello Embedded Swift!")
-    // CHECK: Hello Embedded Swift!
-    objects.append(MyClass())
-    objects.append(MySubClass())
-    for o in objects {
-      o.foo()
-    }
-    // CHECK: MyClass.foo
-    // CHECK: MySubClass.foo
-  }
-}
+print("Hello Embedded Swift!") // CHECK: Hello Embedded Swift!
+print(42) // CHECK: 42
+print(false) // CHECK: false

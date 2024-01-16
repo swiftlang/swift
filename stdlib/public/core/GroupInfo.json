@@ -248,7 +248,8 @@
     "DurationProtocol.swift",
     "Instant.swift",
     "EmbeddedRuntime.swift",
-    "EmbeddedStubs.swift"
+    "EmbeddedStubs.swift",
+    "EmbeddedPrint.swift"
   ],
   "Result": [
     "Result.swift"

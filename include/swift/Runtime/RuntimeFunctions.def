@@ -193,7 +193,7 @@ FUNCTION(UnexpectedError, swift_unexpectedError, SwiftCC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(ErrorPtrTy),
          ATTRS(NoUnwind, NoReturn),
-         EFFECT(NoEffect),
+         EFFECT(NoEffect, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_copyPOD(void *dest, void *src, Metadata *self);

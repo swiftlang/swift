@@ -263,6 +263,7 @@ endif()
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
+  EmbeddedPrint.swift
   )
 
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
