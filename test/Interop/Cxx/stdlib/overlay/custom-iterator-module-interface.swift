@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomIterator -source-filename=x -I %S/Inputs -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: struct ConstIterator : UnsafeCxxInputIterator {
 // CHECK:   func successor() -> ConstIterator
