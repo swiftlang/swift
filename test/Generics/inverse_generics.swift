@@ -393,3 +393,25 @@ func checkExistentialAndClasses(
     _ b: any Soup & Copyable & ~Escapable & ~Copyable, // expected-error {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
     _ c: some (~Escapable & Removed) & Soup // expected-error {{composition involving class requirement 'Soup' cannot contain '~Escapable'}}
     ) {}
+
+protocol HasNCBuddy: ~Copyable {
+  associatedtype NCBuddy: HasNCBuddy, ~Copyable
+
+  associatedtype Buddy: HasMember
+}
+
+protocol HasMember : HasNCBuddy {
+  associatedtype Member: HasMember
+
+  associatedtype NCMember: ~Copyable
+}
+
+func checkOwnership<T: HasMember>(_ t: T,
+                                  _ l: T.NCBuddy.Buddy.Member.Buddy,
+                                  _ m: T.Member.Member,
+                                  _ n: T.Member.NCMember,
+// expected-error@-1 {{parameter of noncopyable type 'T.Member.NCMember' must specify ownership}} // expected-note@-1 3{{add}}
+
+                                  _ o: T.Member.NCBuddy.NCBuddy
+// expected-error@-1 {{parameter of noncopyable type 'T.Member.NCBuddy.NCBuddy' must specify ownership}} // expected-note@-1 3{{add}}
+) {}

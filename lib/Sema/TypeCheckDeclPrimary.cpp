@@ -90,8 +90,10 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
 bool swift::isInterfaceTypeNoncopyable(Type type, GenericEnvironment *env) {
   // Turn any type parameters into archetypes.
   if (env)
-    if (!type->hasArchetype() || type->hasOpenedExistential())
-      type = GenericEnvironment::mapTypeIntoContext(env, type);
+    type = GenericEnvironment::mapTypeIntoContext(env, type);
+
+  if (auto sugar = dyn_cast<SugarType>(type))
+    type = sugar->getDesugaredType();
 
   if (!type->hasTypeParameter())
     return type->isNoncopyable();
@@ -100,8 +102,12 @@ bool swift::isInterfaceTypeNoncopyable(Type type, GenericEnvironment *env) {
   if (auto *generic = type->getAnyGeneric())
     return generic->canBeCopyable() != swift::TypeDecl::CBI_Always;
   else if (auto gtpt = type->getAs<GenericTypeParamType>())
-    return gtpt->getDecl()->canBeCopyable() != swift::TypeDecl::CBI_Always;
+    if (auto *gtpd = gtpt->getDecl())
+      return gtpd->canBeCopyable() != swift::TypeDecl::CBI_Always;
 
+  #ifndef NDEBUG
+    type->dump();
+  #endif
   llvm_unreachable("unhandled type kind");
 }
 

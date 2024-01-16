@@ -2371,7 +2371,7 @@ bool swift::diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
   if (options.hasBase(TypeResolverContext::EnumElementDecl))
     return false; // no need for ownership in enum cases.
 
-  if (!ty->isNoncopyable(dc))
+  if (!isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext()))
     return false; // copyable types do not need ownership
 
   if (ownership != ParamSpecifier::Default)
@@ -4776,7 +4776,8 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   // do not allow move-only types as the element of a vararg
   if (!element->hasError()
       && inStage(TypeResolutionStage::Interface)
-      && element->isNoncopyable(getDeclContext())) {
+      && isInterfaceTypeNoncopyable(
+          element, getDeclContext()->getGenericEnvironmentOfContext())) {
     diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
                     element);
     return ErrorType::get(getASTContext());
@@ -4956,7 +4957,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
-    if (inStage(TypeResolutionStage::Interface) && ty->isNoncopyable(dc)
+    if (inStage(TypeResolutionStage::Interface)
+        && isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext())
         && !moveOnlyElementIndex.has_value() && !isa<TupleTypeRepr>(tyR)) {
       moveOnlyElementIndex = i;
     }

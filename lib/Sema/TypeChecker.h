@@ -1400,7 +1400,8 @@ bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 /// could fulfill a protocol requirement for it.
 bool isMemberOperator(FuncDecl *decl, Type type);
 
-/// Given an interface type and a decl context, is the type ever noncopyable?
+/// Given an interface type and possibly a generic environment,
+/// is the type ever noncopyable?
 bool isInterfaceTypeNoncopyable(Type interfaceTy, GenericEnvironment *env);
 
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.

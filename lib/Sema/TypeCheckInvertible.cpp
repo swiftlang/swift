@@ -164,16 +164,10 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   auto *invertible = ctx.getProtocol(getKnownProtocolKind(ip));
   assert(invertible);
 
-  // Pack expansions such as `repeat T` themselves do not have conformances,
-  // so check its pattern type for conformance.
-  if (auto *pet = type->getAs<PackExpansionType>()) {
-    type = pet->getPatternType()->getCanonicalType();
-  }
+  // Must not have a type parameter!
+  assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
 
-  // Must either not have a type parameter, or in the case of a
-  // BoundGenericXType, have a nominal available.
-  assert(!type->hasTypeParameter() || type.getAnyNominal()
-          && "caller forgot to mapTypeIntoContext!");
+  assert(!type->is<PackExpansionType>());
 
   // The SIL types in the AST do not have real conformances, and should have
   // been handled earlier.
@@ -281,11 +275,11 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
       // For a type conforming to IP, ensure that the storage conforms to IP.
       switch (IP) {
       case InvertibleProtocolKind::Copyable:
-        if (!type->isNoncopyable(DC))
+        if (!type->isNoncopyable())
           return false;
         break;
       case InvertibleProtocolKind::Escapable:
-        if (type->isEscapable(DC))
+        if (type->isEscapable())
           return false;
         break;
       }
