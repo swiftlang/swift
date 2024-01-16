@@ -10,6 +10,10 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// Validation gets confused by ARM64e, temporarily disable the test there until
+// we've fixed that. rdar://121029024
+// UNSUPPORTED: CPU=arm64e
+
 struct ConcreteEmpty {}
 
 struct ConcreteFields {
