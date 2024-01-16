@@ -1641,9 +1641,12 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back("-disable-availability-checking");
   }
 
-  if (bool(requireNCGenerics))
+  if (bool(requireNCGenerics)) {
     genericSubInvocation.getLangOptions()
                         .enableFeature(Feature::NoncopyableGenerics);
+    genericSubInvocation.getLangOptions()
+      .EnableExperimentalAssociatedTypeInference = true;
+  }
 
   // Pass-down the obfuscators so we can get the serialized search paths properly.
   genericSubInvocation.setSerializedPathObfuscator(
