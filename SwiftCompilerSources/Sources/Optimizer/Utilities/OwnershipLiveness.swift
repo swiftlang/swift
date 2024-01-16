@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// Utilities that specify ownership SSA (OSSA) lifetimes.
+//
 // TODO: Implement ExtendedLinearLiveness. This requires
 // MultiDefPrunedLiveness, which is not supported by InstructionRange.
 //
@@ -60,28 +62,29 @@ func computeLinearLiveness(for definingValue: Value, _ context: Context)
   return range
 }
 
-/// Indicate whether OwnershipUseVisitor is visiting a use of the
-/// outer OSSA lifetime or within an inner borrow scope (reborrow).
-enum IsInnerLifetime {
-case outerLifetime
-case innerLifetime
-}
-
 typealias InnerScopeHandler = (Value) -> WalkResult
 
 /// Compute liveness and return a range, which the caller must deinitialize.
 ///
-/// An OSSA lifetime begins with a single "defining" value, which
-/// must be owned, or must begin a borrow scope.
+/// An OSSA lifetime begins with a single "defining" value, which must
+/// be owned, or must begin a borrow scope. A complete OSSA lifetime
+/// has a linear lifetime, meaning that it has a lifetime-ending use
+/// on all paths. Interior liveness computes liveness without assuming
+/// the lifetime is complete. To do this, it must find all "use
+/// points" and prove that the defining value is never propagated
+/// beyond those points. This is used to initially complete OSSA
+/// lifetimes and fix them after transformations that's don't preserve
+/// OSSA.
+///
+/// Invariants:
+///
+/// - The definition dominates all use points.
 ///
 /// - Liveness does not extend beyond lifetime-ending operations
 /// (a.k.a. affine lifetimes).
 ///
-/// - The definition dominates all use points.
-///
-/// - Does not assume the current lifetime is complete, but does
-/// assume any inner scopes are complete. Use `innerScopeHandler` to
-/// complete them or bail-out.
+/// - All inner scopes are complete. (Use `innerScopeHandler` to
+/// complete them or bail-out).
 func computeInteriorLiveness(for definingValue: Value,
   _ context: FunctionPassContext,
   innerScopeHandler: InnerScopeHandler? = nil) -> InstructionRange {
@@ -115,7 +118,7 @@ func computeInteriorLiveness(for definingValue: Value,
   return range
 }
 
-/// Visit all interior uses of on OSSA lifetime.
+/// Visit all interior uses of an OSSA lifetime.
 ///
 /// - `definingValue` dominates all uses. Only dominated phis extend
 /// the lifetime. All other phis must have a lifetime-ending outer
@@ -132,14 +135,14 @@ func computeInteriorLiveness(for definingValue: Value,
 /// begin_access) A `innerScopeHandler` callback may be used to
 /// complete inner scopes before updating liveness.
 ///
-/// InteriorUseVisitor can be used to complete (linearize) an OSSA
+/// InteriorUseWalker can be used to complete (linearize) an OSSA
 /// lifetime after transformation that invalidates OSSA.
 ///
 /// Example:
 ///
-///     %struct = struct ...
+///     %s = struct ...
 ///     %f = struct_extract %s     // defines a guaranteed value (%f)
-///     %b = begin_borrow %field
+///     %b = begin_borrow %f
 ///     %a = ref_element_addr %b
 ///     _  = address_to_pointer %a
 ///     end_borrow %b              // the only interior use of %f
@@ -631,17 +634,46 @@ extension AddressUseVisitor {
   }
 }
 
-/// Enumerate all special cases of ownership uses in a visitor
-/// API. This encourages anyone who needs to analyze ownership uses to
-/// think about all of the special cases, many of which result
-/// from phis of borrowed values. Relying on linear lifetimes, which
-/// results from running "lifetime completion", allows you to ignore
-/// those cases.
+/// For OwnershipUseVisitor API entry points that operate on a
+/// use, Isinnerlifetime indicates whether the value being used is
+/// defined by the "outer" OSSA lifetime or an inner borrow scope.
 ///
-/// To visit a value's uses:
+/// When the OwnershipUseVisitor is invoked on an outer value
+/// (visitUsesOfOuter(value:)), it visits all the uses of that value
+/// and also visits the lifetime-ending uses of any inner borrow
+/// scopes. This provides a complete set of liveness "use points":
 ///
-/// - visitUsesOfOuter(value:)
-/// - visitUsesOfInner(value:)
+///   %0 = begin_borrow %outerValue
+///   %1 = begin_borrow %0
+///   end_borrow %1        // inner "use point" of %0
+///   end_borrow %0        // outer use of %1
+///
+/// This becomes more complicated with reborrows and closures. The
+/// implementation can simply rely on IsInnerLifetime to know whether
+/// the value being used is part of the outer lifetimes vs. its inner
+/// lifetimes. This is important, for example, if the implementation
+/// wants to know if the use ends the lifetime of the outer value.
+///
+/// Visitor implementations treat inner and outer uses differently. It
+/// may, for example, assume that inner lifetimes are complete
+/// and therefore only care about the lifetime-ending uses.
+enum IsInnerLifetime {
+case outerLifetime
+case innerLifetime
+}
+
+/// Package operand ownership into a visitor API.
+///
+/// Code that relies on effect of a use on ownership of its value
+/// should conform to this visitor. This ensures correct handling for
+/// special cases involving borrow scopes and interior pointers.
+///
+/// `visitUsesOfOuter(value:)` is the main entry point.
+///
+/// `visitUsesOfInner(value:)` is called back for each inner borrow
+/// scope. The implementation may or may not decide to recurse through
+/// reborrows and nested borrow scopes, calling back to
+/// `visitUsesOfInner(value:)` as needed.
 ///
 /// Visitors need to implement:
 ///
@@ -652,14 +684,14 @@ extension AddressUseVisitor {
 ///
 /// This only visits the first level of uses. The implementation may
 /// transitively visit forwarding operations in its implementation of
-/// `visitForwarding(operand:_)` and `visitReborrow(operand:_)`,
-/// calling back to `visitUsesOfOuter(value:)` or
+/// `visitForwarding(operand:_)` and `visitReborrow(operand:_)`, which
+/// can recursively call back to `visitUsesOfOuter(value:)` or
 /// `visitUsesOfInner(value:)`.
 ///
-/// For uses that begin a borrow or access scope, this skips ahead to
-/// the end of the scope. To record incomplete or dead inner scopes
-/// (no scope-ending use on some path), the implementation must
-/// override handleInner(borrow:).
+/// For uses that begin a borrow or access scope, this correctly
+/// "skips ahead" to the end of the scope. To record incomplete or
+/// dead inner scopes (no scope-ending use on some path), the
+/// implementation must override `handleInner(borrow:)`.
 protocol OwnershipUseVisitor {
   var _context: Context { get }
 
@@ -698,18 +730,24 @@ protocol OwnershipUseVisitor {
   /// result and implement this as a fatalError.
   mutating func visitPointerEscape(use: Operand) -> WalkResult
 
-  /// Handle begin_borrow, load_borrow, store_borrow, begin_apply.
+  /// Handles any of:
   ///
-  /// Handle an inner adjacent phi where the original OSSA def is a
-  /// phi in the same block
+  /// - begin_borrow, load_borrow, store_borrow, begin_apply.
   ///
-  /// Handle a reborrow of an inner borrow scope or inner adjacent phi
+  /// - an inner adjacent phi (where the value currently being visited is an
+  /// outer adjacent phi in the same block).
+  ///
+  /// - a reborrow of an inner borrow scope or a reborrow of an inner
+  /// adjacent phi.
   ///
   /// If this returns .continueWalk, then visit(use:) will be called
-  /// on the scope ending operands.
+  /// on the scope-ending operands.
   ///
-  /// Allows the implementation to complete inner scopes before considering
-  /// their scope ending operations as uses of the outer scope.
+  /// Allows the implementation to complete an inner scope before
+  /// visiting its scope-ending operations as uses of the outer
+  /// scope. The implementation may add uses to the inner scope, but
+  /// it may not modify the use-list containing \p address or in any
+  /// outer scopes.
   mutating func handleInner(borrow: BeginBorrowValue) -> WalkResult
 
   /// Handle begin_access.
@@ -717,11 +755,11 @@ protocol OwnershipUseVisitor {
   /// If this returns .continueWalk, then visit(use:) will be called
   /// on the scope ending operands.
   ///
-  /// Allows the implementation to complete inner scopes before considering
-  /// their scope ending operations as uses of the outer scope.
-  ///
-  /// This may add uses to the inner scope, but it may not modify the use-list
-  /// containing \p address or in any outer scopes.
+  /// Allows the implementation to complete an inner scope before
+  /// visiting its scope-ending operations as uses of the outer
+  /// scope. The implementation may add uses to the inner scope, but
+  /// it may not modify the use-list containing \p address or in any
+  /// outer scopes.
   mutating func handleAccess(address: BeginAccessInst) -> WalkResult
 }
 

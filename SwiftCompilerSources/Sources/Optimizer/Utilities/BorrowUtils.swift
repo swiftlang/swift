@@ -9,6 +9,126 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// Utilities that model Ownership SSA (OSSA) borrow scopes.
+//
+// A BorrowingInstruction borrows one or more operands over a new
+// borrow scope, up to its scope-ending uses. This is typically
+// checked during a def-use walk.
+//
+//   %val = some owned value
+//   %store = store_borrow %val to %addr // borrowing instruction
+//   ...                                 // borrow scope
+//   end_borrow %store                   // scope-ending use
+//
+// A BeginBorrowValue introduces a guaranteed OSSA lifetime. It
+// begins a new borrow scope that ends at its scope-ending uses. A
+// begin-borrow value may be defined by a borrowing instruction:
+//
+//   %begin = begin_borrow %val          // %begin borrows %val
+//   ...                                 // borrow scope
+//   end_borrow %begin                   // scope-ending use
+//
+// Other kinds of BeginBorrowValues, however, like block arguments and
+// `load_borrow`, are not borrowing instructions. BeginBorrowValues
+// are typically checked during a use-def walk. Here, walking up from
+// `%forward` finds `%begin` as the introducer of its guaranteed
+// lifetime:
+//
+//   %begin = load_borrow %addr          // BeginBorrowValue
+//   %forward = struct (%begin)          // forwards a guaranteed value
+//   ...
+//   end_borrow %begin                   // scope-ending use
+//  
+// Every guaranteed OSSA value has a set of borrow introducers, each
+// of which dominates the value and introduces a borrow scope that
+// encloses all forwarded uses of the guaranteed value.
+//
+//   %1 = begin_borrow %0                // borrow introducer for %3
+//   %2 = begin_borrow %1                // borrow introducer for %3
+//   %3 = struct (%1, %2)                // forwards two guaranteed values
+//   ... all forwarded uses of %3
+//   end_borrow %1                       // scope-ending use
+//   end_borrow %2                       // scope-ending use
+//
+// Inner borrow scopes may be nested in outer borrow scopes:
+//
+//   %1 = begin_borrow %0                // borrow introducer for %2
+//   %2 = begin_borrow %1                // borrow introducer for %3
+//   %3 = struct (%2)
+//   ... all forwarded uses of %3
+//   end_borrow %2                       // scope-ending use of %2
+//   end_borrow %1                       // scope-ending use of %1
+//
+// Walking up the nested OSSA lifetimes requires iteratively querying
+// "enclosing values" until either a guaranteed function argument or
+// owned value is reached. Like a borrow introducer, an enclosing
+// value dominates all values that it encloses.
+//
+//                                Borrow Introducer    Enclosing Value
+//                                ~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~
+//   %0 = some owned value        invalid              none
+//   %1 = begin_borrow %0         %1                   %0
+//   %2 = begin_borrow %1         %2                   %1
+//   %3 = struct (%2)             %2                   %2
+//
+// The borrow introducer of a guaranteed phi is not directly
+// determined by a use-def walk because an introducer must dominate
+// all uses in its scope:
+//
+//                                Borrow Introducer    Enclosing Value
+//                                ~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~
+//                                
+//     cond_br ..., bb1, bb2      
+//   bb1:                         
+//     %2 = begin_borrow %0       %2                   %0
+//     %3 = struct (%2)           %2                   %2
+//     br bb3(%2, %3)             
+//   bb2:                         
+//     %6 = begin_borrow %0       %6                   %0
+//     %7 = struct (%6)           %6                   %6
+//     br bb3(%6, %7)             
+//   bb3(%reborrow: @guaranteed,  %reborrow            %0
+//       %phi: @guaranteed):      %phi                 %reborrow
+//  
+// `%reborrow` is an outer-adjacent phi to `%phi` because it encloses
+// `%phi`. `%phi` is an inner-adjacent phi to `%reborrow` because its
+// uses keep `%reborrow` alive. An outer-adjacent phi is either an
+// owned value or a reborrow. An inner-adjacent phi is either a
+// reborrow or a guaranteed forwarding phi. Here is an example of an
+// owned outer-adjacent phi with an inner-adjacent reborrow:
+// 
+//                                Borrow Introducer    Enclosing Value
+//                                ~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~
+//                                
+//     cond_br ..., bb1, bb2      
+//   bb1:                         
+//     %1 = owned value           
+//     %2 = begin_borrow %0       %2                   %1
+//     br bb3(%1, %2)             
+//   bb2:                         
+//     %5 = owned value           
+//     %6 = begin_borrow %5       %6                   %5
+//     br bb3(%5, %6)             
+//   bb3(%phi: @owned,            invalid              %0
+//       %reborrow: @guaranteed): %reborrow            %phi
+//  
+// In OSSA, each owned value defines a separate lifetime. It is
+// consumed on all paths by a direct use. Owned lifetimes can,
+// however, be nested within a borrow scope. In this case, finding the
+// scope-ending uses requires traversing owned forwarding
+// instructions:
+//
+//   %1 = partial_apply %f(%0) // borrowing instruction borrows %0 and produces
+//                             // an owned closure value.
+//   %2 = struct (%1)          // end owned lifetime %1, begin owned lifetime %2
+//   destroy_value %2          // end owned lifetime %2, scope-ending use of %1
+//
+//
+// TODO: These utilities should be integrated with OSSA SIL verification and
+// guaranteed to be compelete (produce known results for all legal SIL
+// patterns).
+// ===----------------------------------------------------------------------===//
 
 import SIL
 
