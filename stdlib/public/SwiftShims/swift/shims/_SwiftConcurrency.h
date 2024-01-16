@@ -31,9 +31,9 @@ typedef struct _SwiftContext {
 #endif
 
 #ifdef __cplusplus
-extern "C" [[noreturn]]
+extern "C"
 #endif
-void exit(int);
+[[noreturn]] void exit(int);
 
 #define EXIT_SUCCESS 0
 
