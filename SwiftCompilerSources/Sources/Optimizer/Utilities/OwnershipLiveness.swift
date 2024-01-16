@@ -95,7 +95,7 @@ func computeInteriorLiveness(for definingValue: Value,
 
   var range = InstructionRange(for: definingValue, context)
 
-  var visitor = InteriorUseVisitor(definingValue: definingValue, context) {
+  var visitor = InteriorUseWalker(definingValue: definingValue, context) {
     range.insert($0.instruction)
     return .continueWalk
   }
@@ -159,17 +159,18 @@ func computeInteriorLiveness(for definingValue: Value,
 ///
 /// TODO: Change the operandOwnership of MarkDependenceInst base operand.
 /// It should be a borrowing operand, not a pointer escape.
-struct InteriorUseVisitor: OwnershipUseVisitor, AddressUseVisitor {
+struct InteriorUseWalker: OwnershipUseVisitor, AddressUseVisitor {
   let context: FunctionPassContext
   var _context: Context { context }
 
-  let function: Function
   let definingValue: Value
   let useVisitor: (Operand) -> WalkResult
 
   var innerScopeHandler: InnerScopeHandler? = nil
 
   var unenclosedPhis: [Phi] = []
+
+  var function: Function { definingValue.parentFunction }
 
   /// If any interior pointer may escape, then record the first instance
   /// here. This immediately aborts the walk, so further instances are
@@ -197,7 +198,6 @@ struct InteriorUseVisitor: OwnershipUseVisitor, AddressUseVisitor {
     visitor: @escaping (Operand) -> WalkResult) {
     assert(!definingValue.type.isAddress, "address values have no ownership")
     self.context = context
-    self.function = definingValue.parentFunction
     self.definingValue = definingValue
     self.useVisitor = visitor
     self.visited = ValueSet(context)
@@ -312,18 +312,22 @@ struct InteriorUseVisitor: OwnershipUseVisitor, AddressUseVisitor {
   }
 
   func handleInner(borrow: BeginBorrowValue) -> WalkResult  {
-    guard let innerScopeHandler else { return .continueWalk }
+    guard let innerScopeHandler else {
+      return .continueWalk
+    }
     return innerScopeHandler(borrow.value)
   }
 
   func handleAccess(address: BeginAccessInst) -> WalkResult {
-    guard let innerScopeHandler else { return .continueWalk }
+    guard let innerScopeHandler else {
+      return .continueWalk
+    }
     return innerScopeHandler(address)
   }
 }
 
 // Helpers to walk down forwarding operations.
-extension InteriorUseVisitor {
+extension InteriorUseWalker {
   // Walk down forwarding operands
   private mutating func walkDown(operand: Operand) -> WalkResult {
     // Record all uses
@@ -345,10 +349,12 @@ extension InteriorUseVisitor {
   }
 
   private mutating func walkDownUses(of value: Value) -> WalkResult {
-    guard value.ownership.hasLifetime else { return .continueWalk }
-
-    guard visited.insert(value) else { return .continueWalk }
-
+    guard value.ownership.hasLifetime else {
+      return .continueWalk
+    }
+    guard visited.insert(value) else {
+      return .continueWalk
+    }
     switch value.ownership {
     case .owned:
       return visitUsesOfInner(value: value)
@@ -985,7 +991,7 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   var range = InstructionRange(for: value, context)
   defer { range.deinitialize() }
 
-  var visitor = InteriorUseVisitor(definingValue: value, context) {
+  var visitor = InteriorUseWalker(definingValue: value, context) {
     range.insert($0.instruction)
     return .continueWalk
   }
@@ -1047,5 +1053,5 @@ let addressUseTest = FunctionTest("address_use_test") {
   print(function)
   print("Uses of address: \(address)")
   var printer = AddressUsePrinter(_context: context)
-  printer.walkDownUses(ofAddress: address)
+  _ = printer.walkDownUses(ofAddress: address)
 }

@@ -145,14 +145,15 @@ func gatherLifetimeIntroducers(for value: Value, _ context: Context) -> [Value] 
     introducers.append($0)
     return .continueWalk
   }
-  defer { walker.visitedValues.deinitialize() }
+  defer { walker.deinitialize() }
   _ = walker.walkUp(value: value)
   return introducers
 }
 
 // TODO: visitor can be nonescaping when we have borrowed properties.
 func visitLifetimeIntroducers(for value: Value, _ context: Context,
-  visitor: @escaping (Value) -> WalkResult) -> WalkResult {
+                              visitor: @escaping (Value) -> WalkResult)
+  -> WalkResult {
   var walker = VisitLifetimeIntroducers(context, visitor: visitor)
   defer { walker.visitedValues.deinitialize() }
   return walker.walkUp(value: value)
@@ -167,6 +168,8 @@ private struct VisitLifetimeIntroducers : ForwardingUseDefWalker {
     self.visitedValues = ValueSet(context)
   }
   
+  mutating func deinitialize() { visitedValues.deinitialize() }
+
   mutating func needWalk(for value: Value) -> Bool {
     visitedValues.insert(value)
   }
