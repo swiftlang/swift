@@ -7,6 +7,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://120430239
+// UNSUPPORTED: CPU=arm64e
+
 import Dispatch
 import StdlibUnittest
 import _Concurrency
