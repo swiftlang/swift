@@ -1171,7 +1171,10 @@ swift_dynamicCastObjCClassImpl(const void *object,
   if (object == nullptr)
     return nullptr;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreceiver-forward-class"
   if ([id_const_cast(object) isKindOfClass:[__SwiftValue class]]) {
+#pragma clang diagnostic pop
     // Source is a `__SwiftValue` container
     // Unwrap, then use the most general casting machine to do the heavy lifting
     auto typeValue = getValueFromSwiftValue(reinterpret_cast<__SwiftValue *>(object));
