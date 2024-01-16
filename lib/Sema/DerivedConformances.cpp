@@ -184,8 +184,8 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC->getParentModule())) {
+    if (!DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
+                                                 protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -839,9 +839,8 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC->getParentModule())
-              .isInvalid()) {
+      if (DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
+                                                  protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }

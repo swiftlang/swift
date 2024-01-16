@@ -4324,8 +4324,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // a member that could in turn satisfy *this* requirement.
         auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
         auto conformance =
-            TypeChecker::conformsToProtocol(Adoptee, derivableProto,
-                                            DC->getParentModule());
+            DC->getParentModule()->checkConformance(Adoptee, derivableProto);
         if (conformance.isConcrete()) {
           (void)conformance.getConcrete()->getWitnessDecl(derivable);
         }
@@ -5762,8 +5761,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
       auto result =
           (skipConditionalRequirements
                ? M->lookupConformance(superclass, Proto, /*allowMissing=*/false)
-               : TypeChecker::conformsToProtocol(superclass, Proto, M,
-                                                 /*allowMissing=*/false));
+               : M->checkConformance(superclass, Proto, /*allowMissing=*/false));
       if (result) {
         return result;
       }
@@ -5788,33 +5786,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
   // For non-existential types, this is equivalent to checking conformance.
   return (skipConditionalRequirements
           ? M->lookupConformance(T, Proto, allowMissing)
-          : TypeChecker::conformsToProtocol(T, Proto, M, allowMissing));
-}
-
-ProtocolConformanceRef
-TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
-                                bool allowMissing) {
-  // Look up conformance in the module.
-  auto lookupResult = M->lookupConformance(T, Proto, allowMissing);
-  if (lookupResult.isInvalid()) {
-    return ProtocolConformanceRef::forInvalid();
-  }
-
-  auto condReqs = lookupResult.getConditionalRequirements();
-
-  // If we have a conditional requirements that we need to check, do so now.
-  if (!condReqs.empty()) {
-    switch (checkRequirements(condReqs)) {
-    case CheckRequirementsResult::Success:
-      break;
-
-    case CheckRequirementsResult::RequirementFailure:
-    case CheckRequirementsResult::SubstitutionFailure:
-      return ProtocolConformanceRef::forInvalid();
-    }
-  }
-
-  return lookupResult;
+          : M->checkConformance(T, Proto, allowMissing));
 }
 
 bool TypeChecker::conformsToKnownProtocol(
@@ -5822,8 +5794,7 @@ bool TypeChecker::conformsToKnownProtocol(
     bool allowMissing) {
   if (auto *proto =
           TypeChecker::getProtocol(module->getASTContext(), SourceLoc(), protocol))
-    return (bool)TypeChecker::conformsToProtocol(
-        type, proto, module, allowMissing);
+    return (bool) module->checkConformance(type, proto, allowMissing);
   return false;
 }
 
@@ -5864,15 +5835,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   if (type->isKnownStdlibCollectionType())
     return !M->lookupConformance(type, Proto, /*allowMissing=*/true)
                 .isInvalid();
-  return !conformsToProtocol(type, Proto, M).isInvalid();
-}
-
-/// Exposes TypeChecker functionality for querying protocol conformance.
-/// Returns a valid ProtocolConformanceRef only if all conditional
-/// requirements are successfully resolved.
-ProtocolConformanceRef
-ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
-  return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this);
+  return !M->checkConformance(type, Proto).isInvalid();
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
@@ -7324,8 +7287,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoContext(defaultAssocType);
     auto requirementProto = req.getProtocolDecl();
-    auto conformance = conformsToProtocol(defaultAssocTypeInContext,
-                                          requirementProto, module);
+    auto conformance = module->checkConformance(defaultAssocTypeInContext,
+                                                requirementProto);
     if (conformance.isInvalid()) {
       // Diagnose the lack of a conformance. This is potentially an ABI
       // incompatibility.

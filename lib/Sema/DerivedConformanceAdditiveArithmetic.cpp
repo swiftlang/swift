@@ -77,8 +77,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, proto,
-                                                 DC->getParentModule());
+    return (bool) DC->getParentModule()->checkConformance(varType, proto);
   });
 }
 

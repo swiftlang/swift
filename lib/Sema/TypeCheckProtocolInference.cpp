@@ -344,8 +344,7 @@ static bool isExtensionUsableForInference(const ExtensionDecl *extension,
   auto *module = conformanceDC->getParentModule();
   auto checkConformance = [&](ProtocolDecl *proto) {
     auto typeInContext = conformanceDC->mapTypeIntoContext(conformance->getType());
-    auto otherConf = TypeChecker::conformsToProtocol(
-        typeInContext, proto, module);
+    auto otherConf = module->checkConformance(typeInContext, proto);
     return !otherConf.isInvalid();
   };
 

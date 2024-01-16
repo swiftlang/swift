@@ -799,17 +799,6 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
                                         bool skipConditionalRequirements=false,
                                         bool allowMissing=false);
 
-/// Determine whether the given type conforms to the given protocol.
-///
-/// Unlike subTypeOfProtocol(), this will return false for existentials of
-/// non-self conforming protocols.
-///
-/// \returns The protocol conformance, if \c T conforms to the
-/// protocol \c Proto, or \c None.
-ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          ModuleDecl *M,
-                                          bool allowMissing = true);
-
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
                              ModuleDecl *module, bool allowMissing = true);

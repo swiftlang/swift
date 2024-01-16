@@ -1396,8 +1396,8 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    auto ref = TypeChecker::conformsToProtocol(
-        superclassType, decodableProto, classDecl->getParentModule());
+    auto ref = classDecl->getParentModule()->checkConformance(
+        superclassType, decodableProto);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1425,8 +1425,8 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      auto ref = TypeChecker::conformsToProtocol(
-          superclassType, encodableProto, classDecl->getParentModule());
+      auto ref = classDecl->getParentModule()->checkConformance(
+          superclassType, encodableProto);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
@@ -1653,8 +1653,8 @@ static void diagnoseRetroactiveConformances(
     proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
 
       // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = TypeChecker::conformsToProtocol(
-          extendedType, decl, ext->getParentModule());
+      auto conformanceRef = ext->getParentModule()->checkConformance(
+          extendedType, decl);
       if (!conformanceRef.isConcrete()) {
 
         return TypeWalker::Action::Continue;

@@ -823,10 +823,7 @@ public:
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results) const;
 
-  /// Look for the conformance of the given type to the given protocol.
-  ///
-  /// This routine determines whether the given \c type conforms to the given
-  /// \c protocol.
+  /// Global conformance lookup, does not check conditional requirements.
   ///
   /// \param type The type for which we are computing conformance.
   ///
@@ -836,22 +833,32 @@ public:
   /// might include "missing" conformances, which are synthesized for some
   /// protocols as an error recovery mechanism.
   ///
-  /// \returns The result of the conformance search, which will be
-  /// None if the type does not conform to the protocol or contain a
-  /// ProtocolConformanceRef if it does conform.
+  /// \returns An invalid conformance if the search failed, otherwise an
+  /// abstract, concrete or pack conformance, depending on the lookup type.
   ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
                                            bool allowMissing = false);
+
+  /// Global conformance lookup, checks conditional requirements.
+  ///
+  /// \param type The type for which we are computing conformance. Must not
+  /// contain type parameters.
+  ///
+  /// \param protocol The protocol to which we are computing conformance.
+  ///
+  /// \param allowMissing When \c true, the resulting conformance reference
+  /// might include "missing" conformances, which are synthesized for some
+  /// protocols as an error recovery mechanism.
+  ///
+  /// \returns An invalid conformance if the search failed, otherwise an
+  /// abstract, concrete or pack conformance, depending on the lookup type.
+  ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
+                                          // Note: different default than above
+                                          bool allowMissing = true);
 
   /// Look for the conformance of the given existential type to the given
   /// protocol.
   ProtocolConformanceRef lookupExistentialConformance(Type type,
                                                       ProtocolDecl *protocol);
-
-  /// Exposes TypeChecker functionality for querying protocol conformance.
-  /// Returns a valid ProtocolConformanceRef only if all conditional
-  /// requirements are successfully resolved.
-  ProtocolConformanceRef conformsToProtocol(Type sourceTy,
-                                            ProtocolDecl *targetProtocol);
 
   /// Collect the conformances of \c fromType to each of the protocols of an
   /// existential type's layout.

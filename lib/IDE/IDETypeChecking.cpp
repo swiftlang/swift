@@ -689,7 +689,7 @@ class ExpressionTypeCollector: public SourceEntityWalker {
 
     // Collecting protocols conformed by this expressions that are in the list.
     for (auto Proto: InterestedProtocols) {
-      if (Module.conformsToProtocol(E->getType(), Proto.first)) {
+      if (Module.checkConformance(E->getType(), Proto.first)) {
         Conformances.push_back(Proto.second);
       }
     }
