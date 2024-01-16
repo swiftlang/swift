@@ -740,14 +740,14 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // requirements on the base class's own generic parameters that are not
     // satisfied by the derived class. In this case, we don't want to inherit
     // this initializer; there's no way to call it on the derived class.
-    auto checkResult = TypeChecker::checkGenericArguments(
+    auto checkResult = checkRequirements(
         classDecl->getParentModule(),
         superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
           auto substType = type.subst(subMap);
           return GenericEnvironment::mapTypeIntoContext(genericEnv, substType);
         });
-    if (checkResult != CheckGenericArgumentsResult::Success)
+    if (checkResult != CheckRequirementsResult::Success)
       return nullptr;
   }
 

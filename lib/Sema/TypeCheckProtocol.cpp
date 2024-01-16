@@ -5138,13 +5138,13 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
       module, reqSig, QuerySubstitutionMap{substitutions});
-  switch (result) {
-  case CheckGenericArgumentsResult::Success:
+  switch (result.getKind()) {
+  case CheckRequirementsResult::Success:
     // Go on to check exportability.
     break;
 
-  case CheckGenericArgumentsResult::RequirementFailure:
-  case CheckGenericArgumentsResult::SubstitutionFailure:
+  case CheckRequirementsResult::RequirementFailure:
+  case CheckRequirementsResult::SubstitutionFailure:
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
@@ -5152,7 +5152,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
                      Adoptee,
                      Proto->getDeclaredInterfaceType());
 
-      if (result == CheckGenericArgumentsResult::RequirementFailure) {
+      if (result.getKind() == CheckRequirementsResult::RequirementFailure) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), Loc, Loc,
             proto->getDeclaredInterfaceType(),
@@ -5795,27 +5795,21 @@ ProtocolConformanceRef
 TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
                                 bool allowMissing) {
   // Look up conformance in the module.
-  auto lookupResult = M->lookupConformance(
-      T, Proto, allowMissing);
-
+  auto lookupResult = M->lookupConformance(T, Proto, allowMissing);
   if (lookupResult.isInvalid()) {
     return ProtocolConformanceRef::forInvalid();
   }
 
-  auto condReqs = lookupResult.getConditionalRequirementsIfAvailable();
-  assert(condReqs &&
-         "unhandled recursion: missing conditional requirements when they're "
-         "required");
+  auto condReqs = lookupResult.getConditionalRequirements();
 
   // If we have a conditional requirements that we need to check, do so now.
-  if (!condReqs->empty()) {
-    auto conditionalCheckResult = checkGenericArguments(*condReqs);
-    switch (conditionalCheckResult) {
-    case CheckGenericArgumentsResult::Success:
+  if (!condReqs.empty()) {
+    switch (checkRequirements(condReqs)) {
+    case CheckRequirementsResult::Success:
       break;
 
-    case CheckGenericArgumentsResult::RequirementFailure:
-    case CheckGenericArgumentsResult::SubstitutionFailure:
+    case CheckRequirementsResult::RequirementFailure:
+    case CheckRequirementsResult::SubstitutionFailure:
       return ProtocolConformanceRef::forInvalid();
     }
   }

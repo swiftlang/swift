@@ -1353,17 +1353,17 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   sanitizeProtocolRequirements(proto, requirements,
                                sanitizedRequirements);
 
-  switch (TypeChecker::checkGenericArguments(
+  switch (checkRequirements(
       dc->getParentModule(), sanitizedRequirements,
       QuerySubstitutionMap{substitutions}, options)) {
-  case CheckGenericArgumentsResult::RequirementFailure:
+  case CheckRequirementsResult::RequirementFailure:
     ++NumSolutionStatesFailedCheck;
     LLVM_DEBUG(llvm::dbgs() << std::string(valueWitnesses.size(), '+')
                << "+ Requirement failure\n";);
     return true;
 
-  case CheckGenericArgumentsResult::Success:
-  case CheckGenericArgumentsResult::SubstitutionFailure:
+  case CheckRequirementsResult::Success:
+  case CheckRequirementsResult::SubstitutionFailure:
     break;
   }
 
@@ -1401,14 +1401,14 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   auto subs = typeInContext->getContextSubstitutions(ext);
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
-  switch (TypeChecker::checkGenericArguments(
+  switch (checkRequirements(
       dc->getParentModule(), ext->getGenericSignature().getRequirements(),
       QueryTypeSubstitutionMap{subs}, options)) {
-  case CheckGenericArgumentsResult::Success:
-  case CheckGenericArgumentsResult::SubstitutionFailure:
+  case CheckRequirementsResult::Success:
+  case CheckRequirementsResult::SubstitutionFailure:
     return false;
 
-  case CheckGenericArgumentsResult::RequirementFailure:
+  case CheckRequirementsResult::RequirementFailure:
     return true;
   }
   llvm_unreachable("unhandled result");

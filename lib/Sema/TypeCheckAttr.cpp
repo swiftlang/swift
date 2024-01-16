@@ -3739,8 +3739,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                               nominalTypeDecl);
     QuerySubstitutionMap getSubstitution{baseMap};
 
-    // Use invalid 'SourceLoc's to suppress diagnostics.
-    auto result = TypeChecker::checkGenericArguments(
+    auto result = checkRequirements(
           module, genericSignature.getRequirements(),
           [&](SubstitutableType *type) -> Type {
             if (type->isEqual(genericParamType))
@@ -3749,7 +3748,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
             return getSubstitution(type);
           });
 
-    if (result != CheckGenericArgumentsResult::Success) {
+    if (result != CheckRequirementsResult::Success) {
       unviable.push_back(
           std::make_tuple(init, UnviableReason::UnsatisfiedRequirements,
                           genericParamType));
