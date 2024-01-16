@@ -1381,7 +1381,12 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
       return unlock();
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
+    // This _should_ be statically unreachable, but we leave it in as a
+    // safeguard in case the control flow above changes.
     swift_unreachable("expected to early return from when handling offer of last task in group");
+#pragma clang diagnostic pop
   }
 
   assert(!hadErrorResult && "only successfully completed tasks can reach here");
