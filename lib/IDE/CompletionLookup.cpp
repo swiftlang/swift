@@ -637,6 +637,8 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
     //     τ_1_0(U) => U }
     auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
 
+    // FIXME: The below should use substitution map substitution.
+
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
     auto keyPathResultTy =
