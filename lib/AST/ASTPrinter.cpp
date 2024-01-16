@@ -5384,6 +5384,9 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         case BuiltinMacroKind::ExternalMacro:
           Printer << "ExternalMacro";
           break;
+        case BuiltinMacroKind::IsolationMacro:
+          Printer << "IsolationMacro";
+          break;
         }
         break;
 
@@ -5651,6 +5654,12 @@ void PrintAST::visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
 }
 
 void PrintAST::visitForceValueExpr(ForceValueExpr *expr) {
+}
+
+void PrintAST::visitCurrentContextIsolationExpr(
+    CurrentContextIsolationExpr *expr) {
+  if (auto actor = expr->getActor())
+    visit(actor);
 }
 
 void PrintAST::visitKeyPathDotExpr(KeyPathDotExpr *expr) {

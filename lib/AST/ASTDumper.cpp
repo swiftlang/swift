@@ -3148,6 +3148,15 @@ public:
     printFoot();
   }
 
+  void visitCurrentContextIsolationExpr(
+      CurrentContextIsolationExpr *E, StringRef label) {
+    printCommon(E, "current_context_isolation_expr", label);
+    if (auto actor = E->getActor())
+      printRec(actor);
+
+    printFoot();
+  }
+
   void visitKeyPathDotExpr(KeyPathDotExpr *E, StringRef label) {
     printCommon(E, "key_path_dot_expr", label);
     printFoot();

@@ -1492,7 +1492,9 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   /// or the new spelling `#externalMacro(module: "Module", type: "Type")`.
   BridgedExternalMacro,
   /// The builtin definition for "externalMacro".
-  BridgedBuiltinExternalMacro
+  BridgedBuiltinExternalMacro,
+  /// The builtin definition for the "isolation" macro.
+  BridgedBuiltinIsolationMacro,
 };
 
 SWIFT_NAME("BridgedGenericParamList.createParsed(_:leftAngleLoc:parameters:"

@@ -5153,6 +5153,10 @@ public:
         builtinKind = BuiltinMacroKind::ExternalMacro;
         break;
 
+      case 2:
+        builtinKind = BuiltinMacroKind::IsolationMacro;
+        break;
+          
       default:
         break;
       }

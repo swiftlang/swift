@@ -3914,6 +3914,12 @@ namespace {
       return kpTy;
     }
 
+    Type visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
+      auto actorProto = CS.getASTContext().getProtocol(
+          KnownProtocolKind::AnyActor);
+      return OptionalType::get(actorProto->getDeclaredExistentialType());
+    }
+
     Type visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }

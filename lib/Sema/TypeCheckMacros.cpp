@@ -188,6 +188,9 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   case BridgedBuiltinExternalMacro:
     return MacroDefinition::forBuiltin(BuiltinMacroKind::ExternalMacro);
+
+  case BridgedBuiltinIsolationMacro:
+    return MacroDefinition::forBuiltin(BuiltinMacroKind::IsolationMacro);
   }
 
   // Type-check the macro expansion.
@@ -1072,7 +1075,21 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     case BuiltinMacroKind::ExternalMacro:
       ctx.Diags.diagnose(loc, diag::external_macro_outside_macro_definition);
       return nullptr;
+
+    case BuiltinMacroKind::IsolationMacro:
+      if (!ctx.LangOpts.hasFeature(Feature::OptionalIsolatedParameters)) {
+        ctx.Diags.diagnose(loc, diag::isolation_macro_experimental);
+      }
+
+      // Create a buffer full of scratch space; this will be populated
+      // much later.
+      std::string scratchSpace(128, ' ');
+      evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+          scratchSpace,
+          adjustMacroExpansionBufferName(*discriminator));
+      break;
     }
+    break;
   }
 
   case MacroDefinition::Kind::Expanded: {
@@ -1167,26 +1184,53 @@ llvm::Optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   auto macroBufferID = *macroSourceFile->getBufferID();
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
 
-  // Retrieve the parsed expression from the list of top-level items.
-  auto topLevelItems = macroSourceFile->getTopLevelItems();
+  // Handle builtin macro definitions by producing the expression we
+  // need without parsing the buffer.
+  auto expandedType = mee->getType();
   Expr *expandedExpr = nullptr;
-  if (topLevelItems.size() != 1) {
-    ctx.Diags.diagnose(
-        macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
-    return macroBufferID;
+  auto macro = cast<MacroDecl>(mee->getMacroRef().getDecl());
+  switch (auto definition = macro->getDefinition()) {
+  case MacroDefinition::Kind::Expanded:
+  case MacroDefinition::Kind::External:
+  case MacroDefinition::Kind::Invalid:
+  case MacroDefinition::Kind::Undefined:
+    break;
+
+  case MacroDefinition::Kind::Builtin:
+    switch (definition.getBuiltinKind()) {
+    case BuiltinMacroKind::ExternalMacro:
+      break;
+
+    case BuiltinMacroKind::IsolationMacro:
+      expandedExpr = new (ctx) CurrentContextIsolationExpr(
+          macroBufferRange.getStart(), expandedType);
+      break;
+    }
   }
 
-  auto codeItem = topLevelItems.front();
-  if (auto *expr = codeItem.dyn_cast<Expr *>())
-    expandedExpr = expr;
+  if (!expandedExpr) {
+    // Parse the macro source file and retrieve the parsed expression
+    // from the list of top-level items.
+    auto topLevelItems = macroSourceFile->getTopLevelItems();
+    if (topLevelItems.size() != 1) {
+      ctx.Diags.diagnose(
+          macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
+      return macroBufferID;
+    }
+
+    auto codeItem = topLevelItems.front();
+    if (auto *expr = codeItem.dyn_cast<Expr *>())
+      expandedExpr = expr;
+  } else {
+    // We produced the expanded expression via a builtin macro above,
+    // so there is nothing more we need to do.
+  }
 
   if (!expandedExpr) {
     ctx.Diags.diagnose(
         macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
     return macroBufferID;
   }
-
-  auto expandedType = mee->getType();
 
   // Type-check the expanded expression.
   // FIXME: Would like to pass through type checking options like "discarded"
@@ -1346,6 +1390,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
+    case BuiltinMacroKind::IsolationMacro:
       // FIXME: Error here.
       return nullptr;
     }

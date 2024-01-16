@@ -5362,6 +5362,11 @@ namespace {
         buildKeyPathOptionalForceComponent(components);
     }
 
+    Expr *visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
+      E->setType(simplifyType(cs.getType(E)));
+      return E;
+    }
+
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }

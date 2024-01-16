@@ -5552,6 +5552,8 @@ ERROR(isolated_parameter_global_actor_type,none,
 ERROR(isolated_parameter_combined_nonisolated,none,
       "%0 with 'isolated' parameter cannot be 'nonisolated'",
       (DescriptiveDeclKind))
+ERROR(isolation_macro_experimental,none,
+      "#isolation macro is experimental", ())
 
 NOTE(in_derived_conformance, none,
      "in derived conformance to %0",

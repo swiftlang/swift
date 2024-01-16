@@ -1315,6 +1315,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
+    if (auto actor = E->getActor()) {
+      if (auto newActor = doIt(actor))
+        E->setActor(newActor);
+      else
+        return nullptr;
+    }
+
+    return E;
+  }
+
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
