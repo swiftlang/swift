@@ -34,7 +34,9 @@ public struct Unmanaged<Instance: AnyObject> {
   public static func fromOpaque(
     @_nonEphemeral _ value: UnsafeRawPointer
   ) -> Unmanaged {
-    // NOTE: This function does NOT go through the init(_private:) initializer
+    // NOTE: `value` is allowed to be a dangling pointer, so 
+    // this function must not ever try to dereference it. For
+    // example, it must NOT go through the init(_private:) initializer
     // because it requires us to materialize a strong reference to 'Instance'.
     // This materialization is enough to convince the compiler to add
     // retain/releases which we want to avoid for the opaque pointer functions.
