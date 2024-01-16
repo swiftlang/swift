@@ -80,13 +80,17 @@ UnmanagedTests.test("Opaque avoid retain/release") {
   // pointer. This test's expectEqual is kind of bogus, we're just checking that
   // it doesn't crash.
 
-  let ref = UnsafeMutablePointer<Int>(capacity: 1)
-  let unmanaged = Unmanaged.fromOpaque(UnsafeRawPointer(ref))
+  // Create a dangling pointer, usually to unmapped memory.
+  let ref = UnsafeRawPointer(bitPattern: 1)!
+  // Turn it into a dangling unmanaged reference.
+  // We expect this not to crash, as this operation isn't 
+  // supposed to dereference the pointer in any way.
+  let unmanaged = Unmanaged.fromOpaque(ref)
+  // Similarly, converting the unmanaged reference back to a 
+  // pointer should not ever try to dereference it either.
   let ref2 = unmanaged.toOpaque()
-
+  // ...and we must get back the same pointer.
   expectEqual(ref, ref2)
-
-  ref.deallocate()
 }
 
 runAllTests()
