@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend -Onone -disable-availability-checking -emit-ir -primary-file %s -enable-pack-metadata-stack-promotion=false -enable-pack-metadata-stack-promotion=true -Xllvm -sil-print-after=pack-metadata-marker-inserter 2>&1 | %FileCheck %s --check-prefixes CHECK-SIL
 // RUN: %target-swift-frontend -Onone -disable-availability-checking -emit-ir -primary-file %s -enable-pack-metadata-stack-promotion=false -enable-pack-metadata-stack-promotion=true | %IRGenFileCheck %s --check-prefixes CHECK-LLVM
 
-// rdar://121028415
-// UNSUPPORTED: CPU=arm64e
-
 public struct G<each T> {
   var pack: (repeat each T)
 }
@@ -75,7 +72,8 @@ public func consume2S<T>(_: consuming S<T>, _: consuming S<T>) {}
 // CHECK-LLVM:         [[S_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[S_METADATA_RESPONSE]]
 // CHECK-LLVM:         [[S_VWT_ADDR:%[^,]+]] = getelementptr inbounds ptr, ptr [[S_METADATA]], [[INT]] -1
 // CHECK-LLVM:         [[S_VWT:%[^,]+]] = load ptr, ptr [[S_VWT_ADDR]]
-// CHECK-LLVM:         [[S_SIZE_ADDR:%[^,]+]] = getelementptr inbounds %swift.vwtable, ptr [[S_VWT]]
+// CHECK-LLVM:         [[S_SIZE_ADDR:%[^,]+]] = getelementptr inbounds %swift.vwtable, ptr 
+//  HECK-LLVM-SAME:        [[S_VWT]]
 // CHECK-LLVM:         [[S_SIZE:%[^,]+]] = load [[INT]], ptr [[S_SIZE_ADDR]]
 // CHECK-LLVM:         [[COPY_1_ADDR:%[^,]+]] = alloca i8, [[INT]] [[S_SIZE]]
 // CHECK-LLVM:         call void @llvm.lifetime.start.p0(
