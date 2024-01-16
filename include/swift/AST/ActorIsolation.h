@@ -39,9 +39,6 @@ class AbstractClosureExpr;
 /// to avoid having to include Types.h.
 bool areTypesEqual(Type type1, Type type2);
 
-/// Determine whether the given type is suitable as a concurrent value type.
-bool isSendableType(ModuleDecl *module, Type type);
-
 /// Determines if the 'let' can be read from anywhere within the given module,
 /// regardless of the isolation or async-ness of the context in which
 /// the var is read.

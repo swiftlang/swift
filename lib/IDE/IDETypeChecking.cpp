@@ -52,7 +52,9 @@ swift::getTopLevelDeclsForDisplay(ModuleDecl *M,
           !accessScope.isPublic() && !accessScope.isPackage())
         continue;
 
-      (void)swift::isSendableType(M, NTD->getDeclaredInterfaceType());
+      auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+      if (proto)
+        (void) M->lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 

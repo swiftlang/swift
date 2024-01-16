@@ -361,7 +361,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       auto type = var->getTypeInContext();
       auto isolation = getActorIsolation(var);
       if (isolation.isGlobalActor()) {
-        if (!isSendableType(decl->getModuleContext(), type) ||
+        if (!type->isSendableType() ||
             var->getInitializerIsolation().isGlobalActor()) {
           // If different isolated stored properties require different
           // global actors, it is impossible to initialize this type.

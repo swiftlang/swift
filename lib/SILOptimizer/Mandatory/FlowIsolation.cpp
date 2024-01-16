@@ -499,7 +499,7 @@ static bool accessIsConcurrencySafe(ModuleDecl *module,
 
   // must be accessible from nonisolated and Sendable
   return isLetAccessibleAnywhere(module, var)
-      && isSendableType(module, var->getTypeInContext());
+      && var->getTypeInContext()->isSendableType();
 }
 
 /// \returns true iff the ref_element_addr instruction is only used
@@ -517,11 +517,10 @@ static bool onlyDeinitAccess(RefElementAddrInst *inst) {
 /// diagnostic if it is not Sendable. The diagnostic assumes that the access
 /// is happening in a deinit that uses flow-isolation.
 /// \returns true iff a diagnostic was emitted for this reference.
-static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
-                                          RefElementAddrInst *inst) {
+static bool diagnoseNonSendableFromDeinit(RefElementAddrInst *inst) {
   VarDecl *var = inst->getField();
   Type ty = var->getTypeInContext();
-  DeclContext* dc = inst->getFunction()->getDeclContext();
+  DeclContext *dc = inst->getFunction()->getDeclContext();
 
 // FIXME: we should emit diagnostics in other modes using:
 //
@@ -534,7 +533,7 @@ static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
       != StrictConcurrency::Complete)
       return false;
 
-  if (isSendableType(module, ty))
+  if (ty->isSendableType())
     return false;
 
   auto &diag = var->getASTContext().Diags;
@@ -657,7 +656,7 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
           continue;
 
         // emit a diagnostic and skip if it's non-sendable in a deinit
-        if (forDeinit && diagnoseNonSendableFromDeinit(module, refInst))
+        if (forDeinit && diagnoseNonSendableFromDeinit(refInst))
           continue;
 
         markPropertyUse(user);
