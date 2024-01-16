@@ -6295,6 +6295,9 @@ BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
   if (auto *proto = getProtocol(KnownProtocolKind::Escapable))
     buildFakeExtension(proto);
 
+  if (auto *proto = getProtocol(KnownProtocolKind::BitwiseCopyable))
+    buildFakeExtension(proto);
+
   return result;
 }
 

@@ -7582,6 +7582,24 @@ NOTE(add_explicit_protocol_for_conformance,none,
 ERROR(escapable_requires_feature_flag,none,
       "type '~Escapable' requires -enable-experimental-feature NonescapableTypes",
       ())
+ERROR(non_bitwise_copyable_type_class,none,
+      "class cannot conform to 'BitwiseCopyable'", ())
+ERROR(non_bitwise_copyable_type_member,none,
+      "%select{stored property %2|associated value %2}1 of "
+      "'BitwiseCopyable'-conforming %kind3 has non-bitwise-copyable type %0",
+      (Type, bool, DeclName, const ValueDecl *))
+NOTE(non_bitwise_copyable_nominal,none,
+     "%kind0 does not conform to the 'BitwiseCopyable' protocol",
+      (const ValueDecl *))
+NOTE(non_bitwise_copyable_function_type,none,
+      "a function type must be marked '@convention(thin)' or '@convention(c)' to be bitwise copyable",
+      ())
+NOTE(add_nominal_bitwise_copyable_conformance,none,
+     "consider making %kind0 conform to the 'BitwiseCopyable' protocol",
+     (const ValueDecl *))
+NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
+     "consider making generic parameter %0 conform to the 'BitwiseCopyable' protocol",
+     (Type))
 
 // -- older ones below --
 

@@ -45,6 +45,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckAccess.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp
+  TypeCheckBitwise.cpp
   TypeCheckCaptures.cpp
   TypeCheckCircularity.cpp
   TypeCheckCodeCompletion.cpp

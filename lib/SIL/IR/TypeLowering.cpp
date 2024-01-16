@@ -2941,6 +2941,14 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
+  verifyLexicalLowering(lowering, origType, substType, forExpansion);
+  verifyTrivialLowering(lowering, origType, substType, forExpansion);
+}
+
+void TypeConverter::verifyLexicalLowering(const TypeLowering &lowering,
+                                          AbstractionPattern origType,
+                                          CanType substType,
+                                          TypeExpansionContext forExpansion) {
   // Non-trivial lowerings should always be lexical unless all non-trivial
   // fields are eager move.
   if (!lowering.isTrivial() && !lowering.isLexical()) {
@@ -3005,6 +3013,148 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
         });
     assert(hasNoNontrivialLexicalLeaf &&
            "Found non-trivial lexical leaf in non-trivial non-lexical type?!");
+  }
+}
+
+void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
+                                          AbstractionPattern origType,
+                                          CanType substType,
+                                          TypeExpansionContext forExpansion) {
+  if (!Context.LangOpts.hasFeature(Feature::BitwiseCopyable))
+    return;
+  auto *bitwiseCopyableProtocol =
+      Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
+  if (!bitwiseCopyableProtocol)
+    return;
+
+  auto conformance = M.conformsToProtocol(substType, bitwiseCopyableProtocol);
+
+  if (lowering.isTrivial() && !conformance) {
+    // A trivial type can only lack a conformance if one of its leaves is a
+    // public type that doesn't conform.
+    bool hasNoNonconformingNode = visitAggregateLeaves(
+        origType, substType, forExpansion,
+        /*isLeaf=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // The field's type is an aggregate.  Treat it as a leaf if it is
+          // public.
+          auto *nominal = ty.getAnyNominal();
+          // Non-nominal types are public iff their components are; visit the
+          // components.
+          if (!nominal)
+            return false;
+
+          // Nominals with generic parameters must be explicitly conformed to
+          // BitwiseCopyable.
+          auto *generic = ty.getAnyGeneric();
+          if (generic && generic->isGenericContext()) {
+            return true;
+          }
+
+          return nominal
+              ->getFormalAccessScope(/*useDC=*/nullptr,
+                                     /*treatUsableFromInlineAsPublic=*/true)
+              .isPublic();
+        },
+        /*visit=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // Return false to indicate seeing a leaf which justifies the type
+          // being trivial but not conforming to BitwiseCopyable.
+
+          // A BitwiseCopyable conformer appearing within its layout doesn't
+          // explain why substType doesn't itself conform.
+          if (M.conformsToProtocol(ty, bitwiseCopyableProtocol))
+            return true;
+
+          // ModuleTypes are trivial but don't warrant being given a conformance
+          // to BitwiseCopyable.
+          if (auto mt = dyn_cast<ModuleType>(ty)) {
+            // If one were to appear within a type, its lack of conformance
+            // wouldn't result in the type's failure to conform.  Conversely, if
+            // substType itself is the ModuleType, it is trivial and
+            // non-conformant; return false to indicate its the leaf which
+            // justifies substType being non-conformant.
+            return field;
+          }
+
+          // Given a non-bitwise-copyable C, unowned(unsafe) C is still
+          // BitwiseCopyable.
+          auto rst = dyn_cast<ReferenceStorageType>(ty);
+          if (rst && rst->getOwnership() == ReferenceOwnership::Unmanaged) {
+            // If a ReferenceStorageType appears as a component of an aggregate,
+            // that shouldn't stop the aggregate from being BitwiseCopyable.  If
+            // the whole type is the ReferenceStorageType, however, it does not
+            // conform.
+            return field;
+          }
+
+          auto *nominal = ty.getAnyNominal();
+
+          // Non-nominal types are trivial iff conforming.
+          if (!nominal) {
+            llvm::errs()
+                << "Non-nominal type without conformance to _BitwiseCopyable:\n"
+                << ty << "\n"
+                << "within " << substType << "\n"
+                << "of " << origType << "\n";
+            assert(false);
+            return true;
+          }
+
+          /// A non-conforming generic nominal type justifies substType not
+          /// conforming.
+          auto *generic = ty.getAnyGeneric();
+          if (generic && generic->isGenericContext()) {
+            return false;
+          }
+
+          // The field is trivial and the whole type is nonconforming.  That's
+          // legal iff the type is public.
+          return !nominal
+                      ->getFormalAccessScope(
+                          /*useDC=*/nullptr,
+                          /*treatUsableFromInlineAsPublic=*/true)
+                      .isPublic();
+        });
+    if (hasNoNonconformingNode) {
+      llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
+                   << substType << "\n"
+                   << "of " << origType << "\n";
+      assert(false);
+    }
+  }
+
+  if (!lowering.isTrivial() && conformance) {
+    // A non-trivial type can only conform if at least one of its leaves is a
+    // type parameter that conforms.
+    bool hasNoConformingArchetypeNode = visitAggregateLeaves(
+        origType, substType, forExpansion,
+        /*isLeaf=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // Walk into every aggregate.
+          return false;
+        },
+        /*visit=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // Return false to indicate visiting a type parameter.
+
+          if (origTy.isTypeParameter())
+            return false;
+
+          // Unfortunately, the type parameter's conformance may not be visible
+          // here.
+          assert(M.conformsToProtocol(ty, bitwiseCopyableProtocol) &&
+                 "leaf of non-trivial BitwiseCopyable type that doesn't "
+                 "conform to BitwiseCopyable!?");
+
+          return true;
+        });
+    if (hasNoConformingArchetypeNode) {
+      llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
+                   << substType << "\n";
+      conformance.print(llvm::errs());
+      assert(false);
+    }
   }
 }
 #endif

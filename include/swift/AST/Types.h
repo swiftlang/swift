@@ -1643,6 +1643,7 @@ public:
                         bool prependBuiltinNamespace = true) const;
 
   BuiltinTypeKind getBuiltinTypeKind() const;
+  bool isBitwiseCopyable() const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
 
