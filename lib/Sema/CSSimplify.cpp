@@ -8857,8 +8857,7 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
 static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
                                             Type toType) {
   auto &ctx = cs.getASTContext();
-  auto *nilLiteral = TypeChecker::getProtocol(
-      ctx, SourceLoc(), KnownProtocolKind::ExpressibleByNilLiteral);
+  auto *nilLiteral = ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral);
   if (!nilLiteral)
     return false;
 

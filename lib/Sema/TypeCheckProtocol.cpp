@@ -5823,8 +5823,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 bool TypeChecker::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol, ModuleDecl *module,
     bool allowMissing) {
-  if (auto *proto =
-          TypeChecker::getProtocol(module->getASTContext(), SourceLoc(), protocol))
+  if (auto *proto = module->getASTContext().getProtocol(protocol))
     return (bool) module->checkConformance(type, proto, allowMissing);
   return false;
 }
