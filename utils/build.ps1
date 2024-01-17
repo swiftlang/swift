@@ -62,6 +62,9 @@ If set, debug information will be generated for the builds.
 .PARAMETER EnableCaching
 If true, use `sccache` to cache the build rules.
 
+.PARAMETER Clean
+If true, clean non-compiler builds while building.
+
 .PARAMETER Test
 An array of names of projects to run tests for.
 '*' runs all tests
@@ -101,6 +104,7 @@ param(
   [string[]] $Test = @(),
   [string] $Stage = "",
   [string] $BuildTo = "",
+  [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
   [switch] $ToBatch
@@ -1161,7 +1165,6 @@ function Build-Runtime($Arch) {
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = "$BinaryCache\1\bin";
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
-        SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
         CMAKE_SHARED_LINKER_FLAGS = @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF");
       }
   }
@@ -1741,6 +1744,13 @@ if (-not $SkipBuild) {
 if (-not $SkipBuild) {
   Invoke-BuildStep Build-BuildTools $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
+}
+
+if ($Clean) {
+  2..16 | % { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
+  foreach ($Arch in $SDKArchs) {
+    0..3 | % { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildiD + $_)" -ErrorAction Ignore }
+  }
 }
 
 foreach ($Arch in $SDKArchs) {
