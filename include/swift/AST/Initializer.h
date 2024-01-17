@@ -76,6 +76,11 @@ class PatternBindingInitializer : public Initializer {
   // created lazily for 'self' lookup from lazy property initializer
   ParamDecl *SelfParam;
 
+  // Sets itself as the parent.
+  friend class PatternBindingDecl;
+
+  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex);
+
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
       Binding(nullptr), SelfParam(nullptr) {
@@ -89,8 +94,6 @@ public:
 
   static PatternBindingInitializer *createDeserialized(PatternBindingDecl *PBD,
                                                        unsigned index);
-
-  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex);
 
   PatternBindingDecl *getBinding() const { return Binding; }
 

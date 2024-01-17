@@ -2004,6 +2004,11 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
 
 void PatternBindingInitializer::setBinding(PatternBindingDecl *binding,
                                            unsigned bindingIndex) {
+  assert(binding);
+  assert(!Binding || Binding == binding &&
+         "Cannot change the binding after the fact");
+  assert(!Binding || SpareBits == bindingIndex &&
+         "Cannot change the binding index after the fact");
   setParent(binding->getDeclContext());
   Binding = binding;
   SpareBits = bindingIndex;
