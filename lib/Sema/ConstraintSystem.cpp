@@ -2806,8 +2806,7 @@ ConstraintSystem::getTypeOfMemberReference(
     FunctionType::ExtInfo info;
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-      if (isPartialApplication(locator) &&
-          isSendableType(DC->getParentModule(), baseOpenedTy)) {
+      if (isPartialApplication(locator) && baseOpenedTy->isSendableType()) {
         // Add @Sendable to functions without conditional conformances
         functionType =
             functionType

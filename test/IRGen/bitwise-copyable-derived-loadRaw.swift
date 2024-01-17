@@ -6,7 +6,7 @@
 
 public protocol MyBitwiseCopyable : _BitwiseCopyable {}
 
-extension SIMD16 : @retroactive MyBitwiseCopyable where Scalar.SIMD16Storage : MyBitwiseCopyable {}
+extension SIMD16 : MyBitwiseCopyable where Scalar.SIMD16Storage : MyBitwiseCopyable {}
 extension UInt8.SIMD16Storage : MyBitwiseCopyable {}
 
 func doit() {

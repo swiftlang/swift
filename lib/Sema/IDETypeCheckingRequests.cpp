@@ -161,20 +161,34 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
     return true;
+
+  // The declaration may introduce inner generic parameters and requirements,
+  // or it may be nested in an outer generic context.
   GenericSignature genericSig = genericDecl->getGenericSignature();
   if (!genericSig)
     return true;
 
+  // The context substitution map for the base type fixes the declaration's
+  // outer generic parameters.
   auto *module = DC->getParentModule();
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
+  auto substMap = BaseTy->getContextSubstitutionMap(
       module, VD->getDeclContext());
 
-  // Note: we treat substitution failure as success, to avoid tripping
-  // up over generic parameters introduced by the declaration itself.
+  // The innermost generic parameters are mapped to error types.
+  unsigned innerDepth = genericSig.getGenericParams().back()->getDepth();
+  if (!genericDecl->isGeneric())
+    ++innerDepth;
+
+  // We treat substitution failure as success, to ignore requirements
+  // that involve innermost generic parameters.
   return checkRequirements(module,
                            genericSig.getRequirements(),
-                           QuerySubstitutionMap{substMap}) !=
-         CheckRequirementsResult::RequirementFailure;
+                           [&](SubstitutableType *type) -> Type {
+                             auto *paramTy = cast<GenericTypeParamType>(type);
+                             if (paramTy->getDepth() == innerDepth)
+                               return ErrorType::get(DC->getASTContext());
+                             return Type(paramTy).subst(substMap);
+                           }) != CheckRequirementsResult::RequirementFailure;
 }
 
 bool

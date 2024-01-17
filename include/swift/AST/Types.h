@@ -925,11 +925,9 @@ public:
   /// Determines whether this type is an any actor type.
   bool isAnyActorType();
 
-  /// Returns true if this type is a Sendable type.
-  bool isSendableType(DeclContext *declContext);
-
-  /// Returns true if this type is a Sendable type.
-  bool isSendableType(ModuleDecl *parentModule);
+  /// Returns true if this type conforms to Sendable, or if its a function type
+  /// that is @Sendable.
+  bool isSendableType();
 
   /// Determines whether this type conforms or inherits (if it's a protocol
   /// type) from `DistributedActor`.

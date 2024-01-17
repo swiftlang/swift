@@ -1653,7 +1653,7 @@ static void diagnoseRetroactiveConformances(
     proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
 
       // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = ext->getParentModule()->checkConformance(
+      auto conformanceRef = ext->getParentModule()->lookupConformance(
           extendedType, decl);
       if (!conformanceRef.isConcrete()) {
 
