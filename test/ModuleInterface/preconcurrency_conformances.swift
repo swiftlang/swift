@@ -13,15 +13,16 @@
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -enable-experimental-feature PreconcurrencyConformances \
+// RUN:   -disable-availability-checking \
 // RUN:   -verify
 
 // RUN: %FileCheck %s < %t/Client.swiftinterface
 
 // RUN: %target-swift-emit-module-interface(%t/Client.swiftinterface) -I %t %t/src/Client.swift -module-name Client \
-// RUN:   -enable-experimental-feature PreconcurrencyConformances -verify
+// RUN:   -disable-availability-checking -enable-experimental-feature PreconcurrencyConformances -verify
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -module-name Client \
-// RUN:   -enable-experimental-feature PreconcurrencyConformances -verify
+// RUN:   -disable-availability-checking -enable-experimental-feature PreconcurrencyConformances -verify
 
 // REQUIRES: asserts
 // REQUIRES: concurrency

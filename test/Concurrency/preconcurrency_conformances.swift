@@ -111,7 +111,7 @@ extension TestConditional : @preconcurrency WithAssoc where T == Int {
 
 @globalActor
 struct GlobalActor {
-  static var shared: MyActor = MyActor()
+  static let shared: MyActor = MyActor()
 }
 
 protocol WithIndividuallyIsolatedRequirements {
