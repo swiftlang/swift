@@ -76,14 +76,6 @@ class PatternBindingInitializer : public Initializer {
   // created lazily for 'self' lookup from lazy property initializer
   ParamDecl *SelfParam;
 
-  friend class ASTContext; // calls reset on unused contexts
-
-  void reset(DeclContext *parent) {
-    setParent(parent);
-    Binding = nullptr;
-    SelfParam = nullptr;
-  }
-
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
       Binding(nullptr), SelfParam(nullptr) {
