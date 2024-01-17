@@ -4481,14 +4481,17 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
 
   Type type = resolveType(repr->getBase(), options);
 
+  Type unwrappedType = type;
   if (auto ty = dyn_cast<DynamicSelfType>(type)) {
-    type = ty->getSelfType();
+    unwrappedType = ty->getSelfType();
   }
 
   // isolated parameters must be of actor type
-  if (!type->hasTypeParameter() && !type->isAnyActorType() && !type->hasError()) {
+  if (!unwrappedType->isTypeParameter() &&
+      !unwrappedType->isAnyActorType() &&
+      !unwrappedType->hasError()) {
     // Optional actor types are fine - `nil` represents `nonisolated`.
-    auto wrapped = type->getOptionalObjectType();
+    auto wrapped = unwrappedType->getOptionalObjectType();
     auto allowOptional = getASTContext().LangOpts
         .hasFeature(Feature::OptionalIsolatedParameters);
     if (allowOptional && wrapped && wrapped->isAnyActorType()) {
