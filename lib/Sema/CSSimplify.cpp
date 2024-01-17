@@ -10686,9 +10686,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         auto *sequenceProto = cast<ProtocolDecl>(
             getContextualType(baseExpr, /*forConstraint=*/false)
                 ->getAnyNominal());
-        bool isAsync = sequenceProto ==
-                       TypeChecker::getProtocol(
-                           ctx, SourceLoc(), KnownProtocolKind::AsyncSequence);
+        bool isAsync = sequenceProto->getKnownProtocolKind() ==
+                       KnownProtocolKind::AsyncSequence;
 
         auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
                                      : ctx.getSequenceMakeIterator();
@@ -10704,10 +10703,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         auto *iteratorProto = cast<ProtocolDecl>(
             getContextualType(baseExpr, /*forConstraint=*/false)
                 ->getAnyNominal());
-        bool isAsync =
-            iteratorProto ==
-            TypeChecker::getProtocol(ctx, SourceLoc(),
-                                     KnownProtocolKind::AsyncIteratorProtocol);
+        bool isAsync = iteratorProto->getKnownProtocolKind() ==
+                       KnownProtocolKind::AsyncIteratorProtocol;
 
         auto *next =
             isAsync ? ctx.getAsyncIteratorNext() : ctx.getIteratorNext();
