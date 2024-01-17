@@ -3455,7 +3455,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     for (auto protocol : missingProtocols) {
       auto conformance = NormalProtocolConformance(
           nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
-          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false);
+          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
+          /*isPreconcurrency=*/false);
       ConformanceChecker checker(getASTContext(), &conformance,
                                  missingWitnesses);
       // Type witnesses must be resolved first.

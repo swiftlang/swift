@@ -444,11 +444,11 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   // Flag bits used in ContextAndBits.
   enum {
-    /// The conformance is invalid.
-    InvalidFlag = 0x01,
-
     /// The conformance was labeled with @unchecked.
-    UncheckedFlag = 0x02,
+    UncheckedFlag = 0x01,
+
+    /// The conformance was labeled with @preconcurrency.
+    PreconcurrencyFlag = 0x02,
 
     /// We have allocated the AssociatedConformances array (but not necessarily
     /// populated any of its elements).
@@ -458,9 +458,12 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
   ///
-  /// Also stores the "invalid", "unchecked" and "has computed associated
+  /// Also stores the "unchecked", "preconcurrency" and "has computed associated
   /// conformances" bits.
   llvm::PointerIntPair<DeclContext *, 3, unsigned> ContextAndBits;
+
+  /// Indicates whether the conformance is invalid.
+  bool Invalid : 1;
 
   /// The reason that this conformance exists.
   ///
@@ -501,12 +504,14 @@ class NormalProtocolConformance : public RootProtocolConformance,
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
-                            ProtocolConformanceState state,
-                            bool isUnchecked)
+                            ProtocolConformanceState state, bool isUnchecked,
+                            bool isPreconcurrency)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
         ProtocolAndState(protocol, state), Loc(loc),
-        ContextAndBits(dc, isUnchecked ? UncheckedFlag : 0) {
+        ContextAndBits(dc, ((isUnchecked ? UncheckedFlag : 0) |
+                            (isPreconcurrency ? PreconcurrencyFlag : 0))),
+        Invalid(false) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
   }
@@ -543,12 +548,12 @@ public:
 
   /// Determine whether this conformance is invalid.
   bool isInvalid() const {
-    return ContextAndBits.getInt() & InvalidFlag;
+    return Invalid;
   }
 
   /// Mark this conformance as invalid.
   void setInvalid() {
-    ContextAndBits.setInt(ContextAndBits.getInt() | InvalidFlag);
+    Invalid = true;
   }
 
   /// Whether this is an "unchecked" conformance.
@@ -562,6 +567,9 @@ public:
     // OK to mutate because the flags are not part of the folding set node ID.
     ContextAndBits.setInt(ContextAndBits.getInt() | UncheckedFlag);
   }
+
+  /// Whether this is an preconcurrency conformance.
+  bool isPreconcurrency() const;
 
   /// Determine whether we've lazily computed the associated conformance array
   /// already.

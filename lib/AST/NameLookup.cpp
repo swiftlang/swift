@@ -3687,15 +3687,17 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
   SourceLoc uncheckedLoc;
+  SourceLoc preconcurrencyLoc;
   auto inheritedTypes = InheritedTypes(decl);
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
     uncheckedLoc = typeRepr->findAttrLoc(TAK_unchecked);
+    preconcurrencyLoc = typeRepr->findAttrLoc(TAK_preconcurrency);
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc, uncheckedLoc});
+    result.push_back({nominal, loc, uncheckedLoc, preconcurrencyLoc});
   }
 }
 
@@ -3733,7 +3735,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(req.getProtocolDecl(), loc, SourceLoc());
+      result.emplace_back(req.getProtocolDecl(), loc, SourceLoc(), SourceLoc());
     }
     return result;
   }
@@ -3744,8 +3746,9 @@ swift::getDirectlyInheritedNominalTypeDecls(
   for (auto attr :
        protoDecl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     auto loc = attr->getLocation();
-    result.push_back(
-        {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc()});
+    result.push_back({attr->getProtocol(), loc,
+                      attr->isUnchecked() ? loc : SourceLoc(),
+                      /*preconcurrencyLoc=*/SourceLoc()});
   }
 
   // Else we have access to this information on the where clause.
@@ -3753,7 +3756,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   anyObject |= selfBounds.anyObject;
 
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, loc, SourceLoc());
+    result.emplace_back(inheritedNominal, loc, SourceLoc(), SourceLoc());
 
   return result;
 }

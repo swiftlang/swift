@@ -746,7 +746,8 @@ public:
     ASTContext &ctx = M->getASTContext();
     auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
         TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
-        /*isRetroactive=*/false)));
+        /*isRetroactive=*/false,
+        /*isPreconcurrency=*/false)));
     auto extension =
         ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
                               nominal->getModuleScopeContext(), nullptr);

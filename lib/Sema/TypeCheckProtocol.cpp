@@ -3094,6 +3094,14 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       getDeclRefInContext(witness), witness->getLoc(), DC, llvm::None,
       llvm::None, llvm::None, requirementIsolation);
   bool sameConcurrencyDomain = false;
+  // If the requirement is isolated (explicitly or implicitly) or
+  // explicitly marked as `nonisolated` it means that the protocol
+  // has adopted concurrency and `@preconcurrency` doesn't apply.
+  bool isPreconcurrency =
+      Conformance->isPreconcurrency() &&
+      !(requirementIsolation.isActorIsolated() ||
+        requirement->getAttrs().hasAttribute<NonisolatedAttr>());
+
   switch (refResult) {
   case ActorReferenceResult::SameConcurrencyDomain:
     // If the witness has distributed-actor isolation, we have extra
@@ -3182,8 +3190,9 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     }
   }
 
-  // If we aren't missing anything, do a Sendable check and move on.
-  if (!missingOptions) {
+  // If we aren't missing anything or this is a witness to a `@preconcurrency`
+  // conformance, do a Sendable check and move on.
+  if (!missingOptions || isPreconcurrency) {
     // FIXME: Disable Sendable checking when the witness is an initializer
     // that is explicitly marked nonisolated.
     if (isa<ConstructorDecl>(witness) &&
@@ -3210,9 +3219,15 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     if (isAccessibleAcrossActors(witness, refResult.isolation, DC))
       return llvm::None;
 
-    if (refResult.isolation.isActorIsolated() && isAsyncDecl(requirement) &&
-        !isAsyncDecl(witness))
-      return refResult.isolation;
+    if (refResult.isolation.isActorIsolated()) {
+      if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
+        return refResult.isolation;
+
+      // Always treat `@preconcurrency` witnesses as isolated.
+      if (isPreconcurrency &&
+          missingOptions.contains(MissingFlags::RequirementAsync))
+        return refResult.isolation;
+    }
 
     return llvm::None;
   }
@@ -5265,6 +5280,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 }
 
 void ConformanceChecker::resolveValueWitnesses() {
+  bool usesPreconcurrencyConformance = false;
   for (auto *requirement : Proto->getProtocolRequirements()) {
     // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
@@ -5283,6 +5299,15 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Check actor isolation. If we need to enter into the actor's
       // isolation within the witness thunk, record that.
       if (auto enteringIsolation = checkActorIsolation(requirement, witness)) {
+        // Only @preconcurrency conformances allow entering isolation
+        // when neither requirement nor witness are async by adding a
+        // runtime precondition that witness is always called on the
+        // expected executor.
+        if (Conformance->isPreconcurrency()) {
+          usesPreconcurrencyConformance =
+              !isAsyncDecl(requirement) && !isAsyncDecl(witness);
+        }
+
         Conformance->overrideWitness(
             requirement,
             Conformance->getWitnessUncached(requirement)
@@ -5414,6 +5439,12 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Let it get diagnosed later.
       break;
     }
+  }
+
+  if (Conformance->isPreconcurrency() && !usesPreconcurrencyConformance) {
+    DC->getASTContext().Diags.diagnose(
+        Conformance->getLoc(), diag::preconcurrency_conformance_not_used,
+        Proto->getDeclaredInterfaceType());
   }
 
   // Finally, check some ad-hoc protocol requirements.

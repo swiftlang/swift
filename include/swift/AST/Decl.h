@@ -1604,11 +1604,15 @@ struct InheritedEntry : public TypeLoc {
   /// Whether there was an @retroactive attribute.
   bool isRetroactive = false;
 
+  /// Whether there was an @preconcurrency attribute.
+  bool isPreconcurrency = false;
+
   InheritedEntry(const TypeLoc &typeLoc);
 
-  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive)
-    : TypeLoc(typeLoc), isUnchecked(isUnchecked), isRetroactive(isRetroactive) {
-    }
+  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
+                 bool isPreconcurrency)
+      : TypeLoc(typeLoc), isUnchecked(isUnchecked),
+        isRetroactive(isRetroactive), isPreconcurrency(isPreconcurrency) {}
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or

@@ -322,7 +322,8 @@ DeriveImplicitBitwiseCopyableConformance::synthesizeConformance(
   auto conformance = context.getNormalConformance(
       nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(), dc,
       ProtocolConformanceState::Complete,
-      /*isUnchecked=*/false);
+      /*isUnchecked=*/false,
+      /*isPreconcurrency=*/false);
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
 

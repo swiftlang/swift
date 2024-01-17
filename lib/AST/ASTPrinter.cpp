@@ -2732,6 +2732,8 @@ void PrintAST::printInherited(const Decl *decl) {
     if (inherited.isRetroactive &&
         !llvm::is_contained(Options.ExcludeAttrList, TAK_retroactive))
       Printer << "@retroactive ";
+    if (inherited.isPreconcurrency)
+      Printer << "@preconcurrency ";
 
     printTypeLoc(inherited);
   }, [&]() {
@@ -3905,6 +3907,30 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
 static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
 static bool usesFeatureTransferringArgsAndResults(Decl *decl) { return false; }
+
+static bool usesFeaturePreconcurrencyConformances(Decl *decl) {
+  auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
+    return llvm::any_of(
+        inherited.getEntries(),
+        [](const InheritedEntry &entry) { return entry.isPreconcurrency; });
+  };
+
+  if (auto *T = dyn_cast<TypeDecl>(decl))
+    return usesPreconcurrencyConformance(T->getInherited());
+
+  if (auto *E = dyn_cast<ExtensionDecl>(decl)) {
+    // If type has `@preconcurrency` conformance(s) all of its
+    // extensions have to be guarded by the flag too.
+    if (auto *T = dyn_cast<TypeDecl>(E->getExtendedNominal())) {
+      if (usesPreconcurrencyConformance(T->getInherited()))
+        return true;
+    }
+
+    return usesPreconcurrencyConformance(E->getInherited());
+  }
+
+  return false;
+}
 
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
@@ -8317,7 +8343,8 @@ swift::getInheritedForPrinting(
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
                        isUnchecked,
-                       /*isRetroactive=*/false});
+                       /*isRetroactive=*/false,
+                       /*isPreconcurrency=*/false});
   }
 }
 

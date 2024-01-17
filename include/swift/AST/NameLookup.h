@@ -586,12 +586,15 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   /// The location of the "unchecked" attribute, if present.
   SourceLoc uncheckedLoc;
 
+  /// The location of the "preconcurrency" attribute if present.
+  SourceLoc preconcurrencyLoc;
+
   InheritedNominalEntry() { }
 
-  InheritedNominalEntry(
-    NominalTypeDecl *item, SourceLoc loc,
-    SourceLoc uncheckedLoc
-  ) : Located(item, loc), uncheckedLoc(uncheckedLoc) { }
+  InheritedNominalEntry(NominalTypeDecl *item, SourceLoc loc,
+                        SourceLoc uncheckedLoc, SourceLoc preconcurrencyLoc)
+      : Located(item, loc), uncheckedLoc(uncheckedLoc),
+        preconcurrencyLoc(preconcurrencyLoc) {}
 };
 
 /// Retrieve the set of nominal type declarations that are directly

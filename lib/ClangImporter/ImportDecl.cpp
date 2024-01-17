@@ -7271,9 +7271,9 @@ void SwiftDeclConverter::importObjCProtocols(
             Impl.importDecl(*cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
       inheritedTypes.push_back(
-        InheritedEntry(
-          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-          /*isUnchecked=*/false, /*isRetroactive=*/false));
+          InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+                         /*isUnchecked=*/false, /*isRetroactive=*/false,
+                         /*isPreconcurrency=*/false));
     }
   }
 
@@ -9466,7 +9466,8 @@ void ClangImporter::Implementation::loadAllConformances(
         dc->getDeclaredInterfaceType(),
         protocol, SourceLoc(), dc,
         ProtocolConformanceState::Incomplete,
-        protocol->isSpecificProtocol(KnownProtocolKind::Sendable));
+        protocol->isSpecificProtocol(KnownProtocolKind::Sendable),
+        /*isPreconcurrency=*/false);
     conformance->setLazyLoader(this, /*context*/0);
     conformance->setState(ProtocolConformanceState::Complete);
     Conformances.push_back(conformance);

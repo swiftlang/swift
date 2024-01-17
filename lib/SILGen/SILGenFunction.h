@@ -946,12 +946,16 @@ public:
   ///
   /// This is used for both concrete witness thunks and default witness
   /// thunks.
+  ///
+  /// \param isPreconcurrency If the conformance is marked as `@preconcurrency`
+  /// instead of a hop (when entering isolation) emit a dynamic check to make
+  /// sure that witness has been unsed in the expected context.
   void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement, SubstitutionMap reqtSubs,
                            SILDeclRef witness, SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree,
-                           bool isSelfConformance,
+                           bool isSelfConformance, bool isPreconcurrency,
                            llvm::Optional<ActorIsolation> enterIsolation);
 
   /// Generates subscript arguments for keypath. This function handles lowering
