@@ -829,12 +829,6 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       OS << "DefaultArgument index=" << init->getIndex();
       break;
     }
-    case LocalDeclContextKind::PatternBindingInitializer: {
-      auto init = cast<SerializedPatternBindingInitializer>(local);
-      OS << " PatternBinding 0x" << (void*) init->getBinding()
-         << " #" << init->getBindingIndex();
-      break;
-    }
     case LocalDeclContextKind::TopLevelCodeDecl:
       OS << " TopLevelCode";
       break;

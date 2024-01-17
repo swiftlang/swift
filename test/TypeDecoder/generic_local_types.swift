@@ -175,7 +175,7 @@ class Generic<T> {
 // DEMANGLE-DECL: $s19generic_local_types7GenericCfd7Alias15L_a
 // DEMANGLE-DECL: $s19generic_local_types7GenericC6methodyySiF6nestedL_yylF5AliasL_a
 
-// CHECK-DECL: generic_local_types.(file).Generic.local context.local context.Alias1
+// CHECK-DECL: generic_local_types.(file).Generic.pattern binding initializer.local context.Alias1
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias2
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias3
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias4

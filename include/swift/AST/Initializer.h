@@ -95,6 +95,9 @@ public:
     return new (parent->getASTContext()) PatternBindingInitializer(parent);
   }
 
+  static PatternBindingInitializer *createDeserialized(PatternBindingDecl *PBD,
+                                                       unsigned index);
+
   void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
     setParent(binding->getDeclContext());
     Binding = binding;
@@ -119,37 +122,6 @@ public:
   }
   static bool classof(const Initializer *I) {
     return I->getInitializerKind() == InitializerKind::PatternBinding;
-  }
-};
-
-/// SerializedPatternBindingInitializer - This represents what was originally a
-/// PatternBindingInitializer during serialization. It is preserved as a special
-/// class only to maintain the correct AST structure and remangling after
-/// deserialization.
-class SerializedPatternBindingInitializer : public SerializedLocalDeclContext {
-  PatternBindingDecl *Binding;
-
-public:
-  SerializedPatternBindingInitializer(PatternBindingDecl *Binding,
-                                      unsigned bindingIndex)
-    : SerializedLocalDeclContext(LocalDeclContextKind::PatternBindingInitializer,
-                                 Binding->getDeclContext()),
-      Binding(Binding) {
-    SpareBits = bindingIndex;
-  }
-
-  PatternBindingDecl *getBinding() const {
-    return Binding;
-  }
-
-  unsigned getBindingIndex() const { return SpareBits; }
-
-
-  static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-      LocalDeclContextKind::PatternBindingInitializer;
-    return false;
   }
 };
 
