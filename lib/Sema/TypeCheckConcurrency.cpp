@@ -1049,7 +1049,7 @@ bool swift::diagnoseNonSendableTypes(
     return false;
 
   // FIXME: More detail for unavailable conformances.
-  auto conformance = module->checkConformance(type, proto);
+  auto conformance = module->lookupConformance(type, proto, /*allowMissing=*/true);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);

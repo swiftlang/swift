@@ -269,7 +269,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  if (!derived.getParentModule()->checkConformance(codingKeysType, codingKeyProto)) {
+  if (!derived.getParentModule()->lookupConformance(codingKeysType, codingKeyProto)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to

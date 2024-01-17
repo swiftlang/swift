@@ -4339,9 +4339,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // a member that could in turn satisfy *this* requirement.
         auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
         auto conformance =
-            DC->getParentModule()->checkConformance(Adoptee, derivableProto);
+            DC->getParentModule()->lookupConformance(Adoptee, derivableProto);
         if (conformance.isConcrete()) {
-          (void)conformance.getConcrete()->getWitnessDecl(derivable);
+          (void) conformance.getConcrete()->getWitnessDecl(derivable);
         }
       }
     }
