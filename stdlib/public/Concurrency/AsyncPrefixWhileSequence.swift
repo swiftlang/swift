@@ -129,8 +129,8 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
     /// `nil`, ending the sequence.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> Base.Element? {
-      if !predicateHasFailed, let nextElement = try await baseIterator.nextElement() {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
+      if !predicateHasFailed, let nextElement = try await baseIterator.next(actor) {
         if await predicate(nextElement) {
           return nextElement
         } else {

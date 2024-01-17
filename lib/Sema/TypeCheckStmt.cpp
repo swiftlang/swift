@@ -3237,17 +3237,17 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   if (!isAsync)
     return ctx.getIteratorNext();
 
-  // If AsyncIteratorProtocol.nextElement() isn't available at all,
+  // If AsyncIteratorProtocol.next(_:) isn't available at all,
   // we're stuck using AsyncIteratorProtocol.next().
-  auto nextElement = ctx.getAsyncIteratorNextElement();
+  auto nextElement = ctx.getAsyncIteratorNextIsolated();
   if (!nextElement)
     return ctx.getAsyncIteratorNext();
 
-  // If availability checking is disabled, use nextElement().
+  // If availability checking is disabled, use next(_:).
   if (ctx.LangOpts.DisableAvailabilityChecking || loc.isInvalid())
     return nextElement;
 
-  // We can only call nextElement() if we are in an availability context
+  // We can only call next(_:) if we are in an availability context
   // that supports typed throws.
   auto availability = overApproximateAvailabilityAtLocation(loc, dc);
   if (availability.isContainedIn(ctx.getTypedThrowsAvailability()))

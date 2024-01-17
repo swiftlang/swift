@@ -287,8 +287,9 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncIteratorProtocol.next()'.
   FuncDecl *AsyncIteratorNext = nullptr;
 
-  /// The declaration of 'AsyncIteratorProtocol.nextElement()'.
-  FuncDecl *AsyncIteratorNextElement = nullptr;
+  /// The declaration of 'AsyncIteratorProtocol.next(_:)' that takes
+  /// an actor isolation.
+  FuncDecl *AsyncIteratorNextIsolated = nullptr;
 
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
@@ -951,38 +952,48 @@ FuncDecl *ASTContext::getIteratorNext() const {
   return nullptr;
 }
 
+static std::pair<FuncDecl *, FuncDecl *>
+getAsyncIteratorNextRequirements(const ASTContext &ctx) {
+  auto proto = ctx.getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
+  if (!proto)
+    return { nullptr, nullptr };
+
+  FuncDecl *next = nullptr;
+  FuncDecl *nextThrowing = nullptr;
+  for (auto result : proto->lookupDirect(ctx.Id_next)) {
+    if (result->getDeclContext() != proto)
+      continue;
+
+    if (auto func = dyn_cast<FuncDecl>(result)) {
+      switch (func->getParameters()->size()) {
+      case 0: next = func; break;
+      case 1: nextThrowing = func; break;
+      default: break;
+      }
+    }
+  }
+
+  return { next, nextThrowing };
+}
+
 FuncDecl *ASTContext::getAsyncIteratorNext() const {
   if (getImpl().AsyncIteratorNext) {
     return getImpl().AsyncIteratorNext;
   }
 
-  auto proto = getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
-  if (!proto)
-    return nullptr;
-
-  if (auto *func = lookupRequirement(proto, Id_next)) {
-    getImpl().AsyncIteratorNext = func;
-    return func;
-  }
-
-  return nullptr;
+  auto next = getAsyncIteratorNextRequirements(*this).first;
+  getImpl().AsyncIteratorNext = next;
+  return next;
 }
 
-FuncDecl *ASTContext::getAsyncIteratorNextElement() const {
-  if (getImpl().AsyncIteratorNextElement) {
-    return getImpl().AsyncIteratorNextElement;
+FuncDecl *ASTContext::getAsyncIteratorNextIsolated() const {
+  if (getImpl().AsyncIteratorNextIsolated) {
+    return getImpl().AsyncIteratorNextIsolated;
   }
 
-  auto proto = getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
-  if (!proto)
-    return nullptr;
-
-  if (auto *func = lookupRequirement(proto, Id_nextElement)) {
-    getImpl().AsyncIteratorNextElement = func;
-    return func;
-  }
-
-  return nullptr;
+  auto nextThrowing = getAsyncIteratorNextRequirements(*this).second;
+  getImpl().AsyncIteratorNextIsolated = nextThrowing;
+  return nextThrowing;
 }
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \

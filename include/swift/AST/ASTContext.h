@@ -650,8 +650,8 @@ public:
   /// Get AsyncIteratorProtocol.next().
   FuncDecl *getAsyncIteratorNext() const;
 
-  /// Get AsyncIteratorProtocol.nextElement().
-  FuncDecl *getAsyncIteratorNextElement() const;
+  /// Get AsyncIteratorProtocol.next(actor).
+  FuncDecl *getAsyncIteratorNextIsolated() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.

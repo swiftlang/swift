@@ -129,7 +129,7 @@ extension AsyncDropWhileSequence: AsyncSequence {
 
     /// Produces the next element in the drop-while sequence.
     ///
-    /// This iterator calls `nextElement()` on its base iterator and evaluates
+    /// This iterator calls `next(_:)` on its base iterator and evaluates
     /// the result with the `predicate` closure. As long as the predicate
     /// returns `true`, this method returns `nil`. After the predicate returns
     /// `false`, for a value received from the base iterator, this method
@@ -138,9 +138,9 @@ extension AsyncDropWhileSequence: AsyncSequence {
     /// again.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> Base.Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       while let predicate = self.predicate {
-        guard let element = try await baseIterator.nextElement() else {
+        guard let element = try await baseIterator.next(actor) else {
           return nil
         }
         if await predicate(element) == false {
@@ -148,7 +148,7 @@ extension AsyncDropWhileSequence: AsyncSequence {
           return element
         }
       }
-      return try await baseIterator.nextElement()
+      return try await baseIterator.next(actor)
     }
   }
 

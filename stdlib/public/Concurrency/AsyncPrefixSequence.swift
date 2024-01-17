@@ -112,15 +112,15 @@ extension AsyncPrefixSequence: AsyncSequence {
     /// Produces the next element in the prefix sequence.
     ///
     /// Until reaching the number of elements to include, this iterator calls
-    /// `nextElement()` on its base iterator and passes through the
+    /// `next()` on its base iterator and passes through the
     /// result. After reaching the maximum number of elements, subsequent calls
-    /// to `nextElement()` return `nil`.
+    /// to `next()` return `nil`.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> Base.Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       if remaining != 0 {
         remaining &-= 1
-        return try await baseIterator.nextElement()
+        return try await baseIterator.next(actor)
       } else {
         return nil
       }

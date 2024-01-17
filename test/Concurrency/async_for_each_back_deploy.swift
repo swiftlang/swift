@@ -3,7 +3,7 @@
 
 @available(SwiftStdlib 5.1, *)
 func f<S: AsyncSequence>(s: S) async throws {
-  // CHECK-NOT: nextElement()
+  // CHECK-NOT: next(_:)
   // CHECK: next()
   for try await x in s { }
 }

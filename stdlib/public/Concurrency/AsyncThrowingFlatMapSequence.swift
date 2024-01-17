@@ -180,7 +180,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     /// sequence. If `transform` throws an error, the sequence terminates.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> SegmentOfResult.Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
       while !finished {
         if var iterator = currentIterator {
           do {

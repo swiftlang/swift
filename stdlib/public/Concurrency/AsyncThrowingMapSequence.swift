@@ -142,15 +142,15 @@ extension AsyncThrowingMapSequence: AsyncSequence {
 
     /// Produces the next element in the map sequence.
     ///
-    /// This iterator calls `nextElement()` on its base iterator; if this call
-    /// returns `nil`, `nextElement()` returns nil. Otherwise, `nextElement()`
+    /// This iterator calls `next()` on its base iterator; if this call
+    /// returns `nil`, `next()` returns nil. Otherwise, `next()`
     /// returns the result of calling the transforming closure on the received
     /// element. If calling the closure throws an error, the sequence ends and
-    /// `nextElement()` rethrows the error.
+    /// `next()` rethrows the error.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> Transformed? {
-      guard !finished, let element = try await baseIterator.nextElement() else {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Transformed? {
+      guard !finished, let element = try await baseIterator.next(actor) else {
         return nil
       }
       do {

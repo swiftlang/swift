@@ -153,18 +153,18 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
 
     /// Produces the next element in the compact map sequence.
     ///
-    /// This iterator calls `nextElement()` on its base iterator; if this call
-    /// returns `nil`, `nextElement()` returns `nil`. Otherwise, `nextElement()`
+    /// This iterator calls `next()` on its base iterator; if this call
+    /// returns `nil`, `next()` returns `nil`. Otherwise, `next()`
     /// calls the transforming closure on the received element, returning it if
     /// the transform returns a non-`nil` value. If the transform returns `nil`,
     /// this method continues to wait for further elements until it gets one
     /// that transforms to a non-`nil` value. If calling the closure throws an
-    /// error, the sequence ends and `nextElement()` rethrows the error.
+    /// error, the sequence ends and `next()` rethrows the error.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> ElementOfResult? {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> ElementOfResult? {
       while !finished {
-        guard let element = try await baseIterator.nextElement() else {
+        guard let element = try await baseIterator.next(actor) else {
           finished = true
           return nil
         }

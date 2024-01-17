@@ -37,8 +37,6 @@ func iterate(stream: AsyncStream<Int>) async {
     print(element)
   }
 
-  // expected-region-isolation-warning@+2 {{transferring value of non-Sendable type 'AsyncStream<Int>.Iterator' from main actor-isolated context to nonisolated context; later accesses could race}}
-  // expected-region-isolation-note@+1 {{access here could race}}
   for await x in stream {
     print(x)
   }

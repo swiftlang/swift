@@ -80,10 +80,11 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[NEXT_RESULT:%.*]] = alloc_stack $Optional<Int>
+// CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK:   [[MUTATION:%.*]] = begin_access
-// CHECK:   [[WITNESS_METHOD:%.*]] = function_ref @$sScIsE11nextElement0B0QzSgyYa7FailureQzYKF : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
+// CHECK:   [[WITNESS_METHOD:%.*]] = function_ref @$sScIsE4nexty7ElementQzSgScA_pSgYiYa7FailureQzYKF : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@guaranteed Optional<any Actor>, @inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
 // CHECK:   [[ERROR_SLOT:%[0-9]+]] = alloc_stack $Never
-// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[ERROR_SLOT]], [[MUTATION]]) : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal [[NORMAL_BB:bb[0-2]+]], error [[ERROR_BB:bb[0-9]+]]
+// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[ERROR_SLOT]], [[ACTOR]], [[MUTATION]]) : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@guaranteed Optional<any Actor>, @inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal [[NORMAL_BB:bb[0-2]+]], error [[ERROR_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]](
 // CHECK:   end_access [[MUTATION]]
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -112,10 +113,11 @@ func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
 
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[NEXT_RESULT:%.*]] = alloc_stack $Optional<Int>
+// CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK:   [[MUTATION:%.*]] = begin_access
-// CHECK:   [[WITNESS_METHOD:%.*]] = function_ref @$sScIsE11nextElement0B0QzSgyYa7FailureQzYKF : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
+// CHECK:   [[WITNESS_METHOD:%.*]] = function_ref @$sScIsE4nexty7ElementQzSgScA_pSgYiYa7FailureQzYKF : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@guaranteed Optional<any Actor>, @inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
 // CHECK:   [[ERROR_SLOT:%[0-9]+]] = alloc_stack $Never
-// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[ERROR_SLOT]], [[MUTATION]]) : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal [[NORMAL_BB:bb[0-2]+]], error [[ERROR_BB:bb[0-9]+]]
+// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[ERROR_SLOT]], [[ACTOR]], [[MUTATION]]) : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@guaranteed Optional<any Actor>, @inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal [[NORMAL_BB:bb[0-2]+]], error [[ERROR_BB:bb[0-9]+]]
 // CHECK:  [[NORMAL_BB]](
 // CHECK:   end_access [[MUTATION]]
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -171,10 +173,11 @@ func trivialStructBreak(_ xx: AsyncLazySequence<[Int]>) async {
 
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[NEXT_RESULT:%.*]] = alloc_stack $Optional<Int>
+// CHECK:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
 // CHECK:   [[MUTATION:%.*]] = begin_access
-// CHECK:   [[WITNESS_METHOD:%.*]] = function_ref @$sScIsE11nextElement0B0QzSgyYa7FailureQzYKF : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
+// CHECK:   [[WITNESS_METHOD:%.*]] = function_ref @$sScIsE4nexty7ElementQzSgScA_pSgYiYa7FailureQzYKF : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@guaranteed Optional<any Actor>, @inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
 // CHECK:   [[ERROR_SLOT:%[0-9]+]] = alloc_stack $Never
-// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[ERROR_SLOT]], [[MUTATION]]) : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal [[NORMAL_BB:bb[0-2]+]], error [[ERROR_BB:bb[0-9]+]]
+// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[ERROR_SLOT]], [[ACTOR]], [[MUTATION]]) : $@convention(method) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@guaranteed Optional<any Actor>, @inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal [[NORMAL_BB:bb[0-2]+]], error [[ERROR_BB:bb[0-9]+]]
 // CHECK:  [[NORMAL_BB]](
 // CHECK:   end_access [[MUTATION]]
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]

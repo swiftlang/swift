@@ -4603,7 +4603,15 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         nextId, /*labels=*/ArrayRef<Identifier>());
     nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-    Expr *nextCall = CallExpr::createImplicitEmpty(ctx, nextRef);
+    ArgumentList *nextArgs;
+    if (nextFn && nextFn->getParameters()->size() == 1) {
+      auto isolationArg =
+        new (ctx) CurrentContextIsolationExpr(stmt->getForLoc(), Type());
+      nextArgs = ArgumentList::forImplicitUnlabeled(ctx, { isolationArg });
+    } else {
+      nextArgs = ArgumentList::createImplicit(ctx, {});
+    }
+    Expr *nextCall = CallExpr::createImplicit(ctx, nextRef, nextArgs);
 
     // `next` is always async but witness might not be throwing
     if (isAsync) {

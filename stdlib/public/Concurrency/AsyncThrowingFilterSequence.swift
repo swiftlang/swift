@@ -138,18 +138,18 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
 
     /// Produces the next element in the filter sequence.
     ///
-    /// This iterator calls `nextElement()` on its base iterator; if this call
-    /// returns `nil`, `nextElement()` returns nil. Otherwise, `nextElement()`
+    /// This iterator calls `next()` on its base iterator; if this call
+    /// returns `nil`, `next()` returns nil. Otherwise, `next()`
     /// evaluates the result with the `predicate` closure. If the closure
-    /// returns `true`, `nextElement()` returns the received element; otherwise
+    /// returns `true`, `next()` returns the received element; otherwise
     /// it awaits the next element from the base iterator. If calling the
-    /// closure throws an error, the sequence ends and `nextElement()` rethrows
+    /// closure throws an error, the sequence ends and `next()` rethrows
     /// the error.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> Base.Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       while !finished {
-        guard let element = try await baseIterator.nextElement() else {
+        guard let element = try await baseIterator.next(actor) else {
           return nil
         }
         do {

@@ -125,8 +125,8 @@ extension AsyncMapSequence: AsyncSequence {
     /// calling the transforming closure on the received element.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> Transformed? {
-      guard let element = try await baseIterator.nextElement() else {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Transformed? {
+      guard let element = try await baseIterator.next(actor) else {
         return nil
       }
       return await transform(element)

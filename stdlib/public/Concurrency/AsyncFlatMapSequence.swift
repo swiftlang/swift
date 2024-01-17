@@ -270,20 +270,20 @@ extension AsyncFlatMapSequence: AsyncSequence {
 
     /// Produces the next element in the flat map sequence.
     ///
-    /// This iterator calls `nextElement()` on its base iterator; if this call
-    /// returns `nil`, `nextElement()` returns `nil`. Otherwise, `nextElement()`
+    /// This iterator calls `next()` on its base iterator; if this call
+    /// returns `nil`, `next()` returns `nil`. Otherwise, `next()`
     /// calls the transforming closure on the received element, takes the
     /// resulting asynchronous sequence, and creates an asynchronous iterator
-    /// from it.  `nextElement()` then consumes values from this iterator until
-    /// it terminates.  At this point, `nextElement()` is ready to receive the
+    /// from it.  `next()` then consumes values from this iterator until
+    /// it terminates.  At this point, `next()` is ready to receive the
     /// next value from the base sequence.
     @available(SwiftStdlib 5.11, *)
     @inlinable
-    public mutating func nextElement() async throws(Failure) -> SegmentOfResult.Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
       while !finished {
         if var iterator = currentIterator {
           do throws(any Error) {
-            let optElement = try await iterator.nextElement()
+            let optElement = try await iterator.next(actor)
             guard let element = optElement else {
               currentIterator = nil
               continue
@@ -296,7 +296,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
             throw error as! Failure
           }
         } else {
-          let optItem = try await baseIterator.nextElement()
+          let optItem = try await baseIterator.next(actor)
           guard let item = optItem else {
             finished = true
             return nil
@@ -304,7 +304,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
           do throws(any Error) { 
             let segment = await transform(item)
             var iterator = segment.makeAsyncIterator()
-            let optElement = try await iterator.nextElement()  
+            let optElement = try await iterator.next(actor)  
             guard let element = optElement else {
               currentIterator = nil
               continue

@@ -1335,7 +1335,7 @@ public:
             isRethrowLikeTypedThrows(fnRef.getFunction())) {
           // If we are in a rethrowing context and the function we're referring
           // to is a rethrow-like function using typed throws or we are
-          // calling the next() or nextElement() of an async iterator,
+          // calling the next() or next(_:) of an async iterator,
           // then look at all of the closure arguments.
           LLVM_FALLTHROUGH;
         } else {

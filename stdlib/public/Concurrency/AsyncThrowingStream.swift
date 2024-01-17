@@ -418,19 +418,19 @@ extension AsyncThrowingStream: AsyncSequence {
 
     /// The next value from the asynchronous stream.
     ///
-    /// When `nextElement()` returns `nil`, this signifies the end of the
+    /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncThrowingStream`.
     ///
-    /// It is a programmer error to invoke `nextElement()` from a concurrent
+    /// It is a programmer error to invoke `next()` from a concurrent
     /// context that contends with another such call, which results in a call to
     /// `fatalError()`.
     ///
-    /// If you cancel the task this iterator is running in while `nextElement()`
+    /// If you cancel the task this iterator is running in while `next()`
     /// is awaiting a value, the `AsyncThrowingStream` terminates. In this case,
-    /// `nextElement()` may return `nil` immediately, or else return `nil` on
+    /// `next()` may return `nil` immediately, or else return `nil` on
     /// subsequent calls.
     @available(SwiftStdlib 5.11, *)
-    public mutating func nextElement() async throws(Failure) -> Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Element? {
       return try await context.produce()
     }
   }

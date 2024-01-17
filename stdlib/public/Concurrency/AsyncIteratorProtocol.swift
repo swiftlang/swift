@@ -106,16 +106,16 @@ public protocol AsyncIteratorProtocol<Element, Failure> {
   /// - Returns: The next element, if it exists, or `nil` to signal the end of
   ///   the sequence.
   @available(SwiftStdlib 5.11, *)
-  mutating func nextElement() async throws(Failure) -> Element?
+  mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Element?
 }
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncIteratorProtocol {
-  /// Default implementation of `nextElement()` in terms of `next()`, which is
+  /// Default implementation of `next()` in terms of `next()`, which is
   /// required to maintain backward compatibility with existing async iterators.
   @available(SwiftStdlib 5.11, *)
   @inlinable
-  public mutating func nextElement() async throws(Failure) -> Element? {
+  public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Element? {
     do {
       return try await next()
     } catch {

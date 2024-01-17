@@ -380,19 +380,19 @@ extension AsyncStream: AsyncSequence {
 
     /// The next value from the asynchronous stream.
     ///
-    /// When `nextElement()` returns `nil`, this signifies the end of the
+    /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncStream`.
     ///
-    /// It is a programmer error to invoke `nextElement()` from a concurrent
+    /// It is a programmer error to invoke `next()` from a concurrent
     /// context that contends with another such call, which results in a call to
     /// `fatalError()`.
     ///
-    /// If you cancel the task this iterator is running in while `nextElement()`
+    /// If you cancel the task this iterator is running in while `next()`
     /// is awaiting a value, the `AsyncStream` terminates. In this case,
-    /// `nextElement()` might return `nil` immediately, or return `nil` on
+    /// `next()` might return `nil` immediately, or return `nil` on
     /// subsequent calls.
     @available(SwiftStdlib 5.11, *)
-    public mutating func nextElement() async -> Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async -> Element? {
       await context.produce()
     }
   }
@@ -551,7 +551,7 @@ extension AsyncStream {
     
     @available(SwiftStdlib 5.11, *)
     @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-    public mutating func nextElement() async -> Element? {
+    public mutating func next(_ actor: isolated (any Actor)?) async -> Element? {
       fatalError("Unavailable in task-to-thread concurrency model")
     }
   }
