@@ -34,12 +34,12 @@ public struct Unmanaged<Instance: AnyObject> {
   public static func fromOpaque(
     @_nonEphemeral _ value: UnsafeRawPointer
   ) -> Unmanaged {
-    // NOTE: `value` is allowed to be a dangling pointer, so 
+    // NOTE: `value` is allowed to represent a dangling reference, so 
     // this function must not ever try to dereference it. For
-    // example, it must NOT go through the init(_private:) initializer
-    // because it requires us to materialize a strong reference to 'Instance'.
-    // This materialization is enough to convince the compiler to add
-    // retain/releases which we want to avoid for the opaque pointer functions.
+    // example, this function must NOT use the init(_private:) initializer
+    // because doing so requires materializing a strong reference to 'Instance'.
+    // This materialization would be enough to convince the compiler to add
+    // retain/releases which must be avoided for the opaque pointer functions.
     // 'Unmanaged<Instance>' is layout compatible with 'UnsafeRawPointer' and
     // casting to that will not attempt to retain the reference held at 'value'.
     unsafeBitCast(value, to: Unmanaged<Instance>.self)

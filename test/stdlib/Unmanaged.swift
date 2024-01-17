@@ -85,7 +85,7 @@ UnmanagedTests.test("Opaque avoid retain/release") {
   // Turn it into a dangling unmanaged reference.
   // We expect this not to crash, as this operation isn't 
   // supposed to dereference the pointer in any way.
-  let unmanaged = Unmanaged.fromOpaque(ref)
+  let unmanaged = Unmanaged<Foobar>.fromOpaque(ref)
   // Similarly, converting the unmanaged reference back to a 
   // pointer should not ever try to dereference it either.
   let ref2 = unmanaged.toOpaque()
