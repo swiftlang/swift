@@ -115,8 +115,6 @@ TypeInfo::~TypeInfo() {
 }
 
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
-  assert(cast<llvm::PointerType>(ptr->getType())
-             ->isOpaqueOrPointeeTypeMatches(getStorageType()));
   return Address(ptr, getStorageType(), getBestKnownAlignment());
 }
 

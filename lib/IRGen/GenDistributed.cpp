@@ -712,12 +712,6 @@ void DistributedAccessor::emit() {
 
     // Generic arguments associated with the distributed thunk directly
     // e.g. `distributed func echo<T, U>(...)`
-    assert(
-        !IGM.getLLVMContext().supportsTypedPointers() ||
-        expandedSignature.numTypeMetadataPtrs ==
-            llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
-              return type == IGM.TypeMetadataPtrTy;
-            }));
 
     for (unsigned index = 0; index < expandedSignature.numTypeMetadataPtrs; ++index) {
       auto offset =
