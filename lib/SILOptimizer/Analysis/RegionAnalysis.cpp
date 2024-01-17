@@ -2108,6 +2108,7 @@ CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(FixLifetimeInst, Require)
 CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Require)
 CONSTANT_TRANSLATION(BridgeObjectToWordInst, Require)
+CONSTANT_TRANSLATION(IsUniqueInst, Require)
 
 //===---
 // Terminators
@@ -2156,7 +2157,6 @@ CONSTANT_TRANSLATION(ValueToBridgeObjectInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
-CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
