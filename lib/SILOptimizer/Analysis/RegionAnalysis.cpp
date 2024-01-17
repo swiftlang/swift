@@ -177,6 +177,45 @@ struct UseDefChainVisitor
 
 } // namespace
 
+/// Classify an instructions as look through when we are looking through
+/// values. We assert that all instructions that are CONSTANT_TRANSLATION
+/// LookThrough to make sure they stay in sync.
+static bool isStaticallyLookThroughInst(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::BeginAccessInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginDeallocRefInst:
+  case SILInstructionKind::BridgeObjectToRefInst:
+  case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndInitLetRefInst:
+  case SILInstructionKind::ExplicitCopyValueInst:
+  case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::ProjectBlockStorageInst:
+  case SILInstructionKind::ProjectBoxInst:
+  case SILInstructionKind::RefToBridgeObjectInst:
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UpcastInst:
+    return true;
+  }
+}
+
 static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
   auto *fn = value->getFunction();
   SILValue result = value;
@@ -189,12 +228,14 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
     temp = lookThroughOwnershipInsts(temp);
 
     if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
-      if (isa<ExplicitCopyValueInst, CopyableToMoveOnlyWrapperValueInst,
-              MoveOnlyWrapperToCopyableValueInst,
-              MoveOnlyWrapperToCopyableBoxInst, BeginAccessInst,
-              MarkDependenceInst>(svi) ||
-          isIdentityPreservingRefCast(svi)) {
+      if (isStaticallyLookThroughInst(svi)) {
         temp = svi->getOperand(0);
+      }
+
+      if (auto cast = SILDynamicCastInst::getAs(svi)) {
+        if (cast.isRCIdentityPreserving()) {
+          temp = svi->getOperand(0);
+        }
       }
 
       // If we have a cast and our operand and result are non-Sendable, treat it
@@ -223,13 +264,10 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
       }
     }
 
-    if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
-            temp->getDefiningInstruction())) {
-      temp = dsi->getOperand();
-    }
-    if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
-            temp->getDefiningInstruction())) {
-      temp = dti->getOperand();
+    if (auto *inst = temp->getDefiningInstruction()) {
+      if (isStaticallyLookThroughInst(inst)) {
+        temp = inst->getOperand(0);
+      }
     }
 
     if (temp != result) {
@@ -1895,6 +1933,12 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 
 #define CONSTANT_TRANSLATION(INST, Kind)                                       \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    assert((TranslationSemantics::Kind != TranslationSemantics::LookThrough || \
+            isStaticallyLookThroughInst(inst)) &&                              \
+           "Out of sync?!");                                                   \
+    assert((TranslationSemantics::Kind == TranslationSemantics::LookThrough || \
+            !isStaticallyLookThroughInst(inst)) &&                             \
+           "Out of sync?!");                                                   \
     return TranslationSemantics::Kind;                                         \
   }
 
@@ -2297,7 +2341,7 @@ PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
-  translateSILAssign(mdi, mdi->getValue());
+  translateSILLookThrough(mdi->getResults(), mdi->getValue());
   translateSILRequire(mdi->getBase());
   return TranslationSemantics::Special;
 }
