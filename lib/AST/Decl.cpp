@@ -1931,7 +1931,7 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
     // closures/decls present in the initialization expr. This currently should
     // only affect implicit code though.
     if (!initContext && !Parent->isLocalContext())
-      initContext = new (Ctx) PatternBindingInitializer(Parent);
+      initContext = PatternBindingInitializer::create(Parent);
 
     if (initContext)
       initContext->setBinding(PBD, idx);

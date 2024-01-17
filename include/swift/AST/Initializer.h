@@ -84,13 +84,16 @@ class PatternBindingInitializer : public Initializer {
     SelfParam = nullptr;
   }
 
-public:
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
       Binding(nullptr), SelfParam(nullptr) {
     SpareBits = 0;
   }
- 
+
+public:
+  static PatternBindingInitializer *create(DeclContext *parent) {
+    return new (parent->getASTContext()) PatternBindingInitializer(parent);
+  }
 
   void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
     setParent(binding->getDeclContext());

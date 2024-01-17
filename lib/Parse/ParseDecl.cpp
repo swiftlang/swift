@@ -4173,10 +4173,8 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
       // initializers.
       llvm::Optional<ParseFunctionBody> initParser;
       if (!CurDeclContext->isLocalContext()) {
-        if (!initContext) {
-          initContext =
-              new (Context) PatternBindingInitializer(CurDeclContext);
-        }
+        if (!initContext)
+          initContext = PatternBindingInitializer::create(CurDeclContext);
 
         initParser.emplace(*this, initContext);
       }
@@ -8339,7 +8337,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // for the PBD we'll eventually create.  This allows us to have reasonable
       // DeclContexts for any closures that may live inside of initializers.
       if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
-        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+        initContext = PatternBindingInitializer::create(CurDeclContext);
 
       // If we're using a local context (either a TopLevelCodeDecl or a
       // PatternBindingContext) install it now so that CurDeclContext is set
