@@ -3916,7 +3916,7 @@ namespace {
 
     Type visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
       auto actorProto = CS.getASTContext().getProtocol(
-          KnownProtocolKind::AnyActor);
+          KnownProtocolKind::Actor);
       return OptionalType::get(actorProto->getDeclaredExistentialType());
     }
 

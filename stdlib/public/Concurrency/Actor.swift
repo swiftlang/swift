@@ -77,4 +77,4 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 /// isolated, or `nil` if the code is nonisolated.
 @available(SwiftStdlib 5.1, *)
 @freestanding(expression)
-public macro isolation() -> (any AnyActor)? = Builtin.IsolationMacro
+public macro isolation() -> (any Actor)? = Builtin.IsolationMacro
