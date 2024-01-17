@@ -24,6 +24,11 @@ public func staticstring() -> StaticString {
   return "hello"
 }
 
+public func unicodescalars() {
+  let a = UInt8(ascii: "-")
+  let b = Unicode.Scalar("-").value
+}
+
 public func checks(n: Int) {
   precondition(n > 0)
   precondition(n > 0, "message")

@@ -107,7 +107,7 @@ split_embedded_sources(
   EMBEDDED ManagedBuffer.swift
     NORMAL Map.swift
   EMBEDDED MemoryLayout.swift
-    NORMAL UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
