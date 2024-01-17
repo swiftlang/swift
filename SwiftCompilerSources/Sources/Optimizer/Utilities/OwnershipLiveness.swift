@@ -329,7 +329,7 @@ extension AddressLifetimeDefUseWalker {
 ///   %0 = begin_borrow %outerValue
 ///   %1 = begin_borrow %0
 ///   end_borrow %1        // inner "use point" of %0
-///   end_borrow %0        // outer use of %1
+///   end_borrow %0        // outer use of %0
 ///
 /// This becomes more complicated with reborrows and closures. The
 /// implementation can simply rely on IsInnerLifetime to know whether
@@ -492,7 +492,7 @@ extension OwnershipUseVisitor {
     }
   }
 
-  /// Visit only those uses of an value within an inner borrow scope
+  /// Visit only those uses of a value within an inner borrow scope
   /// that may affect the outer lifetime. An inner borrow scope is one
   /// in which the borrowing operand is itself a use of the outer
   /// lifetime, including: begin_borrow, reborrow, partial_apply,

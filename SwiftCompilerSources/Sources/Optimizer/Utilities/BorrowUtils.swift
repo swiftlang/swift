@@ -44,7 +44,7 @@
 // of which dominates the value and introduces a borrow scope that
 // encloses all forwarded uses of the guaranteed value.
 //
-//   %1 = begin_borrow %0                // borrow introducer for %3
+//   %1 = begin_borrow %0                // borrow introducer for %2
 //   %2 = begin_borrow %1                // borrow introducer for %3
 //   %3 = struct (%1, %2)                // forwards two guaranteed values
 //   ... all forwarded uses of %3
@@ -88,7 +88,7 @@
 //     %6 = begin_borrow %0       %6                   %0
 //     %7 = struct (%6)           %6                   %6
 //     br bb3(%6, %7)             
-//   bb3(%reborrow: @guaranteed,  %reborrow            %0
+//   bb3(%reborrow: @reborrow,    %reborrow            %0
 //       %phi: @guaranteed):      %phi                 %reborrow
 //  
 // `%reborrow` is an outer-adjacent phi to `%phi` because it encloses
@@ -104,14 +104,14 @@
 //     cond_br ..., bb1, bb2      
 //   bb1:                         
 //     %1 = owned value           
-//     %2 = begin_borrow %0       %2                   %1
+//     %2 = begin_borrow %1       %2                   %1
 //     br bb3(%1, %2)             
 //   bb2:                         
 //     %5 = owned value           
 //     %6 = begin_borrow %5       %6                   %5
 //     br bb3(%5, %6)             
-//   bb3(%phi: @owned,            invalid              %0
-//       %reborrow: @guaranteed): %reborrow            %phi
+//   bb3(%phi: @owned,            invalid              none
+//       %reborrow: @reborrow):   %reborrow            %phi
 //  
 // In OSSA, each owned value defines a separate lifetime. It is
 // consumed on all paths by a direct use. Owned lifetimes can,
@@ -201,9 +201,8 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     switch self {
     case .beginBorrow, .storeBorrow:
       let svi = instruction as! SingleValueInstruction
-      return svi.uses.walk {
-        if $0.instruction is EndBorrowInst { return visitor($0) }
-        return .continueWalk
+      return svi.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+        visitor($0)
       }
     case .beginApply(let bai):
       return bai.token.uses.walk { return visitor($0) }
@@ -494,10 +493,10 @@ private struct BorrowIntroducers {
   //
   // Example:
   //
-  //     bb1(%reborrow_1 : @guaranteed)
+  //     bb1(%reborrow_1 : @reborrow)
   //         %field = struct_extract %reborrow_1
   //         br bb2(%reborrow_1, %field)
-  //     bb2(%reborrow_2 : @guaranteed, %forward_2 : @guaranteed)
+  //     bb2(%reborrow_2 : @reborrow, %forward_2 : @guaranteed)
   //         end_borrow %reborrow_2
   //
   // Calling `gather(forPhi: %forward_2)`
@@ -606,8 +605,8 @@ private func mapToPhi<PredecessorSequence: Sequence<Value>> (
 ///     %outerBorrow = begin_borrow %0             // %0
 ///     %innerBorrow = begin_borrow %outerBorrow   // %outerBorrow
 ///     br bb1(%outerBorrow, %innerBorrow)
-///   bb1(%outerReborrow : @guaranteed,            // %0
-///       %innerReborrow : @guaranteed)            // %outerReborrow
+///   bb1(%outerReborrow : @reborrow,              // %0
+///       %innerReborrow : @reborrow)              // %outerReborrow
 ///
 func gatherEnclosingValues(for value: Value,
                            in enclosingValues: inout Stack<Value>,
@@ -735,11 +734,11 @@ private struct EnclosingValues {
   //         %value = ...
   //         %borrow = begin_borrow %value
   //         br one(%borrow)
-  //     one(%reborrow_1 : @guaranteed)
+  //     one(%reborrow_1 : @reborrow)
   //         br two(%value, %reborrow_1)
-  //     two(%phi_2 : @owned, %reborrow_2 : @guaranteed)
+  //     two(%phi_2 : @owned, %reborrow_2 : @reborrow)
   //         br three(%value, %reborrow_2)
-  //     three(%phi_3 : @owned, %reborrow_3 : @guaranteed)
+  //     three(%phi_3 : @owned, %reborrow_3 : @reborrow)
   //         end_borrow %reborrow_3
   //         destroy_value %phi_3
   //
@@ -758,7 +757,7 @@ private struct EnclosingValues {
   //         %struct = struct (%outerBorrowA, outerBorrowB)
   //         %borrow = begin_borrow %struct
   //         br one(%outerBorrowA, %borrow)
-  //     one(%outerReborrow : @guaranteed, %reborrow : @guaranteed)
+  //     one(%outerReborrow : @reborrow, %reborrow : @reborrow)
   //
   // gather(forReborrow: %reborrow) finds (%outerReborrow, %outerBorrowB).
   //
