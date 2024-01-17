@@ -428,10 +428,18 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
     for (auto fileUnit : mainModule->getFiles()) {
       auto sf = dyn_cast<SourceFile>(fileUnit);
       if (!sf)
-	continue;
+        continue;
 
       mainDependencies.addModuleImport(*sf, alreadyAddedModules);
     }
+
+    // Add all the successful canImport checks from the ASTContext as part of
+    // the dependency since only mainModule can have `canImport` check. This
+    // needs to happen after visiting all the top-level decls from all
+    // SourceFiles.
+    for (auto &Module :
+         mainModule->getASTContext().getSuccessfulCanImportCheckNames())
+      mainDependencies.addModuleImport(Module.first(), &alreadyAddedModules);
   }    
 
   return mainDependencies;

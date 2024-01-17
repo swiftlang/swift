@@ -860,6 +860,9 @@ private:
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
                               ImportPath::Module path);
 
+  /// Lookup a clang module.
+  clang::Module *lookupModule(StringRef moduleName);
+
 public:
   /// Load a module using either method.
   ModuleDecl *loadModule(SourceLoc importLoc,
