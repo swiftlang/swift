@@ -56,8 +56,9 @@ public struct Unmanaged<Instance: AnyObject> {
   /// - Returns: An opaque pointer to the value of this unmanaged reference.
   @_transparent
   public func toOpaque() -> UnsafeMutableRawPointer {
-    // NOTE: This function does not attempt to unsafeBitCast '_value' because
-    // that will get a strong reference temporary value who the compiler will
+    // NOTE: `self` is allowed to be a dangling reference.
+    // Therefore, this function must not unsafeBitCast '_value' because
+    // that will get a strong reference temporary value that the compiler will
     // try to retain/release. Use 'self' to avoid this. 'Unmanaged<Instance>' is
     // layout compatible with 'UnsafeRawPointer' and casting from that will not
     // attempt to retain the reference held at '_value'.
