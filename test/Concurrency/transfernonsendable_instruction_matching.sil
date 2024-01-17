@@ -21,6 +21,8 @@ final class SendableKlass : Sendable {}
 @_moveOnly
 struct NonSendableMoveOnlyStruct {
   var ns: NonSendableKlass
+
+  deinit
 }
 
 struct NonSendableStruct {
@@ -41,6 +43,7 @@ sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_
 sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
 sil @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
+sil @transferMoveOnlyStruct : $@convention(thin) @async (@guaranteed NonSendableMoveOnlyStruct) -> ()
 
 enum FakeOptional<T> {
 case none
@@ -884,3 +887,12 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @drop_deinit_test : $@convention(thin) @async (@owned NonSendableMoveOnlyStruct) -> () {
+bb0(%0 : @owned $NonSendableMoveOnlyStruct):
+  %1 = drop_deinit %0 : $NonSendableMoveOnlyStruct
+  destroy_value %1 : $NonSendableMoveOnlyStruct
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
