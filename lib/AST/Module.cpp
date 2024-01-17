@@ -2249,6 +2249,31 @@ LookupConformanceInModuleRequest::evaluate(
   return ProtocolConformanceRef(conformance);
 }
 
+ProtocolConformanceRef
+ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
+                             bool allowMissing) {
+  auto lookupResult = lookupConformance(type, proto, allowMissing);
+  if (lookupResult.isInvalid()) {
+    return ProtocolConformanceRef::forInvalid();
+  }
+
+  auto condReqs = lookupResult.getConditionalRequirements();
+
+  // If we have a conditional requirements that we need to check, do so now.
+  if (!condReqs.empty()) {
+    switch (checkRequirements(condReqs)) {
+    case CheckRequirementsResult::Success:
+      break;
+
+    case CheckRequirementsResult::RequirementFailure:
+    case CheckRequirementsResult::SubstitutionFailure:
+      return ProtocolConformanceRef::forInvalid();
+    }
+  }
+
+  return lookupResult;
+}
+
 Fingerprint SourceFile::getInterfaceHash() const {
   assert(hasInterfaceHash() && "Interface hash not enabled");
   auto &eval = getASTContext().evaluator;

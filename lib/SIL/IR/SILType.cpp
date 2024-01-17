@@ -1252,7 +1252,7 @@ SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
 
 ProtocolConformanceRef
 SILType::conformsToProtocol(SILFunction *fn, ProtocolDecl *protocol) const {
-  return fn->getParentModule()->conformsToProtocol(getASTType(), protocol);
+  return fn->getParentModule()->checkConformance(getASTType(), protocol);
 }
 
 bool SILType::isSendable(SILFunction *fn) const {

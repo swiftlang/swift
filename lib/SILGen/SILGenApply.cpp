@@ -5866,7 +5866,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
         assert(outerErrorType == SILType::getExceptionType(getASTContext()));
 
         ProtocolConformanceRef conformances[1] = {
-          getModule().getSwiftModule()->conformsToProtocol(
+          getModule().getSwiftModule()->checkConformance(
             innerError->getType().getASTType(),
             getASTContext().getErrorDecl())
         };

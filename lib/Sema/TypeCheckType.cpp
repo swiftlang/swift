@@ -651,8 +651,8 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
       module, genericSig.getRequirements(), substitutions);
-  switch (result) {
-  case CheckGenericArgumentsResult::RequirementFailure:
+  switch (result.getKind()) {
+  case CheckRequirementsResult::RequirementFailure:
     if (loc.isValid()) {
       TypeChecker::diagnoseRequirementFailure(
           result.getRequirementFailureInfo(), loc, noteLoc,
@@ -661,9 +661,9 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
     }
 
     return false;
-  case CheckGenericArgumentsResult::SubstitutionFailure:
+  case CheckRequirementsResult::SubstitutionFailure:
     return false;
-  case CheckGenericArgumentsResult::Success:
+  case CheckRequirementsResult::Success:
     return true;
   }
   llvm_unreachable("invalid requirement check type");
@@ -1158,8 +1158,8 @@ Type TypeResolution::applyUnboundGenericArguments(
 
     const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
         module, genericSig.getRequirements(), substitutions);
-    switch (result) {
-    case CheckGenericArgumentsResult::RequirementFailure:
+    switch (result.getKind()) {
+    case CheckRequirementsResult::RequirementFailure:
       if (loc.isValid()) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), loc, noteLoc,
@@ -1168,9 +1168,9 @@ Type TypeResolution::applyUnboundGenericArguments(
       }
 
       LLVM_FALLTHROUGH;
-    case CheckGenericArgumentsResult::SubstitutionFailure:
+    case CheckRequirementsResult::SubstitutionFailure:
       return ErrorType::get(getASTContext());
-    case CheckGenericArgumentsResult::Success:
+    case CheckRequirementsResult::Success:
       break;
     }
   }
@@ -3726,9 +3726,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !TypeChecker::conformsToProtocol(
-                  thrownTy, ctx.getErrorDecl(),
-                  resolution.getDeclContext()->getParentModule())) {
+               !resolution.getDeclContext()->getParentModule()->checkConformance(
+                  thrownTy, ctx.getErrorDecl())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
           thrownTy);
@@ -3996,9 +3995,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       selfType = next;
     }
 
-    witnessMethodConformance = TypeChecker::conformsToProtocol(
-        selfType, protocolType->getDecl(),
-        getDeclContext()->getParentModule());
+    witnessMethodConformance = getDeclContext()->getParentModule()
+      ->checkConformance(selfType, protocolType->getDecl());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }

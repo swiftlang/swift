@@ -928,7 +928,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     auto DistributedActorProto = C.getDistributedActorDecl();
     for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
       if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = module->conformsToProtocol(
+        auto conformance = module->checkConformance(
             proto->mapTypeIntoContext(var->getInterfaceType()),
             DAS);
 

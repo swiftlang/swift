@@ -246,6 +246,46 @@ int Requirement::compare(const Requirement &other) const {
   return compareProtos;
 }
 
+CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requirements) {
+  SmallVector<Requirement, 4> worklist(requirements.begin(), requirements.end());
+
+  bool hadSubstFailure = false;
+
+  while (!worklist.empty()) {
+    auto req = worklist.pop_back_val();
+    switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
+    case CheckRequirementResult::Success:
+    case CheckRequirementResult::ConditionalConformance:
+    case CheckRequirementResult::PackRequirement:
+      break;
+
+    case CheckRequirementResult::RequirementFailure:
+      return CheckRequirementsResult::RequirementFailure;
+
+    case CheckRequirementResult::SubstitutionFailure:
+      hadSubstFailure = true;
+      break;
+    }
+  }
+
+  if (hadSubstFailure)
+    return CheckRequirementsResult::SubstitutionFailure;
+
+  return CheckRequirementsResult::Success;
+}
+
+CheckRequirementsResult swift::checkRequirements(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions, SubstOptions options) {
+  SmallVector<Requirement, 4> substReqs;
+  for (auto req : requirements) {
+    substReqs.push_back(req.subst(substitutions,
+                              LookUpConformanceInModule(module), options));
+  }
+
+  return checkRequirements(substReqs);
+}
+
 InverseRequirement::InverseRequirement(Type subject,
                                        ProtocolDecl *protocol,
                                        SourceLoc loc)

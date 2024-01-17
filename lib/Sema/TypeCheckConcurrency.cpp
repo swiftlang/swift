@@ -691,12 +691,12 @@ bool swift::isSendableType(ModuleDecl *module, Type type) {
 
   // First check if we have a function type. If we do, check if it is
   // Sendable. We do this since functions cannot conform to protocols.
-  if (auto *fas = type->getCanonicalType()->getAs<SILFunctionType>())
+  if (auto *fas = type->getAs<SILFunctionType>())
     return fas->isSendable();
-  if (auto *fas = type->getCanonicalType()->getAs<AnyFunctionType>())
+  if (auto *fas = type->getAs<AnyFunctionType>())
     return fas->isSendable();
 
-  auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
+  auto conformance = module->checkConformance(type, proto);
   if (conformance.isInvalid())
     return false;
 
@@ -1074,7 +1074,7 @@ bool swift::diagnoseNonSendableTypes(
     return false;
 
   // FIXME: More detail for unavailable conformances.
-  auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
+  auto conformance = module->checkConformance(type, proto);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);
@@ -1271,8 +1271,7 @@ namespace {
           return true;
 
         auto module = nominal->getParentModule();
-        auto conformance = TypeChecker::conformsToProtocol(
-            type, sendableProto, module);
+        auto conformance = module->checkConformance(type, sendableProto);
         if (conformance.isInvalid())
           return true;
 
@@ -4702,7 +4701,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       auto &ctx = value->getASTContext();
       auto conformsTo = [&](KnownProtocolKind kind) {
         if (auto *proto = ctx.getProtocol(kind))
-          return value->getModuleContext()->conformsToProtocol(paramType, proto);
+          return value->getModuleContext()->checkConformance(paramType, proto);
         return ProtocolConformanceRef::forInvalid();
       };
 
@@ -5655,9 +5654,9 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   if (classDecl) {
     if (Type superclass = classDecl->getSuperclass()) {
       auto classModule = classDecl->getParentModule();
-      auto inheritedConformance = TypeChecker::conformsToProtocol(
+      auto inheritedConformance = classModule->checkConformance(
           classDecl->mapTypeIntoContext(superclass),
-          proto, classModule, /*allowMissing=*/false);
+          proto, /*allowMissing=*/false);
       if (inheritedConformance.hasUnavailableConformance())
         inheritedConformance = ProtocolConformanceRef::forInvalid();
 

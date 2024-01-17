@@ -131,7 +131,7 @@ bool BitwiseCopyableStorageVisitor::visitMemberDecl(ValueDecl *decl, Type ty) {
 }
 
 bool BitwiseCopyableStorageVisitor::visitMemberType(Type ty, SourceLoc loc) {
-  auto conformance = TypeChecker::conformsToProtocol(ty, protocol, module);
+  auto conformance = module->checkConformance(ty, protocol);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return visitNonconformingMemberType(ty, loc);
   }
