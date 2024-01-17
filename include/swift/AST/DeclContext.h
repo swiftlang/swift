@@ -79,7 +79,6 @@ namespace swift {
   class Initializer;
   class ClassDecl;
   class SerializedAbstractClosureExpr;
-  class SerializedDefaultArgumentInitializer;
   class SerializedTopLevelCodeDecl;
   class StructDecl;
   class AccessorDecl;
@@ -114,7 +113,6 @@ enum class DeclContextKind : unsigned {
 /// \see SerializedLocalDeclContext.
 enum class LocalDeclContextKind : uint8_t {
   AbstractClosure,
-  DefaultArgumentInitializer,
   TopLevelCodeDecl
 };
 

@@ -151,29 +151,6 @@ public:
   }
 };
 
-/// SerializedDefaultArgumentInitializer - This represents what was originally a
-/// DefaultArgumentInitializer during serialization. It is preserved only to
-/// maintain the correct AST structure and remangling after deserialization.
-class SerializedDefaultArgumentInitializer : public SerializedLocalDeclContext {
-  const unsigned Index;
-public:
-  SerializedDefaultArgumentInitializer(unsigned Index, DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::DefaultArgumentInitializer,
-                                 Parent),
-      Index(Index) {}
-
-  unsigned getIndex() const {
-    return Index;
-  }
-
-  static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::DefaultArgumentInitializer;
-    return false;
-  }
-};
-
 /// A property wrapper initialization expression.  The parent context is the
 /// function or closure which owns the property wrapper.
 class PropertyWrapperInitializer : public Initializer {

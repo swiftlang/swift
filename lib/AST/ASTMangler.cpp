@@ -2323,11 +2323,6 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     case LocalDeclContextKind::AbstractClosure:
       appendClosureEntity(cast<SerializedAbstractClosureExpr>(local));
       return;
-    case LocalDeclContextKind::DefaultArgumentInitializer: {
-      auto argInit = cast<SerializedDefaultArgumentInitializer>(local);
-      appendDefaultArgumentEntity(ctx->getParent(), argInit->getIndex());
-      return;
-    }
     case LocalDeclContextKind::TopLevelCodeDecl:
       return appendContext(local->getParent(), useModuleName);
     }

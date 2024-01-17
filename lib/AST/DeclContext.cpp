@@ -824,11 +824,6 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       OS << " closure : " << serializedClosure->getType();
       break;
     }
-    case LocalDeclContextKind::DefaultArgumentInitializer: {
-      auto init = cast<SerializedDefaultArgumentInitializer>(local);
-      OS << "DefaultArgument index=" << init->getIndex();
-      break;
-    }
     case LocalDeclContextKind::TopLevelCodeDecl:
       OS << " TopLevelCode";
       break;

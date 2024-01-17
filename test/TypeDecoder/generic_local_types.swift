@@ -186,7 +186,7 @@ class Generic<T> {
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias9
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias10
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias11
-// CHECK-DECL: generic_local_types.(file).Generic.method(_:).local context.local context.Alias12
+// CHECK-DECL: generic_local_types.(file).Generic.method(_:).default argument initializer.local context.Alias12
 // CHECK-DECL: generic_local_types.(file).Generic.method(_:).Alias13
 // CHECK-DECL: generic_local_types.(file).Generic.init().Alias14
 // CHECK-DECL: generic_local_types.(file).Generic.deinit.Alias15

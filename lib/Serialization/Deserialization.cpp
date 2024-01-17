@@ -2674,8 +2674,7 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
                                                               index);
     DeclContext *parent = getDeclContext(parentID);
 
-    declContextOrOffset = new (ctx)
-      SerializedDefaultArgumentInitializer(index, parent);
+    declContextOrOffset = new (ctx) DefaultArgumentInitializer(parent, index);
     break;
   }
 
