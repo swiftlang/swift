@@ -227,8 +227,8 @@ protected:
                                    buildBlockArguments);
     }
     if (builder.supports(ctx.Id_buildExpression)) {
-      expr = builder.buildCall(expr->getLoc(), ctx.Id_buildExpression, {expr},
-                               {Identifier()});
+      expr = builder.buildCall(expr->getStartLoc(), ctx.Id_buildExpression,
+                               {expr}, {Identifier()});
     }
 
     if (isa<CodeCompletionExpr>(expr)) {
