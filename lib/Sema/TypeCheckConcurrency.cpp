@@ -2785,6 +2785,25 @@ namespace {
               }
             }
             return nullptr;
+          },
+          [this]() -> VarDecl * {
+            auto isolation = getActorIsolationOfContext(
+                               const_cast<DeclContext *>(getDeclContext()),
+                               getClosureActorIsolation);
+            if (isolation == ActorIsolation::ActorInstance) {
+              VarDecl *var = isolation.getActorInstance();
+              if (!var) {
+                auto dc = const_cast<DeclContext *>(getDeclContext());
+                auto paramIdx = isolation.getActorInstanceParameter();
+                if (paramIdx == 0) {
+                  var = cast<AbstractFunctionDecl>(dc)->getImplicitSelfDecl();
+                } else {
+                  var = const_cast<ParamDecl *>(getParameterAt(dc, paramIdx - 1));
+                }
+              }
+              return var;
+            }
+            return nullptr;
           });
     }
 
@@ -3293,7 +3312,8 @@ namespace {
         }
 
         argForIsolatedParam = arg;
-        if (getIsolatedActor(arg))
+        unsatisfiedIsolation = llvm::None;
+        if (getIsolatedActor(arg) || isa<CurrentContextIsolationExpr>(arg))
           continue;
 
         // An isolated parameter was provided with a non-isolated argument.
@@ -6030,7 +6050,8 @@ AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(
 /// for the given expression.
 VarDecl *swift::getReferencedParamOrCapture(
     Expr *expr,
-    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue) {
+    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue,
+    llvm::function_ref<VarDecl *()> getCurrentIsolatedVar) {
   // Look through identity expressions and implicit conversions.
   Expr *prior;
 
@@ -6056,6 +6077,11 @@ VarDecl *swift::getReferencedParamOrCapture(
   // Declaration references to a variable.
   if (auto declRef = dyn_cast<DeclRefExpr>(expr))
     return dyn_cast<VarDecl>(declRef->getDecl());
+
+  // The current context isolation expression (#isolation) always
+  // corresponds to the isolation of the given code.
+  if (isa<CurrentContextIsolationExpr>(expr))
+    return getCurrentIsolatedVar();
 
   return nullptr;
 }

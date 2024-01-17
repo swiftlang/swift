@@ -8234,6 +8234,10 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
             return existential.ExistentialValue;
         }
         return nullptr;
+      },
+      []() -> VarDecl * {
+        // FIXME: Need to communicate this.
+        return nullptr;
       });
 
   if (!actor)
