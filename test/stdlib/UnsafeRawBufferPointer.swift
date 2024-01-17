@@ -83,7 +83,10 @@ UnsafeRawBufferPointerTestSuite.test("nonmutating_subscript_setter") {
   }
   expectEqual(value2, value1)
 
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 4,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
   buffer.copyBytes(from: [0, 1, 2, 3] as [UInt8])
   let leftBytes = buffer[0..<2]
@@ -131,7 +134,10 @@ UnsafeRawBufferPointerTestSuite.test("initFromArray") {
 #if !os(WASI)
 // Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).underflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 30, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 30,
+    alignment: MemoryLayout<UInt64>.alignment
+  )
   defer { buffer.deallocate() }
   let source = stride(from: 5 as Int64, to: 0, by: -1)
   if _isDebugAssertConfiguration() {
@@ -147,7 +153,10 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).underflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 30, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 30,
+    alignment: MemoryLayout<UInt64>.alignment
+  )
   defer { buffer.deallocate() }
   let source: [Int64] = [5, 4, 3, 2, 1]
   if _isDebugAssertConfiguration() {
@@ -164,7 +173,10 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).overflow") {
 #endif
 
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).exact") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 24, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3*MemoryLayout<Int64>.stride,
+    alignment: MemoryLayout<Int64>.alignment
+  )
   defer { buffer.deallocate() }
   let source: [Int64] = [5, 4, 3]
   var (it,bound) = buffer.initializeMemory(as: Int64.self, from: source)
@@ -213,7 +225,10 @@ UnsafeRawBufferPointerTestSuite.test("empty") {
   for _ in emptyBytes {
     expectUnreachable()
   }
-  let emptyMutableBytes = UnsafeMutableRawBufferPointer.allocate(byteCount: 0, alignment: MemoryLayout<UInt>.alignment)
+  let emptyMutableBytes = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 0,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   for _ in emptyMutableBytes {
     expectUnreachable()
   }
@@ -229,8 +244,10 @@ UnsafeRawBufferPointerTestSuite.test("reinterpret") {
   }
   let numPairs = 2
   let bytes = UnsafeMutableRawBufferPointer.allocate(
-    byteCount: MemoryLayout<Pair>.stride * numPairs, alignment: MemoryLayout<UInt>.alignment)
-  defer { bytes.deallocate() }  
+    byteCount: MemoryLayout<Pair>.stride * numPairs,
+    alignment: MemoryLayout<Pair>.alignment
+  )
+  defer { bytes.deallocate() }
 
   for i in 0..<(numPairs * 2) {
     bytes.storeBytes(of: Int32(i), toByteOffset: i * MemoryLayout<Int32>.stride,
@@ -259,7 +276,9 @@ UnsafeRawBufferPointerTestSuite.test("reinterpret") {
 UnsafeRawBufferPointerTestSuite.test("inBounds") {
   let numInts = 4
   let bytes = UnsafeMutableRawBufferPointer.allocate(
-    byteCount: MemoryLayout<Int>.stride * numInts, alignment: MemoryLayout<UInt>.alignment)
+    byteCount: MemoryLayout<Int>.stride * numInts,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { bytes.deallocate() }
 
   for i in 0..<numInts {
@@ -289,7 +308,10 @@ UnsafeRawBufferPointerTestSuite.test("inBounds") {
 #if !os(WASI)
 // Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 2, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 2,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeRawBufferPointer(rebasing: buffer[1..<2])
@@ -302,7 +324,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.get.overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 2, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 2,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeRawBufferPointer(rebasing: buffer[0..<1])
@@ -315,7 +340,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.get.overflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 2, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 2,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<2])
@@ -328,7 +356,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 2, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 2,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<1])
@@ -341,7 +372,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.get.underflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeRawBufferPointer(rebasing: buffer[1..<3])
@@ -354,7 +388,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.get.underflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeRawBufferPointer(rebasing: buffer[0..<2])
@@ -367,7 +404,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<3])
@@ -380,7 +420,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<2])
@@ -394,7 +437,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.narrow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   if _isDebugAssertConfiguration() {
@@ -405,7 +451,10 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.narrow") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.wide") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   if _isDebugAssertConfiguration() {
@@ -431,7 +480,10 @@ UnsafeRawBufferPointerTestSuite.test("_copyContents") {
 #if !os(WASI)
 // Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
 
   let bytes = buffer[0..<2]
@@ -461,7 +513,10 @@ UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguousStorage") {
 #if !os(WASI)
 // Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("copyBytes.sequence.overflow") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 3,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { buffer.deallocate() }
   
   let bytes = buffer[0..<2]
@@ -650,7 +705,10 @@ UnsafeRawBufferPointerTestSuite.test("copy.sequence.overflow")
 #endif
 
 UnsafeRawBufferPointerTestSuite.test("copy.overlap") {
-  let bytes = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: MemoryLayout<UInt>.alignment)
+  let bytes = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 4,
+    alignment: MemoryLayout<UInt>.alignment
+  )
   defer { bytes.deallocate() }
   // Right Overlap
   bytes[0] = 1
