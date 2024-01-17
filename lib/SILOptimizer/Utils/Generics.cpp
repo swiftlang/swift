@@ -3053,9 +3053,10 @@ bool usePrespecialized(
               stride = irgen::Size(1);
 
             if (stride.getValueInBits() == layout->getTrivialStrideInBits()) {
-              newSubs.push_back(CanType(
-                  BuiltinIntegerType::get(layout->getTrivialStrideInBits(),
-                                          genericParam->getASTContext())));
+              newSubs.push_back(CanType(BuiltinVectorType::get(
+                  genericParam->getASTContext(),
+                  BuiltinIntegerType::get(8, genericParam->getASTContext()),
+                  layout->getTrivialStride())));
             }
           }
         } else {

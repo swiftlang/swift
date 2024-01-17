@@ -12,7 +12,7 @@ public class SomeClass {
 @_specialize(exported: true, where @_noMetadata T : _Class)
 @_specialize(exported: true, where @_noMetadata T : _BridgeObject)
 @_specialize(exported: true, where @_noMetadata T : _Trivial(64))
-@_specialize(exported: true, where @_noMetadata T : _TrivialStride(128))
+@_specialize(exported: true, where @_noMetadata T : _TrivialStride(96))
 @_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
 public func publicPrespecialized<T>(_ t: T) {
 }
