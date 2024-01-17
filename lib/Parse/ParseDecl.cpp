@@ -8315,9 +8315,10 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       }
     });
 
-    // Check whether we have already established an initializer context.
+    // Check whether we have already established an initializer context for
+    // the first binding entry (subsequent entries need a separate context).
     PatternBindingInitializer *initContext =
-      findAttributeInitContent(Attributes);
+      PBDEntries.empty() ? findAttributeInitContent(Attributes) : nullptr;
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
