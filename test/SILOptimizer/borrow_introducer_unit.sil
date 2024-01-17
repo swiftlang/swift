@@ -381,3 +381,66 @@ bb0(%0 : @owned $C,
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: testSelfIntroducer: borrow_introducers with: %phi
+// CHECK: Borrow introducers for: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: testSelfIntroducer: borrow_introducers with: %phi
+
+// CHECK-LABEL: testSelfIntroducer: enclosing_values with: %reborrow
+// CHECK: Enclosing values for: %4 = argument of bb1 : $C                         // users: %8, %7
+// CHECK-NEXT: %0 = argument of bb0 : $C                         // user: %1
+// CHECK-NEXT: testSelfIntroducer: enclosing_values with: %reborrow
+sil [ossa] @testSelfIntroducer : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  %d = unconditional_checked_cast %borrow : $C to D
+  br bb1(%borrow : $C, %d : $D)
+ 
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
+  specify_test "borrow_introducers %phi"
+  specify_test "enclosing_values %reborrow"
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%reborrow : $C, %phi : $D)
+
+bb3:
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Test the reborrow cache in EnclosingValues. Here, %reborrow must be
+// visited once on each path, and each time the recursive algorithm
+// must find the enclosing def %0, which maps to a %outer0 on one path
+// and %outer1 on another path. If the cache fails, then we only find
+// one of the outer adjacent phis as and enclosing value for %inner.
+//
+// CHECK-LABEL: testEnclosingRevisitReborrow: enclosing_values with: %inner
+// CHECK: Enclosing values for: %10 = argument of bb4 : $C                        // user: %11
+// CHECK-NEXT: %{{.*}} = argument of bb4 : $C
+// CHECK-NEXT: %{{.*}} = argument of bb4 : $C
+// CHECK-NEXT: end running test 1 of 1 on testEnclosingRevisitReborrow: enclosing_values with: %inner
+sil [ossa] @testEnclosingRevisitReborrow : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  %borrow = begin_borrow %0 : $C
+  br bb1(%borrow : $C)
+
+bb1(%reborrow : @guaranteed $C):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4(%0 : $C, %1 : $C, %reborrow : $C)
+
+bb3:
+  br bb4(%1 : $C, %0 : $C, %reborrow : $C)
+
+bb4(%outer0 : @owned $C, %outer1 : @owned $C, %inner : @guaranteed $C):
+  specify_test "enclosing_values %inner"
+  end_borrow %inner : $C
+  destroy_value %outer0 : $C
+  destroy_value %outer1 : $C
+  %99 = tuple()
+  return %99 : $()
+}

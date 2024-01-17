@@ -613,11 +613,9 @@ func gatherEnclosingValues(for value: Value,
                            in enclosingValues: inout Stack<Value>,
                            _ context: some Context) {
 
-  var gatherValues = EnclosingValues(context)
-  defer { gatherValues.deinitialize() }
-  var cache = BorrowIntroducers.Cache(context)
+  var cache = EnclosingValues.Cache(context)
   defer { cache.deinitialize() }
-  gatherValues.gather(for: value, in: &enclosingValues, &cache)
+  EnclosingValues.gather(for: value, in: &enclosingValues, &cache, context)
 }
 
 /// Find inner adjacent phis in the same block as `enclosingPhi`.
@@ -637,21 +635,61 @@ func gatherInnerAdjacentPhis(for enclosingPhi: Phi,
 
 // Find the enclosing values for any value, including reborrows.
 private struct EnclosingValues {
-  var context: Context
-  var visitedReborrows : ValueSet
+  typealias CachedEnclosingValues = SingleInlineArray<Value>
+  struct Cache {
+    // Cache the enclosing values already found for each Reborrow.
+    var reborrowToEnclosingValues: Dictionary<HashableValue,
+                                              CachedEnclosingValues>
+    // Record recursively followed reborrows to avoid infinite cycles.
+    // Reborrows are removed from this set when they are cached.
+    var pendingReborrows: ValueSet
 
-  init(_ context: Context) {
-    self.context = context
-    self.visitedReborrows = ValueSet(context)
+    var borrowIntroducerCache: BorrowIntroducers.Cache
+
+    init(_ context: Context) {
+      reborrowToEnclosingValues =
+        Dictionary<HashableValue, CachedEnclosingValues>()
+      pendingReborrows = ValueSet(context)
+      borrowIntroducerCache = BorrowIntroducers.Cache(context)
+    }
+
+    mutating func deinitialize() {
+      pendingReborrows.deinitialize()
+      borrowIntroducerCache.deinitialize()
+    }
   }
 
-  mutating func deinitialize() {
-    visitedReborrows.deinitialize()
+  var context: Context
+  // EnclosingValues instances are recursively nested in order to
+  // find outer adjacent phis. Each instance populates a separate
+  // 'enclosingValeus' set. The same value may occur in 'enclosingValues' at
+  // multiple levels. Each instance, therefore, needs a separate
+  // visited set to avoid adding duplicates.
+  var visitedEnclosingValues: Set<HashableValue> = Set()
+
+  static func gather(for value: Value, in enclosingValues: inout Stack<Value>,
+                     _ cache: inout Cache, _ context: Context) {
+    var gatherValues = EnclosingValues(context: context)
+    gatherValues.gather(for: value, in: &enclosingValues, &cache)
+  }
+
+  private mutating func push(_ enclosingValue: Value,
+    in enclosingValues: inout Stack<Value>) {
+    if visitedEnclosingValues.insert(enclosingValue.hashable).inserted {
+      enclosingValues.push(enclosingValue)
+    }
+  }
+
+  private mutating func push<S: Sequence>(contentsOf other: S,
+    in enclosingValues: inout Stack<Value>) where S.Element == Value {
+    for elem in other {
+      push(elem, in: &enclosingValues)
+    }
   }
 
   mutating func gather(for value: Value,
                        in enclosingValues: inout Stack<Value>,
-                       _ cache: inout BorrowIntroducers.Cache) {
+                       _ cache: inout Cache) {
     if value is Undef || value.ownership != .guaranteed {
       return
     }
@@ -660,7 +698,7 @@ private struct EnclosingValues {
       case let .beginBorrow(bbi):
         // Gather the outer enclosing borrow scope.
         BorrowIntroducers.gather(for: bbi.operand.value, in: &enclosingValues,
-                                 &cache, context)
+                                 &cache.borrowIntroducerCache, context)
       case .loadBorrow, .beginApply, .functionArgument:
         // There is no enclosing value on this path.
         break
@@ -670,7 +708,7 @@ private struct EnclosingValues {
     } else {
       // Handle forwarded guaranteed values.
       BorrowIntroducers.gather(for: value, in: &enclosingValues,
-                               &cache, context)
+                               &cache.borrowIntroducerCache, context)
     }
   }
   
@@ -724,16 +762,25 @@ private struct EnclosingValues {
   //
   // gather(forReborrow: %reborrow) finds (%outerReborrow, %outerBorrowB).
   //
+  // This implementation mirrors BorrowIntroducers.gather(forPhi:in:).
+  // The difference is that this performs use-def recursion over
+  // reborrows rather, and at each step, it finds the enclosing values
+  // of the reborrow operands rather than the borrow introducers of
+  // the guaranteed phi.
   private mutating func gather(forReborrow reborrow: Phi,
                                in enclosingValues: inout Stack<Value>,
-                               _ cache: inout BorrowIntroducers.Cache) {
+                               _ cache: inout Cache) {
 
-    guard visitedReborrows.insert(reborrow.value) else {
+    // Phi cycles are skipped. They cannot contribute any new introducer.
+    if !cache.pendingReborrows.insert(reborrow.value) {
       return
     }
-    // avoid duplicates in the enclosingValues set.
-    var pushedEnclosingValues = ValueSet(context)
-    defer { pushedEnclosingValues.deinitialize() }
+    if let cachedEnclosingValues =
+         cache.reborrowToEnclosingValues[reborrow.value.hashable] {
+      push(contentsOf: cachedEnclosingValues, in: &enclosingValues)
+      return
+    }
+    assert(enclosingValues.isEmpty)
 
     // Find the enclosing introducer for each reborrow operand, and
     // remap it to the enclosing introducer for the successor block.
@@ -743,14 +790,20 @@ private struct EnclosingValues {
       defer {
         incomingEnclosingValues.deinitialize()
       }
-      gather(for: incomingValue, in: &incomingEnclosingValues, &cache)
-      mapToPhi(predecessor: pred,
-               incomingValues: incomingEnclosingValues).forEach {
-        if pushedEnclosingValues.insert($0) {
-          enclosingValues.append($0)
-        }
-      }
+      EnclosingValues.gather(for: incomingValue, in: &incomingEnclosingValues,
+                             &cache, context)
+      push(contentsOf: mapToPhi(predecessor: pred,
+                                incomingValues: incomingEnclosingValues),
+           in: &enclosingValues)
     }
+    { cachedIntroducers in
+      enclosingValues.forEach { cachedIntroducers.push($0) }
+    }(&cache.reborrowToEnclosingValues[reborrow.value.hashable,
+                                       default: CachedEnclosingValues()])
+
+    // Remove this reborrow from the pending set. It may be visited
+    // again at a different level of recursion.
+    cache.pendingReborrows.erase(reborrow.value)
   }
 }
 

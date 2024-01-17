@@ -304,6 +304,60 @@ bb1(%reborrow : @guaranteed $C):
   return %99 : $()
 }
 
+// CHECK-LABEL: testInteriorNondominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK-LABEL: sil [ossa] @testInteriorNondominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedReborrow: interior_liveness_swift with: %borrow1
+sil [ossa] @testInteriorNondominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb3(%borrow1 : $C, %borrow2 : $D)
+ 
+bb3(%reborrow1 : @guaranteed $C, %reborrow2 : @guaranteed $D):
+  end_borrow %reborrow2 : $D
+  end_borrow %reborrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorDominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK: sil [ossa] @testInteriorDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : $D
+// CHECK-NEXT:             br bb1(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedReborrow: interior_liveness_swift with: %borrow1
+sil [ossa] @testInteriorDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb3(%borrow2 : $D)
+ 
+bb3(%reborrow2 : @guaranteed $D):
+  end_borrow %reborrow2 : $D
+  end_borrow %borrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
 // CHECK-LABEL: testInteriorDominatedGuaranteedForwardingPhi: interior-liveness with: @argument[0]
 // CHECK: Complete liveness
 // CHECK: last user: %{{.*}} load [copy]
