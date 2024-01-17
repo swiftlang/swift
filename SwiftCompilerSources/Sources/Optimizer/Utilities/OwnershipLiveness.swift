@@ -131,7 +131,7 @@ func computeInteriorLiveness(for definingValue: Value,
 ///
 /// TODO: Verify that pointerEscape is only called for live ranges in which
 /// `findPointerEscape()` returns true.
-protocol AddressUseVisitor {
+protocol AddressLifetimeDefUseWalker {
   var _context: Context { get }
 
   /// Start a def-use walk from and address.
@@ -190,7 +190,7 @@ protocol AddressUseVisitor {
   mutating func handle(borrow: LoadBorrowInst) -> WalkResult
 }
 
-extension AddressUseVisitor {
+extension AddressLifetimeDefUseWalker {
   mutating func projection(of address: Operand) -> WalkResult {
     return .continueWalk
   }
@@ -651,7 +651,7 @@ extension OwnershipUseVisitor {
 ///
 /// TODO: Change the operandOwnership of MarkDependenceInst base operand.
 /// It should be a borrowing operand, not a pointer escape.
-struct InteriorUseWalker: OwnershipUseVisitor, AddressUseVisitor {
+struct InteriorUseWalker: OwnershipUseVisitor, AddressLifetimeDefUseWalker {
   let context: FunctionPassContext
   var _context: Context { context }
 
@@ -1022,7 +1022,7 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
 }
 
 // Print the uses of an address.
-struct AddressUsePrinter: AddressUseVisitor {
+struct AddressLifetimeUsePrinter: AddressLifetimeDefUseWalker {
   let _context: Context
 
   mutating func leafUse(address: Operand) -> WalkResult {
@@ -1053,6 +1053,6 @@ let addressUseTest = FunctionTest("address_use_test") {
   assert(address.type.isAddress)
   print(function)
   print("Uses of address: \(address)")
-  var printer = AddressUsePrinter(_context: context)
+  var printer = AddressLifetimeUsePrinter(_context: context)
   _ = printer.walkDownUses(ofAddress: address)
 }
