@@ -2105,6 +2105,7 @@ CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 // Instructions that only require that the region of the value be live:
 CONSTANT_TRANSLATION(FixLifetimeInst, Require)
 CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Require)
+CONSTANT_TRANSLATION(BridgeObjectToWordInst, Require)
 
 //===---
 // Terminators
@@ -2146,7 +2147,6 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(BridgeObjectToWordInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
