@@ -712,12 +712,15 @@ void DistributedAccessor::emit() {
 
     // Generic arguments associated with the distributed thunk directly
     // e.g. `distributed func echo<T, U>(...)`
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     assert(
         !IGM.getLLVMContext().supportsTypedPointers() ||
         expandedSignature.numTypeMetadataPtrs ==
             llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
               return type == IGM.TypeMetadataPtrTy;
             }));
+#pragma clang diagnostic pop
 
     for (unsigned index = 0; index < expandedSignature.numTypeMetadataPtrs; ++index) {
       auto offset =

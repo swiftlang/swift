@@ -1265,6 +1265,8 @@ static llvm::AttributeList
 fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
                                         llvm::AttributeList attrList) {
   auto &context = fnType->getContext();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (!context.supportsTypedPointers())
     return attrList;
 
@@ -1282,6 +1284,7 @@ fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
           context, attrListIndex, llvm::Attribute::ByVal,
           paramTy->getNonOpaquePointerElementType());
   }
+#pragma clang diagnostic pop
   return attrList;
 }
 /// Replace direct callers of Old with New. Also add parameters to the call to

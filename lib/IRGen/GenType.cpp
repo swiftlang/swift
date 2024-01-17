@@ -115,8 +115,11 @@ TypeInfo::~TypeInfo() {
 }
 
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   assert(cast<llvm::PointerType>(ptr->getType())
              ->isOpaqueOrPointeeTypeMatches(getStorageType()));
+#pragma clang diagnostic pop
   return Address(ptr, getStorageType(), getBestKnownAlignment());
 }
 

@@ -463,7 +463,10 @@ namespace {
               clang::QualType(clangDecl->getTypeForDecl(), 0));
       auto *dstValue = dst.getAddress();
       auto *srcValue = src.getAddress();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
       if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
+#pragma clang diagnostic pop
         dstValue = IGF.coerceValue(
             dst.getAddress(), copyFunction->getFunctionType()->getParamType(0),
             IGF.IGM.DataLayout);
@@ -634,7 +637,10 @@ namespace {
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
       if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
+#pragma clang diagnostic pop
         dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
                                IGF.IGM.DataLayout);
         src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
@@ -705,7 +711,10 @@ namespace {
 
       SmallVector<llvm::Value *, 2> args;
       auto *thisArg = address.getAddress();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
       if (IGF.IGM.getLLVMContext().supportsTypedPointers())
+#pragma clang diagnostic pop
         thisArg = IGF.coerceValue(address.getAddress(),
                                   destructorFnAddr->getArg(0)->getType(),
                                   IGF.IGM.DataLayout);

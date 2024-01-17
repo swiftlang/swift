@@ -3208,6 +3208,8 @@ static llvm::AttributeList
 assertTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
                                          llvm::AttributeList attrList) {
   auto &context = fnType->getContext();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (context.supportsTypedPointers()) {
     for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
       auto paramTy = fnType->getParamType(i);
@@ -3221,6 +3223,7 @@ assertTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
               attrList.getParamByValType(i)));
     }
   }
+#pragma clang diagnostic pop
   return attrList;
 }
 
@@ -3462,10 +3465,13 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
         resultTy = func->getParamStructRetType(0);
       }
       auto temp = IGF.createAlloca(resultTy, Alignment(), "indirect.result");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
       if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
         temp = IGF.Builder.CreateElementBitCast(
             temp, fnType->getParamType(0)->getNonOpaquePointerElementType());
       }
+#pragma clang diagnostic pop
       emitToMemory(temp, substResultTI, isOutlined);
       return;
     }
@@ -3492,10 +3498,13 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
         auto resultTy = func->getParamStructRetType(1);
         auto temp = IGF.createAlloca(resultTy, Alignment(/*safe alignment*/ 16),
                                      "indirect.result");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
           temp = IGF.Builder.CreateElementBitCast(
               temp, fnType->getParamType(1)->getNonOpaquePointerElementType());
         }
+#pragma clang diagnostic pop
         emitToMemory(temp, substResultTI, isOutlined);
         return;
       }
@@ -5931,6 +5940,8 @@ void irgen::forwardAsyncCallResult(IRGenFunction &IGF,
   emitAsyncReturn(IGF, layout, fnType, nativeResults);
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 llvm::FunctionType *FunctionPointer::getFunctionType() const {
   // Static async function pointers can read the type off the secondary value
   // (the function definition.
@@ -5971,3 +5982,4 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
              ->isOpaqueOrPointeeTypeMatches(Sig.getType()));
   return Sig.getType();
 }
+#pragma clang diagnostic pop

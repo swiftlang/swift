@@ -228,9 +228,12 @@ namespace {
       // We might be presented with a value of the more precise pointer to
       // function type "void(*)*" rather than the generic "i8*". Downcast to the
       // more general expected type.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
       if (fn->getContext().supportsTypedPointers() &&
           fn->getType()->getNonOpaquePointerElementType()->isFunctionTy())
         fn = IGF.Builder.CreateBitCast(fn, getStorageType());
+#pragma clang diagnostic pop
 
       Explosion tmp;
       tmp.add(fn);

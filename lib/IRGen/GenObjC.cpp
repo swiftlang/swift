@@ -459,7 +459,10 @@ getProtocolRefsList(llvm::Constant *protocol) {
     return std::make_pair(0, nullptr);
   }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (!protocol->getContext().supportsTypedPointers()) {
+#pragma clang diagnostic pop
     auto protocolRefsVar = cast<llvm::GlobalVariable>(objCProtocolList);
     auto sizeListPair =
         cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
