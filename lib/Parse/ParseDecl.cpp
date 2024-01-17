@@ -7928,7 +7928,6 @@ void Parser::parseExpandedMemberList(SmallVectorImpl<ASTNode> &items) {
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
 
-  auto *decl = CurDeclContext->getAsDecl();
   bool previousHadSemi = true;
 
   SourceLoc startingLoc = Tok.getLoc();

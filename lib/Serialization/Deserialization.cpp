@@ -7629,7 +7629,6 @@ public:
     if (!rawKind)
       return nullptr;
 
-    clang::attr::Kind attrKind = static_cast<clang::attr::Kind>(rawKind - 1);
     auto name = readIdentifier();
     auto scopeName = readIdentifier();
 
