@@ -4553,7 +4553,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
 
     auto makeIteratorTarget = SyntacticElementTarget::forInitialization(
-        makeIteratorCall, dc, /*patternType=*/Type(), PB, /*index=*/0,
+        makeIteratorCall, /*patternType=*/Type(), PB, /*index=*/0,
         /*shouldBindPatternsOneWay=*/false);
 
     ContextualTypeInfo contextInfo(sequenceProto->getDeclaredInterfaceType(),
@@ -4876,7 +4876,7 @@ bool ConstraintSystem::generateConstraints(
       }
 
       auto target = init ? SyntacticElementTarget::forInitialization(
-                               init, dc, patternType, patternBinding, index,
+                               init, patternType, patternBinding, index,
                                /*bindPatternVarsOneWay=*/true)
                          : SyntacticElementTarget::forUninitializedVar(
                                patternBinding, index, patternType);

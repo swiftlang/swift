@@ -821,7 +821,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    TypeCheckExprOptions options) {
   SyntacticElementTarget target =
       PBD ? SyntacticElementTarget::forInitialization(
-                initializer, DC, patternType, PBD, patternNumber,
+                initializer, patternType, PBD, patternNumber,
                 /*bindPatternVarsOneWay=*/false)
           : SyntacticElementTarget::forInitialization(
                 initializer, DC, patternType, pattern,

@@ -8234,7 +8234,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   // In var/let decl with multiple patterns, accumulate them all in this list
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
-  auto BaseContext = CurDeclContext;
+  DeclContext *BindingContext = topLevelDecl ? topLevelDecl : CurDeclContext;
 
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
@@ -8249,13 +8249,12 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
     auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                           VarLoc, PBDEntries, BaseContext);
+                                           VarLoc, PBDEntries, BindingContext);
 
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
     // up in Decls to be returned to caller.
     if (topLevelDecl) {
-      PBD->setDeclContext(topLevelDecl);
       auto range = PBD->getSourceRangeIncludingAttrs();
       topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
                                               ASTNode(PBD), range.End, true));

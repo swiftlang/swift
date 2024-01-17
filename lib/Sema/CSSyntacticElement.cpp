@@ -751,8 +751,7 @@ private:
     // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SyntacticElementTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
+          init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
 
       if (ConstraintSystem::preCheckTarget(
@@ -764,8 +763,7 @@ private:
 
     if (init) {
       return SyntacticElementTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
+          init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
     }
 
