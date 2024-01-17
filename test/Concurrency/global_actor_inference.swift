@@ -445,7 +445,7 @@ actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
   @WrapperWithMainActorDefaultInit var property: Int // expected-minimal-targeted-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
-  // expected-complete-tns-error@-1 {{main actor-isolated default value in a actor-isolated context}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated default value in a actor-isolated context; this is an error in Swift 6}}
   func f() {
     _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced on a different actor instance}}
     _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced on a different actor instance}}
@@ -561,7 +561,7 @@ struct WrapperOnUnsafeActor<Wrapped> {
 
 // HasWrapperOnUnsafeActor gets an inferred @MainActor attribute.
 struct HasWrapperOnUnsafeActor {
-  @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-tns-error {{global actor 'OtherGlobalActor'-isolated default value in a main actor-isolated context}}
+  @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-tns-warning {{global actor 'OtherGlobalActor'-isolated default value in a main actor-isolated context; this is an error in Swift 6}}
   // expected-note @-1 3{{property declared here}}
   // expected-complete-tns-note @-2 3{{property declared here}}
 
@@ -681,10 +681,10 @@ class Cutter {
 @SomeGlobalActor
 class Butter {
   var a = useFooInADefer() // expected-minimal-targeted-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
-  // expected-complete-tns-error@-1 {{main actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context; this is an error in Swift 6}}
 
   nonisolated let b = statefulThingy // expected-minimal-targeted-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
-  // expected-complete-tns-error@-1 {{main actor-isolated default value in a nonisolated context}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
 
   var c: Int = {
     return getGlobal7()
