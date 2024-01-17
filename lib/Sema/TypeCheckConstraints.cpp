@@ -871,14 +871,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   Expr *init = PBD->getInit(patternNumber);
 
   // Enter an initializer context if necessary.
-  PatternBindingInitializer *initContext = nullptr;
-  DeclContext *DC = PBD->getDeclContext();
-  if (!DC->isLocalContext()) {
-    initContext = cast_or_null<PatternBindingInitializer>(
-        PBD->getInitContext(patternNumber));
-    if (initContext)
-      DC = initContext;
-  }
+  PatternBindingInitializer *initContext = PBD->getInitContext(patternNumber);
+  DeclContext *DC = initContext ? initContext : PBD->getDeclContext();
 
   // If we weren't given a pattern type, compute one now.
   if (!patternType) {

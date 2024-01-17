@@ -437,9 +437,7 @@ bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
-  auto *initContext = dyn_cast_or_null<PatternBindingInitializer>(
-      decl->getInitContext(0));
-  if (initContext) {
+  if (auto *initContext = decl->getInitContext(0)) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
       return consumer.consume({selfParam});
     }

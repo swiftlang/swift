@@ -21,9 +21,9 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/Decl.h"
 
 namespace swift {
+class ParamDecl;
 class PatternBindingDecl;
 
 enum class InitializerKind : uint8_t {
@@ -90,12 +90,8 @@ public:
   static PatternBindingInitializer *createDeserialized(PatternBindingDecl *PBD,
                                                        unsigned index);
 
-  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
-    setParent(binding->getDeclContext());
-    Binding = binding;
-    SpareBits = bindingIndex;
-  }
-  
+  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex);
+
   PatternBindingDecl *getBinding() const { return Binding; }
 
   unsigned getBindingIndex() const { return SpareBits; }
