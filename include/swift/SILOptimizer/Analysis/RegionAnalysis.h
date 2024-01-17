@@ -299,7 +299,11 @@ private:
   /// This only includes function arguments.
   std::vector<TrackableValueID> neverTransferredValueIDs;
 
+  SILFunction *fn;
+
 public:
+  RegionAnalysisValueMap(SILFunction *fn) : fn(fn) { }
+
   /// Returns the value for this instruction if it isn't a fake "represenative
   /// value" to inject actor isolatedness. Asserts in such a case.
   SILValue getRepresentative(Element trackableValueID) const;
