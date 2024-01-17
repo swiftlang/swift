@@ -650,6 +650,9 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
     auto interfaceTy =
         origType->getInterfaceType()->getCanonicalType()->getAs<SubstitutableType>();
 
+    if (!interfaceTy)
+      return CanType();
+
     // Make sure any duplicate bindings are equal to the one already recorded.
     // Otherwise, the substitution has conflicting generic arguments.
     auto bound = substMap.find(interfaceTy);
