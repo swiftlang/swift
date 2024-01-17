@@ -411,8 +411,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     return &pbe;
   }
 
-  binding->setPattern(entryNumber, pattern,
-                      binding->getInitContext(entryNumber));
+  binding->setPattern(entryNumber, pattern);
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();

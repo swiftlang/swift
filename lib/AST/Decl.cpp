@@ -1932,12 +1932,11 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
     if (!initContext && !Parent->isLocalContext())
       initContext = PatternBindingInitializer::create(Parent);
 
-    if (initContext)
-      initContext->setBinding(PBD, idx);
-
     // We need to call setPattern to ensure the VarDecls in the pattern have
-    // the PatternBindingDecl set as their parent, and to setup the context.
-    PBD->setPattern(idx, PBD->getPattern(idx), initContext);
+    // the PatternBindingDecl set as their parent. We also need to call
+    // setInitContext to setup the context.
+    PBD->setPattern(idx, PBD->getPattern(idx));
+    PBD->setInitContext(idx, initContext);
   }
   return PBD;
 }
@@ -2238,12 +2237,10 @@ PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
-                                    PatternBindingInitializer *InitContext,
                                     bool isFullyValidated) {
   auto PatternList = getMutablePatternList();
   PatternList[i].setPattern(P);
-  PatternList[i].setInitContext(InitContext);
-  
+
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
   if (P) {

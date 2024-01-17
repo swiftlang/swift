@@ -9477,7 +9477,6 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       // this is important for subsequent call to typeCheckDecl
       // because otherwise it would try to re-typecheck pattern.
       patternBinding->setPattern(index, pattern,
-                                 patternBinding->getInitContext(index),
                                  /*isFullyValidated=*/true);
 
       if (patternBinding->isExplicitlyInitialized(index) ||
