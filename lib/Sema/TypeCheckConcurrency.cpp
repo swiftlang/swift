@@ -4856,7 +4856,8 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
     if (enclosingIsolation != requiredIsolation) {
       var->diagnose(
           diag::isolated_default_argument_context,
-          requiredIsolation, enclosingIsolation);
+          requiredIsolation, enclosingIsolation)
+        .warnUntilSwiftVersionIf(!isa<ParamDecl>(var), 6);
       return ActorIsolation::forUnspecified();
     }
   }

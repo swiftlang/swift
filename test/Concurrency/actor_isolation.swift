@@ -784,15 +784,15 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l32: Int = v
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l34: Int = self.v
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
 
     nonisolated lazy var l41: Int = { l }()
     nonisolated lazy var l42: Int = l
