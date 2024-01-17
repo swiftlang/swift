@@ -401,11 +401,7 @@ where E: SerialExecutor {
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
 internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: _TaskExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(SwiftStdlib 9999, *) {
-    executor.enqueue(ExecutorJob(context: unownedJob._context))
-  } else {
-    executor.enqueue(unownedJob)
-  }
+  executor.enqueue(ExecutorJob(context: unownedJob._context))
   #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   executor.enqueue(unownedJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
