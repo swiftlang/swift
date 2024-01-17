@@ -4483,6 +4483,10 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
 
   Type type = resolveType(repr->getBase(), options);
 
+  if (auto ty = dyn_cast<DynamicSelfType>(type)) {
+    type = ty->getSelfType();
+  }
+
   // isolated parameters must be of actor type
   if (!type->hasTypeParameter() && !type->isAnyActorType() && !type->hasError()) {
     // Optional actor types are fine - `nil` represents `nonisolated`.

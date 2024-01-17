@@ -395,3 +395,10 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
   // expected-note@-2 {{calls to global function 'optionalIsolatedSync(_:to:)' from outside of its actor context are implicitly asynchronous}}
   // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
 }
+
+actor A2 {}
+extension A2 {
+  nonisolated func f() async {
+    await { (self: isolated Self) in }(self)
+  }
+}
