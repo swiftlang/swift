@@ -114,7 +114,9 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
       }
 
       Type GP = typeVar->getImpl().getGenericParameter();
-      return resolvedType->is<UnresolvedType>() && GP ? GP : resolvedType;
+      return resolvedType->is<UnresolvedType>() && GP
+          ? ErrorType::get(GP)
+          : resolvedType;
     }
 
     if (type->hasElementArchetype()) {
