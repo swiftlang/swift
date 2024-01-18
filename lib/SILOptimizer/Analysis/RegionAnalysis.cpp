@@ -762,7 +762,8 @@ void InferredCallerArgumentTypeInfo::initForApply(
 
 void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
                                                   ApplyExpr *sourceApply) {
-  auto isolationCrossing = *sourceApply->getIsolationCrossing();
+  auto isolationCrossing = sourceApply->getIsolationCrossing();
+  assert(isolationCrossing && "Should have valid isolation crossing?!");
 
   // Grab out full apply site and see if we can find a better expr.
   SILInstruction *i = const_cast<SILInstruction *>(op->getUser());

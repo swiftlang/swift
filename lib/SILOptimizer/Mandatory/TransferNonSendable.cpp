@@ -127,6 +127,7 @@ public:
   UseDiagnosticInfoKind getKind() const { return kind; }
 
   ApplyIsolationCrossing getIsolationCrossing() const {
+    assert(isolationCrossing && "Isolation crossing must be non-null");
     return *isolationCrossing;
   }
 
@@ -189,7 +190,8 @@ void InferredCallerArgumentTypeInfo::initForApply(
 
 void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
                                                   ApplyExpr *sourceApply) {
-  auto isolationCrossing = *sourceApply->getIsolationCrossing();
+  auto isolationCrossing = sourceApply->getIsolationCrossing();
+  assert(isolationCrossing);
 
   // Grab out full apply site and see if we can find a better expr.
   SILInstruction *i = const_cast<SILInstruction *>(op->getUser());
@@ -215,7 +217,7 @@ void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
       foundExpr ? foundExpr->findOriginalType() : baseInferredType;
   applyUses.emplace_back(
       inferredArgType,
-      UseDiagnosticInfo::forIsolationCrossing(isolationCrossing));
+      UseDiagnosticInfo::forIsolationCrossing(*isolationCrossing));
 }
 
 namespace {
