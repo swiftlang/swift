@@ -901,6 +901,9 @@ WARNING(regionbasedisolation_transfer_yields_race_with_isolation, none,
 WARNING(regionbasedisolation_transfer_yields_race_transferring_parameter, none,
         "transferred value of non-Sendable type %0 into transferring parameter; later accesses could result in races",
         (Type))
+WARNING(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
+        "binding of non-Sendable type %0 accessed after being transferred; later accesses could result in races",
+        (Type))
 NOTE(regionbasedisolation_maybe_race, none,
      "access here could race", ())
 ERROR(regionbasedisolation_unknown_pattern, none,

@@ -101,6 +101,10 @@ enum class UseDiagnosticInfoKind {
   /// Used if the error is due to a transfer into an assignment into a
   /// transferring parameter.
   AssignmentIntoTransferringParameter = 3,
+
+  /// Set to true if this is a use of a normal value that was strongly
+  /// transferred.
+  UseOfStronglyTransferredValue = 4,
 };
 
 class UseDiagnosticInfo {
@@ -124,11 +128,16 @@ public:
         UseDiagnosticInfoKind::AssignmentIntoTransferringParameter, {});
   }
 
+  static UseDiagnosticInfo forUseOfStronglyTransferredValue() {
+    return UseDiagnosticInfo(
+        UseDiagnosticInfoKind::UseOfStronglyTransferredValue, {});
+  }
+
   UseDiagnosticInfoKind getKind() const { return kind; }
 
   ApplyIsolationCrossing getIsolationCrossing() const {
-    assert(isolationCrossing && "Isolation crossing must be non-null");
-    return *isolationCrossing;
+    // assert(isolationCrossing && "Isolation crossing must be non-null");
+    return isolationCrossing.value();
   }
 
 private:
@@ -156,8 +165,19 @@ private:
 
   void initForApply(const Operand *op, ApplyExpr *expr);
   void initForAutoclosure(const Operand *op, AutoClosureExpr *expr);
-  void initForAssignmentToTransferringParameter(const Operand *op,
-                                                TrackableValue trackedValue);
+
+  void initForAssignmentToTransferringParameter(const Operand *op) {
+    applyUses.emplace_back(
+        op->get()->getType().getASTType(),
+        UseDiagnosticInfo::forAssignmentIntoTransferringParameter());
+  }
+
+  void initForUseOfStronglyTransferredValue(const Operand *op) {
+    applyUses.emplace_back(
+        op->get()->getType().getASTType(),
+        UseDiagnosticInfo::forUseOfStronglyTransferredValue());
+  }
+
   Expr *getFoundExprForSelf(ApplyExpr *sourceApply) {
     if (auto callExpr = dyn_cast<CallExpr>(sourceApply))
       if (auto calledExpr =
@@ -190,8 +210,7 @@ void InferredCallerArgumentTypeInfo::initForApply(
 
 void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
                                                   ApplyExpr *sourceApply) {
-  auto isolationCrossing = sourceApply->getIsolationCrossing();
-  assert(isolationCrossing);
+  auto isolationCrossing = sourceApply->getIsolationCrossing().value();
 
   // Grab out full apply site and see if we can find a better expr.
   SILInstruction *i = const_cast<SILInstruction *>(op->getUser());
@@ -217,7 +236,7 @@ void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
       foundExpr ? foundExpr->findOriginalType() : baseInferredType;
   applyUses.emplace_back(
       inferredArgType,
-      UseDiagnosticInfo::forIsolationCrossing(*isolationCrossing));
+      UseDiagnosticInfo::forIsolationCrossing(isolationCrossing));
 }
 
 namespace {
@@ -307,13 +326,6 @@ static SILValue getDestOfStoreOrCopyAddr(Operand *op) {
   return SILValue();
 }
 
-void InferredCallerArgumentTypeInfo::initForAssignmentToTransferringParameter(
-    const Operand *op, TrackableValue trackedValue) {
-  applyUses.emplace_back(
-      op->get()->getType().getASTType(),
-      UseDiagnosticInfo::forAssignmentIntoTransferringParameter());
-}
-
 void InferredCallerArgumentTypeInfo::init(const Operand *op) {
   baseInferredType = op->get()->getType().getASTType();
   auto *nonConstOp = const_cast<Operand *>(op);
@@ -324,7 +336,15 @@ void InferredCallerArgumentTypeInfo::init(const Operand *op) {
   if (auto destValue = getDestOfStoreOrCopyAddr(nonConstOp)) {
     auto trackedValue = valueMap.getTrackableValue(destValue);
     if (trackedValue.isTransferringParameter()) {
-      return initForAssignmentToTransferringParameter(op, trackedValue);
+      return initForAssignmentToTransferringParameter(op);
+    }
+  }
+
+  // Otherwise, see if our operand's instruction is a transferring parameter.
+  if (auto fas = FullApplySite::isa(nonConstOp->getUser())) {
+    if (fas.getArgumentParameterInfo(*nonConstOp)
+            .hasOption(SILParameterInfo::Transferring)) {
+      return initForUseOfStronglyTransferredValue(op);
     }
   }
 
@@ -719,6 +739,14 @@ static void emitDiagnostics(RegionAnalysisFunctionInfo *regionInfo) {
         diagnose(transferOp,
                  diag::regionbasedisolation_transfer_yields_race_no_isolation,
                  info.first)
+            .highlight(transferOp->get().getLoc().getSourceRange());
+        break;
+      case UseDiagnosticInfoKind::UseOfStronglyTransferredValue:
+        diagnose(
+            transferOp,
+            diag::
+                regionbasedisolation_transfer_yields_race_stronglytransferred_binding,
+            info.first)
             .highlight(transferOp->get().getLoc().getSourceRange());
         break;
       case UseDiagnosticInfoKind::AssignmentIntoTransferringParameter:

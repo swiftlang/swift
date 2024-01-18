@@ -32,9 +32,16 @@ func transferArgWithOtherParam2(_ x: Klass, _ y: transferring Klass) {
 // MARK: Tests //
 /////////////////
 
-func testSimpleTransfer() {
+func testSimpleTransferLet() {
   let k = Klass()
-  transferArg(k) // expected-warning {{passing argument of non-sendable type 'Klass' from nonisolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could result in races}}
+  useValue(k) // expected-note {{access here could race}}
+}
+
+func testSimpleTransferVar() {
+  var k = Klass()
+  k = Klass()
+  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could result in races}}
   useValue(k) // expected-note {{access here could race}}
 }
 
