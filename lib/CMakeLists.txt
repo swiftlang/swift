@@ -19,8 +19,13 @@ list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets)
 file(GENERATE
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
   CONTENT "
+#ifndef COMPILED_WITH_SWIFT
 #define COMPILED_WITH_SWIFT
+#endif
+
+#ifndef SWIFT_TARGET
 #define SWIFT_TARGET
+#endif
 
 #include \"swift/Basic/BasicBridging.h\"
 #include \"swift/AST/ASTBridging.h\"
