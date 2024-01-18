@@ -58,7 +58,7 @@ typedef llvm::DenseMap<AssociatedTypeDecl *, TypeWitnessAndDecl>
 enum class ProtocolConformanceKind {
   /// "Normal" conformance of a (possibly generic) nominal type, which
   /// contains complete mappings.
-  Normal,
+  Normal = 0,
   /// Self-conformance of a protocol to itself.
   Self,
   /// Conformance for a specialization of a generic type, which projects the
@@ -69,7 +69,13 @@ enum class ProtocolConformanceKind {
   Inherited,
   /// Builtin conformances are special conformances that the runtime handles
   /// and isn't implemented directly in Swift.
-  Builtin
+  Builtin,
+
+  Last_Kind = Builtin
+};
+enum : unsigned {
+  NumProtocolConformanceKindBits =
+      countBitsUsed(static_cast<unsigned>(ProtocolConformanceKind::Last_Kind))
 };
 
 /// Describes the state of a protocol conformance, which may be complete,
@@ -93,20 +99,35 @@ enum class ProtocolConformanceState {
 /// for the various kinds of conformance (normal, specialized, inherited).
 class alignas(1 << DeclAlignInBits) ProtocolConformance
     : public ASTAllocated<ProtocolConformance> {
-  /// The kind of protocol conformance.
-  ProtocolConformanceKind Kind;
-
   /// The type that conforms to the protocol, in the context of the
   /// conformance definition.
   Type ConformingType;
 
 protected:
+  // clang-format off
+  //
+  // We format these different than clang-format wishes us to... so turn if off
+  // for the inline bitfields.
+  union { uint64_t OpaqueBits;
+
+    SWIFT_INLINE_BITFIELD_BASE(ProtocolConformance,
+                               bitmax(NumProtocolConformanceKindBits, 8),
+      /// The kind of protocol conformance.
+      Kind : bitmax(NumProtocolConformanceKindBits, 8)
+    );
+  } Bits;
+  // clang-format on
+
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
-    : Kind(kind), ConformingType(conformingType) {}
+    : ConformingType(conformingType) {
+    Bits.ProtocolConformance.Kind = unsigned(kind);
+  }
 
 public:
   /// Determine the kind of protocol conformance.
-  ProtocolConformanceKind getKind() const { return Kind; }
+  ProtocolConformanceKind getKind() const {
+    return static_cast<ProtocolConformanceKind>(Bits.ProtocolConformance.Kind);
+  }
 
   /// Get the conforming type.
   Type getType() const { return ConformingType; }
