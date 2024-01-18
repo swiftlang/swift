@@ -124,13 +124,15 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
     return;
 
   T = T->getRValueType();
-  if (T->hasArchetype())
-    T = T->mapTypeOutOfContext();
 
   // If there are no (instance) members for this type, bail.
   if (!T->mayHaveMembers() || T->is<ModuleType>()) {
     return;
   }
+
+  auto interfaceTy = T;
+  if (T->hasArchetype())
+    interfaceTy = interfaceTy->mapTypeOutOfContext();
 
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {
@@ -140,7 +142,7 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
   }
 
   // Collect the matching methods.
-  ConformingMethodListResult result(CurDeclContext, T);
+  ConformingMethodListResult result(CurDeclContext, interfaceTy);
   getMatchingMethods(T, expectedProtocols, result.Members);
 
   Consumer.handleResult(result);
