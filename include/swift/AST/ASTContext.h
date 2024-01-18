@@ -395,6 +395,10 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::StringSet<> FailedModuleImportNames;
 
+  /// Cache of module names that passed the 'canImport' test. This cannot be
+  /// mutable since it needs to be queried for dependency discovery.
+  llvm::StringSet<> SucceededModuleImportNames;
+
   /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
   /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
   /// if the module names appearing in source files are aliases or real names.
@@ -1202,9 +1206,19 @@ public:
   bool canImportModule(ImportPath::Module ModulePath,
                        llvm::VersionTuple version = llvm::VersionTuple(),
                        bool underlyingVersion = false);
-  bool canImportModule(ImportPath::Module ModulePath,
-                       llvm::VersionTuple version = llvm::VersionTuple(),
-                       bool underlyingVersion = false) const;
+
+  /// Check whether the module with a given name can be imported without
+  /// importing it. This is a const method that won't remember the outcome so
+  /// repeated check of the same module will induce full cost and won't count
+  /// as the dependency for current module.
+  bool testImportModule(ImportPath::Module ModulePath,
+                        llvm::VersionTuple version = llvm::VersionTuple(),
+                        bool underlyingVersion = false) const;
+
+  /// \returns a set of names from all successfully canImport module checks.
+  const llvm::StringSet<> &getSuccessfulCanImportCheckNames() const {
+    return SucceededModuleImportNames;
+  }
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.

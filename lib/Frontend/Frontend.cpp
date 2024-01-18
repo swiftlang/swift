@@ -1119,14 +1119,14 @@ bool CompilerInstance::canImportSwiftConcurrency() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportSwiftConcurrencyShims() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_SHIMS_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitStringProcessingImport() {
@@ -1141,7 +1141,7 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitBacktracingImport() {
@@ -1156,15 +1156,16 @@ bool CompilerInstance::canImportSwiftBacktracing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportCxxShim() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(CXX_SHIM_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath) &&
-         !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
+  return getASTContext().testImportModule(modulePath) &&
+         !Invocation.getFrontendOptions()
+              .InputsAndOutputs.hasModuleInterfaceOutputPath();
 }
 
 bool CompilerInstance::supportCaching() const {

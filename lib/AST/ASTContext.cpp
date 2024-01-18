@@ -2318,6 +2318,10 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     return false;
 
   if (version.empty()) {
+    // If this module has already been checked successfully, it is importable.
+    if (SucceededModuleImportNames.count(ModuleNameStr))
+      return true;
+
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
@@ -2375,12 +2379,19 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
 bool ASTContext::canImportModule(ImportPath::Module ModuleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
-  return canImportModuleImpl(ModuleName, version, underlyingVersion, true);
+  if (!canImportModuleImpl(ModuleName, version, underlyingVersion, true))
+    return false;
+
+  // If inserted successfully, add that to success list as dependency.
+  SmallString<64> FullModuleName;
+  ModuleName.getString(FullModuleName);
+  SucceededModuleImportNames.insert(FullModuleName.str());
+  return true;
 }
 
-bool ASTContext::canImportModule(ImportPath::Module ModuleName,
-                                 llvm::VersionTuple version,
-                                 bool underlyingVersion) const {
+bool ASTContext::testImportModule(ImportPath::Module ModuleName,
+                                  llvm::VersionTuple version,
+                                  bool underlyingVersion) const {
   return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
 }
 
