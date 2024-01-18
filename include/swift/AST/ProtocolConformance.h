@@ -94,6 +94,17 @@ enum class ProtocolConformanceState {
   Last_State = Checking
 };
 
+/// Describes the kind of a builtin conformance.
+enum class BuiltinConformanceKind {
+  // A builtin conformance that has been synthesized by the implementation.
+  Synthesized = 0,
+  // A missing conformance that we have nonetheless synthesized so that
+  // we can diagnose it later.
+  Missing,
+
+  Last_Kind = Missing
+};
+
 enum : unsigned {
   NumProtocolConformanceStateBits =
       countBitsUsed(static_cast<unsigned>(ProtocolConformanceState::Last_State))
@@ -102,6 +113,11 @@ enum : unsigned {
 enum : unsigned {
   NumConformanceEntryKindBits =
       countBitsUsed(static_cast<unsigned>(ConformanceEntryKind::Last_Kind))
+};
+
+enum : unsigned {
+  NumBuiltinConformanceKindBits =
+      countBitsUsed(static_cast<unsigned>(BuiltinConformanceKind::Last_Kind))
 };
 
 /// Describes how a particular type conforms to a given protocol,
@@ -159,6 +175,12 @@ protected:
       /// This should never be Inherited: that is handled by
       /// InheritedProtocolConformance.
       SourceKind : bitmax(NumConformanceEntryKindBits, 8)
+    );
+
+    SWIFT_INLINE_BITFIELD(BuiltinProtocolConformance, RootProtocolConformance,
+                          bitmax(NumBuiltinConformanceKindBits, 8),
+      /// The kind of the builtin conformance
+      Kind: bitmax(NumBuiltinConformanceKindBits, 8)
     );
   } Bits;
   // clang-format on
@@ -1093,22 +1115,12 @@ public:
   }
 };
 
-/// Describes the kind of a builtin conformance.
-enum class BuiltinConformanceKind {
-  // A builtin conformance that has been synthesized by the implementation.
-  Synthesized = 0,
-  // A missing conformance that we have nonetheless synthesized so that
-  // we can diagnose it later.
-  Missing,
-};
-
 /// A builtin conformance appears when a non-nominal type has a
 /// conformance that is synthesized by the implementation.
 class BuiltinProtocolConformance final : public RootProtocolConformance {
   friend ASTContext;
 
   ProtocolDecl *protocol;
-  unsigned builtinConformanceKind;
 
   BuiltinProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                              BuiltinConformanceKind kind);
@@ -1120,7 +1132,8 @@ public:
   }
 
   BuiltinConformanceKind getBuiltinConformanceKind() const {
-    return static_cast<BuiltinConformanceKind>(builtinConformanceKind);
+    return static_cast<BuiltinConformanceKind>(
+        Bits.BuiltinProtocolConformance.Kind);
   }
 
   GenericSignature getGenericSignature() const {
