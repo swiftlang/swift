@@ -19,6 +19,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
@@ -238,15 +239,13 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
 /// Lookup members in extensions of \p LookupType, using \p BaseType as the
 /// underlying type when checking any constraints on the extensions.
 static void doGlobalExtensionLookup(Type BaseType,
-                                    Type LookupType,
+                                    NominalTypeDecl *LookupType,
                                     SmallVectorImpl<ValueDecl *> &FoundDecls,
                                     const DeclContext *CurrDC,
                                     LookupState LS,
                                     DeclVisibilityKind Reason) {
-  auto nominal = LookupType->getAnyNominal();
-
   // Look in each extension of this type.
-  for (auto extension : nominal->getExtensions()) {
+  for (auto extension : LookupType->getExtensions()) {
     if (!evaluateOrDefault(CurrDC->getASTContext().evaluator,
         IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType,
                                                        extension)), false))
@@ -265,17 +264,17 @@ static void doGlobalExtensionLookup(Type BaseType,
 /// Don't do lookup into superclasses or implemented protocols.  Uses
 /// \p BaseType as the underlying type when checking any constraints on the
 /// extensions.
-static void lookupTypeMembers(Type BaseType, Type LookupType,
+static void lookupTypeMembers(Type BaseType, NominalTypeDecl *LookupType,
                               VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC, LookupState LS,
                               DeclVisibilityKind Reason) {
-  NominalTypeDecl *D = LookupType->getAnyNominal();
-  assert(D && "should have a nominal type");
+  assert(!BaseType->hasTypeParameter());
+  assert(LookupType && "should have a nominal type");
 
-  Consumer.onLookupNominalTypeMembers(D, Reason);
+  Consumer.onLookupNominalTypeMembers(LookupType, Reason);
 
   SmallVector<ValueDecl*, 2> FoundDecls;
-  collectVisibleMemberDecls(CurrDC, LS, BaseType, D, FoundDecls);
+  collectVisibleMemberDecls(CurrDC, LS, BaseType, LookupType, FoundDecls);
 
   doGlobalExtensionLookup(BaseType, LookupType, FoundDecls, CurrDC, LS, Reason);
 
@@ -527,7 +526,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     // Add members from any extensions.
     if (LS.isIncludingProtocolExtensionMembers()) {
       SmallVector<ValueDecl *, 2> FoundDecls;
-      doGlobalExtensionLookup(BaseTy, Proto->getDeclaredInterfaceType(),
+      doGlobalExtensionLookup(BaseTy, Proto,
                               FoundDecls, FromContext, LS,
                               ReasonForThisProtocol);
       for (auto *VD : FoundDecls)
@@ -537,29 +536,20 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 }
 
 static void
-lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
-                             const DeclContext *CurrDC, LookupState LS,
-                             DeclVisibilityKind Reason,
-                             GenericSignature Sig,
-                             VisitedSet &Visited);
-
-static void
-  lookupVisibleProtocolMemberDecls(Type BaseTy, const ProtocolDecl *PD,
+  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolDecl *PD,
                                    VisibleDeclConsumer &Consumer,
                                    const DeclContext *CurrDC, LookupState LS,
                                    DeclVisibilityKind Reason,
-                                   GenericSignature Sig,
                                    VisitedSet &Visited) {
   if (!Visited.insert(PD).second)
     return;
 
-  lookupTypeMembers(BaseTy, PD->getDeclaredInterfaceType(), Consumer, CurrDC,
-                    LS, Reason);
+  lookupTypeMembers(BaseTy, PD, Consumer, CurrDC, LS, Reason);
 
   // Collect members from the inherited protocols.
   for (auto Proto : PD->getInheritedProtocols())
     lookupVisibleProtocolMemberDecls(BaseTy, Proto, Consumer, CurrDC, LS,
-                                     getReasonForSuper(Reason), Sig, Visited);
+                                     getReasonForSuper(Reason), Visited);
 }
 
 static void lookupVisibleCxxNamespaceMemberDecls(
@@ -621,10 +611,10 @@ static void lookupVisibleCxxNamespaceMemberDecls(
 
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
-    LookupState LS, DeclVisibilityKind Reason, GenericSignature Sig,
-    VisitedSet &Visited) {
+    LookupState LS, DeclVisibilityKind Reason, VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
   assert(BaseTy && "lookup into null type");
+  assert(!BaseTy->hasTypeParameter());
   assert(!BaseTy->hasLValueType());
 
   // Handle metatype references, as in "some_type.some_member".  These are
@@ -651,8 +641,7 @@ static void lookupVisibleMemberDeclsImpl(
     // anything else.  For example, type SomeTy.SomeMember can look up static
     // functions, and can even look up non-static functions as well (thus
     // getting the address of the member).
-    lookupVisibleMemberDeclsImpl(Ty, Consumer, CurrDC, subLS, Reason,
-                                 Sig, Visited);
+    lookupVisibleMemberDeclsImpl(Ty, Consumer, CurrDC, subLS, Reason, Visited);
     return;
   }
 
@@ -675,8 +664,7 @@ static void lookupVisibleMemberDeclsImpl(
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
     lookupVisibleProtocolMemberDecls(BaseTy, PT->getDecl(),
-                                     Consumer, CurrDC, LS, Reason,
-                                     Sig, Visited);
+                                     Consumer, CurrDC, LS, Reason, Visited);
     return;
   }
 
@@ -684,14 +672,14 @@ static void lookupVisibleMemberDeclsImpl(
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Member : PC->getMembers())
       lookupVisibleMemberDeclsImpl(Member, Consumer, CurrDC, LS, Reason,
-                                   Sig, Visited);
+                                   Visited);
     return;
   }
 
   if (auto *existential = BaseTy->getAs<ExistentialType>()) {
     auto constraint = existential->getConstraintType();
     lookupVisibleMemberDeclsImpl(constraint, Consumer, CurrDC, LS, Reason,
-                                 Sig, Visited);
+                                 Visited);
     return;
   }
 
@@ -700,11 +688,11 @@ static void lookupVisibleMemberDeclsImpl(
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleProtocolMemberDecls(
           BaseTy, Proto, Consumer, CurrDC, LS,
-          Reason, Sig, Visited);
+          Reason, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
-                                   Reason, Sig, Visited);
+                                   Reason, Visited);
     return;
   }
 
@@ -718,88 +706,53 @@ static void lookupVisibleMemberDeclsImpl(
     }
   }
 
-  // If we're looking into a type parameter and we have a GenericSignature,
-  // query the signature to resolve where we should look.
-  if (BaseTy->isTypeParameter() && Sig) {
-    // The type might be fully concrete via a same-type requirement.
-    if (auto ConcreteTy = Sig->getConcreteType(BaseTy)) {
-      BaseTy = ConcreteTy;
-    } else {
-      // Look into protocols of conformance requirements
-      for (const auto *Proto : Sig->getRequiredProtocols(BaseTy)) {
-        lookupVisibleProtocolMemberDecls(
-            BaseTy, Proto, Consumer, CurrDC,
-            LS, getReasonForSuper(Reason), Sig, Visited);
-      }
-
-      // Look into the superclass requirement type, if there is one.
-      if (auto SuperclassTy = Sig->getSuperclassBound(BaseTy)) {
-        lookupVisibleMemberDeclsImpl(SuperclassTy, Consumer, CurrDC,
-                                     LS, getReasonForSuper(Reason),
-                                     Sig, Visited);
-      }
-
-      return;
-    }
-  }
-
   // The members of a dynamic 'Self' type are the members of its static
   // class type.
   if (auto *const DS = BaseTy->getAs<DynamicSelfType>()) {
     BaseTy = DS->getSelfType();
   }
 
-  auto lookupTy = BaseTy;
+  auto *NTD = BaseTy->getAnyNominal();
+  if (NTD == nullptr)
+    return;
 
+  lookupTypeMembers(BaseTy, NTD, Consumer, CurrDC, LS, Reason);
+
+  // Look into protocols only on the current nominal to avoid repeatedly
+  // visiting inherited conformances.
+  lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
+                                           Reason, Visited);
+
+  auto *CD = dyn_cast<ClassDecl>(NTD);
+
+  if (!CD || !CD->hasSuperclass())
+    return;
+
+  // We have a superclass; switch state and look into the inheritance chain.
   llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
-  {
-    const auto NTD = BaseTy->getAnyNominal();
-    if (NTD == nullptr)
-      return;
+  Ancestors.insert(CD);
 
-    lookupTypeMembers(BaseTy, lookupTy, Consumer, CurrDC, LS, Reason);
+  Reason = getReasonForSuper(Reason);
 
-    // Look into protocols only on the current nominal to avoid repeatedly
-    // visiting inherited conformances.
-    lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
-                                             Reason, Visited);
+  LS = LS.withOnSuperclass();
+  if (CD->inheritsSuperclassInitializers())
+    LS = LS.withInheritsSuperclassInitializers();
 
-    const auto CD = dyn_cast<ClassDecl>(NTD);
-
-    // FIXME: We check `getSuperclass()` here because we'll be using the
-    // superclass Type below, and in ill-formed code `hasSuperclass()` could
-    // be true while `getSuperclass()` returns null, because the latter
-    // looks for a declaration.
-    if (!CD || !CD->getSuperclass())
-      return;
-
-    // We have a superclass; switch state and look into the inheritance chain.
-    Ancestors.insert(CD);
-
-    Reason = getReasonForSuper(Reason);
-    lookupTy = CD->getSuperclass();
-
-    LS = LS.withOnSuperclass();
-    if (CD->inheritsSuperclassInitializers())
-      LS = LS.withInheritsSuperclassInitializers();
-  }
+  CD = CD->getSuperclassDecl();
 
   // Look into the inheritance chain.
   do {
-    const auto CurClass = lookupTy->getClassOrBoundGenericClass();
-
     // FIXME: This path is no substitute for an actual circularity check.
     // The real fix is to check that the superclass doesn't introduce a
     // circular reference before it's written into the AST.
-    if (!Ancestors.insert(CurClass).second)
+    if (!Ancestors.insert(CD).second)
       break;
 
-    lookupTypeMembers(BaseTy, lookupTy, Consumer, CurrDC, LS, Reason);
+    lookupTypeMembers(BaseTy, CD, Consumer, CurrDC, LS, Reason);
 
-    lookupTy = CurClass->getSuperclass();
-    if (!CurClass->inheritsSuperclassInitializers())
+    if (!CD->inheritsSuperclassInitializers())
       LS = LS.withoutInheritsSuperclassInitializers();
-  } while (lookupTy);
+  } while ((CD = CD->getSuperclassDecl()));
 }
 
 swift::DynamicLookupInfo::DynamicLookupInfo(
@@ -1121,8 +1074,7 @@ struct KeyPathDynamicMemberConsumer : public VisibleDeclConsumer {
 static void lookupVisibleDynamicMemberLookupDecls(
     Type baseType, SourceLoc loc, KeyPathDynamicMemberConsumer &consumer,
     const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
-    GenericSignature Sig, VisitedSet &visited,
-    llvm::DenseSet<TypeBase *> &seenDynamicLookup);
+    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup);
 
 /// Enumerates all members of \c baseType, including both directly visible and
 /// members visible by keypath dynamic member lookup.
@@ -1132,11 +1084,12 @@ static void lookupVisibleDynamicMemberLookupDecls(
 static void lookupVisibleMemberAndDynamicMemberDecls(
     Type baseType, SourceLoc loc, VisibleDeclConsumer &consumer,
     KeyPathDynamicMemberConsumer &dynamicMemberConsumer, const DeclContext *DC,
-    LookupState LS, DeclVisibilityKind reason, GenericSignature Sig,
+    LookupState LS, DeclVisibilityKind reason,
     VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
-  lookupVisibleMemberDeclsImpl(baseType, consumer, DC, LS, reason, Sig, visited);
+
+  lookupVisibleMemberDeclsImpl(baseType, consumer, DC, LS, reason, visited);
   lookupVisibleDynamicMemberLookupDecls(baseType, loc, dynamicMemberConsumer,
-                                        DC, LS, reason, Sig, visited,
+                                        DC, LS, reason, visited,
                                         seenDynamicLookup);
 }
 
@@ -1149,8 +1102,7 @@ static void lookupVisibleMemberAndDynamicMemberDecls(
 static void lookupVisibleDynamicMemberLookupDecls(
     Type baseType, SourceLoc loc, KeyPathDynamicMemberConsumer &consumer,
     const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
-    GenericSignature Sig, VisitedSet &visited,
-    llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
+    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
   if (!seenDynamicLookup.insert(baseType.getPointer()).second)
     return;
 
@@ -1187,7 +1139,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
                                                       baseType);
 
     lookupVisibleMemberAndDynamicMemberDecls(memberType, loc, consumer,
-                                             consumer, dc, LS, reason, Sig,
+                                             consumer, dc, LS, reason,
                                              visited, seenDynamicLookup);
   }
 }
@@ -1201,7 +1153,9 @@ static void lookupVisibleDynamicMemberLookupDecls(
 static void lookupVisibleMemberDecls(
     Type BaseTy, SourceLoc loc, VisibleDeclConsumer &Consumer,
     const DeclContext *CurrDC, LookupState LS,
-    DeclVisibilityKind Reason, GenericSignature Sig) {
+    DeclVisibilityKind Reason) {
+  assert(!BaseTy->hasTypeParameter());
+
   OverrideFilteringConsumer overrideConsumer(BaseTy, CurrDC);
   KeyPathDynamicMemberConsumer dynamicConsumer(
       Consumer,
@@ -1211,7 +1165,7 @@ static void lookupVisibleMemberDecls(
   llvm::DenseSet<TypeBase *> seenDynamicLookup;
   lookupVisibleMemberAndDynamicMemberDecls(
       BaseTy, loc, overrideConsumer, dynamicConsumer, CurrDC, LS, Reason,
-      Sig, Visited, seenDynamicLookup);
+      Visited, seenDynamicLookup);
 
   // Report the declarations we found to the real consumer.
   overrideConsumer.filterDecls(Consumer);
@@ -1325,7 +1279,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
     if (ExtendedType) {
       ::lookupVisibleMemberDecls(ExtendedType, Loc, Consumer, DC, LS,
-                                 MemberReason, nullptr);
+                                 MemberReason);
 
       // Going outside the current type context.
       MemberReason = DeclVisibilityKind::MemberOfOutsideNominal;
@@ -1386,6 +1340,13 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      bool includeDerivedRequirements,
                                      bool includeProtocolExtensionMembers,
                                      GenericSignature Sig) {
+  // If we have an interface type, map it into its primary environment before
+  // doing anything else.
+  if (BaseTy->hasTypeParameter()) {
+    assert(Sig);
+    BaseTy = Sig.getGenericEnvironment()->mapTypeIntoContext(BaseTy);
+  }
+
   assert(CurrDC);
   LookupState ls = LookupState::makeQualified();
   if (includeInstanceMembers) {
@@ -1399,6 +1360,5 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   }
 
   ::lookupVisibleMemberDecls(BaseTy, loc, Consumer, CurrDC, ls,
-                             DeclVisibilityKind::MemberOfCurrentNominal,
-                             Sig);
+                             DeclVisibilityKind::MemberOfCurrentNominal);
 }

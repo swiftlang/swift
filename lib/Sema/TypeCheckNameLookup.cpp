@@ -581,6 +581,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         TypoCorrectionResults &corrections,
                                         GenericSignature genericSig,
                                         unsigned maxResults) {
+  // Even when typo correction is disabled, we want to make sure people are
+  // calling into it the right way.
+  assert(!baseTypeOrNull || !baseTypeOrNull->hasTypeParameter() || genericSig);
+
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
   auto &Ctx = DC->getASTContext();

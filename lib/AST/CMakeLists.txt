@@ -33,6 +33,7 @@ add_swift_host_library(swiftAST STATIC
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
   ConcreteDeclRef.cpp
+  ConformanceLookup.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp

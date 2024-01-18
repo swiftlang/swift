@@ -253,6 +253,22 @@ CheckRequirementsResult swift::checkRequirements(ArrayRef<Requirement> requireme
 
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
+
+  // Check preconditions.
+#ifndef NDEBUG
+  {
+    auto firstType = req.getFirstType();
+    assert(!firstType->hasTypeParameter());
+    assert(!firstType->hasTypeVariable());
+
+    if (req.getKind() != RequirementKind::Layout) {
+      auto secondType = req.getSecondType();
+      assert(!secondType->hasTypeParameter());
+      assert(!secondType->hasTypeVariable());
+    }
+  }
+#endif
+
     switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
     case CheckRequirementResult::ConditionalConformance:

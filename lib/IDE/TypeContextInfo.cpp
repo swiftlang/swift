@@ -133,21 +133,19 @@ void ContextInfoCallbacks::doneParsing(SourceFile *SrcFile) {
       continue;
 
     T = T->getRValueType();
-    if (T->hasArchetype())
-      T = T->mapTypeOutOfContext();
+
+    auto interfaceTy = T;
+    if (interfaceTy->hasArchetype())
+      interfaceTy = interfaceTy->mapTypeOutOfContext();
 
     // TODO: Do we need '.none' for Optionals?
-    auto objT = T->lookThroughAllOptionalTypes();
-
-    if (auto env = CurDeclContext->getGenericEnvironmentOfContext())
-      objT = env->mapTypeIntoContext(T);
-
-    if (!seenTypes.insert(objT->getCanonicalType()).second)
+    auto objTy = T->lookThroughAllOptionalTypes();
+    if (!seenTypes.insert(objTy->getCanonicalType()).second)
       continue;
 
-    results.emplace_back(T);
+    results.emplace_back(interfaceTy);
     auto &item = results.back();
-    getImplicitMembers(objT, item.ImplicitMembers);
+    getImplicitMembers(objTy, item.ImplicitMembers);
   }
 
   Consumer.handleResults(results);

@@ -172,7 +172,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // outer generic parameters.
   auto *module = DC->getParentModule();
   auto substMap = BaseTy->getContextSubstitutionMap(
-      module, VD->getDeclContext());
+      module, VD->getDeclContext(), genericDecl->getGenericEnvironment());
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig.getGenericParams().back()->getDepth();

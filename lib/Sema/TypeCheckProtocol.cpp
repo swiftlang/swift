@@ -4339,9 +4339,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         // a member that could in turn satisfy *this* requirement.
         auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
         auto conformance =
-            DC->getParentModule()->checkConformance(Adoptee, derivableProto);
+            DC->getParentModule()->lookupConformance(Adoptee, derivableProto);
         if (conformance.isConcrete()) {
-          (void)conformance.getConcrete()->getWitnessDecl(derivable);
+          (void) conformance.getConcrete()->getWitnessDecl(derivable);
         }
       }
     }
@@ -5674,6 +5674,9 @@ void swift::diagnoseConformanceFailure(Type T,
 
       // If the reason is that the raw type does not conform to
       // Equatable, say so.
+      //
+      // Map it into context since we want to check conditional requirements.
+      rawType = enumDecl->mapTypeIntoContext(rawType);
       if (!TypeChecker::conformsToKnownProtocol(
               rawType, KnownProtocolKind::Equatable, DC->getParentModule())) {
         SourceLoc loc = enumDecl->getInherited().getStartLoc();
@@ -5823,8 +5826,7 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 bool TypeChecker::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol, ModuleDecl *module,
     bool allowMissing) {
-  if (auto *proto =
-          TypeChecker::getProtocol(module->getASTContext(), SourceLoc(), protocol))
+  if (auto *proto = module->getASTContext().getProtocol(protocol))
     return (bool) module->checkConformance(type, proto, allowMissing);
   return false;
 }

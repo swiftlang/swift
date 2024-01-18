@@ -3027,6 +3027,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   if (!bitwiseCopyableProtocol)
     return;
 
+  // We can't check conditional requirements in this case. Why are we seeing
+  // interface types here at all?
+  if (substType->hasTypeParameter())
+    return;
+
   auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
 
   if (lowering.isTrivial() && !conformance) {
