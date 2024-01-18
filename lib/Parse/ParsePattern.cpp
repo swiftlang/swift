@@ -799,11 +799,11 @@ Parser::parseFunctionSignature(DeclBaseName SimpleName,
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 
-  ParameterContextKind paramContext = SimpleName.isOperator()
-    ? ParameterContextKind::Operator
-    : (SimpleName == DeclBaseName::createConstructor()
-         ? ParameterContextKind::Initializer
-         : ParameterContextKind::Function);
+  ParameterContextKind paramContext =
+      SimpleName.isOperator()
+          ? ParameterContextKind::Operator
+          : (SimpleName.isConstructor() ? ParameterContextKind::Initializer
+                                        : ParameterContextKind::Function);
   Status |= parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);

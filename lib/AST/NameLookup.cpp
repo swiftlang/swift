@@ -344,7 +344,7 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
       // C.init overrides B.init overrides A.init, but only C.init and
       // A.init are in the chain. Make sure we still remove A.init from the
       // set in this case.
-      if (decl->getBaseName() == DeclBaseName::createConstructor()) {
+      if (decl->getBaseName().isConstructor()) {
         /// FIXME: Avoid the possibility of an infinite loop by fixing the root
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
@@ -2494,7 +2494,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       // current class permits inheritance. Even then, only find complete
       // object initializers.
       bool visitSuperclass = true;
-      if (member.getBaseName() == DeclBaseName::createConstructor()) {
+      if (member.getBaseName().isConstructor()) {
         if (classDecl->inheritsSuperclassInitializers())
           onlyCompleteObjectInits = true;
         else

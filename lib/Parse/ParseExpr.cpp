@@ -1755,8 +1755,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     LLVM_FALLTHROUGH;
   }
+  case tok::kw_init:
   case tok::kw_Self:     // Self
-    return parseExprIdentifier();
+    return parseExprIdentifier(/*allowKeyword=*/true);
 
   case tok::kw_Any: { // Any
     auto TyR = parseAnyType();
@@ -2390,17 +2391,20 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
-ParserResult<Expr> Parser::parseExprIdentifier() {
+ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
   ParserStatus status;
-  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self) ||
+         (allowKeyword && Tok.isKeyword()));
   Token IdentTok = Tok;
 
+  auto declNameFlags = DeclNameFlag::AllowCompoundNames |
+                       DeclNameFlag::AllowLowercaseAndUppercaseSelf;
+  if (allowKeyword) {
+    declNameFlags |= DeclNameFlag::AllowKeywords;
+  }
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclNameRef name =
-      parseDeclNameRef(loc, diag::expected_expr,
-                       DeclNameFlag::AllowCompoundNames |
-                           DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr, declNameFlags);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -2701,7 +2705,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // the expression to capture.
         if (!Tok.is(tok::code_complete)) {
           name = Context.getIdentifier(Tok.getText());
-          auto initializerResult = parseExprIdentifier();
+          auto initializerResult = parseExprIdentifier(/*allowKeyword=*/false);
           status |= initializerResult;
           initializer = initializerResult.get();
         } else {

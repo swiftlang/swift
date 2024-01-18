@@ -1490,8 +1490,7 @@ bool swift::accessorMacroOnlyIntroducesObservers(
     if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
         (name.getName().getBaseName().userFacingName() == "willSet" ||
          name.getName().getBaseName().userFacingName() == "didSet" ||
-         name.getName().getBaseName().getKind() ==
-             DeclBaseName::Kind::Constructor)) {
+         name.getName().getBaseName().isConstructor())) {
       foundObserver = true;
     } else {
       // Introduces something other than an observer.
@@ -1518,8 +1517,7 @@ bool swift::accessorMacroIntroducesInitAccessor(
 ) {
   for (auto name : attr->getNames()) {
     if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
-        (name.getName().getBaseName().getKind() ==
-           DeclBaseName::Kind::Constructor))
+        (name.getName().getBaseName().isConstructor()))
       return true;
   }
 

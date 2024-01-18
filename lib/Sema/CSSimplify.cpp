@@ -10100,8 +10100,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // the same name, so you could write "foo.init" to look up a
   // method or property named `init`.
   if (!ctx.isSwiftVersionAtLeast(5) &&
-      memberName.getBaseName() == DeclBaseName::createConstructor() &&
-      !isImplicitInit) {
+      memberName.getBaseName().isConstructor() && !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
                                       DeclNameRef(ctx.getIdentifier("init")),
                                       memberLoc);

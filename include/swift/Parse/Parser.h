@@ -1799,7 +1799,7 @@ public:
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
       const Diagnostic &diag);
 
-  ParserResult<Expr> parseExprIdentifier();
+  ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 

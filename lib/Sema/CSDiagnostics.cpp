@@ -4325,7 +4325,7 @@ bool MissingMemberFailure::diagnoseAsError() {
       correction->addFixits(diagnostic);
     } else if ((instanceTy->getAnyNominal() ||
                 instanceTy->is<ExistentialType>()) &&
-               getName().getBaseName() == DeclBaseName::createConstructor()) {
+               getName().getBaseName().isConstructor()) {
       auto &cs = getConstraintSystem();
 
       auto result = cs.performMemberLookup(

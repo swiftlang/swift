@@ -5691,7 +5691,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   auto baseName = member.getBaseName();
   auto &Context = getASTContext();
   llvm::Optional<ImplicitMemberAction> action = llvm::None;
-  if (baseName == DeclBaseName::createConstructor())
+  if (baseName.isConstructor())
     action.emplace(ImplicitMemberAction::ResolveImplicitInit);
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
@@ -5701,19 +5701,20 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   } else {
     auto argumentNames = member.getArgumentNames();
     if (member.isSimpleName() || argumentNames.size() == 1) {
-      if (baseName == DeclBaseName::createConstructor()) {
+      if (baseName.isConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
         } else if (argumentNames.front() == Context.Id_system) {
           action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
         }
       } else if (!baseName.isSpecial() &&
-           baseName.getIdentifier() == Context.Id_encode &&
-           (member.isSimpleName() || argumentNames.front() == Context.Id_to)) {
+                 baseName.getIdentifier() == Context.Id_encode &&
+                 (member.isSimpleName() ||
+                  argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
       }
     } else if (member.isSimpleName() || argumentNames.size() == 2) {
-      if (baseName == DeclBaseName::createConstructor()) {
+      if (baseName.isConstructor()) {
         if (argumentNames[0] == Context.Id_resolve &&
             argumentNames[1] == Context.Id_using) {
           action.emplace(ImplicitMemberAction::ResolveDistributedActor);
@@ -10370,7 +10371,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.Failable = Failable;
 
-  assert(Name.getBaseName() == DeclBaseName::createConstructor());
+  assert(Name.getBaseName().isConstructor());
 }
 
 ConstructorDecl *ConstructorDecl::createImported(

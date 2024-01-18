@@ -2139,7 +2139,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
       !isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
+  if (!requirement->getBaseName().isConstructor()) {
     // Unknown requirement.
     requirement->diagnose(diag::broken_decodable_requirement);
     return nullptr;
