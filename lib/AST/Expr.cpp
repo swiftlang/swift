@@ -2535,9 +2535,14 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
           if (!IS->isSyntacticallyExhaustive())
             continue;
         } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+            continue;
           if (!DCS->isSyntacticallyExhaustive())
             continue;
-        } else if (!isa<SwitchStmt>(S) && !isa<DoStmt>(S)) {
+        } else if (isa<DoStmt>(S)) {
+          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+            continue;
+        } else if (!isa<SwitchStmt>(S)) {
           continue;
         }
       } else {
