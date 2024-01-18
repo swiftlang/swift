@@ -585,15 +585,27 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
               ClangOpts.BridgingHeader))
         MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
                        std::move(loadedBuffer));
+      else
+        Diagnostics.diagnose(
+            SourceLoc(), diag::error_load_input_from_cas,
+            Invocation.getClangImporterOptions().BridgingHeader);
     }
     if (!Opts.InputFileKey.empty()) {
-      auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
-      auto Type = file_types::lookupTypeForExtension(
-          llvm::sys::path::extension(InputPath));
-      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-              getObjectStore(), getActionCache(), Diagnostics,
-              Opts.InputFileKey, Type, InputPath))
-        MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+      if (Opts.InputsAndOutputs.getAllInputs().size() != 1)
+        Diagnostics.diagnose(SourceLoc(),
+                             diag::error_wrong_input_num_for_input_file_key);
+      else {
+        auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
+        auto Type = file_types::lookupTypeFromFilename(
+            llvm::sys::path::filename(InputPath));
+        if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
+                getObjectStore(), getActionCache(), Diagnostics,
+                Opts.InputFileKey, Type, InputPath))
+          MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+        else
+          Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                               InputPath);
+      }
     }
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
         new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
