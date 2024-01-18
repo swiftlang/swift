@@ -3191,12 +3191,14 @@ public:
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
-  /// Indicates how "strongly" a TypeDecl will conform to an invertible
-  /// protocol. Supports inequality comparisons and casts to bool.
-  enum CanBeInvertibleResult: unsigned {
-    CBI_Never = 0,            // Never conforms.
-    CBI_Conditionally = 1,    // Conditionally conforms.
-    CBI_Always = 2,           // Always conforms.
+  struct CanBeInvertible {
+    /// Indicates how "strongly" a TypeDecl will conform to an invertible
+    /// protocol. Supports inequality comparisons and casts to bool.
+    enum Result : unsigned {
+      Never = 0,            // Never conforms.
+      Conditionally = 1,    // Conditionally conforms.
+      Always = 2,           // Always conforms.
+    };
   };
 
   /// "Does a conformance for Copyable exist for this type declaration?"
@@ -3207,7 +3209,7 @@ public:
   ///
   /// If you need a more precise answer, ask this Decl's corresponding
   /// Type if it `isCopyable` instead of using this.
-  CanBeInvertibleResult canBeCopyable() const;
+  CanBeInvertible::Result canBeCopyable() const;
 
   /// "Does a conformance for Escapable exist for this type declaration?"
   ///
@@ -3217,7 +3219,7 @@ public:
   ///
   /// If you need a more precise answer, ask this Decl's corresponding
   /// Type if it `isEscapable` instead of using this.
-  CanBeInvertibleResult canBeEscapable() const;
+  CanBeInvertible::Result canBeEscapable() const;
 
   /// Determine how the given invertible protocol was written on this TypeDecl,
   /// if at all.

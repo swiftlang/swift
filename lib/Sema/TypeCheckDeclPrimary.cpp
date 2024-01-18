@@ -100,10 +100,10 @@ bool swift::isInterfaceTypeNoncopyable(Type type, GenericEnvironment *env) {
 
   // Handle types containing unbound generic parameters.
   if (auto *generic = type->getAnyGeneric())
-    return generic->canBeCopyable() != swift::TypeDecl::CBI_Always;
+    return generic->canBeCopyable() != swift::TypeDecl::CanBeInvertible::Always;
   else if (auto gtpt = type->getAs<GenericTypeParamType>())
     if (auto *gtpd = gtpt->getDecl())
-      return gtpd->canBeCopyable() != swift::TypeDecl::CBI_Always;
+      return gtpd->canBeCopyable() != swift::TypeDecl::CanBeInvertible::Always;
 
   #ifndef NDEBUG
     type->dump();

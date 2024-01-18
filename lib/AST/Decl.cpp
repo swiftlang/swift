@@ -4930,7 +4930,7 @@ InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
   );
 }
 
-static TypeDecl::CanBeInvertibleResult
+static TypeDecl::CanBeInvertible::Result
 conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   auto *proto = decl->getASTContext().getProtocol(getKnownProtocolKind(ip));
   assert(proto);
@@ -4938,8 +4938,8 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   // Handle protocols specially, without building a GenericSignature.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl))
     return protoDecl->requiresInvertible(ip)
-         ? TypeDecl::CBI_Always
-         : TypeDecl::CBI_Never;
+         ? TypeDecl::CanBeInvertible::Always
+         : TypeDecl::CanBeInvertible::Never;
 
   Type selfTy = decl->getDeclaredInterfaceType();
   assert(selfTy);
@@ -4948,31 +4948,31 @@ conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
       /*allowMissing=*/false);
 
   if (conformance.isInvalid())
-    return TypeDecl::CBI_Never;
+    return TypeDecl::CanBeInvertible::Never;
 
   if (!conformance.getConditionalRequirements().empty())
-    return TypeDecl::CBI_Conditionally;
+    return TypeDecl::CanBeInvertible::Conditionally;
 
-  return TypeDecl::CBI_Always;
+  return TypeDecl::CanBeInvertible::Always;
 }
 
-TypeDecl::CanBeInvertibleResult TypeDecl::canBeCopyable() const {
+TypeDecl::CanBeInvertible::Result TypeDecl::canBeCopyable() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     auto copyable = getMarking(InvertibleProtocolKind::Copyable);
     return !copyable.getInverse() || bool(copyable.getPositive())
-         ? CBI_Always
-         : CBI_Never;
+         ? CanBeInvertible::Always
+         : CanBeInvertible::Never;
   }
 
   return conformanceExists(this, InvertibleProtocolKind::Copyable);
 }
 
-TypeDecl::CanBeInvertibleResult TypeDecl::canBeEscapable() const {
+TypeDecl::CanBeInvertible::Result TypeDecl::canBeEscapable() const {
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     auto escapable = getMarking(InvertibleProtocolKind::Escapable);
     return !escapable.getInverse() || bool(escapable.getPositive())
-         ? CBI_Always
-         : CBI_Never;
+         ? CanBeInvertible::Always
+         : CanBeInvertible::Never;
   }
 
   return conformanceExists(this, InvertibleProtocolKind::Escapable);
