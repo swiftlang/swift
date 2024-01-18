@@ -358,7 +358,8 @@ static int run_driver(StringRef ExecName,
       llvm::errs() << "error: unable to invoke subcommand: " << subCommandArgs[0]
                    << " (" << ErrorString << ")\n";
       return 2;
-    }
+    } else
+      Diags.diagnose(SourceLoc(), diag::new_driver_not_found, NewDriverPath);
   }
   
   // We are in the fallback to legacy driver mode.
