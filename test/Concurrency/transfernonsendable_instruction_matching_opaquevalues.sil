@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: objc_interop
 
 // PLEASE READ THIS!
 //
