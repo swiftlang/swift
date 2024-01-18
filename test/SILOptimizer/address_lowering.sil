@@ -100,6 +100,7 @@ sil [ossa] @getT : $@convention(thin) <T> () -> @out T
 sil [ossa] @getKlass : $@convention(thin) () -> (@owned Klass)
 sil [ossa] @borrowKlass : $(@in_guaranteed Klass) -> ()
 sil [ossa] @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [ossa] @borrowMoveOnlyT : $@convention(thin) <T> (@in_guaranteed @moveOnly T) -> ()
 sil [ossa] @getPair : $@convention(thin) <T> () -> @out Pair<T>
 sil [ossa] @getOwned : $@convention(thin) <T : AnyObject> () -> (@owned T)
 sil [ossa] @takeGuaranteedObject : $@convention(thin) (@guaranteed AnyObject) -> ()
@@ -2341,6 +2342,34 @@ failure(%original : @owned $T):
   destroy_value %original : $T
   br exit
 exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_copyable_to_moveonlywrapper_1_owned : {{.*}} {
+// CHECK:       bb0([[TMO:%[^,]+]] :
+// CHECK:         [[T:%[^,]+]] = copyable_to_moveonlywrapper_addr [[TMO]]
+// CHECK:         destroy_addr [[T]]
+// CHECK-LABEL: } // end sil function 'test_copyable_to_moveonlywrapper_1_owned'
+sil [ossa] @test_copyable_to_moveonlywrapper_1_owned : $@convention(thin) <T> (@in T) -> () {
+entry(%t : @owned $T):
+  %tmo = copyable_to_moveonlywrapper [owned] %t : $T
+  destroy_value %tmo : $@moveOnly T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_copyable_to_moveonlywrapper_2_guaranteed : {{.*}} {
+// CHECK:       bb0([[TMO:%[^,]+]] :
+// CHECK:         [[T:%[^,]+]] = copyable_to_moveonlywrapper_addr [[TMO]]
+// CHECK:         [[BORROW_T:%[^,]+]] = function_ref @borrowMoveOnlyT
+// CHECK:         apply [[BORROW_T]]<T>([[T]])
+// CHECK-LABEL: } // end sil function 'test_copyable_to_moveonlywrapper_2_guaranteed'
+sil [ossa] @test_copyable_to_moveonlywrapper_2_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+entry(%t : @guaranteed $T):
+  %tmo = copyable_to_moveonlywrapper [guaranteed] %t : $T
+  %borrowT = function_ref @borrowMoveOnlyT : $@convention(thin) <T> (@in_guaranteed @moveOnly T) -> ()
+  apply %borrowT<T>(%tmo) : $@convention(thin) <T> (@in_guaranteed @moveOnly T) -> ()
   %retval = tuple ()
   return %retval : $()
 }

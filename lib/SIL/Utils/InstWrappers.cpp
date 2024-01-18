@@ -43,6 +43,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
     return false;
 
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::InitExistentialRefInst:
