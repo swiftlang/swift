@@ -947,6 +947,9 @@ static Operand *getProjectedDefOperand(SILValue value) {
 
     return nullptr;
 
+  case ValueKind::MarkUnresolvedNonCopyableValueInst:
+    return &cast<MarkUnresolvedNonCopyableValueInst>(value)->getOperandRef();
+
   case ValueKind::MoveValueInst:
     return &cast<MoveValueInst>(value)->getOperandRef();
 
@@ -3479,6 +3482,16 @@ protected:
   // the use-side because it may produce either loadable or address-only
   // types.
   void visitOpenExistentialValueInst(OpenExistentialValueInst *openExistential);
+
+  void visitMarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableValueInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+
+    auto address = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    auto *replacement = builder.createMarkUnresolvedNonCopyableValueInst(
+        inst->getLoc(), address, inst->getCheckKind());
+    markRewritten(inst, replacement);
+  }
 
   void visitMoveValueInst(MoveValueInst *mvi);
 

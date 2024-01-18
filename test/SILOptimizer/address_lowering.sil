@@ -2526,6 +2526,32 @@ bb0:
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_mark_unresolved_non_copyable_value_1_consumable_and_assignable : {{.*}} {
+// CHECK:       bb0([[T:%[^,]+]] :
+// CHECK:         [[TP:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T]]
+// CHECK:         destroy_addr [[TP]]
+// CHECK-LABEL: } // end sil function 'test_mark_unresolved_non_copyable_value_1_consumable_and_assignable'
+sil [ossa] @test_mark_unresolved_non_copyable_value_1_consumable_and_assignable : $@convention(thin) <T> (@in @moveOnly T) -> () {
+entry(%t : @owned $@moveOnly T):
+  %tp = mark_unresolved_non_copyable_value [consumable_and_assignable] %t : $@moveOnly T
+  destroy_value %tp : $@moveOnly T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_mark_unresolved_non_copyable_value_2_no_consume_or_assign : {{.*}} {
+// CHECK:       bb0([[T:%[^,]+]] :
+// CHECK:         [[TP:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[T]]
+// CHECK:         destroy_addr [[TP]]
+// CHECK-LABEL: } // end sil function 'test_mark_unresolved_non_copyable_value_2_no_consume_or_assign'
+sil [ossa] @test_mark_unresolved_non_copyable_value_2_no_consume_or_assign : $@convention(thin) <T> (@in @moveOnly T) -> () {
+entry(%t : @owned $@moveOnly T):
+  %tp = mark_unresolved_non_copyable_value [no_consume_or_assign] %t : $@moveOnly T
+  destroy_value %tp : $@moveOnly T
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
 // CHECK:       bb0([[PACK:%[^,]+]] : 
 // CHECK-SAME:      [[RAW_INDEX:%[^,]+]] :
