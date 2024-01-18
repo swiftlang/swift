@@ -3352,7 +3352,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
       !isMetadataAllowedInEmbedded(type)) {
     llvm::errs() << "Metadata pointer requested in embedded Swift for type "
                  << type << "\n";
-    assert(0 && "metadata used in embedded mode");
+    llvm::report_fatal_error("metadata used in embedded mode");
   }
 
   type = IGM.getRuntimeReifiedType(type);
