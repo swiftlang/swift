@@ -1396,7 +1396,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    auto ref = classDecl->getParentModule()->checkConformance(
+    auto ref = classDecl->getParentModule()->lookupConformance(
         superclassType, decodableProto);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
@@ -1425,7 +1425,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      auto ref = classDecl->getParentModule()->checkConformance(
+      auto ref = classDecl->getParentModule()->lookupConformance(
           superclassType, encodableProto);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
