@@ -715,8 +715,7 @@ private:
 
       // Reset binding to point to the resolved pattern. This is required
       // before calling `forPatternBindingDecl`.
-      patternBinding->setPattern(index, pattern,
-                                 patternBinding->getInitContext(index));
+      patternBinding->setPattern(index, pattern);
 
       patterns.push_back(makeElement(
           patternBinding,
@@ -751,8 +750,7 @@ private:
     // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SyntacticElementTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
+          init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
 
       if (ConstraintSystem::preCheckTarget(
@@ -764,8 +762,7 @@ private:
 
     if (init) {
       return SyntacticElementTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
+          init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
     }
 

@@ -31,6 +31,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -1966,7 +1967,7 @@ class PatternBindingEntry {
     IsFromDebugger = 1 << 2,
   };
   /// The initializer context used for this pattern binding entry.
-  llvm::PointerIntPair<DeclContext *, 3, OptionSet<PatternFlags>>
+  llvm::PointerIntPair<PatternBindingInitializer *, 3, OptionSet<PatternFlags>>
       InitContextAndFlags;
 
   /// Values captured by this initializer.
@@ -2007,7 +2008,7 @@ private:
 public:
   /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
-                      DeclContext *InitContext)
+                      PatternBindingInitializer *InitContext)
       : PatternAndFlags(P, {}),
         InitExpr({E, {E, InitializerStatus::NotChecked}, EqualLoc}),
         InitContextAndFlags({InitContext, llvm::None}) {}
@@ -2111,12 +2112,14 @@ private:
   VarDecl *getAnchoringVarDecl() const;
 
   // Retrieve the declaration context for the initializer.
-  DeclContext *getInitContext() const {
+  PatternBindingInitializer *getInitContext() const {
     return InitContextAndFlags.getPointer();
   }
 
   /// Override the initializer context.
-  void setInitContext(DeclContext *dc) { InitContextAndFlags.setPointer(dc); }
+  void setInitContext(PatternBindingInitializer *init) {
+    InitContextAndFlags.setPointer(init);
+  }
 
   SourceLoc getStartLoc() const;
 
@@ -2314,16 +2317,22 @@ public:
   Pattern *getPattern(unsigned i) const {
     return getPatternList()[i].getPattern();
   }
-  
-  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext,
-                  bool isFullyValidated = false);
+
+  void setPattern(unsigned i, Pattern *P, bool isFullyValidated = false);
 
   bool isFullyValidated(unsigned i) const {
     return getPatternList()[i].isFullyValidated();
   }
 
-  DeclContext *getInitContext(unsigned i) const {
+  PatternBindingInitializer *getInitContext(unsigned i) const {
     return getPatternList()[i].getInitContext();
+  }
+
+  void setInitContext(unsigned i, PatternBindingInitializer *init) {
+    if (init) {
+      init->setBinding(this, i);
+    }
+    getMutablePatternList()[i].setInitContext(init);
   }
 
   CaptureInfo getCaptureInfo(unsigned i) const {

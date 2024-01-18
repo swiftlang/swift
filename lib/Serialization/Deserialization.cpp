@@ -2659,10 +2659,10 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
     auto decl = getDecl(bindingID);
     PatternBindingDecl *binding = cast<PatternBindingDecl>(decl);
 
-    if (!declContextOrOffset.isComplete())
-      declContextOrOffset = new (ctx)
-        SerializedPatternBindingInitializer(binding, bindingIndex);
-
+    if (!declContextOrOffset.isComplete()) {
+      declContextOrOffset =
+          PatternBindingInitializer::createDeserialized(binding, bindingIndex);
+    }
     if (!blobData.empty())
       binding->setInitStringRepresentation(bindingIndex, blobData);
     break;
@@ -2676,8 +2676,7 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
                                                               index);
     DeclContext *parent = getDeclContext(parentID);
 
-    declContextOrOffset = new (ctx)
-      SerializedDefaultArgumentInitializer(index, parent);
+    declContextOrOffset = new (ctx) DefaultArgumentInitializer(parent, index);
     break;
   }
 
@@ -4370,8 +4369,9 @@ public:
       binding->setImplicit();
 
     for (unsigned i = 0; i != patterns.size(); ++i) {
-      DeclContext *initContext = MF.getDeclContext(patterns[i].second);
-      binding->setPattern(i, patterns[i].first, initContext);
+      binding->setPattern(i, patterns[i].first);
+      if (auto *context = MF.getDeclContext(patterns[i].second))
+        binding->setInitContext(i, cast<PatternBindingInitializer>(context));
     }
 
     return binding;

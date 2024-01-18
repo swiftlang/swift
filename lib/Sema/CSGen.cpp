@@ -4553,7 +4553,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
 
     auto makeIteratorTarget = SyntacticElementTarget::forInitialization(
-        makeIteratorCall, dc, /*patternType=*/Type(), PB, /*index=*/0,
+        makeIteratorCall, /*patternType=*/Type(), PB, /*index=*/0,
         /*shouldBindPatternsOneWay=*/false);
 
     ContextualTypeInfo contextInfo(sequenceProto->getDeclaredInterfaceType(),
@@ -4857,8 +4857,7 @@ bool ConstraintSystem::generateConstraints(
 
       // Reset binding to point to the resolved pattern. This is required
       // before calling `forPatternBindingDecl`.
-      patternBinding->setPattern(index, pattern,
-                                 patternBinding->getInitContext(index));
+      patternBinding->setPattern(index, pattern);
 
       auto contextualPattern =
           ContextualPattern::forPatternBindingDecl(patternBinding, index);
@@ -4876,7 +4875,7 @@ bool ConstraintSystem::generateConstraints(
       }
 
       auto target = init ? SyntacticElementTarget::forInitialization(
-                               init, dc, patternType, patternBinding, index,
+                               init, patternType, patternBinding, index,
                                /*bindPatternVarsOneWay=*/true)
                          : SyntacticElementTarget::forUninitializedVar(
                                patternBinding, index, patternType);

@@ -343,8 +343,7 @@ bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext) {
 
 BridgedPatternBindingInitializer
 BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
-  auto *dc = cDeclContext.unbridged();
-  return new (dc->getASTContext()) PatternBindingInitializer(dc);
+  return PatternBindingInitializer::create(cDeclContext.unbridged());
 }
 
 BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(

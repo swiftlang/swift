@@ -1925,21 +1925,19 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                           PBD->getTrailingObjects<PatternBindingEntry>());
 
   for (auto idx : range(PBD->getNumPatternEntries())) {
-    auto *initContext =
-        cast_or_null<PatternBindingInitializer>(PBD->getInitContext(idx));
+    auto *initContext = PBD->getInitContext(idx);
 
     // FIXME: We ought to reconsider this since it won't recontextualize any
     // closures/decls present in the initialization expr. This currently should
     // only affect implicit code though.
     if (!initContext && !Parent->isLocalContext())
-      initContext = new (Ctx) PatternBindingInitializer(Parent);
-
-    if (initContext)
-      initContext->setBinding(PBD, idx);
+      initContext = PatternBindingInitializer::create(Parent);
 
     // We need to call setPattern to ensure the VarDecls in the pattern have
-    // the PatternBindingDecl set as their parent, and to setup the context.
-    PBD->setPattern(idx, PBD->getPattern(idx), initContext);
+    // the PatternBindingDecl set as their parent. We also need to call
+    // setInitContext to setup the context.
+    PBD->setPattern(idx, PBD->getPattern(idx));
+    PBD->setInitContext(idx, initContext);
   }
   return PBD;
 }
@@ -1960,6 +1958,14 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
                                 /*Init*/ nullptr, /*InitContext*/ nullptr);
   }
   return PBD;
+}
+
+PatternBindingInitializer *
+PatternBindingInitializer::createDeserialized(PatternBindingDecl *PBD,
+                                              unsigned index) {
+  auto *init = PatternBindingInitializer::create(PBD->getDeclContext());
+  init->setBinding(PBD, index);
+  return init;
 }
 
 ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
@@ -1995,6 +2001,18 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
   }
 
   return SelfParam;
+}
+
+void PatternBindingInitializer::setBinding(PatternBindingDecl *binding,
+                                           unsigned bindingIndex) {
+  assert(binding);
+  assert(!Binding || Binding == binding &&
+         "Cannot change the binding after the fact");
+  assert(!Binding || SpareBits == bindingIndex &&
+         "Cannot change the binding index after the fact");
+  setParent(binding->getDeclContext());
+  Binding = binding;
+  SpareBits = bindingIndex;
 }
 
 VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
@@ -2225,12 +2243,10 @@ PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
-                                    DeclContext *InitContext,
                                     bool isFullyValidated) {
   auto PatternList = getMutablePatternList();
   PatternList[i].setPattern(P);
-  PatternList[i].setInitContext(InitContext);
-  
+
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
   if (P) {
@@ -2243,7 +2259,6 @@ void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
       PatternList[i].setFullyValidated();
   }
 }
-
 
 VarDecl *PatternBindingDecl::getSingleVar() const {
   if (getNumPatternEntries() == 1)

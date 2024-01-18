@@ -411,8 +411,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     return &pbe;
   }
 
-  binding->setPattern(entryNumber, pattern,
-                      binding->getInitContext(entryNumber));
+  binding->setPattern(entryNumber, pattern);
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -608,9 +607,7 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
       return;
   }
 
-  auto *initContext =
-      cast_or_null<PatternBindingInitializer>(binding->getInitContext(i));
-  if (initContext) {
+  if (auto *initContext = binding->getInitContext(i)) {
     auto *init = binding->getInit(i);
     TypeChecker::contextualizeInitializer(initContext, init);
     (void)binding->getInitializerIsolation(i);
@@ -2235,10 +2232,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
       const auto i = bindingDecl->getPatternEntryIndexForVarDecl(varDecl);
-      auto *bindingInit = cast<PatternBindingInitializer>(
-        bindingDecl->getInitContext(i));
-
-      selfDecl = bindingInit->getImplicitSelfDecl();
+      selfDecl = bindingDecl->getInitContext(i)->getImplicitSelfDecl();
     }
   }
 

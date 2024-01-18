@@ -2500,16 +2500,6 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
                                SACE->isImplicit(), SACE->getDiscriminator());
       return;
     }
-    case LocalDeclContextKind::DefaultArgumentInitializer: {
-      auto DAI = cast<SerializedDefaultArgumentInitializer>(local);
-      writeDefaultArgumentInitializer(DAI->getParent(), DAI->getIndex());
-      return;
-    }
-    case LocalDeclContextKind::PatternBindingInitializer: {
-      auto PBI = cast<SerializedPatternBindingInitializer>(local);
-      writePatternBindingInitializer(PBI->getBinding(), PBI->getBindingIndex());
-      return;
-    }
     case LocalDeclContextKind::TopLevelCodeDecl: {
       auto abbrCode = DeclTypeAbbrCodes[TopLevelCodeDeclContextLayout::Code];
       TopLevelCodeDeclContextLayout::emitRecord(Out, ScratchRecord,

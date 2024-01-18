@@ -2323,22 +2323,6 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     case LocalDeclContextKind::AbstractClosure:
       appendClosureEntity(cast<SerializedAbstractClosureExpr>(local));
       return;
-    case LocalDeclContextKind::DefaultArgumentInitializer: {
-      auto argInit = cast<SerializedDefaultArgumentInitializer>(local);
-      appendDefaultArgumentEntity(ctx->getParent(), argInit->getIndex());
-      return;
-    }
-    case LocalDeclContextKind::PatternBindingInitializer: {
-      auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      if (auto var = findFirstVariable(patternInit->getBinding())) {
-        appendInitializerEntity(var.value());
-      } else {
-        // This is incorrect in that it does not produce a /unique/ mangling,
-        // but it will at least produce a /valid/ mangling.
-        appendContext(ctx->getParent(), useModuleName);
-      }
-      return;
-    }
     case LocalDeclContextKind::TopLevelCodeDecl:
       return appendContext(local->getParent(), useModuleName);
     }
