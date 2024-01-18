@@ -2552,6 +2552,34 @@ entry(%t : @owned $@moveOnly T):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_moveonlywrapper_to_copyable_1_owned : {{.*}} {
+// CHECK:       bb0([[TMO:%[^,]+]] :
+// CHECK:         [[T:%[^,]+]] = moveonlywrapper_to_copyable_addr [[TMO]]
+// CHECK:         destroy_addr [[T]]
+// CHECK-LABEL: } // end sil function 'test_moveonlywrapper_to_copyable_1_owned'
+sil [ossa] @test_moveonlywrapper_to_copyable_1_owned : $@convention(thin) <T> (@in @moveOnly T) -> () {
+entry(%tmo : @owned $@moveOnly T):
+  %t = moveonlywrapper_to_copyable [owned] %tmo : $@moveOnly T
+  destroy_value %t : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_moveonlywrapper_to_copyable_2_guaranteed : {{.*}} {
+// CHECK:       bb0([[TMO:%[^,]+]] :
+// CHECK:         [[T:%[^,]+]] = moveonlywrapper_to_copyable_addr [[TMO]]
+// CHECK:         [[BORROW_T:%[^,]+]] = function_ref @borrowT
+// CHECK:         apply [[BORROW_T]]<T>([[T]])
+// CHECK-LABEL: } // end sil function 'test_moveonlywrapper_to_copyable_2_guaranteed'
+sil [ossa] @test_moveonlywrapper_to_copyable_2_guaranteed : $@convention(thin) <T> (@in_guaranteed @moveOnly T) -> () {
+entry(%tmo : @guaranteed $@moveOnly T):
+  %t = moveonlywrapper_to_copyable [guaranteed] %tmo : $@moveOnly T
+  %borrowT = function_ref @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %borrowT<T>(%t) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
 // CHECK:       bb0([[PACK:%[^,]+]] : 
 // CHECK-SAME:      [[RAW_INDEX:%[^,]+]] :

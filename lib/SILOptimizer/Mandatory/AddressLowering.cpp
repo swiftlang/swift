@@ -1009,6 +1009,7 @@ static Operand *getReusedStorageOperand(SILValue value) {
   default:
     break;
 
+  case ValueKind::MoveOnlyWrapperToCopyableValueInst:
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -3494,6 +3495,19 @@ protected:
   }
 
   void visitMoveValueInst(MoveValueInst *mvi);
+
+  void visitMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *inst) {
+    assert(use == getReusedStorageOperand(inst));
+    assert(inst->getType().isAddressOnly(*pass.function));
+    SILValue srcVal = inst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr =
+        builder.createMoveOnlyWrapperToCopyableAddr(inst->getLoc(), srcAddr);
+
+    markRewritten(inst, destAddr);
+  }
 
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after
