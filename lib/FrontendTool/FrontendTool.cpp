@@ -311,6 +311,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
     C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
+    C.NumMacroPluginDependencies = D->getMacroPluginDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
