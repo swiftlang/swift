@@ -4506,22 +4506,27 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
+  // Keep the `type` to be returned, while we unwrap and inspect the inner
+  // type for whether it can be isolated on.
   Type type = resolveType(repr->getBase(), options);
+  Type unwrappedType = type;
 
-  if (auto ty = dyn_cast<DynamicSelfType>(type)) {
-    type = ty->getSelfType();
+  // Optional actor types are fine - `nil` represents `nonisolated`.
+  auto allowOptional = getASTContext().LangOpts
+                           .hasFeature(Feature::OptionalIsolatedParameters);
+  if (allowOptional) {
+    if (auto wrappedOptionalType = unwrappedType->getOptionalObjectType()) {
+      unwrappedType = wrappedOptionalType;
+    }
+  }
+  if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(unwrappedType)) {
+    unwrappedType = dynamicSelfType->getSelfType();
   }
 
   // isolated parameters must be of actor type
-  if (!type->hasTypeParameter() && !type->isAnyActorType() && !type->hasError()) {
-    // Optional actor types are fine - `nil` represents `nonisolated`.
-    auto wrapped = type->getOptionalObjectType();
-    auto allowOptional = getASTContext().LangOpts
-        .hasFeature(Feature::OptionalIsolatedParameters);
-    if (allowOptional && wrapped && wrapped->isAnyActorType()) {
-      return type;
-    }
-
+  if (!unwrappedType->isTypeParameter() &&
+      !unwrappedType->isAnyActorType() &&
+      !unwrappedType->hasError()) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(), diag::isolated_parameter_not_actor, type);
     return ErrorType::get(type);

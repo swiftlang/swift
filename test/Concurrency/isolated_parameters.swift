@@ -356,7 +356,11 @@ func isolated_generic_bad_2<T: Equatable>(_ t: isolated T) {}
 func isolated_generic_bad_3<T: AnyActor>(_ t: isolated T) {}
 // expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
 
+func isolated_generic_bad_4<T>(_ t: isolated Array<T>) {}
+// expected-error@-1 {{'isolated' parameter has non-actor type 'Array<T>'}}
+
 func isolated_generic_ok_1<T: Actor>(_ t: isolated T) {}
+
 
 class NotSendable {} // expected-complete-note 5 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 
@@ -396,9 +400,19 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
   // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
 }
 
-actor A2 {}
-extension A2 {
-  nonisolated func f() async {
+// TODO: Consider making an actor's Self behave like in a struct, removing this special casing.
+//       We could consider changing this, so that self is always Self because we don't allow inheritance of actors.
+//       See: https://github.com/apple/swift/issues/70954 and rdar://121091417
+actor A2 {
+  nonisolated func f1() async {
     await { (self: isolated Self) in }(self)
+    // expected-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self'}}
+    await { (self: isolated Self?) in }(self)
+    // expected-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self?'}}
+  }
+  nonisolated func f2() async -> Self {
+    await { (self: isolated Self) in }(self)
+    await { (self: isolated Self?) in }(self)
+    return self
   }
 }
