@@ -5,6 +5,7 @@ set(swiftDriver_sources
   Compilation.cpp
   DarwinToolChains.cpp
   Driver.cpp
+  FineGrainedDependencyDriverGraph.cpp
   FrontendUtil.cpp
   Job.cpp
   PrettyStackTrace.cpp

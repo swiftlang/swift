@@ -334,6 +334,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
@@ -1199,6 +1201,8 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+
+  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));

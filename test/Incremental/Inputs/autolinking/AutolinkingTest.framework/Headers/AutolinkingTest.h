@@ -1,0 +1,3 @@
+struct Test {
+  int value;
+};
