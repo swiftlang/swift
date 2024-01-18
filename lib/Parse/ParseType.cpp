@@ -172,7 +172,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
 
   // Eat any '~' preceding the type.
   SourceLoc tildeLoc;
-  if (Tok.isTilde() && !isInSILMode()) {
+  if (Tok.isTilde()) {
     tildeLoc = consumeToken();
   }
 
