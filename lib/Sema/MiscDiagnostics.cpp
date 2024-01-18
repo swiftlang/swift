@@ -3938,6 +3938,8 @@ private:
               continue;
             }
           }
+          // TODO: If 'then' statements are enabled by default, the wording of
+          // this diagnostic should be tweaked.
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_result,
                          S->getKind());
