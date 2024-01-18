@@ -127,6 +127,26 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.mayBeDeinitBarrierNotConsideringSideEffects()
   }
 
+  public final var isEndOfScopeMarker: Bool {
+    switch self {
+    case is EndAccessInst, is EndBorrowInst:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  /// Incidental uses are marker instructions that do not propagate
+  /// their operand.
+  public final var isIncidentalUse: Bool {
+    switch self {
+    case is DebugValueInst, is FixLifetimeInst, is EndLifetimeInst:
+      return true
+    default:
+      return isEndOfScopeMarker
+    }
+  }
+
   public func visitReferencedFunctions(_ cl: (Function) -> ()) {
   }
 
@@ -283,6 +303,10 @@ final public class AssignInst : Instruction, StoringInstruction {
   }
 }
 
+final public class AssignByWrapperInst : Instruction {}
+
+final public class AssignOrInitInst : Instruction {}
+
 final public class CopyAddrInst : Instruction {
   public var sourceOperand: Operand { return operands[0] }
   public var destinationOperand: Operand { return operands[1] }
@@ -295,6 +319,13 @@ final public class CopyAddrInst : Instruction {
   public var isInitializationOfDest: Bool {
     bridged.CopyAddrInst_isInitializationOfDest()
   }
+}
+
+final public class ExplicitCopyAddrInst : Instruction {
+  public var sourceOperand: Operand { return operands[0] }
+  public var destinationOperand: Operand { return operands[1] }
+  public var source: Value { return sourceOperand.value }
+  public var destination: Value { return destinationOperand.value }
 }
 
 final public class EndAccessInst : Instruction, UnaryInstruction {
@@ -350,6 +381,8 @@ final public class CondFailInst : Instruction, UnaryInstruction {
 
   public var message: StringRef { StringRef(bridged: bridged.CondFailInst_getMessage()) }
 }
+
+final public class MarkFunctionEscapeInst : Instruction {}
 
 final public class HopToExecutorInst : Instruction, UnaryInstruction {}
 
@@ -418,6 +451,12 @@ final public class UnownedRetainInst : RefCountingInst {
 
 final public class RetainValueInst : RefCountingInst {
   public var value: Value { return operand.value }
+}
+
+final public class RetainValueAddrInst : RefCountingInst {
+}
+
+final public class ReleaseValueAddrInst : RefCountingInst {
 }
 
 final public class StrongReleaseInst : RefCountingInst {
@@ -539,6 +578,9 @@ class UncheckedRefCastInst : SingleValueInstruction, ConversionInstruction {
   public var fromInstance: Value { operand.value }
 }
 
+final public
+class UncheckedRefCastAddrInst : Instruction {}
+
 final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruction {
   public var fromAddress: Value { operand.value }
 }
@@ -578,6 +620,12 @@ class IndexAddrInst : SingleValueInstruction {
 }
 
 final public
+class TailAddrInst : SingleValueInstruction {
+  public var base: Value { operands[0].value }
+  public var index: Value { operands[1].value }
+}
+
+final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
 }
@@ -595,6 +643,12 @@ class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction, Forwa
 
 final public
 class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class DeinitExistentialAddrInst : Instruction {}
+
+final public
+class DeinitExistentialValueInst : Instruction {}
 
 final public
 class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
@@ -699,8 +753,7 @@ final public class StringLiteralInst : SingleValueInstruction {
   }
 }
 
-final public class TupleInst : SingleValueInstruction, ForwardingInstruction {
-}
+final public class TupleInst : SingleValueInstruction, ForwardingInstruction {}
 
 final public class TupleExtractInst : SingleValueInstruction, UnaryInstruction, ForwardingInstruction  {
   public var `tuple`: Value { operand.value }
@@ -712,6 +765,8 @@ class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var `tuple`: Value { operand.value }
   public var fieldIndex: Int { bridged.TupleElementAddrInst_fieldIndex() }
 }
+
+final public class TupleAddrConstructorInst : Instruction {}
 
 final public class StructInst : SingleValueInstruction, ForwardingInstruction {
 }
@@ -873,10 +928,14 @@ public protocol ScopedInstruction {
 }
 
 extension BeginAccessInst : ScopedInstruction {
-  public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndAccessInst?>>, EndAccessInst>
+  public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<UseList>, EndAccessInst>
 
   public var endInstructions: EndInstructions {
-    uses.lazy.compactMap({ $0.instruction as? EndAccessInst })
+    endOperands.map { $0.instruction as! EndAccessInst }
+  }
+
+  public var endOperands: LazyFilterSequence<UseList> {
+    return uses.lazy.filter { $0.instruction is EndAccessInst }
   }
 }
 
@@ -951,6 +1010,15 @@ final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruct
 final public
 class MarkUnresolvedNonCopyableValueInst : SingleValueInstruction, UnaryInstruction {}
 
+final public
+  class MarkUnresolvedMoveAddrInst : Instruction {}
+
+final public
+class CopyableToMoveOnlyWrapperAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class MoveOnlyWrapperToCopyableAddrInst : SingleValueInstruction, UnaryInstruction {}
+
 final public class ObjectInst : SingleValueInstruction {
   public var baseOperands: OperandArray {
     operands[0..<bridged.ObjectInst_getNumBaseElements()]
@@ -970,9 +1038,22 @@ final public class TuplePackExtractInst: SingleValueInstruction, ForwardingInstr
   public var tupleOperand: Operand { operands[1] }
 }
 
+final public class TuplePackElementAddrInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
+}
+
+final public class PackElementGetInst: SingleValueInstruction {}
+
+final public class PackElementSetInst: SingleValueInstruction {}
+
 final public class DifferentiableFunctionInst: SingleValueInstruction, ForwardingInstruction {}
 
 final public class LinearFunctionInst: SingleValueInstruction, ForwardingInstruction {}
+
+final public class ProjectBlockStorageInst: SingleValueInstruction, UnaryInstruction {}
+
+final public class InitBlockStorageHeaderInst: SingleValueInstruction {}
 
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
@@ -1191,6 +1272,9 @@ final public class SwitchEnumInst : TermInst, ForwardingInstruction {
 }
 
 final public class SwitchEnumAddrInst : TermInst {
+}
+
+final public class SelectEnumAddrInst : TermInst {
 }
 
 final public class DynamicMethodBranchInst : TermInst {

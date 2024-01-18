@@ -54,6 +54,10 @@ A projected value is defined by the original value and a projection path.
 **Related C++ utilities:** `AccessPath`
 **Status:** done
 
+### `SingleInlineArray`
+
+An array with the first element stored inline. Useful for analyses that produces results that are typically a 1-to-1 map, but rarely a 1-to-N map.
+
 ## Building SIL
 
 #### `static Builder.insert(after:, insertFunc: (Builder) -> ())`
@@ -66,6 +70,7 @@ Useful to insert instructions after a (potential) terminator instruction.
 
 #### Walk Utils
 This consists of four protocols, which can be implemented to walk up or down the SSA graph:
+
 * `ValueDefUseWalker`
 * `AddressDefUseWalker`
 * `ValueUseDefWalker`
@@ -78,6 +83,7 @@ This consists of four protocols, which can be implemented to walk up or down the
 #### Escape Utilities
 Escape analysis, which is used e.g. in stack promotion or alias analysis.
 Escape analysis is usable through the following methods of `ProjectedValue` and `Value`:
+
 * `isEscaping()`
 * `isAddressEscaping()`
 * `visit()`
@@ -89,6 +95,7 @@ Escape analysis is usable through the following methods of `ProjectedValue` and 
 
 #### Access Utils
 A set of utilities for analyzing memory accesses. It defines the following concepts:
+
 * `AccessBase`: represents the base address of a memory access.
 * `AccessPath`: a pair of an `AccessBase` and `SmallProjectionPath` with the path describing the specific address (in terms of projections) of the access.
 * Access storage path (which is of type `ProjectedValue`): identifies the reference - or a value which contains a reference - an address originates from.
@@ -96,6 +103,34 @@ A set of utilities for analyzing memory accesses. It defines the following conce
 **Uses:** Walk utils
 **Related C++ utilities:** `AccessPath`  and other access utilities.
 **Status:** done
+
+### Ownership Utils
+
+#### BorrowUtils.swift has utilities for traversing borrow scopes:
+
+* `BorrowingInstruction`: find borrow scopes during def-use walks
+* `BeginBorrowValue`: find borrow scopes during use-def walks
+* `gatherBorrowIntroducers`: use-def walk finds the current scopes
+* `gatherEnclosingValues`: use-def walk finds the outer lifetimes that enclose the current scope
+
+#### OwnershipUtils.swift has utilities for traversing OSSA lifetimes:
+
+* `computeLinearLiveness`: compute an InstructionRange from the immediate lifetime ending uses.
+* `computeInteriorLiveness`: complete def-use walk to compute an InstructionRange from all transitive use points that must be within an OSSA lifetime.
+* `InteriorUseWalker`: def-use walker for all transitive use points that must be within an OSSA lifetime.
+* `AddressLifetimeDefUseWalker`: def-use address walker to categorize all legal address uses by ownership effect.
+* `OwnershipUseVistor`: categorize all uses of an owned or guaranteed use by ownership effect. Use this within a recursive def-use walker to decide how to follow each use.
+
+`AddressLifetimeDefUseWalker` currently differs from `AddressDefUseWalker`. It visits all uses regardless of whether they are projections, has callbacks for handling inner scopes, and automatically handles the lifetime effect of inner scopes and dependent values.
+
+TODO: Define address projections in a single place rather than in both `AddressDefUseWalker` and `AddressUseVisitor`. This can be done with a simple `AddressProjection` protocol.
+
+#### ForwardingUtils.swift has utilities for traversing forward-extended  lifetimes:
+
+Forward-extended lifetimes may include multiple OSSA lifetimes joined by ForwardingInstructions. Querying certain information about OSSA lifetimes, such as whether it has a lexical lifetime or a pointer escape, requires finding the introducer of the forward-extended lifetime. Forwarding walkers traverse the SSA graph of ForwardingInstructions:
+
+* `ForwardingUseDefWalker`: Find the introducer of a forward-extended lifetime
+* `ForwardingDefUseWalker`: Find all OSSA lifetimes within a forward-extended lifetime.
 
 ## Control- and Dataflow
 

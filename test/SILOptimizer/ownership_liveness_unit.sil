@@ -4,6 +4,8 @@
 // then consider moving all tests with 'unreachable' into a separate file with the flag
 // -disable-ownership-verification
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin
@@ -30,17 +32,27 @@ sil @getC : $@convention(thin) () -> @owned C
 // LinearLiveness
 // =============================================================================
 
-// CHECK-LABEL: begin running test 1 of 1 on testLinearRefElementEscape: linear-liveness with: @trace[0]
+// CHECK-LABEL: testLinearRefElementEscape: linear-liveness with: %borrow
 // CHECK-LABEL: Linear liveness:
 // CHECK: lifetime-ending user:
 // CHECK-SAME: end_borrow
 // CHECK-NEXT: last user:   end_borrow
-// CHECK-NEXT: end running test 1 of 1 on testLinearRefElementEscape
+// CHECK-NEXT: testLinearRefElementEscape
+
+// CHECK-LABEL: testLinearRefElementEscape: linear_liveness_swift with: %borrow
+// CHECK: Linear liveness:
+// CHECK-NEXT: Live blocks:
+// CHECK-NEXT: begin: %{{.*}} = begin_borrow
+// CHECK-NEXT: ends: end_borrow
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user: end_borrow
+// CHECK-NEXT: testLinearRefElementEscape
 sil [ossa] @testLinearRefElementEscape : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  specify_test "linear-liveness @trace[0]"
   %borrow = begin_borrow %0 : $C
-  debug_value [trace] %borrow : $C
+  specify_test "linear-liveness %borrow"
+  specify_test "linear_liveness_swift %borrow"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -61,17 +73,27 @@ bb3(%phi : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testLinearBitwiseEscape: linear-liveness with: @trace[0]
+// CHECK-LABEL: testLinearBitwiseEscape: linear-liveness with: %borrow
 // CHECK: Linear liveness:
 // CHECK: lifetime-ending user:
 // CHECK-SAME: end_borrow
 // CHECK-NEXT: last user:   end_borrow
-// CHECK-NEXT: end running test 1 of 1 on testLinearBitwiseEscape
+// CHECK-NEXT: testLinearBitwiseEscape
+
+// CHECK-LABEL: testLinearBitwiseEscape: linear_liveness_swift with: %borrow
+// CHECK: Linear liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Live blocks:
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   end_borrow
+// CHECK-NEXT: testLinearBitwiseEscape
 sil [ossa] @testLinearBitwiseEscape : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  specify_test "linear-liveness @trace[0]"
   %borrow = begin_borrow %0 : $C
-  debug_value [trace] %borrow : $C
+  specify_test "linear-liveness %borrow"
+  specify_test "linear_liveness_swift %borrow"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -88,15 +110,26 @@ bb3(%phi : @unowned $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testLinearInnerReborrow: linear-liveness with: @argument[0]
+// CHECK-LABEL: testLinearInnerReborrow: linear-liveness with: @argument[0]
 // CHECK: Linear liveness:
 // CHECK: lifetime-ending user:
 // CHECK-SAME: destroy_value %0
 // CHECK-NEXT: last user:   destroy_value %0
-// CHECK-NEXT: end running test 1 of 1 on testLinearInnerReborrow
+// CHECK-NEXT: testLinearInnerReborrow
+
+// CHECK-LABEL: testLinearInnerReborrow: linear_liveness_swift with: @argument[0]
+// CHECK: Linear liveness:
+// CHECK-NEXT: Live blocks:
+// CHECK-NEXT: begin:      cond_br undef, bb1, bb2
+// CHECK-NEXT: ends:       destroy_value %0 : $C
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   destroy_value %0 : $C
+// CHECK-NEXT: testLinearInnerReborrow
 sil [ossa] @testLinearInnerReborrow : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
   specify_test "linear-liveness @argument[0]"
+  specify_test "linear_liveness_swift @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -114,18 +147,29 @@ bb3(%phi : @guaranteed $C):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testLinearAdjacentReborrow: linear-liveness with: @trace[0]
+// CHECK-LABEL: testLinearAdjacentReborrow: linear-liveness with: %borrow
 // CHECK: lifetime-ending user:
 // CHECK-SAME: br bb3
 // CHECK-NEXT: lifetime-ending user: br bb3
 // CHECK-NEXT: last user: br bb3
 // CHECK-NEXT: last user: br bb3
-// CHECK-NEXT: end running test 1 of 1 on testLinearAdjacentReborrow
+// CHECK-NEXT: testLinearAdjacentReborrow
+
+// CHECK-LABEL: testLinearAdjacentReborrow: linear_liveness_swift with: %borrow
+// CHECK: Live blocks:
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb3
+// CHECK-NEXT:             br bb3
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   br bb3
+// CHECK-NEXT: last user:   br bb3
+// CHECK-NEXT: testLinearAdjacentReborrow
 sil [ossa] @testLinearAdjacentReborrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  specify_test "linear-liveness @trace[0]"
+  specify_test "linear-liveness %borrow"
+  specify_test "linear_liveness_swift %borrow"
   %borrow = begin_borrow %0 : $C
-  debug_value [trace] %borrow : $C
   cond_br undef, bb1, bb2
 
 bb1:
@@ -147,7 +191,7 @@ bb3(%outer : @guaranteed $C, %inner : @guaranteed $C):
 // visitInnerAdjacentPhis
 // =============================================================================
 
-// CHECK-LABEL: begin running test 1 of 1 on pay_the_phi: visit-inner-adjacent-phis with: @trace[0]
+// CHECK-LABEL: pay_the_phi: visit-inner-adjacent-phis with: %owned
 // CHECK: sil [ossa] @pay_the_phi : {{.*}} {
 // CHECK:   [[C:%[^,]+]] = apply
 // CHECK:   [[BORROW1:%[^,]+]] = begin_borrow %1
@@ -158,7 +202,7 @@ bb3(%outer : @guaranteed $C, %inner : @guaranteed $C):
 //
 // CHECK:[[GUARANTEED1]] = argument of [[EXIT]]
 // CHECK:[[GUARANTEED2]] = argument of [[EXIT]]
-// CHECK-LABEL: end running test 1 of 1 on pay_the_phi: visit-inner-adjacent-phis with: @trace[0]
+// CHECK-LABEL: pay_the_phi: visit-inner-adjacent-phis with: %owned
 sil [ossa] @pay_the_phi : $@convention(thin) () -> () {
 entry:
   %getC = function_ref @getC : $@convention(thin) () -> @owned C
@@ -169,8 +213,7 @@ entry:
   br exit(%c : $C, %borrow1 : $C, %borrow2 : $C, %borrow3 : $C)
 
 exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaranteed $C, %guaranteed_3 : @guaranteed $C):
-  specify_test "visit-inner-adjacent-phis @trace[0]"
-  debug_value [trace] %owned : $C
+  specify_test "visit-inner-adjacent-phis %owned"
   end_borrow %guaranteed_3 : $C
   end_borrow %guaranteed_2 : $C
   end_borrow %guaranteed_1 : $C
@@ -179,11 +222,11 @@ exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaran
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on pay_the_phi_forward: visit-inner-adjacent-phis with: @trace[0]
+// CHECK-LABEL: pay_the_phi_forward: visit-inner-adjacent-phis with: %reborrow
 // CHECK: bb1(%{{.*}} : @reborrow @guaranteed $C, [[INNER:%.*]] : @guaranteed $D):    // Preds: bb0
 // CHECK: } // end sil function 'pay_the_phi_forward'
 // CHECK: [[INNER]] = argument of bb1 : $D
-// CHECK: end running test 1 of 1 on pay_the_phi_forward: visit-inner-adjacent-phis with: @trace[0]
+// CHECK: pay_the_phi_forward: visit-inner-adjacent-phis with: %reborrow
 sil [ossa] @pay_the_phi_forward : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %borrow0 = begin_borrow %0 : $C
@@ -191,8 +234,7 @@ bb0(%0 : @guaranteed $C):
   br exit(%borrow0 : $C, %d0 : $D)
 
 exit(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
-  specify_test "visit-inner-adjacent-phis @trace[0]"
-  debug_value [trace] %reborrow : $C
+  specify_test "visit-inner-adjacent-phis %reborrow"
   %f = ref_element_addr %phi : $D, #D.object
   %o = load [copy] %f : $*C
   destroy_value %o : $C
@@ -205,32 +247,57 @@ exit(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
 // InteriorLiveness and visitAdjacentPhis
 // =============================================================================
 
-// CHECK-LABEL: begin running test 1 of 1 on testInteriorRefElementEscape: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInteriorRefElementEscape: interior-liveness with: %0
 // CHECK: Incomplete liveness: Escaping address
 // CHECK: last user:   %{{.*}} = address_to_pointer
-// CHECK-NEXT: end running test 1 of 1 on testInteriorRefElementEscape:
+// CHECK-NEXT: testInteriorRefElementEscape:
+
+// CHECK-LABEL: testInteriorRefElementEscape: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: Incomplete liveness
+// CHECK-NEXT: begin:      %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: ends:       %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorRefElementEscape:
 sil [ossa] @testInteriorRefElementEscape : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  specify_test "interior-liveness @trace[0]"
+  specify_test "interior-liveness %0"
+  specify_test "interior_liveness_swift %0"
   %d = unchecked_ref_cast %0 : $C to $D
-  debug_value [trace] %d : $D
   %f1 = ref_element_addr %d : $D, #D.object  
   %p1 = address_to_pointer %f1 : $*C to $Builtin.RawPointer
   %99 = tuple()
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInteriorReborrow: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInteriorReborrow: interior-liveness with: %borrow
 // CHECK: Complete liveness
 // CHECK-NEXT: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   br bb1
-// CHECK-NEXT: end running test 1 of 1 on testInteriorReborrow: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInteriorReborrow: interior-liveness with: %borrow
+
+// CHECK-LABEL: testInteriorReborrow: interior_liveness_swift with: %borrow
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb1(%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C)
+// CHECK-NEXT: testInteriorReborrow: interior_liveness_swift with: %borrow
 sil [ossa] @testInteriorReborrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  specify_test "interior-liveness @trace[0]"
   %borrow = begin_borrow %0 : $C
-  debug_value [trace] %borrow : $C
+  specify_test "interior-liveness %borrow"
+  specify_test "interior_liveness_swift %borrow"
   br bb1(%borrow : $C)
 
 bb1(%reborrow : @guaranteed $C):
@@ -239,13 +306,83 @@ bb1(%reborrow : @guaranteed $C):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInteriorDominatedGuaranteedForwardingPhi: interior-liveness with: @argument[0]
+// CHECK-LABEL: testInteriorNondominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK-LABEL: sil [ossa] @testInteriorNondominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedReborrow: interior_liveness_swift with: %borrow1
+sil [ossa] @testInteriorNondominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb3(%borrow1 : $C, %borrow2 : $D)
+ 
+bb3(%reborrow1 : @guaranteed $C, %reborrow2 : @guaranteed $D):
+  end_borrow %reborrow2 : $D
+  end_borrow %reborrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorDominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK: sil [ossa] @testInteriorDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : $D
+// CHECK-NEXT:             br bb1(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedReborrow: interior_liveness_swift with: %borrow1
+sil [ossa] @testInteriorDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb3(%borrow2 : $D)
+ 
+bb3(%reborrow2 : @guaranteed $D):
+  end_borrow %reborrow2 : $D
+  end_borrow %borrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorDominatedGuaranteedForwardingPhi: interior-liveness with: @argument[0]
 // CHECK: Complete liveness
 // CHECK: last user: %{{.*}} load [copy]
-// CHECK-NEXT: end running test 1 of 1 on testInteriorDominatedGuaranteedForwardingPhi:
+// CHECK-NEXT: testInteriorDominatedGuaranteedForwardingPhi:
+
+// CHECK-LABEL: testInteriorDominatedGuaranteedForwardingPhi: interior_liveness_swift with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: begin:      cond_br undef, bb1, bb2
+// CHECK-NEXT: ends:       %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  br bb3(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             br bb3(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInteriorDominatedGuaranteedForwardingPhi:
 sil [ossa] @testInteriorDominatedGuaranteedForwardingPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   specify_test "interior-liveness @argument[0]"
+  specify_test "interior_liveness_swift @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -264,23 +401,34 @@ bb3(%phi : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInteriorNondominatedGuaranteedForwardingPhi: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInteriorNondominatedGuaranteedForwardingPhi: interior-liveness with: %borrow1
 // CHECK: Complete liveness
 // CHECK: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   br bb3(
-// CHECK-NEXT: end running test 1 of 1 on testInteriorNondominatedGuaranteedForwardingPhi: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInteriorNondominatedGuaranteedForwardingPhi: interior-liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorNondominatedGuaranteedForwardingPhi: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb3(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   br bb3(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedGuaranteedForwardingPhi: interior_liveness_swift with: %borrow1
 sil [ossa] @testInteriorNondominatedGuaranteedForwardingPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
 
 bb1:
   %borrow1 = begin_borrow %0 : $C
-  debug_value [trace] %borrow1 : $C
-  specify_test "interior-liveness @trace[0]"
+  specify_test "interior-liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
   %d1 = unchecked_ref_cast %borrow1 : $C to $D
   br bb3(%borrow1 : $C, %d1 : $D)
-
+ 
 bb2:
   %borrow2 = begin_borrow %0 : $C
   %d2 = unchecked_ref_cast %borrow2 : $C to $D
@@ -295,17 +443,29 @@ bb3(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerDominatedReborrow: interior-liveness with: @argument[0]
+// CHECK-LABEL: testInnerDominatedReborrow: interior-liveness with: @argument[0]
 // CHECK: Interior liveness:
 // CHECK: Inner scope:   %{{.*}} = begin_borrow %0 : $C
 // CHECK: Complete liveness
 // CHECK: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   end_borrow
-// CHECK-NEXT: end running test 1 of 1 on testInnerDominatedReborrow: interior-liveness with: @argument[0]
+// CHECK-NEXT: testInnerDominatedReborrow: interior-liveness with: @argument[0]
+
+// CHECK-LABEL: testInnerDominatedReborrow: interior_liveness_swift with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  br bb1(%{{.*}} : $C)
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInnerDominatedReborrow: interior_liveness_swift with: @argument[0]
 sil [ossa] @testInnerDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   specify_test "interior-liveness @argument[0]"
+  specify_test "interior_liveness_swift @argument[0]"
   %borrow = begin_borrow %0 : $C
   br bb1(%borrow : $C)
 
@@ -315,20 +475,32 @@ bb1(%reborrow : @guaranteed $C):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerDominatedReborrow2: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerDominatedReborrow2: interior-liveness with: %copy0a
 // CHECK: Inner scope:   %{{.*}} = begin_borrow %1 : $C
 // CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $C
 // CHECK: Complete liveness
 // CHECK-NEXT: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   destroy_value
-// CHECK-NEXT: end running test 1 of 1 on testInnerDominatedReborrow2: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerDominatedReborrow2: interior-liveness with: %copy0a
+
+// CHECK-LABEL: testInnerDominatedReborrow2: interior_liveness_swift with: %copy0a
+// CHECK: Interior liveness:   %{{.*}} = copy_value %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = copy_value %0 : $C
+// CHECK-NEXT: ends:       destroy_value %{{.*}} : $C
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : $C
+// CHECK-NEXT:             br bb3(%{{.*}} : $C)
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   destroy_value %{{.*}} : $C
+// CHECK-NEXT: testInnerDominatedReborrow2: interior_liveness_swift with: %copy0a
 sil [ossa] @testInnerDominatedReborrow2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %copy0a = copy_value %0 : $C
   %copy0b = copy_value %0 : $C
-  specify_test "interior-liveness @trace[0]"
-  debug_value [trace] %copy0a : $C
+  specify_test "interior-liveness %copy0a"
+  specify_test "interior_liveness_swift %copy0a"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -347,21 +519,32 @@ bb3(%reborrow : @guaranteed $C):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerNonDominatedReborrow: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerNonDominatedReborrow: interior-liveness with: %borrow1
 // CHECK: Inner scope:   [[BORROW:%.*]] = begin_borrow [[DEF:%.*]] : $D
 // CHECK: Complete liveness
 // CHECK: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   br bb3([[DEF]] : $D, [[BORROW]] : $D)
-// CHECK-NEXT: end running test 1 of 1 on testInnerNonDominatedReborrow: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerNonDominatedReborrow: interior-liveness with: %borrow1
+
+// CHECK-LABEL: testInnerNonDominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $D
+// CHECK-NEXT: ends:       br bb3(%{{.*}} : $D, %{{.*}} : $D)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   br bb3(%{{.*}} : $D, %{{.*}} : $D)
+// CHECK-NEXT: testInnerNonDominatedReborrow: interior_liveness_swift with: %borrow1
 sil [ossa] @testInnerNonDominatedReborrow : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   cond_br undef, bb1, bb2
 
 bb1:
-  specify_test "interior-liveness @trace[0]"
   %borrow1 = begin_borrow %0 : $D
-  debug_value [trace] %borrow1 : $D
+  specify_test "interior-liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
   %inner1 = begin_borrow %borrow1 : $D
   br bb3(%borrow1 : $D, %inner1 : $D)
 
@@ -380,7 +563,7 @@ bb3(%outer : @guaranteed $D, %inner : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerAdjacentReborrow1: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerAdjacentReborrow1: interior-liveness with: %outer3
 // CHECK: Interior liveness: [[DEF:%.*]] = argument of bb3 : $D
 // CHECK:      Inner scope: %{{.*}} = argument of bb3 : $D
 // CHECK:      Inner scope: %{{.*}} = argument of bb4 : $D
@@ -390,7 +573,18 @@ bb3(%outer : @guaranteed $D, %inner : @guaranteed $D):
 // CHECK-NEXT: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user: end_borrow
-// CHECK-NEXT: end running test 1 of 1 on testInnerAdjacentReborrow1: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerAdjacentReborrow1: interior-liveness with: %outer3
+
+// CHECK-LABEL: testInnerAdjacentReborrow1: interior_liveness_swift with: %outer3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: begin:      br bb4(
+// CHECK-NEXT: ends:       end_borrow
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  br bb4(
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   end_borrow
+// CHECK-NEXT: testInnerAdjacentReborrow1: interior_liveness_swift with: %outer3
 sil [ossa] @testInnerAdjacentReborrow1 : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   cond_br undef, bb1, bb2
@@ -406,8 +600,8 @@ bb2:
   br bb3(%copy2 : $D, %borrow2 : $D)
 
 bb3(%outer3 : @owned $D, %inner3 : @guaranteed $D):
-  specify_test "interior-liveness @trace[0]"
-  debug_value [trace] %outer3 : $D
+  specify_test "interior-liveness %outer3"
+  specify_test "interior_liveness_swift %outer3"
   br bb4(%inner3 : $D)
 
 bb4(%inner4 : @guaranteed $D):
@@ -418,7 +612,7 @@ bb4(%inner4 : @guaranteed $D):
   unreachable
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerAdjacentReborrow2: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerAdjacentReborrow2: interior-liveness with: %outer3
 // CHECK: Interior liveness: [[DEF:%.*]] = argument of bb3 : $D
 // CHECK:      Inner scope: %{{.*}} = argument of bb3 : $D
 // CHECK:      Inner scope: %{{.*}} = argument of bb4 : $D
@@ -428,7 +622,18 @@ bb4(%inner4 : @guaranteed $D):
 // CHECK-NEXT: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user: end_borrow
-// CHECK-NEXT: end running test 1 of 1 on testInnerAdjacentReborrow2: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerAdjacentReborrow2: interior-liveness with: %outer3
+
+// CHECK-LABEL: testInnerAdjacentReborrow2: interior_liveness_swift with: %outer3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: begin:      br bb4(%{{.*}} : $D)
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $D
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  br bb4(%{{.*}} : $D)
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: testInnerAdjacentReborrow2: interior_liveness_swift with: %outer3
 sil [ossa] @testInnerAdjacentReborrow2 : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   cond_br undef, bb1, bb2
@@ -444,8 +649,8 @@ bb2:
   br bb3(%copy2 : $D, %borrow2 : $D)
 
 bb3(%outer3 : @owned $D, %inner3 : @guaranteed $D):
-  specify_test "interior-liveness @trace[0]"
-  debug_value [trace] %outer3 : $D
+  specify_test "interior-liveness %outer3"
+  specify_test "interior_liveness_swift %outer3"
   br bb4(%inner3 : $D)
 
 bb4(%inner4 : @guaranteed $D):
@@ -456,7 +661,7 @@ bb4(%inner4 : @guaranteed $D):
   unreachable
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerNonAdjacentReborrow: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerNonAdjacentReborrow: interior-liveness with: %outer3
 // CHECK: Interior liveness: [[DEF:%.*]] = argument of bb3 : $D
 // CHECK-NOT:  Inner scope
 // CHECK-NOT:  lifetime-ending user
@@ -464,7 +669,18 @@ bb4(%inner4 : @guaranteed $D):
 // CHECK-NEXT: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: dead def: [[DEF]] = argument of bb3 : $D
-// CHECK-NEXT: end running test 1 of 1 on testInnerNonAdjacentReborrow: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerNonAdjacentReborrow: interior-liveness with: %outer3
+
+// CHECK-LABEL: testInnerNonAdjacentReborrow: interior_liveness_swift with: %outer3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: begin:      br bb4(%{{.*}} : $D)
+// CHECK-NEXT: ends:
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: dead def:    %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: testInnerNonAdjacentReborrow: interior_liveness_swift with: %outer3
 sil [ossa] @testInnerNonAdjacentReborrow : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   cond_br undef, bb1, bb2
@@ -480,8 +696,8 @@ bb2:
   br bb3(%copy2 : $D, %borrow2 : $D)
 
 bb3(%outer3 : @owned $D, %inner3 : @guaranteed $D):
-  specify_test "interior-liveness @trace[0]"
-  debug_value [trace] %outer3 : $D
+  specify_test "interior-liveness %outer3"
+  specify_test "interior_liveness_swift %outer3"
   br bb4(%inner3 : $D)
 
 bb4(%inner4 : @guaranteed $D):
@@ -492,13 +708,25 @@ bb4(%inner4 : @guaranteed $D):
   unreachable
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerAdjacentPhi1: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerAdjacentPhi1: interior-liveness with: %inner3
 // CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
 // CHECK: Complete liveness
 // CHECK: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   %{{.*}} = load [copy]
-// CHECK-NEXT: end running test 1 of 1 on testInnerAdjacentPhi1: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerAdjacentPhi1: interior-liveness with: %inner3
+
+// CHECK-LABEL: testInnerAdjacentPhi1: interior_liveness_swift with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: begin:      br bb4(%{{.*}} : $D)
+// CHECK-NEXT: ends:       %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  br bb4(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInnerAdjacentPhi1: interior_liveness_swift with: %inner3
 sil [ossa] @testInnerAdjacentPhi1 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
@@ -516,8 +744,8 @@ bb2:
   br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
 
 bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
-  specify_test "interior-liveness @trace[0]"
-  debug_value [trace] %inner3 : $C
+  specify_test "interior-liveness %inner3"
+  specify_test "interior_liveness_swift %inner3"
   br bb4(%phi3 : $D)
 
 bb4(%phi4 : @guaranteed $D):
@@ -527,13 +755,25 @@ bb4(%phi4 : @guaranteed $D):
   unreachable
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerAdjacentPhi2: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerAdjacentPhi2: interior-liveness with: %inner3
 // CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
 // CHECK: Complete liveness
 // CHECK: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   %{{.*}} = load [copy]
-// CHECK-NEXT: end running test 1 of 1 on testInnerAdjacentPhi2: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerAdjacentPhi2: interior-liveness with: %inner3
+
+// CHECK-LABEL: testInnerAdjacentPhi2: interior_liveness_swift with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: begin:      br bb4(%{{.*}} : $D)
+// CHECK-NEXT: ends:       %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  br bb4(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInnerAdjacentPhi2: interior_liveness_swift with: %inner3
 sil [ossa] @testInnerAdjacentPhi2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
@@ -551,8 +791,8 @@ bb2:
   br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
 
 bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
-  specify_test "interior-liveness @trace[0]"
-  debug_value [trace] %inner3 : $C
+  specify_test "interior-liveness %inner3"
+  specify_test "interior_liveness_swift %inner3"
   br bb4(%phi3 : $D)
 
 bb4(%phi4 : @guaranteed $D):
@@ -562,13 +802,24 @@ bb4(%phi4 : @guaranteed $D):
   unreachable
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testInnerNonAdjacentPhi: interior-liveness with: @trace[0]
+// CHECK-LABEL: testInnerNonAdjacentPhi: interior-liveness with: %inner3
 // CHECK: Interior liveness: [[DEF:%.*]] = argument of bb3 : $C
 // CHECK: Complete liveness
 // CHECK: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: dead def: [[DEF]] = argument of bb3 : $C
-// CHECK-NEXT: end running test 1 of 1 on testInnerNonAdjacentPhi: interior-liveness with: @trace[0]
+// CHECK-NEXT: testInnerNonAdjacentPhi: interior-liveness with: %inner3
+
+// CHECK-LABEL: testInnerNonAdjacentPhi: interior_liveness_swift with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: begin:      br bb4(%{{.*}} : $D)
+// CHECK-NEXT: ends:     
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: dead def: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: testInnerNonAdjacentPhi: interior_liveness_swift with: %inner3
 sil [ossa] @testInnerNonAdjacentPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
@@ -586,8 +837,8 @@ bb2:
   br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
 
 bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
-  specify_test "interior-liveness @trace[0]"
-  debug_value [trace] %inner3 : $C
+  specify_test "interior-liveness %inner3"
+  specify_test "interior_liveness_swift %inner3"
   br bb4(%phi3 : $D)
 
 bb4(%phi4 : @guaranteed $D):
@@ -597,15 +848,27 @@ bb4(%phi4 : @guaranteed $D):
   unreachable
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testScopedAddress: interior-liveness with: @argument[0]
+// CHECK-LABEL: testScopedAddress: interior-liveness with: @argument[0]
 // CHECK: Complete liveness
 // CHECK-NEXT: Unenclosed phis {
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   end_access
-// CHECK-NEXT: end running test 1 of 1 on testScopedAddress: interior-liveness with: @argument[0]
+// CHECK-NEXT: testScopedAddress: interior-liveness with: @argument[0]
+
+// CHECK-LABEL: testScopedAddress: interior_liveness_swift with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: begin:      %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: ends:       end_access %{{.*}} : $*C
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   end_access %{{.*}} : $*C
+// CHECK-NEXT: testScopedAddress: interior_liveness_swift with: @argument[0]
 sil [ossa] @testScopedAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   specify_test "interior-liveness @argument[0]"
+  specify_test "interior_liveness_swift @argument[0]"
   %f = ref_element_addr %0 : $D, #D.object
   %access = begin_access [read] [static] %f : $*C
   %o = load [copy] %access : $*C
@@ -615,7 +878,7 @@ bb0(%0 : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testUnenclosedReborrow: interior-liveness with: @trace[0]
+// CHECK-LABEL: testUnenclosedReborrow: interior-liveness with: %copy0a
 // CHECK: Interior liveness:   [[DEF:%.*]] = copy_value %0 : $C
 // CHECK-NEXT: Inner scope:   [[BORROW:%.*]] = begin_borrow [[DEF]] : $C
 // CHECK: Complete liveness
@@ -623,15 +886,27 @@ bb0(%0 : @guaranteed $D):
 // CHECK-NEXT:   %{{.*}} = argument of bb3 : $C
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   br bb3([[BORROW]] : $C)
-// CHECK-NEXT: end running test 1 of 1 on testUnenclosedReborrow: interior-liveness with: @trace[0]
+// CHECK-NEXT: testUnenclosedReborrow: interior-liveness with: %copy0a
+
+// CHECK-LABEL: testUnenclosedReborrow: interior_liveness_swift with: %copy0a
+// CHECK: Interior liveness:   %{{.*}} = copy_value %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = copy_value %0 : $C
+// CHECK-NEXT: ends:       br bb3(%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT:   Phi(value: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   br bb3(%{{.*}} : $C)
+// CHECK-NEXT: testUnenclosedReborrow: interior_liveness_swift with: %copy0a
 sil [ossa] @testUnenclosedReborrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
 
 bb1:
-  specify_test "interior-liveness @trace[0]"
   %copy0a = copy_value %0 : $C
-  debug_value [trace] %copy0a : $C
+  specify_test "interior-liveness %copy0a"
+  specify_test "interior_liveness_swift %copy0a"
   %borrow1 = begin_borrow %copy0a : $C
   br bb3(%borrow1 : $C)
 
@@ -645,23 +920,35 @@ bb3(%reborrow : @guaranteed $C):
   unreachable
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testUnenclosedGuaranteedPhi: interior-liveness with: @trace[0]
+// CHECK-LABEL: testUnenclosedGuaranteedPhi: interior-liveness with: %borrow1
 // CHECK: Interior liveness:   %{{.*}} = begin_borrow
 // CHECK: Complete liveness
 // CHECK: Unenclosed phis {
 // CHECK-NEXT:   %{{.*}} = argument of bb3 : $D
 // CHECK-NEXT: }
 // CHECK-NEXT: last user:   br bb3(
-// CHECK-NEXT: end running test 1 of 1 on testUnenclosedGuaranteedPhi: interior-liveness with: @trace[0]
+// CHECK-NEXT: testUnenclosedGuaranteedPhi: interior-liveness with: %borrow1
+
+// CHECK-LABEL: testUnenclosedGuaranteedPhi: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %{{.*}} : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %{{.*}} : $C
+// CHECK-NEXT: ends:       br bb3(%{{.*}} : $D)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Unenclosed phis {
+// CHECK-NEXT:   Phi(value: %{{.*}} = argument of bb3 : $D)
+// CHECK-NEXT: }
+// CHECK-NEXT: last user:   br bb3(%{{.*}} : $D)
+// CHECK-NEXT: testUnenclosedGuaranteedPhi: interior_liveness_swift with: %borrow1
 sil [ossa] @testUnenclosedGuaranteedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
 
 bb1:
-  specify_test "interior-liveness @trace[0]"
   %copy0a = copy_value %0 : $C
   %borrow1 = begin_borrow %copy0a : $C
-  debug_value [trace] %borrow1 : $C
+  specify_test "interior-liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
   %d1 = unchecked_ref_cast %borrow1 : $C to $D
   br bb3(%d1 : $D)
 
@@ -679,21 +966,20 @@ bb3(%phi : @guaranteed $D):
 // ExtendedLiveness
 // =============================================================================
 
-// CHECK-LABEL: begin running test 1 of 1 on testExtendedPhi: extended-liveness with: @trace[0]
+// CHECK-LABEL: testExtendedPhi: extended-liveness with: %copy1
 // CHECK: Extended liveness:   %{{.*}} = copy_value %0 : $C
 // CHECK: lifetime-ending user:   br bb3(
 // CHECK: lifetime-ending user:   destroy_value
 // CHECK: last user:   br bb3(
 // CHECK: last user:   destroy_value
-// CHECK: end running test 1 of 1 on testExtendedPhi: extended-liveness with: @trace[0]
+// CHECK: testExtendedPhi: extended-liveness with: %copy1
 sil [ossa] @testExtendedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
 
 bb1:
-  specify_test "extended-liveness @trace[0]"
   %copy1 = copy_value %0 : $C
-  debug_value [trace] %copy1 : $C
+  specify_test "extended-liveness %copy1"
   br bb3(%copy1 : $C)
 
 bb2:
@@ -706,22 +992,21 @@ bb3(%phi : @owned $C):
   return %99 : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on testExtendedReborrow: extended-liveness with: @trace[0]
+// CHECK-LABEL: testExtendedReborrow: extended-liveness with: %borrow1
 // CHECK: Extended liveness:   %{{.*}} = begin_borrow
 // CHECK: lifetime-ending user:   br bb3(
 // CHECK: lifetime-ending user:   end_borrow
 // CHECK: last user:   br bb3(
 // CHECK: last user:   end_borrow
-// CHECK: end running test 1 of 1 on testExtendedReborrow: extended-liveness with: @trace[0]
+// CHECK: testExtendedReborrow: extended-liveness with: %borrow1
 sil [ossa] @testExtendedReborrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
 
 bb1:
   %copy1 = copy_value %0 : $C
-  specify_test "extended-liveness @trace[0]"
   %borrow1 = begin_borrow %copy1 : $C
-  debug_value [trace] %borrow1 : $C
+  specify_test "extended-liveness %borrow1"
   br bb3(%copy1 : $C, %borrow1 : $C)
 
 bb2:

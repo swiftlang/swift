@@ -138,7 +138,11 @@ public func registerOptimizerTests() {
   registerFunctionTests(
       parseTestSpecificationTest,
       forwardingUseDefTest,
-      forwardingDefUseTest
+      forwardingDefUseTest,
+      borrowIntroducersTest,
+      enclosingValuesTest,
+      linearLivenessTest,
+      interiorLivenessTest
     )
 
   // Finally register the thunk they all call through.
