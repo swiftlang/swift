@@ -407,9 +407,12 @@ actor A2 {
   nonisolated func f1() async {
     await { (self: isolated Self) in }(self)
     // expected-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self'}}
+    await { (self: isolated Self?) in }(self)
+    // expected-error@-1 {{cannot convert value of type 'A2' to expected argument type 'Self?'}}
   }
   nonisolated func f2() async -> Self {
     await { (self: isolated Self) in }(self)
+    await { (self: isolated Self?) in }(self)
     return self
   }
 }
