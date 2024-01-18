@@ -342,7 +342,8 @@ SourceFile *DeclContext::getParentSourceFile() const {
       case DeclContextKind::FileUnit:
       case DeclContextKind::Module:
       case DeclContextKind::Package:
-      case DeclContextKind::SerializedLocal:
+      case DeclContextKind::SerializedAbstractClosure:
+      case DeclContextKind::SerializedTopLevelCodeDecl:
         break;
       }
     }
@@ -613,7 +614,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<EnumElementDecl>(this)->walk(Walker);
   case DeclContextKind::MacroDecl:
     return cast<MacroDecl>(this)->walk(Walker);
-  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SerializedAbstractClosure:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     llvm_unreachable("walk is unimplemented for deserialized contexts");
   case DeclContextKind::Initializer:
     // Is there any point in trying to walk the expression?
@@ -689,9 +691,11 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   case DeclContextKind::Package:          Kind = "Package"; break;
   case DeclContextKind::Module:           Kind = "Module"; break;
   case DeclContextKind::FileUnit:         Kind = "FileUnit"; break;
-  case DeclContextKind::SerializedLocal:  Kind = "Serialized Local"; break;
   case DeclContextKind::AbstractClosureExpr:
     Kind = "AbstractClosureExpr";
+    break;
+  case DeclContextKind::SerializedAbstractClosure:
+    Kind = "SerializedAbstractClosure";
     break;
   case DeclContextKind::GenericTypeDecl:
     switch (cast<GenericTypeDecl>(this)->getKind()) {
@@ -702,6 +706,9 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     break;
   case DeclContextKind::ExtensionDecl:    Kind = "ExtensionDecl"; break;
   case DeclContextKind::TopLevelCodeDecl: Kind = "TopLevelCodeDecl"; break;
+  case DeclContextKind::SerializedTopLevelCodeDecl:
+    Kind = "SerializedTopLevelCodeDecl"; 
+    break;
   case DeclContextKind::Initializer:      Kind = "Initializer"; break;
   case DeclContextKind::AbstractFunctionDecl:
     Kind = "AbstractFunctionDecl";
@@ -741,16 +748,29 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     OS << " line=" << getLineNumber(cast<AbstractClosureExpr>(this));
     OS << " : " << cast<AbstractClosureExpr>(this)->getType();
     break;
+
+  case DeclContextKind::SerializedAbstractClosure: {
+    OS << " : " << cast<SerializedAbstractClosureExpr>(this)->getType();
+    break;
+  }
+
   case DeclContextKind::GenericTypeDecl:
     OS << " name=" << cast<GenericTypeDecl>(this)->getName();
     break;
+
   case DeclContextKind::ExtensionDecl:
     OS << " line=" << getLineNumber(cast<ExtensionDecl>(this));
     OS << " base=" << cast<ExtensionDecl>(this)->getExtendedType();
     break;
+
   case DeclContextKind::TopLevelCodeDecl:
     OS << " line=" << getLineNumber(cast<TopLevelCodeDecl>(this));
     break;
+
+  case DeclContextKind::SerializedTopLevelCodeDecl:
+    // Already printed the kind, nothing else to do.
+    break;
+
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
     OS << " name=" << AFD->getName();
@@ -815,20 +835,6 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     }
     }
     break;
-
-  case DeclContextKind::SerializedLocal: {
-    auto local = cast<SerializedLocalDeclContext>(this);
-    switch (local->getLocalDeclContextKind()) {
-    case LocalDeclContextKind::AbstractClosure: {
-      auto serializedClosure = cast<SerializedAbstractClosureExpr>(local);
-      OS << " closure : " << serializedClosure->getType();
-      break;
-    }
-    case LocalDeclContextKind::TopLevelCodeDecl:
-      OS << " TopLevelCode";
-      break;
-    }
-  }
   }
 
   if (auto decl = getAsDecl())
@@ -1308,8 +1314,10 @@ DeclContextKind DeclContext::getContextKind() const {
     return DeclContextKind::AbstractClosureExpr;
   case ASTHierarchy::Initializer:
     return DeclContextKind::Initializer;
-  case ASTHierarchy::SerializedLocal:
-    return DeclContextKind::SerializedLocal;
+  case ASTHierarchy::SerializedAbstractClosure:
+    return DeclContextKind::SerializedAbstractClosure;
+  case ASTHierarchy::SerializedTopLevelCodeDecl:
+    return DeclContextKind::SerializedTopLevelCodeDecl;
   case ASTHierarchy::FileUnit:
     return DeclContextKind::FileUnit;
   case ASTHierarchy::Package:
@@ -1362,7 +1370,8 @@ bool DeclContext::isAsyncContext() const {
   case DeclContextKind::Initializer:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
-  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SerializedAbstractClosure:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
   case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::GenericTypeDecl:
@@ -1414,7 +1423,8 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
     return SourceLoc();
 
   case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SerializedAbstractClosure:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     return extractNearestSourceLoc(dc->getParent());
   }
   llvm_unreachable("Unhandled DeclContextKindIn switch");

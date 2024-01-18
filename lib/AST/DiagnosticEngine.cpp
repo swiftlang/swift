@@ -1247,6 +1247,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 
             case DeclContextKind::FileUnit:
             case DeclContextKind::TopLevelCodeDecl:
+            case DeclContextKind::SerializedTopLevelCodeDecl:
               break;
 
             case DeclContextKind::ExtensionDecl:
@@ -1257,9 +1258,9 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
               ppDecl = cast<GenericTypeDecl>(dc);
               break;
 
-            case DeclContextKind::SerializedLocal:
             case DeclContextKind::Initializer:
             case DeclContextKind::AbstractClosureExpr:
+            case DeclContextKind::SerializedAbstractClosure:
             case DeclContextKind::AbstractFunctionDecl:
             case DeclContextKind::SubscriptDecl:
             case DeclContextKind::EnumElementDecl:

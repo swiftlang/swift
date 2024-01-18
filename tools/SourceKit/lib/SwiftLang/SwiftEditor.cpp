@@ -1247,9 +1247,10 @@ inferAccessSyntactically(const ValueDecl *D) {
 
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     return AccessLevel::FilePrivate;
-  case DeclContextKind::SerializedLocal:
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractFunctionDecl:
