@@ -1,5 +1,8 @@
 // RUN: %target-sil-opt -transfer-non-sendable -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
 
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
 // PLEASE READ THIS!
 //
 // This test is specifically to test out individual instruction interactions,
