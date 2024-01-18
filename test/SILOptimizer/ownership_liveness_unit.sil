@@ -4,6 +4,8 @@
 // then consider moving all tests with 'unreachable' into a separate file with the flag
 // -disable-ownership-verification
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin
