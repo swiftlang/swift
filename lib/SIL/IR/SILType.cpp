@@ -1062,6 +1062,7 @@ bool SILType::isMoveOnly() const {
   auto ty = getASTType();
 
   // All kinds of references are copyable.
+  // FIXME: this doesn't match with how isNoncopyable in the AST handles it!
   if (isa<ReferenceStorageType>(ty))
     return false;
 

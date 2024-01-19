@@ -71,7 +71,8 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     // getSingleValueCopyOrCast returns true.  That function returns true for
     // move_value instructions.  And `move_value %moveOnlyValue` must not be
     // deleted.
-    if (result->getType().getASTType()->isNoncopyable() &&
+    auto type = result->getType();
+    if (type.isMoveOnly() && !type.isMoveOnlyWrapped() &&
         result->getOwnershipKind() == OwnershipKind::Owned) {
       return false;
     }
