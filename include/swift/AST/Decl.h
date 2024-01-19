@@ -1599,21 +1599,27 @@ public:
 
 /// An entry in the "inherited" list of a type or extension.
 struct InheritedEntry : public TypeLoc {
+private:
   /// Whether there was an @unchecked attribute.
-  bool isUnchecked = false;
+  bool IsUnchecked : 1;
 
   /// Whether there was an @retroactive attribute.
-  bool isRetroactive = false;
+  bool IsRetroactive : 1;
 
   /// Whether there was an @preconcurrency attribute.
-  bool isPreconcurrency = false;
+  bool IsPreconcurrency : 1;
 
+public:
   InheritedEntry(const TypeLoc &typeLoc);
 
   InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
                  bool isPreconcurrency)
-      : TypeLoc(typeLoc), isUnchecked(isUnchecked),
-        isRetroactive(isRetroactive), isPreconcurrency(isPreconcurrency) {}
+      : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
+        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency) {}
+
+  bool isUnchecked() const { return IsUnchecked; }
+  bool isRetroactive() const { return IsRetroactive; }
+  bool isPreconcurrency() const { return IsPreconcurrency; }
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or

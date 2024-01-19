@@ -1673,7 +1673,7 @@ static void diagnoseRetroactiveConformances(
         // However, if this is the protocol in the inherited type entry,
         // check to make sure it's not erroneously marked @retroactive when it's
         // not actually retroactive.
-        if (decl == proto && entry.isRetroactive) {
+        if (decl == proto && entry.isRetroactive()) {
           auto loc = entry.getTypeRepr()->findAttrLoc(TAK_retroactive);
           bool typeIsSameModule =
               extTypeModule->isSameModuleLookingThroughOverlays(module);
@@ -1688,7 +1688,7 @@ static void diagnoseRetroactiveConformances(
       }
 
       // If it's marked @retroactive, no need to warn.
-      if (entry.isRetroactive) {
+      if (entry.isRetroactive()) {
         return TypeWalker::Action::Continue;
       }
 

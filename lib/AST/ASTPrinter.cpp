@@ -2727,12 +2727,12 @@ void PrintAST::printInherited(const Decl *decl) {
   Printer << ": ";
 
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
-    if (inherited.isUnchecked)
+    if (inherited.isUnchecked())
       Printer << "@unchecked ";
-    if (inherited.isRetroactive &&
+    if (inherited.isRetroactive() &&
         !llvm::is_contained(Options.ExcludeAttrList, TAK_retroactive))
       Printer << "@retroactive ";
-    if (inherited.isPreconcurrency)
+    if (inherited.isPreconcurrency())
       Printer << "@preconcurrency ";
 
     printTypeLoc(inherited);
@@ -3221,11 +3221,9 @@ static bool usesFeatureRetroactiveAttribute(Decl *decl) {
   if (!ext)
     return false;
 
-  ArrayRef<InheritedEntry> entries = ext->getInherited().getEntries();
-  return std::find_if(entries.begin(), entries.end(), 
-    [](const InheritedEntry &entry) {
-      return entry.isRetroactive;
-    }) != entries.end();
+  return llvm::any_of(
+      ext->getInherited().getEntries(),
+      [](const InheritedEntry &entry) { return entry.isRetroactive(); });
 }
 
 static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
@@ -3912,7 +3910,7 @@ static bool usesFeaturePreconcurrencyConformances(Decl *decl) {
   auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
     return llvm::any_of(
         inherited.getEntries(),
-        [](const InheritedEntry &entry) { return entry.isPreconcurrency; });
+        [](const InheritedEntry &entry) { return entry.isPreconcurrency(); });
   };
 
   if (auto *T = dyn_cast<TypeDecl>(decl))
