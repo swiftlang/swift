@@ -37,7 +37,7 @@ struct Options {
   bool includeExactMatch = true;
   bool addInnerResults = false;
   bool addInnerOperators = true;
-  bool addInitsToTopLevel = false;
+  bool addInitsToTopLevel = true;
   bool callPatternHeuristics = false;
   bool hideUnderscores = true;
   bool reallyHideAllUnderscores = false;
