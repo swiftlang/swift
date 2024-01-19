@@ -182,6 +182,4 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 @_marker public protocol Escapable {}
 #endif
 
-#if $BitwiseCopyable
 @_marker public protocol _BitwiseCopyable {}
-#endif
