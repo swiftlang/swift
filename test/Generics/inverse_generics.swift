@@ -415,3 +415,10 @@ func checkOwnership<T: HasMember>(_ t: T,
                                   _ o: T.Member.NCBuddy.NCBuddy
 // expected-error@-1 {{parameter of noncopyable type 'T.Member.NCBuddy.NCBuddy' must specify ownership}} // expected-note@-1 3{{add}}
 ) {}
+
+// Covers an issue when building Combine from its interface.
+public struct Record<Output> {
+  public init(recording: Record<Output>) {}
+}
+protocol P {}
+extension Record : Decodable where Output : P {}
