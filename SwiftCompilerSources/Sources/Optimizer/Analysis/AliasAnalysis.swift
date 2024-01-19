@@ -159,7 +159,10 @@ private func getMemoryEffect(ofBuiltin builtin: BuiltinInst, for address: Value,
     let callee = builtin.operands[1].value
     return context.calleeAnalysis.getSideEffects(ofCallee: callee).memory
   default:
-    return builtin.memoryEffects
+    if address.at(path).isEscaping(using: EscapesToInstructionVisitor(target: builtin, isAddress: true), context) {
+      return builtin.memoryEffects
+    }
+    return SideEffects.Memory()
   }
 }
 
