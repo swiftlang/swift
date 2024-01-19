@@ -97,3 +97,13 @@ class EncodableSubWithoutInitialValue : CodableSuper { // expected-error {{class
 class CodableSubWithInitialValue : CodableSuper {
   var value2 = 10
 }
+
+class GenericCodableSuper<T>: Decodable {}
+
+class GenericCodableSub<T>: GenericCodableSuper<T> {
+// expected-error@-1 {{class 'GenericCodableSub' has no initializers}}
+// expected-note@-2 {{did you mean to override 'init(from:)'?}}
+// expected-warning@-2 {{'required' initializer 'init(from:)' must be provided by subclass of 'GenericCodableSuper<T>'; this is an error in Swift 6}}
+  var t: T
+  // expected-note@-1 {{stored property 't' without initial value prevents synthesized initializers}}
+}

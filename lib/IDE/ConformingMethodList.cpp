@@ -174,8 +174,19 @@ void ConformingMethodListCallbacks::getMatchingMethods(
       if (FD->isStatic() || FD->isOperator())
         return false;
 
-      auto resultTy = T->getTypeOfMember(CurModule, FD,
-                                         FD->getResultInterfaceType());
+      assert(!T->hasTypeParameter());
+
+      // T may contain primary archetypes from some fixed generic signature G.
+      // This might be unrelated to the generic signature of FD. However if
+      // FD has a generic parameter of its own and it returns a type containing
+      // that parameter, we want to map it to the corresponding archetype
+      // from the generic environment of FD, because all we do with the
+      // resulting type is check conformance. If the conformance is conditional,
+      // we might run into trouble with really complicated cases but the fake
+      // archetype setup will mostly work.
+      auto substitutions = T->getMemberSubstitutionMap(
+          CurModule, FD, FD->getGenericEnvironment());
+      auto resultTy =  FD->getResultInterfaceType().subst(substitutions);
       if (resultTy->is<ErrorType>())
         return false;
 
