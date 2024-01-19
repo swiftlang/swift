@@ -308,11 +308,11 @@ public struct UnsafePointer<Pointee>: _Pointer {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0333_UnsafePointer_withMemoryRebound")
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Failure, Result>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafePointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ pointer: UnsafePointer<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||
@@ -1060,11 +1060,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @_alwaysEmitIntoClient
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
-  public func withMemoryRebound<T, Result>(
+  public func withMemoryRebound<T, Failure, Result>(
     to type: T.Type,
     capacity count: Int,
-    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
-  ) rethrows -> Result {
+    _ body: (_ pointer: UnsafeMutablePointer<T>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||

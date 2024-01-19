@@ -218,13 +218,13 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
 
 extension _SmallString {
   @inlinable @inline(__always)
-  internal func withUTF8<Result>(
-    _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
+  internal func withUTF8<Result, Failure>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
-      let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
+    return try Swift._withUnprotectedUnsafeBytes(of: &raw) { (bytes) throws(Failure) in
+      let rawPtr = bytes.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.
       let ptr = rawPtr.bindMemory(to: UInt8.self, capacity: count)
@@ -240,11 +240,11 @@ extension _SmallString {
   // new count. This will re-establish the invariant after `f` that all bits
   // between the last code unit and the discriminator are unset.
   @inline(__always)
-  fileprivate mutating func withMutableCapacity(
-    _ f: (UnsafeMutableRawBufferPointer) throws -> Int
-  ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &_storage) {
-      try f(.init(start: $0.baseAddress, count: _SmallString.capacity))
+  fileprivate mutating func withMutableCapacity<Failure>(
+    _ f: (UnsafeMutableRawBufferPointer) throws(Failure) -> Int
+  ) throws(Failure) {
+    let len = try withUnsafeMutableBytes(of: &_storage) { (bytes) throws(Failure) in
+      try f(.init(start: bytes.baseAddress, count: _SmallString.capacity))
     }
 
     if len <= 0 {
@@ -308,14 +308,14 @@ extension _SmallString {
   }
 
   @inline(__always)
-  internal init(
+  internal init<Failure>(
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows {
+    ) throws(Failure) -> Int
+  ) throws(Failure) {
     self.init()
-    try self.withMutableCapacity {
-      try $0.withMemoryRebound(to: UInt8.self, initializer)
+    try self.withMutableCapacity { (bytes) throws(Failure) in
+      try bytes.withMemoryRebound(to: UInt8.self, initializer)
     }
     self._invariantCheck()
   }

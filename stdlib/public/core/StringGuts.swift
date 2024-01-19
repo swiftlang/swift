@@ -141,9 +141,9 @@ extension _StringGuts {
   }
 
   @inlinable @inline(__always)
-  internal func withFastUTF8<R>(
-    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
-  ) rethrows -> R {
+  internal func withFastUTF8<R, E>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> R
+  ) throws(E) -> R {
     _internalInvariant(isFastUTF8)
 
     if self.isSmall { return try _SmallString(_object).withUTF8(f) }
@@ -153,20 +153,20 @@ extension _StringGuts {
   }
 
   @inlinable @inline(__always)
-  internal func withFastUTF8<R>(
+  internal func withFastUTF8<Result, Failure>(
     range: Range<Int>,
-    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
-  ) rethrows -> R {
-    return try self.withFastUTF8 { wholeUTF8 in
+    _ f: (UnsafeBufferPointer<UInt8>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
+    return try self.withFastUTF8 { (wholeUTF8) throws(Failure) -> Result in
       return try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
   @inlinable @inline(__always)
-  internal func withFastCChar<R>(
-    _ f: (UnsafeBufferPointer<CChar>) throws -> R
-  ) rethrows -> R {
-    return try self.withFastUTF8 { utf8 in
+  internal func withFastCChar<Result, Failure>(
+    _ f: (UnsafeBufferPointer<CChar>) throws(Failure) -> Result
+  ) throws(Failure) -> Result {
+    return try self.withFastUTF8 { (utf8) throws(Failure) -> Result in
       return try utf8.withMemoryRebound(to: CChar.self, f)
     }
   }

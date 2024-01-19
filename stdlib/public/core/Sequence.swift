@@ -796,9 +796,9 @@ extension Sequence {
   ///   parameter.
   @_semantics("sequence.forEach")
   @inlinable
-  public func forEach(
-    _ body: (Element) throws -> Void
-  ) rethrows {
+  public func forEach<Failure>(
+    _ body: (Element) throws(Failure) -> Void
+  ) throws(Failure) {
     for element in self {
       try body(element)
     }
