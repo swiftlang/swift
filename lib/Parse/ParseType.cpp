@@ -163,7 +163,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
         Tok.getRawText().equals("consuming") ||
         Tok.getRawText().equals("borrowing") ||
         (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-         Tok.getRawText().equals("resultDependsOn"))))) {
+         Tok.getRawText().equals("resultDependsOn")) ||
+        (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
+         Tok.getRawText().equals("transferring"))))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());

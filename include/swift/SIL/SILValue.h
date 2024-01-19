@@ -1655,6 +1655,15 @@ namespace llvm {
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
 
+  /// A SILValue can be checked if a value is present, so we can use it with
+  /// dyn_cast_or_null.
+  template <>
+  struct ValueIsPresent<swift::SILValue> {
+    using SILValue = swift::SILValue;
+    using UnwrappedType = SILValue;
+    static inline bool isPresent(const SILValue &t) { return bool(t); }
+    static inline decltype(auto) unwrapValue(SILValue &t) { return t; }
+  };
 } // end namespace llvm
 
 #endif

@@ -2211,7 +2211,11 @@ enum class ParamSpecifier : uint8_t {
   /// `__shared`, a legacy spelling of `borrowing`.
   LegacyShared = 4,
   /// `__owned`, a legacy spelling of `consuming`.
-  LegacyOwned = 5
+  LegacyOwned = 5,
+
+  /// `transferring`. Indicating the transfer of a value from one isolation
+  /// domain to another.
+  Transferring = 6,
 };
 
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
@@ -2228,7 +2232,8 @@ class ParameterTypeFlags {
     Isolated = 1 << 7,
     CompileTimeConst = 1 << 8,
     ResultDependsOn = 1 << 9,
-    NumBits = 10
+    Transferring = 1 << 10,
+    NumBits = 11
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2243,20 +2248,22 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst, bool hasResultDependsOn)
+                     bool compileTimeConst, bool hasResultDependsOn,
+                     bool isTransferring)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0) |
-              (hasResultDependsOn ? ResultDependsOn : 0)) {}
+              (hasResultDependsOn ? ResultDependsOn : 0) |
+              (isTransferring ? Transferring : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative, bool compileTimeConst,
-                    bool hasResultDependsOn);
+                    bool hasResultDependsOn, bool isTransferring);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2269,6 +2276,7 @@ public:
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool hasResultDependsOn() const { return value.contains(ResultDependsOn); }
+  bool isTransferring() const { return value.contains(Transferring); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2329,6 +2337,12 @@ public:
     return ParameterTypeFlags(noDerivative
                                   ? value | ParameterTypeFlags::NoDerivative
                                   : value - ParameterTypeFlags::NoDerivative);
+  }
+
+  ParameterTypeFlags withTransferring(bool withTransferring) const {
+    return ParameterTypeFlags(withTransferring
+                                  ? value | ParameterTypeFlags::Transferring
+                                  : value - ParameterTypeFlags::Transferring);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2424,7 +2438,8 @@ public:
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
                               /*compileTimeConst*/ false,
-                              /*hasResultDependsOn*/ false);
+                              /*hasResultDependsOn*/ false,
+                              /*is transferring*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -4111,6 +4126,9 @@ public:
     /// - If the function type is `@differentiable`, the function is
     ///   differentiable with respect to this parameter.
     NotDifferentiable = 0x1,
+
+    /// Set if the given parameter is transferring.
+    Transferring = 0x2,
   };
 
   using Options = OptionSet<Flag>;
@@ -7627,7 +7645,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst, bool hasResultDependsOn) {
+    bool compileTimeConst, bool hasResultDependsOn, bool isTransferring) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -7637,8 +7655,9 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
            ownership == ParamSpecifier::InOut);
     ownership = ParamSpecifier::InOut;
   }
-  return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
-          isolated,   isNoDerivative, compileTimeConst, hasResultDependsOn};
+  return {isVariadic,       isAutoClosure,      isNonEphemeral,
+          ownership,        isolated,           isNoDerivative,
+          compileTimeConst, hasResultDependsOn, isTransferring};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

@@ -139,6 +139,8 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("__shared") &&
         !Tok.isContextualKeyword("__owned") &&
         !Tok.isContextualKeyword("borrowing") &&
+        (!Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
+         !Tok.isContextualKeyword("transferring")) &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
         (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
          !Tok.isContextualKeyword("_resultDependsOn")))
@@ -236,7 +238,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                Tok.isContextualKeyword("isolated") ||
                Tok.isContextualKeyword("_const") ||
                (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-                Tok.isContextualKeyword("_resultDependsOn"))))) {
+                Tok.isContextualKeyword("_resultDependsOn")) ||
+               (Context.LangOpts.hasFeature(
+                   Feature::TransferringArgsAndResults))))) {
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
@@ -288,7 +292,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           } else if (Tok.isContextualKeyword("__owned")) {
             param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
             param.SpecifierLoc = consumeToken();
+          } else if (Context.LangOpts.hasFeature(
+                         Feature::TransferringArgsAndResults) &&
+                     Tok.isContextualKeyword("transferring")) {
+            param.SpecifierKind = ParamDecl::Specifier::Transferring;
+            param.SpecifierLoc = consumeToken();
           }
+
           hasSpecifier = true;
         } else {
           // Redundant specifiers are fairly common, recognize, reject, and
