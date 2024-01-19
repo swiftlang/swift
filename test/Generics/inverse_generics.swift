@@ -101,6 +101,8 @@ protocol Test: ~Copyable {
   init?() // expected-error {{noncopyable types cannot have failable initializers yet}}
 }
 
+struct NoncopyableAndSendable: ~Copyable, Sendable {}
+
 /// ---------------
 
 // expected-note@+2 {{consider adding '~Copyable' to generic enum 'Maybe'}}
