@@ -56,7 +56,7 @@ struct TemplateInstantiationNamePrinter
     }
 
     if (swiftType) {
-      if (swiftType->is<NominalType>()) {
+      if (swiftType->is<NominalType>() || swiftType->isVoid()) {
         return swiftType->getStringAsComponent();
       }
     }
@@ -110,6 +110,22 @@ struct TemplateInstantiationNamePrinter
     buffer << pointeeResult;
     if (decorator != TagTypeDecorator::None)
       buffer << '>';
+
+    return buffer.str().str();
+  }
+
+  std::string VisitFunctionProtoType(const clang::FunctionProtoType *type) {
+    llvm::SmallString<128> storage;
+    llvm::raw_svector_ostream buffer(storage);
+
+    buffer << "((";
+    llvm::interleaveComma(type->getParamTypes(), buffer,
+                          [&](const clang::QualType &paramType) {
+                            buffer << Visit(paramType.getTypePtr());
+                          });
+    buffer << ") -> ";
+    buffer << Visit(type->getReturnType().getTypePtr());
+    buffer << ")";
 
     return buffer.str().str();
   }
