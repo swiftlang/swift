@@ -483,12 +483,6 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
     return { Type(), nullptr };
   }
 
-  // If the conditional requirements aren't known, we can't properly run
-  // inference.
-  if (!getConditionalRequirementsIfAvailable()) {
-    return TypeWitnessAndDecl();
-  }
-
   return evaluateOrDefault(
       assocType->getASTContext().evaluator,
       TypeWitnessRequest{const_cast<NormalProtocolConformance *>(this),
