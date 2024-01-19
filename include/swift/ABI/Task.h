@@ -170,8 +170,8 @@ static_assert(alignof(Job) == 2 * alignof(void*),
 class NullaryContinuationJob : public Job {
 
 private:
-  AsyncTask* Task;
-  AsyncTask* Continuation;
+  SWIFT_ATTRIBUTE_UNUSED AsyncTask *Task;
+  AsyncTask *Continuation;
 
 public:
   NullaryContinuationJob(AsyncTask *task, JobPriority priority, AsyncTask *continuation)
