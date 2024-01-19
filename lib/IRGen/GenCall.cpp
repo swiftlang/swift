@@ -4994,7 +4994,22 @@ void IRGenFunction::emitEpilogue() {
     // The function should have an unwind table when catching exceptions.
     CurFn->addFnAttr(llvm::Attribute::getWithUWTableKind(
         *IGM.LLVMContext, llvm::UWTableKind::Default));
-    CurFn->setPersonalityFn(IGM.getForeignExceptionHandlingPersonalityFunc());
+
+    auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(IGM.Context);
+    bool canUseSwiftPersonality = deploymentAvailability.isContainedIn(
+      IGM.Context.getSwift511Availability());
+    llvm::Constant *personality;
+
+    if (canUseSwiftPersonality) {
+      // The function should use our personality routine
+      auto swiftPersonality = IGM.getExceptionPersonalityFunctionPointer();
+      personality = swiftPersonality.getDirectPointer();
+    } else {
+      personality = IGM.getForeignExceptionHandlingPersonalityFunc();
+    }
+
+    CurFn->setPersonalityFn(personality);
   }
   for (auto *bb : ExceptionUnwindBlocks)
     CurFn->insert(CurFn->end(), bb);
