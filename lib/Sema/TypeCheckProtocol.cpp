@@ -2232,8 +2232,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   }
 
   // Not every protocol/type is compatible with conditional conformances.
-  auto conditionalReqs = conformance->getConditionalRequirementsIfAvailable();
-  if (conditionalReqs && !conditionalReqs->empty()) {
+  auto conditionalReqs = conformance->getConditionalRequirements();
+  if (!conditionalReqs.empty()) {
     auto nestedType = DC->getSelfNominalTypeDecl()->getDeclaredInterfaceType();
     // Obj-C generics cannot be looked up at runtime, so we don't support
     // conditional conformances involving them. Check the full stack of nested
@@ -2256,7 +2256,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // protocol, the conditional requirements must not involve conformance to a
     // marker protocol. We cannot evaluate such a conformance at runtime.
     if (!Proto->isMarkerProtocol()) {
-      for (const auto &req : *conditionalReqs) {
+      for (const auto &req : conditionalReqs) {
         if (req.getKind() == RequirementKind::Conformance &&
             req.getProtocolDecl()->isMarkerProtocol()) {
           C.Diags.diagnose(
@@ -2318,9 +2318,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       implyingConf = implyingConf->getImplyingConformance();
     }
 
-    auto implyingCondReqs =
-      implyingConf->getConditionalRequirementsIfAvailable();
-    if (implyingCondReqs && !implyingCondReqs->empty()) {
+    auto implyingCondReqs = implyingConf->getConditionalRequirements();
+    if (!implyingCondReqs.empty()) {
       // We shouldn't suggest including witnesses for the conformance, because
       // those suggestions will go in the current DeclContext, but really they
       // should go into the new extension we (might) suggest here.
