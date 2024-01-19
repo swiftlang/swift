@@ -3442,45 +3442,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   assert(!type->hasArchetype() && "Got a contextual type here?");
 
-  checkObjCTypeErasedGenerics(assocType, type, typeDecl);
-
-  if (typeDecl) {
-    // Check access.
-    bool isSetter = false;
-    if (checkWitnessAccess(assocType, typeDecl, &isSetter)) {
-      assert(!isSetter);
-
-      // Note: you must not capture 'this' in the below closure.
-      const DeclContext *DC = this->DC;
-      auto requiredAccessScope = getRequiredAccessScope();
-
-      diagnoseOrDefer(assocType, false,
-          [DC, requiredAccessScope, typeDecl](
-            NormalProtocolConformance *conformance) {
-        AccessLevel requiredAccess =
-            requiredAccessScope.requiredAccessForDiagnostics();
-        auto proto = conformance->getProtocol();
-        auto protoAccessScope = proto->getFormalAccessScope(DC);
-        bool protoForcesAccess =
-            requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
-        auto diagKind = protoForcesAccess
-                          ? diag::type_witness_not_accessible_proto
-                          : diag::type_witness_not_accessible_type;
-        auto &diags = DC->getASTContext().Diags;
-        diags.diagnose(getLocForDiagnosingWitness(conformance, typeDecl),
-                       diagKind, typeDecl, requiredAccess, proto);
-        diagnoseWitnessFixAccessLevel(diags, typeDecl, requiredAccess);
-      });
-    }
-
-    if (isUsableFromInlineRequired()) {
-      bool witnessIsUsableFromInline = typeDecl->getFormalAccessScope(
-          DC, /*usableFromInlineAsPublic*/true).isPublic();
-      if (!witnessIsUsableFromInline)
-        diagnoseOrDefer(assocType, false, DiagnoseUsableFromInline(typeDecl));
-    }
-  } else {
-    // If there was no type declaration, synthesize one.
+  // If there was no type declaration, synthesize one.
+  if (typeDecl == nullptr) {
     auto aliasDecl = new (getASTContext()) TypeAliasDecl(
         SourceLoc(), SourceLoc(), assocType->getName(), SourceLoc(),
         /*genericparams*/ nullptr, DC);
@@ -3490,55 +3453,48 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     aliasDecl->setSynthesized();
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
-    if (auto nominal = DC->getSelfNominalTypeDecl()) {
-      AccessScope requiredAccessScope = getRequiredAccessScope();
+    auto nominal = DC->getSelfNominalTypeDecl();
+    AccessScope requiredAccessScope = getRequiredAccessScope();
 
-      if (!getASTContext().isSwiftVersionAtLeast(5) &&
-          !DC->getParentModule()->isResilient()) {
-        // HACK: In pre-Swift-5, these typealiases were synthesized with the
-        // same access level as the conforming type, which might be more
-        // visible than the associated type witness. Preserve that behavior
-        // when the underlying type has sufficient access, but only in
-        // non-resilient modules.
-        llvm::Optional<AccessScope> underlyingTypeScope =
-            TypeAccessScopeChecker::getAccessScope(type, DC,
-                                                   /*usableFromInline*/ false);
-        assert(underlyingTypeScope.has_value() &&
-               "the type is already invalid and we shouldn't have gotten here");
+    if (!getASTContext().isSwiftVersionAtLeast(5) &&
+        !DC->getParentModule()->isResilient()) {
+      // HACK: In pre-Swift-5, these typealiases were synthesized with the
+      // same access level as the conforming type, which might be more
+      // visible than the associated type witness. Preserve that behavior
+      // when the underlying type has sufficient access, but only in
+      // non-resilient modules.
+      llvm::Optional<AccessScope> underlyingTypeScope =
+          TypeAccessScopeChecker::getAccessScope(type, DC,
+                                                 /*usableFromInline*/ false);
+      assert(underlyingTypeScope.has_value() &&
+             "the type is already invalid and we shouldn't have gotten here");
 
-        AccessScope nominalAccessScope = nominal->getFormalAccessScope(DC);
-        llvm::Optional<AccessScope> widestPossibleScope =
-            underlyingTypeScope->intersectWith(nominalAccessScope);
-        assert(widestPossibleScope.has_value() &&
-               "we found the nominal and the type witness, didn't we?");
-        requiredAccessScope = widestPossibleScope.value();
-      }
+      AccessScope nominalAccessScope = nominal->getFormalAccessScope(DC);
+      llvm::Optional<AccessScope> widestPossibleScope =
+          underlyingTypeScope->intersectWith(nominalAccessScope);
+      assert(widestPossibleScope.has_value() &&
+             "we found the nominal and the type witness, didn't we?");
+      requiredAccessScope = widestPossibleScope.value();
+    }
 
-      // An associated type witness can never be less than fileprivate, since
-      // it must always be at least as visible as the enclosing type.
-      AccessLevel requiredAccess =
-          std::max(requiredAccessScope.accessLevelForDiagnostics(),
-                   AccessLevel::FilePrivate);
+    // An associated type witness can never be less than fileprivate, since
+    // it must always be at least as visible as the enclosing type.
+    AccessLevel requiredAccess =
+        std::max(requiredAccessScope.accessLevelForDiagnostics(),
+                 AccessLevel::FilePrivate);
 
-      aliasDecl->setAccess(requiredAccess);
-      if (isUsableFromInlineRequired()) {
-        auto *attr =
-            new (getASTContext()) UsableFromInlineAttr(/*implicit=*/true);
-        aliasDecl->getAttrs().add(attr);
-      }
+    aliasDecl->setAccess(requiredAccess);
+    if (isUsableFromInlineRequired()) {
+      auto *attr =
+          new (getASTContext()) UsableFromInlineAttr(/*implicit=*/true);
+      aliasDecl->getAttrs().add(attr);
+    }
 
-      if (nominal == DC) {
-        nominal->addMember(aliasDecl);
-      } else {
-        auto ext = cast<ExtensionDecl>(DC);
-        ext->addMember(aliasDecl);
-      }
+    if (nominal == DC) {
+      nominal->addMember(aliasDecl);
     } else {
-      // If the declcontext is a Module, then we're in a special error recovery
-      // situation.  Mark the typealias as an error and don't inject it into any
-      // DeclContext.
-      assert(isa<ModuleDecl>(DC) && "Not an UnresolvedType conformance?");
-      aliasDecl->setInvalid();
+      auto ext = cast<ExtensionDecl>(DC);
+      ext->addMember(aliasDecl);
     }
 
     typeDecl = aliasDecl;
@@ -5186,8 +5142,47 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   if (where.isImplicit())
     return;
 
-  Conformance->forEachTypeWitness([&](const AssociatedTypeDecl *assoc,
+  Conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
                                       Type type, TypeDecl *typeDecl) -> bool {
+    checkObjCTypeErasedGenerics(assocType, type, typeDecl);
+
+    if (typeDecl && !typeDecl->isImplicit()) {
+      // Check access.
+      bool isSetter = false;
+      if (checkWitnessAccess(assocType, typeDecl, &isSetter)) {
+        assert(!isSetter);
+
+        // Note: you must not capture 'this' in the below closure.
+        const DeclContext *DC = this->DC;
+        auto requiredAccessScope = getRequiredAccessScope();
+
+        diagnoseOrDefer(assocType, false,
+            [DC, requiredAccessScope, typeDecl](
+              NormalProtocolConformance *conformance) {
+          AccessLevel requiredAccess =
+              requiredAccessScope.requiredAccessForDiagnostics();
+          auto proto = conformance->getProtocol();
+          auto protoAccessScope = proto->getFormalAccessScope(DC);
+          bool protoForcesAccess =
+              requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
+          auto diagKind = protoForcesAccess
+                            ? diag::type_witness_not_accessible_proto
+                            : diag::type_witness_not_accessible_type;
+          auto &diags = DC->getASTContext().Diags;
+          diags.diagnose(getLocForDiagnosingWitness(conformance, typeDecl),
+                         diagKind, typeDecl, requiredAccess, proto);
+          diagnoseWitnessFixAccessLevel(diags, typeDecl, requiredAccess);
+        });
+      }
+
+      if (isUsableFromInlineRequired()) {
+        bool witnessIsUsableFromInline = typeDecl->getFormalAccessScope(
+            DC, /*usableFromInlineAsPublic*/true).isPublic();
+        if (!witnessIsUsableFromInline)
+          diagnoseOrDefer(assocType, false, DiagnoseUsableFromInline(typeDecl));
+      }
+    }
+
     // Make sure any associated type witnesses don't make reference to a
     // parameterized existential type, or we're going to have trouble at
     // runtime.
