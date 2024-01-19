@@ -177,6 +177,85 @@ struct UseDefChainVisitor
 
 } // namespace
 
+/// Classify an instructions as look through when we are looking through
+/// values. We assert that all instructions that are CONSTANT_TRANSLATION
+/// LookThrough to make sure they stay in sync.
+static bool isStaticallyLookThroughInst(SILInstruction *inst) {
+  if (auto cast = SILDynamicCastInst::getAs(inst))
+    if (cast.isRCIdentityPreserving())
+      return true;
+
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::BeginAccessInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginDeallocRefInst:
+  case SILInstructionKind::BridgeObjectToRefInst:
+  case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::DropDeinitInst:
+  case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndInitLetRefInst:
+  case SILInstructionKind::ExplicitCopyValueInst:
+  case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::ProjectBlockStorageInst:
+  case SILInstructionKind::ProjectBoxInst:
+  case SILInstructionKind::RefToBridgeObjectInst:
+  case SILInstructionKind::RefToUnownedInst:
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UnownedCopyValueInst:
+  case SILInstructionKind::UnownedToRefInst:
+  case SILInstructionKind::UpcastInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
+    return true;
+  }
+}
+
+static bool isLookThroughIfResultNonSendable(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::RawPointerToRefInst:
+    return true;
+  }
+}
+
+static bool isLookThroughIfOperandNonSendable(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::RefToRawPointerInst:
+    return true;
+  }
+}
+
+static bool isLookThroughIfOperandAndResultSendable(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::UncheckedTrivialBitCastInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
+    return true;
+  }
+}
+
 static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
   auto *fn = value->getFunction();
   SILValue result = value;
@@ -189,47 +268,37 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
     temp = lookThroughOwnershipInsts(temp);
 
     if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
-      if (isa<ExplicitCopyValueInst, CopyableToMoveOnlyWrapperValueInst,
-              MoveOnlyWrapperToCopyableValueInst,
-              MoveOnlyWrapperToCopyableBoxInst, BeginAccessInst,
-              MarkDependenceInst>(svi) ||
-          isIdentityPreservingRefCast(svi)) {
+      if (isStaticallyLookThroughInst(svi)) {
         temp = svi->getOperand(0);
       }
 
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
-      if (isa<UncheckedTrivialBitCastInst, UncheckedBitwiseCastInst,
-              UncheckedValueCastInst>(svi)) {
+      if (isLookThroughIfOperandAndResultSendable(svi)) {
         if (isNonSendableType(svi->getType(), fn) &&
             isNonSendableType(svi->getOperand(0)->getType(), fn)) {
           temp = svi->getOperand(0);
         }
       }
-    }
 
-    if (auto *r = dyn_cast<RefToRawPointerInst>(temp)) {
-      // If our operand is a non-Sendable type, look through this instruction.
-      if (isNonSendableType(r->getOperand()->getType(), fn)) {
-        temp = r->getOperand();
+      if (isLookThroughIfResultNonSendable(svi)) {
+        if (isNonSendableType(svi->getType(), fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+
+      if (isLookThroughIfOperandNonSendable(svi)) {
+        // If our operand is a non-Sendable type, look through this instruction.
+        if (isNonSendableType(svi->getOperand(0)->getType(), fn)) {
+          temp = svi->getOperand(0);
+        }
       }
     }
 
-    if (auto *r = dyn_cast<RawPointerToRefInst>(temp)) {
-      // If our result is a non-Sendable type, look through this
-      // instruction. Builtin.RawPointer is always non-Sendable.
-      if (isNonSendableType(r->getType(), fn)) {
-        temp = r->getOperand();
+    if (auto *inst = temp->getDefiningInstruction()) {
+      if (isStaticallyLookThroughInst(inst)) {
+        temp = inst->getOperand(0);
       }
-    }
-
-    if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
-            temp->getDefiningInstruction())) {
-      temp = dsi->getOperand();
-    }
-    if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
-            temp->getDefiningInstruction())) {
-      temp = dti->getOperand();
     }
 
     if (temp != result) {
@@ -1787,6 +1856,11 @@ public:
 
     case TranslationSemantics::LookThrough:
       assert(inst->getNumOperands() == 1);
+      assert((isStaticallyLookThroughInst(inst) ||
+              isLookThroughIfResultNonSendable(inst) ||
+              isLookThroughIfOperandNonSendable(inst) ||
+              isLookThroughIfOperandAndResultSendable(inst)) &&
+             "Out of sync... should return true for one of these categories!");
       return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
 
     case TranslationSemantics::Store:
@@ -1895,6 +1969,12 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 
 #define CONSTANT_TRANSLATION(INST, Kind)                                       \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    assert((TranslationSemantics::Kind != TranslationSemantics::LookThrough || \
+            isStaticallyLookThroughInst(inst)) &&                              \
+           "Out of sync?!");                                                   \
+    assert((TranslationSemantics::Kind == TranslationSemantics::LookThrough || \
+            !isStaticallyLookThroughInst(inst)) &&                             \
+           "Out of sync?!");                                                   \
     return TranslationSemantics::Kind;                                         \
   }
 
@@ -2008,6 +2088,11 @@ CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
 CONSTANT_TRANSLATION(ProjectBlockStorageInst, LookThrough)
+CONSTANT_TRANSLATION(RefToUnownedInst, LookThrough)
+CONSTANT_TRANSLATION(UnownedToRefInst, LookThrough)
+CONSTANT_TRANSLATION(UnownedCopyValueInst, LookThrough)
+CONSTANT_TRANSLATION(DropDeinitInst, LookThrough)
+CONSTANT_TRANSLATION(ValueToBridgeObjectInst, LookThrough)
 
 //===---
 // Store
@@ -2032,6 +2117,7 @@ CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 // value is within or because even though they are technically a use we would
 // rather emit an error on a better instruction.
 CONSTANT_TRANSLATION(AllocGlobalInst, Ignored)
+CONSTANT_TRANSLATION(AutoreleaseValueInst, Ignored)
 CONSTANT_TRANSLATION(DeallocBoxInst, Ignored)
 CONSTANT_TRANSLATION(DeallocStackInst, Ignored)
 CONSTANT_TRANSLATION(DebugValueInst, Ignored)
@@ -2046,6 +2132,7 @@ CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
 CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
+CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 
 //===---
 // Require
@@ -2053,6 +2140,9 @@ CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 
 // Instructions that only require that the region of the value be live:
 CONSTANT_TRANSLATION(FixLifetimeInst, Require)
+CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Require)
+CONSTANT_TRANSLATION(BridgeObjectToWordInst, Require)
+CONSTANT_TRANSLATION(IsUniqueInst, Require)
 
 //===---
 // Terminators
@@ -2094,20 +2184,12 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(RefToUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedToRefInst, Unhandled)
-CONSTANT_TRANSLATION(BridgeObjectToWordInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
-CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Unhandled)
-CONSTANT_TRANSLATION(ValueToBridgeObjectInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
-CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
-CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
@@ -2144,14 +2226,12 @@ CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(AutoreleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(AssignInst, Unhandled)
 CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
 CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
 CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
-CONSTANT_TRANSLATION(DebugStepInst, Unhandled)
 CONSTANT_TRANSLATION(TestSpecificationInst, Unhandled)
 CONSTANT_TRANSLATION(StoreUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(DeinitExistentialAddrInst, Unhandled)
@@ -2211,6 +2291,7 @@ CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 // of the Sendable addr. That would require adding more logic though.
 #define LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(INST)              \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    assert(isLookThroughIfResultNonSendable(inst) && "Out of sync?!");         \
     if (isNonSendableType(inst->getType())) {                                  \
       return TranslationSemantics::LookThrough;                                \
     }                                                                          \
@@ -2246,6 +2327,7 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 #define CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(INST)               \
                                                                                \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *cast) {        \
+    assert(isLookThroughIfOperandAndResultSendable(cast) && "Out of sync");    \
     bool isOperandNonSendable =                                                \
         isNonSendableType(cast->getOperand()->getType());                      \
     bool isResultNonSendable = isNonSendableType(cast->getType());             \
@@ -2276,6 +2358,7 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 
 TranslationSemantics
 PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
+  assert(isLookThroughIfResultNonSendable(r) && "Out of sync");
   // If our result is non sendable, perform a look through.
   if (isNonSendableType(r->getType()))
     return TranslationSemantics::LookThrough;
@@ -2286,6 +2369,8 @@ PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
+  assert(isLookThroughIfOperandNonSendable(r) && "Out of sync");
+
   // If our source ref is non sendable, perform a look through.
   if (isNonSendableType(r->getOperand()->getType()))
     return TranslationSemantics::LookThrough;
@@ -2297,7 +2382,8 @@ PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
-  translateSILAssign(mdi, mdi->getValue());
+  assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
+  translateSILLookThrough(mdi->getResults(), mdi->getValue());
   translateSILRequire(mdi->getBase());
   return TranslationSemantics::Special;
 }
@@ -2312,8 +2398,12 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  if (SILDynamicCastInst(ucci).isRCIdentityPreserving())
+  if (SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
+    assert(isStaticallyLookThroughInst(ucci) && "Out of sync");
     return TranslationSemantics::LookThrough;
+  }
+
+  assert(!isStaticallyLookThroughInst(ucci) && "Out of sync");
   return TranslationSemantics::Assign;
 }
 
