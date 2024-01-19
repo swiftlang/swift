@@ -9043,6 +9043,11 @@ ClangImporter::Implementation::importDeclContextOf(
                                      nominal->getDeclaredType());
   SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{ext},
                                      std::move(nominal));
+
+  // Record this extension so we can find it later. We do this early because
+  // once we've set the member loader, we don't know when the compiler will use
+  // it and end up back in this method.
+  extensionPoints[extensionKey] = ext;
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
@@ -9052,8 +9057,6 @@ ClangImporter::Implementation::importDeclContextOf(
   // Add the extension to the nominal type.
   nominal->addExtension(ext);
 
-  // Record this extension so we can find it later.
-  extensionPoints[extensionKey] = ext;
   return ext;
 }
 
