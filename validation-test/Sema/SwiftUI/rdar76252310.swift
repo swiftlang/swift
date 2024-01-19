@@ -35,7 +35,7 @@ func fromMainActor() async {
 
 func fromConcurrencyAware() async {
   // expected-note@+3 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
-  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
+  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
   // expected-warning@+1 {{non-sendable type 'CoffeeTrackerView' returned by call to main actor-isolated function cannot cross actor boundary}}
   let view = CoffeeTrackerView()
 

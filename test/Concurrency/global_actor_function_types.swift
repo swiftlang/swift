@@ -71,7 +71,7 @@ func testClosures(i: Int) async {
   }
 
   acceptOnSomeGlobalActor { () -> Int in
-    let i = onOtherGlobalActorUnsafe() // expected-error{{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    let i = onOtherGlobalActorUnsafe() // expected-warning{{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     return i
   }
 }
@@ -93,12 +93,12 @@ func testClosuresOld() {
   }
 
   acceptOnSomeGlobalActor { () -> Int in
-    let i = onOtherGlobalActorUnsafe() // expected-complete-tns-error {{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    let i = onOtherGlobalActorUnsafe() // expected-complete-tns-warning {{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     return i
   }
 
   acceptOnSomeGlobalActor { @SomeGlobalActor () -> Int in
-    let i = onOtherGlobalActorUnsafe() // expected-error{{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    let i = onOtherGlobalActorUnsafe() // expected-warning{{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     return i
   }
 }

@@ -126,7 +126,7 @@ func globActorTest1() {
 
   _ = SomeStruct(asyncMainActorUnsafe: 0) // expected-error {{'async' call in a function that does not support concurrency}}
 
-  _ = SomeStruct(mainActorUnsafe: 0) // expected-complete-and-tns-error {{call to main actor-isolated initializer 'init(mainActorUnsafe:)' in a synchronous nonisolated context}}
+  _ = SomeStruct(mainActorUnsafe: 0) // expected-complete-and-tns-warning {{call to main actor-isolated initializer 'init(mainActorUnsafe:)' in a synchronous nonisolated context}}
 }
 
 func globActorTestAsyncEdition() async {

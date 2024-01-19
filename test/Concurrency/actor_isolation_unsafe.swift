@@ -60,7 +60,7 @@ struct S5_P2: P2 {
 }
 
 nonisolated func testP2(x: S5_P2, p2: P2) {
-  p2.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  p2.f() // expected-warning{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // OKAY
   x.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
@@ -69,7 +69,7 @@ nonisolated func testP2(x: S5_P2, p2: P2) {
 func testP2_noconcurrency(x: S5_P2, p2: P2) {
   // expected-complete-tns-note @-1 2{{add '@MainActor' to make global function 'testP2_noconcurrency(x:p2:)' part of global actor 'MainActor'}}
   p2.f() // okay without complete. with targeted/minimal not concurrency-related code.
-  // expected-complete-tns-error @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  // expected-complete-tns-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // okay
   x.f() // okay without complete. with targeted/minimal not concurrency-related code
   // expected-complete-tns-error @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
@@ -86,19 +86,19 @@ class C1 {
 class C2: C1 {
   override func method() { // expected-note 2{{overridden declaration is here}}
     globalSome() // okay when not in complete
-    // expected-complete-tns-error @-1 {{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
+    // expected-complete-tns-warning @-1 {{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
   }
 }
 
 class C3: C1 {
   nonisolated override func method() {
-    globalSome() // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous nonisolated context}}
+    globalSome() // expected-warning{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous nonisolated context}}
   }
 }
 
 class C4: C1 {
   @MainActor override func method() {
-    globalSome() // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
+    globalSome() // expected-warning{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
   }
 }
 
@@ -115,7 +115,7 @@ class C6: C2 {
 
 class C7: C2 {
   @SomeGlobalActor(unsafe) override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from main actor-isolated overridden declaration}}
-    globalMain() // expected-error{{call to main actor-isolated global function 'globalMain()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    globalMain() // expected-warning{{call to main actor-isolated global function 'globalMain()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     globalSome() // okay
   }
 }

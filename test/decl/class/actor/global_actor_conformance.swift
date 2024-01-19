@@ -56,3 +56,16 @@ extension OnMain: NonIsolatedRequirement {
   // expected-note@+1 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
   func requirement() {}
 }
+
+// expected-note@+1 {{calls to global function 'downgrade()' from outside of its actor context are implicitly asynchronous}}
+@MainActor(unsafe) func downgrade() {}
+
+extension OnMain {
+  struct Nested {
+    // expected-note@+1 {{add '@MainActor' to make instance method 'test()' part of global actor 'MainActor'}}
+    func test() {
+      // expected-warning@+1 {{call to main actor-isolated global function 'downgrade()' in a synchronous nonisolated context}}
+      downgrade()
+    }
+  }
+}
