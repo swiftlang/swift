@@ -69,14 +69,14 @@
 
 //--- main.swift
 #if canImport(A.Sub)
-import A.Sub
+func a() {}
 #endif
 
 #if canImport(A.Missing)
 import A.Missing
 #endif
 
-#if canImport(B) // never actually import B
+#if canImport(B)
 func b() {}
 #endif
 
@@ -99,7 +99,7 @@ module B {
 }
 
 //--- include/sub.h
-void a(void);
+void notused(void);
 
 //--- include/B.h
-void notused(void);
+void notused2(void);
