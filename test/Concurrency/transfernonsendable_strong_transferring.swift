@@ -46,14 +46,14 @@ func transferArgWithOtherParam2(_ x: Klass, _ y: transferring Klass) {
 
 func testSimpleTransferLet() {
   let k = Klass()
-  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could result in races}}
+  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could race}}
   useValue(k) // expected-note {{access here could race}}
 }
 
 func testSimpleTransferVar() {
   var k = Klass()
   k = Klass()
-  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could result in races}}
+  transferArg(k) // expected-warning {{binding of non-Sendable type 'Klass' accessed after being transferred; later accesses could race}}
   useValue(k) // expected-note {{access here could race}}
 }
 
@@ -89,12 +89,12 @@ func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) 
 }
 
 func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
-  await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'Klass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context; later accesses could race}}
   await transferToMain(x) // expected-note {{access here could race}}
 }
 
 func testTransferringParameter_cannotUseAfterTransfer(_ x: transferring Klass, _ y: Klass) async {
-  await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'Klass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context; later accesses could race}}
   useValue(x) // expected-note {{access here could race}}
 }
 
@@ -107,12 +107,12 @@ actor MyActor {
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {
-    await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'Klass' from actor-isolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+    await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from actor-isolated context to main actor-isolated context; later accesses could race}}
     await transferToMain(x) // expected-note {{access here could race}}
   }
 
   func getNormalErrorIfUseAfterTransfer(_ x: transferring Klass) async {
-    await transferToMain(x)  // expected-warning {{passing argument of non-sendable type 'Klass' from actor-isolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+    await transferToMain(x)  // expected-warning {{transferring value of non-Sendable type 'Klass' from actor-isolated context to main actor-isolated context; later accesses could race}}
     useValue(x) // expected-note {{access here could race}}
   }
 
@@ -150,7 +150,7 @@ func canTransferAssigningIntoLocal(_ x: transferring Klass) async {
 
 func canTransferAssigningIntoLocal2(_ x: transferring Klass) async {
   let _ = x
-  await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'Klass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Klass' from nonisolated context to main actor-isolated context; later accesses could race}}
   let _ = x // expected-note {{access here could race}}
 }
 
@@ -165,7 +165,7 @@ func assigningIsATransfer(_ x: transferring Klass) async {
   let y = Klass()
 
   // y is transferred into x.
-  x = y // expected-warning {{transferred value of non-Sendable type 'Klass' into transferring parameter; later accesses could result in races}}
+  x = y // expected-warning {{transferring value of non-Sendable type 'Klass' into transferring parameter; later accesses could race}}
 
   // Since y is now in x, we can't use y anymore so we emit an error.
   useValue(y) // expected-note {{access here could race}}
@@ -186,7 +186,7 @@ func assigningIsATransferAny(_ x: transferring Any) async {
   let y = getAny()
 
   // y is transferred into x.
-  x = y // expected-warning {{transferred value of non-Sendable type 'Any' into transferring parameter; later accesses could result in races}}
+  x = y // expected-warning {{transferring value of non-Sendable type 'Any' into transferring parameter; later accesses could race}}
 
   // Since y is now in x, we can't use y anymore so we emit an error.
   useValue(y) // expected-note {{access here could race}}
@@ -210,7 +210,7 @@ func canTransferAfterAssignButUseIsError(_ x: transferring Any) async {
   x = y
 
   // TODO: Change this to refer to task context? Or to transferring parameter?
-  await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'Any' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'Any' from nonisolated context to main actor-isolated context; later accesses could race}}
 
   useValue(x) // expected-note {{access here could race}}
 }
@@ -237,7 +237,7 @@ func mergeDoesNotEliminateEarlierTransfer(_ x: transferring NonSendableStruct) a
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'NonSendableStruct' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'NonSendableStruct' from nonisolated context to main actor-isolated context; later accesses could race}}
 
   // y is assigned into a field of x, so we treat this like a merge.
   x.first = y
@@ -252,10 +252,10 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: transferring NonSendableStruct) 
   useValue(x)
 
   // Transfer x
-  await transferToMain(x) // expected-warning {{passing argument of non-sendable type 'NonSendableStruct' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await transferToMain(x) // expected-warning {{transferring value of non-Sendable type 'NonSendableStruct' from nonisolated context to main actor-isolated context; later accesses could race}}
 
   // y is assigned into a field of x, so we treat this like a merge.
-  x.first = y // expected-warning {{transferred value of non-Sendable type 'Klass' into transferring parameter; later accesses could result in races}}
+  x.first = y // expected-warning {{transferring value of non-Sendable type 'Klass' into transferring parameter; later accesses could race}}
 
   useValue(x) // expected-note {{access here could race}}
 
