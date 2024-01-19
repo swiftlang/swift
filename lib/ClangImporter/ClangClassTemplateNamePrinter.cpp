@@ -28,6 +28,11 @@ struct TemplateInstantiationNamePrinter
                                    ImportNameVersion version)
       : swiftCtx(swiftCtx), nameImporter(nameImporter), version(version) {}
 
+  std::string VisitType(const clang::Type *type) {
+    // Print "_" as a fallback if we couldn't emit a more meaningful type name.
+    return "_";
+  }
+
   std::string VisitBuiltinType(const clang::BuiltinType *type) {
     Type swiftType = nullptr;
     switch (type->getKind()) {
