@@ -639,7 +639,7 @@ struct DenseMapInfo<swift::ReferencedActor::Kind> {
     }
 
     static unsigned getHashValue(RefActor Val) {
-     return static_cast<unsigned>(Val.getKind());
+     return hash_value(Val);
     }
 
     static bool isEqual(const RefActor &LHS, const RefActor &RHS) {
