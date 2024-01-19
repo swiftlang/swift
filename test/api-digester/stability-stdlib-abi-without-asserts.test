@@ -99,6 +99,9 @@ Constructor Result.init(__abi_catching:) is a new API without @available attribu
 Constructor Result.init(catching:) has been removed
 Func Result.get() has been renamed to Func __abi_get()
 Func Result.get() has mangled name changing from 'Swift.Result.get() throws -> A' to 'Swift.Result.__abi_get() throws -> A'
+Func withUnsafePointer(to:_:) has been renamed to Func __abi_withUnsafePointer(to:_:)
+Func withUnsafePointer(to:_:) has mangled name changing from 'Swift.withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B' to 'Swift.__abi_withUnsafePointer<A, B>(to: A, _: (Swift.UnsafePointer<A>) throws -> B) throws -> B'
+Func withUnsafePointer(to:_:) is now without @rethrows
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'
 Func withoutActuallyEscaping(_:do:) is now without @rethrows
