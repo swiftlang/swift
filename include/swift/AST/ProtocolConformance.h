@@ -24,6 +24,7 @@
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -55,7 +56,7 @@ typedef llvm::DenseMap<AssociatedTypeDecl *, TypeWitnessAndDecl>
 
 /// Describes the kind of protocol conformance structure used to encode
 /// conformance.
-enum class ProtocolConformanceKind {
+enum class ProtocolConformanceKind : unsigned {
   /// "Normal" conformance of a (possibly generic) nominal type, which
   /// contains complete mappings.
   Normal,
@@ -69,20 +70,54 @@ enum class ProtocolConformanceKind {
   Inherited,
   /// Builtin conformances are special conformances that the runtime handles
   /// and isn't implemented directly in Swift.
-  Builtin
+  Builtin,
+
+  Last_Kind = Builtin
+};
+enum : unsigned {
+  NumProtocolConformanceKindBits =
+      countBitsUsed(static_cast<unsigned>(ProtocolConformanceKind::Last_Kind))
 };
 
 /// Describes the state of a protocol conformance, which may be complete,
 /// incomplete, or currently being checked.
 enum class ProtocolConformanceState {
   /// The conformance has been fully checked.
-  Complete,
+  Complete = 0,
   /// The conformance is known but is not yet complete.
   Incomplete,
   /// The conformance's type witnesses are currently being resolved.
   CheckingTypeWitnesses,
   /// The conformance is being checked.
   Checking,
+
+  Last_State = Checking
+};
+
+/// Describes the kind of a builtin conformance.
+enum class BuiltinConformanceKind {
+  // A builtin conformance that has been synthesized by the implementation.
+  Synthesized = 0,
+  // A missing conformance that we have nonetheless synthesized so that
+  // we can diagnose it later.
+  Missing,
+
+  Last_Kind = Missing
+};
+
+enum : unsigned {
+  NumProtocolConformanceStateBits =
+      countBitsUsed(static_cast<unsigned>(ProtocolConformanceState::Last_State))
+};
+
+enum : unsigned {
+  NumConformanceEntryKindBits =
+      countBitsUsed(static_cast<unsigned>(ConformanceEntryKind::Last_Kind))
+};
+
+enum : unsigned {
+  NumBuiltinConformanceKindBits =
+      countBitsUsed(static_cast<unsigned>(BuiltinConformanceKind::Last_Kind))
 };
 
 /// Describes how a particular type conforms to a given protocol,
@@ -93,20 +128,73 @@ enum class ProtocolConformanceState {
 /// for the various kinds of conformance (normal, specialized, inherited).
 class alignas(1 << DeclAlignInBits) ProtocolConformance
     : public ASTAllocated<ProtocolConformance> {
-  /// The kind of protocol conformance.
-  ProtocolConformanceKind Kind;
-
   /// The type that conforms to the protocol, in the context of the
   /// conformance definition.
   Type ConformingType;
 
 protected:
+  // clang-format off
+  //
+  // We format these different than clang-format wishes us to... so turn if off
+  // for the inline bitfields.
+  union { uint64_t OpaqueBits;
+
+    SWIFT_INLINE_BITFIELD_BASE(ProtocolConformance,
+                               bitmax(NumProtocolConformanceKindBits, 8),
+      /// The kind of protocol conformance.
+      Kind : bitmax(NumProtocolConformanceKindBits, 8)
+    );
+
+    SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
+
+    SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
+                               1+1+1+1+bitmax(NumProtocolConformanceStateBits,8)+
+                               bitmax(NumConformanceEntryKindBits,8),
+      /// Indicates whether the conformance is invalid.
+      IsInvalid : 1,
+      /// The conformance was labeled with @unchecked.
+      IsUnchecked : 1,
+      /// The conformance was labeled with @preconcurrency.
+      IsPreconcurrency : 1,
+      /// We have allocated the AssociatedConformances array (but not necessarily
+      /// populated any of its elements).
+      HasComputedAssociatedConformances : 1,
+
+      : NumPadBits,
+
+      /// The current state of the conformance.
+      State : bitmax(NumProtocolConformanceStateBits, 8),
+      /// The reason that this conformance exists.
+      ///
+      /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
+      /// Protocol {}'), Synthesized (e.g. RawRepresentable for 'enum Foo: Int {}')
+      /// or Implied (e.g. 'Foo : Protocol' in 'protocol Other: Protocol {} struct
+      /// Foo: Other {}'). In only the latter case, the conformance is non-null and
+      /// points to the conformance that implies this one.
+      ///
+      /// This should never be Inherited: that is handled by
+      /// InheritedProtocolConformance.
+      SourceKind : bitmax(NumConformanceEntryKindBits, 8)
+    );
+
+    SWIFT_INLINE_BITFIELD(BuiltinProtocolConformance, RootProtocolConformance,
+                          bitmax(NumBuiltinConformanceKindBits, 8),
+      /// The kind of the builtin conformance
+      Kind: bitmax(NumBuiltinConformanceKindBits, 8)
+    );
+  } Bits;
+  // clang-format on
+
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
-    : Kind(kind), ConformingType(conformingType) {}
+    : ConformingType(conformingType) {
+    Bits.ProtocolConformance.Kind = unsigned(kind);
+  }
 
 public:
   /// Determine the kind of protocol conformance.
-  ProtocolConformanceKind getKind() const { return Kind; }
+  ProtocolConformanceKind getKind() const {
+    return static_cast<ProtocolConformanceKind>(Bits.ProtocolConformance.Kind);
+  }
 
   /// Get the conforming type.
   Type getType() const { return ConformingType; }
@@ -435,49 +523,17 @@ class NormalProtocolConformance : public RootProtocolConformance,
   friend class ValueWitnessRequest;
   friend class TypeWitnessRequest;
 
-  /// The protocol being conformed to and its current state.
-  llvm::PointerIntPair<ProtocolDecl *, 2, ProtocolConformanceState>
-    ProtocolAndState;
+  /// The protocol being conformed to.
+  ProtocolDecl *Protocol;
 
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
-  // Flag bits used in ContextAndBits.
-  enum {
-    /// The conformance was labeled with @unchecked.
-    UncheckedFlag = 0x01,
-
-    /// The conformance was labeled with @preconcurrency.
-    PreconcurrencyFlag = 0x02,
-
-    /// We have allocated the AssociatedConformances array (but not necessarily
-    /// populated any of its elements).
-    HasComputedAssociatedConformancesFlag = 0x04,
-  };
-
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
-  ///
-  /// Also stores the "unchecked", "preconcurrency" and "has computed associated
-  /// conformances" bits.
-  llvm::PointerIntPair<DeclContext *, 3, unsigned> ContextAndBits;
+  DeclContext *Context;
 
-  /// Indicates whether the conformance is invalid.
-  bool Invalid : 1;
-
-  /// The reason that this conformance exists.
-  ///
-  /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
-  /// Protocol {}'), Synthesized (e.g. RawRepresentable for 'enum Foo: Int {}')
-  /// or Implied (e.g. 'Foo : Protocol' in 'protocol Other: Protocol {} struct
-  /// Foo: Other {}'). In only the latter case, the conformance is non-null and
-  /// points to the conformance that implies this one.
-  ///
-  /// This should never be Inherited: that is handled by
-  /// InheritedProtocolConformance.
-  llvm::PointerIntPair<NormalProtocolConformance *, 3, ConformanceEntryKind>
-      SourceKindAndImplyingConformance = {nullptr,
-                                          ConformanceEntryKind::Explicit};
+  NormalProtocolConformance *ImplyingConformance = nullptr;
 
   /// The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -508,25 +564,27 @@ public:
                             bool isPreconcurrency)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
-        ProtocolAndState(protocol, state), Loc(loc),
-        ContextAndBits(dc, ((isUnchecked ? UncheckedFlag : 0) |
-                            (isPreconcurrency ? PreconcurrencyFlag : 0))),
-        Invalid(false) {
+        Protocol(protocol), Loc(loc), Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
+    setState(state);
+    Bits.NormalProtocolConformance.IsInvalid = false;
+    Bits.NormalProtocolConformance.IsUnchecked = isUnchecked;
+    Bits.NormalProtocolConformance.IsPreconcurrency = isPreconcurrency;
+    Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
+    Bits.NormalProtocolConformance.SourceKind =
+        unsigned(ConformanceEntryKind::Explicit);
   }
 
   /// Get the protocol being conformed to.
-  ProtocolDecl *getProtocol() const { return ProtocolAndState.getPointer(); }
+  ProtocolDecl *getProtocol() const { return Protocol; }
 
   /// Retrieve the location of this
   SourceLoc getLoc() const { return Loc; }
 
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
-  DeclContext *getDeclContext() const {
-    return ContextAndBits.getPointer();
-  }
+  DeclContext *getDeclContext() const { return Context; }
 
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied, e.g. for Array<T>: Equatable, T: Equatable also needs
@@ -538,59 +596,59 @@ public:
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
-    return ProtocolAndState.getInt();
+    return static_cast<ProtocolConformanceState>(
+        Bits.NormalProtocolConformance.State);
   }
 
   /// Set the state of this conformance.
   void setState(ProtocolConformanceState state) {
-    ProtocolAndState.setInt(state);
+    Bits.NormalProtocolConformance.State = unsigned(state);
   }
 
   /// Determine whether this conformance is invalid.
-  bool isInvalid() const {
-    return Invalid;
-  }
+  bool isInvalid() const { return Bits.NormalProtocolConformance.IsInvalid; }
 
   /// Mark this conformance as invalid.
-  void setInvalid() {
-    Invalid = true;
-  }
+  void setInvalid() { Bits.NormalProtocolConformance.IsInvalid = true; }
 
   /// Whether this is an "unchecked" conformance.
   bool isUnchecked() const {
-    return ContextAndBits.getInt() & UncheckedFlag;
+    return Bits.NormalProtocolConformance.IsUnchecked;
   }
 
   /// Mark the conformance as unchecked (equivalent to the @unchecked
   /// conformance attribute).
   void setUnchecked() {
     // OK to mutate because the flags are not part of the folding set node ID.
-    ContextAndBits.setInt(ContextAndBits.getInt() | UncheckedFlag);
+    Bits.NormalProtocolConformance.IsUnchecked = true;
   }
 
   /// Whether this is an preconcurrency conformance.
-  bool isPreconcurrency() const;
+  bool isPreconcurrency() const {
+    return Bits.NormalProtocolConformance.IsPreconcurrency;
+  }
 
   /// Determine whether we've lazily computed the associated conformance array
   /// already.
   bool hasComputedAssociatedConformances() const {
-    return ContextAndBits.getInt() & HasComputedAssociatedConformancesFlag;
+    return Bits.NormalProtocolConformance.HasComputedAssociatedConformances;
   }
 
   /// Mark this conformance as having computed the assocaited conformance array.
   void setHasComputedAssociatedConformances() {
-    ContextAndBits.setInt(ContextAndBits.getInt() | HasComputedAssociatedConformancesFlag);
+    Bits.NormalProtocolConformance.HasComputedAssociatedConformances = true;
   }
 
   /// Get the kind of source from which this conformance comes.
   ConformanceEntryKind getSourceKind() const {
-    return SourceKindAndImplyingConformance.getInt();
+    return static_cast<ConformanceEntryKind>(
+        Bits.NormalProtocolConformance.SourceKind);
   }
 
   /// Get the protocol conformance which implied this implied conformance.
   NormalProtocolConformance *getImplyingConformance() const {
     assert(getSourceKind() == ConformanceEntryKind::Implied);
-    return SourceKindAndImplyingConformance.getPointer();
+    return ImplyingConformance;
   }
 
   void setSourceKindAndImplyingConformance(
@@ -603,7 +661,8 @@ public:
            "an implied conformance needs something that implies it");
     assert(sourceKind != ConformanceEntryKind::PreMacroExpansion &&
            "cannot create conformance pre-macro-expansion");
-    SourceKindAndImplyingConformance = {implyingConformance, sourceKind};
+    Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
+    ImplyingConformance = implyingConformance;
   }
 
   /// Determine whether this conformance is lazily loaded.
@@ -1056,22 +1115,12 @@ public:
   }
 };
 
-/// Describes the kind of a builtin conformance.
-enum class BuiltinConformanceKind {
-  // A builtin conformance that has been synthesized by the implementation.
-  Synthesized = 0,
-  // A missing conformance that we have nonetheless synthesized so that
-  // we can diagnose it later.
-  Missing,
-};
-
 /// A builtin conformance appears when a non-nominal type has a
 /// conformance that is synthesized by the implementation.
 class BuiltinProtocolConformance final : public RootProtocolConformance {
   friend ASTContext;
 
   ProtocolDecl *protocol;
-  unsigned builtinConformanceKind;
 
   BuiltinProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                              BuiltinConformanceKind kind);
@@ -1083,7 +1132,8 @@ public:
   }
 
   BuiltinConformanceKind getBuiltinConformanceKind() const {
-    return static_cast<BuiltinConformanceKind>(builtinConformanceKind);
+    return static_cast<BuiltinConformanceKind>(
+        Bits.BuiltinProtocolConformance.Kind);
   }
 
   GenericSignature getGenericSignature() const {

@@ -158,6 +158,8 @@ enum class ConformanceEntryKind : unsigned {
 
   /// Implied by an explicitly-specified conformance.
   Implied,
+
+  Last_Kind = Implied
 };
 
 /// Describes the kind of conformance lookup desired.
