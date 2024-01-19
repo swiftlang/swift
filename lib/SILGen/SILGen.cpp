@@ -1437,14 +1437,14 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 void SILGenModule::emitFunction(FuncDecl *fd) {
   assert(!shouldSkipDecl(fd));
 
-  Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
-
   SILDeclRef::Loc decl = fd;
 
   emitAbstractFuncDecl(fd);
 
-  if (shouldEmitFunctionBody(fd))
+  if (shouldEmitFunctionBody(fd)) {
+    Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
     emitOrDelayFunction(SILDeclRef(decl));
+  }
 }
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {
