@@ -1634,10 +1634,10 @@ public:
       : Stmt(StmtKind::Fail, getDefaultImplicitFlag(implicit, returnLoc)),
         ReturnLoc(returnLoc), NilLoc(nilLoc) {}
 
-  SourceLoc getLoc() const { return ReturnLoc; }
-  
-  SourceRange getSourceRange() const { return SourceRange(ReturnLoc, NilLoc); }
-  
+  SourceRange getSourceRange() const {
+    return SourceRange::combine(ReturnLoc, NilLoc);
+  }
+
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Fail;
   }

@@ -121,6 +121,17 @@ public:
   /// if (auto x = getSourceRange()) { ... }
   explicit operator bool() const { return isValid(); }
 
+  /// Combine the given source ranges into the smallest contiguous SourceRange
+  /// that includes them all, ignoring any invalid ranges present.
+  static SourceRange combine(ArrayRef<SourceRange> ranges);
+
+  /// Combine the given source ranges into the smallest contiguous SourceRange
+  /// that includes them all, ignoring any invalid ranges present.
+  template <typename ...T>
+  static SourceRange combine(T... ranges) {
+    return SourceRange::combine({ranges...});
+  }
+
   /// Extend this SourceRange to the smallest continuous SourceRange that
   /// includes both this range and the other one.
   void widen(SourceRange Other);
