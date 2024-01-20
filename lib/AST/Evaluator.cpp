@@ -60,6 +60,17 @@ Evaluator::Evaluator(DiagnosticEngine &diags, const LangOptions &opts)
       debugDumpCycles(opts.DebugDumpCycles),
       recorder(opts.RecordRequestReferences) {}
 
+SourceLoc Evaluator::getInnermostSourceLoc(
+    llvm::function_ref<bool(SourceLoc)> fn) {
+  for (auto request : llvm::reverse(activeRequests)) {
+    SourceLoc loc = request.getNearestLoc();
+    if (fn(loc))
+      return loc;
+  }
+
+  return SourceLoc();
+}
+
 bool Evaluator::checkDependency(const ActiveRequest &request) {
   // Record this as an active request.
   if (activeRequests.insert(request)) {

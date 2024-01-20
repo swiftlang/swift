@@ -6403,6 +6403,8 @@ void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
 SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
+SourceLoc extractNearestSourceLoc(const MacroExpansionExpr *expr);
+SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
 
 } // end namespace swift
 
