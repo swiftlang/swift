@@ -3401,13 +3401,6 @@ namespace {
             return nullptr;
           }
         }
-        // Use the exit function from _SwiftConcurrency.h as it is platform
-        // agnostic.
-        if ((topLevelModuleEq(decl, "Darwin") ||
-             topLevelModuleEq(decl, "SwiftGlibc")) &&
-            decl->getDeclName().isIdentifier() && decl->getName() == "exit") {
-          return nullptr;
-        }
       }
 
       auto dc =

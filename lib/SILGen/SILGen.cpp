@@ -513,15 +513,24 @@ FuncDecl *SILGenModule::getExit() {
     return *ExitFunc;
 
   ASTContext &C = getASTContext();
-  ModuleDecl *concurrencyShims =
-      C.getModuleByIdentifier(C.getIdentifier("_SwiftConcurrencyShims"));
+  ModuleDecl *exitModule;
+  const llvm::Triple &triple = C.LangOpts.Target;
+  if (triple.isOSDarwin()) {
+    exitModule = C.getModuleByIdentifier(C.getIdentifier("Darwin"));
+  } else if (triple.isOSWASI()) {
+    exitModule = C.getModuleByIdentifier(C.getIdentifier("SwiftWASILibc"));
+  } else if (triple.isWindowsMSVCEnvironment()) {
+    exitModule = C.getModuleByIdentifier(C.getIdentifier("ucrt"));
+  } else {
+    exitModule = C.getModuleByIdentifier(C.getIdentifier("SwiftGlibc"));
+  }
 
-  if (!concurrencyShims) {
+  if (!exitModule) {
     ExitFunc = nullptr;
     return nullptr;
   }
 
-  return lookupIntrinsic(*concurrencyShims, ExitFunc, C.getIdentifier("exit"));
+  return lookupIntrinsic(*exitModule, ExitFunc, C.getIdentifier("exit"));
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {

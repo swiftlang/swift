@@ -1,3 +1,7 @@
+#if os(Linux)
+import SwiftGlibc
+#endif
+
 func square(_ x: Int) -> Int {
   return x * x
 }
