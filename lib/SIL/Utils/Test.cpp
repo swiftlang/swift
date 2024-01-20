@@ -25,7 +25,7 @@ using namespace swift::test;
 namespace {
 
 class Registry {
-  DenseMap<StringRef, FunctionTest *> registeredTests;
+  StringMap<FunctionTest *> registeredTests;
   SwiftNativeFunctionTestThunk thunk;
 
 public:
@@ -47,7 +47,8 @@ public:
   SwiftNativeFunctionTestThunk getFunctionTestThunk() { return thunk; }
 
   FunctionTest *getFunctionTest(StringRef name) {
-    auto *res = registeredTests[name];
+    // Avoid creating a new entry here.
+    auto *res = registeredTests.lookup(name);
     if (!res) {
       llvm::errs() << "Found no test named " << name << "!\n";
       print(llvm::errs());
@@ -58,8 +59,9 @@ public:
   void print(raw_ostream &OS) const {
     OS << "test::Registry(" << this << ") with " << registeredTests.size()
        << " entries: {{\n";
-    for (auto pair : registeredTests) {
-      OS << "\t" << pair.getFirst() << " -> " << pair.getSecond() << "\n";
+    for (auto &stringMapEntry : registeredTests) {
+      OS << "\t" << stringMapEntry.getKey() << " -> "
+         << stringMapEntry.getValue() << "\n";
     }
     OS << "}} test::Registry(" << this << ")\n";
   }
