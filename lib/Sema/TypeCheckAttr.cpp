@@ -3101,13 +3101,18 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
 
   if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
     llvm::SmallVector<Type, 4> typeErasedParams;
-    for (const auto &pair : llvm::zip(attr->getTrailingWhereClause()->getRequirements(), specializedSig.getRequirements())) {
-      auto &reqRepr = std::get<0>(pair);
-      auto &req = std::get<1>(pair);
+    for (const auto &reqRepr :
+         attr->getTrailingWhereClause()->getRequirements()) {
       if (reqRepr.getKind() == RequirementReprKind::LayoutConstraint) {
         if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
           if (attributedTy->getAttrs().has(TAK__noMetadata)) {
-            typeErasedParams.push_back(req.getFirstType());
+            const auto resolution = TypeResolution::forInterface(
+                FD->getDeclContext(), genericSig, llvm::None,
+                /*unboundTyOpener*/ nullptr,
+                /*placeholderHandler*/ nullptr,
+                /*packElementOpener*/ nullptr);
+            const auto ty = resolution.resolveType(attributedTy);
+            typeErasedParams.push_back(ty);
           }
         }
       }
