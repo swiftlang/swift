@@ -3072,8 +3072,10 @@ public:
       return *this;
     }
 
+#ifndef __swift__
     bool operator==(iterator x) const { return x.attr == attr; }
     bool operator!=(iterator x) const { return x.attr != attr; }
+#endif // __swift__
 
     CustomAttr *operator*() const { return attr; }
     CustomAttr &operator->() const { return *attr; }
