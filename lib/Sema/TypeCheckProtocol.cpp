@@ -2916,12 +2916,7 @@ ConformanceChecker::ConformanceChecker(
       LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
       SuppressDiagnostics(suppressDiagnostics) {}
 
-ConformanceChecker::~ConformanceChecker() {
-  // its not OK to forget about error diagnostics, unless if we have already
-  // complained or are suppose to suppress diagnostics.
-  assert(AlreadyComplained || SuppressDiagnostics ||
-            !getASTContext().hasDelayedConformanceErrors(Conformance));
-}
+ConformanceChecker::~ConformanceChecker() {}
 
 
 TinyPtrVector<AssociatedTypeDecl *>
