@@ -25,7 +25,7 @@ using namespace swift::test;
 namespace {
 
 class Registry {
-  StringMap<FunctionTest *> registeredTests;
+  StringMap<FunctionTest> registeredTests;
   SwiftNativeFunctionTestThunk thunk;
 
 public:
@@ -34,7 +34,7 @@ public:
     return registry;
   }
 
-  void registerFunctionTest(FunctionTest *test, StringRef name) {
+  void registerFunctionTest(FunctionTest test, StringRef name) {
     auto inserted = registeredTests.insert({name, test}).second;
     assert(inserted);
     (void)inserted;
@@ -46,14 +46,13 @@ public:
 
   SwiftNativeFunctionTestThunk getFunctionTestThunk() { return thunk; }
 
-  FunctionTest *getFunctionTest(StringRef name) {
-    // Avoid creating a new entry here.
-    auto *res = registeredTests.lookup(name);
-    if (!res) {
+  FunctionTest getFunctionTest(StringRef name) {
+    auto iter = registeredTests.find(name);
+    if (iter == registeredTests.end()) {
       llvm::errs() << "Found no test named " << name << "!\n";
       print(llvm::errs());
     }
-    return res;
+    return iter->getValue();
   }
 
   void print(raw_ostream &OS) const {
@@ -61,7 +60,7 @@ public:
        << " entries: {{\n";
     for (auto &stringMapEntry : registeredTests) {
       OS << "\t" << stringMapEntry.getKey() << " -> "
-         << stringMapEntry.getValue() << "\n";
+         << &stringMapEntry.getValue() << "\n";
     }
     OS << "}} test::Registry(" << this << ")\n";
   }
@@ -78,7 +77,7 @@ void registerFunctionTestThunk(SwiftNativeFunctionTestThunk thunk) {
 FunctionTest::FunctionTest(StringRef name, Invocation invocation)
     : invocation(invocation), pass(nullptr), function(nullptr),
       dependencies(nullptr) {
-  Registry::get().registerFunctionTest(this, name);
+  Registry::get().registerFunctionTest(*this, name);
 }
 FunctionTest::FunctionTest(StringRef name, NativeSwiftInvocation invocation)
     : invocation(invocation), pass(nullptr), function(nullptr),
@@ -86,13 +85,10 @@ FunctionTest::FunctionTest(StringRef name, NativeSwiftInvocation invocation)
 
 void FunctionTest::createNativeSwiftFunctionTest(
     StringRef name, NativeSwiftInvocation invocation) {
-  /// Statically allocate the tests to avoid triggering LSAN's "leak" detection.
-  static SmallVector<FunctionTest, 4> tests;
-  auto &test = tests.emplace_back(name, invocation);
-  Registry::get().registerFunctionTest(&test, name);
+  Registry::get().registerFunctionTest({name, invocation}, name);
 }
 
-FunctionTest *FunctionTest::get(StringRef name) {
+FunctionTest FunctionTest::get(StringRef name) {
   return Registry::get().getFunctionTest(name);
 }
 

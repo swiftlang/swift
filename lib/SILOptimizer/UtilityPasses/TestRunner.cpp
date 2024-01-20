@@ -98,14 +98,10 @@ void TestRunner::printTestLifetime(bool begin, unsigned testIndex,
 }
 
 void TestRunner::runTest(StringRef name, Arguments &arguments) {
-  auto *test = FunctionTest::get(name);
-  if (!test) {
-    llvm::outs() << "No test named: " << name << "\n";
-    assert(false && "Invalid test name");
-  }
+  FunctionTest test = FunctionTest::get(name);
   auto *function = getFunction();
   FunctionTestDependenciesImpl dependencies(this, function);
-  test->run(*function, arguments, *this, dependencies);
+  test.run(*function, arguments, *this, dependencies);
 }
 
 void TestRunner::run() {
