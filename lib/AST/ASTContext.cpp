@@ -1865,7 +1865,7 @@ void ASTContext::addCleanup(std::function<void(void)> cleanup) {
 }
 
 bool ASTContext::hadError() const {
-  return Diags.hadAnyError();
+  return Diags.hadAnyError() || hasDelayedConformanceErrors();
 }
 
 /// Retrieve the arena from which we should allocate storage for a type.
