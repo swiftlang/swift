@@ -1574,6 +1574,31 @@ public:
     }
   }
 
+  /// Handles the semantics for SIL applies that cross isolation.
+  ///
+  /// Semantically this causes all arguments of the applysite to be transferred.
+  void translateIsolatedPartialApply(PartialApplyInst *pai) {
+    ApplySite applySite(pai);
+
+    // For each argument operand.
+    for (auto &op : applySite.getArgumentOperands()) {
+      // See if we tracked it.
+      if (auto value = tryToTrackValue(op.get())) {
+        // If we are tracking it, transfer it and if it is actor derived, mark
+        // our partial apply as actor derived.
+        builder.addTransfer(value->getRepresentative().getValue(), &op);
+      }
+    }
+
+    // Now that we have transferred everything into the partial_apply, perform
+    // an assign fresh for the partial_apply. If we use any of the transferred
+    // values later, we will error, so it is safe to just create a new value.
+    auto paiValue = tryToTrackValue(pai).value();
+    SILValue rep = paiValue.getRepresentative().getValue();
+    markValueAsActorDerived(rep);
+    translateSILAssignFresh(rep);
+  }
+
   void translateSILPartialApply(PartialApplyInst *pai) {
     assert(!isIsolationBoundaryCrossingApply(pai));
 
@@ -1581,6 +1606,14 @@ public:
     // handle it especially.
     if (isAsyncLetBeginPartialApply(pai)) {
       return translateSILPartialApplyAsyncLetBegin(pai);
+    }
+
+    // Check if our closure is isolated to a specific actor. If it is, we need
+    // to treat all of the captures as being transferred.
+    if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
+      if (ace->getActorIsolation().isActorIsolated()) {
+        return translateIsolatedPartialApply(pai);
+      }
     }
 
     SILMultiAssignOptions options;

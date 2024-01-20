@@ -898,6 +898,9 @@ WARNING(regionbasedisolation_transfer_yields_race_no_isolation, none,
 WARNING(regionbasedisolation_transfer_yields_race_with_isolation, none,
         "transferring value of non-Sendable type %0 from %1 context to %2 context; later accesses could race",
         (Type, ActorIsolation, ActorIsolation))
+WARNING(regionbasedisolation_isolated_capture_yields_race, none,
+        "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
+        (Type, ActorIsolation, ActorIsolation))
 WARNING(regionbasedisolation_transfer_yields_race_transferring_parameter, none,
         "transferring value of non-Sendable type %0 into transferring parameter; later accesses could race",
         (Type))
