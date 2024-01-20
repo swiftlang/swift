@@ -3142,15 +3142,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
         /*visit=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
           // Return false to indicate visiting a type parameter.
-
-          if (origTy.isTypeParameter())
-            return false;
-
-          // Unfortunately, the type parameter's conformance may not be visible
-          // here.
           assert(M.checkConformance(ty, bitwiseCopyableProtocol) &&
                  "leaf of non-trivial BitwiseCopyable type that doesn't "
                  "conform to BitwiseCopyable!?");
+
+          if (origTy.isTypeParameter())
+            return false;
 
           return true;
         });
