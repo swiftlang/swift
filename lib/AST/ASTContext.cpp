@@ -2382,10 +2382,12 @@ bool ASTContext::canImportModule(ImportPath::Module ModuleName,
   if (!canImportModuleImpl(ModuleName, version, underlyingVersion, true))
     return false;
 
-  // If inserted successfully, add that to success list as dependency.
-  SmallString<64> FullModuleName;
-  ModuleName.getString(FullModuleName);
-  SucceededModuleImportNames.insert(FullModuleName.str());
+  // If checked successfully, add the top level name to success list as
+  // dependency to handle clang submodule correctly. Swift does not have
+  // submodule so the name should be the same.
+  SmallString<64> TopModuleName;
+  ModuleName.getTopLevelPath().getString(TopModuleName);
+  SucceededModuleImportNames.insert(TopModuleName.str());
   return true;
 }
 
