@@ -355,62 +355,64 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     VarDecl *previousVar = nullptr;
 
     for (auto member : decl->getImplementationContext()->getAllMembers()) {
+      bool hasError = false;
       auto pbd = dyn_cast<PatternBindingDecl>(member);
       if (!pbd || pbd->isStatic())
         continue;
 
-      auto *var = pbd->getSingleVar();
-      if (!var) {
-        shouldAddNonisolated = false;
-        break;
-      }
+      for (auto i : range(pbd->getNumPatternEntries())) {
+        if (pbd->isInitializerSubsumed(i))
+          continue;
 
-      auto i = pbd->getPatternEntryIndexForVarDecl(var);
-      if (pbd->isInitializerSubsumed(i))
-        continue;
+        auto *var = pbd->getAnchoringVarDecl(i);
 
-      ActorIsolation initIsolation;
-      if (var->hasInitAccessor()) {
-        // Init accessors share the actor isolation of the property;
-        // the accessor body can call anything in that isolation domain,
-        // and we don't attempt to infer when the isolation isn't
-        // necessary.
-        initIsolation = getActorIsolation(var);
-      } else {
-        initIsolation = var->getInitializerIsolation();
-      }
+        ActorIsolation initIsolation;
+        if (var->hasInitAccessor()) {
+          // Init accessors share the actor isolation of the property;
+          // the accessor body can call anything in that isolation domain,
+          // and we don't attempt to infer when the isolation isn't
+          // necessary.
+          initIsolation = getActorIsolation(var);
+        } else {
+          initIsolation = var->getInitializerIsolation();
+        }
 
-      auto type = var->getTypeInContext();
-      auto isolation = getActorIsolation(var);
-      if (isolation.isGlobalActor()) {
-        if (!type->isSendableType() ||
-            initIsolation.isGlobalActor()) {
-          // If different isolated stored properties require different
-          // global actors, it is impossible to initialize this type.
-          if (existingIsolation != isolation) {
-            ctx.Diags.diagnose(decl->getLoc(),
-                diag::conflicting_stored_property_isolation,
-                ICK == ImplicitConstructorKind::Memberwise,
-                decl->getDeclaredType(), existingIsolation, isolation)
-              .warnUntilSwiftVersion(6);
-            if (previousVar) {
-              previousVar->diagnose(
+        auto type = var->getTypeInContext();
+        auto isolation = getActorIsolation(var);
+        if (isolation.isGlobalActor()) {
+          if (!type->isSendableType() ||
+              initIsolation.isGlobalActor()) {
+            // If different isolated stored properties require different
+            // global actors, it is impossible to initialize this type.
+            if (existingIsolation != isolation) {
+              ctx.Diags.diagnose(decl->getLoc(),
+                  diag::conflicting_stored_property_isolation,
+                  ICK == ImplicitConstructorKind::Memberwise,
+                  decl->getDeclaredType(), existingIsolation, isolation)
+                .warnUntilSwiftVersion(6);
+              if (previousVar) {
+                previousVar->diagnose(
+                    diag::property_requires_actor,
+                    previousVar->getDescriptiveKind(),
+                    previousVar->getName(), existingIsolation);
+              }
+              var->diagnose(
                   diag::property_requires_actor,
-                  previousVar->getDescriptiveKind(),
-                  previousVar->getName(), existingIsolation);
+                  var->getDescriptiveKind(),
+                  var->getName(), isolation);
+              hasError = true;
+              break;
             }
-            var->diagnose(
-                diag::property_requires_actor,
-                var->getDescriptiveKind(),
-                var->getName(), isolation);
-            break;
-          }
 
-          existingIsolation = isolation;
-          previousVar = var;
-          shouldAddNonisolated = false;
+            existingIsolation = isolation;
+            previousVar = var;
+            shouldAddNonisolated = false;
+          }
         }
       }
+
+      if (hasError)
+        break;
     }
 
     if (shouldAddNonisolated) {

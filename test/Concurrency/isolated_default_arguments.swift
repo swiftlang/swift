@@ -220,10 +220,21 @@ class C3 {
   var y = 0
 }
 
+@MainActor class MultipleVars {
+  var (x, y) = (0, 0)
+}
+
 func callDefaultInit() async {
   _ = C2()
   _ = NonIsolatedInit()
   _ = NonIsolatedInit(x: 10)
+  _ = MultipleVars()
+}
+
+// expected-warning@+1 {{default initializer for 'MultipleVarsInvalid' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+class MultipleVarsInvalid {
+  // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
+  @MainActor var (x, y) = (requiresMainActor(), requiresMainActor())
 }
 
 @propertyWrapper 
