@@ -2681,7 +2681,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_SetterAccess:
     case DAK_ObjCBridged:
     case DAK_SynthesizedProtocol:
-    case DAK_Implements:
     case DAK_ObjCRuntimeName:
     case DAK_RestatedObjCConformance:
     case DAK_ClangImporterSynthesizedType:
@@ -2706,6 +2705,29 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       SILGenNameDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
   	                                       theAttr->isImplicit(),
   	                                       theAttr->Name);
+      return;
+    }
+
+    case DAK_Implements: {
+      auto *theAttr = cast<ImplementsAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ImplementsDeclAttrLayout::Code];
+
+      DeclName memberName = theAttr->getMemberName();
+      SmallVector<IdentifierID, 4> nameComponents;
+      nameComponents.push_back(
+          S.addDeclBaseNameRef(memberName.getBaseName()));
+      for (auto argName : memberName.getArgumentNames())
+        nameComponents.push_back(S.addDeclBaseNameRef(argName));
+
+      auto dc = D->getDeclContext();
+      ImplementsDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(),
+          S.addDeclContextRef(dc).getOpaqueValue(),
+          S.addDeclRef(theAttr->getProtocol(dc)),
+          memberName.getArgumentNames().size() +
+            memberName.isCompoundName(),
+          nameComponents);
       return;
     }
 

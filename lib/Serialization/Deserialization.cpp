@@ -5440,6 +5440,47 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Implements_DECL_ATTR: {
+        bool isImplicit;
+        DeclContextID contextID;
+        DeclID protocolID;
+        unsigned numNameComponentsBiased;
+        ArrayRef<uint64_t> nameIDs;
+        serialization::decls_block::ImplementsDeclAttrLayout::readRecord(
+            scratch, isImplicit, contextID, protocolID, numNameComponentsBiased,
+            nameIDs);
+
+        // Resolve the context.
+        auto dcOrError = MF.getDeclContextChecked(contextID);
+        if (!dcOrError)
+          return dcOrError.takeError();
+        DeclContext *dc = dcOrError.get();
+
+        // Resolve the member name.
+        DeclName memberName;
+        Identifier baseName = MF.getIdentifier(nameIDs.front());
+        if (numNameComponentsBiased != 0) {
+          SmallVector<Identifier, 2> names;
+          for (auto nameID : nameIDs.slice(1, numNameComponentsBiased-1)) {
+            names.push_back(MF.getIdentifier(nameID));
+          }
+          memberName = DeclName(ctx, baseName, names);
+        } else {
+          memberName = baseName;
+        }
+
+        Expected<Decl *> protocolOrError = MF.getDeclChecked(protocolID);
+        ProtocolDecl *protocol;
+        if (protocolOrError) {
+          protocol = cast<ProtocolDecl>(protocolOrError.get());
+        } else {
+          return protocolOrError.takeError();
+        }
+
+        Attr = ImplementsAttr::create(dc, protocol, memberName);
+        break;
+      }
+
       case decls_block::CDecl_DECL_ATTR: {
         bool isImplicit;
         serialization::decls_block::CDeclDeclAttrLayout::readRecord(
