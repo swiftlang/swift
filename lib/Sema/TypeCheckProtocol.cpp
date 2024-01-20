@@ -5752,10 +5752,13 @@ void ConformanceChecker::emitDelayedDiags() {
 
   assert(!SuppressDiagnostics && "Should not be suppressing diagnostics now");
   for (const auto &diag: diags) {
-    diagnoseOrDefer(diag.Requirement, diag.IsError,
-      [&](NormalProtocolConformance *conformance) {
-        return diag.Callback();
-    });
+    // Complain that the type does not conform, once.
+    if (diag.IsError && !AlreadyComplained) {
+      diagnoseConformanceFailure(Adoptee, Proto, DC, Loc);
+      AlreadyComplained = true;
+    }
+
+    diag.Callback();
   }
 }
 
