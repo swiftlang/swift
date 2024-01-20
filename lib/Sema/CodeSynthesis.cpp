@@ -350,34 +350,59 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     // and actor initializers do not run on the actor, so initial values
     // cannot be actor-instance-isolated.
     bool shouldAddNonisolated = true;
-    llvm::Optional<ActorIsolation> existingIsolation = llvm::None;
+    ActorIsolation existingIsolation = getActorIsolation(decl);
     VarDecl *previousVar = nullptr;
 
-    // The memberwise init properties are also effectively what the
-    // default init uses, e.g. default initializers initialize via
-    // properties wrapped and init accessors.
-    for (auto var : decl->getMemberwiseInitProperties()) {
+    for (auto member : decl->getImplementationContext()->getAllMembers()) {
+      auto pbd = dyn_cast<PatternBindingDecl>(member);
+      if (!pbd || pbd->isStatic())
+        continue;
+
+      auto *var = pbd->getSingleVar();
+      if (!var) {
+        shouldAddNonisolated = false;
+        break;
+      }
+
+      auto i = pbd->getPatternEntryIndexForVarDecl(var);
+      if (pbd->isInitializerSubsumed(i))
+        continue;
+
+      ActorIsolation initIsolation;
+      if (var->hasInitAccessor()) {
+        // Init accessors share the actor isolation of the property;
+        // the accessor body can call anything in that isolation domain,
+        // and we don't attempt to infer when the isolation isn't
+        // necessary.
+        initIsolation = getActorIsolation(var);
+      } else {
+        initIsolation = var->getInitializerIsolation();
+      }
+
       auto type = var->getTypeInContext();
       auto isolation = getActorIsolation(var);
       if (isolation.isGlobalActor()) {
         if (!isSendableType(decl->getModuleContext(), type) ||
-            var->getInitializerIsolation().isGlobalActor()) {
+            initIsolation.isGlobalActor()) {
           // If different isolated stored properties require different
           // global actors, it is impossible to initialize this type.
-          if (existingIsolation &&
-              *existingIsolation != isolation) {
+          if (existingIsolation != isolation) {
             ctx.Diags.diagnose(decl->getLoc(),
                 diag::conflicting_stored_property_isolation,
                 ICK == ImplicitConstructorKind::Memberwise,
-                decl->getDeclaredType(), *existingIsolation, isolation);
-            previousVar->diagnose(
-                diag::property_requires_actor,
-                previousVar->getDescriptiveKind(),
-                previousVar->getName(), *existingIsolation);
+                decl->getDeclaredType(), existingIsolation, isolation)
+              .warnUntilSwiftVersion(6);
+            if (previousVar) {
+              previousVar->diagnose(
+                  diag::property_requires_actor,
+                  previousVar->getDescriptiveKind(),
+                  previousVar->getName(), existingIsolation);
+            }
             var->diagnose(
                 diag::property_requires_actor,
                 var->getDescriptiveKind(),
                 var->getName(), isolation);
+            break;
           }
 
           existingIsolation = isolation;

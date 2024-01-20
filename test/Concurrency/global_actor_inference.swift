@@ -558,9 +558,13 @@ struct WrapperOnUnsafeActor<Wrapped> {
   }
 }
 
-// HasWrapperOnUnsafeActor gets an inferred @MainActor attribute.
+// HasWrapperOnUnsafeActor does not have an inferred global actor attribute,
+// because synced and $synced have different global actors.
 struct HasWrapperOnUnsafeActor {
-  @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-sns-warning {{global actor 'OtherGlobalActor'-isolated default value in a main actor-isolated context; this is an error in Swift 6}}
+// expected-complete-sns-warning@-1 {{memberwise initializer for 'HasWrapperOnUnsafeActor' cannot be both nonisolated and global actor 'OtherGlobalActor'-isolated; this is an error in Swift 6}}
+// expected-complete-sns-warning@-2 {{default initializer for 'HasWrapperOnUnsafeActor' cannot be both nonisolated and global actor 'OtherGlobalActor'-isolated; this is an error in Swift 6}}
+
+  @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-sns-note 2 {{initializer for property '_synced' is global actor 'OtherGlobalActor'-isolated}}
   // expected-note @-1 3{{property declared here}}
   // expected-complete-sns-note @-2 3{{property declared here}}
 
@@ -583,6 +587,10 @@ struct HasWrapperOnUnsafeActor {
     _ = synced
     synced = 17
   }
+}
+
+nonisolated func createHasWrapperOnUnsafeActor() {
+  _ = HasWrapperOnUnsafeActor()
 }
 
 // ----------------------------------------------------------------------
@@ -669,7 +677,9 @@ func replacesDynamicOnMainActor() {
 // Global-actor isolation of stored property initializer expressions
 // ----------------------------------------------------------------------
 
+// expected-complete-sns-warning@+1 {{default initializer for 'Cutter' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
 class Cutter {
+  // expected-complete-sns-note@+1 {{initializer for property 'x' is main actor-isolated}}
   @MainActor var x = useFooInADefer()
   @MainActor var y = { () -> Bool in
       var z = statefulThingy
