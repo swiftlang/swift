@@ -282,8 +282,6 @@ initializeExecutablePlugin(ASTContext &ctx,
       return llvm::createStringError(err, err.message());
     }
 
-    ctx.getPluginLoader().recordDependency(resolvedLibraryPath);
-
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 

@@ -110,6 +110,9 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
   auto IncDeps =
       Instance.getDependencyTracker()->getIncrementalDependencyPaths();
   InitialDepNames.append(IncDeps.begin(), IncDeps.end());
+  auto MacroDeps =
+      Instance.getDependencyTracker()->getMacroPluginDependencyPaths();
+  InitialDepNames.append(MacroDeps.begin(), MacroDeps.end());
   InitialDepNames.push_back(interfacePath.str());
   for (const auto &extra : extraDependencies) {
     InitialDepNames.push_back(extra.str());

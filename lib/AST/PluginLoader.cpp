@@ -150,12 +150,14 @@ const PluginLoader::PluginEntry &
 PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
   auto &map = getPluginMap();
   auto found = map.find(moduleName);
-  if (found != map.end()) {
-    return found->second;
-  } else {
+  if (found == map.end()) {
     static PluginEntry notFound{"", ""};
     return notFound;
   }
+
+  // Track the dependency.
+  recordDependency(found->second, moduleName);
+  return found->second;
 }
 
 llvm::Expected<LoadedLibraryPlugin *>
@@ -165,9 +167,6 @@ PluginLoader::loadLibraryPlugin(StringRef path) {
   if (auto err = fs->getRealPath(path, resolvedPath)) {
     return llvm::createStringError(err, err.message());
   }
-
-  // Track the dependency.
-  recordDependency(path);
 
   // Load the plugin.
   auto plugin = getRegistry()->loadLibraryPlugin(resolvedPath);
@@ -193,9 +192,6 @@ PluginLoader::loadExecutablePlugin(StringRef path) {
     return llvm::createStringError(err, err.message());
   }
 
-  // Track the dependency.
-  recordDependency(path);
-
   // Load the plugin.
   auto plugin =
       getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox);
@@ -213,7 +209,26 @@ PluginLoader::loadExecutablePlugin(StringRef path) {
   return plugin;
 }
 
-void PluginLoader::recordDependency(StringRef path) {
-  if (DepTracker)
-    DepTracker->addDependency(path, /*IsSystem=*/false);
+void PluginLoader::recordDependency(const PluginEntry &plugin,
+                                    Identifier moduleName) {
+  if (!DepTracker)
+    return;
+
+  // libraryPath: non-nil, executablePath: nil: in-process library plugin.
+  // libraryPath: non-nil, executablePath: non-nil: external library plugin.
+  // libraryPath: nil, executablePath: non-nil: executable plugin.
+  StringRef path =
+      !plugin.libraryPath.empty() ? plugin.libraryPath : plugin.executablePath;
+
+  // NOTE: We don't track plugin-server path as a dependency because it doesn't
+  // provide much value.
+
+  assert(!path.empty());
+  SmallString<128> resolvedPath;
+  auto fs = Ctx.SourceMgr.getFileSystem();
+  if (auto err = fs->getRealPath(path, resolvedPath)) {
+    return;
+  }
+
+  DepTracker->addMacroPluginDependency(resolvedPath, moduleName);
 }
