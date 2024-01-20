@@ -350,45 +350,82 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     // initializers apply Sendable checking to arguments at the call-site,
     // and actor initializers do not run on the actor, so initial values
     // cannot be actor-instance-isolated.
-    bool shouldAddNonisolated = true;
-    llvm::Optional<ActorIsolation> existingIsolation = llvm::None;
+    ActorIsolation existingIsolation = getActorIsolation(decl);
     VarDecl *previousVar = nullptr;
+    bool hasError = false;
 
-    // The memberwise init properties are also effectively what the
-    // default init uses, e.g. default initializers initialize via
-    // properties wrapped and init accessors.
-    for (auto var : decl->getMemberwiseInitProperties()) {
-      auto type = var->getTypeInContext();
-      auto isolation = getActorIsolation(var);
-      if (isolation.isGlobalActor()) {
-        if (!type->isSendableType() ||
-            var->getInitializerIsolation().isGlobalActor()) {
-          // If different isolated stored properties require different
-          // global actors, it is impossible to initialize this type.
-          if (existingIsolation &&
-              *existingIsolation != isolation) {
-            ctx.Diags.diagnose(decl->getLoc(),
-                diag::conflicting_stored_property_isolation,
-                ICK == ImplicitConstructorKind::Memberwise,
-                decl->getDeclaredType(), *existingIsolation, isolation);
-            previousVar->diagnose(
-                diag::property_requires_actor,
-                previousVar->getDescriptiveKind(),
-                previousVar->getName(), *existingIsolation);
-            var->diagnose(
-                diag::property_requires_actor,
-                var->getDescriptiveKind(),
-                var->getName(), isolation);
+    // FIXME: Calling `getAllMembers` here causes issues for conformance
+    // synthesis to RawRepresentable and friends. Instead, iterate over
+    // both the stored properties and the init accessor properties, as
+    // those can participate in implicit initializers.
+
+    auto stored = decl->getStoredProperties();
+    auto initAccessor = decl->getInitAccessorProperties();
+
+    auto shouldAddNonisolated = [&](ArrayRef<VarDecl *> properties) {
+      if (hasError)
+        return false;
+
+      bool addNonisolated = true;
+      for (auto *var : properties) {
+        auto *pbd = var->getParentPatternBinding();
+        if (!pbd)
+          continue;
+
+        auto i = pbd->getPatternEntryIndexForVarDecl(var);
+        if (pbd->isInitializerSubsumed(i))
+          continue;
+
+        ActorIsolation initIsolation;
+        if (var->hasInitAccessor()) {
+          // Init accessors share the actor isolation of the property;
+          // the accessor body can call anything in that isolation domain,
+          // and we don't attempt to infer when the isolation isn't
+          // necessary.
+          initIsolation = getActorIsolation(var);
+        } else {
+          initIsolation = var->getInitializerIsolation();
+        }
+
+        auto type = var->getTypeInContext();
+        auto isolation = getActorIsolation(var);
+        if (isolation.isGlobalActor()) {
+          if (!type->isSendableType() ||
+              initIsolation.isGlobalActor()) {
+            // If different isolated stored properties require different
+            // global actors, it is impossible to initialize this type.
+            if (existingIsolation != isolation) {
+              ctx.Diags.diagnose(decl->getLoc(),
+                  diag::conflicting_stored_property_isolation,
+                  ICK == ImplicitConstructorKind::Memberwise,
+                  decl->getDeclaredType(), existingIsolation, isolation)
+                .warnUntilSwiftVersion(6);
+              if (previousVar) {
+                previousVar->diagnose(
+                    diag::property_requires_actor,
+                    previousVar->getDescriptiveKind(),
+                    previousVar->getName(), existingIsolation);
+              }
+              var->diagnose(
+                  diag::property_requires_actor,
+                  var->getDescriptiveKind(),
+                  var->getName(), isolation);
+              hasError = true;
+              return false;
+            }
+
+            existingIsolation = isolation;
+            previousVar = var;
+            addNonisolated = false;
           }
-
-          existingIsolation = isolation;
-          previousVar = var;
-          shouldAddNonisolated = false;
         }
       }
-    }
 
-    if (shouldAddNonisolated) {
+      return addNonisolated;
+    };
+
+    if (shouldAddNonisolated(stored) &&
+        shouldAddNonisolated(initAccessor)) {
       addNonIsolatedToSynthesized(decl, ctor);
     }
   }
