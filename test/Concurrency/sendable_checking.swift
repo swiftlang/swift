@@ -273,7 +273,7 @@ func testNonSendableBaseArg() async {
   let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-  // expected-tns-warning@-2 {{passing argument of non-sendable type 'NonSendable' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-tns-warning@-2 {{transferring value of non-Sendable type 'NonSendable' from nonisolated context to main actor-isolated context; later accesses could race}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
