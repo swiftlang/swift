@@ -507,7 +507,7 @@ class InheritedProtocolCollector {
         else
           ExtraProtocols.push_back(ProtocolAndAvailability(
               protoDecl, getAvailabilityAttrs(D, availableAttrs),
-              inherited.isUnchecked, getOriginallyDefinedInAttrList(D)));
+              inherited.isUnchecked(), getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.

@@ -1588,11 +1588,12 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
-    : TypeLoc(typeLoc), isUnchecked(false) {
+    : InheritedEntry(typeLoc, /*isUnchecked=*/false, /*isRetroactive=*/false,
+                     /*isPreconcurrency=*/false) {
   if (auto typeRepr = typeLoc.getTypeRepr()) {
-    isUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
-    isRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
-    isPreconcurrency = typeRepr->findAttrLoc(TAK_preconcurrency).isValid();
+    IsUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
+    IsRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
+    IsPreconcurrency = typeRepr->findAttrLoc(TAK_preconcurrency).isValid();
   }
 }
 
