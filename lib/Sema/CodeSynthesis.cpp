@@ -349,21 +349,31 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     // initializers apply Sendable checking to arguments at the call-site,
     // and actor initializers do not run on the actor, so initial values
     // cannot be actor-instance-isolated.
-    bool shouldAddNonisolated = true;
     ActorIsolation existingIsolation = getActorIsolation(decl);
     VarDecl *previousVar = nullptr;
+    bool hasError = false;
 
-    for (auto member : decl->getImplementationContext()->getAllMembers()) {
-      bool hasError = false;
-      auto pbd = dyn_cast<PatternBindingDecl>(member);
-      if (!pbd || pbd->isStatic())
-        continue;
+    // FIXME: Calling `getAllMembers` here causes issues for conformance
+    // synthesis to RawRepresentable and friends. Instead, iterate over
+    // both the stored properties and the init accessor properties, as
+    // those can participate in implicit initializers.
 
-      for (auto i : range(pbd->getNumPatternEntries())) {
-        if (pbd->isInitializerSubsumed(i))
+    auto stored = decl->getStoredProperties();
+    auto initAccessor = decl->getInitAccessorProperties();
+
+    auto shouldAddNonisolated = [&](ArrayRef<VarDecl *> properties) {
+      if (hasError)
+        return false;
+
+      bool addNonisolated = true;
+      for (auto *var : properties) {
+        auto *pbd = var->getParentPatternBinding();
+        if (!pbd)
           continue;
 
-        auto *var = pbd->getAnchoringVarDecl(i);
+        auto i = pbd->getPatternEntryIndexForVarDecl(var);
+        if (pbd->isInitializerSubsumed(i))
+          continue;
 
         ActorIsolation initIsolation;
         if (var->hasInitAccessor()) {
@@ -400,21 +410,21 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                   var->getDescriptiveKind(),
                   var->getName(), isolation);
               hasError = true;
-              break;
+              return false;
             }
 
             existingIsolation = isolation;
             previousVar = var;
-            shouldAddNonisolated = false;
+            addNonisolated = false;
           }
         }
       }
 
-      if (hasError)
-        break;
-    }
+      return addNonisolated;
+    };
 
-    if (shouldAddNonisolated) {
+    if (shouldAddNonisolated(stored) &&
+        shouldAddNonisolated(initAccessor)) {
       addNonIsolatedToSynthesized(decl, ctor);
     }
   }
