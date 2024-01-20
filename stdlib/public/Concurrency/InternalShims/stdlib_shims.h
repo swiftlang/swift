@@ -1,4 +1,4 @@
-//===--- _SwiftConcurrency.h - Swift Concurrency Support --------*- C++ -*-===//
+//===--- stdlib_shims.h - Swift Concurrency Support -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,24 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  Defines types and support functions for the Swift concurrency model.
+//  Forward declarations of <stdlib.h> interfaces so that Swift Concurrency
+//  doesn't depend on the C library.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_CONCURRENCY_H
-#define SWIFT_CONCURRENCY_H
+#ifndef STDLIB_SHIMS_H
+#define STDLIB_SHIMS_H
 
 #ifdef __cplusplus
-namespace swift {
-extern "C" {
+extern "C" [[noreturn]]
 #endif
+void exit(int);
 
-typedef struct _SwiftContext {
-  struct _SwiftContext *parentContext;
-} _SwiftContext;
+#define EXIT_SUCCESS 0
 
-#ifdef __cplusplus
-} // extern "C"
-} // namespace swift
-#endif
-
-#endif // SWIFT_CONCURRENCY_H
+#endif // STDLIB_SHIMS_H

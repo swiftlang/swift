@@ -3388,25 +3388,23 @@ namespace {
                     ->getTopLevelModule()
                     ->getFullModuleName() == n;
         };
-        if ((decl->getOwningModule() &&
-             importer::isCxxStdModule(decl->getOwningModule()))) {
+        
+        if (clang::Module *owningModule = decl->getOwningModule();
+            owningModule && importer::isCxxStdModule(owningModule)) {
           if (isAlternativeCStdlibFunctionFromTextualHeader(decl)) {
             return nullptr;
           }
-          auto filename =
-              Impl.getClangPreprocessor().getSourceManager().getFilename(
-                  decl->getLocation());
-          if (filename.endswith("cmath") || filename.endswith("math.h") ||
-              filename.endswith("stdlib.h") || filename.endswith("cstdlib")) {
-            return nullptr;
+
+          auto &sourceManager = Impl.getClangPreprocessor().getSourceManager();
+          if (const auto file = sourceManager.getFileEntryForID(
+                  sourceManager.getFileID(decl->getLocation()))) {
+            auto filename = file->getName();
+            if ((file->getDir() == owningModule->Directory) &&
+                (filename.endswith("cmath") || filename.endswith("math.h") ||
+                 filename.endswith("stdlib.h") || filename.endswith("cstdlib"))) {
+              return nullptr;
+            }
           }
-        }
-        // Use the exit function from _SwiftConcurrency.h as it is platform
-        // agnostic.
-        if ((topLevelModuleEq(decl, "Darwin") ||
-             topLevelModuleEq(decl, "SwiftGlibc")) &&
-            decl->getDeclName().isIdentifier() && decl->getName() == "exit") {
-          return nullptr;
         }
       }
 

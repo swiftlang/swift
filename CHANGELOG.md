@@ -59,6 +59,12 @@
   Having been [gated](https://github.com/apple/swift/pull/28171) behind a
   compiler warning since at least Swift 5.2, this syntax is now rejected.
 
+* [bugfix][]:
+
+  \_SwiftConcurrencyShims used to declare the `exit` function, even though it
+  might not be available. The declaration has been removed, and must be imported
+  from the appropriate C library module (e.g. Darwin or SwiftGlibc)
+
 ## Swift 5.10
 
 * Swift 5.10 closes all known static data-race safey holes in complete strict

@@ -12,6 +12,7 @@
 
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
+@_implementationOnly import SwiftConcurrencyInternalShims
 
 // ==== Task -------------------------------------------------------------------
 

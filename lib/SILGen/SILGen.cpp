@@ -450,16 +450,51 @@ FuncDecl *SILGenModule::getSwiftJobRun() {
 
 FuncDecl *SILGenModule::getExit() {
   ASTContext &C = getASTContext();
-  ModuleDecl *concurrencyShims =
-      C.getModuleByIdentifier(C.getIdentifier("_SwiftConcurrencyShims"));
 
-  if (!concurrencyShims)
-    return nullptr;
+  // Try the most likely modules.
+  Identifier mostLikelyIdentifier;
+  const llvm::Triple &triple = C.LangOpts.Target;
+  if (triple.isOSDarwin()) {
+    mostLikelyIdentifier = C.getIdentifier("Darwin");
+  } else if (triple.isOSWASI()) {
+    mostLikelyIdentifier = C.getIdentifier("SwiftWASILibc");
+  } else if (triple.isWindowsMSVCEnvironment()) {
+    mostLikelyIdentifier = C.getIdentifier("ucrt");
+  } else {
+    mostLikelyIdentifier = C.getIdentifier("SwiftGlibc");
+  }
+  ModuleDecl *exitModule = C.getModuleByIdentifier(mostLikelyIdentifier);
+  FuncDecl *exitFunction = nullptr;
+  if (exitModule) {
+    exitFunction = evaluateOrDefault(
+        C.evaluator,
+        LookupIntrinsicRequest{exitModule, C.getIdentifier("exit")},
+        /*default=*/nullptr);
+  }
 
-  return evaluateOrDefault(
-      C.evaluator,
-      LookupIntrinsicRequest{concurrencyShims, C.getIdentifier("exit")},
-      /*default=*/nullptr);
+  if (!exitFunction) {
+    // No go, look for it in any loaded module. Several of the internal
+    // Swift modules or swift-corelibs modules may have absorbed <stdlib.h>
+    // when buliding without fully specified clang modules in the OS/SDK.
+    for (const auto &loadedModuleVector : C.getLoadedModules()) {
+      if (loadedModuleVector.first == mostLikelyIdentifier) {
+        continue;
+      }
+
+      ModuleDecl *loadedModule = loadedModuleVector.second;
+      if (loadedModule) {
+        exitFunction = evaluateOrDefault(
+            C.evaluator,
+            LookupIntrinsicRequest{loadedModule, C.getIdentifier("exit")},
+            /*default=*/nullptr);
+      }
+      if (exitFunction) {
+        break;
+      }
+    }
+  }
+
+  return exitFunction;
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
