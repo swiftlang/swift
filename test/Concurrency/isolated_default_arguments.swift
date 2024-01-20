@@ -149,7 +149,7 @@ struct S2 {
 }
 
 struct S3 {
-  // expected-error@+1 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+  // expected-error@+1 3 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
   var (x, y, z) = (requiresMainActor(), requiresSomeGlobalActor(), 10)
 }
 
@@ -274,4 +274,11 @@ struct InitAccessors {
       _a
     }
   }
+}
+
+// Make sure isolation inference for implicit initializers
+// doesn't impact conformance synthesis.
+
+struct CError: Error, RawRepresentable {
+  var rawValue: CInt
 }
