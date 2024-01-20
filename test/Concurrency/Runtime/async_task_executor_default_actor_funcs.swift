@@ -44,12 +44,12 @@ actor ThreaddyTheDefaultActor {
 
     let defaultActor = ThreaddyTheDefaultActor()
 
-    await Task(_on: executor) {
+    await Task(_executorPreference: executor) {
       dispatchPrecondition(condition: .onQueue(executor.queue))
       await defaultActor.actorIsolated(expectedExecutor: executor)
     }.value
 
-    await _withTaskExecutor(executor) {
+    await _withTaskExecutorPreference(executor) {
       await defaultActor.actorIsolated(expectedExecutor: executor)
     }
   }

@@ -107,6 +107,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
   GlobalActor.swift
+  GlobalConcurrentExecutor.swift
   MainActor.swift
   PartialAsyncTask.swift
   SourceCompatibilityShims.swift
