@@ -3892,7 +3892,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   // conforms to the specified protocol.
   NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
-    if (!OtherPD->inheritsFrom(PD)) {
+    if (!OtherPD->inheritsFrom(PD) &&
+        !(OtherPD->isSpecificProtocol(KnownProtocolKind::DistributedActor) ||
+          PD->isSpecificProtocol(KnownProtocolKind::Actor))) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_not_conformed_to, NTD, PD)
         .highlight(attr->getProtocolTypeRepr()->getSourceRange());

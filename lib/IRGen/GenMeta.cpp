@@ -2719,8 +2719,11 @@ IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
       // at runtime.
       auto mangledName = entity.mangleAsString();
       if (auto otherDefinition = Module.getGlobalVariable(mangledName)) {
-        GlobalVars.insert({entity, otherDefinition});
-        return otherDefinition;
+        if (!otherDefinition->isDeclaration() ||
+            !entity.isAlwaysSharedLinkage()) {
+          GlobalVars.insert({entity, otherDefinition});
+          return otherDefinition;
+        }
       }
       
       // Otherwise, emit the descriptor.

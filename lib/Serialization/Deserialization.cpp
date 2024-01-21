@@ -972,7 +972,10 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
 
-  dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
+  // Note: the DistributedActor -> Actor pseudo-conformance can be deserialized
+  // but must not be registered, so don't register it here.
+  if (!dc->getSelfProtocolDecl())
+    dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
 
   // If the conformance is complete, we're done.
   if (conformance->isComplete())

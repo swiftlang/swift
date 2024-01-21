@@ -305,6 +305,10 @@ private:
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
   /// The queue of opaque type descriptors to emit.
   llvm::SmallVector<OpaqueTypeDecl*, 4> LazyOpaqueTypeDescriptors;
+  /// The set of extension contenxts enqueued for lazy emission.
+  llvm::DenseMap<ExtensionDecl*, LazyOpaqueInfo> LazyExtensions;
+  /// The queue of opaque type descriptors to emit.
+  llvm::TinyPtrVector<ExtensionDecl*> LazyExtensionDescriptors;
 public:
   /// The set of eagerly emitted opaque types.
   llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
@@ -504,7 +508,7 @@ public:
   }
   
   void noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque);
-
+  void noteUseOfExtensionDescriptor(ExtensionDecl *ext);
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
 
   void noteUseOfFieldDescriptors(CanType type) {
@@ -1609,6 +1613,9 @@ public:
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
       SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+
+  TypeEntityReference
+  getContextDescriptorEntityReference(const LinkEntity &entity);
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
