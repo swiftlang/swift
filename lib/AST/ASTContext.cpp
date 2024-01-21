@@ -192,6 +192,28 @@ template <> struct DenseMapInfo<OverrideSignatureKey> {
 };
 } // namespace llvm
 
+namespace {
+
+/// If the conformance is in a primary file, we might diagnose some failures
+/// early via request evaluation, with all remaining failures diagnosed when
+/// we completely force the conformance from typeCheckDecl(). To emit the
+/// diagnostics together, we batch them up in the Diags vector.
+///
+/// If the conformance is in a secondary file, we instead just diagnose a
+/// generic "T does not conform to P" error the first time we hit an error
+/// via request evaluation. The detailed delayed conformance diagnostics
+/// are discarded, since we'll emit them again when we compile the file as
+/// a primary file.
+struct DelayedConformanceDiags {
+  /// We set this if we've ever seen an error diagnostic here.
+  bool HadError = false;
+
+  /// The delayed conformance diagnostics that have not been emitted yet.
+  /// Never actually emitted for a secondary file.
+  std::vector<ASTContext::DelayedConformanceDiag> Diags;
+};
+
+}
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -354,8 +376,7 @@ struct ASTContext::Implementation {
 
   /// Map from normal protocol conformances to diagnostics that have
   /// been delayed until the conformance is fully checked.
-  llvm::DenseMap<NormalProtocolConformance *,
-                 std::vector<ASTContext::DelayedConformanceDiag>>
+  llvm::DenseMap<NormalProtocolConformance *, ::DelayedConformanceDiags>
     DelayedConformanceDiags;
 
   /// Map from normal protocol conformances to missing witnesses that have
@@ -1865,7 +1886,7 @@ void ASTContext::addCleanup(std::function<void(void)> cleanup) {
 }
 
 bool ASTContext::hadError() const {
-  return Diags.hadAnyError();
+  return Diags.hadAnyError() || hasDelayedConformanceErrors();
 }
 
 /// Retrieve the arena from which we should allocate storage for a type.
@@ -2735,17 +2756,10 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
 bool ASTContext::hasDelayedConformanceErrors(
                           NormalProtocolConformance const* conformance) const {
 
-  auto hasDelayedErrors = [](std::vector<DelayedConformanceDiag> const& diags) {
-    return std::any_of(diags.begin(), diags.end(),
-                    [](ASTContext::DelayedConformanceDiag const& diag) {
-                      return diag.IsError;
-                    });
-  };
-
   if (conformance) {
     auto entry = getImpl().DelayedConformanceDiags.find(conformance);
     if (entry != getImpl().DelayedConformanceDiags.end())
-      return hasDelayedErrors(entry->second);
+      return entry->second.HadError;
 
     return false; // unknown conformance, so no delayed diags either.
   }
@@ -2753,7 +2767,7 @@ bool ASTContext::hasDelayedConformanceErrors(
   // check all conformances for any delayed errors
   for (const auto &entry : getImpl().DelayedConformanceDiags) {
     auto const& diagnostics = entry.getSecond();
-    if (hasDelayedErrors(diagnostics))
+    if (diagnostics.HadError)
       return true;
   }
 
@@ -2763,9 +2777,49 @@ bool ASTContext::hasDelayedConformanceErrors(
 MissingWitnessesBase::~MissingWitnessesBase() { }
 
 void ASTContext::addDelayedConformanceDiag(
-       NormalProtocolConformance *conformance,
-       DelayedConformanceDiag fn) {
-  getImpl().DelayedConformanceDiags[conformance].push_back(std::move(fn));
+       NormalProtocolConformance *conformance, bool isError,
+       std::function<void(NormalProtocolConformance *)> callback) {
+  if (isError)
+    conformance->setInvalid();
+
+  auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
+
+  if (isError && !diagnostics.HadError) {
+    diagnostics.HadError = true;
+
+    auto *proto = conformance->getProtocol();
+    auto *dc = conformance->getDeclContext();
+    auto *sf = dc->getParentSourceFile();
+    auto *mod = sf->getParentModule();
+    assert(mod->isMainModule());
+
+    // If we have at least one primary file and the conformance is declared in a
+    // non-primary file, emit a fallback diagnostic.
+    if ((!sf->isPrimary() && !mod->getPrimarySourceFiles().empty()) ||
+        TypeCheckerOpts.EnableLazyTypecheck) {
+      auto complainLoc = evaluator.getInnermostSourceLoc([&](SourceLoc loc) {
+        if (loc.isInvalid())
+          return false;
+
+        auto *otherSF = mod->getSourceFileContainingLocation(loc);
+        if (otherSF == nullptr)
+          return false;
+
+        return otherSF->isPrimary();
+      });
+
+      if (complainLoc.isInvalid()) {
+        complainLoc = conformance->getLoc();
+      }
+
+      Diags.diagnose(complainLoc,
+                     diag::type_does_not_conform,
+                     dc->getSelfInterfaceType(),
+                     proto->getDeclaredInterfaceType());
+    }
+  }
+
+  diagnostics.Diags.push_back({isError, callback});
 }
 
 void ASTContext::addDelayedMissingWitnesses(
@@ -2791,8 +2845,7 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance const* cnfrm){
   std::vector<ASTContext::DelayedConformanceDiag> result;
   auto known = getImpl().DelayedConformanceDiags.find(cnfrm);
   if (known != getImpl().DelayedConformanceDiags.end()) {
-    result = std::move(known->second);
-    getImpl().DelayedConformanceDiags.erase(known);
+    std::swap(result, known->second.Diags);
   }
   return result;
 }

@@ -572,8 +572,7 @@ protocol P35a {
   associatedtype B // expected-note {{protocol requires nested type 'B'}}
 }
 protocol P35b: P35a where B == A {}
-// expected-error@+2 {{type 'S35' does not conform to protocol 'P35a'}}
-// expected-error@+1 {{type 'S35' does not conform to protocol 'P35b'}}
+// expected-error@+1 {{type 'S35' does not conform to protocol 'P35a'}}
 struct S35: P35b {}
 
 // Circular reference through a value witness.
@@ -634,7 +633,6 @@ protocol P40b: P40a {
 protocol P40c: P40b where D == S40<Never> {}
 struct S40<E: Equatable>: P40c {
   // expected-error@-1 {{type 'S40<E>' does not conform to protocol 'P40b'}}
-  // expected-error@-2 {{type 'S40<E>' does not conform to protocol 'P40c'}}
   func foo(arg: Never) {}
 
   typealias B = Self
@@ -712,6 +710,5 @@ protocol FIXME_P1a {
   associatedtype B: FIXME_P1a // expected-note {{protocol requires nested type 'B'}}
 }
 protocol FIXME_P1b: FIXME_P1a where B == FIXME_S1<A> {}
-// expected-error@+2 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1a'}}
-// expected-error@+1 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1b'}}
+// expected-error@+1 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1a'}}
 struct FIXME_S1<T: Equatable>: FIXME_P1b {}

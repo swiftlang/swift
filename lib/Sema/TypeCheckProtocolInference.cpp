@@ -2227,15 +2227,14 @@ namespace {
 } // end anonymous namespace
 
 bool AssociatedTypeInference::diagnoseNoSolutions(
-                         ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                         ConformanceChecker &checker) {
+                         ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) {
   // If a defaulted type witness failed, diagnose it.
   if (failedDefaultedAssocType) {
     auto failedDefaultedAssocType = this->failedDefaultedAssocType;
     auto failedDefaultedWitness = this->failedDefaultedWitness;
     auto failedDefaultedResult = this->failedDefaultedResult;
 
-    checker.diagnoseOrDefer(failedDefaultedAssocType, true,
+    ctx.addDelayedConformanceDiag(conformance, true,
       [failedDefaultedAssocType, failedDefaultedWitness,
        failedDefaultedResult](NormalProtocolConformance *conformance) {
         auto proto = conformance->getProtocol();
@@ -2304,7 +2303,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
       return false;
 
     auto failedSet = std::move(known->second);
-    checker.diagnoseOrDefer(assocType, true,
+    ctx.addDelayedConformanceDiag(conformance, true,
       [assocType, failedSet](NormalProtocolConformance *conformance) {
         auto proto = conformance->getProtocol();
         auto &diags = proto->getASTContext().Diags;
@@ -2411,7 +2410,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
   if (typeWitnessConflict) {
     auto typeWitnessConflict = this->typeWitnessConflict;
 
-    checker.diagnoseOrDefer(typeWitnessConflict->AssocType, true,
+    ctx.addDelayedConformanceDiag(conformance, true,
       [typeWitnessConflict](NormalProtocolConformance *conformance) {
         auto &diags = conformance->getDeclContext()->getASTContext().Diags;
         diags.diagnose(typeWitnessConflict->AssocType,
@@ -2438,7 +2437,6 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
 
 bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
                   ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                  ConformanceChecker &checker,
                   SmallVectorImpl<InferredTypeWitnessesSolution> &solutions) {
   for (auto assocType : unresolvedAssocTypes) {
     // Find two types that conflict.
@@ -2474,7 +2472,7 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
       continue;
 
     // We found an ambiguity. diagnose it.
-    checker.diagnoseOrDefer(assocType, true,
+    ctx.addDelayedConformanceDiag(conformance, true,
       [assocType, firstType, firstMatch, secondType, secondMatch](
         NormalProtocolConformance *conformance) {
         auto &diags = assocType->getASTContext().Diags;
@@ -2660,12 +2658,12 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
 
   // Diagnose the complete lack of solutions.
   if (solutions.empty() &&
-      diagnoseNoSolutions(unresolvedAssocTypes.getArrayRef(), checker))
+      diagnoseNoSolutions(unresolvedAssocTypes.getArrayRef()))
     return llvm::None;
 
   // Diagnose ambiguous solutions.
   if (!solutions.empty() &&
-      diagnoseAmbiguousSolutions(unresolvedAssocTypes.getArrayRef(), checker,
+      diagnoseAmbiguousSolutions(unresolvedAssocTypes.getArrayRef(),
                                  solutions))
     return llvm::None;
 
@@ -2993,10 +2991,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
 void ConformanceChecker::resolveSingleTypeWitness(
        AssociatedTypeDecl *assocType) {
-  // Ensure we diagnose if the witness is missing.
-  SWIFT_DEFER {
-    diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
-  };
   switch (resolveTypeWitnessViaLookup(assocType)) {
   case ResolveWitnessResult::Success:
   case ResolveWitnessResult::ExplicitFailed:

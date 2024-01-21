@@ -5,3 +5,4 @@
 
 func reproducer() -> Float { return Struct().func1(1.0) }
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Struct.Input'}}
+// expected-error@-2 {{type 'Struct' does not conform to protocol 'Proto1'}}

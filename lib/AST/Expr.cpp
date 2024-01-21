@@ -2835,7 +2835,15 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "expression";
 }
 
+SourceLoc swift::extractNearestSourceLoc(const ClosureExpr *expr) {
+  return expr->getLoc();
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
+  return expr->getLoc();
+}
+
+SourceLoc swift::extractNearestSourceLoc(const MacroExpansionExpr *expr) {
   return expr->getLoc();
 }
 

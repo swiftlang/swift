@@ -1313,9 +1313,8 @@ public:
   /// conformance itself, along with a bit indicating whether this diagnostic
   /// produces an error.
   struct DelayedConformanceDiag {
-    const ValueDecl *Requirement;
-    std::function<void()> Callback;
     bool IsError;
+    std::function<void(NormalProtocolConformance *)> Callback;
   };
 
   /// Check whether current context has any errors associated with
@@ -1330,8 +1329,9 @@ public:
 
   /// Add a delayed diagnostic produced while type-checking a
   /// particular protocol conformance.
-  void addDelayedConformanceDiag(NormalProtocolConformance *conformance,
-                                 DelayedConformanceDiag fn);
+  void addDelayedConformanceDiag(
+      NormalProtocolConformance *conformance, bool isError,
+      std::function<void(NormalProtocolConformance *)> callback);
 
   /// Retrieve the delayed-conformance diagnostic callbacks for the
   /// given normal protocol conformance.
