@@ -8,8 +8,8 @@ import Distributed
 
 // rdar://90886302 This test would crash if not typealias ActorSystem was declared for an actor
 distributed actor Fish {
-  // expected-error@-1{{distributed actor 'Fish' does not declare ActorSystem it can be used with.}}
-  // expected-error@-2{{distributed actor 'Fish' does not declare ActorSystem it can be used with.}}
+  // expected-error@-1{{distributed actor 'Fish' does not declare ActorSystem it can be used with}}
+  // expected-error@-2{{distributed actor 'Fish' does not declare ActorSystem it can be used with}}
   // expected-note@-3{{you can provide a module-wide default actor system by declaring:\ntypealias DefaultDistributedActorSystem = <#ConcreteActorSystem#>}}
 
   distributed func tell(_ text: String, by: Fish) {

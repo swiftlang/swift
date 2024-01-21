@@ -5110,20 +5110,19 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
-      diags.diagnose(Loc, diag::type_does_not_conform,
-                     Adoptee,
-                     Proto->getDeclaredInterfaceType());
-
       if (result.getKind() == CheckRequirementsResult::RequirementFailure) {
-        TypeChecker::diagnoseRequirementFailure(
-            result.getRequirementFailureInfo(), Loc, Loc,
-            proto->getDeclaredInterfaceType(),
-            {proto->getSelfInterfaceType()->castTo<GenericTypeParamType>()},
-            QuerySubstitutionMap{substitutions}, module);
+        auto Loc = this->Loc;
+        diagnoseOrDefer(nullptr, /*isError=*/true,
+          [Loc, result, proto, substitutions, module](NormalProtocolConformance *conformance) {
+            TypeChecker::diagnoseRequirementFailure(
+              result.getRequirementFailureInfo(), Loc, Loc,
+              proto->getDeclaredInterfaceType(),
+              {proto->getSelfInterfaceType()->castTo<GenericTypeParamType>()},
+              QuerySubstitutionMap{substitutions}, module);
+          });
       }
 
       Conformance->setInvalid();
-      AlreadyComplained = true;
     }
     return;
   }
