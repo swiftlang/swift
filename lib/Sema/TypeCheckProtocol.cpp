@@ -43,6 +43,7 @@
 #include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/RequirementMatch.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
@@ -75,38 +76,6 @@ namespace {
 
     return false;
   }
-}
-
-/// Describes the suitability of the chosen witness for
-/// the requirement.
-struct swift::RequirementCheck {
-  CheckKind Kind;
-
-  /// The required access scope, if the check failed due to the
-  /// witness being less accessible than the requirement.
-  AccessScope RequiredAccessScope;
-
-  /// The required availability, if the check failed due to the
-  /// witness being less available than the requirement.
-  AvailabilityContext RequiredAvailability;
-
-  RequirementCheck(CheckKind kind)
-    : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-      RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
-
-  RequirementCheck(CheckKind kind, AccessScope requiredAccessScope)
-    : Kind(kind), RequiredAccessScope(requiredAccessScope),
-      RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
-
-  RequirementCheck(CheckKind kind, AvailabilityContext requiredAvailability)
-    : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-      RequiredAvailability(requiredAvailability) { }
-};
-
-swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
-  return swift::Witness(
-      this->Witness, WitnessSubstitutions, ReqEnv->getWitnessThunkSignature(),
-      ReqEnv->getRequirementToWitnessThunkSubs(), DerivativeGenSig, llvm::None);
 }
 
 AssociatedTypeDecl *
