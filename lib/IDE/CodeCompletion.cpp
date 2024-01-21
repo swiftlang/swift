@@ -1314,7 +1314,8 @@ void swift::ide::postProcessCompletionResults(
         Kind != CompletionKind::TypeSimpleWithoutDot &&
         Kind != CompletionKind::TypeSimpleWithDot &&
         Kind != CompletionKind::TypeDeclResultBeginning &&
-        Kind != CompletionKind::GenericRequirement) {
+        Kind != CompletionKind::GenericRequirement &&
+        Kind != CompletionKind::WithoutConstraintType) {
       flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
       modified = true;
     }
@@ -2007,7 +2008,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   }
 
   case CompletionKind::WithoutConstraintType: {
-    Lookup.getWithoutConstraintTypes();
+    Lookup.addWithoutConstraintTypes();
     break;
   }
 
