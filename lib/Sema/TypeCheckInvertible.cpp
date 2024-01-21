@@ -162,7 +162,7 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   auto &ctx = type->getASTContext();
 
   auto *invertible = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(invertible);
+  assert(invertible && "failed to load Copyable/Escapable from stdlib!");
 
   // Must not have a type parameter!
   assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
