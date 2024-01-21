@@ -170,7 +170,7 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   assert(!type->is<PackExpansionType>());
 
   // The SIL types in the AST do not have real conformances, and should have
-  // been handled earlier.
+  // been handled in SILType instead.
   assert(!(type->is<SILBoxType,
                     SILMoveOnlyWrappedType,
                     SILPackType,

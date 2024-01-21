@@ -184,10 +184,6 @@ static CanType preprocessTypeForInvertibleQuery(Type orig) {
   // Strip off any StorageType wrapper.
   type = type->getReferenceStorageReferent();
 
-  // Always strip off SILMoveOnlyWrapper.
-  if (auto wrapper = type->getAs<SILMoveOnlyWrappedType>())
-    type = wrapper->getInnerType();
-
   // Pack expansions such as `repeat T` themselves do not have conformances,
   // so check its pattern type for conformance.
   if (auto *pet = type->getAs<PackExpansionType>()) {
