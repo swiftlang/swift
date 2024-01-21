@@ -3876,7 +3876,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
     auto matches = Missing.matches;
     auto nominal = DC->getSelfNominalTypeDecl();
 
-    diagnoseOrDefer(requirement, true,
+    getASTContext().addDelayedConformanceDiag(Conformance, true,
       [requirement, matches, nominal](NormalProtocolConformance *conformance) {
         auto dc = conformance->getDeclContext();
         auto *protocol = conformance->getProtocol();
@@ -4010,8 +4010,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
           std::make_unique<DelayedMissingWitnesses>(MissingWitnesses));
     } else {
       auto Loc = this->Loc;
-      diagnoseOrDefer(
-          LocalMissing[0].requirement, true,
+      getASTContext().addDelayedConformanceDiag(Conformance, true,
           [InsertFixit, Loc, IsEditorMode, MissingWitnesses](NormalProtocolConformance *Conf) {
             InsertFixit(Conf, Loc, IsEditorMode, MissingWitnesses);
           });
@@ -4020,8 +4019,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
     return true;
   }
   case MissingWitnessDiagnosisKind::ErrorOnly: {
-    diagnoseOrDefer(
-        LocalMissing[0].requirement, true, [](NormalProtocolConformance *) {});
+    getASTContext().addDelayedConformanceDiag(Conformance, true,
+                                              [](NormalProtocolConformance *) {});
     return true;
   }
   case MissingWitnessDiagnosisKind::FixItOnly:
@@ -4125,7 +4124,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
         !ctor->hasClangNode()) {
       // FIXME: We're not recovering (in the AST), so the Fix-It
       // should move.
-      diagnoseOrDefer(requirement, false,
+      getASTContext().addDelayedConformanceDiag(Conformance, false,
         [ctor, requirement](NormalProtocolConformance *conformance) {
           bool inExtension = isa<ExtensionDecl>(ctor->getDeclContext());
           auto &diags = ctor->getASTContext().Diags;
@@ -4159,7 +4158,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
     // References to Self in a position where subclasses cannot do
     // the right thing. Complain if the adoptee is a non-final
     // class.
-    diagnoseOrDefer(requirement, false,
+    getASTContext().addDelayedConformanceDiag(Conformance, false,
       [witness, requirement](NormalProtocolConformance *conformance) {
         auto proto = conformance->getProtocol();
         auto &diags = proto->getASTContext().Diags;
@@ -4187,7 +4186,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
       }();
 
       if (!hasDynamicSelfResult) {
-        diagnoseOrDefer(requirement, false,
+        getASTContext().addDelayedConformanceDiag(Conformance, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
             auto &diags = proto->getASTContext().Diags;
@@ -4236,7 +4235,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   if (isa<FuncDecl>(witness) || isa<SubscriptDecl>(witness)) {
     if (witness->getDeclContext()->getExtendedProtocolDecl()) {
       if (selfRefInfo.hasCovariantSelfResult && selfRefInfo.assocTypeRef) {
-        diagnoseOrDefer(requirement, false,
+        getASTContext().addDelayedConformanceDiag(Conformance, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();
             auto &diags = proto->getASTContext().Diags;
@@ -4318,7 +4317,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         requirement->getName() != best.Witness->getName() &&
         !witnessHasImplementsAttrForRequiredName(best.Witness, requirement)) {
 
-      diagnoseOrDefer(requirement, false,
+      getASTContext().addDelayedConformanceDiag(Conformance, false,
         [witness, requirement](NormalProtocolConformance *conformance) {
           auto proto = conformance->getProtocol();
           auto &diags = proto->getASTContext().Diags;
@@ -4350,7 +4349,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         
         // Avoid relying on the lifetime of 'this'.
         const DeclContext *DC = this->DC;
-        diagnoseOrDefer(requirement, isError,
+        getASTContext().addDelayedConformanceDiag(Conformance, isError,
                         [DC, requirement, witness, sendFrom](
                           NormalProtocolConformance *conformance) {
           diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
@@ -4393,7 +4392,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
       // Avoid relying on the lifetime of 'this'.
       const DeclContext *DC = this->DC;
-      diagnoseOrDefer(requirement, false,
+      getASTContext().addDelayedConformanceDiag(Conformance, false,
         [DC, witness, check, requirement](
           NormalProtocolConformance *conformance) {
         auto requiredAccessScope = check.RequiredAccessScope;
@@ -4426,11 +4425,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     case CheckKind::UsableFromInline:
-      diagnoseOrDefer(requirement, false, DiagnoseUsableFromInline(witness));
+      getASTContext().addDelayedConformanceDiag(Conformance, false,
+                                                DiagnoseUsableFromInline(witness));
       break;
 
     case CheckKind::Availability: {
-      diagnoseOrDefer(requirement, false,
+      getASTContext().addDelayedConformanceDiag(Conformance, false,
         [witness, requirement, check](
             NormalProtocolConformance *conformance) {
           // FIXME: The problem may not be the OS version.
@@ -4459,7 +4459,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     case CheckKind::OptionalityConflict: {
       auto adjustments = best.OptionalAdjustments;
 
-      diagnoseOrDefer(requirement, false,
+      getASTContext().addDelayedConformanceDiag(Conformance, false,
         [witness, adjustments, requirement](NormalProtocolConformance *conformance) {
           auto proto = conformance->getProtocol();
           auto &ctx = witness->getASTContext();
@@ -4490,7 +4490,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     case CheckKind::ConstructorFailability:
-      diagnoseOrDefer(requirement, false,
+      getASTContext().addDelayedConformanceDiag(Conformance, false,
         [witness, requirement](NormalProtocolConformance *conformance) {
           auto ctor = cast<ConstructorDecl>(requirement);
           auto witnessCtor = cast<ConstructorDecl>(witness);
@@ -4505,9 +4505,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       break;
 
     case CheckKind::WitnessUnavailable:
-      diagnoseOrDefer(requirement, /*isError=*/true,
-        [witness, requirement](
-                                    NormalProtocolConformance *conformance) {
+      getASTContext().addDelayedConformanceDiag(Conformance, true,
+        [witness, requirement](NormalProtocolConformance *conformance) {
           auto &diags = witness->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
           auto *attr = AvailableAttr::isUnavailable(witness);
@@ -4572,7 +4571,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     return ResolveWitnessResult::Missing;
   }
 
-  diagnoseOrDefer(requirement, true,
+  getASTContext().addDelayedConformanceDiag(Conformance, true,
     [requirement, matches, ignoringNames](
       NormalProtocolConformance *conformance) {
       auto dc = conformance->getDeclContext();
@@ -4632,7 +4631,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   }
 
   // Derivation failed.
-  diagnoseOrDefer(requirement, true,
+  getASTContext().addDelayedConformanceDiag(Conformance, true,
     [](NormalProtocolConformance *conformance) {
       auto proto = conformance->getProtocol();
       auto &diags = proto->getASTContext().Diags;
@@ -4911,7 +4910,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
-    diagnoseOrDefer(assocType, true,
+    getASTContext().addDelayedConformanceDiag(Conformance, true,
       [assocType, viable](NormalProtocolConformance *conformance) {
         auto &diags = assocType->getASTContext().Diags;
         diags.diagnose(assocType, diag::ambiguous_witnesses_type,
@@ -4927,7 +4926,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   GlobalMissingWitnesses.insert({assocType, {}});
 
   // None of the candidates were viable.
-  diagnoseOrDefer(assocType, true,
+  getASTContext().addDelayedConformanceDiag(Conformance, true,
     [nonViable](NormalProtocolConformance *conformance) {
       auto &diags = conformance->getDeclContext()->getASTContext().Diags;
       for (auto candidate : nonViable) {
@@ -5112,7 +5111,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     if (!Conformance->isInvalid()) {
       if (result.getKind() == CheckRequirementsResult::RequirementFailure) {
         auto Loc = this->Loc;
-        diagnoseOrDefer(nullptr, /*isError=*/true,
+        getASTContext().addDelayedConformanceDiag(Conformance, /*isError=*/true,
           [Loc, result, proto, substitutions, module](NormalProtocolConformance *conformance) {
             TypeChecker::diagnoseRequirementFailure(
               result.getRequirementFailureInfo(), Loc, Loc,
@@ -5147,7 +5146,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
         const DeclContext *DC = this->DC;
         auto requiredAccessScope = getRequiredAccessScope();
 
-        diagnoseOrDefer(assocType, false,
+        getASTContext().addDelayedConformanceDiag(Conformance, false,
             [DC, requiredAccessScope, typeDecl](
               NormalProtocolConformance *conformance) {
           AccessLevel requiredAccess =
@@ -5170,7 +5169,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
         bool witnessIsUsableFromInline = typeDecl->getFormalAccessScope(
             DC, /*usableFromInlineAsPublic*/true).isPublic();
         if (!witnessIsUsableFromInline)
-          diagnoseOrDefer(assocType, false, DiagnoseUsableFromInline(typeDecl));
+          getASTContext().addDelayedConformanceDiag(Conformance, false,
+                                                    DiagnoseUsableFromInline(typeDecl));
       }
     }
 
@@ -5707,20 +5707,6 @@ void swift::diagnoseConformanceFailure(Type T,
                  T, Proto->getDeclaredInterfaceType());
 }
 
-void ConformanceChecker::diagnoseOrDefer(
-    const ValueDecl *requirement, bool isError,
-    std::function<void(NormalProtocolConformance *)> fn) {
-  if (isError)
-    Conformance->setInvalid();
-
-  // Stash this in the ASTContext for later emission.
-  auto conformance = Conformance;
-
-  getASTContext().addDelayedConformanceDiag(
-      conformance,
-      {requirement, [conformance, fn] { fn(conformance); }, isError});
-}
-
 void ConformanceChecker::emitDelayedDiags() {
   auto diags = getASTContext().takeDelayedConformanceDiags(Conformance);
 
@@ -5731,7 +5717,7 @@ void ConformanceChecker::emitDelayedDiags() {
       AlreadyComplained = true;
     }
 
-    diag.Callback();
+    diag.Callback(Conformance);
   }
 }
 

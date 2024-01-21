@@ -2775,11 +2775,14 @@ bool ASTContext::hasDelayedConformanceErrors(
 MissingWitnessesBase::~MissingWitnessesBase() { }
 
 void ASTContext::addDelayedConformanceDiag(
-       NormalProtocolConformance *conformance,
-       DelayedConformanceDiag fn) {
+       NormalProtocolConformance *conformance, bool isError,
+       std::function<void(NormalProtocolConformance *)> callback) {
+  if (isError)
+    conformance->setInvalid();
+
   auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
 
-  if (fn.IsError && !diagnostics.HadError) {
+  if (isError && !diagnostics.HadError) {
     diagnostics.HadError = true;
 
     auto *proto = conformance->getProtocol();
@@ -2814,7 +2817,7 @@ void ASTContext::addDelayedConformanceDiag(
     }
   }
 
-  diagnostics.Diags.push_back(std::move(fn));
+  diagnostics.Diags.push_back({isError, callback});
 }
 
 void ASTContext::addDelayedMissingWitnesses(

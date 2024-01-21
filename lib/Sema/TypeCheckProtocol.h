@@ -857,18 +857,6 @@ private:
   /// the chosen type witnesses.
   void ensureRequirementsAreSatisfied();
 
-  /// Diagnose or defer a diagnostic, as appropriate.
-  ///
-  /// \param requirement The requirement with which this diagnostic is
-  /// associated, if any.
-  ///
-  /// \param isError Whether this diagnostic is an error.
-  ///
-  /// \param fn A function to call to emit the actual diagnostic. If
-  /// diagnostics are being deferred,
-  void diagnoseOrDefer(const ValueDecl *requirement, bool isError,
-                       std::function<void(NormalProtocolConformance *)> fn);
-
   ArrayRef<MissingWitness> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
       slice(LocalMissingWitnessesStartIndex,
@@ -1220,15 +1208,13 @@ private:
   ///
   /// \returns true if a diagnostic was emitted, false otherwise.
   bool diagnoseNoSolutions(
-                     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                     ConformanceChecker &checker);
+                     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes);
 
   /// Emit a diagnostic when there are multiple solutions.
   ///
   /// \returns true if a diagnostic was emitted, false otherwise.
   bool diagnoseAmbiguousSolutions(
                 ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                ConformanceChecker &checker,
                 SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
 
   /// We may need to determine a type witness, regardless of the existence of a
