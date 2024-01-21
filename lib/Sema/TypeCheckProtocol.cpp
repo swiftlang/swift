@@ -1802,7 +1802,7 @@ class swift::MultiConformanceChecker {
   llvm::SmallVector<ValueDecl*, 16> UnsatisfiedReqs;
   llvm::SmallVector<ConformanceChecker, 4> AllUsedCheckers;
   llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
-  llvm::SetVector<MissingWitness> MissingWitnesses;
+  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
   llvm::SmallPtrSet<ValueDecl *, 8> CoveredMembers;
 
   /// Check one conformance.
@@ -2068,17 +2068,13 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
   PrettyStackTraceConformance trace("type-checking", conformance);
 
-  std::vector<MissingWitness> revivedMissingWitnesses;
+  std::vector<ASTContext::MissingWitness> revivedMissingWitnesses;
   switch (conformance->getState()) {
     case ProtocolConformanceState::Incomplete:
       if (conformance->isInvalid()) {
         // Revive registered missing witnesses to handle it below.
-        if (auto delayed = getASTContext().takeDelayedMissingWitnesses(
-                conformance)) {
-          revivedMissingWitnesses = std::move(
-              static_cast<DelayedMissingWitnesses *>(
-                delayed.get())->missingWitnesses);
-        }
+        revivedMissingWitnesses = getASTContext().takeDelayedMissingWitnesses(
+            conformance);
 
         // If we have no missing witnesses for this invalid conformance, the
         // conformance is invalid for other reasons, so emit diagnosis now.
@@ -2875,7 +2871,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
 ConformanceChecker::ConformanceChecker(
     ASTContext &ctx, NormalProtocolConformance *conformance,
-    llvm::SetVector<MissingWitness> &GlobalMissingWitnesses)
+    llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses)
     : WitnessChecker(ctx, conformance->getProtocol(), conformance->getType(),
                      conformance->getDeclContext()),
       Conformance(conformance), Loc(conformance->getLoc()),
@@ -3662,12 +3658,12 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 /// NoStubRequirements.
 static void
 printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
-                             ArrayRef<MissingWitness> MissingWitnesses,
+                             ArrayRef<ASTContext::MissingWitness> MissingWitnesses,
                              std::string &FixitString,
                              llvm::SetVector<ValueDecl*> &NoStubRequirements) {
   llvm::raw_string_ostream FixitStream(FixitString);
   std::for_each(MissingWitnesses.begin(), MissingWitnesses.end(),
-    [&](const MissingWitness &Missing) {
+    [&](const ASTContext::MissingWitness &Missing) {
       if (!printRequirementStub(
               Missing.requirement, Conf->getDeclContext(), Conf->getType(),
               TypeLoc, FixitStream)) {
@@ -3679,10 +3675,10 @@ printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
 /// Filter the given array of protocol requirements and produce a new vector
 /// containing the non-conflicting requirements to be implemented by the given
 /// \c Adoptee type.
-static llvm::SmallVector<MissingWitness, 4>
+static llvm::SmallVector<ASTContext::MissingWitness, 4>
 filterProtocolRequirements(
-    ArrayRef<MissingWitness> MissingWitnesses, Type Adoptee) {
-  llvm::SmallVector<MissingWitness, 4> Filtered;
+    ArrayRef<ASTContext::MissingWitness> MissingWitnesses, Type Adoptee) {
+  llvm::SmallVector<ASTContext::MissingWitness, 4> Filtered;
   if (MissingWitnesses.empty()) {
     return Filtered;
   }
@@ -3733,12 +3729,12 @@ filterProtocolRequirements(
 
 /// Prune the set of missing witnesses for the given conformance, eliminating
 /// any requirements that do not actually need to satisfied.
-static ArrayRef<MissingWitness> pruneMissingWitnesses(
+static ArrayRef<ASTContext::MissingWitness> pruneMissingWitnesses(
     ConformanceChecker &checker,
     ProtocolDecl *proto,
     NormalProtocolConformance *conformance,
-    ArrayRef<MissingWitness> missingWitnesses,
-    SmallVectorImpl<MissingWitness> &scratch) {
+    ArrayRef<ASTContext::MissingWitness> missingWitnesses,
+    SmallVectorImpl<ASTContext::MissingWitness> &scratch) {
   if (missingWitnesses.empty()) {
     return missingWitnesses;
   }
@@ -3831,7 +3827,7 @@ bool ConformanceChecker::
 diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
   auto LocalMissing = getLocalMissingWitness();
 
-  SmallVector<MissingWitness, 4> MissingWitnessScratch;
+  SmallVector<ASTContext::MissingWitness, 4> MissingWitnessScratch;
   LocalMissing = pruneMissingWitnesses(
       *this, Proto, Conformance, LocalMissing, MissingWitnessScratch);
 
@@ -3860,7 +3856,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
 
   const auto InsertFixit = [](
       NormalProtocolConformance *Conf, SourceLoc ComplainLoc, bool EditorMode,
-      llvm::SmallVector<MissingWitness, 4> MissingWitnesses) {
+      llvm::SmallVector<ASTContext::MissingWitness, 4> MissingWitnesses) {
     DeclContext *DC = Conf->getDeclContext();
     // The location where to insert stubs.
     SourceLoc FixitLocation;
@@ -3974,9 +3970,9 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
       // If the diagnostics are suppressed, we register these missing witnesses
       // for later revisiting.
       Conformance->setInvalid();
-      getASTContext().addDelayedMissingWitnesses(
-          Conformance,
-          std::make_unique<DelayedMissingWitnesses>(MissingWitnesses));
+      for (auto Missing : MissingWitnesses) {
+        getASTContext().addDelayedMissingWitness(Conformance, Missing);
+      }
     } else {
       auto Loc = this->Loc;
       getASTContext().addDelayedConformanceDiag(Conformance, true,
@@ -6914,7 +6910,7 @@ TypeWitnessAndDecl
 TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
                              AssociatedTypeDecl *requirement) const {
-  llvm::SetVector<MissingWitness> MissingWitnesses;
+  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
   ConformanceChecker checker(requirement->getASTContext(), conformance,
                              MissingWitnesses);
   checker.resolveSingleTypeWitness(requirement);
@@ -6933,7 +6929,7 @@ Witness
 ValueWitnessRequest::evaluate(Evaluator &eval,
                               NormalProtocolConformance *conformance,
                               ValueDecl *requirement) const {
-  llvm::SetVector<MissingWitness> MissingWitnesses;
+  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
   ConformanceChecker checker(requirement->getASTContext(), conformance,
                              MissingWitnesses);
   checker.resolveSingleWitness(requirement);

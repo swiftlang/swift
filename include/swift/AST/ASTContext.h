@@ -123,6 +123,7 @@ namespace swift {
   class Pattern;
   enum PointerTypeKind : unsigned;
   class PrecedenceGroupDecl;
+  struct RequirementMatch;
   class TupleTypeElt;
   class EnumElementDecl;
   class ProtocolDecl;
@@ -1317,6 +1318,19 @@ public:
     std::function<void(NormalProtocolConformance *)> Callback;
   };
 
+  /// Describes a missing witness during conformance checking.
+  class MissingWitness {
+  public:
+    /// The requirement that is missing a witness.
+    ValueDecl *requirement;
+
+    /// The set of potential matching witnesses.
+    std::vector<RequirementMatch> matches;
+
+    MissingWitness(ValueDecl *requirement,
+                   ArrayRef<RequirementMatch> matches);
+  };
+
   /// Check whether current context has any errors associated with
   /// ill-formed protocol conformances which haven't been produced yet.
   ///
@@ -1339,13 +1353,13 @@ public:
   takeDelayedConformanceDiags(NormalProtocolConformance const* conformance);
 
   /// Add delayed missing witnesses for the given normal protocol conformance.
-  void addDelayedMissingWitnesses(
+  void addDelayedMissingWitness(
       NormalProtocolConformance *conformance,
-      std::unique_ptr<MissingWitnessesBase> missingWitnesses);
+      MissingWitness missingWitness);
 
   /// Retrieve the delayed missing witnesses for the given normal protocol
   /// conformance.
-  std::unique_ptr<MissingWitnessesBase>
+  std::vector<MissingWitness>
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
 
   /// Produce a specialized conformance, which takes a generic

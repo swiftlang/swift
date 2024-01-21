@@ -20,6 +20,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/RequirementMatch.h"
 #include "swift/AST/Type.h"
@@ -323,31 +324,6 @@ enum class MissingWitnessDiagnosisKind {
 class AssociatedTypeInference;
 class MultiConformanceChecker;
 
-/// Describes a missing witness during conformance checking.
-class MissingWitness {
-public:
-  /// The requirement that is missing a witness.
-  ValueDecl *requirement;
-
-  /// The set of potential matching witnesses.
-  std::vector<RequirementMatch> matches;
-
-  MissingWitness(ValueDecl *requirement,
-                 ArrayRef<RequirementMatch> matches)
-    : requirement(requirement),
-      matches(matches.begin(), matches.end()) { }
-};
-
-/// Capture missing witnesses that have been delayed and will be stored
-/// in the ASTContext for later.
-class DelayedMissingWitnesses : public MissingWitnessesBase {
-public:
-  std::vector<MissingWitness> missingWitnesses;
-
-  DelayedMissingWitnesses(ArrayRef<MissingWitness> missingWitnesses)
-      : missingWitnesses(missingWitnesses.begin(), missingWitnesses.end()) { }
-};
-
 /// The protocol conformance checker.
 ///
 /// This helper class handles most of the details of checking whether a
@@ -371,7 +347,7 @@ private:
   /// Keep track of missing witnesses, either type or value, for later
   /// diagnosis emits. This may contain witnesses that are external to the
   /// protocol under checking.
-  llvm::SetVector<MissingWitness> &GlobalMissingWitnesses;
+  llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses;
 
   /// Keep track of the slice in GlobalMissingWitnesses that is local to
   /// this protocol under checking.
@@ -447,7 +423,7 @@ private:
   /// the chosen type witnesses.
   void ensureRequirementsAreSatisfied();
 
-  ArrayRef<MissingWitness> getLocalMissingWitness() {
+  ArrayRef<ASTContext::MissingWitness> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
       slice(LocalMissingWitnessesStartIndex,
             GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
@@ -469,7 +445,7 @@ public:
   void emitDelayedDiags();
 
   ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
-                     llvm::SetVector<MissingWitness> &GlobalMissingWitnesses);
+                     llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses);
 
   ~ConformanceChecker();
 
@@ -895,8 +871,8 @@ void diagnoseConformanceFailure(Type T,
 namespace llvm {
 
 template<>
-struct DenseMapInfo<swift::MissingWitness> {
-  using MissingWitness = swift::MissingWitness;
+struct DenseMapInfo<swift::ASTContext::MissingWitness> {
+  using MissingWitness = swift::ASTContext::MissingWitness;
   using RequirementPointerTraits = DenseMapInfo<swift::ValueDecl *>;
 
   static inline MissingWitness getEmptyKey() {

@@ -46,6 +46,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/RequirementMatch.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -205,12 +206,19 @@ namespace {
 /// are discarded, since we'll emit them again when we compile the file as
 /// a primary file.
 struct DelayedConformanceDiags {
-  /// We set this if we've ever seen an error diagnostic here.
-  bool HadError = false;
-
   /// The delayed conformance diagnostics that have not been emitted yet.
   /// Never actually emitted for a secondary file.
   std::vector<ASTContext::DelayedConformanceDiag> Diags;
+
+  /// Any missing witnesses that need to be diagnosed.
+  std::vector<ASTContext::MissingWitness> MissingWitnesses;
+
+  /// We set this if we've ever seen an error diagnostic here.
+  unsigned HadError : 1;
+
+  DelayedConformanceDiags() {
+    HadError = false;
+  }
 };
 
 }
@@ -378,13 +386,6 @@ struct ASTContext::Implementation {
   /// been delayed until the conformance is fully checked.
   llvm::DenseMap<NormalProtocolConformance *, ::DelayedConformanceDiags>
     DelayedConformanceDiags;
-
-  /// Map from normal protocol conformances to missing witnesses that have
-  /// been delayed until the conformance is fully checked, so that we can
-  /// issue a fixit that fills the entire protocol stub.
-  llvm::DenseMap<
-      NormalProtocolConformance *, std::unique_ptr<MissingWitnessesBase>>
-    DelayedMissingWitnesses;
 
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
@@ -2774,7 +2775,10 @@ bool ASTContext::hasDelayedConformanceErrors(
   return false;
 }
 
-MissingWitnessesBase::~MissingWitnessesBase() { }
+ASTContext::MissingWitness::MissingWitness(ValueDecl *requirement,
+                                           ArrayRef<RequirementMatch> matches)
+  : requirement(requirement),
+    matches(matches.begin(), matches.end()) { }
 
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance, bool isError,
@@ -2822,20 +2826,21 @@ void ASTContext::addDelayedConformanceDiag(
   diagnostics.Diags.push_back({isError, callback});
 }
 
-void ASTContext::addDelayedMissingWitnesses(
+void ASTContext::addDelayedMissingWitness(
     NormalProtocolConformance *conformance,
-    std::unique_ptr<MissingWitnessesBase> missingWitnesses) {
-  getImpl().DelayedMissingWitnesses[conformance] = std::move(missingWitnesses);
+    ASTContext::MissingWitness missingWitness) {
+  auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
+  diagnostics.MissingWitnesses.push_back(missingWitness);
 }
 
-std::unique_ptr<MissingWitnessesBase>
+std::vector<ASTContext::MissingWitness>
 ASTContext::takeDelayedMissingWitnesses(
     NormalProtocolConformance *conformance) {
-  std::unique_ptr<MissingWitnessesBase> result;
-  auto known = getImpl().DelayedMissingWitnesses.find(conformance);
-  if (known != getImpl().DelayedMissingWitnesses.end()) {
-    result = std::move(known->second);
-    getImpl().DelayedMissingWitnesses.erase(known);
+  std::vector<ASTContext::MissingWitness> result;
+  auto known = getImpl().DelayedConformanceDiags.find(conformance);
+  if (known != getImpl().DelayedConformanceDiags.end()) {
+    auto &diagnostics = known->second;
+    std::swap(result, diagnostics.MissingWitnesses);
   }
   return result;
 }
@@ -2845,7 +2850,8 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance const* cnfrm){
   std::vector<ASTContext::DelayedConformanceDiag> result;
   auto known = getImpl().DelayedConformanceDiags.find(cnfrm);
   if (known != getImpl().DelayedConformanceDiags.end()) {
-    std::swap(result, known->second.Diags);
+    auto &diagnostics = known->second;
+    std::swap(result, diagnostics.Diags);
   }
   return result;
 }
