@@ -241,9 +241,9 @@ EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 
-/// Whether to perform validation of the parse tree produced by the Swift
-/// Swift parser.
-EXPERIMENTAL_FEATURE(ParserValidation, false)
+/// When the legacy parser produces no diagnostics, check that the new
+/// parser also produces no diagnostics.
+EXPERIMENTAL_FEATURE(ValidateNewParserDiagnostics, false)
 
 /// Whether to emit diagnostics from the new parser first, and only emit
 /// diagnostics from the existing parser when there are none from the new

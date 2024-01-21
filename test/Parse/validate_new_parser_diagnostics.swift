@@ -6,8 +6,8 @@
 // support skipping, causing validation fail as it generates diagnostics when
 // the C++ parser would not.
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserValidation
-// RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature ParserValidation -experimental-skip-all-function-bodies
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValidateNewParserDiagnostics
+// RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature ValidateNewParserDiagnostics -experimental-skip-all-function-bodies
 
 func bad() {
   _ = [(Int) -> async throws Int]()
