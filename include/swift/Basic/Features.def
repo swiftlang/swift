@@ -250,12 +250,12 @@ EXPERIMENTAL_FEATURE(ParserValidation, false)
 /// parser.
 EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
 
-/// Enables implicit some while also enabling existential `any`
-EXPERIMENTAL_FEATURE(ImplicitSome, false)
-
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(ParserASTGen, false)
+
+/// Enables implicit some while also enabling existential `any`
+EXPERIMENTAL_FEATURE(ImplicitSome, false)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
