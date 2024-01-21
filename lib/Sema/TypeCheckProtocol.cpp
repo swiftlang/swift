@@ -1853,7 +1853,6 @@ public:
       if (checker.AlreadyComplained)
         continue;
 
-      checker.SuppressDiagnostics = false; // no need to restore to prev value
       checker.emitDelayedDiags();
     }
   }
@@ -2116,8 +2115,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
         // conformance is invalid for other reasons, so emit diagnosis now.
         if (revivedMissingWitnesses.empty()) {
           // Emit any delayed diagnostics.
-          ConformanceChecker(getASTContext(), conformance, MissingWitnesses,
-                             false)
+          ConformanceChecker(getASTContext(), conformance, MissingWitnesses)
               .emitDelayedDiags();
         }
       }
@@ -2908,14 +2906,12 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
 ConformanceChecker::ConformanceChecker(
     ASTContext &ctx, NormalProtocolConformance *conformance,
-    llvm::SetVector<MissingWitness> &GlobalMissingWitnesses,
-    bool suppressDiagnostics)
+    llvm::SetVector<MissingWitness> &GlobalMissingWitnesses)
     : WitnessChecker(ctx, conformance->getProtocol(), conformance->getType(),
                      conformance->getDeclContext()),
       Conformance(conformance), Loc(conformance->getLoc()),
       GlobalMissingWitnesses(GlobalMissingWitnesses),
-      LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
-      SuppressDiagnostics(suppressDiagnostics) {}
+      LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()) {}
 
 ConformanceChecker::~ConformanceChecker() {}
 
@@ -5485,9 +5481,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   FrontendStatsTracer statsTracer(getASTContext().Stats,
                                   "check-conformance", Conformance);
 
-  llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
-  SuppressDiagnostics = false;
-
   // FIXME: Caller checks that this type conforms to all of the
   // inherited protocols.
 
@@ -5503,11 +5496,11 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
 
-  // Check the requirements from the requirement signature.
-  ensureRequirementsAreSatisfied();
-
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind, /*Delayed=*/false);
+
+  // Check the requirements from the requirement signature.
+  ensureRequirementsAreSatisfied();
 
   // Check non-type requirements.
   resolveValueWitnesses();
@@ -5538,10 +5531,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
                          nominalModule->getName());
       }
     }
-  }
-
-  if (Conformance->isInvalid()) {
-    return;
   }
 }
 
@@ -5725,29 +5714,17 @@ void ConformanceChecker::diagnoseOrDefer(
   if (isError)
     Conformance->setInvalid();
 
-  if (SuppressDiagnostics) {
-    // Stash this in the ASTContext for later emission.
-    auto conformance = Conformance;
+  // Stash this in the ASTContext for later emission.
+  auto conformance = Conformance;
 
-    getASTContext().addDelayedConformanceDiag(
-        conformance,
-        {requirement, [conformance, fn] { fn(conformance); }, isError});
-    return;
-  }
-
-  // Complain that the type does not conform, once.
-  if (isError && !AlreadyComplained) {
-    diagnoseConformanceFailure(Adoptee, Proto, DC, Loc);
-    AlreadyComplained = true;
-  }
-
-  fn(Conformance);
+  getASTContext().addDelayedConformanceDiag(
+      conformance,
+      {requirement, [conformance, fn] { fn(conformance); }, isError});
 }
 
 void ConformanceChecker::emitDelayedDiags() {
   auto diags = getASTContext().takeDelayedConformanceDiags(Conformance);
 
-  assert(!SuppressDiagnostics && "Should not be suppressing diagnostics now");
   for (const auto &diag: diags) {
     // Complain that the type does not conform, once.
     if (diag.IsError && !AlreadyComplained) {

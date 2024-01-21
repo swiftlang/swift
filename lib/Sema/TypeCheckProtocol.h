@@ -787,11 +787,6 @@ private:
   /// this protocol under checking.
   unsigned LocalMissingWitnessesStartIndex;
 
-  /// True if we shouldn't complain about problems with this conformance
-  /// right now, i.e. if methods are being called outside
-  /// checkConformance().
-  bool SuppressDiagnostics;
-
   /// Whether we've already complained about problems with this conformance.
   bool AlreadyComplained = false;
 
@@ -896,8 +891,7 @@ public:
   void emitDelayedDiags();
 
   ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
-                     llvm::SetVector<MissingWitness> &GlobalMissingWitnesses,
-                     bool suppressDiagnostics = true);
+                     llvm::SetVector<MissingWitness> &GlobalMissingWitnesses);
 
   ~ConformanceChecker();
 
