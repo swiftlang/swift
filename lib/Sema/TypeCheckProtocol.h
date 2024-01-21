@@ -889,7 +889,8 @@ public:
   /// Call this to diagnose currently known missing witnesses.
   ///
   /// \returns true if any witnesses were diagnosed.
-  bool diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind);
+  bool diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind,
+                                bool Delayed);
 
   /// Emit any diagnostics that have been delayed.
   void emitDelayedDiags();

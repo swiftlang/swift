@@ -2993,10 +2993,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
 void ConformanceChecker::resolveSingleTypeWitness(
        AssociatedTypeDecl *assocType) {
-  // Ensure we diagnose if the witness is missing.
-  SWIFT_DEFER {
-    diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
-  };
   switch (resolveTypeWitnessViaLookup(assocType)) {
   case ResolveWitnessResult::Success:
   case ResolveWitnessResult::ExplicitFailed:

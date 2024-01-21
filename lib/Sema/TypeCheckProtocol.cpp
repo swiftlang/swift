@@ -1957,7 +1957,8 @@ void MultiConformanceChecker::checkAllConformances() {
   for (auto It = AllUsedCheckers.rbegin(); It != AllUsedCheckers.rend();
        ++It) {
     if (!It->getLocalMissingWitness().empty()) {
-      if (It->diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::FixItOnly))
+      if (It->diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::FixItOnly,
+                                       /*Delayed=*/false))
         break;
     }
   }
@@ -3862,7 +3863,7 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses(
 }
 
 bool ConformanceChecker::
-diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
+diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
   auto LocalMissing = getLocalMissingWitness();
 
   SmallVector<MissingWitness, 4> MissingWitnessScratch;
@@ -4004,7 +4005,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
     const auto MissingWitnesses = filterProtocolRequirements(
         GlobalMissingWitnesses.getArrayRef(), Adoptee);
-    if (SuppressDiagnostics) {
+    if (Delayed) {
       // If the diagnostics are suppressed, we register these missing witnesses
       // for later revisiting.
       Conformance->setInvalid();
@@ -4012,10 +4013,11 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           Conformance,
           std::make_unique<DelayedMissingWitnesses>(MissingWitnesses));
     } else {
+      auto Loc = this->Loc;
       diagnoseOrDefer(
           LocalMissing[0].requirement, true,
-          [&](NormalProtocolConformance *Conf) {
-            InsertFixit(Conf, Loc, IsEditorMode, std::move(MissingWitnesses));
+          [InsertFixit, Loc, IsEditorMode, MissingWitnesses](NormalProtocolConformance *Conf) {
+            InsertFixit(Conf, Loc, IsEditorMode, MissingWitnesses);
           });
     }
     clearGlobalMissingWitnesses();
@@ -5505,13 +5507,13 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   ensureRequirementsAreSatisfied();
 
   // Diagnose missing type witnesses for now.
-  diagnoseMissingWitnesses(Kind);
-
-  // Diagnose missing value witnesses later.
-  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
+  diagnoseMissingWitnesses(Kind, /*Delayed=*/false);
 
   // Check non-type requirements.
   resolveValueWitnesses();
+
+  // Diagnose missing value witnesses.
+  diagnoseMissingWitnesses(Kind, /*Delayed=*/false);
 
   emitDelayedDiags();
 
@@ -6985,7 +6987,8 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
   ConformanceChecker checker(requirement->getASTContext(), conformance,
                              MissingWitnesses);
   checker.resolveSingleTypeWitness(requirement);
-  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt,
+                                   /*Delayed=*/true);
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the
   // evaluator's model. All of this should be refactored away.
@@ -7003,7 +7006,8 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
   ConformanceChecker checker(requirement->getASTContext(), conformance,
                              MissingWitnesses);
   checker.resolveSingleWitness(requirement);
-  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt,
+                                   /*Delayed=*/true);
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the
   // evaluator's model. All of this should be refactored away.
