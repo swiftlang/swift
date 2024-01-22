@@ -6736,8 +6736,14 @@ public:
   }
 };
 
-/// Invalidate an enum value and take ownership of its payload data
-/// without moving it in memory.
+/// Project an enum's payload data without checking the case of the enum or
+/// moving it in memory.
+///
+/// For some classes of enum, this is a destructive operation that invalidates
+/// the enum, particularly in cases where the layout algorithm can potentially
+/// use the common spare bits out of the payloads of a multi-payload enum
+/// to store the tag without allocating additional space. The `isDestructive`
+/// static method returns true for enums where this is potentially the case.
 class UncheckedTakeEnumDataAddrInst
   : public UnaryInstructionBase<SILInstructionKind::UncheckedTakeEnumDataAddrInst,
                                 SingleValueInstruction>
@@ -6755,6 +6761,15 @@ class UncheckedTakeEnumDataAddrInst
   }
 
 public:
+  // Returns true if the projection operation is possibly destructive for
+  // instances of the given enum declaration.
+  static bool isDestructive(EnumDecl *forEnum, SILModule &M);
+
+  // Returns true if this projection operation is possibly destructive.
+  bool isDestructive() const {
+    return isDestructive(Element->getParentEnum(), getModule());
+  }
+
   EnumElementDecl *getElement() const { return Element; }
 
   unsigned getCaseIndex() {
@@ -7025,6 +7040,7 @@ class TupleExtractInst
                    ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
                              forwardingOwnershipKind) {
+    assert(Operand->getType().castTo<TupleType>());
     sharedUInt32().TupleExtractInst.fieldNo = FieldNo;
   }
 

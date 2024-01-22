@@ -4112,7 +4112,8 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
     subjectExpr = load->getSubExpr()->getSemanticsProvidingExpr();
   }
-  if (isa<DeclRefExpr>(subjectExpr)) {
+  if (!C.LangOpts.hasFeature(Feature::BorrowingSwitch)
+      && isa<DeclRefExpr>(subjectExpr)) {
     C.Diags.diagnose(subjectExpr->getLoc(),
                            diag::move_only_pattern_match_not_consumed)
       .fixItInsert(subjectExpr->getStartLoc(), "consume ");
