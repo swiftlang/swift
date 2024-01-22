@@ -7,8 +7,8 @@
 
 import AppKit
 
-// CHECK: @objc @_inheritsConvenienceInitializers @_Concurrency.MainActor(unsafe) public class Subclass : AppKit.NSView {
+// CHECK: @objc @_inheritsConvenienceInitializers @_Concurrency.MainActor @preconcurrency public class Subclass : AppKit.NSView {
 public class Subclass: NSView {
-  // CHECK: @_Concurrency.MainActor(unsafe) @objc override dynamic public init(frame frameRect: Foundation.NSRect)
-  // CHECK: @_Concurrency.MainActor(unsafe) @objc required dynamic public init?(coder: Foundation.NSCoder)
+  // CHECK: @_Concurrency.MainActor @preconcurrency @objc override dynamic public init(frame frameRect: Foundation.NSRect)
+  // CHECK: @_Concurrency.MainActor @preconcurrency @objc required dynamic public init?(coder: Foundation.NSCoder)
 }
