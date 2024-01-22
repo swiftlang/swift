@@ -768,14 +768,15 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   }
   case ActorIsolation::GlobalActorUnsafe:
-    // For "unsafe" global actor isolation, automatic 'async' only happens
+  case ActorIsolation::GlobalActor: {
+    // For "preconcurrency" global actor isolation, automatic 'async' only happens
     // if the context has adopted concurrency.
-    if (!CanCurrDeclContextHandleAsync &&
+    if (isolation.preconcurrency() &&
+        !CanCurrDeclContextHandleAsync &&
         !completionContextUsesConcurrencyFeatures(CurrDeclContext)) {
       return;
     }
-    LLVM_FALLTHROUGH;
-  case ActorIsolation::GlobalActor: {
+
     auto getClosureActorIsolation = [this](AbstractClosureExpr *CE) {
       // Prefer solution-specific actor-isolations and fall back to the one
       // recorded in the AST.

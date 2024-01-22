@@ -1687,6 +1687,9 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
 
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
+  if (state.preconcurrency())
+    out << "preconcurrency ";
+
   switch (state) {
     case ActorIsolation::ActorInstance:
       out << "actor-isolated to instance of ";
@@ -1721,9 +1724,6 @@ void swift::simple_display(
       } else {
         out << state.getGlobalActor().getString();
       }
-
-      if (state == ActorIsolation::GlobalActorUnsafe)
-        out << "(unsafe)";
       break;
   }
 }

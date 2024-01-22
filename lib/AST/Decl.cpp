@@ -2512,15 +2512,21 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
         if (type->isAnyActor())
           return true;
 
-        switch (getActorIsolation(type)) {
+        auto isolation = getActorIsolation(type);
+        switch (isolation) {
           case ActorIsolation::Unspecified:
           case ActorIsolation::NonisolatedUnsafe:
-          case ActorIsolation::GlobalActorUnsafe:
             break;
+
+          case ActorIsolation::GlobalActorUnsafe:
+          case ActorIsolation::GlobalActor:
+            if (isolation.preconcurrency())
+              break;
+
+            return true;
 
           case ActorIsolation::ActorInstance:
           case ActorIsolation::Nonisolated:
-          case ActorIsolation::GlobalActor:
             return true;
         }
       }

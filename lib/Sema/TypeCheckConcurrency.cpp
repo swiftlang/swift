@@ -4863,8 +4863,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
             TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
         auto attr =
             CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-        if (inferred == ActorIsolation::GlobalActorUnsafe)
-          attr->setArgIsUnsafe(true);
         value->getAttrs().add(attr);
 
         if (inferred.preconcurrency()) {

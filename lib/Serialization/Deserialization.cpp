@@ -3863,8 +3863,9 @@ public:
 
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe:
-        isolation = ActorIsolation::forGlobalActor(globalActor)
-            .withPreconcurrency(isoKind == ActorIsolation::GlobalActorUnsafe);
+        // 'unsafe' or 'preconcurrency' doesn't mean anything for isolated
+        // default arguments.
+        isolation = ActorIsolation::forGlobalActor(globalActor);
         break;
 
       case ActorIsolation::ActorInstance:
