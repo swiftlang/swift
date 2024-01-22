@@ -1,8 +1,8 @@
-//===--- TypeCheckProtocolInference.cpp - Associated Type Inference -------===//
+//===--- AssociatedTypeInference.cpp - Associated Type Inference ---000----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for protocols, in particular, checking
-// whether a given type conforms to a given protocol.
+// This file implements type witness lookup and associated type inference.
+//
 //===----------------------------------------------------------------------===//
 #include "TypeCheckProtocol.h"
 #include "DerivedConformances.h"

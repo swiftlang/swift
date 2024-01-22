@@ -1,5 +1,6 @@
 
 add_swift_host_library(swiftSema STATIC
+  AssociatedTypeInference.cpp
   BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
@@ -66,7 +67,6 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckPattern.cpp
   TypeCheckPropertyWrapper.cpp
   TypeCheckProtocol.cpp
-  TypeCheckProtocolInference.cpp
   TypeCheckRegex.cpp
   TypeCheckRequestFunctions.cpp
   TypeCheckStmt.cpp
