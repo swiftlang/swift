@@ -82,6 +82,10 @@ public:
     llvm_unreachable("no private decls in Clang modules");
   }
 
+  virtual version::Version getLanguageVersionBuiltWith() const override {
+    return version::Version();
+  }
+
   virtual StringRef getFilename() const override { return ""; }
 
   virtual const clang::Module *getUnderlyingClangModule() const override {

@@ -17,6 +17,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/Version.h"
 
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -417,6 +418,10 @@ protected:
     assert(classof(this) && "invalid kind");
   }
 public:
+  /// Returns the language version that was used to compile the contents of this
+  /// file. An empty `Version` is returned if the information is not available.
+  virtual version::Version getLanguageVersionBuiltWith() const = 0;
+
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.

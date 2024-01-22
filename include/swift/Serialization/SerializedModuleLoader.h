@@ -400,7 +400,7 @@ public:
 
   /// Returns the language version that was used to compile the contents of this
   /// file.
-  const version::Version &getLanguageVersionBuiltWith() const;
+  virtual version::Version getLanguageVersionBuiltWith() const override;
 
   virtual bool hadLoadError() const override;
 
