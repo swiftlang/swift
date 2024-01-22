@@ -618,201 +618,6 @@ private:
   static ResolvedTypeComparisonResult compareResolvedTypes(Type ty1, Type ty2);
 };
 
-/// Captures the state needed to infer associated types.
-class AssociatedTypeInference {
-  /// The type checker we'll need to validate declarations etc.
-  ASTContext &ctx;
-
-  /// The conformance for which we are inferring associated types.
-  NormalProtocolConformance *conformance;
-
-  /// The protocol for which we are inferring associated types.
-  ProtocolDecl *proto;
-
-  /// The declaration context in which conformance to the protocol is
-  /// declared.
-  DeclContext *dc;
-
-  /// The type that is adopting the protocol.
-  Type adoptee;
-
-  /// The set of type witnesses inferred from value witnesses.
-  InferredAssociatedTypes inferred;
-
-  /// Hash table containing the type witnesses that we've inferred for
-  /// each associated type, as well as an indication of how we inferred them.
-  llvm::ScopedHashTable<AssociatedTypeDecl *, std::pair<Type, unsigned>>
-    typeWitnesses;
-
-  /// Information about a failed, defaulted associated type.
-  const AssociatedTypeDecl *failedDefaultedAssocType = nullptr;
-  Type failedDefaultedWitness;
-  CheckTypeWitnessResult failedDefaultedResult = CheckTypeWitnessResult::forSuccess();
-
-  /// Information about a failed, derived associated type.
-  AssociatedTypeDecl *failedDerivedAssocType = nullptr;
-  Type failedDerivedWitness;
-
-  // Which type witness was missing?
-  AssociatedTypeDecl *missingTypeWitness = nullptr;
-
-  // Was there a conflict in type witness deduction?
-  llvm::Optional<TypeWitnessConflict> typeWitnessConflict;
-  unsigned numTypeWitnessesBeforeConflict = 0;
-
-public:
-  AssociatedTypeInference(ASTContext &ctx,
-                          NormalProtocolConformance *conformance);
-
-private:
-  /// Retrieve the AST context.
-  ASTContext &getASTContext() const { return ctx; }
-
-  /// Infer associated type witnesses for the given tentative
-  /// requirement/witness match.
-  InferredAssociatedTypesByWitness inferTypeWitnessesViaValueWitness(
-                                     ValueDecl *req,
-                                     ValueDecl *witness);
-
-  /// Infer associated type witnesses for the given value requirement.
-  InferredAssociatedTypesByWitnesses inferTypeWitnessesViaValueWitnesses(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
-                   ValueDecl *req);
-
-  /// Infer associated type witnesses for the given associated type.
-  InferredAssociatedTypesByWitnesses inferTypeWitnessesViaAssociatedType(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
-                   AssociatedTypeDecl *assocType);
-
-  /// Infer associated type witnesses for all relevant value requirements.
-  ///
-  /// \param assocTypes The set of associated types we're interested in.
-  InferredAssociatedTypes
-  inferTypeWitnessesViaValueWitnesses(
-    const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
-
-  /// Compute a "fixed" type witness for an associated type, e.g.,
-  /// if the refined protocol requires it to be equivalent to some other type.
-  Type computeFixedTypeWitness(AssociatedTypeDecl *assocType);
-
-  /// Compute the default type witness from an associated type default,
-  /// if there is one.
-  llvm::Optional<AbstractTypeWitness>
-  computeDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
-
-  /// Compute the "derived" type witness for an associated type that is
-  /// known to the compiler.
-  std::pair<Type, TypeDecl *>
-  computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
-
-  /// Compute a type witness without using a specific potential witness.
-  llvm::Optional<AbstractTypeWitness>
-  computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
-
-  /// Collect abstract type witnesses and feed them to the given system.
-  void collectAbstractTypeWitnesses(
-      TypeWitnessSystem &system,
-      ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const;
-
-  /// Substitute the current type witnesses into the given interface type.
-  Type substCurrentTypeWitnesses(Type type);
-
-  /// Retrieve substitution options with a tentative type witness
-  /// operation that queries the current set of type witnesses.
-  SubstOptions getSubstOptionsWithCurrentTypeWitnesses();
-
-  /// Check whether the current set of type witnesses meets the
-  /// requirements of the protocol.
-  bool checkCurrentTypeWitnesses(
-         const SmallVectorImpl<std::pair<ValueDecl *, ValueDecl *>>
-           &valueWitnesses);
-
-  /// Check the current type witnesses against the
-  /// requirements of the given constrained extension.
-  bool checkConstrainedExtension(ExtensionDecl *ext);
-
-  /// Attempt to infer abstract type witnesses for the given set of associated
-  /// types.
-  ///
-  /// \returns \c nullptr, or the associated type that failed.
-  AssociatedTypeDecl *inferAbstractTypeWitnesses(
-      ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes, unsigned reqDepth);
-
-  /// Top-level operation to find solutions for the given unresolved
-  /// associated types.
-  void findSolutions(
-                 ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                 SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
-
-  /// Explore the solution space to find both viable and non-viable solutions.
-  void findSolutionsRec(
-         ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-         SmallVectorImpl<InferredTypeWitnessesSolution> &solutions,
-         SmallVectorImpl<InferredTypeWitnessesSolution> &nonViableSolutions,
-         SmallVector<std::pair<ValueDecl *, ValueDecl *>, 4> &valueWitnesses,
-         unsigned numTypeWitnesses,
-         unsigned numValueWitnessesInProtocolExtensions,
-         unsigned reqDepth);
-
-  /// Determine whether the first solution is better than the second
-  /// solution.
-  bool isBetterSolution(const InferredTypeWitnessesSolution &first,
-                        const InferredTypeWitnessesSolution &second);
-
-  /// Find the best solution.
-  ///
-  /// \param solutions All of the solutions to consider. On success,
-  /// this will contain only the best solution.
-  ///
-  /// \returns \c false if there was a single best solution,
-  /// \c true if no single best solution exists.
-  bool findBestSolution(
-                SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
-
-  /// Emit a diagnostic for the case where there are no solutions at all
-  /// to consider.
-  ///
-  /// \returns true if a diagnostic was emitted, false otherwise.
-  bool diagnoseNoSolutions(
-                     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes);
-
-  /// Emit a diagnostic when there are multiple solutions.
-  ///
-  /// \returns true if a diagnostic was emitted, false otherwise.
-  bool diagnoseAmbiguousSolutions(
-                ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
-
-  /// We may need to determine a type witness, regardless of the existence of a
-  /// default value for it, e.g. when a 'distributed actor' is looking up its
-  /// 'ID', the default defined in an extension for 'Identifiable' would be
-  /// located using the lookup resolve. This would not be correct, since the
-  /// type actually must be based on the associated 'ActorSystem'.
-  ///
-  /// TODO(distributed): perhaps there is a better way to avoid this mixup?
-  ///   Note though that this issue seems to only manifest in "real" builds
-  ///   involving multiple files/modules, and not in tests within the Swift
-  ///   project itself.
-  bool canAttemptEagerTypeWitnessDerivation(
-      DeclContext *DC, AssociatedTypeDecl *assocType);
-
-public:
-  /// Describes a mapping from associated type declarations to their
-  /// type witnesses (as interface types).
-  using InferredTypeWitnesses =
-      std::vector<std::pair<AssociatedTypeDecl *, Type>>;
-
-  /// Perform associated type inference.
-  ///
-  /// \returns \c true if an error occurred, \c false otherwise
-  llvm::Optional<InferredTypeWitnesses> solve(ConformanceChecker &checker);
-
-  /// Find an associated type declaration that provides a default definition.
-  static AssociatedTypeDecl *findDefaultedAssociatedType(
-      DeclContext *dc, NominalTypeDecl *adoptee,
-      AssociatedTypeDecl *assocType);
-};
-
 /// Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
@@ -865,6 +670,14 @@ void diagnoseConformanceFailure(Type T,
                                 ProtocolDecl *Proto,
                                 DeclContext *DC,
                                 SourceLoc ComplainLoc);
+
+Type getTupleConformanceTypeWitness(DeclContext *dc,
+                                    AssociatedTypeDecl *assocType);
+
+/// Find an associated type declaration that provides a default definition.
+AssociatedTypeDecl *findDefaultedAssociatedType(
+    DeclContext *dc, NominalTypeDecl *adoptee,
+    AssociatedTypeDecl *assocType);
 
 }
 
