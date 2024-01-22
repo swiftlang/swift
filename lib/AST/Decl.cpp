@@ -2518,7 +2518,6 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
           case ActorIsolation::NonisolatedUnsafe:
             break;
 
-          case ActorIsolation::GlobalActorUnsafe:
           case ActorIsolation::GlobalActor:
             if (isolation.preconcurrency())
               break;
@@ -10903,7 +10902,6 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
         return false;
 
       case ActorIsolation::ActorInstance:

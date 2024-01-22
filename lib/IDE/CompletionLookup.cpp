@@ -767,7 +767,6 @@ void CompletionLookup::analyzeActorIsolation(
     }
     break;
   }
-  case ActorIsolation::GlobalActorUnsafe:
   case ActorIsolation::GlobalActor: {
     // For "preconcurrency" global actor isolation, automatic 'async' only happens
     // if the context has adopted concurrency.

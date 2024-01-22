@@ -468,8 +468,9 @@ getActualActorIsolationKind(uint8_t raw) {
   CASE(Nonisolated)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
-  CASE(GlobalActorUnsafe)
 #undef CASE
+  case serialization::ActorIsolation::GlobalActorUnsafe:
+    return swift::ActorIsolation::GlobalActor;
   }
   return llvm::None;
 }
@@ -3862,7 +3863,6 @@ public:
         break;
 
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
         // 'unsafe' or 'preconcurrency' doesn't mean anything for isolated
         // default arguments.
         isolation = ActorIsolation::forGlobalActor(globalActor);

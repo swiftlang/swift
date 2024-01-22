@@ -1274,7 +1274,6 @@ void SILGenFunction::emitProlog(
           return true;
 
         case ActorIsolation::GlobalActor:
-        case ActorIsolation::GlobalActorUnsafe:
           // Global-actor-isolated types should likely have deinits that
           // are not themselves actor-isolated, yet still have access to
           // the instance properties of the class.
@@ -1373,7 +1372,6 @@ void SILGenFunction::emitProlog(
     }
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       if (F.isAsync() || wantDataRaceChecks) {
         ExpectedExecutor =
           emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());
@@ -1397,7 +1395,6 @@ void SILGenFunction::emitProlog(
     }
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       if (wantExecutor) {
         ExpectedExecutor =
           emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());
@@ -1553,7 +1550,6 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   }
 
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
     return emitLoadGlobalActorExecutor(isolation.getGlobalActor());
   }
   llvm_unreachable("covered switch");
