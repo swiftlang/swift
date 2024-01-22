@@ -346,6 +346,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
         {"-Xcc", "-target", "-Xcc", ScanASTContext.LangOpts.Target.str()});
 
   std::string rootID;
+  std::vector<std::string> buildArgs;
   if (tracker) {
     tracker->startTracking();
     for (auto fileUnit : mainModule->getFiles()) {
@@ -371,10 +372,22 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(
       return std::make_error_code(std::errc::io_error);
     }
     rootID = root->getID().toString();
+
+    buildArgs.push_back("-direct-clang-cc1-module-build");
+    for (auto &arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
+      buildArgs.push_back("-Xcc");
+      buildArgs.push_back(arg);
+    }
   }
 
-  auto mainDependencies =
-      ModuleDependencyInfo::forSwiftSourceModule(rootID, {}, {}, ExtraPCMArgs);
+  llvm::SmallVector<StringRef> buildCommands;
+  buildCommands.reserve(buildArgs.size());
+  llvm::for_each(buildArgs, [&](const std::string &arg) {
+    buildCommands.emplace_back(arg);
+  });
+
+  auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
+      rootID, buildCommands, {}, ExtraPCMArgs);
 
   llvm::StringSet<> alreadyAddedModules;
   // Compute Implicit dependencies of the main module
