@@ -5078,6 +5078,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
     result |= SILParameterInfoFlags::NotDifferentiable;
   }
 
+  if (options.contains(SILParameterInfo::Isolated)) {
+    options -= SILParameterInfo::Isolated;
+    result |= SILParameterInfoFlags::Isolated;
+  }
+
   // If we still have options left, this code is out of sync... return none.
   if (bool(options))
     return {};

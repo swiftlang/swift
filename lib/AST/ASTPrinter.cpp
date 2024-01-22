@@ -8086,6 +8086,11 @@ void SILParameterInfo::print(ASTPrinter &Printer,
     Printer << "@transferring ";
   }
 
+  if (options.contains(SILParameterInfo::Isolated)) {
+    options -= SILParameterInfo::Isolated;
+    Printer << "@isolated ";
+  }
+
   // If we did not handle a case in Options, this code was not updated
   // appropriately.
   assert(!bool(options) && "Code not updated for introduced option");

@@ -31,7 +31,7 @@ distributed actor MyDistActor {
   }
 
   // CHECK-LABEL: // MyDistActor.init(system_async_fail_throws:cond:)
-  // CHECK: sil hidden @$s14default_deinit11MyDistActorC24system_async_fail_throws4condACSg015FakeDistributedE7Systems0kE6SystemV_SbtYaKcfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @owned MyDistActor) -> (@owned Optional<MyDistActor>, @error any Error) {
+  // CHECK: sil hidden @$s14default_deinit11MyDistActorC24system_async_fail_throws4condACSg015FakeDistributedE7Systems0kE6SystemV_SbtYaKcfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @isolated @owned MyDistActor) -> (@owned Optional<MyDistActor>, @error any Error) {
   // CHECK: bb0([[SYSTEM:%[0-9]+]] : $FakeActorSystem, [[COND:%[0-9]+]] : $Bool, [[SELF:%[0-9]+]] : $MyDistActor):
   // CHECK:   cond_br {{%[0-9]+}}, [[SUCCESS_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
 
