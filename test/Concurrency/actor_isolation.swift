@@ -139,7 +139,8 @@ struct InferredFromContext {
     get { [] }
   }
 
-  nonisolated var status: Bool = true // expected-error {{'nonisolated' can not be applied to stored properties}}{{3-15=}}
+  nonisolated var status: Bool = true // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}{{3-15=}}{{3-15=}}{{14-14=(unsafe)}}
+  // expected-note@-1{{convert 'status' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
 
   nonisolated let flag: Bool = false // expected-warning {{'nonisolated' is redundant on struct's stored properties; this is an error in Swift 6}}{{3-15=}}
 
