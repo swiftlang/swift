@@ -379,39 +379,41 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(
     MarkUnresolvedNonCopyableValueInst *markedAddr) {
   SILValue operand = markedAddr->getOperand();
 
-  if (markedAddr->getCheckKind() ==
+  // TODO: This should really be a property of the marker instruction.
+  if (markedAddr->getCheckKind() !=
       MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable) {
-    // TODO: This should really be a property of the marker instruction.
-    
-    // Check for inout types of arguments that are marked with consumable and
-    // assignable.
-    if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
-      switch (fArg->getArgumentConvention()) {
-      case SILArgumentConvention::Indirect_In:
-      case SILArgumentConvention::Indirect_Out:
-      case SILArgumentConvention::Indirect_In_Guaranteed:
-      case SILArgumentConvention::Direct_Guaranteed:
-      case SILArgumentConvention::Direct_Owned:
-      case SILArgumentConvention::Direct_Unowned:
-      case SILArgumentConvention::Pack_Guaranteed:
-      case SILArgumentConvention::Pack_Owned:
-      case SILArgumentConvention::Pack_Out:
-        return false;
-      case SILArgumentConvention::Indirect_Inout:
-      case SILArgumentConvention::Indirect_InoutAliasable:
-      case SILArgumentConvention::Pack_Inout:
-        LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
-        return true;
-      }
-    }
-    // Check for yields from a modify coroutine.
-    if (auto bai = dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
+    return false;
+  }
+
+  // Check for inout types of arguments that are marked with consumable and
+  // assignable.
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
+    switch (fArg->getArgumentConvention()) {
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Direct_Guaranteed:
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Out:
+      return false;
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Pack_Inout:
+      LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
       return true;
     }
-    // Check for modify accesses.
-    if (auto access = dyn_cast<BeginAccessInst>(operand)) {
-      return access->getAccessKind() == SILAccessKind::Modify;
-    }
+  }
+  // Check for yields from a modify coroutine.
+  if (auto bai =
+          dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
+    return true;
+  }
+  // Check for modify accesses.
+  if (auto access = dyn_cast<BeginAccessInst>(operand)) {
+    return access->getAccessKind() == SILAccessKind::Modify;
   }
 
   return false;
