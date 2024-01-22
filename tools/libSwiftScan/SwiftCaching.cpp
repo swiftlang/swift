@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/StringUtils.h"
+#include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/CachedDiagnostics.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
@@ -108,7 +109,7 @@ struct SwiftCachedOutputHandle {
 struct SwiftScanReplayInstance {
   swift::CompilerInvocation Invocation;
   llvm::BumpPtrAllocator StringAlloc;
-  std::vector<const char *> Args;
+  llvm::SmallVector<const char *> Args;
 };
 
 struct SwiftCachedReplayResult {
@@ -196,6 +197,25 @@ swiftscan_string_ref_t swiftscan_cas_store(swiftscan_cas_t cas, uint8_t *data,
       CAS.getID(*Result).toString().c_str());
 }
 
+/// Expand the invocation if there is repsonseFile into Args that are passed in
+/// the parameter. Return swift-frontend arguments in an ArrayRef, which has the
+/// first "-frontend" option dropped if needed.
+static llvm::ArrayRef<const char *>
+expandSwiftInvocation(int argc, const char **argv, llvm::StringSaver &Saver,
+                      llvm::SmallVectorImpl<const char *> &ArgsStorage) {
+  ArgsStorage.reserve(argc);
+  for (int i = 0; i < argc; ++i)
+    ArgsStorage.push_back(argv[i]);
+  swift::driver::ExpandResponseFilesWithRetry(Saver, ArgsStorage);
+
+  // Drop the `-frontend` option if it is passed.
+  llvm::ArrayRef<const char*> FrontendArgs(ArgsStorage);
+  if (!FrontendArgs.empty() &&
+      llvm::StringRef(FrontendArgs.front()) == "-frontend")
+    FrontendArgs = FrontendArgs.drop_front();
+  return FrontendArgs;
+}
+
 static llvm::Expected<std::string>
 computeCacheKey(llvm::cas::ObjectStore &CAS, llvm::ArrayRef<const char *> Args,
                 llvm::StringRef InputPath) {
@@ -214,10 +234,6 @@ computeCacheKey(llvm::cas::ObjectStore &CAS, llvm::ArrayRef<const char *> Args,
 
   std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(
       "swift-frontend", (void *)swiftscan_cache_replay_compilation);
-
-  // Drop the `-frontend` option if it is passed.
-  if (llvm::StringRef(Args.front()) == "-frontend")
-    Args = Args.drop_front();
 
   if (Invocation.parseArgs(Args, Diags, &configurationFileBuffers,
                            workingDirectory, MainExecutablePath))
@@ -270,11 +286,12 @@ computeCacheKeyFromIndex(llvm::cas::ObjectStore &CAS,
 swiftscan_string_ref_t
 swiftscan_cache_compute_key(swiftscan_cas_t cas, int argc, const char **argv,
                             const char *input, swiftscan_string_ref_t *error) {
-  std::vector<const char *> Compilation;
-  for (int i = 0; i < argc; ++i)
-    Compilation.push_back(argv[i]);
+  llvm::SmallVector<const char *> ArgsStorage;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  auto Args = expandSwiftInvocation(argc, argv, Saver, ArgsStorage);
 
-  auto ID = computeCacheKey(unwrap(cas)->getCAS(), Compilation, input);
+  auto ID = computeCacheKey(unwrap(cas)->getCAS(), Args, input);
   if (!ID) {
     *error =
         swift::c_string_utils::create_clone(toString(ID.takeError()).c_str());
@@ -289,12 +306,13 @@ swiftscan_cache_compute_key_from_input_index(swiftscan_cas_t cas, int argc,
                                              const char **argv,
                                              unsigned input_index,
                                              swiftscan_string_ref_t *error) {
-  std::vector<const char *> Compilation;
-  for (int i = 0; i < argc; ++i)
-    Compilation.push_back(argv[i]);
+  llvm::SmallVector<const char *> ArgsStorage;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  auto Args = expandSwiftInvocation(argc, argv, Saver, ArgsStorage);
 
   auto ID =
-      computeCacheKeyFromIndex(unwrap(cas)->getCAS(), Compilation, input_index);
+      computeCacheKeyFromIndex(unwrap(cas)->getCAS(), Args, input_index);
   if (!ID) {
     *error =
         swift::c_string_utils::create_clone(toString(ID.takeError()).c_str());
@@ -747,11 +765,9 @@ swiftscan_cache_replay_instance_t
 swiftscan_cache_replay_instance_create(int argc, const char **argv,
                                        swiftscan_string_ref_t *error) {
   auto *Instance = new SwiftScanReplayInstance();
+  llvm::SmallVector<const char *> Compilation;
   llvm::StringSaver Saver(Instance->StringAlloc);
-  for (int i = 0; i < argc; ++i) {
-    auto Str = Saver.save(argv[i]);
-    Instance->Args.push_back(Str.data());
-  }
+  auto Args = expandSwiftInvocation(argc, argv, Saver, Instance->Args);
 
   // Capture the diagnostics when creating invocation.
   std::string err_msg;
@@ -764,7 +780,7 @@ swiftscan_cache_replay_instance_create(int argc, const char **argv,
   std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(
       "swift-frontend", (void *)swiftscan_cache_replay_compilation);
 
-  if (Instance->Invocation.parseArgs(Instance->Args, DE, nullptr, {},
+  if (Instance->Invocation.parseArgs(Args, DE, nullptr, {},
                                      MainExecutablePath)) {
     delete Instance;
     *error = swift::c_string_utils::create_clone(err_msg.c_str());
