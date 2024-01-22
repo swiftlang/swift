@@ -53,7 +53,6 @@ add_pure_swift_host_library(swiftASTGen STATIC
     SwiftCompilerPluginMessageHandling
     SwiftDiagnostics
     SwiftOperators
-    SwiftParser
     SwiftParserDiagnostics
     SwiftSyntax
     SwiftSyntaxBuilder

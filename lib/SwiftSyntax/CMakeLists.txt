@@ -26,7 +26,6 @@ FetchContent_MakeAvailable(SwiftSyntax)
 # Install swift-syntax libraries.
 set(SWIFT_SYNTAX_MODULES
   SwiftBasicFormat
-  SwiftParser
   SwiftParserDiagnostics
   SwiftDiagnostics
   SwiftSyntax

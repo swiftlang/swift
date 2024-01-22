@@ -30,7 +30,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftParse
     PRIVATE
     SwiftBasicFormat
-    SwiftParser
     SwiftParserDiagnostics
     SwiftDiagnostics
     SwiftSyntax
@@ -42,7 +41,6 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
 
   add_dependencies(swiftParse
     SwiftBasicFormat
-    SwiftParser
     SwiftParserDiagnostics
     SwiftDiagnostics
     SwiftSyntax

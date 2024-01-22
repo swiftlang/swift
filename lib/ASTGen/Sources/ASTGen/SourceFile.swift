@@ -12,9 +12,8 @@
 
 import ASTBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.

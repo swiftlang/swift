@@ -82,7 +82,7 @@ extension ASTGenVisitor {
   }
 
   func generate(conditionElement node: ConditionElementSyntax) -> BridgedStmtConditionElement {
-    // FIXME: _hasSymbol is not implemented in SwiftSyntax/SwiftParser.
+    // FIXME: _hasSymbol is not implemented in SwiftSyntax.
     switch node.condition {
     case .availability(_):
       fatalError("unimplemented")
