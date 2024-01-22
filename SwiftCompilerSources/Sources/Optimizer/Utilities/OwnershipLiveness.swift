@@ -118,7 +118,6 @@ func computeInteriorLiveness(for definingValue: Value,
   return range
 }
 
-
 /// Visit all uses of an interior address that keep the parent object alive.
 ///
 /// See C++ TransitiveAddressWalker.
