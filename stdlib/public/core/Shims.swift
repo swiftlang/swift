@@ -51,6 +51,8 @@ internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
  */
 @_effects(readnone) @inline(__always)
 internal func _mallocGoodSize(for size: Int) -> Int {
+  // Not all allocators will see benefits from rounding up to 16/32 byte aligned
+  // but it'll never cause misbehavior, and many reasonable ones will benefit
   if (size <= 128) {
     return (size &+ 15) & ~15;
   }
