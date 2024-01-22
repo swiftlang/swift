@@ -654,14 +654,15 @@ private:
     // The interesting cases are already handled above.
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedAbstractClosure:
 
     // We don't model these in DWARF.
-    case DeclContextKind::SerializedLocal:
     case DeclContextKind::Initializer:
     case DeclContextKind::ExtensionDecl:
     case DeclContextKind::SubscriptDecl:
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::SerializedTopLevelCodeDecl:
       return getOrCreateContext(DC->getParent());
 
     case DeclContextKind::Package: {

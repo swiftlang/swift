@@ -886,12 +886,13 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
                                                  bool fromAnonymousContext) {
   switch (parent->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
   case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
     return {getAddrOfAnonymousContextDescriptor(
               fromAnonymousContext ? parent : ofChild),
             ConstantReference::Direct};

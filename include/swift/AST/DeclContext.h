@@ -97,7 +97,8 @@ enum class DeclContextKind : unsigned {
   SubscriptDecl,
   EnumElementDecl,
   AbstractFunctionDecl,
-  SerializedLocal,
+  SerializedAbstractClosure,
+  SerializedTopLevelCodeDecl,
   MacroDecl,
   Last_LocalDeclContextKind = MacroDecl,
   Package,
@@ -106,14 +107,6 @@ enum class DeclContextKind : unsigned {
   GenericTypeDecl,
   ExtensionDecl,
   Last_DeclContextKind = ExtensionDecl
-};
-
-/// Kinds of DeclContexts after deserialization.
-///
-/// \see SerializedLocalDeclContext.
-enum class LocalDeclContextKind : uint8_t {
-  AbstractClosure,
-  TopLevelCodeDecl
 };
 
 /// Describes the kind of a particular conformance.
@@ -251,10 +244,11 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
     FileUnit,
     Package,
     Initializer,
-    SerializedLocal,
+    SerializedAbstractClosure,
+    SerializedTopLevelCodeDecl,
     // If you add a new AST hierarchies, then update the static_assert() below.
   };
-  static_assert(unsigned(ASTHierarchy::SerializedLocal) <
+  static_assert(unsigned(ASTHierarchy::SerializedTopLevelCodeDecl) <
                 (1 << DeclContextAlignInBits),
                 "ASTHierarchy exceeds bits available");
 
@@ -283,8 +277,10 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
       return ASTHierarchy::Expr;
     case DeclContextKind::Initializer:
       return ASTHierarchy::Initializer;
-    case DeclContextKind::SerializedLocal:
-      return ASTHierarchy::SerializedLocal;
+    case DeclContextKind::SerializedAbstractClosure:
+      return ASTHierarchy::SerializedAbstractClosure;
+    case DeclContextKind::SerializedTopLevelCodeDecl:
+      return ASTHierarchy::SerializedTopLevelCodeDecl;
     case DeclContextKind::FileUnit:
       return ASTHierarchy::FileUnit;
     case DeclContextKind::Package:
@@ -704,31 +700,6 @@ public:
   
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
-};
-
-/// SerializedLocalDeclContext - the base class for DeclContexts that were
-/// serialized to preserve AST structure and accurate mangling after
-/// deserialization.
-class SerializedLocalDeclContext : public DeclContext {
-private:
-  unsigned LocalKind : 3;
-
-protected:
-  unsigned SpareBits : 29;
-
-public:
-  SerializedLocalDeclContext(LocalDeclContextKind LocalKind,
-                             DeclContext *Parent)
-    : DeclContext(DeclContextKind::SerializedLocal, Parent),
-      LocalKind(static_cast<unsigned>(LocalKind)) {}
-
-  LocalDeclContextKind getLocalDeclContextKind() const {
-    return static_cast<LocalDeclContextKind>(LocalKind);
-  }
-
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::SerializedLocal;
-  }
 };
 
 /// An iterator that walks through a list of declarations stored

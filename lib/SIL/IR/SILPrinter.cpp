@@ -221,12 +221,9 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
 
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
     // FIXME
     Buffer << "<anonymous function>";
-    return;
-
-  case DeclContextKind::SerializedLocal:
-    Buffer << "<serialized local context>";
     return;
 
   case DeclContextKind::GenericTypeDecl: {
@@ -245,6 +242,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   }
   
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     // FIXME
     Buffer << "<top level code>";
     return;

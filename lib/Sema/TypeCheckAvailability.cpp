@@ -139,8 +139,9 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
   for (; !DC->isModuleScopeContext(); DC = DC->getParent()) {
     switch (DC->getContextKind()) {
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedAbstractClosure:
     case DeclContextKind::TopLevelCodeDecl:
-    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::SerializedTopLevelCodeDecl:
     case DeclContextKind::Package:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:

@@ -2317,17 +2317,6 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     appendContext(ctx->getParent(), useModuleName);
     return;
 
-  case DeclContextKind::SerializedLocal: {
-    auto local = cast<SerializedLocalDeclContext>(ctx);
-    switch (local->getLocalDeclContextKind()) {
-    case LocalDeclContextKind::AbstractClosure:
-      appendClosureEntity(cast<SerializedAbstractClosureExpr>(local));
-      return;
-    case LocalDeclContextKind::TopLevelCodeDecl:
-      return appendContext(local->getParent(), useModuleName);
-    }
-  }
-
   case DeclContextKind::GenericTypeDecl:
     appendAnyGenericType(cast<GenericTypeDecl>(ctx));
     return;
@@ -2367,6 +2356,9 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
 
   case DeclContextKind::AbstractClosureExpr:
     return appendClosureEntity(cast<AbstractClosureExpr>(ctx));
+
+  case DeclContextKind::SerializedAbstractClosure:
+    return appendClosureEntity(cast<SerializedAbstractClosureExpr>(ctx));
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto fn = cast<AbstractFunctionDecl>(ctx);
@@ -2428,6 +2420,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     llvm_unreachable("bad initializer kind");
 
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     // Mangle the containing module context.
     return appendContext(ctx->getParent(), useModuleName);
 
