@@ -2119,11 +2119,9 @@ void SwiftLangSupport::getCursorInfo(
   std::shared_ptr<llvm::MemoryBuffer> InputBuffer;
   if (InputBufferName.empty() && Length == 0) {
     std::string InputFileError;
-    llvm::SmallString<128> RealInputFilePath;
-    fileSystem->getRealPath(PrimaryFilePath, RealInputFilePath);
     InputBuffer =
         std::shared_ptr<llvm::MemoryBuffer>(getASTManager()->getMemoryBuffer(
-            RealInputFilePath, fileSystem, InputFileError));
+            PrimaryFilePath, fileSystem, InputFileError));
   }
 
   // Receiver is async, so be careful about captured values. This is all
