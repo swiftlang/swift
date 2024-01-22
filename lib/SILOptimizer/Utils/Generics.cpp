@@ -2984,7 +2984,8 @@ bool usePrespecialized(
 
     if (specializedReInfo.getSpecializedType() != reInfo.getSpecializedType()) {
       SmallVector<Type, 4> newSubs;
-      auto specializedSig = SA->getUnerasedSpecializedSignature();
+      auto specializedSig =
+          SA->getUnerasedSpecializedSignature().withoutMarkerProtocols();
 
       auto erasedParams = SA->getTypeErasedParams();
       if(!ctxt.LangOpts.hasFeature(Feature::LayoutPrespecialization) || erasedParams.empty()) {

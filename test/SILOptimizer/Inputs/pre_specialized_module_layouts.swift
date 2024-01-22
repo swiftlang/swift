@@ -3,7 +3,7 @@ public struct SomeData {
   public init() {}
 }
 
-public class SomeClass {
+public final class SomeClass: Sendable {
   public init() {}
 }
 
@@ -15,6 +15,11 @@ public class SomeClass {
 @_specialize(exported: true, where @_noMetadata T : _TrivialStride(96))
 @_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
 public func publicPrespecialized<T>(_ t: T) {
+}
+
+@_specialize(exported: true, where @_noMetadata T : _Class)
+public func publicPrespecializedWithMarkerProtocol<T: Sendable>(_ t: T) -> T {
+  return t
 }
 
 @_specialize(exported: true, where T == Int)
@@ -135,6 +140,11 @@ public func useInternalThing<T>(_ t: T) {
 
 @_specialize(exported: true, where @_noMetadata T : _Class, @_noMetadata V : _Class)
 @_specialize(exported: true, where @_noMetadata T : _BridgeObject, @_noMetadata V : _BridgeObject)
-public func publicPresepcializedMultipleIndirectResults<T, V>(_ t: T, _ v: V, _ x: Int64)-> (V, Int64, T) {
+public func publicPresepcializedMultipleIndirectResults<T, V>(_ t: T, _ v: V, _ x: Int64) -> (V, Int64, T) {
+    return (v, x, t)
+}
+
+@_specialize(exported: true, where @_noMetadata T : _Class, @_noMetadata V : _Class)
+public func publicPresepcializedMultipleIndirectResultsWithMarkerProtocol<T: Sendable, V>(_ t: T, _ v: V, _ x: Int64) -> (V, Int64, T) {
     return (v, x, t)
 }

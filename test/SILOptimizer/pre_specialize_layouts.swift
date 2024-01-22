@@ -179,6 +179,24 @@ public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, 
   useInternalThing(SomeClass())
 }
 
+// OPT: sil @$s22pre_specialize_layouts46usePrespecializedEntryPointsWithMarkerProtocol1ty0a20_specialized_module_C09SomeClassC_tF : $@convention(thin) (@guaranteed SomeClass) -> () {
+// OPT: bb0([[P1:%.*]] : $SomeClass):
+// OPT:   [[R1:%.*]] = alloc_stack $SomeClass
+// OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts38publicPrespecializedWithMarkerProtocolyxxs8SendableRzlFyXl_Ts5 : $@convention(thin) (@guaranteed AnyObject) -> @owned AnyObject
+// OPT:   [[R2:%.*]] = unchecked_addr_cast [[R1]] : $*SomeClass to $*AnyObject
+// OPT:   [[A1:%.*]] = unchecked_ref_cast [[P1]] : $SomeClass to $AnyObject
+// OPT:   [[R3:%.*]] = apply [[F1]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> @owned AnyObject
+// OPT:   store [[R3]] to [[R2]] : $*AnyObject
+// OPT:   [[A2:%.*]] = load [[R1]] : $*SomeClass
+// OPT:   [[F2:%.*]] = function_ref @$s22pre_specialize_layouts7consumeyyxlF0a20_specialized_module_C09SomeClassC_Tg5 : $@convention(thin) (@guaranteed SomeClass) -> ()
+// OPT:   apply [[F2]]([[A2]]) : $@convention(thin) (@guaranteed SomeClass) -> ()
+// OPT:   strong_release [[A2]] : $SomeClass
+// OPT:   dealloc_stack [[R1]] : $*SomeClass
+// OPT: } // end sil function '$s22pre_specialize_layouts46usePrespecializedEntryPointsWithMarkerProtocol1ty0a20_specialized_module_C09SomeClassC_tF'
+public func usePrespecializedEntryPointsWithMarkerProtocol(t: SomeClass) {
+  consume(publicPrespecializedWithMarkerProtocol(t))
+}
+
 // OPT: sil @$s22pre_specialize_layouts34usePrespecializedThrowsEntryPointsyyKF : $@convention(thin) () -> @error any Error {
 // OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts26publicPrespecializedThrowsyxxKlFSi_Ts5 : $@convention(thin) (Int) -> (Int, @error any Error)
 // OPT:   try_apply [[F1]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error)
@@ -220,6 +238,21 @@ public final class SomeOtherClass {}
 public func usePresepcializedMultipleIndirectResults(_ c: SomeClass, _ d: SomeOtherClass, _ x: Int64, xs: [Int], ys: [Float]) {
   consume(publicPresepcializedMultipleIndirectResults(c, d, x))
   consume(publicPresepcializedMultipleIndirectResults(xs, ys, x))
+}
+
+// OPT: sil @$s22pre_specialize_layouts58usePresepcializedMultipleIndirectResultsWithMarkerProtocolyy0a20_specialized_module_C09SomeClassC_AA0n5OtherO0Cs5Int64VtF : $@convention(thin) (@guaranteed SomeClass, @guaranteed SomeOtherClass, Int64) -> () {
+// OPT: {{bb.*}}([[P1:%.*]] : $SomeClass, [[P2:%.*]] : $SomeOtherClass, [[P3:%.*]] : $Int64):
+// OPT:   [[R1:%.*]] = alloc_stack $SomeOtherClass
+// OPT:   [[R2:%.*]] = alloc_stack $SomeClass
+// OPT:   [[F1:%.*]] = function_ref @$s30pre_specialized_module_layouts61publicPresepcializedMultipleIndirectResultsWithMarkerProtocolyq__s5Int64Vxtx_q_ADts8SendableRzr0_lFyXl_yXlTs5 : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Int64) -> (@out AnyObject, Int64, @out AnyObject)
+// OPT:   [[R3:%.*]] = unchecked_addr_cast [[R1]] : $*SomeOtherClass to $*AnyObject
+// OPT:   [[R4:%.*]] = unchecked_addr_cast [[R2]] : $*SomeClass to $*AnyObject
+// OPT:   [[A1:%.*]] = unchecked_ref_cast [[P1]] : $SomeClass to $AnyObject
+// OPT:   [[A2:%.*]] = unchecked_ref_cast [[P2]] : $SomeOtherClass to $AnyObject
+// OPT:   apply [[F1]]([[R3]], [[R4]], [[A1]], [[A2]], [[P3]]) : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Int64) -> (@out AnyObject, Int64, @out AnyObject)
+// OPT: } // end sil function '$s22pre_specialize_layouts58usePresepcializedMultipleIndirectResultsWithMarkerProtocolyy0a20_specialized_module_C09SomeClassC_AA0n5OtherO0Cs5Int64VtF'
+public func usePresepcializedMultipleIndirectResultsWithMarkerProtocol(_ c: SomeClass, _ d: SomeOtherClass, _ x: Int64) {
+  consume(publicPresepcializedMultipleIndirectResultsWithMarkerProtocol(c, d, x))
 }
 
 // OPT: sil [noinline] @$s22pre_specialize_layouts15usePartialApply1y0a20_specialized_module_C09SomeClassCAFcAF_tF : $@convention(thin) (@guaranteed SomeClass) -> @owned @callee_guaranteed (@guaranteed SomeClass) -> @owned SomeClass {
