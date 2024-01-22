@@ -133,7 +133,7 @@ static int action_cache_query(swiftscan_cas_t cas, const char *key) {
     return printError(err_msg);
 
   if (!comp) {
-    llvm::errs() << "cached output not found for \"" << key << "\n";
+    llvm::errs() << "cached output not found for \"" << key << "\"\n";
     return EXIT_FAILURE;
   }
 
