@@ -114,31 +114,6 @@ public:
 
   llvm::Optional<ProtocolConformance *> NSErrorConformanceToError;
 
-  llvm::Optional<FuncDecl *> AsyncLetStart;
-  llvm::Optional<FuncDecl *> AsyncLetGet;
-  llvm::Optional<FuncDecl *> AsyncLetGetThrowing;
-  llvm::Optional<FuncDecl *> EndAsyncLet;
-
-  llvm::Optional<FuncDecl *> TaskFutureGet;
-  llvm::Optional<FuncDecl *> TaskFutureGetThrowing;
-
-  llvm::Optional<FuncDecl *> RunTaskForBridgedAsyncMethod;
-  llvm::Optional<FuncDecl *> ResumeUnsafeContinuation;
-  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuation;
-  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
-  llvm::Optional<FuncDecl *> CheckExpectedExecutor;
-
-  llvm::Optional<FuncDecl*> CreateCheckedContinuation;
-  llvm::Optional<FuncDecl*> CreateCheckedThrowingContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuationWithError;
-
-  llvm::Optional<FuncDecl *> AsyncMainDrainQueue;
-  llvm::Optional<FuncDecl *> GetMainExecutor;
-  llvm::Optional<FuncDecl *> SwiftJobRun;
-  llvm::Optional<FuncDecl *> ExitFunc;
-
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
 
