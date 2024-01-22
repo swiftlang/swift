@@ -165,9 +165,10 @@ do {
   // expected-error@-1 {{extraneous argument label 'x:' in call}}
 
   takesValue(_: x: switch Bool.random() { case true: 1 case false: 2 })
-  // expected-error@-1 {{expected expression in list of expressions}}
+  // expected-error@-1 {{expected argument label before colon}}
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'x' in scope}}
+  // expected-error@-4 {{extra argument in call}}
 }
 func takesValueWithLabel<T>(x: T) {}
 do {
@@ -175,9 +176,10 @@ do {
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   takesValueWithLabel(x: y: switch Bool.random() { case true: 1 case false: 2 })
-  // expected-error@-1 {{expected expression in list of expressions}}
+  // expected-error@-1 {{expected argument label before colon}}
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'y' in scope}}
+  // expected-error@-4 {{extra argument in call}}
 }
 func takesValueAndTrailingClosure<T>(_ x: T, _ fn: () -> Int) {}
 takesValueAndTrailingClosure(switch Bool.random() { case true: 0 case false: 1 }) { 2 }

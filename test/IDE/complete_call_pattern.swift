@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -code-complete-call-pattern-heuristics -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -disable-objc-attr-requires-foundation-module
 
 struct FooStruct {
   init() {}
@@ -20,19 +20,17 @@ func testInsideFunctionCall_2(_ x: inout FooStruct) {
 }
 func testConstructor() {
   FooStruct(#^CONSTRUCTOR^#,
-// CONSTRUCTOR-NOT: Pattern/{{.*}}
-// CONSTRUCTOR-NOT: Decl[Constructor]
-// CONSTRUCTOR: Pattern/Local/Flair[ArgLabels]: {#a: Int#}[#Int#]
-// CONSTRUCTOR-NOT: Pattern/{{.*}}
-// CONSTRUCTOR-NOT: Decl[Constructor]
+// CONSTURCTOR: Begin completions, 3 items
+// CONSTRUCTOR-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#FooStruct#];
+// CONSTRUCTOR-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}[')'][#FooStruct#];
+// CONSTRUCTOR-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}, {#b: Float#}[')'][#FooStruct#];
 }
 
 func firstArg(arg1 arg1: Int, arg2: Int) {}
 func testArg2Name3() {
   firstArg(#^LABELED_FIRSTARG^#,
-// LABELED_FIRSTARG-NOT: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
-// LABELED_FIRSTARG-DAG: Pattern/Local/Flair[ArgLabels]: {#arg1: Int#}[#Int#];
-// LABELED_FIRSTARG-NOT: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
+// LABELED_FIRSTARG: Begin completions, 1 item
+// LABELED_FIRSTARG-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 }
 
 func optionalClosure(optClosure: ((Int) -> Void)?, someArg: Int) {
@@ -53,7 +51,7 @@ func optionalProtocolMethod() {
 
 func subscriptAccess(info: [String: Int]) {
   info[#^SUBSCRIPT_ACCESS^#]
-// SUBSCRIPT_ACCESS: Pattern/Local/Flair[ArgLabels]:     {#keyPath: KeyPath<[String : Int], Value>#}[#KeyPath<[String : Int], Value>#]; name=keyPath:
+// SUBSCRIPT_ACCESS: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<[String : Int], Value>#}[']'][#Value#];
 }
 
 struct StaticMethods {

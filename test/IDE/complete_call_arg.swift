@@ -1040,11 +1040,14 @@ func testArgsAfterCompletion() {
   // VALID_DEFAULTED_AFTER-DAG: Pattern/Local/Flair[ArgLabels]: {#p: A#}[#A#]; name=p:
   // VALID_DEFAULTED_AFTER-DAG: Pattern/Local/Flair[ArgLabels]: {#y: A#}[#A#]; name=y:
 
-  overloadedDefaulted(x: 1, #^VALID_DEFAULTED_AFTER_NOCOMMA?check=VALID_DEFAULTED^# z: localA)
+  overloadedDefaulted(x: 1, #^VALID_DEFAULTED_AFTER_NOCOMMA^# z: localA)
+  // VALID_DEFAULTED_AFTER_NOCOMMA: Begin completions, 2 items
+  // VALID_DEFAULTED_AFTER_NOCOMMA-DAG: Pattern/Local/Flair[ArgLabels]: {#p: A#}[#A#]; name=p:
+  // VALID_DEFAULTED_AFTER_NOCOMMA-DAG: Pattern/Local/Flair[ArgLabels]: {#y: A#}[#A#]; name=y:
   overloadedDefaulted(x: 1, #^INVALID_DEFAULTED?check=VALID_DEFAULTED^#, w: "hello")
   overloadedDefaulted(x: 1, #^INVALID_DEFAULTED_TYPO?check=VALID_DEFAULTED^#, zz: localA)
   overloadedDefaulted(x: 1, #^INVALID_DEFAULTED_TYPO_TYPE?check=VALID_DEFAULTED^#, zz: "hello")
-  SubOverloadedDefaulted()[x: 1, #^VALID_DEFAULTED_AFTER_NOCOMMA_SUB?check=VALID_DEFAULTED^# z: localA]
+  SubOverloadedDefaulted()[x: 1, #^VALID_DEFAULTED_AFTER_NOCOMMA_SUB?check=VALID_DEFAULTED_AFTER_NOCOMMA^# z: localA]
   SubOverloadedDefaulted()[x: 1, #^INVALID_DEFAULTED_SUB?check=VALID_DEFAULTED^#, w: "hello"]
   SubOverloadedDefaulted()[x: 1, #^INVALID_DEFAULTED_TYPO_SUB?check=VALID_DEFAULTED^#, zz: localA]
   SubOverloadedDefaulted()[x: 1, #^INVALID_DEFAULTED_TYPO_TYPE_SUB?check=VALID_DEFAULTED^#, zz: "hello"]
@@ -1165,9 +1168,8 @@ func testFunctionConversionAfterCodecompletionPos() {
 
     var searchCategories: [(Int, [String])]
     ForEach(searchCategories, #^FUNC_CONVERSION_AFTER_COMPLETION_POS^#id: 0, content: searchSection)
-// FUNC_CONVERSION_AFTER_COMPLETION_POS:     Begin completions, 2 items
+// FUNC_CONVERSION_AFTER_COMPLETION_POS:     Begin completions, 1 items
 // FUNC_CONVERSION_AFTER_COMPLETION_POS-DAG: Pattern/Local/Flair[ArgLabels]:     {#content: ((Int, [String])) -> String##((Int, [String])) -> String#}[#((Int, [String])) -> String#];
-// FUNC_CONVERSION_AFTER_COMPLETION_POS-DAG: Pattern/Local/Flair[ArgLabels]:     {#id: Int#}[#Int#];
 }
 
 func testPlaceholderNoBetterThanArchetype() {
@@ -1387,5 +1389,21 @@ struct AmbiguousCallInResultBuilder {
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#style: String#}[#String#];
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Pattern/Local/Flair[ArgLabels]:     {#lineWidth: Int#}[#Int#];
 // AMBIGUOUS_IN_RESULT_BUILDER: End completions
+  }
+}
+
+struct AtStartOfFunctionCallWithExistingParams {
+  func foo(a: Int = 1, b: Int =, c: Int = 1) {
+    self.foo(#^AT_START_OF_CALL_NO_EXISTING_ARGUMENTS^#)
+    // AT_START_OF_CALL_NO_EXISTING_ARGUMENTS: Begin completions, 2 items
+    // AT_START_OF_CALL_NO_EXISTING_ARGUMENTS-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#b: Int#}[')'][#Void#]; name=b:
+    // AT_START_OF_CALL_NO_EXISTING_ARGUMENTS-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}, {#b: Int#}, {#c: Int#}[')'][#Void#]; name=a:b:c:
+    
+    self.foo(#^AT_START_OF_CALL_ONE_EXISTING_ARGUMENT^# b: 1)
+    self.foo(#^AT_START_OF_CALL_ONE_EXISTING_ARGUMENT_NO_SPACE?check=AT_START_OF_CALL_ONE_EXISTING_ARGUMENT^#b: 1)
+    self.foo(#^AT_START_OF_CALL_TWO_EXISTING_ARGUMENTS?check=AT_START_OF_CALL_ONE_EXISTING_ARGUMENT^# b: 1, c: 2)
+    self.foo(#^AT_START_OF_CALL_TWO_EXISTING_ARGUMENTS_NO_SPACE?check=AT_START_OF_CALL_ONE_EXISTING_ARGUMENT^#b: 1, c: 2)
+    // AT_START_OF_CALL_ONE_EXISTING_ARGUMENT: Begin completions, 1 item
+    // AT_START_OF_CALL_ONE_EXISTING_ARGUMENT-DAG: Pattern/Local/Flair[ArgLabels]:     {#a: Int#}[#Int#]; name=a:
   }
 }

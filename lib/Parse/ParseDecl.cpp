@@ -4148,44 +4148,24 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   ParserStatus status;
   ArgumentList *argList = nullptr;
   if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
-    if (peekToken().is(tok::code_complete)) {
-      auto lParenLoc = consumeToken(tok::l_paren);
-      auto typeE = new (Context) TypeExpr(type.get());
-      auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-      if (CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completePostfixExprParen(typeE, CCE);
-      }
-      consumeToken(tok::code_complete);
-      skipUntilDeclStmtRBrace(tok::r_paren);
-      auto rParenLoc = PreviousLoc;
-      if (Tok.is(tok::r_paren)) {
-        rParenLoc = consumeToken(tok::r_paren);
-      }
+    // If we have no local context to parse the initial value into, create
+    // one for the PBD we'll eventually create.  This allows us to have
+    // reasonable DeclContexts for any closures that may live inside of
+    // initializers.
+    llvm::Optional<ParseFunctionBody> initParser;
+    if (!CurDeclContext->isLocalContext()) {
+      if (!initContext)
+        initContext = PatternBindingInitializer::create(CurDeclContext);
 
-      argList = ArgumentList::createParsed(
-          Context, lParenLoc, {Argument::unlabeled(CCE)}, rParenLoc,
-          /*trailingClosureIdx=*/llvm::None);
-      status.setHasCodeCompletionAndIsError();
-    } else {
-      // If we have no local context to parse the initial value into, create
-      // one for the PBD we'll eventually create.  This allows us to have
-      // reasonable DeclContexts for any closures that may live inside of
-      // initializers.
-      llvm::Optional<ParseFunctionBody> initParser;
-      if (!CurDeclContext->isLocalContext()) {
-        if (!initContext)
-          initContext = PatternBindingInitializer::create(CurDeclContext);
-
-        initParser.emplace(*this, initContext);
-      }
-      auto result = parseArgumentList(tok::l_paren, tok::r_paren,
-                                      /*isExprBasic*/ true,
-                                      /*allowTrailingClosure*/ false);
-      status |= result;
-      argList = result.get();
-      assert(!argList->hasAnyTrailingClosures() &&
-             "Cannot parse a trailing closure here");
+      initParser.emplace(*this, initContext);
     }
+    auto result = parseArgumentList(tok::l_paren, tok::r_paren,
+                                    /*isExprBasic*/ true,
+                                    /*allowTrailingClosure*/ false);
+    status |= result;
+    argList = result.get();
+    assert(!argList->hasAnyTrailingClosures() &&
+           "Cannot parse a trailing closure here");
   }
 
   // Form the attribute.
