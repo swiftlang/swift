@@ -1583,9 +1583,20 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
 
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
-    case ActorIsolation::ActorInstance:
-      if (requiredIsolation != contextIsolation)
+    case ActorIsolation::ActorInstance: {
+      if (requiredIsolation != contextIsolation) {
+        // Implicit initializers diagnose actor isolation violations
+        // for property initializers in Sema. Still emit the invalid
+        // member initializer here to avoid duplicate diagnostics and
+        // to preserve warn-until-Swift-6 behavior.
+        auto *init =
+            dyn_cast_or_null<ConstructorDecl>(dc->getAsDecl());
+        if (init && init->isImplicit())
+          break;
+
         continue;
+      }
+    }
     }
 
     auto *varPattern = field->getPattern(i);

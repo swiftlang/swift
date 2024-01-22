@@ -2494,16 +2494,13 @@ public:
 /// SerializedTopLevelCodeDeclContext - This represents what was originally a
 /// TopLevelCodeDecl during serialization. It is preserved only to maintain the
 /// correct AST structure and remangling after deserialization.
-class SerializedTopLevelCodeDeclContext : public SerializedLocalDeclContext {
+class SerializedTopLevelCodeDeclContext : public DeclContext {
 public:
   SerializedTopLevelCodeDeclContext(DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::TopLevelCodeDecl,
-                                 Parent) {}
+    : DeclContext(DeclContextKind::SerializedTopLevelCodeDecl, Parent) {}
+
   static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::TopLevelCodeDecl;
-    return false;
+    return DC->getContextKind() == DeclContextKind::SerializedTopLevelCodeDecl;
   }
 };
 

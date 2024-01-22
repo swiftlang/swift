@@ -2755,7 +2755,12 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     if (!cs.findSelectedOverloadFor(calleeLoc))
       return 10;
   }
-  
+
+  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+    if (isResultBuilderMethodReference(cs.getASTContext(), UDE))
+      return 12;
+  }
+
   auto resolvedTy = cs.simplifyType(requirementType);
 
   // Increase the impact of a conformance fix for generic parameters on

@@ -2806,6 +2806,28 @@ public:
   bool isCached() const { return true; }
 };
 
+using ConformanceAccessScope =
+    std::pair<AccessScope, /*witnessesMustBeUsableFromInline=*/bool>;
+
+class ConformanceAccessScopeRequest
+    : public SimpleRequest<ConformanceAccessScopeRequest,
+                           ConformanceAccessScope(DeclContext *, ProtocolDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ConformanceAccessScope
+  evaluate(Evaluator &evaluator, DeclContext *dc, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class TypeWitnessRequest
     : public SimpleRequest<TypeWitnessRequest,
                            TypeWitnessAndDecl(NormalProtocolConformance *,

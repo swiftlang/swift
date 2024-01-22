@@ -3453,7 +3453,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   {
     llvm::SmallString<128> Text;
     llvm::raw_svector_ostream SS(Text);
-    llvm::SetVector<MissingWitness> missingWitnesses;
+    llvm::SetVector<ASTContext::MissingWitness> missingWitnesses;
     for (auto protocol : missingProtocols) {
       auto conformance = NormalProtocolConformance(
           nominal->getDeclaredType(), protocol, SourceLoc(), nominal,

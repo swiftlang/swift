@@ -11769,7 +11769,8 @@ MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
 
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SerializedAbstractClosure:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
   case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:

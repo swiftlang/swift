@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
-
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature IsolatedDefaultValues -parse-as-library -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-experimental-feature RegionBasedIsolation %s
 
@@ -151,7 +149,7 @@ struct S2 {
 }
 
 struct S3 {
-  // expected-error@+1 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+  // expected-error@+1 3 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
   var (x, y, z) = (requiresMainActor(), requiresSomeGlobalActor(), 10)
 }
 
@@ -196,21 +194,19 @@ extension A {
   }
 }
 
-// expected-error@+1 {{default initializer for 'C1' cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+// expected-warning@+1 {{default initializer for 'C1' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
 class C1 {
   // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
   @MainActor var x = requiresMainActor()
-  // expected-note@+1 {{initializer for property 'y' is global actor 'SomeGlobalActor'-isolated}}
   @SomeGlobalActor var y = requiresSomeGlobalActor()
 }
 
 class NonSendable {}
 
-// expected-error@+1 {{default initializer for 'C2' cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+// expected-warning@+1 {{default initializer for 'C2' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
 class C2 {
   // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
   @MainActor var x = NonSendable()
-  // expected-note@+1 {{initializer for property 'y' is global actor 'SomeGlobalActor'-isolated}}
   @SomeGlobalActor var y = NonSendable()
 }
 
@@ -224,8 +220,65 @@ class C3 {
   var y = 0
 }
 
+@MainActor class MultipleVars {
+  var (x, y) = (0, 0)
+}
+
 func callDefaultInit() async {
   _ = C2()
   _ = NonIsolatedInit()
   _ = NonIsolatedInit(x: 10)
+  _ = MultipleVars()
+}
+
+// expected-warning@+1 {{default initializer for 'MultipleVarsInvalid' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+class MultipleVarsInvalid {
+  // expected-note@+1 {{initializer for property 'x' is main actor-isolated}}
+  @MainActor var (x, y) = (requiresMainActor(), requiresMainActor())
+}
+
+@propertyWrapper 
+@preconcurrency @MainActor
+struct RequiresMain<Value>  {
+  var wrappedValue: Value
+
+  init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+// This is okay; UseRequiresMain has an inferred 'MainActor'
+// attribute.
+struct UseRequiresMain {
+  @RequiresMain private var x = 10
+}
+
+nonisolated func test() async {
+  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'; this is an error in Swift 6}}
+  // expected-note@+1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  _ = UseRequiresMain()
+}
+
+// expected-warning@+2 {{memberwise initializer for 'InitAccessors' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+// expected-warning@+1 {{default initializer for 'InitAccessors' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
+struct InitAccessors {
+  private var _a: Int
+
+  // expected-note@+1 2 {{initializer for property 'a' is main actor-isolated}}
+  @MainActor var a: Int = 5 {
+    @storageRestrictions(initializes: _a)
+    init {
+      _a = requiresMainActor()
+    }
+    get {
+      _a
+    }
+  }
+}
+
+// Make sure isolation inference for implicit initializers
+// doesn't impact conformance synthesis.
+
+struct CError: Error, RawRepresentable {
+  var rawValue: CInt
 }

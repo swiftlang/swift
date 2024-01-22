@@ -66,7 +66,7 @@ internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: St
   
   let value = _getChild(of: value, type: type, index: index, outName: &nameC, outFreeFunc: &freeFunc)
   
-  let name = nameC.flatMap({ String(validatingUTF8: $0) })
+  let name = nameC.flatMap({ String(validatingCString: $0) })
   freeFunc?(nameC)
   return (name, value)
 }

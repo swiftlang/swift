@@ -503,12 +503,13 @@ static bool initDocEntityInfo(const Decl *D,
 
   switch(D->getDeclContext()->getContextKind()) {
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedAbstractClosure:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::SerializedTopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
     case DeclContextKind::ExtensionDecl:
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::MacroDecl:

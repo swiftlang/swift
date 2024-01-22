@@ -435,7 +435,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
           _dyld_process_info_for_each_segment(dyldInfo, machHeaderAddress) {
             address, size, name in
 
-            if let name = String(validatingUTF8: name!), name == "__TEXT" {
+            if let name = String(validatingCString: name!), name == "__TEXT" {
               endOfText = address + size
             }
           }
