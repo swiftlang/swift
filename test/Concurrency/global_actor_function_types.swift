@@ -28,10 +28,10 @@ func testConversions(f: @escaping @SomeGlobalActor (Int) -> Void, g: @escaping (
 }
 
 @SomeGlobalActor func onSomeGlobalActor() -> Int { 5 }
-@SomeGlobalActor(unsafe) func onSomeGlobalActorUnsafe() -> Int { 5 }
+@preconcurrency @SomeGlobalActor func onSomeGlobalActorUnsafe() -> Int { 5 }
 
 @OtherGlobalActor func onOtherGlobalActor() -> Int { 5 } // expected-note{{calls to global function 'onOtherGlobalActor()' from outside of its actor context are implicitly asynchronous}}
-@OtherGlobalActor(unsafe) func onOtherGlobalActorUnsafe() -> Int { 5 }  // expected-note 2{{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
+@preconcurrency @OtherGlobalActor func onOtherGlobalActorUnsafe() -> Int { 5 }  // expected-note 2{{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
 // expected-complete-tns-note @-1 {{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
 
 func someSlowOperation() async -> Int { 5 }

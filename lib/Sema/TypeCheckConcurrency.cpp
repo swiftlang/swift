@@ -4110,16 +4110,27 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       return ActorIsolation::forUnspecified();
 
     // Handle @<global attribute type>(unsafe).
-    bool isUnsafe = globalActorAttr->first->isArgUnsafe();
-    if (globalActorAttr->first->hasArgs() && !isUnsafe) {
-      ctx.Diags.diagnose(
-          globalActorAttr->first->getLocation(),
-          diag::global_actor_non_unsafe_init, globalActorType);
+    auto *attr = globalActorAttr->first;
+    bool isUnsafe = attr->isArgUnsafe();
+    if (attr->hasArgs()) {
+      if (isUnsafe) {
+        SourceFile *file = decl->getDeclContext()->getParentSourceFile();
+        bool inSwiftinterface =
+            file && file->Kind == SourceFileKind::Interface;
+        ctx.Diags.diagnose(
+            attr->getLocation(),
+            diag::unsafe_global_actor)
+          .fixItRemove(attr->getArgs()->getSourceRange())
+          .fixItInsert(attr->getLocation(), "@preconcurrency ")
+          .warnUntilSwiftVersion(6)
+          .limitBehaviorIf(inSwiftinterface, DiagnosticBehavior::Ignore);
+      } else {
+        ctx.Diags.diagnose(
+            attr->getLocation(),
+            diag::global_actor_arg, globalActorType)
+          .fixItRemove(attr->getArgs()->getSourceRange());
+      }
     }
-
-    // If the declaration predates concurrency, it has unsafe actor isolation.
-    if (decl->preconcurrency())
-      isUnsafe = true;
 
     return ActorIsolation::forGlobalActor(
         globalActorType->mapTypeOutOfContext())

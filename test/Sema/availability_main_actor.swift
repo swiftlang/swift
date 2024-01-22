@@ -8,7 +8,7 @@
 @MainActor
 struct AlwaysAvailable {}
 
-@MainActor(unsafe)
+@preconcurrency @MainActor
 struct AlwaysAvailableUnsafe {}
 
 @available(SwiftStdlib 5.1, *)
@@ -16,5 +16,5 @@ struct AlwaysAvailableUnsafe {}
 struct AvailableSwift5_1 {}
 
 @available(SwiftStdlib 5.1, *)
-@MainActor(unsafe)
+@preconcurrency @MainActor
 struct AvailableSwift5_1Unsafe {}

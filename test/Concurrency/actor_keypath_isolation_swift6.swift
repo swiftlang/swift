@@ -25,8 +25,8 @@ actor Door {
     @MainActor var globActor_mutable : Int = 0
     @MainActor let globActor_immutable : Int = 0
 
-    @MainActor(unsafe) var unsafeGlobActor_mutable : Int = 0
-    @MainActor(unsafe) let unsafeGlobActor_immutable : Int = 0
+    @preconcurrency @MainActor var unsafeGlobActor_mutable : Int = 0
+    @preconcurrency @MainActor let unsafeGlobActor_immutable : Int = 0
 
     subscript(byIndex: Int) -> Int { 0 }
 
