@@ -85,6 +85,27 @@ public:
   void dump(llvm::raw_ostream &os, const clang::ASTContext &ctx) const;
 };
 
+class LifetimeDependenceInfo {
+  IndexSubset *copyLifetimeParamIndices;
+  IndexSubset *borrowLifetimeParamIndices;
+
+public:
+  LifetimeDependenceInfo()
+      : copyLifetimeParamIndices(nullptr), borrowLifetimeParamIndices(nullptr) {
+  }
+  LifetimeDependenceInfo(IndexSubset *copyLifetimeParamIndices,
+                         IndexSubset *borrowLifetimeParamIndices)
+      : copyLifetimeParamIndices(copyLifetimeParamIndices),
+        borrowLifetimeParamIndices(borrowLifetimeParamIndices) {}
+
+  operator bool() const { return empty(); }
+
+  bool empty() const {
+    return copyLifetimeParamIndices == nullptr &&
+           borrowLifetimeParamIndices == nullptr;
+  }
+};
+
 // MARK: - UnexpectedClangTypeError
 /// Potential errors when trying to store a Clang type in an ExtInfo.
 struct UnexpectedClangTypeError {

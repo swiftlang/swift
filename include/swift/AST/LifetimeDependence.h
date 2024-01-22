@@ -93,6 +93,17 @@ public:
     assert(specifierKind == SpecifierKind::Ordered);
     return value.Ordered.index;
   }
+  std::string getParamString() const {
+    switch (specifierKind) {
+    case SpecifierKind::Named:
+      return value.Named.name.str().str();
+    case SpecifierKind::Self:
+      return "self";
+    case SpecifierKind::Ordered:
+      return std::to_string(value.Ordered.index);
+    }
+    llvm_unreachable("Invalid LifetimeDependenceSpecifier::SpecifierKind");
+  }
 };
 } // namespace swift
 

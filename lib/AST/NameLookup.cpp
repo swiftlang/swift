@@ -3047,6 +3047,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Existential:
   case TypeReprKind::Inverse:
   case TypeReprKind::ResultDependsOn:
+  case TypeReprKind::LifetimeDependentReturn:
     return { };
 
   case TypeReprKind::Fixed:

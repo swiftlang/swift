@@ -2637,6 +2637,11 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::ResultDependsOn:
     return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
                                           options);
+
+  case TypeReprKind::LifetimeDependentReturn: {
+    auto lifetimeDependenceRepr = cast<LifetimeDependentReturnTypeRepr>(repr);
+    return resolveType(lifetimeDependenceRepr->getBase(), options);
+  }
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -5496,6 +5501,7 @@ public:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::ResultDependsOn:
+    case TypeReprKind::LifetimeDependentReturn:
       return false;
     }
   }

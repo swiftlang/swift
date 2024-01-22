@@ -7765,5 +7765,23 @@ ERROR(result_depends_on_no_result,none,
 ERROR(pack_iteration_where_clause_not_supported, none,
       "'where' clause in pack iteration is not supported", ())
 
+
+ //------------------------------------------------------------------------------
+ // MARK: Lifetime Dependence Diagnostics
+ //------------------------------------------------------------------------------
+
+ ERROR(lifetime_dependence_invalid_param_name, none,
+       "invalid parameter name specified %0", (Identifier))
+ ERROR(lifetime_dependence_invalid_param_index, none,
+       "invalid parameter index specified %0", (unsigned))
+ ERROR(lifetime_dependence_invalid_self, none,
+       "invalid lifetime dependence specifier, self is valid in non-static "
+       "methods only", ())
+ ERROR(lifetime_dependence_duplicate_param_id, none,
+       "duplicate lifetime dependence specifier", ())
+ ERROR(lifetime_dependence_cannot_use_kind, none,
+       "invalid use of %0 lifetime dependence for %1 ownership",
+       (StringRef, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
