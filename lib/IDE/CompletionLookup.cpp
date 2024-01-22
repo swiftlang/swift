@@ -1233,6 +1233,10 @@ void CompletionLookup::addFunctionCallPattern(
             : CodeCompletionResultKind::Pattern,
         SemanticContext ? *SemanticContext : getSemanticContextKind(AFD));
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
+    if (DotLoc) {
+      Builder.setNumBytesToErase(Ctx.SourceMgr.getByteDistance(
+          DotLoc, Ctx.SourceMgr.getIDEInspectionTargetLoc()));
+    }
     if (AFD)
       Builder.setAssociatedDecl(AFD);
 
