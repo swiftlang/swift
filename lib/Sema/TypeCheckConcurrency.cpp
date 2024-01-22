@@ -4652,6 +4652,8 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
 
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
+  auto &ctx = value->getASTContext();
+
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
@@ -4728,6 +4730,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
   };
 
   auto isolationFromAttr = getIsolationFromAttributes(value);
+  if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
+      !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
+    auto preconcurrency =
+        new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
+    value->getAttrs().add(preconcurrency);
+  }
+
   if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
     // Main.main() and Main.$main are implicitly MainActor-protected.
     // Any other isolation is an error.
@@ -4807,7 +4816,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
       // Add an implicit attribute to capture the actor isolation that was
       // inferred, so that (e.g.) it will be printed and serialized.
-      ASTContext &ctx = value->getASTContext();
       switch (inferred) {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
@@ -4847,6 +4855,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (inferred == ActorIsolation::GlobalActorUnsafe)
           attr->setArgIsUnsafe(true);
         value->getAttrs().add(attr);
+
+        if (inferred.preconcurrency()) {
+          auto preconcurrency =
+              new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
+          value->getAttrs().add(preconcurrency);
+        }
+
         break;
       }
 
