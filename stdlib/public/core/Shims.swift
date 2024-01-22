@@ -49,15 +49,18 @@ internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
  Usually:
  malloc_size(malloc(malloc_good_size(size))) == malloc_good_size(size)
  */
-@inlinable @_effects(readnone)
+@_effects(readnone) @inline(__always)
 internal func _mallocGoodSize(for size: Int) -> Int {
-  if (size <= 256) {
+  if (size <= 128) {
     return (size &+ 15) & ~15;
+  }
+  if (size <= 256) {
+    return (size &+ 31) & ~31;
   }
   return _mallocGoodSizeLarge(for: size)
 }
 
-@usableFromInline @_effects(readnone)
+@_effects(readnone)
 internal func _mallocGoodSizeLarge(for size: Int) -> Int {
   return _swift_stdlib_malloc_good_size(size)
 }
