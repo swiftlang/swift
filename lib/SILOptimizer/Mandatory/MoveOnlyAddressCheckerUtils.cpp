@@ -146,7 +146,7 @@
 /// * copyTransformableToTake - certain load [copy], certain copy_addr ![take]
 /// %src of a temporary %dest.
 /// * reinit - store [assign], copy_addr ![init] %dest
-/// * borrow - load_borror, a load [copy] without consuming uses.
+/// * borrow - load_borrow, a load [copy] without consuming uses.
 /// * livenessOnly - a read only use of the address.
 ///
 /// We classify these by adding them to several disjoint SetVectors which track
