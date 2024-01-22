@@ -47,10 +47,79 @@ STATISTIC(NumDuplicateSolutionStates,
 
 using namespace swift;
 
-CheckTypeWitnessResult
-swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
-                        const NormalProtocolConformance *Conf,
-                        SubstOptions options) {
+/// Describes the result of checking a type witness.
+///
+/// This class evaluates true if an error occurred.
+class CheckTypeWitnessResult {
+public:
+  enum Kind {
+    Success,
+
+    /// Type witness contains an error type.
+    Error,
+
+    /// Type witness does not satisfy a conformance requirement on
+    /// the associated type.
+    Conformance,
+
+    /// Type witness does not satisfy a superclass requirement on
+    /// the associated type.
+    Superclass,
+
+    /// Type witness does not satisfy a layout requirement on
+    /// the associated type.
+    Layout,
+
+    /// Type witness of a tuple conformance does not have the form
+    /// (repeat (each Element).A).
+    Tuple
+  } kind;
+
+private:
+  Type reqt;
+
+  CheckTypeWitnessResult() : kind(Success) {}
+
+  CheckTypeWitnessResult(Kind kind, Type reqt)
+    : kind(kind), reqt(reqt) {}
+
+public:
+  static CheckTypeWitnessResult forSuccess() {
+    return CheckTypeWitnessResult(Success, Type());
+  }
+
+  static CheckTypeWitnessResult forError() {
+    return CheckTypeWitnessResult(Error, Type());
+  }
+
+  static CheckTypeWitnessResult forConformance(ProtocolDecl *proto) {
+    auto reqt = proto->getDeclaredInterfaceType();
+    return CheckTypeWitnessResult(Conformance, reqt);
+  }
+
+  static CheckTypeWitnessResult forSuperclass(Type reqt) {
+    assert(reqt->getClassOrBoundGenericClass());
+    return CheckTypeWitnessResult(Superclass, reqt);
+  }
+
+  static CheckTypeWitnessResult forLayout(Type reqt) {
+    return CheckTypeWitnessResult(Layout, reqt);
+  }
+
+  static CheckTypeWitnessResult forTuple(Type reqt) {
+    return CheckTypeWitnessResult(Tuple, reqt);
+  }
+
+  Kind getKind() const { return kind; }
+  Type getRequirement() const { return reqt; }
+
+  explicit operator bool() const { return kind != Success; }
+};
+
+static CheckTypeWitnessResult
+checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
+                 const NormalProtocolConformance *Conf,
+                 SubstOptions options) {
   auto &ctx = assocType->getASTContext();
 
   if (type->hasError())
@@ -132,13 +201,13 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   return CheckTypeWitnessResult::forSuccess();
 }
 
-void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
-                                           Type type,
-                                           TypeDecl *typeDecl) {
-
+static void recordTypeWitness(NormalProtocolConformance *conformance,
+                              AssociatedTypeDecl *assocType,
+                              Type type,
+                              TypeDecl *typeDecl) {
   // If we already recoded this type witness, there's nothing to do.
-  if (Conformance->hasTypeWitness(assocType)) {
-    assert(Conformance->getTypeWitnessUncached(assocType)
+  if (conformance->hasTypeWitness(assocType)) {
+    assert(conformance->getTypeWitnessUncached(assocType)
                .getWitnessType()
                ->isEqual(type) &&
            "Conflicting type witness deductions");
@@ -147,36 +216,40 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   assert(!type->hasArchetype() && "Got a contextual type here?");
 
+  auto *dc = conformance->getDeclContext();
+  auto *proto = conformance->getProtocol();
+  auto &ctx = dc->getASTContext();
+
   // If there was no type declaration, synthesize one.
   if (typeDecl == nullptr) {
-    auto aliasDecl = new (getASTContext()) TypeAliasDecl(
+    auto aliasDecl = new (ctx) TypeAliasDecl(
         SourceLoc(), SourceLoc(), assocType->getName(), SourceLoc(),
-        /*genericparams*/ nullptr, DC);
+        /*genericparams*/ nullptr, dc);
     aliasDecl->setUnderlyingType(type);
     
     aliasDecl->setImplicit();
     aliasDecl->setSynthesized();
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
-    auto nominal = DC->getSelfNominalTypeDecl();
+    auto nominal = dc->getSelfNominalTypeDecl();
     auto requiredAccessScope = evaluateOrDefault(
-        Context.evaluator, ConformanceAccessScopeRequest{DC, Proto},
+        ctx.evaluator, ConformanceAccessScopeRequest{dc, proto},
         std::make_pair(AccessScope::getPublic(), false));
 
-    if (!getASTContext().isSwiftVersionAtLeast(5) &&
-        !DC->getParentModule()->isResilient()) {
+    if (!ctx.isSwiftVersionAtLeast(5) &&
+        !dc->getParentModule()->isResilient()) {
       // HACK: In pre-Swift-5, these typealiases were synthesized with the
       // same access level as the conforming type, which might be more
       // visible than the associated type witness. Preserve that behavior
       // when the underlying type has sufficient access, but only in
       // non-resilient modules.
       llvm::Optional<AccessScope> underlyingTypeScope =
-          TypeAccessScopeChecker::getAccessScope(type, DC,
+          TypeAccessScopeChecker::getAccessScope(type, dc,
                                                  /*usableFromInline*/ false);
       assert(underlyingTypeScope.has_value() &&
              "the type is already invalid and we shouldn't have gotten here");
 
-      AccessScope nominalAccessScope = nominal->getFormalAccessScope(DC);
+      AccessScope nominalAccessScope = nominal->getFormalAccessScope(dc);
       llvm::Optional<AccessScope> widestPossibleScope =
           underlyingTypeScope->intersectWith(nominalAccessScope);
       assert(widestPossibleScope.has_value() &&
@@ -192,15 +265,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     aliasDecl->setAccess(requiredAccess);
     if (requiredAccessScope.second) {
-      auto *attr =
-          new (getASTContext()) UsableFromInlineAttr(/*implicit=*/true);
+      auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
       aliasDecl->getAttrs().add(attr);
     }
 
-    if (nominal == DC) {
+    if (nominal == dc) {
       nominal->addMember(aliasDecl);
     } else {
-      auto ext = cast<ExtensionDecl>(DC);
+      auto ext = cast<ExtensionDecl>(dc);
       ext->addMember(aliasDecl);
     }
 
@@ -208,7 +280,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  Conformance->setTypeWitness(assocType, type, typeDecl);
+  conformance->setTypeWitness(assocType, type, typeDecl);
 
   // Record type witnesses for any "overridden" associated types.
   llvm::SetVector<AssociatedTypeDecl *> overriddenAssocTypes;
@@ -224,7 +296,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     // Find the conformance for this overridden protocol.
     auto overriddenConformance =
-      DC->getParentModule()->lookupConformance(Adoptee,
+      dc->getParentModule()->lookupConformance(dc->getSelfInterfaceType(),
                                                overridden->getProtocol(),
                                                /*allowMissing=*/true);
     if (overriddenConformance.isInvalid() ||
@@ -250,22 +322,20 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     // - If the current conformance is more restrictive, this type witness may
     //   not be a viable candidate for the overridden associated type.
     if (overriddenRootConformanceDC->getSelfNominalTypeDecl() !=
-        DC->getSelfNominalTypeDecl())
+        dc->getSelfNominalTypeDecl())
       continue;
 
-    if (overriddenRootConformanceDC->getParentModule() != DC->getParentModule())
+    if (overriddenRootConformanceDC->getParentModule() != dc->getParentModule())
       continue;
 
-    auto currConformanceSig = DC->getGenericSignatureOfContext();
+    auto currConformanceSig = dc->getGenericSignatureOfContext();
     auto overriddenConformanceSig =
         overriddenRootConformanceDC->getGenericSignatureOfContext();
     if (currConformanceSig.getCanonicalSignature() !=
         overriddenConformanceSig.getCanonicalSignature())
       continue;
 
-    ConformanceChecker(getASTContext(), overriddenRootConformance,
-                       GlobalMissingWitnesses)
-        .recordTypeWitness(overridden, type, typeDecl);
+    recordTypeWitness(overriddenRootConformance, overridden, type, typeDecl);
   }
 }
 
@@ -381,7 +451,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
     // Check this type against the protocol requirements.
     if (auto checkResult =
-            checkTypeWitness(memberType, assocType, Conformance)) {
+            checkTypeWitness(memberType, assocType, Conformance, llvm::None)) {
       nonViable.push_back({typeDecl, checkResult});
     } else {
       viable.push_back({typeDecl, memberType, nullptr});
@@ -401,12 +471,14 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
     auto interfaceType = viable.front().MemberType;
-    recordTypeWitness(assocType, interfaceType, viable.front().Member);
+    recordTypeWitness(Conformance, assocType, interfaceType,
+                      viable.front().Member);
     return ResolveWitnessResult::Success;
   }
 
   // Record an error.
-  recordTypeWitness(assocType, ErrorType::get(getASTContext()), nullptr);
+  recordTypeWitness(Conformance, assocType,
+                    ErrorType::get(getASTContext()), nullptr);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
@@ -470,6 +542,25 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   return ResolveWitnessResult::ExplicitFailed;
 }
 
+/// The set of associated types that have been inferred by matching
+/// the given value witness to its corresponding requirement.
+struct InferredAssociatedTypesByWitness {
+  /// The witness we matched.
+  ValueDecl *Witness = nullptr;
+
+  /// The associated types inferred from matching this witness.
+  SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> Inferred;
+
+  /// Inferred associated types that don't meet the associated type
+  /// requirements.
+  SmallVector<std::tuple<AssociatedTypeDecl *, Type, CheckTypeWitnessResult>,
+              2> NonViable;
+
+  void dump(llvm::raw_ostream &out, unsigned indent) const;
+
+  SWIFT_DEBUG_DUMP;
+};
+
 void InferredAssociatedTypesByWitness::dump() const {
   dump(llvm::errs(), 0);
 }
@@ -501,29 +592,14 @@ void InferredAssociatedTypesByWitness::dump(llvm::raw_ostream &out,
   out << ")";
 }
 
-void InferredTypeWitnessesSolution::dump() const {
-  const auto numValueWitnesses = ValueWitnesses.size();
-  llvm::errs() << "Type Witnesses:\n";
-  for (auto &typeWitness : TypeWitnesses) {
-    llvm::errs() << "  " << typeWitness.first->getName() << " := ";
-    typeWitness.second.first->print(llvm::errs());
-    if (typeWitness.second.second == numValueWitnesses) {
-      llvm::errs() << ", abstract";
-    } else {
-      llvm::errs() << ", inferred from $" << typeWitness.second.second;
-    }
-    llvm::errs() << '\n';
-  }
-  llvm::errs() << "Value Witnesses:\n";
-  for (unsigned i : indices(ValueWitnesses)) {
-    const auto &valueWitness = ValueWitnesses[i];
-    llvm::errs() << '$' << i << ":\n  ";
-    valueWitness.first->dumpRef(llvm::errs());
-    llvm::errs() << " ->\n  ";
-    valueWitness.second->dumpRef(llvm::errs());
-    llvm::errs() << '\n';
-  }
-}
+/// The set of witnesses that were considered when attempting to
+/// infer associated types.
+using InferredAssociatedTypesByWitnesses =
+    SmallVector<InferredAssociatedTypesByWitness, 2>;
+
+/// A mapping from requirements to the set of matches with witnesses.
+using InferredAssociatedTypes =
+    SmallVector<std::pair<ValueDecl *, InferredAssociatedTypesByWitnesses>, 4>;
 
 namespace {
   void dumpInferredAssociatedTypesByWitnesses(
@@ -561,6 +637,105 @@ namespace {
 
   void dumpInferredAssociatedTypes(const InferredAssociatedTypes &inferred) {
     dumpInferredAssociatedTypes(inferred, llvm::errs(), 0);
+  }
+}
+
+/// A conflict between two inferred type witnesses for the same
+/// associated type.
+struct TypeWitnessConflict {
+  /// The associated type.
+  AssociatedTypeDecl *AssocType;
+
+  /// The first type.
+  Type FirstType;
+
+  /// The requirement to which the first witness was matched.
+  ValueDecl *FirstRequirement;
+
+  /// The witness from which the first type witness was inferred.
+  ValueDecl *FirstWitness;
+
+  /// The second type.
+  Type SecondType;
+
+  /// The requirement to which the second witness was matched.
+  ValueDecl *SecondRequirement;
+
+  /// The witness from which the second type witness was inferred.
+  ValueDecl *SecondWitness;
+};
+
+/// A type witness inferred without the aid of a specific potential
+/// value witness.
+class AbstractTypeWitness {
+  AssociatedTypeDecl *AssocType;
+  Type TheType;
+
+  /// The defaulted associated type that was used to infer this type witness.
+  /// Need not necessarily match \c AssocType, but their names must.
+  AssociatedTypeDecl *DefaultedAssocType;
+
+public:
+  AbstractTypeWitness(AssociatedTypeDecl *AssocType, Type TheType,
+                      AssociatedTypeDecl *DefaultedAssocType = nullptr)
+      : AssocType(AssocType), TheType(TheType),
+        DefaultedAssocType(DefaultedAssocType) {
+    assert(AssocType && TheType);
+    assert(!DefaultedAssocType ||
+           (AssocType->getName() == DefaultedAssocType->getName()));
+  }
+
+  AssociatedTypeDecl *getAssocType() const { return AssocType; }
+
+  Type getType() const { return TheType; }
+
+  AssociatedTypeDecl *getDefaultedAssocType() const {
+    return DefaultedAssocType;
+  }
+};
+
+/// A potential solution to the set of inferred type witnesses.
+struct InferredTypeWitnessesSolution {
+  /// The set of type witnesses inferred by this solution, along
+  /// with the index into the value witnesses where the type was
+  /// inferred.
+  llvm::SmallDenseMap<AssociatedTypeDecl *, std::pair<Type, unsigned>, 4>
+    TypeWitnesses;
+
+  /// The value witnesses selected by this step of the solution.
+  SmallVector<std::pair<ValueDecl *, ValueDecl *>, 4> ValueWitnesses;
+
+  /// The number of value witnesses that occur in protocol
+  /// extensions.
+  unsigned NumValueWitnessesInProtocolExtensions;
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_USED
+#endif
+  void dump() const;
+};
+
+void InferredTypeWitnessesSolution::dump() const {
+  const auto numValueWitnesses = ValueWitnesses.size();
+  llvm::errs() << "Type Witnesses:\n";
+  for (auto &typeWitness : TypeWitnesses) {
+    llvm::errs() << "  " << typeWitness.first->getName() << " := ";
+    typeWitness.second.first->print(llvm::errs());
+    if (typeWitness.second.second == numValueWitnesses) {
+      llvm::errs() << ", abstract";
+    } else {
+      llvm::errs() << ", inferred from $" << typeWitness.second.second;
+    }
+    llvm::errs() << '\n';
+  }
+  llvm::errs() << "Value Witnesses:\n";
+  for (unsigned i : indices(ValueWitnesses)) {
+    const auto &valueWitness = ValueWitnesses[i];
+    llvm::errs() << '$' << i << ":\n  ";
+    valueWitness.first->dumpRef(llvm::errs());
+    llvm::errs() << " ->\n  ";
+    valueWitness.second->dumpRef(llvm::errs());
+    llvm::errs() << '\n';
   }
 }
 
@@ -1165,7 +1340,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
         // Check that the type witness meets the
         // requirements on the associated type.
         if (auto failed =
-                checkTypeWitness(result.second, result.first, conformance)) {
+                checkTypeWitness(result.second, result.first, conformance,
+                                 llvm::None)) {
           witnessResult.NonViable.push_back(
                           std::make_tuple(result.first,result.second,failed));
           LLVM_DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
@@ -1742,7 +1918,7 @@ AssociatedTypeInference::computeDerivedTypeWitness(
     return std::make_pair(Type(), nullptr);
 
   // Make sure that the derived type satisfies requirements.
-  if (checkTypeWitness(result.first, assocType, conformance)) {
+  if (checkTypeWitness(result.first, assocType, conformance, llvm::None)) {
     /// FIXME: Diagnose based on this.
     failedDerivedAssocType = assocType;
     failedDerivedWitness = result.first;
@@ -3218,9 +3394,9 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     if (canAttemptEagerTypeWitnessDerivation(dc, assocType)) {
       auto derivedType = computeDerivedTypeWitness(assocType);
       if (derivedType.first) {
-        checker.recordTypeWitness(assocType,
-                                  derivedType.first->mapTypeOutOfContext(),
-                                  derivedType.second);
+        recordTypeWitness(conformance, assocType,
+                          derivedType.first->mapTypeOutOfContext(),
+                          derivedType.second);
         continue;
       }
     }
@@ -3248,9 +3424,9 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
     // Finally, try to derive the witness if we know how.
     auto derivedType = computeDerivedTypeWitness(assocType);
     if (derivedType.first) {
-      checker.recordTypeWitness(assocType,
-                                derivedType.first->mapTypeOutOfContext(),
-                                derivedType.second);
+      recordTypeWitness(conformance, assocType,
+                        derivedType.first->mapTypeOutOfContext(),
+                        derivedType.second);
       continue;
     }
 
@@ -3637,7 +3813,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
   AssociatedTypeInference inference(getASTContext(), Conformance);
   if (auto inferred = inference.solve(*this)) {
     for (const auto &inferredWitness : *inferred) {
-      recordTypeWitness(inferredWitness.first, inferredWitness.second,
+      recordTypeWitness(Conformance,
+                        inferredWitness.first,
+                        inferredWitness.second,
                         /*typeDecl=*/nullptr);
     }
 
@@ -3654,7 +3832,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (Conformance->hasTypeWitness(assocType))
       continue;
 
-    recordTypeWitness(assocType, ErrorType::get(getASTContext()), nullptr);
+    recordTypeWitness(Conformance, assocType,
+                      ErrorType::get(getASTContext()), nullptr);
   }
 }
 
