@@ -664,7 +664,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   auto builtinCall =
       DerivedConformance::createBuiltinCall(ctx,
                                             BuiltinValueKind::BuildDefaultActorExecutorRef,
-                                            {selfType}, {}, {selfArg});
+                                            {selfType}, {selfArg});
   // Turn that into an UnownedSerialExecutor.
   auto initCall = constructDistributedUnownedSerialExecutor(ctx, builtinCall);
   if (!initCall) return failure();
