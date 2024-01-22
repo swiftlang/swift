@@ -3769,9 +3769,11 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  // TODO: Handle LifetimeDependenceInfo here.
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
-      diffKind, /*clangFunctionType*/ nullptr, Type());
+      diffKind, /*clangFunctionType*/ nullptr, Type(),
+      LifetimeDependenceInfo());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)

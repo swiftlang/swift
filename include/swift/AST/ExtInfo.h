@@ -390,16 +390,20 @@ class ASTExtInfoBuilder {
   unsigned bits; // Naturally sized for speed.
 
   ClangTypeInfo clangTypeInfo;
+
   Type globalActor;
   Type thrownError;
 
+  LifetimeDependenceInfo lifetimeDependenceInfo;
+
   using Representation = FunctionTypeRepresentation;
 
-  ASTExtInfoBuilder(
-      unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor,
-      Type thrownError
-  ) : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor),
-      thrownError(thrownError) {}
+  ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
+                    Type globalActor, Type thrownError,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
+      : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor),
+        thrownError(thrownError),
+        lifetimeDependenceInfo(lifetimeDependenceInfo) {}
 
 public:
   /// An ExtInfoBuilder for a typical Swift function: @convention(swift),
@@ -407,25 +411,26 @@ public:
   ASTExtInfoBuilder()
       : ASTExtInfoBuilder(Representation::Swift, false, false, Type(),
                           DifferentiabilityKind::NonDifferentiable, nullptr,
-                          Type()) {}
+                          Type(), LifetimeDependenceInfo()) {}
 
   // Constructor for polymorphic type.
   ASTExtInfoBuilder(Representation rep, bool throws, Type thrownError)
       : ASTExtInfoBuilder(rep, false, throws, thrownError,
                           DifferentiabilityKind::NonDifferentiable, nullptr,
-                          Type()) {}
+                          Type(), LifetimeDependenceInfo()) {}
 
   // Constructor with no defaults.
   ASTExtInfoBuilder(Representation rep, bool isNoEscape, bool throws,
-                    Type thrownError,
-                    DifferentiabilityKind diffKind, const clang::Type *type,
-                    Type globalActor)
+                    Type thrownError, DifferentiabilityKind diffKind,
+                    const clang::Type *type, Type globalActor,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
       : ASTExtInfoBuilder(
             ((unsigned)rep) | (isNoEscape ? NoEscapeMask : 0) |
                 (throws ? ThrowsMask : 0) |
                 (((unsigned)diffKind << DifferentiabilityMaskOffset) &
                  DifferentiabilityMask),
-            ClangTypeInfo(type), globalActor, thrownError) {}
+            ClangTypeInfo(type), globalActor, thrownError,
+            lifetimeDependenceInfo) {}
 
   void checkInvariants() const;
 
@@ -465,6 +470,10 @@ public:
   Type getGlobalActor() const { return globalActor; }
   Type getThrownError() const { return thrownError; }
 
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return lifetimeDependenceInfo;
+  }
+
   constexpr bool hasSelfParam() const {
     switch (getSILRepresentation()) {
     case SILFunctionTypeRepresentation::Thick:
@@ -498,31 +507,31 @@ public:
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo(),
-                             globalActor, thrownError);
+                             globalActor, thrownError, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
-    return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
-                                      : (bits & ~NoEscapeMask),
-                             clangTypeInfo, globalActor, thrownError);
+    return ASTExtInfoBuilder(
+        noEscape ? (bits | NoEscapeMask) : (bits & ~NoEscapeMask),
+        clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
-    return ASTExtInfoBuilder(concurrent ? (bits | SendableMask)
-                                        : (bits & ~SendableMask),
-                             clangTypeInfo, globalActor, thrownError);
+    return ASTExtInfoBuilder(
+        concurrent ? (bits | SendableMask) : (bits & ~SendableMask),
+        clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withAsync(bool async = true) const {
-    return ASTExtInfoBuilder(async ? (bits | AsyncMask)
-                                   : (bits & ~AsyncMask),
-                             clangTypeInfo, globalActor, thrownError);
+    return ASTExtInfoBuilder(async ? (bits | AsyncMask) : (bits & ~AsyncMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             lifetimeDependenceInfo);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withThrows(bool throws, Type thrownError) const {
     return ASTExtInfoBuilder(
         throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo,
-        globalActor, thrownError);
+        globalActor, thrownError, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withThrows() const {
@@ -534,12 +543,12 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
-        clangTypeInfo, globalActor, thrownError);
+        clangTypeInfo, globalActor, thrownError, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return ASTExtInfoBuilder(
-        bits, ClangTypeInfo(type), globalActor, thrownError);
+    return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor,
+                             thrownError, lifetimeDependenceInfo);
   }
 
   /// Put a SIL representation in the ExtInfo.
@@ -553,19 +562,27 @@ public:
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo(),
-                             globalActor, thrownError);
+                             globalActor, thrownError, lifetimeDependenceInfo);
   }
 
   [[nodiscard]]
   ASTExtInfoBuilder withGlobalActor(Type globalActor) const {
-    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError);
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                             lifetimeDependenceInfo);
+  }
+
+  [[nodiscard]] ASTExtInfoBuilder withLifetimeDependenceInfo(
+      LifetimeDependenceInfo lifetimeDependenceInfo) const {
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                             lifetimeDependenceInfo);
   }
 
   bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes) const {
     return bits == other.bits &&
-      (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
-      globalActor.getPointer() == other.globalActor.getPointer() &&
-      thrownError.getPointer() == other.thrownError.getPointer();
+           (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
+           globalActor.getPointer() == other.globalActor.getPointer() &&
+           thrownError.getPointer() == other.thrownError.getPointer() &&
+           lifetimeDependenceInfo == other.lifetimeDependenceInfo;
   }
 
   constexpr std::tuple<unsigned, const void *, const void *, const void *>
@@ -594,8 +611,9 @@ class ASTExtInfo {
   ASTExtInfo(ASTExtInfoBuilder builder) : builder(builder) {}
 
   ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor,
-             Type thrownError)
-      : builder(bits, clangTypeInfo, globalActor, thrownError) {
+             Type thrownError, LifetimeDependenceInfo lifetimeDependenceInfo)
+      : builder(bits, clangTypeInfo, globalActor, thrownError,
+                lifetimeDependenceInfo) {
     builder.checkInvariants();
   };
 
@@ -641,6 +659,10 @@ public:
 
   Type getGlobalActor() const { return builder.getGlobalActor(); }
   Type getThrownError() const { return builder.getThrownError(); }
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return builder.getLifetimeDependenceInfo();
+  }
 
   /// Helper method for changing the representation.
   ///
@@ -693,6 +715,11 @@ public:
   [[nodiscard]]
   ASTExtInfo withGlobalActor(Type globalActor) const {
     return builder.withGlobalActor(globalActor).build();
+  }
+
+  [[nodiscard]] ASTExtInfo withLifetimeDependenceInfo(
+      LifetimeDependenceInfo lifetimeDependenceInfo) const {
+    return builder.withLifetimeDependenceInfo(lifetimeDependenceInfo).build();
   }
 
   bool isEqualTo(ASTExtInfo other, bool useClangTypes) const {

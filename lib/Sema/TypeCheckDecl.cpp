@@ -2881,6 +2881,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(D))
         infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());
+      if (lifetimeDependenceInfo.has_value())
+        infoBuilder =
+            infoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
       auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
