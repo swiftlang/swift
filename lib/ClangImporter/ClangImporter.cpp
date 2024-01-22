@@ -7217,6 +7217,12 @@ static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
 }
 
 static bool hasOwnedValueAttr(const clang::RecordDecl *decl) {
+  // HACK: this logic belongs in std.apinotes, but it got broken by a libc++
+  // modulemap change
+  if (decl->getNameAsString() == "basic_string" ||
+      decl->getNameAsString() == "vector")
+    return true;
+
   return hasSwiftAttribute(decl, "import_owned");
 }
 
