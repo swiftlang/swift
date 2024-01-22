@@ -5,6 +5,8 @@
 // possible.
 //
 
+// REQUIRES: rdar118947451
+
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/package_resilience.swift
 // RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/Inputs/package_types/resilient_struct.swift
