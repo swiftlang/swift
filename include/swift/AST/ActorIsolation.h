@@ -121,9 +121,8 @@ public:
     return ActorIsolation(ActorInstance, capturedActor);
   }
 
-  static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
-    return ActorIsolation(
-        unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
+  static ActorIsolation forGlobalActor(Type globalActor) {
+    return ActorIsolation(GlobalActor, globalActor);
   }
 
   static std::optional<ActorIsolation> forSILString(StringRef string) {

@@ -62,7 +62,7 @@ struct S5_P2: P2 {
 nonisolated func testP2(x: S5_P2, p2: P2) {
   p2.f() // expected-warning{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // OKAY
-  x.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  x.f() // expected-warning{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
 }
 
@@ -72,7 +72,7 @@ func testP2_noconcurrency(x: S5_P2, p2: P2) {
   // expected-complete-tns-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // okay
   x.f() // okay without complete. with targeted/minimal not concurrency-related code
-  // expected-complete-tns-error @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  // expected-complete-tns-warning @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
 }
 

@@ -10965,9 +10965,9 @@ ActorIsolation swift::getActorIsolationOfContext(
         dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete) {
       if (Type mainActor = dcToUse->getASTContext().getMainActorType())
-        return ActorIsolation::forGlobalActor(
-            mainActor,
-            /*unsafe=*/!dcToUse->getASTContext().isSwiftVersionAtLeast(6));
+        return ActorIsolation::forGlobalActor(mainActor)
+            .withPreconcurrency(
+                !dcToUse->getASTContext().isSwiftVersionAtLeast(6));
     }
   }
 
