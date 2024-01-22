@@ -266,6 +266,13 @@ public:
   bool isMultilineString() const {
     return MultilineString;
   }
+
+  bool isLifetimeDependenceToken() {
+    auto tokenRawText = getRawText();
+    return tokenRawText.equals("_copy") || tokenRawText.equals("_consume") ||
+           tokenRawText.equals("_borrow") || tokenRawText.equals("_mutate");
+  }
+
   /// Count of extending escaping '#'.
   unsigned getCustomDelimiterLen() const {
     return CustomDelimiterLen;
