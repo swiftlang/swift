@@ -134,6 +134,7 @@
 #include "StructLayout.h"
 #include "SwitchBuilder.h"
 #include "ClassTypeInfo.h"
+#include "NativeConventionSchema.h"
 
 using namespace swift;
 using namespace irgen;
@@ -195,6 +196,21 @@ loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc, Address addr) const {
   IGF.IGM.error(loc, "Can only load from an address of an optional "
                 "reference.");
   llvm::report_fatal_error("loadRefcountedPtr: Invalid SIL in IRGen");
+}
+
+const TypeInfo &EnumImplStrategy::getTypeInfoForPayloadCase(EnumElementDecl *theCase) const {
+  auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                               ElementsWithPayload.end(),
+   [&](const Element &e) { return e.decl == theCase; });
+  assert (payloadI != ElementsWithPayload.end());
+  return *(payloadI->ti);
+}
+
+bool EnumImplStrategy::isPayloadCase(EnumElementDecl *theCase) const {
+  auto payloadI = std::find_if(ElementsWithPayload.begin(),
+                               ElementsWithPayload.end(),
+   [&](const Element &e) { return e.decl == theCase; });
+  return (payloadI != ElementsWithPayload.end());
 }
 
 Address
@@ -283,9 +299,49 @@ EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
 }
 
 llvm::Value *
-EnumImplStrategy::emitFixedGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr) const {
+EnumImplStrategy::emitFixedGetEnumTag(IRGenFunction &IGF, SILType T,
+                                      Address enumAddr) const {
   assert(TIK >= Fixed);
   return emitGetEnumTag(IGF, T, enumAddr);
+}
+
+llvm::Value *
+EnumImplStrategy::emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
+                                         Address enumAddr) const {
+  assert(TIK >= Fixed);
+
+  const TypeInfo &ti = IGF.getTypeInfo(T);
+  llvm::SmallVector<llvm::Value *, 4> args;
+  args.push_back(IGF.Builder.CreateElementBitCast(enumAddr, ti.getStorageType())
+                            .getAddress());
+
+  auto outlinedFn = [T, &IGF] () -> llvm::Constant* {
+    IRGenMangler mangler;
+    auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
+    auto funcName = mangler.mangleOutlinedEnumGetTag(manglingBits.first,
+                                                     manglingBits.second);
+
+    const TypeInfo &ti = IGF.getTypeInfo(T);
+    auto ptrTy = ti.getStorageType()->getPointerTo();
+    llvm::SmallVector<llvm::Type *, 4> paramTys;
+    paramTys.push_back(ptrTy);
+
+    return IGF.IGM.getOrCreateHelperFunction(funcName, IGF.IGM.Int32Ty, paramTys,
+        [&](IRGenFunction &IGF) {
+          Explosion params = IGF.collectParameters();
+          Address enumAddr = ti.getAddressForPointer(params.claimNext());
+          auto res =
+            getEnumImplStrategy(IGF.IGM, T).emitFixedGetEnumTag(IGF, T,
+                                                                enumAddr);
+          IGF.Builder.CreateRet(res);
+        },
+        true /*setIsNoInline*/);
+    }();
+
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      cast<llvm::Function>(outlinedFn)->getFunctionType(), outlinedFn, args);
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  return call;
 }
 
 namespace {
@@ -378,7 +434,8 @@ namespace {
     llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
-                         EnumElementDecl *Case) const override {
+                         EnumElementDecl *Case,
+                         bool) const override {
       return IGF.Builder.getInt1(true);
     }
 
@@ -407,7 +464,8 @@ namespace {
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
-                            llvm::BasicBlock *defaultDest) const override {
+                            llvm::BasicBlock *defaultDest,
+                            bool) const override {
       emitSingletonSwitch(IGF, dests, defaultDest);
     }
 
@@ -906,7 +964,8 @@ namespace {
     
     llvm::Value *emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                                       Address enumAddr,
-                                      EnumElementDecl *Case) const override {
+                                      EnumElementDecl *Case,
+                                      bool) const override {
       Explosion value;
       loadAsTake(IGF, enumAddr, value);
       return emitValueCaseTest(IGF, value, Case);
@@ -946,7 +1005,8 @@ namespace {
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
-                            llvm::BasicBlock *defaultDest) const override {
+                            llvm::BasicBlock *defaultDest,
+                            bool) const override {
       Explosion value;
       loadAsTake(IGF, addr, value);
       emitValueSwitch(IGF, value, dests, defaultDest);
@@ -1971,8 +2031,9 @@ namespace {
     llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
-                         EnumElementDecl *Case) const override {
-      if (TIK >= Fixed) {
+                         EnumElementDecl *Case,
+                         bool noLoad) const override {
+      if (TIK >= Fixed && !noLoad) {
         // Load the fixed-size representation and switch directly.
         Explosion value;
         loadForSwitch(IGF, enumAddr, value);
@@ -1985,7 +2046,8 @@ namespace {
       auto curBlock = IGF.Builder.GetInsertBlock();
       auto caseBlock = llvm::BasicBlock::Create(C);
       auto contBlock = llvm::BasicBlock::Create(C);
-      emitIndirectSwitch(IGF, T, enumAddr, {{Case, caseBlock}}, contBlock);
+      emitIndirectSwitch(IGF, T, enumAddr, {{Case, caseBlock}}, contBlock,
+                         noLoad);
       
       // Emit the case block.
       IGF.Builder.emitBlock(caseBlock);
@@ -2283,7 +2345,9 @@ namespace {
       }
 
       // Ask the runtime to find the case index.
-      auto caseIndex = emitGetEnumTag(IGF, T, addr);
+      auto caseIndex = TIK >= Fixed ?
+        emitOutlinedGetEnumTag(IGF, T, addr) :
+        emitGetEnumTag(IGF, T, addr);
 
       // Switch on the index.
       auto swi = SwitchBuilder::create(IGF, caseIndex,
@@ -2318,8 +2382,9 @@ namespace {
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
-                            llvm::BasicBlock *defaultDest) const override {
-      if (TIK >= Fixed) {
+                            llvm::BasicBlock *defaultDest,
+                            bool noLoad) const override {
+      if (TIK >= Fixed && !noLoad) {
         // Load the fixed-size representation and switch directly.
         Explosion value;
         loadForSwitch(IGF, addr, value);
@@ -4087,8 +4152,9 @@ namespace {
     llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
-                         EnumElementDecl *Case) const override {
-      if (TIK >= Fixed) {
+                         EnumElementDecl *Case,
+                         bool noLoad) const override {
+      if (TIK >= Fixed && !noLoad) {
         // Load the fixed-size representation and switch directly.
         Explosion value;
         loadForSwitch(IGF, enumAddr, value);
@@ -4096,7 +4162,9 @@ namespace {
       }
       
       // Use the runtime to dynamically switch.
-      auto tag = loadDynamicTag(IGF, enumAddr, T);
+      auto tag = TIK >= Fixed ?
+        emitOutlinedGetEnumTag(IGF, T, enumAddr) :
+        loadDynamicTag(IGF, enumAddr, T);
       unsigned tagIndex = getTagIndex(Case);
       llvm::Value *expectedTag
         = llvm::ConstantInt::get(IGM.Int32Ty, tagIndex);
@@ -4294,7 +4362,9 @@ namespace {
                                               llvm::BasicBlock*>> dests,
                            llvm::BasicBlock *defaultDest) const {
       // Ask the runtime to derive the tag index.
-      auto tag = loadDynamicTag(IGF, addr, T);
+      auto tag = TIK >= Fixed ?
+        emitOutlinedGetEnumTag(IGF, T, addr) :
+        loadDynamicTag(IGF, addr, T);
       
       // Switch on the tag value.
       
@@ -4346,8 +4416,9 @@ namespace {
                             Address addr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
-                            llvm::BasicBlock *defaultDest) const override {
-      if (TIK >= Fixed) {
+                            llvm::BasicBlock *defaultDest,
+                            bool noLoad) const override {
+      if (TIK >= Fixed && !noLoad) {
         // Load the fixed-size representation and switch directly.
         Explosion value;
         loadForSwitch(IGF, addr, value);
@@ -5849,7 +5920,8 @@ namespace {
     llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
-                         EnumElementDecl *Case) const override {
+                         EnumElementDecl *Case,
+                         bool) const override {
       llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
       return testResilientTag(IGF, tag, Case);
     }
@@ -5859,7 +5931,8 @@ namespace {
                             Address enumAddr,
                             ArrayRef<std::pair<EnumElementDecl*,
                                                llvm::BasicBlock*>> dests,
-                            llvm::BasicBlock *defaultDest) const override {
+                            llvm::BasicBlock *defaultDest,
+                            bool) const override {
       // Switch on the tag value.
       llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
 
@@ -7210,8 +7283,11 @@ void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
                                                      llvm::BasicBlock *>> dests,
                                   llvm::BasicBlock *defaultDest) {
   auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
+  const auto &TI = IGF.IGM.getTypeInfo(enumTy);
   strategy.emitIndirectSwitch(IGF, enumTy,
-                              enumAddr, dests, defaultDest);
+                              enumAddr, dests, defaultDest,
+                              shouldOutlineEnumValueOperation(TI, IGF.IGM)
+                              /* noLoad */);
 }
 
 void irgen::emitInjectLoadableEnum(IRGenFunction &IGF, SILType enumTy,
@@ -7238,18 +7314,135 @@ Address irgen::emitProjectEnumAddressForStore(IRGenFunction &IGF,
     .projectDataForStore(IGF, theCase, enumAddr);
 }
 
+static llvm::CallInst *emitCallToOutlinedDestructiveProjectDataForLoad(
+  IRGenFunction &IGF, Address addr, SILType T, const TypeInfo &ti,
+  EnumElementDecl *theCase, unsigned caseIdx) {
+
+  llvm::SmallVector<llvm::Value *, 4> args;
+  args.push_back(IGF.Builder.CreateElementBitCast(addr, ti.getStorageType())
+                            .getAddress());
+
+  auto outlinedFn =
+    IGF.IGM.getOrCreateOutlinedDestructiveProjectDataForLoad(T, ti, theCase,
+                                                             caseIdx);
+
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      cast<llvm::Function>(outlinedFn)->getFunctionType(), outlinedFn, args);
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  return call;
+}
+
+llvm::Constant *IRGenModule::getOrCreateOutlinedDestructiveProjectDataForLoad(
+                              SILType T, const TypeInfo &ti,
+                              EnumElementDecl *theCase,
+                              unsigned caseIdx) {
+  IRGenMangler mangler;
+  auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
+  auto funcName =
+    mangler.mangleOutlinedEnumProjectDataForLoadFunction(manglingBits.first,
+                                                         manglingBits.second,
+                                                         caseIdx);
+
+  auto ptrTy = ti.getStorageType()->getPointerTo();
+  llvm::SmallVector<llvm::Type *, 4> paramTys;
+  paramTys.push_back(ptrTy);
+
+  return getOrCreateHelperFunction(funcName, PtrTy, paramTys,
+      [&](IRGenFunction &IGF) {
+        Explosion params = IGF.collectParameters();
+        Address enumAddr = ti.getAddressForPointer(params.claimNext());
+        Address res = getEnumImplStrategy(IGF.IGM, T)
+           .destructiveProjectDataForLoad(IGF, T, enumAddr, theCase);
+        IGF.Builder.CreateRet(res.getAddress());
+      },
+      true /*setIsNoInline*/);
+}
+
+bool irgen::shouldOutlineEnumValueOperation(const TypeInfo &TI,
+                                            IRGenModule &IGM) {
+  if (!isa<LoadableTypeInfo>(TI))
+    return false;
+  auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(IGM);
+  return nativeSchemaOrigParam.size() > 15;
+}
+
 Address irgen::emitDestructiveProjectEnumAddressForLoad(IRGenFunction &IGF,
                                                    SILType enumTy,
                                                    Address enumAddr,
                                                    EnumElementDecl *theCase) {
+  const TypeInfo &TI = IGF.getTypeInfo(enumTy);
+  if (isa<LoadableTypeInfo>(TI)) {
+    auto &strategy = getEnumImplStrategy(IGF.IGM, enumTy);
+      if (shouldOutlineEnumValueOperation(TI, IGF.IGM) &&
+        strategy.getElementsWithPayload().size() > 1 &&
+        strategy.isPayloadCase(theCase)) {
+      unsigned caseIdx = strategy.getTagIndex(theCase);
+      auto res =
+        emitCallToOutlinedDestructiveProjectDataForLoad(IGF, enumAddr,
+                                                        enumTy, TI,
+                                                        theCase, caseIdx);
+      auto &payloadTI = strategy.getTypeInfoForPayloadCase(theCase);
+      return payloadTI.getAddressForPointer(res);
+    }
+  }
+
   return getEnumImplStrategy(IGF.IGM, enumTy)
     .destructiveProjectDataForLoad(IGF, enumTy, enumAddr, theCase);
+}
+
+static void emitCallToOutlinedEnumTagStore(IRGenFunction &IGF,
+                                    Address addr, SILType T,
+                                    const TypeInfo &ti,
+                                    EnumElementDecl *theCase,
+                                    unsigned caseIdx) {
+  llvm::SmallVector<llvm::Value *, 4> args;
+  args.push_back(IGF.Builder.CreateElementBitCast(addr, ti.getStorageType())
+                            .getAddress());
+
+  auto outlinedFn = IGF.IGM.getOrCreateOutlinedEnumTagStoreFunction(T, ti,
+                                                                    theCase,
+                                                                    caseIdx);
+
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      cast<llvm::Function>(outlinedFn)->getFunctionType(), outlinedFn, args);
+  call->setCallingConv(IGF.IGM.DefaultCC);
+}
+
+llvm::Constant *IRGenModule::getOrCreateOutlinedEnumTagStoreFunction(
+                              SILType T, const TypeInfo &ti,
+                              EnumElementDecl *theCase,
+                              unsigned caseIdx) {
+  IRGenMangler mangler;
+  auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
+  auto funcName = mangler.mangleOutlinedEnumTagStoreFunction(manglingBits.first,
+                                                             manglingBits.second,
+                                                             caseIdx);
+
+  auto ptrTy = ti.getStorageType()->getPointerTo();
+  llvm::SmallVector<llvm::Type *, 4> paramTys;
+  paramTys.push_back(ptrTy);
+
+  return getOrCreateHelperFunction(funcName, VoidTy, paramTys,
+      [&](IRGenFunction &IGF) {
+        Explosion params = IGF.collectParameters();
+        Address enumAddr = ti.getAddressForPointer(params.claimNext());
+        getEnumImplStrategy(IGF.IGM, T).storeTag(IGF, T, enumAddr, theCase);
+        IGF.Builder.CreateRetVoid();
+      },
+      true /*setIsNoInline*/);
 }
 
 void irgen::emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                        SILType enumTy,
                                        Address enumAddr,
                                        EnumElementDecl *theCase) {
+  const TypeInfo &TI = IGF.getTypeInfo(enumTy);
+  unsigned caseIdx = getEnumImplStrategy(IGF.IGM, enumTy).getTagIndex(theCase);
+  if (isa<LoadableTypeInfo>(TI) &&
+      shouldOutlineEnumValueOperation(TI, IGF.IGM)) {
+    emitCallToOutlinedEnumTagStore(IGF, enumAddr, enumTy, TI, theCase, caseIdx);
+    return;
+  }
   getEnumImplStrategy(IGF.IGM, enumTy)
     .storeTag(IGF, enumTy, enumAddr, theCase);
 }

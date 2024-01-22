@@ -4832,9 +4832,13 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
     auto &EIS = getEnumImplStrategy(IGM, inst->getEnumOperand()->getType());
     // If this is testing for one case, do simpler codegen.  This is
     // particularly common when testing optionals.
+    const auto &TI = IGM.getTypeInfo(inst->getEnumOperand()->getType());
     auto isTrue = EIS.emitIndirectCaseTest(*this,
                                            inst->getEnumOperand()->getType(),
-                                           value, inst->getCase(0).first);
+                                           value, inst->getCase(0).first,
+                                           shouldOutlineEnumValueOperation(TI,
+                                                                           IGM)
+                                           /*noLoad*/);
     emitSingleEnumMemberSelectResult(*this, SelectEnumOperation(inst), isTrue,
                                      result);
   } else {
