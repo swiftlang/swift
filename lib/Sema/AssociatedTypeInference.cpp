@@ -159,7 +159,9 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     auto nominal = DC->getSelfNominalTypeDecl();
-    AccessScope requiredAccessScope = getRequiredAccessScope();
+    auto requiredAccessScope = evaluateOrDefault(
+        Context.evaluator, ConformanceAccessScopeRequest{DC, Proto},
+        std::make_pair(AccessScope::getPublic(), false));
 
     if (!getASTContext().isSwiftVersionAtLeast(5) &&
         !DC->getParentModule()->isResilient()) {
@@ -179,17 +181,17 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
           underlyingTypeScope->intersectWith(nominalAccessScope);
       assert(widestPossibleScope.has_value() &&
              "we found the nominal and the type witness, didn't we?");
-      requiredAccessScope = widestPossibleScope.value();
+      requiredAccessScope.first = widestPossibleScope.value();
     }
 
     // An associated type witness can never be less than fileprivate, since
     // it must always be at least as visible as the enclosing type.
     AccessLevel requiredAccess =
-        std::max(requiredAccessScope.accessLevelForDiagnostics(),
+        std::max(requiredAccessScope.first.accessLevelForDiagnostics(),
                  AccessLevel::FilePrivate);
 
     aliasDecl->setAccess(requiredAccess);
-    if (isUsableFromInlineRequired()) {
+    if (requiredAccessScope.second) {
       auto *attr =
           new (getASTContext()) UsableFromInlineAttr(/*implicit=*/true);
       aliasDecl->getAttrs().add(attr);

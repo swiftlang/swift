@@ -264,21 +264,8 @@ protected:
 
   RequirementEnvironmentCache ReqEnvironmentCache;
 
-  llvm::Optional<std::pair<AccessScope, bool>>
-      RequiredAccessScopeAndUsableFromInline;
-
   WitnessChecker(ASTContext &ctx, ProtocolDecl *proto, Type adoptee,
                  DeclContext *dc);
-
-  bool isMemberOperator(FuncDecl *decl, Type type);
-
-  AccessScope getRequiredAccessScope();
-
-  bool isUsableFromInlineRequired() {
-    assert(RequiredAccessScopeAndUsableFromInline.has_value() &&
-           "must check access first using getRequiredAccessScope");
-    return RequiredAccessScopeAndUsableFromInline.value().second;
-  }
 
   void lookupValueWitnessesViaImplementsAttr(ValueDecl *req,
                                              SmallVector<ValueDecl *, 4>

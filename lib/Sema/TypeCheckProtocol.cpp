@@ -1605,48 +1605,51 @@ bool WitnessChecker::findBestWitness(
   return isReallyBest;
 }
 
-AccessScope WitnessChecker::getRequiredAccessScope() {
-  if (RequiredAccessScopeAndUsableFromInline.has_value())
-    return RequiredAccessScopeAndUsableFromInline.value().first;
-
-  AccessScope result = Proto->getFormalAccessScope(DC);
-
+ConformanceAccessScope ConformanceAccessScopeRequest::evaluate(
+    Evaluator &evaluator, DeclContext *dc, ProtocolDecl *proto) const {
+  AccessScope result = proto->getFormalAccessScope(dc);
   bool witnessesMustBeUsableFromInline = false;
-  if (Adoptee) {
-    const NominalTypeDecl *adoptingNominal = DC->getSelfNominalTypeDecl();
 
+  auto *nominal = dc->getSelfNominalTypeDecl();
+
+  // We're either looking at a concrete conformance, or the default witness
+  // table for a resilient protocol.
+  if (!isa<ProtocolDecl>(nominal)) {
     // Compute the intersection of the conforming type's access scope
     // and the protocol's access scope.
     auto scopeIntersection =
-        result.intersectWith(adoptingNominal->getFormalAccessScope(DC));
+        result.intersectWith(nominal->getFormalAccessScope(dc));
     assert(scopeIntersection.has_value());
     result = scopeIntersection.value();
 
     if (!result.isPublic()) {
       witnessesMustBeUsableFromInline =
-          Proto->getFormalAccessScope(
-            DC, /*usableFromInlineAsPublic*/true).isPublic() &&
-          adoptingNominal->getFormalAccessScope(
-            DC, /*usableFromInlineAsPublic*/true).isPublic();
+          proto->getFormalAccessScope(
+            dc, /*usableFromInlineAsPublic*/true).isPublic() &&
+          nominal->getFormalAccessScope(
+            dc, /*usableFromInlineAsPublic*/true).isPublic();
     }
   } else {
     if (!result.isPublic()) {
       witnessesMustBeUsableFromInline =
-          Proto->getFormalAccessScope(
-            DC, /*usableFromInlineAsPublic*/true).isPublic();
+          proto->getFormalAccessScope(
+            dc, /*usableFromInlineAsPublic*/true).isPublic();
     }
   }
 
-  RequiredAccessScopeAndUsableFromInline =
-      std::make_pair(result, witnessesMustBeUsableFromInline);
-  return result;
+  return std::make_pair(result, witnessesMustBeUsableFromInline);
 }
 
 bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
                                         ValueDecl *witness,
                                         bool *isSetter) {
   *isSetter = false;
-  AccessScope actualScopeToCheck = getRequiredAccessScope();
+
+  auto requiredAccessScope = evaluateOrDefault(
+      Context.evaluator, ConformanceAccessScopeRequest{DC, Proto},
+      std::make_pair(AccessScope::getPublic(), false));
+
+  auto actualScopeToCheck = requiredAccessScope.first;
 
   // Setting the 'forConformance' flag means that we admit witnesses in
   // protocol extensions that we can see, but are not necessarily as
@@ -1669,7 +1672,7 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
       }
     }
 
-    if (actualScopeToCheck.hasEqualDeclContextWith(getRequiredAccessScope()))
+    if (actualScopeToCheck.hasEqualDeclContextWith(requiredAccessScope.first))
       return true;
   }
 
@@ -1703,15 +1706,20 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
 
+  auto requiredAccessScope = evaluateOrDefault(
+      Context.evaluator, ConformanceAccessScopeRequest{DC, Proto},
+      std::make_pair(AccessScope::getPublic(), false));
+
   bool isSetter = false;
   if (checkWitnessAccess(requirement, match.Witness, &isSetter)) {
     CheckKind kind = (isSetter
                       ? CheckKind::AccessOfSetter
                       : CheckKind::Access);
-    return RequirementCheck(kind, getRequiredAccessScope());
+
+    return RequirementCheck(kind, requiredAccessScope.first);
   }
 
-  if (isUsableFromInlineRequired()) {
+  if (requiredAccessScope.second) {
     bool witnessIsUsableFromInline = match.Witness->getFormalAccessScope(
         DC, /*usableFromInlineAsPublic*/true).isPublic();
     if (!witnessIsUsableFromInline)
@@ -4655,24 +4663,27 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     checkObjCTypeErasedGenerics(assocType, type, typeDecl);
 
     if (typeDecl && !typeDecl->isImplicit()) {
+      auto requiredAccessScope = evaluateOrDefault(
+          Context.evaluator, ConformanceAccessScopeRequest{DC, Proto},
+          std::make_pair(AccessScope::getPublic(), false));
+
       // Check access.
       bool isSetter = false;
       if (checkWitnessAccess(assocType, typeDecl, &isSetter)) {
         assert(!isSetter);
 
         // Note: you must not capture 'this' in the below closure.
-        const DeclContext *DC = this->DC;
-        auto requiredAccessScope = getRequiredAccessScope();
+        auto *DC = this->DC;
 
         getASTContext().addDelayedConformanceDiag(Conformance, false,
             [DC, requiredAccessScope, typeDecl](
               NormalProtocolConformance *conformance) {
           AccessLevel requiredAccess =
-              requiredAccessScope.requiredAccessForDiagnostics();
+              requiredAccessScope.first.requiredAccessForDiagnostics();
           auto proto = conformance->getProtocol();
           auto protoAccessScope = proto->getFormalAccessScope(DC);
           bool protoForcesAccess =
-              requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
+              requiredAccessScope.first.hasEqualDeclContextWith(protoAccessScope);
           auto diagKind = protoForcesAccess
                             ? diag::type_witness_not_accessible_proto
                             : diag::type_witness_not_accessible_type;
@@ -4683,7 +4694,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
         });
       }
 
-      if (isUsableFromInlineRequired()) {
+      if (requiredAccessScope.second) {
         bool witnessIsUsableFromInline = typeDecl->getFormalAccessScope(
             DC, /*usableFromInlineAsPublic*/true).isPublic();
         if (!witnessIsUsableFromInline)
