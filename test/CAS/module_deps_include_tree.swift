@@ -26,14 +26,14 @@
 // RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
 
 /// check cas-fs content
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
 // RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
 
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F clangIncludeTree > %t/F_tree.casid
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F clangIncludeTree > %t/F_tree.casid
 // RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/F_tree.casid | %FileCheck %s -check-prefix INCLUDE_TREE_F
 
 /// make sure the number of CASFS is correct. 10 entries with 2 line each + 1 extra bracket
-// RUN: NUM_CMDS=$(%S/Inputs/SwiftDepsExtractor.py %t/deps.json deps commandLine | wc -l)
+// RUN: NUM_CMDS=$(%{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps commandLine | wc -l)
 // RUN: if [ ! $NUM_CMDS -eq 21 ]; then echo "wrong number of CASFS from scanning"; exit 1; fi
 
 // FS_ROOT_E-DAG: E.swiftinterface

@@ -5,13 +5,13 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache %t/main.swift -o %t/deps.json -I %t/include -swift-version 4 -cache-compile-job -cas-path %t/cas
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:DotDot > %t/DotDot.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:DotDot > %t/DotDot.cmd
 // RUN: %swift_frontend_plain @%t/DotDot.cmd
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
 // RUN: %swift_frontend_plain @%t/SwiftShims.cmd
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Swift > %t/Swift.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Swift > %t/Swift.cmd
 // RUN: %swift_frontend_plain @%t/Swift.cmd
 
 /// Test that if there are non-existing module-map file passed through -Xcc, this still compiles.

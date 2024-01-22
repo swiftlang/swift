@@ -8,23 +8,23 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -I %t/include
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:A > %t/A.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:A > %t/A.cmd
 // RUN: %swift_frontend_plain @%t/A.cmd
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:B > %t/B.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:B > %t/B.cmd
 // RUN: %swift_frontend_plain @%t/B.cmd
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
 // RUN: %swift_frontend_plain @%t/SwiftShims.cmd
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Swift > %t/Swift.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Swift > %t/Swift.cmd
 // RUN: %swift_frontend_plain @%t/Swift.cmd
 
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json Swift moduleCacheKey | tr -d '\n' > %t/Swift.key
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:SwiftShims moduleCacheKey | tr -d '\n' > %t/Shims.key
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:A moduleCacheKey | tr -d '\n' > %t/A.key
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:B moduleCacheKey | tr -d '\n' > %t/B.key
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Swift moduleCacheKey | tr -d '\n' > %t/Swift.key
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:SwiftShims moduleCacheKey | tr -d '\n' > %t/Shims.key
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:A moduleCacheKey | tr -d '\n' > %t/A.key
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:B moduleCacheKey | tr -d '\n' > %t/B.key
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
 
 // RUN: echo "[{" > %/t/map.json
 // RUN: echo "\"moduleName\": \"Swift\"," >> %/t/map.json
