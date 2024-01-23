@@ -309,7 +309,7 @@ These predicates are used to check preconditions. Generally, the predicate asser
 \item A function that only operates on interface types should assert that the given type does not contain archetypes.
 \item A function that only operates on contextual types should assert that the type does not contain type parameters.
 \end{itemize}
-This scheme accomodates fully-concrete types, which contain neither type parameters nor archetypes. An example of this can be seen in the mapping operations. Mapping a type into an environment asserts that the input type does not already contain archetypes, and similarly mapping a type out of an environment asserts that the input type does not already contain type parameters. This ensures that these operations cannot be called ``just in case,'' which would be a sign of sloppy programming; callers must establish that they are working with the correct sort of type upfront with an additional check or assertion.
+This scheme accommodates fully-concrete types, which contain neither type parameters nor archetypes. An example of this can be seen in the mapping operations. Mapping a type into an environment asserts that the input type does not already contain archetypes, and similarly mapping a type out of an environment asserts that the input type does not already contain type parameters. This ensures that these operations cannot be called ``just in case,'' which would be a sign of sloppy programming; callers must establish that they are working with the correct sort of type upfront with an additional check or assertion.
 
 \section{The Type Parameter Graph}\label{type parameter graph}
 
