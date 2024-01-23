@@ -5126,16 +5126,13 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
 
-  // Diagnose missing type witnesses for now.
-  diagnoseMissingWitnesses(Kind, /*Delayed=*/false);
-
   // Check the requirements from the requirement signature.
   ensureRequirementsAreSatisfied();
 
   // Check non-type requirements.
   resolveValueWitnesses();
 
-  // Diagnose missing value witnesses.
+  // Diagnose any missing witnesses.
   diagnoseMissingWitnesses(Kind, /*Delayed=*/false);
 
   emitDelayedDiags();
