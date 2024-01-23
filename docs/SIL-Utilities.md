@@ -143,6 +143,10 @@ Forward-extended lifetimes may include multiple OSSA lifetimes joined by Forward
 * `ForwardingUseDefWalker`: Find the introducer of a forward-extended lifetime
 * `ForwardingDefUseWalker`: Find all OSSA lifetimes within a forward-extended lifetime.
 
+#### LifetimeDependence
+
+Model lifetime dependencies in SIL, as required be ~Escapable types.
+
 ## Control- and Dataflow
 
 #### `DeadEndBlocks`
