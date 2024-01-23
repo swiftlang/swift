@@ -3888,6 +3888,19 @@ ProtocolDecl *ImplementsAttrProtocolRequest::evaluate(
   return dyn_cast<ProtocolDecl>(nominalTypes.front());
 }
 
+FuncDecl *LookupIntrinsicRequest::evaluate(Evaluator &evaluator,
+                                           ModuleDecl *module,
+                                           Identifier funcName) const {
+  llvm::SmallVector<ValueDecl *, 1> decls;
+  module->lookupQualified(module, DeclNameRef(funcName), SourceLoc(),
+                          NL_QualifiedDefault | NL_IncludeUsableFromInline,
+                          decls);
+  if (decls.size() != 1)
+    return nullptr;
+
+  return dyn_cast<FuncDecl>(decls[0]);
+}
+
 void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
   Pat->forEachVariable([&](VarDecl *VD) { checkValueDecl(VD, Reason); });
 }

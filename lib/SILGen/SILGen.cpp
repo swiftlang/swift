@@ -24,6 +24,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -364,164 +365,101 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
-static FuncDecl *lookupIntrinsic(ModuleDecl &module,
-                                 llvm::Optional<FuncDecl *> &cache,
-                                 Identifier name) {
-  if (cache)
-    return *cache;
-
-  SmallVector<ValueDecl *, 1> decls;
-  module.lookupQualified(&module, DeclNameRef(name), SourceLoc(),
-                         NL_QualifiedDefault | NL_IncludeUsableFromInline,
-                         decls);
-  if (decls.size() != 1) {
-    cache = nullptr;
-    return nullptr;
-  }
-  auto func = dyn_cast<FuncDecl>(decls[0]);
-  cache = func;
-  return func;
-}
-
-static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
-                                            llvm::Optional<FuncDecl *> &cache,
-                                            StringRef name) {
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
   auto *module = C.getLoadedModule(C.Id_Concurrency);
-  if (!module) {
-    cache = nullptr;
+  if (!module)
     return nullptr;
-  }
 
-  return lookupIntrinsic(*module, cache, C.getIdentifier(name));
+  return evaluateOrDefault(
+      C.evaluator, LookupIntrinsicRequest{module, C.getIdentifier(name)},
+      /*default=*/nullptr);
 }
 
-FuncDecl *
-SILGenModule::getAsyncLetStart() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    AsyncLetStart,
-                                    "_asyncLetStart");
+FuncDecl *SILGenModule::getAsyncLetStart() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLetStart");
 }
 
-FuncDecl *
-SILGenModule::getAsyncLetGet() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    AsyncLetGet,
-                                    "_asyncLet_get");
+FuncDecl *SILGenModule::getAsyncLetGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get");
 }
 
-FuncDecl *
-SILGenModule::getAsyncLetGetThrowing() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    AsyncLetGetThrowing,
-                                    "_asyncLet_get_throwing");
+FuncDecl *SILGenModule::getAsyncLetGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get_throwing");
 }
 
-FuncDecl *
-SILGenModule::getFinishAsyncLet() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    EndAsyncLet,
-                                    "_asyncLet_finish");
+FuncDecl *SILGenModule::getFinishAsyncLet() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_finish");
 }
 
-FuncDecl *
-SILGenModule::getTaskFutureGet() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    TaskFutureGet,
-                                    "_taskFutureGet");
+FuncDecl *SILGenModule::getTaskFutureGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_taskFutureGet");
 }
 
-FuncDecl *
-SILGenModule::getTaskFutureGetThrowing() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    TaskFutureGetThrowing,
-                                    "_taskFutureGetThrowing");
+FuncDecl *SILGenModule::getTaskFutureGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_taskFutureGetThrowing");
 }
 
-FuncDecl *
-SILGenModule::getResumeUnsafeContinuation() {
+FuncDecl *SILGenModule::getResumeUnsafeContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeUnsafeContinuation,
                                     "_resumeUnsafeContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeUnsafeThrowingContinuation() {
+FuncDecl *SILGenModule::getResumeUnsafeThrowingContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeUnsafeThrowingContinuation,
                                     "_resumeUnsafeThrowingContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeUnsafeThrowingContinuationWithError,
-                                  "_resumeUnsafeThrowingContinuationWithError");
+FuncDecl *SILGenModule::getResumeUnsafeThrowingContinuationWithError() {
+  return lookupConcurrencyIntrinsic(
+      getASTContext(), "_resumeUnsafeThrowingContinuationWithError");
 }
-FuncDecl *
-SILGenModule::getRunTaskForBridgedAsyncMethod() {
+FuncDecl *SILGenModule::getRunTaskForBridgedAsyncMethod() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    RunTaskForBridgedAsyncMethod,
                                     "_runTaskForBridgedAsyncMethod");
 }
-FuncDecl *
-SILGenModule::getCheckExpectedExecutor() {
-  return lookupConcurrencyIntrinsic(getASTContext(), CheckExpectedExecutor,
-                                    "_checkExpectedExecutor");
+FuncDecl *SILGenModule::getCheckExpectedExecutor() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_checkExpectedExecutor");
 }
 
-FuncDecl *
-SILGenModule::getCreateCheckedContinuation() {
+FuncDecl *SILGenModule::getCreateCheckedContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    CreateCheckedContinuation,
                                     "_createCheckedContinuation");
 }
-FuncDecl *
-SILGenModule::getCreateCheckedThrowingContinuation() {
+FuncDecl *SILGenModule::getCreateCheckedThrowingContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    CreateCheckedThrowingContinuation,
                                     "_createCheckedThrowingContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeCheckedContinuation() {
+FuncDecl *SILGenModule::getResumeCheckedContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeCheckedContinuation,
                                     "_resumeCheckedContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeCheckedThrowingContinuation() {
+FuncDecl *SILGenModule::getResumeCheckedThrowingContinuation() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    ResumeCheckedThrowingContinuation,
                                     "_resumeCheckedThrowingContinuation");
 }
-FuncDecl *
-SILGenModule::getResumeCheckedThrowingContinuationWithError() {
+FuncDecl *SILGenModule::getResumeCheckedThrowingContinuationWithError() {
   return lookupConcurrencyIntrinsic(
-      getASTContext(), ResumeCheckedThrowingContinuationWithError,
-      "_resumeCheckedThrowingContinuationWithError");
+      getASTContext(), "_resumeCheckedThrowingContinuationWithError");
 }
 
 FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
-  return lookupConcurrencyIntrinsic(getASTContext(), AsyncMainDrainQueue,
-                                    "_asyncMainDrainQueue");
+  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncMainDrainQueue");
 }
 
 FuncDecl *SILGenModule::getSwiftJobRun() {
-  return lookupConcurrencyIntrinsic(getASTContext(), SwiftJobRun,
-                                    "_swiftJobRun");
+  return lookupConcurrencyIntrinsic(getASTContext(), "_swiftJobRun");
 }
 
 FuncDecl *SILGenModule::getExit() {
-  if (ExitFunc)
-    return *ExitFunc;
-
   ASTContext &C = getASTContext();
   ModuleDecl *concurrencyShims =
       C.getModuleByIdentifier(C.getIdentifier("_SwiftConcurrencyShims"));
 
-  if (!concurrencyShims) {
-    ExitFunc = nullptr;
+  if (!concurrencyShims)
     return nullptr;
-  }
 
-  return lookupIntrinsic(*concurrencyShims, ExitFunc, C.getIdentifier("exit"));
+  return evaluateOrDefault(
+      C.evaluator,
+      LookupIntrinsicRequest{concurrencyShims, C.getIdentifier("exit")},
+      /*default=*/nullptr);
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
