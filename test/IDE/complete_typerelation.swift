@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -code-complete-call-pattern-heuristics -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -disable-objc-attr-requires-foundation-module
 
 // SE-0353
 struct ConstraintedExistentialTest {

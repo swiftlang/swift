@@ -43,7 +43,7 @@ public:
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
 
-  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeThenStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
@@ -65,8 +65,7 @@ void ContextInfoCallbacks::completeForEachSequenceBeginning(
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
-void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E,
-                                           bool isFirst) {
+void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
