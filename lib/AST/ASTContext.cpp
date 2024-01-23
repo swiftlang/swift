@@ -2780,6 +2780,48 @@ ASTContext::MissingWitness::MissingWitness(ValueDecl *requirement,
   : requirement(requirement),
     matches(matches.begin(), matches.end()) { }
 
+static void maybeEmitFallbackConformanceDiagnostic(
+    ASTContext &ctx,
+    NormalProtocolConformance *conformance,
+    DelayedConformanceDiags &diagnostics) {
+
+  if (diagnostics.HadError)
+    return;
+
+  diagnostics.HadError = true;
+
+  auto *proto = conformance->getProtocol();
+  auto *dc = conformance->getDeclContext();
+  auto *sf = dc->getParentSourceFile();
+  auto *mod = sf->getParentModule();
+  assert(mod->isMainModule());
+
+  // If we have at least one primary file and the conformance is declared in a
+  // non-primary file, emit a fallback diagnostic.
+  if ((!sf->isPrimary() && !mod->getPrimarySourceFiles().empty()) ||
+      ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    auto complainLoc = ctx.evaluator.getInnermostSourceLoc([&](SourceLoc loc) {
+      if (loc.isInvalid())
+        return false;
+
+      auto *otherSF = mod->getSourceFileContainingLocation(loc);
+      if (otherSF == nullptr)
+        return false;
+
+      return otherSF->isPrimary();
+    });
+
+    if (complainLoc.isInvalid()) {
+      complainLoc = conformance->getLoc();
+    }
+
+    ctx.Diags.diagnose(complainLoc,
+                       diag::type_does_not_conform,
+                       dc->getSelfInterfaceType(),
+                       proto->getDeclaredInterfaceType());
+  }
+}
+
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance, bool isError,
        std::function<void(NormalProtocolConformance *)> callback) {
@@ -2788,40 +2830,8 @@ void ASTContext::addDelayedConformanceDiag(
 
   auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
 
-  if (isError && !diagnostics.HadError) {
-    diagnostics.HadError = true;
-
-    auto *proto = conformance->getProtocol();
-    auto *dc = conformance->getDeclContext();
-    auto *sf = dc->getParentSourceFile();
-    auto *mod = sf->getParentModule();
-    assert(mod->isMainModule());
-
-    // If we have at least one primary file and the conformance is declared in a
-    // non-primary file, emit a fallback diagnostic.
-    if ((!sf->isPrimary() && !mod->getPrimarySourceFiles().empty()) ||
-        TypeCheckerOpts.EnableLazyTypecheck) {
-      auto complainLoc = evaluator.getInnermostSourceLoc([&](SourceLoc loc) {
-        if (loc.isInvalid())
-          return false;
-
-        auto *otherSF = mod->getSourceFileContainingLocation(loc);
-        if (otherSF == nullptr)
-          return false;
-
-        return otherSF->isPrimary();
-      });
-
-      if (complainLoc.isInvalid()) {
-        complainLoc = conformance->getLoc();
-      }
-
-      Diags.diagnose(complainLoc,
-                     diag::type_does_not_conform,
-                     dc->getSelfInterfaceType(),
-                     proto->getDeclaredInterfaceType());
-    }
-  }
+  if (isError)
+    maybeEmitFallbackConformanceDiagnostic(*this, conformance, diagnostics);
 
   diagnostics.Diags.push_back({isError, callback});
 }
