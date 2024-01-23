@@ -3051,7 +3051,6 @@ done:
     SILValue executor;
     switch (*defaultArgIsolation) {
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       executor = SGF.emitLoadGlobalActorExecutor(
           defaultArgIsolation->getGlobalActor());
       break;
@@ -5630,7 +5629,6 @@ RValue SILGenFunction::emitApply(
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       executor = emitLoadGlobalActorExecutor(
           implicitActorHopTarget->getGlobalActor());
       break;

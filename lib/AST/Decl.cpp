@@ -2512,15 +2512,20 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
         if (type->isAnyActor())
           return true;
 
-        switch (getActorIsolation(type)) {
+        auto isolation = getActorIsolation(type);
+        switch (isolation) {
           case ActorIsolation::Unspecified:
           case ActorIsolation::NonisolatedUnsafe:
-          case ActorIsolation::GlobalActorUnsafe:
             break;
+
+          case ActorIsolation::GlobalActor:
+            if (isolation.preconcurrency())
+              break;
+
+            return true;
 
           case ActorIsolation::ActorInstance:
           case ActorIsolation::Nonisolated:
-          case ActorIsolation::GlobalActor:
             return true;
         }
       }
@@ -10897,7 +10902,6 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
         return false;
 
       case ActorIsolation::ActorInstance:
@@ -10965,9 +10969,9 @@ ActorIsolation swift::getActorIsolationOfContext(
         dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete) {
       if (Type mainActor = dcToUse->getASTContext().getMainActorType())
-        return ActorIsolation::forGlobalActor(
-            mainActor,
-            /*unsafe=*/!dcToUse->getASTContext().isSwiftVersionAtLeast(6));
+        return ActorIsolation::forGlobalActor(mainActor)
+            .withPreconcurrency(
+                !dcToUse->getASTContext().isSwiftVersionAtLeast(6));
     }
   }
 

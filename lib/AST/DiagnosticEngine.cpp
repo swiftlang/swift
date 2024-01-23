@@ -910,8 +910,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << "actor-isolated";
       break;
 
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe: {
+    case ActorIsolation::GlobalActor: {
       if (isolation.isMainActor()) {
         Out << "main actor-isolated";
       } else {

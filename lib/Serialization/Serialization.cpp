@@ -1427,7 +1427,6 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Nonisolated)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
-  CASE(GlobalActorUnsafe)
 #undef CASE
   }
   llvm_unreachable("bad actor isolation");

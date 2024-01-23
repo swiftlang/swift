@@ -5743,8 +5743,13 @@ ERROR(global_actor_on_local_variable,none,
 ERROR(global_actor_on_storage_of_value_type,none,
       "stored property %0 within struct cannot have a global actor",
       (DeclName))
-ERROR(global_actor_non_unsafe_init,none,
-      "global actor attribute %0 argument can only be '(unsafe)'", (Type))
+ERROR(unsafe_global_actor,none,
+      "'(unsafe)' global actors are deprecated; "
+      "use '@preconcurrency' instead",
+      ())
+ERROR(global_actor_arg,none,
+      "global actor attribute %0 cannot have arguments",
+      (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
 ERROR(global_actor_top_level_var,none,

@@ -58,7 +58,7 @@ extension OnMain: NonIsolatedRequirement {
 }
 
 // expected-note@+1 {{calls to global function 'downgrade()' from outside of its actor context are implicitly asynchronous}}
-@MainActor(unsafe) func downgrade() {}
+@preconcurrency @MainActor func downgrade() {}
 
 extension OnMain {
   struct Nested {

@@ -611,7 +611,6 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       return false;
   }
 }
@@ -1582,7 +1581,6 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::ActorInstance: {
       if (requiredIsolation != contextIsolation) {
         // Implicit initializers diagnose actor isolation violations

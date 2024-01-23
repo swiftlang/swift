@@ -25,6 +25,24 @@ public func takesMainActor(
   _ block: @MainActor @escaping () -> Void
 ) { }
 
+@MainActor(unsafe)
+public protocol UnsafeMainProtocol {
+  func requirement()
+}
+
+public struct InferredUnsafeMainActor: UnsafeMainProtocol {
+  public func requirement() {}
+}
+
+@preconcurrency @MainActor
+public protocol PreconcurrencyMainProtocol {
+  func requirement()
+}
+
+public struct InferredPreconcurrencyMainActor: PreconcurrencyMainProtocol {
+  public func requirement() {}
+}
+
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -I %t
 
 #else
@@ -42,6 +60,23 @@ func callFn() async {
 // CHECK: public func reasyncFn(_: () async -> ()) reasync
 // CHECK: public func takesSendable(_ block: @escaping @Sendable () async throws ->
 // CHECK: public func takesMainActor(_ block: @escaping @{{_Concurrency.MainActor|MainActor}} () ->
+
+// CHECK:      @_Concurrency.MainActor @preconcurrency public protocol UnsafeMainProtocol {
+// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency func requirement()
+// CHECK-NEXT: }
+
+// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredUnsafeMainActor :
+// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
+// CHECK-NEXT: }
+
+// CHECK:      @preconcurrency @_Concurrency.MainActor public protocol PreconcurrencyMainProtocol {
+// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency func requirement()
+// CHECK-NEXT: }
+
+// CHECK:      @_Concurrency.MainActor @preconcurrency public struct InferredPreconcurrencyMainActor :
+// CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency public func requirement()
+// CHECK-NEXT: }
+
 
 // RUN: %target-swift-emit-module-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name LibraryPreserveTypesAsWritten -module-interface-preserve-types-as-written
 // RUN: %target-swift-typecheck-module-from-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) -enable-experimental-concurrency

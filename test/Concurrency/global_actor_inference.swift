@@ -49,7 +49,7 @@ struct Carbon {
 // ----------------------------------------------------------------------
 // Check that @MainActor(blah) doesn't work
 // ----------------------------------------------------------------------
-// expected-error@+1{{global actor attribute 'MainActor' argument can only be '(unsafe)'}}
+// expected-error@+1{{global actor attribute 'MainActor' cannot have arguments}}
 @MainActor(blah) func brokenMainActorAttr() { }
 
 // ----------------------------------------------------------------------
@@ -504,7 +504,7 @@ class WrappedContainsNonisolatedAttr {
 // Unsafe global actors
 // ----------------------------------------------------------------------
 protocol UGA {
-  @SomeGlobalActor(unsafe) func req() // expected-note{{calls to instance method 'req()' from outside of its actor context are implicitly asynchronous}}
+  @preconcurrency @SomeGlobalActor func req() // expected-note{{calls to instance method 'req()' from outside of its actor context are implicitly asynchronous}}
 }
 
 struct StructUGA1: UGA {
@@ -528,7 +528,7 @@ func testUGA<T: UGA>(_ value: T) {
 }
 
 class UGAClass {
-  @SomeGlobalActor(unsafe) func method() { }
+  @preconcurrency @SomeGlobalActor func method() { }
 }
 
 class UGASubclass1: UGAClass {
@@ -540,7 +540,7 @@ class UGASubclass2: UGAClass {
 }
 
 @propertyWrapper
-@OtherGlobalActor(unsafe)
+@preconcurrency @OtherGlobalActor
 struct WrapperOnUnsafeActor<Wrapped> {
   private var stored: Wrapped
 
@@ -548,12 +548,12 @@ struct WrapperOnUnsafeActor<Wrapped> {
     stored = wrappedValue
   }
 
-  @MainActor(unsafe) var wrappedValue: Wrapped {
+  @preconcurrency @MainActor var wrappedValue: Wrapped {
     get { }
     set { }
   }
 
-  @SomeGlobalActor(unsafe) var projectedValue: Wrapped {
+  @preconcurrency @SomeGlobalActor var projectedValue: Wrapped {
     get { }
     set { }
   }

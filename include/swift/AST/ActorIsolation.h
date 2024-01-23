@@ -66,10 +66,6 @@ public:
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
-    /// The declaration is isolated to a global actor but with the "unsafe"
-    /// annotation, which means that we only enforce the isolation if we're
-    /// coming from something with specific isolation.
-    GlobalActorUnsafe,
   };
 
 private:
@@ -121,9 +117,8 @@ public:
     return ActorIsolation(ActorInstance, capturedActor);
   }
 
-  static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
-    return ActorIsolation(
-        unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
+  static ActorIsolation forGlobalActor(Type globalActor) {
+    return ActorIsolation(GlobalActor, globalActor);
   }
 
   static std::optional<ActorIsolation> forSILString(StringRef string) {
@@ -140,7 +135,7 @@ public:
             .Case("global_actor",
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
             .Case("global_actor_unsafe", std::optional<ActorIsolation>(
-                                             ActorIsolation::GlobalActorUnsafe))
+                                             ActorIsolation::GlobalActor))
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
@@ -171,7 +166,6 @@ public:
     switch (getKind()) {
     case ActorInstance:
     case GlobalActor:
-    case GlobalActorUnsafe:
       return true;
 
     case Unspecified:
@@ -186,7 +180,7 @@ public:
   VarDecl *getActorInstance() const;
 
   bool isGlobalActor() const {
-    return getKind() == GlobalActor || getKind() == GlobalActorUnsafe;
+    return getKind() == GlobalActor;
   }
 
   bool isMainActor() const;
@@ -238,7 +232,6 @@ public:
               lhs.parameterIndex == rhs.parameterIndex);
 
     case GlobalActor:
-    case GlobalActorUnsafe:
       llvm_unreachable("Global actors handled above");
     }
   }
@@ -270,9 +263,6 @@ public:
       return;
     case GlobalActor:
       os << "global_actor";
-      return;
-    case GlobalActorUnsafe:
-      os << "global_actor_unsafe";
       return;
     }
     llvm_unreachable("Covered switch isn't covered?!");

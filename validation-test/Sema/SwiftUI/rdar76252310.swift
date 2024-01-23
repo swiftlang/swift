@@ -42,13 +42,13 @@ func fromConcurrencyAware() async {
   // expected-warning@+4 {{non-sendable type 'CoffeeTrackerView' passed in implicitly asynchronous call to main actor-isolated property 'body' cannot cross actor boundary}}
   // expected-note@+3 {{property access is 'async'}}
   // expected-warning@+2 {{non-sendable type 'some View' in implicitly asynchronous access to main actor-isolated property 'body' cannot cross actor boundary}}
-  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-warning@+1 {{expression is 'async' but is not marked with 'await'}}
   _ = view.body
 
   // expected-warning@+4 {{non-sendable type 'CoffeeTrackerView' passed in implicitly asynchronous call to main actor-isolated property 'showDrinkList' cannot cross actor boundary}}
   // expected-note@+3 {{property access is 'async'}}
   // expected-warning@+2 {{non-sendable type 'Visibility' in implicitly asynchronous access to main actor-isolated property 'showDrinkList' cannot cross actor boundary}}
-  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-warning@+1 {{expression is 'async' but is not marked with 'await'}}
   _ = view.showDrinkList
 
   // expected-warning@+2 {{non-sendable type 'CoffeeTrackerView' passed in implicitly asynchronous call to main actor-isolated property 'storage' cannot cross actor boundary}}
