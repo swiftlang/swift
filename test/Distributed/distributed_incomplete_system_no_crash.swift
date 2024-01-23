@@ -34,6 +34,8 @@ public final class CompletelyHollowActorSystem: DistributedActorSystem {
 
   public struct ResultHandler: DistributedTargetInvocationResultHandler {
     // expected-error@-1{{type 'CompletelyHollowActorSystem.ResultHandler' does not conform to protocol 'DistributedTargetInvocationResultHandler'}}
+    // expected-error@-2{{struct 'ResultHandler' is missing witness for protocol requirement 'onReturn'}}
+    // expected-note@-3{{add stubs for conformance}}
   }
 
 }

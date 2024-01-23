@@ -2839,6 +2839,8 @@ void ASTContext::addDelayedConformanceDiag(
 void ASTContext::addDelayedMissingWitness(
     NormalProtocolConformance *conformance,
     ASTContext::MissingWitness missingWitness) {
+  conformance->setInvalid();
+
   auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
   maybeEmitFallbackConformanceDiagnostic(*this, conformance, diagnostics);
   diagnostics.MissingWitnesses.push_back(missingWitness);
