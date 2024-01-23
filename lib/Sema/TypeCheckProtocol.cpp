@@ -1855,11 +1855,13 @@ static ValueDecl *getObjCRequirementSibling(
   return nullptr;
 }
 
+namespace {
+
 /// This is a wrapper of multiple instances of ConformanceChecker to allow us
 /// to diagnose and fix code from a more global perspective; for instance,
 /// having this wrapper can help issue a fixit that inserts protocol stubs from
 /// multiple protocols under checking.
-class swift::MultiConformanceChecker {
+class MultiConformanceChecker {
   ASTContext &Context;
   llvm::SmallVector<ValueDecl*, 16> UnsatisfiedReqs;
   llvm::SmallVector<ConformanceChecker, 4> AllUsedCheckers;
@@ -1908,6 +1910,8 @@ public:
   /// Check all conformances and emit diagnosis globally.
   void checkAllConformances();
 };
+
+}
 
 bool MultiConformanceChecker::
 isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req,
@@ -4414,6 +4418,83 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   return ResolveWitnessResult::ExplicitFailed;
 }
 
+static ValueDecl *deriveProtocolRequirement(DeclContext *DC,
+                                            NominalTypeDecl *TypeDecl,
+                                            ValueDecl *Requirement) {
+  // Note: whenever you update this function, also update
+  // DerivedConformance::getDerivableRequirement.
+  const auto protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
+
+  const auto derivableKind = protocol->getKnownDerivableProtocolKind();
+  if (!derivableKind)
+    return nullptr;
+
+  const auto Decl = DC->getInnermostDeclarationDeclContext();
+  if (Decl->isInvalid())
+    return nullptr;
+
+  DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
+                             protocol);
+
+  switch (*derivableKind) {
+  case KnownDerivableProtocolKind::RawRepresentable:
+    return derived.deriveRawRepresentable(Requirement);
+
+  case KnownDerivableProtocolKind::CaseIterable:
+    return derived.deriveCaseIterable(Requirement);
+
+  case KnownDerivableProtocolKind::Comparable:
+    return derived.deriveComparable(Requirement);
+
+  case KnownDerivableProtocolKind::Equatable:
+    return derived.deriveEquatable(Requirement);
+
+  case KnownDerivableProtocolKind::Hashable:
+    return derived.deriveHashable(Requirement);
+
+  case KnownDerivableProtocolKind::BridgedNSError:
+    return derived.deriveBridgedNSError(Requirement);
+
+  case KnownDerivableProtocolKind::CodingKey:
+    return derived.deriveCodingKey(Requirement);
+
+  case KnownDerivableProtocolKind::Encodable:
+    return derived.deriveEncodable(Requirement);
+
+  case KnownDerivableProtocolKind::Decodable:
+    return derived.deriveDecodable(Requirement);
+
+  case KnownDerivableProtocolKind::AdditiveArithmetic:
+    return derived.deriveAdditiveArithmetic(Requirement);
+
+  case KnownDerivableProtocolKind::Actor:
+    return derived.deriveActor(Requirement);
+
+  case KnownDerivableProtocolKind::Differentiable:
+    return derived.deriveDifferentiable(Requirement);
+
+  case KnownDerivableProtocolKind::Identifiable:
+    if (derived.Nominal->isDistributedActor()) {
+      return derived.deriveDistributedActor(Requirement);
+    } else {
+      // No synthesis is required for other types; we should only end up
+      // attempting synthesis if the nominal was a distributed actor.
+      llvm_unreachable("Identifiable is synthesized for distributed actors");
+    }
+
+  case KnownDerivableProtocolKind::DistributedActor:
+    return derived.deriveDistributedActor(Requirement);
+
+  case KnownDerivableProtocolKind::DistributedActorSystem:
+    return derived.deriveDistributedActorSystem(Requirement);
+
+  case KnownDerivableProtocolKind::OptionSet:
+      llvm_unreachable(
+          "When possible, OptionSet is derived via memberwise init synthesis");
+  }
+  llvm_unreachable("unknown derivable protocol kind");
+}
+
 /// Attempt to resolve a witness via derivation.
 ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
                        ValueDecl *requirement) {
@@ -4434,8 +4515,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   }
 
   // Attempt to derive the witness.
-  auto derived =
-      TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
+  auto derived = deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
 
   if (!derived) {
     return ResolveWitnessResult::ExplicitFailed;
@@ -6477,83 +6557,6 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
     return Witness();
   }
   return known->second;
-}
-
-ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
-                                                  NominalTypeDecl *TypeDecl,
-                                                  ValueDecl *Requirement) {
-  // Note: whenever you update this function, also update
-  // DerivedConformance::getDerivableRequirement.
-  const auto protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
-
-  const auto derivableKind = protocol->getKnownDerivableProtocolKind();
-  if (!derivableKind)
-    return nullptr;
-
-  const auto Decl = DC->getInnermostDeclarationDeclContext();
-  if (Decl->isInvalid())
-    return nullptr;
-
-  DerivedConformance derived(TypeDecl->getASTContext(), Decl, TypeDecl,
-                             protocol);
-
-  switch (*derivableKind) {
-  case KnownDerivableProtocolKind::RawRepresentable:
-    return derived.deriveRawRepresentable(Requirement);
-
-  case KnownDerivableProtocolKind::CaseIterable:
-    return derived.deriveCaseIterable(Requirement);
-
-  case KnownDerivableProtocolKind::Comparable:
-    return derived.deriveComparable(Requirement);
-
-  case KnownDerivableProtocolKind::Equatable:
-    return derived.deriveEquatable(Requirement);
-
-  case KnownDerivableProtocolKind::Hashable:
-    return derived.deriveHashable(Requirement);
-
-  case KnownDerivableProtocolKind::BridgedNSError:
-    return derived.deriveBridgedNSError(Requirement);
-
-  case KnownDerivableProtocolKind::CodingKey:
-    return derived.deriveCodingKey(Requirement);
-
-  case KnownDerivableProtocolKind::Encodable:
-    return derived.deriveEncodable(Requirement);
-
-  case KnownDerivableProtocolKind::Decodable:
-    return derived.deriveDecodable(Requirement);
-
-  case KnownDerivableProtocolKind::AdditiveArithmetic:
-    return derived.deriveAdditiveArithmetic(Requirement);
-
-  case KnownDerivableProtocolKind::Actor:
-    return derived.deriveActor(Requirement);
-
-  case KnownDerivableProtocolKind::Differentiable:
-    return derived.deriveDifferentiable(Requirement);
-
-  case KnownDerivableProtocolKind::Identifiable:
-    if (derived.Nominal->isDistributedActor()) {
-      return derived.deriveDistributedActor(Requirement);
-    } else {
-      // No synthesis is required for other types; we should only end up
-      // attempting synthesis if the nominal was a distributed actor.
-      llvm_unreachable("Identifiable is synthesized for distributed actors");
-    }
-
-  case KnownDerivableProtocolKind::DistributedActor:
-    return derived.deriveDistributedActor(Requirement);
-
-  case KnownDerivableProtocolKind::DistributedActorSystem:
-    return derived.deriveDistributedActorSystem(Requirement);
-
-  case KnownDerivableProtocolKind::OptionSet:
-      llvm_unreachable(
-          "When possible, OptionSet is derived via memberwise init synthesis");
-  }
-  llvm_unreachable("unknown derivable protocol kind");
 }
 
 namespace {

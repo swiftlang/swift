@@ -123,18 +123,12 @@ enum class MissingWitnessDiagnosisKind {
   ErrorFixIt,
 };
 
-class AssociatedTypeInference;
-class MultiConformanceChecker;
-
 /// The protocol conformance checker.
 ///
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
-private:
-  friend class MultiConformanceChecker;
-  friend class AssociatedTypeInference;
-
+public:
   NormalProtocolConformance *Conformance;
   SourceLoc Loc;
 
@@ -210,7 +204,6 @@ private:
     LocalMissingWitnessesStartIndex = GlobalMissingWitnesses.size();
   }
 
-public:
   /// Call this to diagnose currently known missing witnesses.
   ///
   /// \returns true if any witnesses were diagnosed.
@@ -250,135 +243,6 @@ public:
   void checkConformance(MissingWitnessDiagnosisKind Kind);
 };
 
-/// A system for recording and probing the integrity of a type witness solution
-/// for a set of unresolved associated type declarations.
-///
-/// Right now can reason only about abstract type witnesses, i.e., same-type
-/// constraints, default type definitions, and bindings to generic parameters.
-class TypeWitnessSystem final {
-  /// Equivalence classes are used on demand to express equivalences between
-  /// witness candidates and reflect changes to resolved types across their
-  /// members.
-  class EquivalenceClass final {
-    /// The pointer:
-    /// - The resolved type for witness candidates belonging to this equivalence
-    ///   class. The resolved type may be a type parameter, but cannot directly
-    ///   pertain to a name variable in the owning system; instead, witness
-    ///   candidates that should resolve to the same type share an equivalence
-    ///   class.
-    /// The int:
-    /// - A flag indicating whether the resolved type is ambiguous. When set,
-    ///   the resolved type is null.
-    llvm::PointerIntPair<Type, 1, bool> ResolvedTyAndIsAmbiguous;
-
-  public:
-    EquivalenceClass(Type ty) : ResolvedTyAndIsAmbiguous(ty, false) {}
-
-    EquivalenceClass(const EquivalenceClass &) = delete;
-    EquivalenceClass(EquivalenceClass &&) = delete;
-    EquivalenceClass &operator=(const EquivalenceClass &) = delete;
-    EquivalenceClass &operator=(EquivalenceClass &&) = delete;
-
-    Type getResolvedType() const {
-      return ResolvedTyAndIsAmbiguous.getPointer();
-    }
-    void setResolvedType(Type ty);
-
-    bool isAmbiguous() const {
-      return ResolvedTyAndIsAmbiguous.getInt();
-    }
-    void setAmbiguous() {
-      ResolvedTyAndIsAmbiguous = {nullptr, true};
-    }
-  };
-
-  /// A type witness candidate for a name variable.
-  struct TypeWitnessCandidate final {
-    /// The defaulted associated type declaration correlating with this
-    /// candidate, if present.
-    AssociatedTypeDecl *DefaultedAssocType;
-
-    /// The equivalence class of this candidate.
-    EquivalenceClass *EquivClass;
-  };
-
-  /// The set of equivalence classes in the system.
-  llvm::SmallPtrSet<EquivalenceClass *, 4> EquivalenceClasses;
-
-  /// The mapping from name variables (the names of unresolved associated
-  /// type declarations) to their corresponding type witness candidates.
-  llvm::SmallDenseMap<Identifier, TypeWitnessCandidate, 4> TypeWitnesses;
-
-public:
-  TypeWitnessSystem(ArrayRef<AssociatedTypeDecl *> assocTypes);
-  ~TypeWitnessSystem();
-
-  TypeWitnessSystem(const TypeWitnessSystem &) = delete;
-  TypeWitnessSystem(TypeWitnessSystem &&) = delete;
-  TypeWitnessSystem &operator=(const TypeWitnessSystem &) = delete;
-  TypeWitnessSystem &operator=(TypeWitnessSystem &&) = delete;
-
-  /// Get the resolved type witness for the associated type with the given name.
-  Type getResolvedTypeWitness(Identifier name) const;
-  bool hasResolvedTypeWitness(Identifier name) const;
-
-  /// Get the defaulted associated type relating to the resolved type witness
-  /// for the associated type with the given name, if present.
-  AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
-
-  /// Record a type witness for the given associated type name.
-  ///
-  /// \note This need not lead to the resolution of a type witness, e.g.
-  /// an associated type may be defaulted to another.
-  void addTypeWitness(Identifier name, Type type);
-
-  /// Record a default type witness.
-  ///
-  /// \param defaultedAssocType The specific associated type declaration that
-  /// defines the given default type.
-  ///
-  /// \note This need not lead to the resolution of a type witness.
-  void addDefaultTypeWitness(Type type, AssociatedTypeDecl *defaultedAssocType);
-
-  /// Record the given same-type requirement, if regarded of interest to
-  /// the system.
-  ///
-  /// \note This need not lead to the resolution of a type witness.
-  void addSameTypeRequirement(const Requirement &req);
-
-  void dump(llvm::raw_ostream &out,
-            const NormalProtocolConformance *conformance) const;
-
-private:
-  /// Form an equivalence between the given name variables.
-  void addEquivalence(Identifier name1, Identifier name2);
-
-  /// Merge \p equivClass2 into \p equivClass1.
-  ///
-  /// \note This will delete \p equivClass2 after migrating its members to
-  /// \p equivClass1.
-  void mergeEquivalenceClasses(EquivalenceClass *equivClass1,
-                               const EquivalenceClass *equivClass2);
-
-  /// The result of comparing two resolved types targeting a single equivalence
-  /// class, in terms of their relative impact on solving the system.
-  enum class ResolvedTypeComparisonResult {
-    /// The first resolved type is a better choice than the second one.
-    Better,
-
-    /// The first resolved type is an equivalent or worse choice than the
-    /// second one.
-    EquivalentOrWorse,
-
-    /// Both resolved types are concrete and mutually exclusive.
-    Ambiguity
-  };
-
-  /// Compare the given resolved types as targeting a single equivalence class,
-  /// in terms of the their relative impact on solving the system.
-  static ResolvedTypeComparisonResult compareResolvedTypes(Type ty1, Type ty2);
-};
-
 /// Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
@@ -395,11 +259,6 @@ RequirementMatch
 matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
              ProtocolDecl *proto, RootProtocolConformance *conformance,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness);
-
-/// If the given type is a direct reference to an associated type of
-/// the given protocol, return the referenced associated type.
-AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
-                                                     ProtocolDecl *proto);
 
 enum class TypeAdjustment : uint8_t {
   NoescapeToEscaping, NonsendableToSendable
