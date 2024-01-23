@@ -621,6 +621,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::PartialApplyStack:
     os << "PartialApply [stack]";
     return;
+  case Kind::MarkDependenceNonEscaping:
+    os << "MarkDependence [nonescaping]";
+    return;
   case Kind::BeginAsyncLet:
     os << "BeginAsyncLet";
     return;
@@ -655,7 +658,8 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
-  case BorrowingOperandKind::PartialApplyStack: {
+  case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::MarkDependenceNonEscaping: {
     return op->getUser()->hasUsesOfAnyResult();
   }
   case BorrowingOperandKind::Branch: {
@@ -716,12 +720,17 @@ bool BorrowingOperand::visitScopeEndingUses(
     return !deadApply;
   }
   case BorrowingOperandKind::PartialApplyStack: {
-    auto user = cast<PartialApplyInst>(op->getUser());
+    auto *user = cast<PartialApplyInst>(op->getUser());
     assert(user->isOnStack() && "escaping closures can't borrow");
     // The closure's borrow lifetimes end when the closure itself ends its
     // lifetime. That may happen transitively through conversions that forward
     // ownership of the closure.
     return user->visitOnStackLifetimeEnds(func);
+  }
+  case BorrowingOperandKind::MarkDependenceNonEscaping: {
+    auto *user = cast<MarkDependenceInst>(op->getUser());
+    assert(user->isNonEscaping() && "escaping dependencies don't borrow");
+    return user->visitNonEscapingLifetimeEnds(func);
   }
   case BorrowingOperandKind::BeginAsyncLet: {
     auto user = cast<BuiltinInst>(op->getUser());
@@ -780,6 +789,7 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::Yield:
   case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::MarkDependenceNonEscaping:
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::StoreBorrow:
     return BorrowedValue();
@@ -810,6 +820,7 @@ SILValue BorrowingOperand::getScopeIntroducingUserResult() {
 
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::MarkDependenceNonEscaping:
   case BorrowingOperandKind::BeginBorrow:
   case BorrowingOperandKind::StoreBorrow:
     return cast<SingleValueInstruction>(op->getUser());

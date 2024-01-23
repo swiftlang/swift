@@ -142,6 +142,7 @@ func computeInteriorLiveness(for definingValue: Value,
 /// - forwardingUse(of:isInnerlifetime:)
 /// - interiorPointerUse(of:into:)
 /// - pointerEscapingUse(of:)
+/// - dependentUse(of:into:)
 /// - borrowingUse(of:by:)
 /// - reborrowingUse(of:isInnerlifetime:)
 ///
@@ -195,9 +196,6 @@ protocol OwnershipUseVisitor {
   mutating func interiorPointerUse(of: Operand, into address: Value)
     -> WalkResult
 
-  /// A use that creates a dependent value.
-  mutating func dependentUse(of: Operand, into value: Value) -> WalkResult
-
   /// A use that escapes information from its operand's value.
   ///
   /// Note: this may not find all relevant pointer escapes, such as
@@ -205,6 +203,14 @@ protocol OwnershipUseVisitor {
   /// findPointerEscape() before relying on a liveness result and
   /// implement this as a fatalError.
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult
+
+  /// A use that creates an implicit borrow scope over the lifetime of
+  /// an owned dependent value. The operand owership is .borrow, but
+  /// there are no explicit scope-ending operations. Instead
+  /// BorrowingInstruction.scopeEndingOperands will return the final
+  /// consumes in the dependent value's forwaring chain.
+  mutating func dependentUse(of operand: Operand, into value: Value)
+    -> WalkResult
 
   /// A use that is scoped to an inner borrow scope.
   ///
@@ -334,8 +340,7 @@ extension OwnershipUseVisitor {
       return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .borrow:
-      return borrowingUse(of: operand,
-                          by: BorrowingInstruction(operand.instruction)!)
+      return visitBorrowingUse(of: operand)
 
     // TODO: Eventually, visit owned InteriorPointers as implicit borrows.
     case .interiorPointer, .trivialUse, .endBorrow, .reborrow,
@@ -365,14 +370,28 @@ extension OwnershipUseVisitor {
       return forwardingUse(of: operand, isInnerLifetime: false)
 
     case .borrow:
-      return borrowingUse(of: operand,
-                          by: BorrowingInstruction(operand.instruction)!)
+      return visitBorrowingUse(of: operand)
 
     case .interiorPointer:
       return visitInteriorPointerUse(of: operand)
 
     case .trivialUse, .forwardingConsume, .destroyingConsume:
       fatalError("ownership incompatible with a guaranteed value")
+    }
+  }
+
+  private mutating func visitBorrowingUse(of operand: Operand)
+    -> WalkResult {
+    switch operand.instruction {
+    case let pai as PartialApplyInst:
+      assert(pai.isOnStack)
+      return dependentUse(of: operand, into: pai)
+    case let mdi as MarkDependenceInst:
+      assert(operand == mdi.baseOperand && mdi.isNonEscaping)
+      return dependentUse(of: operand, into: mdi)
+    default:
+      return borrowingUse(of: operand,
+                          by: BorrowingInstruction(operand.instruction)!)
     }
   }
 
@@ -385,9 +404,6 @@ extension OwnershipUseVisitor {
          is OpenExistentialBoxInst:
       let svi = operand.instruction as! SingleValueInstruction
       return interiorPointerUse(of: operand, into: svi)
-    case let mdi as MarkDependenceInst:
-      assert(operand == mdi.baseOperand && mdi.isNonEscaping)
-      return dependentUse(of: operand, into: mdi)
     default:
       return pointerEscapingUse(of: operand)
     }
@@ -554,6 +570,19 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     return walkDownAddressUses(of: address)
   }  
 
+  // Handle partial_apply [on_stack] and mark_dependence [nonescaping].
+  //
+  // TODO: Rather than walking down the owned uses, this could call
+  // visitInnerBorrowUses, but we need to ensure all dependent values
+  // are complete first:
+  //
+  //   if let svi = borrowInst as! SingleValueInstruction,
+  //          svi.ownership == .owned {
+  //     if handleInner(borrowed: beginBorrow.value) == .abortWalk {
+  //       return .abortWalk
+  //     }
+  //     return visitInnerBorrowUses(of: borrowInst)
+  //   }
   mutating func dependentUse(of operand: Operand, into value: Value)
     -> WalkResult {
     // OSSA lifetime ignores trivial types.
@@ -665,7 +694,8 @@ extension InteriorUseWalker: AddressUseVisitor {
   }
 
   private mutating func walkDownAddressUses(of address: Value) -> WalkResult {
-    address.uses.ignoreTypeDependence.walk {
+    assert(address.type.isAddress)
+    return address.uses.ignoreTypeDependence.walk {
       // Record all uses
       if useVisitor($0) == .abortWalk {
         return .abortWalk
@@ -690,9 +720,9 @@ extension InteriorUseWalker {
       if phi.value.ownership == .guaranteed {
         return walkDown(guaranteedPhi: phi)
       }
-      // This is a phi of a dependent value.
-      // On-stack partial apply cannot be cloned, so all dependent
-      // phis must be dominated.
+      // This is a phi of a dependent value. partial_apply [on_stack]
+      // and mark_dependence [nonescaping] cannot be cloned, so all
+      // dependent phis must be dominated.
       assert(definingValue.parentBlock.dominates(phi.successor,
                                                  functionContext.dominatorTree),
              "on-stack partial apply cannot be cloned")

@@ -1969,6 +1969,14 @@ public:
     }
   }
 
+  void checkMarkDependencInst(MarkDependenceInst *MDI) {
+    if (MDI->isNonEscaping()) {
+      require(F.hasOwnership(), "mark_dependence [nonescaping] requires OSSA");
+      require(MDI->getOwnershipKind() == OwnershipKind::Owned,
+              "mark_dependence [nonescaping] must be an owned value");
+    }
+  }
+  
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
