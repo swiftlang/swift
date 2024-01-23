@@ -3591,6 +3591,55 @@ filterProtocolRequirements(
   return Filtered;
 }
 
+/// Sometimes a witness isn't really diagnosed as missing if we have two
+/// complementary Objective-C protocol requirements, only one of which must
+/// be witnessed.
+static bool shouldRecordMissingWitness(
+    ProtocolDecl *proto,
+    NormalProtocolConformance *conformance,
+    ValueDecl *requirement) {
+  assert(proto == requirement->getDeclContext());
+  assert(proto == conformance->getProtocol());
+
+  // We only care about functions.
+  auto fnRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
+  if (fnRequirement == nullptr)
+    return true;
+
+  if (!proto->isObjC())
+    return true;
+
+  auto map = getObjCRequirementMap(proto);
+
+  if (getObjCRequirementSibling(
+          proto, fnRequirement, map,
+          [proto, conformance](AbstractFunctionDecl *candidate) {
+            // FIXME: This performs a recursive lookup in the lazy case, so
+            // we have to dodge the cycle.
+            auto &ctx = proto->getASTContext();
+
+            // If we've already resolved the sibling candidate to a valid
+            // witness, don't record a missing witness.
+            if (conformance->getWitnessUncached(candidate))
+              return true;
+
+            // If we're currently resolving the sibling candidate, it may
+            // be that the sibling is missing also, so we must record a
+            // missing witness.
+            if (ctx.evaluator.hasActiveRequest(
+                   ValueWitnessRequest{conformance, candidate}))
+              return false;
+
+            // Otherwise, resolve the sibling cadidate; if its valid, don't
+            // record a missing witness.
+            return static_cast<bool>(conformance->getWitness(candidate));
+          })) {
+    return false;
+  }
+
+  return true;
+}
+
 /// Prune the set of missing witnesses for the given conformance, eliminating
 /// any requirements that do not actually need to satisfied.
 static ArrayRef<ASTContext::MissingWitness> pruneMissingWitnesses(
@@ -4393,7 +4442,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   if (!numViable) {
     // Save the missing requirement for later diagnosis.
-    GlobalMissingWitnesses.insert({requirement, matches});
+    if (shouldRecordMissingWitness(Proto, Conformance, requirement))
+      GlobalMissingWitnesses.insert({requirement, matches});
     return ResolveWitnessResult::Missing;
   }
 
