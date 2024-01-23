@@ -1677,7 +1677,7 @@ static std::pair<BraceStmt *, bool>
 synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
   ASTContext &ctx = afd->getASTContext();
   SmallVector<ASTNode, 1> stmts;
-  stmts.push_back(new (ctx) ReturnStmt(afd->getLoc(), nullptr));
+  stmts.push_back(new (ctx) ReturnStmt(afd->getLoc(), nullptr, /*implicit*/ true));
   return { BraceStmt::create(ctx, afd->getLoc(), stmts, afd->getLoc(), true),
            /*isTypeChecked=*/true };
 }

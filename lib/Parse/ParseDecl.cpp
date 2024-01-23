@@ -8733,7 +8733,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
         if (F->isFailable() && isa<NilLiteralExpr>(E)) {
           // If it's a nil literal, just insert return.  This is the only
           // legal thing to return.
-          auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+          auto RS = new (Context) ReturnStmt(E->getStartLoc(), E, /*implicit*/ true);
           BS->setLastElement(RS);
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);
