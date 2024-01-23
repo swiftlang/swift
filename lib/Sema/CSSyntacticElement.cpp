@@ -2651,21 +2651,6 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution, TapExpr *tapExpr,
   return false;
 }
 
-bool ConjunctionElement::mightContainCodeCompletionToken(
-  const ConstraintSystem &cs) const {
-  if (Element->getKind() == ConstraintKind::SyntacticElement) {
-    if (Element->getSyntacticElement().getSourceRange().isInvalid()) {
-      return true;
-    } else {
-      return cs.containsIDEInspectionTarget(Element->getSyntacticElement());
-    }
-  } else {
-    // All other constraint kinds are not handled yet. Assume that they might
-    // contain the code completion token.
-    return true;
-  }
-}
-
 bool ConstraintSystem::applySolutionToSingleValueStmt(
     Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
     RewriteTargetFn rewriteTarget) {
