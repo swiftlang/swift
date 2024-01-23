@@ -2840,6 +2840,7 @@ void ASTContext::addDelayedMissingWitness(
     NormalProtocolConformance *conformance,
     ASTContext::MissingWitness missingWitness) {
   auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
+  maybeEmitFallbackConformanceDiagnostic(*this, conformance, diagnostics);
   diagnostics.MissingWitnesses.push_back(missingWitness);
 }
 
