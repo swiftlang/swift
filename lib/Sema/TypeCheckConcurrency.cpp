@@ -2128,11 +2128,15 @@ namespace {
 
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
-          if (missingGlobalActorOnContext(
+          if (errors.size() == 1) {
+            missingGlobalActorOnContext(
+                    const_cast<DeclContext *>(getDeclContext()),
+                                        isolation.getGlobalActor(), behavior);
+          } else if (missingGlobalActorOnContext(
                   const_cast<DeclContext *>(getDeclContext()),
                   isolation.getGlobalActor(), behavior) &&
               errors.size() > 1) {
-            behavior= DiagnosticBehavior::Note;
+            behavior = DiagnosticBehavior::Note;
           }
         }
 
@@ -2153,11 +2157,15 @@ namespace {
 
         // Add Fix-it for missing @SomeActor annotation
         if (isolation.isGlobalActor()) {
-          if (missingGlobalActorOnContext(
+          if (errors.size() == 1) {
+            missingGlobalActorOnContext(
+                    const_cast<DeclContext *>(getDeclContext()),
+                                        isolation.getGlobalActor(), behavior);
+          } else if (missingGlobalActorOnContext(
                   const_cast<DeclContext *>(getDeclContext()),
                   isolation.getGlobalActor(), behavior) &&
               errors.size() > 1) {
-            behavior= DiagnosticBehavior::Note;
+            behavior = DiagnosticBehavior::Note;
           }
         }
 
