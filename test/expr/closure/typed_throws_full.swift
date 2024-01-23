@@ -22,15 +22,11 @@ func testSingleStatement() {
   let c2 = {
     try doSomething()
   }
-  // FIXME: Single-expression closures aren't inferring thrown error types.
-  // expected-error@+1{{invalid conversion of thrown error type 'any Error' to 'MyError'}}
   let _: () throws(MyError) -> Int = c2
 
   let c3 = {
     return try doSomething()
   }
-  // FIXME: Single-expression closures aren't inferring thrown error types.
-  // expected-error@+1{{invalid conversion of thrown error type 'any Error' to 'MyError'}}
   let _: () throws(MyError) -> Int = c3
 }
 

@@ -1446,6 +1446,15 @@ struct MatchCallArgumentResult {
 /// `x.y` is a potential throw site.
 struct PotentialThrowSite {
   enum Kind {
+    /// The caught type variable for this catch node, which is a stand-in
+    /// for the type that will be caught by the particular catch node.
+    ///
+    /// This is not strictly a potential throw site, but is convenient
+    /// to represent it as such so we don't need a separate mapping
+    /// from catch node -> caught type variable in the constraint solver's
+    /// state.
+    CaughtTypeVariable,
+
     /// The application of a function or subscript.
     Application,
 
@@ -3428,8 +3437,9 @@ public:
   /// Determine the caught error type for the given catch node.
   Type getCaughtErrorType(CatchNode node);
 
-  /// Infer the caught error type for this catch node, once we have all of
-  /// the potential throw sites.
+  /// Infer the caught error type for this catch node, or introduce an
+  /// appropriate type variable to describe that caught error type if
+  /// it cannot be computed yet.
   Type inferCaughtErrorType(CatchNode node);
 
   /// Return the type variable that represents the inferred thrown error

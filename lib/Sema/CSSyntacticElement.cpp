@@ -374,12 +374,8 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
   // of that closure, introduce a constraint to do so.
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
-    if (auto thrownErrorTypeVar = cs.getInferredThrownError(closure)) {
+    if (auto thrownErrorTypeVar = cs.getInferredThrownError(closure))
       referencedVars.push_back(thrownErrorTypeVar);
-      constraints.push_back(
-          Constraint::createCaughtError(cs, Type(thrownErrorTypeVar), closure,
-                                        locator, referencedVars));
-    }
   }
 
   // It's possible that there are no viable elements in the body,
@@ -1139,6 +1135,11 @@ private:
           visitDecl(node.get<Decl *>());
         }
       }
+
+      if (closure) {
+        auto closureType = cs.getClosureType(closure);
+      }
+      
       return;
     }
 

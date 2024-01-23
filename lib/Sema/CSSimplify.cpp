@@ -13016,9 +13016,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // Local function to form an unsolved result.
   auto formUnsolved = [&](bool activate = false) {
     if (flags.contains(TMF_GenerateConstraints)) {
+      auto fixedLocator = getConstraintLocator(locator);
       auto *application = Constraint::createApplicableFunction(
           *this, type1, type2, trailingClosureMatching,
-          getConstraintLocator(locator));
+          fixedLocator);
 
       addUnsolvedConstraint(application);
       if (activate)
@@ -13048,10 +13049,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // is not valid for operators though, where an inout parameter does not
   // have an explicit inout argument.
   if (type1.getPointer() == desugar2) {
-    // Note that this could throw.
-    recordPotentialThrowSite(
-        PotentialThrowSite::Application, Type(desugar2), outerLocator);
-
     if (!isOperator || !hasInOut()) {
       recordMatchCallArgumentResult(
           getConstraintLocator(
@@ -13102,10 +13099,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
   // For a function, bind the output and convert the argument to the input.
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
-    // Note that this could throw.
-    recordPotentialThrowSite(
-        PotentialThrowSite::Application, Type(desugar2), outerLocator);
-
     ConstraintKind subKind = (isOperator
                               ? ConstraintKind::OperatorArgumentConversion
                               : ConstraintKind::ArgumentConversion);
@@ -13848,6 +13841,9 @@ ConstraintSystem::simplifyCaughtErrorConstraint(
     TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
   Type caughtErrorType = inferCaughtErrorType(catchNode);
+  if (caughtErrorType->isEqual(type))
+    return SolutionKind::Unsolved;
+
   addConstraint(ConstraintKind::Bind, type, caughtErrorType, locator);
   return SolutionKind::Solved;
 }
@@ -15719,6 +15715,14 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,
                                      ConstraintLocatorBuilder locator,
                                      bool isFavored) {
+  // When adding a function-application constraint, make sure to introduce
+  // a potential throw site.
+  if (kind == ConstraintKind::ApplicableFunction) {
+    recordPotentialThrowSite(
+        PotentialThrowSite::Application, second,
+        getConstraintLocator(locator));
+  }
+
   switch (addConstraintImpl(kind, first, second, locator, isFavored)) {
   case SolutionKind::Error:
     // Add a failing constraint, if needed.
