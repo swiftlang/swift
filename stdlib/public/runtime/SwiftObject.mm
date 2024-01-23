@@ -1353,15 +1353,6 @@ id swift_dynamicCastObjCProtocolUnconditional(id object,
                                               Protocol * const *protocols,
                                               const char *filename,
                                               unsigned line, unsigned column) {
-  if (numProtocols == 0) {
-    return object;
-  }
-  if (object_isClass(object)) {
-    // ObjC classes never conform to protocols
-    Class sourceType = object_getClass(object);
-    swift_dynamicCastFailure(sourceType, class_getName(sourceType),
-	                     protocols[0], protocol_getName(protocols[0]));
-  }
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       Class sourceType = object_getClass(object);
@@ -1382,10 +1373,6 @@ id swift_dynamicCastObjCProtocolConditional(id object,
       // SwiftValue wrapper never holds a class object
       return nil;
     }
-  }
-  if (object_isClass(object)) {
-    // ObjC classes never conform to protocols
-    return nil;
   }
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
