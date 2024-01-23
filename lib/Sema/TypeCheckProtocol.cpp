@@ -1794,7 +1794,7 @@ class swift::MultiConformanceChecker {
   llvm::SmallPtrSet<ValueDecl *, 8> CoveredMembers;
 
   /// Check one conformance.
-  ProtocolConformance * checkIndividualConformance(
+  void checkIndividualConformance(
     NormalProtocolConformance *conformance, bool issueFixit);
 
   /// Determine whether the given requirement was left unsatisfied.
@@ -2051,28 +2051,13 @@ static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
 
 /// Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
-ProtocolConformance *MultiConformanceChecker::
+void MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
   PrettyStackTraceConformance trace("type-checking", conformance);
 
-  std::vector<ASTContext::MissingWitness> revivedMissingWitnesses;
   switch (conformance->getState()) {
     case ProtocolConformanceState::Incomplete:
-      if (conformance->isInvalid()) {
-        // Revive registered missing witnesses to handle it below.
-        revivedMissingWitnesses = getASTContext().takeDelayedMissingWitnesses(
-            conformance);
-
-        // If we have no missing witnesses for this invalid conformance, the
-        // conformance is invalid for other reasons, so emit diagnosis now.
-        if (revivedMissingWitnesses.empty()) {
-          // Emit any delayed diagnostics.
-          ConformanceChecker(getASTContext(), conformance, MissingWitnesses)
-              .emitDelayedDiags();
-        }
-      }
-
       // Check the rest of the conformance below.
       break;
 
@@ -2080,7 +2065,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     case ProtocolConformanceState::Checking:
     case ProtocolConformanceState::Complete:
       // Nothing to do.
-      return conformance;
+      return;
   }
 
   // Dig out some of the fields from the conformance.
@@ -2098,7 +2083,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
     conformance->setInvalid();
-    return conformance;
+    return;
   }
 
   // If the protocol requires a class, non-classes are a non-starter.
@@ -2107,7 +2092,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                      diag::non_class_cannot_conform_to_class_protocol, T,
                      ProtoType);
     conformance->setInvalid();
-    return conformance;
+    return;
   }
 
   if (T->isActorType()) {
@@ -2126,7 +2111,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                        actor->getDeclaredInterfaceType());
 
       conformance->setInvalid();
-      return conformance;
+      return;
     }
   }
 
@@ -2148,7 +2133,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       if (diagKind) {
         C.Diags.diagnose(ComplainLoc, diagKind.value(), T, ProtoType);
         conformance->setInvalid();
-        return conformance;
+        return;
       }
     }
 
@@ -2162,7 +2147,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                        diag::objc_protocol_cannot_have_conditional_conformance,
                        T, ProtoType);
       conformance->setInvalid();
-      return conformance;
+      return;
     }
     // And... even if it isn't conditional, we still don't currently support
     // @objc protocols in extensions of Swift generic classes, because there's
@@ -2176,7 +2161,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                              diag::objc_protocol_in_generic_extension,
                              classDecl->isGeneric(), T, ProtoType);
             conformance->setInvalid();
-            return conformance;
+            return;
           }
         }
       }
@@ -2197,7 +2182,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                            diag::objc_generics_cannot_conditionally_conform, T,
                            ProtoType);
           conformance->setInvalid();
-          return conformance;
+          return;
         }
       }
 
@@ -2242,7 +2227,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
                        ProtoType);
     }
     conformance->setInvalid();
-    return conformance;
+    return;
   }
 
   // Complain about the use of @unchecked for protocols that don't have
@@ -2300,12 +2285,16 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       }
 
       conformance->setInvalid();
-      return conformance;
+      return;
     }
   }
 
   if (conformance->isComplete())
-    return conformance;
+    return;
+
+  // Revive registered missing witnesses to handle it below.
+  auto revivedMissingWitnesses =
+      getASTContext().takeDelayedMissingWitnesses(conformance);
 
   // The conformance checker we're using.
   AllUsedCheckers.emplace_back(getASTContext(), conformance, MissingWitnesses);
@@ -2316,7 +2305,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   AllUsedCheckers.back().checkConformance(
       missingWitnessFixits ? MissingWitnessDiagnosisKind::ErrorFixIt
                            : MissingWitnessDiagnosisKind::ErrorOnly);
-  return conformance;
 }
 
 /// Add the next associated type deduction to the string representation
