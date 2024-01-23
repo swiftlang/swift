@@ -43,14 +43,27 @@ extern "C" {
 
 typedef void SWIFT_CC_swift (*HeapObjectDestroyer)(SWIFT_CONTEXT void *object);
 
-static inline void _swift_embedded_invoke_heap_object_destroy(void *object) {
-  void *metadata = *(void **)object;
+typedef struct EmbeddedHeapObject {
+#if __has_feature(ptrauth_calls)
+  void * __ptrauth(2, 1, 0x6ae1) metadata;
+#else
+  void *metadata;
+#endif
+} EmbeddedHeapObject;
+
+static inline void
+_swift_embedded_invoke_heap_object_destroy(void *object) {
+  void *metadata = ((EmbeddedHeapObject *)object)->metadata;
   void **destroy_location = &((void **)metadata)[1];
 #if __has_feature(ptrauth_calls)
-  (*(HeapObjectDestroyer __ptrauth(0,1,0xbbbf) *)destroy_location)(object);
+  (*(HeapObjectDestroyer __ptrauth(0, 1, 0xbbbf) *)destroy_location)(object);
 #else
   (*(HeapObjectDestroyer *)destroy_location)(object);
 #endif
+}
+
+static inline void _swift_embedded_set_heap_object_metadata_pointer(void *object, void *metadata) {
+  ((EmbeddedHeapObject *)object)->metadata = metadata;
 }
 
 #ifdef __cplusplus

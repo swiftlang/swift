@@ -19,12 +19,15 @@ public struct ClassMetadata {
 
   // There is no way to express the actual calling convention on the heap desroy
   // function (swiftcc with 'self') currently, so let's use UnsafeRawPointer
-  // and a helper function in C (_swift_runtime_invoke_heap_object_destroy).
+  // and a helper function in C (_swift_embedded_invoke_heap_object_destroy).
   var destroy: UnsafeRawPointer
 }
 
 public struct HeapObject {
-  var metadata: UnsafeMutablePointer<ClassMetadata>
+  // There is no way to express the custom ptrauth signature on the metadata
+  // field, so let's use UnsafeRawPointer and a helper function in C instead
+  // (_swift_embedded_set_heap_object_metadata_pointer).
+  var metadata: UnsafeRawPointer
 
   // TODO: This is just an initial support for strong refcounting only. We need
   // to think about supporting (or banning) weak and/or unowned references.
@@ -82,7 +85,7 @@ public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ ali
 public func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSize: Int, requiredAlignmentMask: Int) -> UnsafeMutablePointer<HeapObject> {
   let p = swift_slowAlloc(requiredSize, requiredAlignmentMask)!
   let object = p.assumingMemoryBound(to: HeapObject.self)
-  object.pointee.metadata = metadata
+  _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   object.pointee.refcount = 1
   return object
 }
@@ -103,14 +106,14 @@ public func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>,
 
 @_silgen_name("swift_initStaticObject")
 public func swift_initStaticObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
-  object.pointee.metadata = metadata
+  _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   object.pointee.refcount = HeapObject.immortalRefCount
   return object
 }
 
 @_silgen_name("swift_initStackObject")
 public func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
-  object.pointee.metadata = metadata
+  _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   object.pointee.refcount = 1 | HeapObject.doNotFreeBit
   return object
 }
