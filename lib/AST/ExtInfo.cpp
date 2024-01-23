@@ -58,6 +58,33 @@ void ClangTypeInfo::dump(llvm::raw_ostream &os,
   }
 }
 
+std::string LifetimeDependenceInfo::getString() const {
+  std::string lifetimeDependenceString;
+  auto getOnIndices = [](IndexSubset *bitvector) {
+    std::string result;
+    bool isFirstSetBit = true;
+    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
+      if (bitvector->contains(i)) {
+        if (!isFirstSetBit) {
+          result += ", ";
+        }
+        result += std::to_string(i);
+        isFirstSetBit = false;
+      }
+    }
+    return result;
+  };
+  if (!copyLifetimeParamIndices->isEmpty()) {
+    lifetimeDependenceString =
+        "_copy(" + getOnIndices(copyLifetimeParamIndices) + ")";
+  }
+  if (!borrowLifetimeParamIndices->isEmpty()) {
+    lifetimeDependenceString +=
+        "_borrow(" + getOnIndices(borrowLifetimeParamIndices) + ")";
+  }
+  return lifetimeDependenceString;
+}
+
 // MARK: - UnexpectedClangTypeError
 
 llvm::Optional<UnexpectedClangTypeError>

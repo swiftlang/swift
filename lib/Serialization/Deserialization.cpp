@@ -7243,10 +7243,11 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
     clangFunctionType = clangType.get();
   }
 
-  auto extInfo = SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
-                                                 noescape, concurrent, async,
-                                                 unimplementable,
-                                                 *diffKind, clangFunctionType)
+  // Handle LifetimeDependenceInfo here.
+  auto extInfo = SILFunctionType::ExtInfoBuilder(
+                     *representation, pseudogeneric, noescape, concurrent,
+                     async, unimplementable, *diffKind, clangFunctionType,
+                     LifetimeDependenceInfo())
                      .build();
 
   // Process the coroutine kind.

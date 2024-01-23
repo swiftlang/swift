@@ -176,6 +176,7 @@ public:
     return copyLifetimeParamIndices == nullptr &&
            borrowLifetimeParamIndices == nullptr;
   }
+  std::string getString() const;
 };
 
 // MARK: - UnexpectedClangTypeError
@@ -922,11 +923,15 @@ class SILExtInfoBuilder {
 
   ClangTypeInfo clangTypeInfo;
 
+  LifetimeDependenceInfo lifetimeDependenceInfo;
+
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
 
-  SILExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : bits(bits), clangTypeInfo(clangTypeInfo.getCanonical()) {}
+  SILExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
+      : bits(bits), clangTypeInfo(clangTypeInfo.getCanonical()),
+        lifetimeDependenceInfo(lifetimeDependenceInfo) {}
 
   static constexpr unsigned makeBits(Representation rep, bool isPseudogeneric,
                                      bool isNoEscape, bool isSendable,
@@ -948,15 +953,15 @@ public:
       : SILExtInfoBuilder(makeBits(SILFunctionTypeRepresentation::Thick, false,
                                    false, false, false, false,
                                    DifferentiabilityKind::NonDifferentiable),
-                          ClangTypeInfo(nullptr)) {}
+                          ClangTypeInfo(nullptr), LifetimeDependenceInfo()) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isSendable, bool isAsync, bool isUnimplementable,
-                    DifferentiabilityKind diffKind, const clang::Type *type)
-      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape,
-                                   isSendable, isAsync, isUnimplementable,
-                                   diffKind),
-                          ClangTypeInfo(type)) {}
+                    DifferentiabilityKind diffKind, const clang::Type *type,
+                    LifetimeDependenceInfo lifetimeDependenceInfo)
+      : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape, isSendable,
+                                   isAsync, isUnimplementable, diffKind),
+                          ClangTypeInfo(type), lifetimeDependenceInfo) {}
 
   // Constructor for polymorphic type.
   SILExtInfoBuilder(ASTExtInfoBuilder info, bool isPseudogeneric)
@@ -964,7 +969,8 @@ public:
                                    info.isNoEscape(), info.isSendable(),
                                    info.isAsync(), /*unimplementable*/ false,
                                    info.getDifferentiabilityKind()),
-                          info.getClangTypeInfo()) {}
+                          info.getClangTypeInfo(),
+                          info.getLifetimeDependenceInfo()) {}
 
   void checkInvariants() const;
 
@@ -1007,6 +1013,10 @@ public:
 
   /// Get the underlying ClangTypeInfo value.
   ClangTypeInfo getClangTypeInfo() const { return clangTypeInfo; }
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return lifetimeDependenceInfo;
+  }
 
   constexpr bool hasSelfParam() const {
     switch (getRepresentation()) {
@@ -1057,36 +1067,37 @@ public:
   SILExtInfoBuilder withRepresentation(Representation rep) const {
     return SILExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
-                                                       : ClangTypeInfo());
+                                                       : ClangTypeInfo(),
+                             lifetimeDependenceInfo);
   }
   [[nodiscard]]
   SILExtInfoBuilder withIsPseudogeneric(bool isPseudogeneric = true) const {
     return SILExtInfoBuilder(isPseudogeneric ? (bits | PseudogenericMask)
                                              : (bits & ~PseudogenericMask),
-                             clangTypeInfo);
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   SILExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return SILExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
-                             clangTypeInfo);
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   SILExtInfoBuilder withConcurrent(bool isSendable = true) const {
     return SILExtInfoBuilder(isSendable ? (bits | SendableMask)
-                                          : (bits & ~SendableMask),
-                             clangTypeInfo);
+                                        : (bits & ~SendableMask),
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   SILExtInfoBuilder withAsync(bool isAsync = true) const {
     return SILExtInfoBuilder(isAsync ? (bits | AsyncMask) : (bits & ~AsyncMask),
-                             clangTypeInfo);
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   SILExtInfoBuilder withUnimplementable(bool isUnimplementable = true) const {
     return SILExtInfoBuilder(isUnimplementable ? (bits | UnimplementableMask)
                                                : (bits & ~UnimplementableMask),
-                             clangTypeInfo);
+                             clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   SILExtInfoBuilder
@@ -1094,13 +1105,17 @@ public:
     return SILExtInfoBuilder(
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
-        clangTypeInfo);
+        clangTypeInfo, lifetimeDependenceInfo);
   }
   [[nodiscard]]
   SILExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return SILExtInfoBuilder(bits, ClangTypeInfo(type).getCanonical());
+    return SILExtInfoBuilder(bits, ClangTypeInfo(type).getCanonical(),
+                             lifetimeDependenceInfo);
   }
-
+  [[nodiscard]] SILExtInfoBuilder withLifetimeDependenceInfo(
+      LifetimeDependenceInfo lifetimeDependenceInfo) const {
+    return SILExtInfoBuilder(bits, clangTypeInfo, lifetimeDependenceInfo);
+  }
 
   bool isEqualTo(SILExtInfoBuilder other, bool useClangTypes) const {
     return bits == other.bits &&
@@ -1129,8 +1144,9 @@ class SILExtInfo {
   // Only for use by SILExtInfoBuilder::build. Don't use it elsewhere!
   SILExtInfo(SILExtInfoBuilder builder) : builder(builder) {}
 
-  SILExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo)
-      : builder(bits, clangTypeInfo) {
+  SILExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo,
+             LifetimeDependenceInfo lifetimeDependenceInfo)
+      : builder(bits, clangTypeInfo, lifetimeDependenceInfo) {
     builder.checkInvariants();
   };
 
@@ -1148,7 +1164,8 @@ public:
   static SILExtInfo getThin() {
     return SILExtInfoBuilder(SILExtInfoBuilder::Representation::Thin, false,
                              false, false, false, false,
-                             DifferentiabilityKind::NonDifferentiable, nullptr)
+                             DifferentiabilityKind::NonDifferentiable, nullptr,
+                             LifetimeDependenceInfo())
         .build();
   }
 
@@ -1186,6 +1203,10 @@ public:
   constexpr bool isDifferentiable() const { return builder.isDifferentiable(); }
 
   ClangTypeInfo getClangTypeInfo() const { return builder.getClangTypeInfo(); }
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    return builder.getLifetimeDependenceInfo();
+  }
 
   constexpr bool hasSelfParam() const { return builder.hasSelfParam(); }
 
