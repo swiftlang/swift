@@ -35,7 +35,6 @@ func getAnyActor(distributedActor: isolated some DistributedActor) -> any Actor 
 // CHECK-IR-NEXT: [[SELF_DA_REQ:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQ_GEP]], i32 0
 // CHECK-IR-NEXT: store ptr %"some DistributedActor.DistributedActor", ptr [[SELF_DA_REQ]]
 // CHECK-IR-NEXT: call ptr @swift_getWitnessTable(ptr @"$sxScA11DistributedMc", ptr %"some DistributedActor", ptr [[CONDITIONAL_REQ_GEP]])
-// CHECK-IR-NEXT: call ptr @swift_unknownObjectRetain
 
 // CHECK-SIL-LABEL: sil_witness_table shared <Self where Self : DistributedActor> T: Actor module Distributed {
 // CHECK-SIL-NEXT: method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$sxScA11DistributedScA15unownedExecutorScevgTW
