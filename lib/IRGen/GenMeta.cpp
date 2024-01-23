@@ -2131,6 +2131,8 @@ namespace {
                 .getLinkage(NotForDefinition)) {
       case SILLinkage::Public:
       case SILLinkage::PublicExternal:
+      case SILLinkage::Package:
+      case SILLinkage::PackageExternal:
       case SILLinkage::Hidden:
       case SILLinkage::HiddenExternal:
       case SILLinkage::Private:
@@ -2138,6 +2140,7 @@ namespace {
         
       case SILLinkage::Shared:
       case SILLinkage::PublicNonABI:
+      case SILLinkage::PackageNonABI:
         return false;
       }
       llvm_unreachable("covered switch");
@@ -7017,7 +7020,7 @@ ExtendedExistentialTypeShapeInfo::get(
                                    .getCanonicalSignature();
 
   auto linkage = getExistentialShapeLinkage(genSig, shapeType);
-  assert(linkage != FormalLinkage::PublicUnique);
+  assert(linkage != FormalLinkage::PublicUnique && linkage != FormalLinkage::PackageUnique);
 
   return { genSig, shapeType, SubstitutionMap(), linkage };
 }

@@ -1590,6 +1590,7 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
   switch (Linkage) {
   case FormalLinkage::PublicUnique:
   case FormalLinkage::PublicNonUnique:
+  case FormalLinkage::PackageUnique:
     return llvm::GlobalValue::ExternalLinkage;
 
   case FormalLinkage::HiddenUnique:

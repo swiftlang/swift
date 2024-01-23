@@ -38,8 +38,8 @@ struct TBDGenOptions {
   /// Only collect linker directive symbols.
   bool LinkerDirectivesOnly = false;
 
-  /// Whether to include only symbols with public linkage.
-  bool PublicSymbolsOnly = true;
+  /// Whether to include only symbols with public or package linkage.
+  bool PublicOrPackageSymbolsOnly = true;
 
   /// Whether LLVM IR Virtual Function Elimination is enabled.
   bool VirtualFunctionElimination = false;
@@ -75,7 +75,7 @@ struct TBDGenOptions {
     return lhs.HasMultipleIGMs == rhs.HasMultipleIGMs &&
            lhs.IsInstallAPI == rhs.IsInstallAPI &&
            lhs.LinkerDirectivesOnly == rhs.LinkerDirectivesOnly &&
-           lhs.PublicSymbolsOnly == rhs.PublicSymbolsOnly &&
+           lhs.PublicOrPackageSymbolsOnly == rhs.PublicOrPackageSymbolsOnly &&
            lhs.VirtualFunctionElimination == rhs.VirtualFunctionElimination &&
            lhs.WitnessMethodElimination == rhs.WitnessMethodElimination &&
            lhs.InstallName == rhs.InstallName &&
@@ -94,7 +94,7 @@ struct TBDGenOptions {
     using namespace llvm;
     return hash_combine(
         opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
-        opts.PublicSymbolsOnly, opts.VirtualFunctionElimination,
+        opts.PublicOrPackageSymbolsOnly, opts.VirtualFunctionElimination,
         opts.WitnessMethodElimination,
         opts.InstallName, opts.ModuleLinkName,
         opts.CurrentVersion, opts.CompatibilityVersion,

@@ -469,9 +469,12 @@ static bool parseSILLinkage(llvm::Optional<SILLinkage> &Result, Parser &P) {
   // Then use a string switch to try and parse the identifier.
   Result = llvm::StringSwitch<llvm::Optional<SILLinkage>>(P.Tok.getText())
                .Case("non_abi", SILLinkage::PublicNonABI)
+               .Case("package_non_abi", SILLinkage::PackageNonABI)
+               .Case("package", SILLinkage::Package)
                .Case("hidden", SILLinkage::Hidden)
                .Case("shared", SILLinkage::Shared)
                .Case("public_external", SILLinkage::PublicExternal)
+               .Case("package_external", SILLinkage::PackageExternal)
                .Case("hidden_external", SILLinkage::HiddenExternal)
                .Default(llvm::None);
 

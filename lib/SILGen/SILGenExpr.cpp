@@ -4010,8 +4010,21 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
           getRepresentativeAccessorForKeyPath(baseDecl), expansion);
       if (representative.isForeign)
         return false;
-      if (representative.getLinkage(ForDefinition) > SILLinkage::PublicNonABI)
+
+      switch (representative.getLinkage(ForDefinition)) {
+      case SILLinkage::Public:
+      case SILLinkage::PublicNonABI:
+      case SILLinkage::Package:
+      case SILLinkage::PackageNonABI:
+        break;
+      case SILLinkage::Hidden:
+      case SILLinkage::Shared:
+      case SILLinkage::Private:
+      case SILLinkage::PublicExternal:
+      case SILLinkage::PackageExternal:
+      case SILLinkage::HiddenExternal:
         return false;
+      }
     }
     
     return true;

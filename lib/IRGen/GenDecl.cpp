@@ -2330,11 +2330,13 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
   switch (linkage) {
   case SILLinkage::Public:
+  case SILLinkage::Package:
     return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
                              : ExportedStorage};
 
   case SILLinkage::PublicNonABI:
+  case SILLinkage::PackageNonABI:
     return isDefinition ? RESULT(WeakODR, Hidden, Default)
                         : RESULT(External, Hidden, Default);
 
@@ -2359,6 +2361,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
     return {linkage, visibility, llvm::GlobalValue::DefaultStorageClass};
   }
 
+  case SILLinkage::PackageExternal:
   case SILLinkage::PublicExternal: {
     if (isDefinition)
       return RESULT(AvailableExternally, Default, Default);
