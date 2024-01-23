@@ -5,6 +5,55 @@
 
 ## Swift 5.10
 
+* Swift 5.10 closes all known static data-race safey holes in complete strict
+concurrency checking.
+
+  When writing code against `-strict-concurrency=complete`, Swift 5.10 will
+  diagnose all potential for data races at compile time unless an explicit
+  unsafe opt out, such as `nonisolated(unsafe)` or `@unchecked Sendable`, is
+  used.
+
+  For example, in Swift 5.9, the following code crashes at runtime due to a
+  `@MainActor`-isolated initializer being evaluated outside the actor, but it
+  was not diagnosed under `-strict-concurrency=complete`:
+
+  ```swift
+  @MainActor
+  class MyModel {
+    init() {
+      MainActor.assertIsolated()
+    }
+
+    static let shared = MyModel()
+  }
+
+  func useShared() async {
+    let model = MyModel.shared
+  }
+
+  await useShared()
+  ```
+
+  The above code admits data races because a `@MainActor`-isolated static
+  variable, which evaluates a `@MainActor`-isolated initial value upon first
+  access, is accessed synchronously from a `nonisolated` context. In Swift
+  5.10, compiling the code with `-strict-concurrency=complete` produces a
+  warning that the access must be done asynchronously:
+
+  ```
+  warning: expression is 'async' but is not marked with 'await'
+    let model = MyModel.shared
+                ^~~~~~~~~~~~~~
+                await
+  ```
+
+  Swift 5.10 fixed numerous other bugs in `Sendable` and actor isolation
+  checking to strengthen the guarantees of complete concurrency checking.
+
+  Note that the complete concurrency model in Swift 5.10 is conservative.
+  Several Swift Evolution proposals are in active development to improve the
+  usability of strict concurrency checking ahead of Swift 6.
+
 * [SE-0412][]:
 
   Under strict concurrency checking, every global or static variable must be either isolated to a global actor or be both immutable and of `Sendable` type.
