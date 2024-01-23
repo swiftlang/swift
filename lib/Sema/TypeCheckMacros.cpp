@@ -646,7 +646,7 @@ static void diagnoseInvalidDecl(Decl *decl,
   if (isa<ImportDecl>(decl) ||
       isa<OperatorDecl>(decl) ||
       isa<PrecedenceGroupDecl>(decl) ||
-      isa<MacroDecl>(decl) ||
+//       isa<MacroDecl>(decl) ||
       isa<ExtensionDecl>(decl)) {
     decl->diagnose(diag::invalid_decl_in_macro_expansion,
                    decl->getDescriptiveKind());
