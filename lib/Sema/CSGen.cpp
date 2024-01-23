@@ -916,6 +916,9 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
         !Locator->directlyAt<ClosureExpr>()) {
       SmallPtrSet<TypeVariableType *, 4> typeVars;
       CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
+
+      FIXME if we're doing full typed throws, also look at the thrown
+        error type here?
       TypeVars.insert(typeVars.begin(), typeVars.end());
     }
   }
@@ -2470,12 +2473,9 @@ namespace {
         // If we are inferring thrown error types, create a type variable
         // to capture the thrown error type. This will be resolved based on the
         // throw sites that occur within the body of the closure.
-        // FIXME: Single-expression closures don't yet work.
-        if (CS.getASTContext().LangOpts.hasFeature(Feature::FullTypedThrows) &&
-            !CS.getAppliedResultBuilderTransform(closure) &&
-            !closure->hasSingleExpressionBody()) {
-          return Type(
-              CS.createTypeVariable(thrownErrorLocator, TVO_CanBindToHole));
+        if (CS.getASTContext().LangOpts.hasFeature(
+                Feature::FullTypedThrows)) {
+          return Type(CS.createTypeVariable(thrownErrorLocator, 0));
         }
 
         // Thrown type inferred from context.

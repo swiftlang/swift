@@ -287,6 +287,23 @@ static bool isViableElement(ASTNode element,
 using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
                                /*isDiscarded=*/bool, ConstraintLocator *>;
 
+static TypeVariableType *assignClosureThrownErrorType(
+    ConstraintSystem &cs, ClosureExpr *closure) {
+  // FIXME: Remove this once the inference is working in general.
+  if (!cs.getASTContext().LangOpts.hasFeature(Feature::FullTypedThrows))
+    return nullptr;
+
+  auto closureType = cs.getClosureType(closure);
+  auto thrownType = closureType->getEffectiveThrownErrorTypeOrNever();
+  auto computedThrownType = cs.inferCaughtErrorType(closure);
+  cs.addConstraint(
+      ConstraintKind::Conversion, computedThrownType, thrownType, 
+      cs.getConstraintLocator(closure,
+                              ConstraintLocator::ClosureThrownError));
+
+  return computedThrownType->getAs<TypeVariableType>();
+}
+
 static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
                               ArrayRef<ElementInfo> elements,
                               ConstraintLocator *locator, bool isIsolated,
@@ -370,14 +387,16 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
   for (auto *externalVar : paramCollector.getTypeVars())
     referencedVars.push_back(externalVar);
 
+#if false
   // If the body of the closure is being used to infer the thrown error type
   // of that closure, introduce a constraint to do so.
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
-    if (auto thrownErrorTypeVar = cs.getInferredThrownError(closure))
+    if (auto thrownErrorTypeVar = assignClosureThrownErrorType(cs, closure))
       referencedVars.push_back(thrownErrorTypeVar);
   }
-
+#endif
+  
   // It's possible that there are no viable elements in the body,
   // because e.g. whole body is an `#if` statement or it only has
   // declarations that are checked during solution application.
@@ -1137,9 +1156,9 @@ private:
       }
 
       if (closure) {
-        auto closureType = cs.getClosureType(closure);
+        assignClosureThrownErrorType(cs, closure);
       }
-      
+
       return;
     }
 
