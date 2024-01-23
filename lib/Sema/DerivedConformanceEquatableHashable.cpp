@@ -145,7 +145,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true,
                          fnType->castTo<FunctionType>()->getResult());
   cmpExpr->setThrows(nullptr);
-  statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
+  statements.push_back(ReturnStmt::createImplicit(C, cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return { body, /*isTypeChecked=*/true };
@@ -249,7 +249,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     // return true
     auto trueExpr = new (C) BooleanLiteralExpr(true, SourceLoc(),
                                                /*Implicit*/true);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, trueExpr);
     statementsInCase.push_back(returnStmt);
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
@@ -268,7 +268,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                 /*implicit*/ true);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, falseExpr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
@@ -333,7 +333,7 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   // return true
   auto trueExpr = new (C) BooleanLiteralExpr(true, SourceLoc(),
                                              /*Implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, trueExpr);
   statements.push_back(returnStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -862,7 +862,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   callExpr->setType(hashFuncResultType);
   callExpr->setThrows(nullptr);
 
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, callExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);

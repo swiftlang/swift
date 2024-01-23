@@ -241,12 +241,25 @@ public:
 class ReturnStmt : public Stmt {
   SourceLoc ReturnLoc;
   Expr *Result;
-  
+
+  ReturnStmt(SourceLoc returnLoc, Expr *result, bool isImplicit)
+      : Stmt(StmtKind::Return, isImplicit), ReturnLoc(returnLoc),
+        Result(result) {}
+
 public:
-  ReturnStmt(SourceLoc ReturnLoc, Expr *Result,
-             llvm::Optional<bool> implicit = llvm::None)
-      : Stmt(StmtKind::Return, getDefaultImplicitFlag(implicit, ReturnLoc)),
-        ReturnLoc(ReturnLoc), Result(Result) {}
+  static ReturnStmt *createParsed(ASTContext &ctx, SourceLoc returnLoc,
+                                  Expr *result) {
+    return new (ctx) ReturnStmt(returnLoc, result, /*isImplicit*/ false);
+  }
+
+  static ReturnStmt *createImplicit(ASTContext &ctx, SourceLoc returnLoc,
+                                    Expr *result) {
+    return new (ctx) ReturnStmt(returnLoc, result, /*isImplicit*/ true);
+  }
+
+  static ReturnStmt *createImplicit(ASTContext &ctx, Expr *result) {
+    return createImplicit(ctx, SourceLoc(), result);
+  }
 
   SourceLoc getReturnLoc() const { return ReturnLoc; }
 

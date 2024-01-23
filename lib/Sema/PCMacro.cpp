@@ -401,8 +401,7 @@ public:
                                          : DeclNameLoc(),
                 true, // implicit
                 AccessSemantics::Ordinary, RS->getResult()->getType());
-            ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(), DRE,
-                                                       true); // implicit
+            ReturnStmt *NRS = ReturnStmt::createImplicit(Context, DRE);
             Added<Stmt *> LogBefore =
                 buildLoggerCall(LogBeforeName, RS->getSourceRange());
             Added<Stmt *> LogAfter =

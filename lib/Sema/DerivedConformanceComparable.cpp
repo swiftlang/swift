@@ -81,7 +81,7 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
 
   auto *cmpExpr =
       BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true);
-  statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
+  statements.push_back(ReturnStmt::createImplicit(C, cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return { body, /*isTypeChecked=*/false };
@@ -176,7 +176,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     // return false 
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                /*Implicit*/true);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, falseExpr);
     statementsInCase.push_back(returnStmt);
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,

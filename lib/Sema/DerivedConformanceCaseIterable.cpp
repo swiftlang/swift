@@ -55,7 +55,7 @@ deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
   }
   auto *arrayExpr = ArrayExpr::create(C, SourceLoc(), elExprs, {}, SourceLoc());
 
-  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), arrayExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, arrayExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };

@@ -2684,8 +2684,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     returnedExpr = callExpr;
   }
 
-  auto *returnStmt =
-      new (context) ReturnStmt(SourceLoc(), returnedExpr, /*Implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(context, returnedExpr);
 
   SmallVector<ASTNode, 1> stmts;
   stmts.push_back(returnStmt);

@@ -566,8 +566,7 @@ public:
                 ConcreteDeclRef(PV.second), DeclNameLoc(),
                 true, // implicit
                 AccessSemantics::Ordinary, RS->getResult()->getType());
-            ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(), DRE,
-                                                       true); // implicit
+            ReturnStmt *NRS = ReturnStmt::createImplicit(Context, DRE);
             Added<Stmt *> Log = buildLoggerCall(
                 new (Context) DeclRefExpr(
                     ConcreteDeclRef(PV.second), DeclNameLoc(),

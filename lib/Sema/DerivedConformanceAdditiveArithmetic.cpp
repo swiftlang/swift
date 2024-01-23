@@ -155,7 +155,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   // Call memberwise initializer with member operator call expressions.
   auto *argList = ArgumentList::createImplicit(C, memberOpArgs);
   auto *callExpr = CallExpr::createImplicit(C, initExpr, argList);
-  ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
+  ASTNode returnStmt = ReturnStmt::createImplicit(C, callExpr);
   return std::pair<BraceStmt *, bool>(
       BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true), false);
 }
@@ -274,7 +274,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   // Call memberwise initializer with member property expressions.
   auto *callExpr = CallExpr::createImplicit(
       C, initExpr, ArgumentList::createImplicit(C, args));
-  ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
+  ASTNode returnStmt = ReturnStmt::createImplicit(C, callExpr);
   auto *braceStmt =
       BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true);
   return std::pair<BraceStmt *, bool>(braceStmt, false);

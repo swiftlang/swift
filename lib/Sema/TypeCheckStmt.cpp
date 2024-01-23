@@ -2693,8 +2693,7 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
         if (S->mayProduceSingleValue(ctx)) {
           auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
               ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
-          auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
-          body->setLastElement(RS);
+          body->setLastElement(ReturnStmt::createImplicit(ctx, SVE));
           func->setHasSingleExpressionBody();
           func->setSingleExpressionBody(SVE);
         }
@@ -2709,9 +2708,8 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
       // This simplifies SILGen.
       SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
                                    body->getElements().end());
-      Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
-                                          /*value*/ nullptr,
-                                          /*implicit*/ true));
+      Elts.push_back(ReturnStmt::createImplicit(ctx, body->getRBraceLoc(),
+                                                /*value*/ nullptr));
       body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
                                body->getRBraceLoc(), body->isImplicit());
     }

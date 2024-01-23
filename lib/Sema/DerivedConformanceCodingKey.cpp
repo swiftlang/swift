@@ -35,7 +35,7 @@ deriveNilReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = parentDC->getASTContext();
 
   auto *nilExpr = new (C) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
-  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, nilExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };
@@ -53,7 +53,7 @@ deriveRawValueReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *memberRef =
       UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_rawValue);
 
-  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
+  auto *returnStmt = ReturnStmt::createImplicit(C, memberRef);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };
@@ -207,7 +207,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     // return ""
     auto *emptyStringExpr = new (C) StringLiteralExpr("", SourceRange(),
                                                       /*Implicit=*/true);
-    auto *returnStmt = new (C) ReturnStmt(SourceLoc(), emptyStringExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, emptyStringExpr);
     body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                              SourceLoc());
   } else {
@@ -224,7 +224,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
       auto *caseValue = new (C) StringLiteralExpr(elt->getNameStr(),
                                                   SourceRange(),
                                                   /*Implicit=*/true);
-      auto *returnStmt = new (C) ReturnStmt(SourceLoc(), caseValue);
+      auto *returnStmt = ReturnStmt::createImplicit(C, caseValue);
       auto *caseBody = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                          SourceLoc());
       cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),

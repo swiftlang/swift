@@ -1469,8 +1469,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
     if (S->mayProduceSingleValue(Ctx)) {
       auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
           Ctx, S, /*DC*/ closure, /*mustBeExpr*/ false);
-      auto *RS = new (Ctx) ReturnStmt(SourceLoc(), SVE);
-      body->setLastElement(RS);
+      body->setLastElement(ReturnStmt::createImplicit(Ctx, SVE));
       closure->setBody(body, /*isSingleExpression*/ true);
     }
   }

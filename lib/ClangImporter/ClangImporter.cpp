@@ -5155,8 +5155,7 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
   baseMemberCallExpr->setThrows(nullptr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
-                                         /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, baseMemberCallExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
@@ -5450,8 +5449,7 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
         ctx, baseGetterMethod->getResultInterfaceType(), resultType,
         returnExpr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), returnExpr,
-                                         /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, returnExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
@@ -6763,8 +6761,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
         ctx, specializedFuncCallExpr, thunkDecl->getResultInterfaceType());
   }
 
-  auto returnStmt = new (ctx)
-      ReturnStmt(SourceLoc(), resultExpr, /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, resultExpr);
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
   return {body, /*isTypeChecked=*/true};
@@ -6886,8 +6883,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
   specializedFuncCallExpr->setType(thunkDecl->getResultInterfaceType());
   specializedFuncCallExpr->setThrows(nullptr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), specializedFuncCallExpr,
-                                         /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, specializedFuncCallExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
