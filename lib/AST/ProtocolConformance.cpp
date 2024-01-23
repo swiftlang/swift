@@ -290,6 +290,13 @@ bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(hasWitness, (requirement))
 }
 
+bool RootProtocolConformance::isSynthesized() const {
+  if (auto normal = dyn_cast<NormalProtocolConformance>(this))
+    return normal->isSynthesizedNonUnique() || normal->isConformanceOfProtocol();
+
+  return false;
+}
+
 bool NormalProtocolConformance::isRetroactive() const {
   auto module = getDeclContext()->getParentModule();
 
@@ -321,9 +328,15 @@ bool NormalProtocolConformance::isRetroactive() const {
 }
 
 bool NormalProtocolConformance::isSynthesizedNonUnique() const {
+  // Check if the conformance was synthesized by the ClangImporter.
   if (auto *file = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext()))
     return file->getKind() == FileUnitKind::ClangModule;
+
   return false;
+}
+
+bool NormalProtocolConformance::isConformanceOfProtocol() const {
+  return getDeclContext()->getSelfProtocolDecl() != nullptr;
 }
 
 bool NormalProtocolConformance::isResilient() const {

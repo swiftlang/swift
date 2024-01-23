@@ -373,6 +373,37 @@ extension DistributedActor {
   }
 }
 
+/// Supports the operation to produce an any Actor instance from a local
+/// distributed actor
+@available(SwiftStdlib 5.7, *)
+extension DistributedActor {
+  @_alwaysEmitIntoClient
+  @_implements(Actor, unownedExecutor)
+  public nonisolated var __actorUnownedExecutor: UnownedSerialExecutor {
+    if #available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *) {
+      return unownedExecutor
+    } else {
+      // On older platforms, all distributed actors are default actors.
+      return UnownedSerialExecutor(Builtin.buildDefaultActorExecutorRef(self))
+    }
+  }
+
+  /// Produces an erased `any Actor` reference to this known to be local distributed actor.
+  ///
+  /// Since this method is not distributed, it can only be invoked when the underlying
+  /// distributed actor is known to be local, e.g. from a context that is isolated
+  /// to this actor.
+  ///
+  /// Such reference can be used to work with APIs accepting `isolated any Actor`,
+  /// as only a local distributed actor can be isolated on and may be automatically
+  /// erased to such `any Actor` when calling methods implicitly accepting the
+  /// caller's actor isolation, e.g. by using the `#isolation` macro.
+  @backDeployed(before: SwiftStdlib 5.11)
+  public var asLocalActor: any Actor {
+    Builtin.distributedActorAsAnyActor(self)
+  }
+}
+
 /******************************************************************************/
 /************************* Runtime Functions **********************************/
 /******************************************************************************/

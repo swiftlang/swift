@@ -468,6 +468,10 @@ public:
   /// Get the conformance substitution map.
   SubstitutionMap getSubstitutionMap() const;
 
+  /// Whether this conformance was synthesized automatically and can have
+  /// multiple copies in a single program.
+  bool isSynthesized() const;
+
   /// Apply the given function object to each value witness within this
   /// protocol conformance.
   ///
@@ -678,6 +682,16 @@ public:
   /// Whether this conformance was synthesized automatically in multiple
   /// modules, but in a manner that ensures that all copies are equivalent.
   bool isSynthesizedNonUnique() const;
+
+  /// Whether this conformance represents the conformance of one protocol's
+  /// conforming types to another protocol.
+  ///
+  /// Such conformances cannot generally be written in the surface language, but
+  /// can be made available for specific tasks. The only such instance at the
+  /// time of this writing is that a (local) distributed actor can conform to
+  /// a local actor, but the witness table can only be used via a specific
+  /// builtin to form an existential.
+  bool isConformanceOfProtocol() const;
 
   /// Whether clients from outside the module can rely on the value witnesses
   /// being consistent across versions of the framework.

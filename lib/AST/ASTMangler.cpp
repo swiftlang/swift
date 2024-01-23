@@ -1787,8 +1787,9 @@ static bool conformanceHasIdentity(const RootProtocolConformance *root) {
     return true;
   }
 
-  // Synthesized non-unique conformances all get collapsed together at run time.
-  if (conformance->isSynthesizedNonUnique())
+  // Synthesized conformances can have multiple copies, so they don't
+  // provide identity.
+  if (conformance->isSynthesized())
     return false;
 
   // Objective-C protocol conformances are checked by the ObjC runtime.

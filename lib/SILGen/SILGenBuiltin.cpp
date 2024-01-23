@@ -25,9 +25,12 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/AST/TypeCheckRequests.h" // FIXME: Temporary
+#include "swift/AST/NameLookupRequests.h" // FIXME: Temporary
 
 using namespace swift;
 using namespace Lowering;
@@ -1884,6 +1887,80 @@ static ManagedValue emitBuiltinInjectEnumTag(SILGenFunction &SGF, SILLocation lo
     { args[0].getValue(), args[1].getValue() });
 
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
+}
+
+static ExtensionDecl *distributedActorAsAnyActorExt = nullptr;
+
+/// Find the extension on DistributedActor that defines __actorUnownedExecutor.
+static ExtensionDecl *findDistributedActorAsActorExtension(
+    ProtocolDecl *distributedActorProto, ModuleDecl *module) {
+  ASTContext &ctx = distributedActorProto->getASTContext();
+  #if true
+  auto name = ctx.getIdentifier("__actorUnownedExecutor");
+  auto results = distributedActorProto->lookupDirect(
+      name, SourceLoc(),
+      NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
+  for (auto result : results) {
+    if (auto var = dyn_cast<VarDecl>(result)) {
+      return dyn_cast<ExtensionDecl>(var->getDeclContext());
+    }
+  }
+
+  return nullptr;
+  #else
+  if (!distributedActorAsAnyActorExt) {
+    auto ext = ExtensionDecl::create(
+        ctx, SourceLoc(), nullptr, { }, module, nullptr);
+    ctx.evaluator.cacheOutput(ExtendedTypeRequest{ext},
+                              distributedActorProto->getDeclaredInterfaceType());
+    ctx.evaluator.cacheOutput(ExtendedNominalRequest{ext},
+                              distributedActorProto);
+
+    distributedActorAsAnyActorExt = ext;
+  }
+
+  return distributedActorAsAnyActorExt;
+  #endif
+}
+
+static ManagedValue emitBuiltinDistributedActorAsAnyActor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  auto distributedActor = args[0];
+
+  auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(
+      ctx, ctx.getIdentifier("distributedActorAsAnyActor")));
+  auto genericSignature = builtinDecl->getGenericSignature();
+  auto genericParam = genericSignature.getGenericParams()[0];
+
+  auto distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+  auto ext = findDistributedActorAsActorExtension(
+      distributedActorProto, SGF.getModule().getSwiftModule());
+
+  // Conformance of DistributedActor to Actor.
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  CanType distributedActorType = distributedActor.getType().getASTType();
+  RootProtocolConformance *daAsActorConformance = ctx.getNormalConformance(
+      Type(genericParam), actorProto, SourceLoc(), ext,
+      ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
+      /*isPreconcurrency=*/false);
+  ProtocolConformanceRef conformance(
+      actorProto,
+      ctx.getSpecializedConformance(distributedActorType, daAsActorConformance,
+                                    subs));
+  ProtocolConformanceRef conformances[1] = { conformance };
+
+  // Erase the distributed actor instance into an `any Actor` existential with
+  // the special conformance.
+  auto &distributedActorTL = SGF.getTypeLowering(distributedActorType);
+  auto &anyActorTL = SGF.getTypeLowering(actorProto->getDeclaredExistentialType());
+  return SGF.emitExistentialErasure(
+      loc, distributedActorType, distributedActorTL, anyActorTL, 
+      ctx.AllocateCopy(conformances),
+      C, [&distributedActor](SGFContext) {
+        return distributedActor;
+      });
 }
 
 llvm::Optional<SpecializedEmitter>
