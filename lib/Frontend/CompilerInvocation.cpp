@@ -3009,7 +3009,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
                  OPT_disable_relative_protocol_witness_tables,
                  Opts.UseRelativeProtocolWitnessTables);
-
+  Opts.EnableLargeLoadableTypesReg2Mem =
+      Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
+                   OPT_disable_large_loadable_types_reg2mem,
+                   Opts.EnableLargeLoadableTypesReg2Mem);
   Opts.EnableLayoutStringValueWitnesses = Args.hasFlag(OPT_enable_layout_string_value_witnesses,
                                                        OPT_disable_layout_string_value_witnesses,
                                                        Opts.EnableLayoutStringValueWitnesses);

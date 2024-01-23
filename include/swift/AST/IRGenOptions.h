@@ -404,6 +404,9 @@ public:
   /// using TypeInfo entries.
   unsigned ForceStructTypeLayouts : 1;
 
+  /// Run a reg2Mem pass after large loadable type lowering.
+  unsigned EnableLargeLoadableTypesReg2Mem : 1;
+
   /// Enable generation and use of layout string based value witnesses
   unsigned EnableLayoutStringValueWitnesses : 1;
 
@@ -537,6 +540,7 @@ public:
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
+        EnableLargeLoadableTypesReg2Mem(true),
         EnableLayoutStringValueWitnesses(false),
         EnableLayoutStringValueWitnessesInstantiation(false),
         EnableObjectiveCProtocolSymbolicReferences(true),
