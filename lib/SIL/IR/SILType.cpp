@@ -1062,12 +1062,11 @@ bool SILType::isMoveOnly(bool orWrapped) const {
   }
 
   // NOTE: getASTType strips the MoveOnlyWrapper off!
-  auto ty = getASTType();
+  CanType ty = getASTType();
 
-  // All kinds of references are copyable.
-  // FIXME: this doesn't match with how isNoncopyable in the AST handles it!
-  if (isa<ReferenceStorageType>(ty))
-    return false;
+  // For storage with reference ownership, check the referent.
+  if (auto refStorage = ty->getAs<ReferenceStorageType>())
+    ty = refStorage->getReferentType()->getCanonicalType();
 
   // TODO: Nonescaping closures ought to be treated as move-only in SIL.
   // They aren't marked move-only now, because the necessary move-only passes
