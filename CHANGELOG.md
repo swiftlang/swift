@@ -108,25 +108,39 @@ concurrency checking.
 
 * [SE-0411][]:
 
-  Default value expressions can now have the same isolation as the enclosing
-  function or the corresponding stored property:
+  Swift 5.10 closes a data-race safety hole that previously permitted isolated
+  default stored property values to be synchronously evaluated from outside the
+  actor. For example, the following code compiles warning-free under
+  `-strict-concurrency=complete` in Swift 5.9, but it will crash at runtime at
+  the call to `MainActor.assertIsolated()`:
 
   ```swift
-  @MainActor
-  func requiresMainActor() -> Int { ... }
-
-  class C {
-    @MainActor
-    var x: Int = requiresMainActor()
+  @MainActor func requiresMainActor() -> Int {
+    MainActor.assertIsolated()
+    return 0
   }
 
-  @MainActor func defaultArg(value: Int = requiresMainActor()) { ... }
+  @MainActor struct S {
+    var x = requiresMainActor()
+    var y: Int
+  }
+
+  nonisolated func call() async {
+    let s = await S(y: 10)
+  }
+
+  await call()
   ```
 
-  For isolated default values of stored properties, the implicit initialization
-  only happens in the body of an `init` with the same isolation. This closes
-  an important data-race safety hole where global-actor-isolated default values
-  could inadvertently run synchronously from outside the actor.
+  This happens because `requiresMainActor()` is used as a default argument to
+  the member-wise initializer of `S`, but default arguments are always
+  evaluated in the caller. In this case, the caller runs on the generic
+  executor, so the default argument evaluation crashes.
+
+  Under `-strict-concurrency=complete` in Swift 5.10, default argument values
+  can safely share the same isolation as the enclosing function or stored
+  property. The above code is still valid, but the isolated default argument is
+  guaranteed to be evaluated in the callee's isolation domain.
 
 ## Swift 5.9.2
 
