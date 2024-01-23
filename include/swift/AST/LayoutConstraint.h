@@ -300,6 +300,8 @@ class LayoutConstraint {
   int compare(LayoutConstraint rhs) const;
 };
 
+void simple_display(llvm::raw_ostream &, LayoutConstraint);
+
 // Permit direct uses of isa/cast/dyn_cast on LayoutConstraint.
 template <class X> inline bool isa(LayoutConstraint LC) {
   return isa<X>(LC.getPointer());

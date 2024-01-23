@@ -69,6 +69,11 @@ DeclContext *ASTNode::getAsDeclContext() const {
   return nullptr;
 }
 
+int ASTNode::getTypeDiscriminator() const {
+  assert(!this->isNull());
+  return this->Val.getInt();
+}
+
 bool ASTNode::isImplicit() const {
   if (const auto *E = this->dyn_cast<Expr*>())
     return E->isImplicit();

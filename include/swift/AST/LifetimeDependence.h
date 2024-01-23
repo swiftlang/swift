@@ -24,8 +24,6 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
 
-#include "llvm/ADT/ArrayRef.h"
-
 namespace swift {
 
 class AbstractFunctionDecl;
@@ -113,21 +111,12 @@ public:
     llvm_unreachable("Invalid LifetimeDependenceSpecifier::SpecifierKind");
   }
 
-  StringRef getLifetimeDependenceKindString() const {
-    switch (lifetimeDependenceKind) {
-    case LifetimeDependenceKind::Borrow:
-      return "_borrow";
-    case LifetimeDependenceKind::Consume:
-      return "_consume";
-    case LifetimeDependenceKind::Copy:
-      return "_copy";
-    case LifetimeDependenceKind::Mutate:
-      return "_mutate";
-    }
-    llvm_unreachable(
-        "Invalid LifetimeDependenceSpecifier::LifetimeDependenceKind");
-  }
+  StringRef getLifetimeDependenceKindString() const;
 };
+
+void simple_display(llvm::raw_ostream &, LifetimeDependenceKind);
+void simple_display(llvm::raw_ostream &,
+                    LifetimeDependenceSpecifier::SpecifierKind);
 
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;

@@ -104,6 +104,9 @@ public:
     return getSourceLocs()[RParenIndex];
   }
 
+  /// Retrieve the argument label locations.
+  ArrayRef<SourceLoc> getArgumentLabelLocs() const;
+
   /// Retrieve the location of an argument label.
   SourceLoc getArgumentLabelLoc(unsigned index) const {
     if (index >= NumArgumentLabels)

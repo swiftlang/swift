@@ -21,6 +21,44 @@
 #include "swift/Basic/Defer.h"
 
 namespace swift {
+
+static StringRef getLifetimeDependenceKindString(LifetimeDependenceKind kind) {
+  switch (kind) {
+  case LifetimeDependenceKind::Borrow:
+    return "_borrow";
+  case LifetimeDependenceKind::Consume:
+    return "_consume";
+  case LifetimeDependenceKind::Copy:
+    return "_copy";
+  case LifetimeDependenceKind::Mutate:
+    return "_mutate";
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+StringRef LifetimeDependenceSpecifier::getLifetimeDependenceKindString() const {
+  return ::swift::getLifetimeDependenceKindString(this->lifetimeDependenceKind);
+}
+
+void simple_display(llvm::raw_ostream &out, LifetimeDependenceKind kind) {
+  out << getLifetimeDependenceKindString(kind);
+}
+
+void simple_display(llvm::raw_ostream &out,
+                    LifetimeDependenceSpecifier::SpecifierKind kind) {
+  switch (kind) {
+#define CASE(X)                                                                \
+  case LifetimeDependenceSpecifier::SpecifierKind::X:                          \
+    out << #X;                                                                 \
+    return;
+    CASE(Named)
+    CASE(Ordered)
+    CASE(Self)
+#undef CASE
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString;
   auto getOnIndices = [](IndexSubset *bitvector) {

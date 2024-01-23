@@ -52,6 +52,8 @@ enum class TypeReprKind : uint8_t {
 enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
+void simple_display(llvm::raw_ostream &, TypeReprKind);
+
 class OpaqueReturnTypeRepr;
 using CollectedOpaqueReprs = SmallVector<TypeRepr *, 2>;
 

@@ -25,6 +25,10 @@
 #include <type_traits>
 #include <utility>
 
+namespace llvm {
+class StringRef;
+} // end namespace llvm
+
 namespace swift {
   template<typename T>
   struct HasTrivialDisplay {
@@ -52,6 +56,7 @@ namespace swift {
   HAS_TRIVIAL_DISPLAY(double);
   HAS_TRIVIAL_DISPLAY(bool);
   HAS_TRIVIAL_DISPLAY(std::string);
+  HAS_TRIVIAL_DISPLAY(llvm::StringRef);
 
 #undef HAS_TRIVIAL_DISPLAY
 

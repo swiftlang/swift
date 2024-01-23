@@ -141,6 +141,8 @@ enum : unsigned {
   NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1),
 };
 
+void simple_display(llvm::raw_ostream &, DeclAttrKind);
+
 // Define enumerators for each type attribute, e.g. TypeAttrKind::Weak.
 enum class TypeAttrKind {
 #define TYPE_ATTR(_, CLASS) CLASS,
@@ -152,6 +154,8 @@ enum : unsigned {
   NumTypeAttrKinds = static_cast<unsigned>(TypeAttrKind::Last_TypeAttr) + 1,
   NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1),
 };
+
+void simple_display(llvm::raw_ostream &, TypeAttrKind);
 
 } // end namespace swift
 
