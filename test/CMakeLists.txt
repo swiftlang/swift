@@ -232,7 +232,6 @@ set(TEST_SUBSETS
     only_validation
     only_long
     only_stress
-    only_early_swiftdriver
 )
 
 if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -426,7 +425,6 @@ foreach(SDK ${SWIFT_SDKS})
              (test_subset STREQUAL "validation") OR
              (test_subset STREQUAL "only_long") OR
              (test_subset STREQUAL "only_stress") OR
-             (test_subset STREQUAL "only_early_swiftdriver") OR
              (test_subset STREQUAL "all"))
             list(APPEND directories "${test_bin_dir}")
           endif()

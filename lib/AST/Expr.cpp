@@ -321,8 +321,9 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
       return cast<Id##Expr>(this)->Getter()
   #define PASS_THROUGH_REFERENCE(Id, GetSubExpr)                      \
     case ExprKind::Id:                                                \
-      return cast<Id##Expr>(this)                                     \
-                 ->GetSubExpr()->getReferencedDecl(stopAtParenExpr)
+      if (auto sub = cast<Id##Expr>(this)->GetSubExpr())              \
+        return sub->getReferencedDecl(stopAtParenExpr);               \
+      return ConcreteDeclRef();
 
   NO_REFERENCE(Error);
   SIMPLE_REFERENCE(NilLiteral, getInitializer);
@@ -469,6 +470,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
+  PASS_THROUGH_REFERENCE(CurrentContextIsolation, getActor);
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
@@ -842,6 +844,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::MacroExpansion:
+  case ExprKind::CurrentContextIsolation:
     return true;
   }
 
@@ -1022,6 +1025,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::SingleValueStmt:
   case ExprKind::TypeJoin:
   case ExprKind::MacroExpansion:
+  case ExprKind::CurrentContextIsolation:
     return false;
   }
 
@@ -2531,9 +2535,14 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
           if (!IS->isSyntacticallyExhaustive())
             continue;
         } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+            continue;
           if (!DCS->isSyntacticallyExhaustive())
             continue;
-        } else if (!isa<SwitchStmt>(S) && !isa<DoStmt>(S)) {
+        } else if (isa<DoStmt>(S)) {
+          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+            continue;
+        } else if (!isa<SwitchStmt>(S)) {
           continue;
         }
       } else {
@@ -2826,7 +2835,15 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "expression";
 }
 
+SourceLoc swift::extractNearestSourceLoc(const ClosureExpr *expr) {
+  return expr->getLoc();
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
+  return expr->getLoc();
+}
+
+SourceLoc swift::extractNearestSourceLoc(const MacroExpansionExpr *expr) {
   return expr->getLoc();
 }
 

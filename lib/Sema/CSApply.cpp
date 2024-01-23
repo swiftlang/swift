@@ -113,8 +113,8 @@ Solution::computeSubstitutions(GenericSignature sig,
     }
 
     // FIXME: Retrieve the conformance from the solution itself.
-    return TypeChecker::conformsToProtocol(replacement, protoType,
-                                   getConstraintSystem().DC->getParentModule());
+    return getConstraintSystem().DC->getParentModule()->checkConformance(
+        replacement, protoType);
   };
 
   return SubstitutionMap::get(sig,
@@ -565,7 +565,7 @@ namespace {
           // the protocol requirement with Self == the concrete type, and SILGen
           // (or later) can devirtualize as appropriate.
           auto conformance =
-            TypeChecker::conformsToProtocol(baseTy, proto, dc->getParentModule());
+            dc->getParentModule()->checkConformance(baseTy, proto);
           if (conformance.isConcrete()) {
             if (auto witness = conformance.getConcrete()->getWitnessDecl(decl)) {
               bool isMemberOperator = witness->getDeclContext()->isTypeContext();
@@ -2459,9 +2459,7 @@ namespace {
 
       // Try to find the conformance of the value type to _BridgedToObjectiveC.
       auto bridgedToObjectiveCConformance
-        = TypeChecker::conformsToProtocol(valueType,
-                                          bridgedProto,
-                                          dc->getParentModule());
+        = dc->getParentModule()->checkConformance(valueType, bridgedProto);
 
       FuncDecl *fn = nullptr;
 
@@ -2722,7 +2720,7 @@ namespace {
       ProtocolDecl *protocol = TypeChecker::getProtocol(
           ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
-      if (!TypeChecker::conformsToProtocol(type, protocol, dc->getParentModule())) {
+      if (!dc->getParentModule()->checkConformance(type, protocol)) {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = TypeChecker::getProtocol(
@@ -2731,7 +2729,7 @@ namespace {
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
       }
-      if (!TypeChecker::conformsToProtocol(type, protocol, dc->getParentModule())) {
+      if (!dc->getParentModule()->checkConformance(type, protocol)) {
         // ... or it should be ExpressibleByUnicodeScalarLiteral.
         protocol = TypeChecker::getProtocol(
             cs.getASTContext(), expr->getLoc(),
@@ -2846,7 +2844,7 @@ namespace {
         assert(proto && "Missing string interpolation protocol?");
 
         auto conformance =
-          TypeChecker::conformsToProtocol(type, proto, dc->getParentModule());
+          dc->getParentModule()->checkConformance(type, proto);
         assert(conformance && "string interpolation type conforms to protocol");
 
         DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
@@ -2987,8 +2985,7 @@ namespace {
       auto proto = TypeChecker::getLiteralProtocol(ctx, expr);
       assert(proto && "Missing object literal protocol?");
       auto conformance =
-        TypeChecker::conformsToProtocol(conformingType, proto,
-                                        dc->getParentModule());
+        dc->getParentModule()->checkConformance(conformingType, proto);
       assert(conformance && "object literal type conforms to protocol");
 
       auto constrName = TypeChecker::getObjectLiteralConstructorName(ctx, expr);
@@ -3686,8 +3683,7 @@ namespace {
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
       auto conformance =
-        TypeChecker::conformsToProtocol(arrayTy, arrayProto,
-                                        dc->getParentModule());
+        dc->getParentModule()->checkConformance(arrayTy, arrayProto);
       assert(conformance && "Type does not conform to protocol?");
 
       DeclName name(ctx, DeclBaseName::createConstructor(),
@@ -3733,8 +3729,7 @@ namespace {
           KnownProtocolKind::ExpressibleByDictionaryLiteral);
 
       auto conformance =
-        TypeChecker::conformsToProtocol(dictionaryTy, dictionaryProto,
-                                        dc->getParentModule());
+        dc->getParentModule()->checkConformance(dictionaryTy, dictionaryProto);
       if (conformance.isInvalid())
         return nullptr;
 
@@ -5345,8 +5340,7 @@ namespace {
         // verified by the solver, we just need to get it again
         // with all of the generic parameters resolved.
         auto hashableConformance =
-          TypeChecker::conformsToProtocol(indexType, hashable,
-                                          dc->getParentModule());
+          dc->getParentModule()->checkConformance(indexType, hashable);
         assert(hashableConformance);
 
         conformances.push_back(hashableConformance);
@@ -5360,6 +5354,11 @@ namespace {
           getIUOForceUnwrapCount(memberLoc, IUOReferenceKind::ReturnValue);
       for (unsigned i = 0; i < unwrapCount; ++i)
         buildKeyPathOptionalForceComponent(components);
+    }
+
+    Expr *visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
+      E->setType(simplifyType(cs.getType(E)));
+      return E;
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
@@ -6905,8 +6904,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Find the conformance of the source type to Hashable.
       auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
       auto conformance =
-        TypeChecker::conformsToProtocol(
-                        cs.getType(expr), hashable, dc->getParentModule());
+        dc->getParentModule()->checkConformance(
+                        cs.getType(expr), hashable);
       assert(conformance && "must conform to Hashable");
 
       return cs.cacheType(
@@ -7692,8 +7691,8 @@ Expr *ExprRewriter::convertLiteralInPlace(
   // Check whether this literal type conforms to the builtin protocol. If so,
   // initialize via the builtin protocol.
   if (builtinProtocol) {
-    auto builtinConformance = TypeChecker::conformsToProtocol(
-        type, builtinProtocol, dc->getParentModule());
+    auto builtinConformance = dc->getParentModule()->checkConformance(
+        type, builtinProtocol);
     if (builtinConformance) {
       // Find the witness that we'll use to initialize the type via a builtin
       // literal.
@@ -7716,8 +7715,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
 
   // This literal type must conform to the (non-builtin) protocol.
   assert(protocol && "requirements should have stopped recursion");
-  auto conformance = TypeChecker::conformsToProtocol(type, protocol,
-                                                     dc->getParentModule());
+  auto conformance = dc->getParentModule()->checkConformance(type, protocol);
   assert(conformance && "must conform to literal protocol");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
@@ -7841,8 +7839,7 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
     auto dictLitProto =
         ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     auto conformance =
-        TypeChecker::conformsToProtocol(argumentType, dictLitProto,
-                                        dc->getParentModule());
+        dc->getParentModule()->checkConformance(argumentType, dictLitProto);
     auto keyType = conformance.getTypeWitnessByName(argumentType, ctx.Id_Key);
     auto valueType =
         conformance.getTypeWitnessByName(argumentType, ctx.Id_Value);
@@ -8257,8 +8254,8 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   while (true) {
     switch (referenceDC->getContextKind()) {
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedAbstractClosure:
     case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
       referenceDC = referenceDC->getParent();
       continue;
 
@@ -8279,6 +8276,7 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
       case DeclContextKind::Package:
       case DeclContextKind::Module:
       case DeclContextKind::TopLevelCodeDecl:
+      case DeclContextKind::SerializedTopLevelCodeDecl:
       case DeclContextKind::MacroDecl:
         break;
     }
@@ -9192,8 +9190,8 @@ static llvm::Optional<SequenceIterationInfo> applySolutionToForEachStmt(
         parsedSequence, LocatorPathElt::ContextualType(CTP_ForEachSequence));
     type = Type(solution.OpenedExistentialTypes[contextualLoc]);
   }
-  auto sequenceConformance = TypeChecker::conformsToProtocol(
-      type, sequenceProto, dc->getParentModule());
+  auto sequenceConformance = dc->getParentModule()->checkConformance(
+      type, sequenceProto);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");
   stmt->setSequenceConformance(sequenceConformance);
@@ -9479,7 +9477,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       // Record that the pattern has been fully validated,
       // this is important for subsequent call to typeCheckDecl
       // because otherwise it would try to re-typecheck pattern.
-      patternBinding->setPattern(index, pattern, resultTarget->getDeclContext(),
+      patternBinding->setPattern(index, pattern,
                                  /*isFullyValidated=*/true);
 
       if (patternBinding->isExplicitlyInitialized(index) ||

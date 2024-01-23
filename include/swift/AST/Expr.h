@@ -3947,7 +3947,7 @@ public:
 /// SerializedAbstractClosureExpr - This represents what was originally an
 /// AbstractClosureExpr during serialization. It is preserved only to maintain
 /// the correct AST structure and remangling after deserialization.
-class SerializedAbstractClosureExpr : public SerializedLocalDeclContext {
+class SerializedAbstractClosureExpr : public DeclContext {
   const Type Ty;
   llvm::PointerIntPair<Type, 1> TypeAndImplicit;
   const unsigned Discriminator;
@@ -3955,8 +3955,7 @@ class SerializedAbstractClosureExpr : public SerializedLocalDeclContext {
 public:
   SerializedAbstractClosureExpr(Type Ty, bool Implicit, unsigned Discriminator,
                                 DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::AbstractClosure,
-                                 Parent),
+    : DeclContext(DeclContextKind::SerializedAbstractClosure, Parent),
       TypeAndImplicit(llvm::PointerIntPair<Type, 1>(Ty, Implicit)),
       Discriminator(Discriminator) {}
 
@@ -3973,10 +3972,7 @@ public:
   }
 
   static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::AbstractClosure;
-    return false;
+    return DC->getContextKind() == DeclContextKind::SerializedAbstractClosure;
   }
 };
 
@@ -6089,6 +6085,39 @@ public:
   }
 };
 
+/// Provides a value of type `(any Actor)?` that represents the actor
+/// isolation of the current context, or `nil` if this is non-isolated
+/// code.
+///
+/// This expression node is implicitly created by the type checker, and
+/// has no in-source spelling.
+class CurrentContextIsolationExpr : public Expr {
+  Expr *actorExpr = nullptr;
+  SourceLoc implicitLoc;
+
+public:
+  CurrentContextIsolationExpr(SourceLoc implicitLoc, Type type)
+      : Expr(ExprKind::CurrentContextIsolation, /*isImplicit=*/true, type),
+        implicitLoc(implicitLoc) {}
+
+  /// The expression that produces the actor isolation value.
+  Expr *getActor() const { return actorExpr; }
+
+  void setActor(Expr *expr) {
+    actorExpr = expr;
+  }
+
+  SourceLoc getLoc() const { return implicitLoc; }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(implicitLoc, implicitLoc);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CurrentContextIsolation;
+  }
+};
+
 /// Represents the unusual behavior of a . in a \ keypath expression, such as
 /// \.[0] and \Foo.?.
 class KeyPathDotExpr : public Expr {
@@ -6370,6 +6399,8 @@ void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
 SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
+SourceLoc extractNearestSourceLoc(const MacroExpansionExpr *expr);
+SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
 
 } // end namespace swift
 

@@ -886,12 +886,13 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
                                                  bool fromAnonymousContext) {
   switch (parent->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
   case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
     return {getAddrOfAnonymousContextDescriptor(
               fromAnonymousContext ? parent : ofChild),
             ConstantReference::Direct};
@@ -2403,6 +2404,17 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   if (const auto *DC = entity.getDeclContextForEmission()) {
     if (const auto *MD = DC->getParentModule())
       isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
+    if (!isKnownLocal && !isDefinition) {
+      bool isClangImportedEntity =
+          isa<ClangModuleUnit>(DC->getModuleScopeContext());
+      // Nominal type descriptor for a type imported from a Clang module
+      // is always a local declaration as it's generated on demand. When WMO is
+      // off, it's emitted into the current file's object file. When WMO is on,
+      // it's emitted into one of the object files in the current module, and
+      // thus it's never imported from outside of the module.
+      if (isClangImportedEntity && entity.isNominalTypeDescriptor())
+        isKnownLocal = true;
+    }
   } else if (entity.hasSILFunction()) {
     // SIL serialized entities (functions, witness tables, vtables) do not have
     // an associated DeclContext and are serialized into the current module.  As

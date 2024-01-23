@@ -145,7 +145,7 @@ public var _swiftEmptySetSingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, U
       /*age*/0, 
       /*seed*/0, 
       /*rawElements*/1, 
-      /*metadata*/-1
+      /*metadata*/~1
     )
 #endif
 

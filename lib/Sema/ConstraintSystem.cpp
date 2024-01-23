@@ -2037,8 +2037,7 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   // been loaded because you've passed `-parse-stdlib` and are not building the
   // stdlib itself (which would have `-module-name Swift` too).
   if (!outerDC->getParentModule()->isBuiltinModule()) {
-    if (auto *copyable = TypeChecker::getProtocol(getASTContext(), SourceLoc(),
-                                                  KnownProtocolKind::Copyable)) {
+    if (auto *copyable = getASTContext().getProtocol(KnownProtocolKind::Copyable)) {
       addConstraint(
           ConstraintKind::ConformsTo, typeVar,
           copyable->getDeclaredInterfaceType(),
@@ -2806,8 +2805,7 @@ ConstraintSystem::getTypeOfMemberReference(
     FunctionType::ExtInfo info;
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-      if (isPartialApplication(locator) &&
-          isSendableType(DC->getParentModule(), baseOpenedTy)) {
+      if (isPartialApplication(locator) && baseOpenedTy->isSendableType()) {
         // Add @Sendable to functions without conditional conformances
         functionType =
             functionType
@@ -3108,12 +3106,15 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
+    auto thrownError = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
+        0);
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
                                              .withAsync(true)
-                                             .withThrows(true, /*FIXME:*/Type())
+                                             .withThrows(true, thrownError)
                                              .build());
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
@@ -3124,7 +3125,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
                                          .withAsync(true)
-                                         .withThrows(true, /*FIXME:*/Type())
+                                         .withThrows(true, thrownError)
                                          .build());
     return {refType, refType, refType, refType, Type()};
   }
@@ -3142,11 +3143,14 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
+    auto thrownError = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
+        0);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
-                                             .withThrows(true, /*FIXME:*/Type())
+                                             .withThrows(true, thrownError)
                                              .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
@@ -3156,7 +3160,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto refType = FunctionType::get(args, result,
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
-                                         .withThrows(true, /*FIXME:*/Type())
+                                         .withThrows(true, thrownError)
                                          .withAsync(true)
                                          .build());
     return {refType, refType, refType, refType, Type()};
@@ -5490,21 +5494,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // Aggregate all requirement fixes that belong to the same callee
   // and attempt to diagnose possible ambiguities.
   {
-    auto isResultBuilderMethodRef = [&](ASTNode node) {
-      auto *UDE = getAsExpr<UnresolvedDotExpr>(node);
-      if (!(UDE && UDE->isImplicit()))
-        return false;
-
-      auto &ctx = getASTContext();
-      SmallVector<Identifier, 4> builderMethods(
-          {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
-           ctx.Id_buildFinalResult});
-
-      return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
-        return UDE->getName().compare(DeclNameRef(methodId)) == 0;
-      });
-    };
-
     // Aggregates fixes fixes attached to `buildExpression` and `buildBlock`
     // methods at the particular source location.
     llvm::MapVector<SourceLoc, SmallVector<FixInContext, 4>>
@@ -5520,7 +5509,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
       auto *calleeLoc = entry.first->getCalleeLocator(fix->getLocator());
 
-      if (isResultBuilderMethodRef(calleeLoc->getAnchor())) {
+      auto *UDE = getAsExpr<UnresolvedDotExpr>(calleeLoc->getAnchor());
+      if (UDE && isResultBuilderMethodReference(getASTContext(), UDE)) {
         auto *anchor = castToExpr<Expr>(calleeLoc->getAnchor());
         builderMethodRequirementFixes[anchor->getLoc()].push_back(entry);
       } else {
@@ -7231,7 +7221,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
   // diagnostics already emitted or waiting to be emitted. Because they are
   // a better indication of the problem.
   ASTContext &ctx = getASTContext();
-  if (ctx.Diags.hadAnyError() || ctx.hasDelayedConformanceErrors())
+  if (ctx.hadError())
     return;
 
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
@@ -7723,7 +7713,6 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       // A reference to an actor isolated state make key path non-Sendable.
       case ActorIsolation::ActorInstance:
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
         isSendable = false;
         break;
       }
@@ -7964,4 +7953,18 @@ void constraints::dumpAnchor(ASTNode anchor, SourceManager *SM,
     }
   }
   // TODO(diagnostics): Implement the rest of the cases.
+}
+
+bool constraints::isResultBuilderMethodReference(ASTContext &ctx,
+                                                 UnresolvedDotExpr *UDE) {
+  if (!(UDE && UDE->isImplicit()))
+    return false;
+
+  SmallVector<Identifier, 5> builderMethods(
+      {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
+       ctx.Id_buildFinalResult, ctx.Id_buildIf});
+
+  return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
+    return UDE->getName().compare(DeclNameRef(methodId)) == 0;
+  });
 }

@@ -211,8 +211,6 @@ struct ParentConditionalConformance {
 
 class CheckGenericArgumentsResult {
 public:
-  enum Kind { Success, RequirementFailure, SubstitutionFailure };
-
   struct RequirementFailureInfo {
     /// The failed requirement.
     Requirement Req;
@@ -227,36 +225,40 @@ public:
   };
 
 private:
-  Kind Knd;
+  CheckRequirementsResult Kind;
   llvm::Optional<RequirementFailureInfo> ReqFailureInfo;
 
   CheckGenericArgumentsResult(
-      Kind Knd, llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
-      : Knd(Knd), ReqFailureInfo(ReqFailureInfo) {}
+      CheckRequirementsResult Kind,
+      llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
+      : Kind(Kind), ReqFailureInfo(ReqFailureInfo) {}
 
 public:
   static CheckGenericArgumentsResult createSuccess() {
-    return CheckGenericArgumentsResult(Success, llvm::None);
+    return CheckGenericArgumentsResult(CheckRequirementsResult::Success,
+                                       llvm::None);
   }
 
   static CheckGenericArgumentsResult createSubstitutionFailure() {
-    return CheckGenericArgumentsResult(SubstitutionFailure, llvm::None);
+    return CheckGenericArgumentsResult(CheckRequirementsResult::SubstitutionFailure,
+                                       llvm::None);
   }
 
   static CheckGenericArgumentsResult createRequirementFailure(
       Requirement Req, Requirement SubstReq,
       SmallVector<ParentConditionalConformance, 2> ReqPath) {
     return CheckGenericArgumentsResult(
-        RequirementFailure, RequirementFailureInfo{Req, SubstReq, ReqPath});
+        CheckRequirementsResult::RequirementFailure,
+        RequirementFailureInfo{Req, SubstReq, ReqPath});
   }
 
   const RequirementFailureInfo &getRequirementFailureInfo() const {
-    assert(Knd == RequirementFailure);
+    assert(Kind == CheckRequirementsResult::RequirementFailure);
 
     return ReqFailureInfo.value();
   }
 
-  operator Kind() const { return Knd; }
+  CheckRequirementsResult getKind() const { return Kind; }
 };
 
 /// Describes the kind of checked cast operation being performed.
@@ -519,19 +521,6 @@ CheckGenericArgumentsResult
 checkGenericArgumentsForDiagnostics(ModuleDecl *module,
                                     ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
-
-/// Check the given generic parameter substitutions against the given
-/// requirements. Unlike \c checkGenericArgumentsForDiagnostics, this version
-/// reports just the result of the check and doesn't provide additional
-/// information on requirement failures that is warranted for diagnostics.
-CheckGenericArgumentsResult::Kind
-checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
-                      TypeSubstitutionFn substitutions,
-                      SubstOptions options = llvm::None);
-
-/// Check the given requirements without applying substitutions.
-CheckGenericArgumentsResult::Kind
-checkGenericArguments(ArrayRef<Requirement> requirements);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
@@ -809,17 +798,6 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
                                         ModuleDecl *M,
                                         bool skipConditionalRequirements=false,
                                         bool allowMissing=false);
-
-/// Determine whether the given type conforms to the given protocol.
-///
-/// Unlike subTypeOfProtocol(), this will return false for existentials of
-/// non-self conforming protocols.
-///
-/// \returns The protocol conformance, if \c T conforms to the
-/// protocol \c Proto, or \c None.
-ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          ModuleDecl *M,
-                                          bool allowMissing = true);
 
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,

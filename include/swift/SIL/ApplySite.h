@@ -721,6 +721,18 @@ public:
                                 getNumIndirectSILErrorResults());
   }
 
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() const {
+    return getArgumentOperands().slice(getNumIndirectSILResults() +
+                                       getNumIndirectSILErrorResults());
+  }
+
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResultsOrSelf() const {
+    auto ops = getOperandsWithoutIndirectResults();
+    if (!hasSelfArgument())
+      return ops;
+    return ops.drop_back();
+  }
+
   InoutArgumentRange getInoutArguments() const {
     switch (getKind()) {
     case FullApplySiteKind::ApplyInst:
@@ -787,6 +799,15 @@ public:
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(**this)->getIsolationCrossing();
     }
+  }
+
+  SILParameterInfo getArgumentParameterInfo(const Operand &oper) const {
+    assert(!getArgumentConvention(oper).isIndirectOutParameter() &&
+           "Can only be applied to non-out parameters");
+
+    // The ParameterInfo is going to be the parameter in the caller.
+    unsigned calleeArgIndex = getCalleeArgIndex(oper);
+    return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

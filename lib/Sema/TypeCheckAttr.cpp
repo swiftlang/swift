@@ -206,6 +206,7 @@ public:
   void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
   void visitBorrowingAttr(BorrowingAttr *attr) { visitMutationAttr(attr); }
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
+  void visitTransferringAttr(TransferringAttr *attr) {}
   void visitLegacyConsumingAttr(LegacyConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitResultDependsOnSelfAttr(ResultDependsOnSelfAttr *attr) {
     FuncDecl *FD = cast<FuncDecl>(D);
@@ -1726,7 +1727,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, module);
+    return (bool) module->checkConformance(argType, arrayLitProto);
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -1735,11 +1736,11 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, module);
+  auto dictConf = module->checkConformance(argType, dictLitProto);
   if (dictConf.isInvalid())
     return false;
   auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
-  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, module);
+  return (bool) module->checkConformance(keyType, stringLitProtocol);
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -2567,9 +2568,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   }
 
   if (!ApplicationDelegateProto ||
-      !TypeChecker::conformsToProtocol(CD->getDeclaredInterfaceType(),
-                                       ApplicationDelegateProto,
-                                       CD->getParentModule())) {
+      !CD->getParentModule()->checkConformance(CD->getDeclaredInterfaceType(),
+                                               ApplicationDelegateProto)) {
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_not_ApplicationDelegate,
              applicationMainKind);
@@ -3101,13 +3101,18 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
 
   if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
     llvm::SmallVector<Type, 4> typeErasedParams;
-    for (const auto &pair : llvm::zip(attr->getTrailingWhereClause()->getRequirements(), specializedSig.getRequirements())) {
-      auto &reqRepr = std::get<0>(pair);
-      auto &req = std::get<1>(pair);
+    for (const auto &reqRepr :
+         attr->getTrailingWhereClause()->getRequirements()) {
       if (reqRepr.getKind() == RequirementReprKind::LayoutConstraint) {
         if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
           if (attributedTy->getAttrs().has(TAK__noMetadata)) {
-            typeErasedParams.push_back(req.getFirstType());
+            const auto resolution = TypeResolution::forInterface(
+                FD->getDeclContext(), genericSig, llvm::None,
+                /*unboundTyOpener*/ nullptr,
+                /*placeholderHandler*/ nullptr,
+                /*packElementOpener*/ nullptr);
+            const auto ty = resolution.resolveType(attributedTy);
+            typeErasedParams.push_back(ty);
           }
         }
       }
@@ -3689,7 +3694,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   }
 
   // The type eraser must conform to the annotated protocol
-  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, module)) {
+  if (!module->checkConformance(typeEraser, protocol)) {
     diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -3739,8 +3744,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                               nominalTypeDecl);
     QuerySubstitutionMap getSubstitution{baseMap};
 
-    // Use invalid 'SourceLoc's to suppress diagnostics.
-    auto result = TypeChecker::checkGenericArguments(
+    auto result = checkRequirements(
           module, genericSignature.getRequirements(),
           [&](SubstitutableType *type) -> Type {
             if (type->isEqual(genericParamType))
@@ -3749,7 +3753,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
             return getSubstitution(type);
           });
 
-    if (result != CheckGenericArgumentsResult::Success) {
+    if (result != CheckRequirementsResult::Success) {
       unviable.push_back(
           std::make_tuple(init, UnviableReason::UnsatisfiedRequirements,
                           genericParamType));
@@ -3982,7 +3986,13 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
   if (nominal->isMainActor() && Ctx.LangOpts.isConcurrencyModelTaskToThread() &&
       !AvailableAttr::isUnavailable(D)) {
-    Ctx.Diags.diagnose(attr->getLocation(),
+    SourceLoc loc;
+    if (attr->isImplicit()) {
+      loc = D->getStartLoc();
+    } else {
+      loc = attr->getLocation();
+    }
+    Ctx.Diags.diagnose(loc,
                        diag::concurrency_task_to_thread_model_main_actor,
                        "task-to-thread concurrency model");
     return;
@@ -4911,7 +4921,7 @@ static bool conformsToDifferentiable(Type type, ModuleDecl *module,
   auto &ctx = module->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = TypeChecker::conformsToProtocol(type, differentiableProto, module);
+  auto conf = module->checkConformance(type, differentiableProto);
   if (conf.isInvalid())
     return false;
   if (!tangentVectorEqualsSelf)
@@ -6827,9 +6837,6 @@ void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
 }
 
 void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
-
-  auto dc = D->getDeclContext();
-
   if ((isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D)) &&
       !isAsyncDecl(cast<ValueDecl>(D))) {
     auto value = cast<ValueDecl>(D);
@@ -6843,8 +6850,8 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   }
   // Prevent Sendable Attr from being added to methods of non-sendable types
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (auto selfdecl = funcDecl->getImplicitSelfDecl()) {
-      if (!isSendableType(dc->getParentModule(), selfdecl->getTypeInContext())) {
+    if (auto selfDecl = funcDecl->getImplicitSelfDecl()) {
+      if (!selfDecl->getTypeInContext()->isSendableType()) {
         diagnose(attr->getLocation(), diag::nonsendable_instance_method)
         .warnUntilSwiftVersion(6);
       }

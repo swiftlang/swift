@@ -651,8 +651,8 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
       module, genericSig.getRequirements(), substitutions);
-  switch (result) {
-  case CheckGenericArgumentsResult::RequirementFailure:
+  switch (result.getKind()) {
+  case CheckRequirementsResult::RequirementFailure:
     if (loc.isValid()) {
       TypeChecker::diagnoseRequirementFailure(
           result.getRequirementFailureInfo(), loc, noteLoc,
@@ -661,9 +661,9 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
     }
 
     return false;
-  case CheckGenericArgumentsResult::SubstitutionFailure:
+  case CheckRequirementsResult::SubstitutionFailure:
     return false;
-  case CheckGenericArgumentsResult::Success:
+  case CheckRequirementsResult::Success:
     return true;
   }
   llvm_unreachable("invalid requirement check type");
@@ -1158,8 +1158,8 @@ Type TypeResolution::applyUnboundGenericArguments(
 
     const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
         module, genericSig.getRequirements(), substitutions);
-    switch (result) {
-    case CheckGenericArgumentsResult::RequirementFailure:
+    switch (result.getKind()) {
+    case CheckRequirementsResult::RequirementFailure:
       if (loc.isValid()) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), loc, noteLoc,
@@ -1168,9 +1168,9 @@ Type TypeResolution::applyUnboundGenericArguments(
       }
 
       LLVM_FALLTHROUGH;
-    case CheckGenericArgumentsResult::SubstitutionFailure:
+    case CheckRequirementsResult::SubstitutionFailure:
       return ErrorType::get(getASTContext());
-    case CheckGenericArgumentsResult::Success:
+    case CheckRequirementsResult::Success:
       break;
     }
   }
@@ -3250,6 +3250,33 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     attrs.clearAttribute(TAK_unchecked);
   }
 
+  if (attrs.has(TAK_preconcurrency)) {
+    auto &ctx = getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::PreconcurrencyConformances)) {
+      ty = resolveType(repr, options);
+      if (!ty || ty->hasError())
+        return ty;
+
+      if (!options.is(TypeResolverContext::Inherited) ||
+          getDeclContext()->getSelfProtocolDecl()) {
+        diagnoseInvalid(repr, attrs.getLoc(TAK_preconcurrency),
+                        diag::preconcurrency_not_inheritance_clause);
+        ty = ErrorType::get(getASTContext());
+      } else if (!ty->isConstraintType()) {
+        diagnoseInvalid(repr, attrs.getLoc(TAK_preconcurrency),
+                        diag::preconcurrency_not_existential, ty);
+        ty = ErrorType::get(getASTContext());
+      }
+
+      // Nothing to record in the type. Just clear the attribute.
+      attrs.clearAttribute(TAK_preconcurrency);
+    } else {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_preconcurrency),
+                      diag::preconcurrency_attr_disabled);
+      ty = ErrorType::get(getASTContext());
+    }
+  }
+
   if (attrs.has(TAK_retroactive)) {
     ty = resolveType(repr, options);
     if (!ty || ty->hasError()) return ty;
@@ -3483,12 +3510,14 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     bool isolated = false;
     bool compileTimeConst = false;
     bool hasResultDependsOn = false;
+    bool isTransferring = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
         case TypeReprKind::Ownership:
           ownership = cast<OwnershipTypeRepr>(specifierRepr)->getSpecifier();
           nestedRepr = specifierRepr->getBase();
+          isTransferring = ownership == ParamSpecifier::Transferring;
           continue;
         case TypeReprKind::Isolated:
           isolated = true;
@@ -3598,7 +3627,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst, hasResultDependsOn);
+        isolated, noDerivative, compileTimeConst, hasResultDependsOn,
+        isTransferring);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -3726,9 +3756,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !TypeChecker::conformsToProtocol(
-                  thrownTy, ctx.getErrorDecl(),
-                  resolution.getDeclContext()->getParentModule())) {
+               !resolution.getDeclContext()->getParentModule()->checkConformance(
+                  thrownTy, ctx.getErrorDecl())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
           thrownTy);
@@ -3996,9 +4025,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       selfType = next;
     }
 
-    witnessMethodConformance = TypeChecker::conformsToProtocol(
-        selfType, protocolType->getDecl(),
-        getDeclContext()->getParentModule());
+    witnessMethodConformance = getDeclContext()->getParentModule()
+      ->checkConformance(selfType, protocolType->getDecl());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }
@@ -4455,6 +4483,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::LegacyOwned:
   case ParamSpecifier::Borrowing:
     break;
+  case ParamSpecifier::Transferring:
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
@@ -4481,18 +4510,27 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
+  // Keep the `type` to be returned, while we unwrap and inspect the inner
+  // type for whether it can be isolated on.
   Type type = resolveType(repr->getBase(), options);
+  Type unwrappedType = type;
+
+  // Optional actor types are fine - `nil` represents `nonisolated`.
+  auto allowOptional = getASTContext().LangOpts
+                           .hasFeature(Feature::OptionalIsolatedParameters);
+  if (allowOptional) {
+    if (auto wrappedOptionalType = unwrappedType->getOptionalObjectType()) {
+      unwrappedType = wrappedOptionalType;
+    }
+  }
+  if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(unwrappedType)) {
+    unwrappedType = dynamicSelfType->getSelfType();
+  }
 
   // isolated parameters must be of actor type
-  if (!type->hasTypeParameter() && !type->isActorType() && !type->hasError()) {
-    // Optional actor types are fine - `nil` represents `nonisolated`.
-    auto wrapped = type->getOptionalObjectType();
-    auto allowOptional = getASTContext().LangOpts
-        .hasFeature(Feature::OptionalIsolatedParameters);
-    if (allowOptional && wrapped && wrapped->isActorType()) {
-      return type;
-    }
-
+  if (!unwrappedType->isTypeParameter() &&
+      !unwrappedType->isAnyActorType() &&
+      !unwrappedType->hasError()) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(), diag::isolated_parameter_not_actor, type);
     return ErrorType::get(type);

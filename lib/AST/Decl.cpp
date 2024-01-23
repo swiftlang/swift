@@ -1588,10 +1588,12 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
-    : TypeLoc(typeLoc), isUnchecked(false) {
+    : InheritedEntry(typeLoc, /*isUnchecked=*/false, /*isRetroactive=*/false,
+                     /*isPreconcurrency=*/false) {
   if (auto typeRepr = typeLoc.getTypeRepr()) {
-    isUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
-    isRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
+    IsUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
+    IsRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
+    IsPreconcurrency = typeRepr->findAttrLoc(TAK_preconcurrency).isValid();
   }
 }
 
@@ -1924,21 +1926,19 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                           PBD->getTrailingObjects<PatternBindingEntry>());
 
   for (auto idx : range(PBD->getNumPatternEntries())) {
-    auto *initContext =
-        cast_or_null<PatternBindingInitializer>(PBD->getInitContext(idx));
+    auto *initContext = PBD->getInitContext(idx);
 
     // FIXME: We ought to reconsider this since it won't recontextualize any
     // closures/decls present in the initialization expr. This currently should
     // only affect implicit code though.
     if (!initContext && !Parent->isLocalContext())
-      initContext = new (Ctx) PatternBindingInitializer(Parent);
-
-    if (initContext)
-      initContext->setBinding(PBD, idx);
+      initContext = PatternBindingInitializer::create(Parent);
 
     // We need to call setPattern to ensure the VarDecls in the pattern have
-    // the PatternBindingDecl set as their parent, and to setup the context.
-    PBD->setPattern(idx, PBD->getPattern(idx), initContext);
+    // the PatternBindingDecl set as their parent. We also need to call
+    // setInitContext to setup the context.
+    PBD->setPattern(idx, PBD->getPattern(idx));
+    PBD->setInitContext(idx, initContext);
   }
   return PBD;
 }
@@ -1959,6 +1959,14 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
                                 /*Init*/ nullptr, /*InitContext*/ nullptr);
   }
   return PBD;
+}
+
+PatternBindingInitializer *
+PatternBindingInitializer::createDeserialized(PatternBindingDecl *PBD,
+                                              unsigned index) {
+  auto *init = PatternBindingInitializer::create(PBD->getDeclContext());
+  init->setBinding(PBD, index);
+  return init;
 }
 
 ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
@@ -1994,6 +2002,18 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
   }
 
   return SelfParam;
+}
+
+void PatternBindingInitializer::setBinding(PatternBindingDecl *binding,
+                                           unsigned bindingIndex) {
+  assert(binding);
+  assert(!Binding || Binding == binding &&
+         "Cannot change the binding after the fact");
+  assert(!Binding || SpareBits == bindingIndex &&
+         "Cannot change the binding index after the fact");
+  setParent(binding->getDeclContext());
+  Binding = binding;
+  SpareBits = bindingIndex;
 }
 
 VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
@@ -2224,12 +2244,10 @@ PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
-                                    DeclContext *InitContext,
                                     bool isFullyValidated) {
   auto PatternList = getMutablePatternList();
   PatternList[i].setPattern(P);
-  PatternList[i].setInitContext(InitContext);
-  
+
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
   if (P) {
@@ -2242,7 +2260,6 @@ void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
       PatternList[i].setFullyValidated();
   }
 }
-
 
 VarDecl *PatternBindingDecl::getSingleVar() const {
   if (getNumPatternEntries() == 1)
@@ -2495,15 +2512,20 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
         if (type->isAnyActor())
           return true;
 
-        switch (getActorIsolation(type)) {
+        auto isolation = getActorIsolation(type);
+        switch (isolation) {
           case ActorIsolation::Unspecified:
           case ActorIsolation::NonisolatedUnsafe:
-          case ActorIsolation::GlobalActorUnsafe:
             break;
+
+          case ActorIsolation::GlobalActor:
+            if (isolation.preconcurrency())
+              break;
+
+            return true;
 
           case ActorIsolation::ActorInstance:
           case ActorIsolation::Nonisolated:
-          case ActorIsolation::GlobalActor:
             return true;
         }
       }
@@ -2986,7 +3008,7 @@ bool AbstractStorageDecl::isFormallyResilient() const {
   // Non-public global and static variables always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+                            /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
     return false;
 
   return true;
@@ -4987,10 +5009,10 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 }
 
 bool NominalTypeDecl::isFormallyResilient() const {
-  // Private, (unversioned) internal, and package types always have a
+  // Private and (unversioned) internal types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+                            /*treatUsableFromInlineAsPublic=*/true).isPublicOrPackage())
     return false;
 
   // Check for an explicit @_fixed_layout or @frozen attribute.
@@ -5690,7 +5712,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   auto baseName = member.getBaseName();
   auto &Context = getASTContext();
   llvm::Optional<ImplicitMemberAction> action = llvm::None;
-  if (baseName == DeclBaseName::createConstructor())
+  if (baseName.isConstructor())
     action.emplace(ImplicitMemberAction::ResolveImplicitInit);
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
@@ -5700,19 +5722,20 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   } else {
     auto argumentNames = member.getArgumentNames();
     if (member.isSimpleName() || argumentNames.size() == 1) {
-      if (baseName == DeclBaseName::createConstructor()) {
+      if (baseName.isConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
         } else if (argumentNames.front() == Context.Id_system) {
           action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
         }
       } else if (!baseName.isSpecial() &&
-           baseName.getIdentifier() == Context.Id_encode &&
-           (member.isSimpleName() || argumentNames.front() == Context.Id_to)) {
+                 baseName.getIdentifier() == Context.Id_encode &&
+                 (member.isSimpleName() ||
+                  argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
       }
     } else if (member.isSimpleName() || argumentNames.size() == 2) {
-      if (baseName == DeclBaseName::createConstructor()) {
+      if (baseName.isConstructor()) {
         if (argumentNames[0] == Context.Id_resolve &&
             argumentNames[1] == Context.Id_using) {
           action.emplace(ImplicitMemberAction::ResolveDistributedActor);
@@ -7729,6 +7752,7 @@ void ParamDecl::setSpecifier(Specifier specifier) {
   // `inout` and `consuming` parameters are locally mutable.
   case ParamSpecifier::InOut:
   case ParamSpecifier::Consuming:
+  case ParamSpecifier::Transferring:
     introducer = VarDecl::Introducer::Var;
     break;
   }
@@ -7792,6 +7816,8 @@ StringRef ParamDecl::getSpecifierSpelling(ParamSpecifier specifier) {
     return "__shared";
   case ParamSpecifier::LegacyOwned:
     return "__owned";
+  case ParamSpecifier::Transferring:
+    return "transferring";
   }
   llvm_unreachable("invalid ParamSpecifier");
 }
@@ -8393,7 +8419,8 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
-      hasResultDependsOn());
+      hasResultDependsOn(),
+      getSpecifier() == ParamDecl::Specifier::Transferring /*is transferring*/);
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -10369,7 +10396,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.Failable = Failable;
 
-  assert(Name.getBaseName() == DeclBaseName::createConstructor());
+  assert(Name.getBaseName().isConstructor());
 }
 
 ConstructorDecl *ConstructorDecl::createImported(
@@ -10875,7 +10902,6 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
         return false;
 
       case ActorIsolation::ActorInstance:
@@ -10943,9 +10969,9 @@ ActorIsolation swift::getActorIsolationOfContext(
         dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete) {
       if (Type mainActor = dcToUse->getASTContext().getMainActorType())
-        return ActorIsolation::forGlobalActor(
-            mainActor,
-            /*unsafe=*/!dcToUse->getASTContext().isSwiftVersionAtLeast(6));
+        return ActorIsolation::forGlobalActor(mainActor)
+            .withPreconcurrency(
+                !dcToUse->getASTContext().isSwiftVersionAtLeast(6));
     }
   }
 
@@ -11747,7 +11773,8 @@ MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
 
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SerializedAbstractClosure:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
   case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:

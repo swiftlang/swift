@@ -89,7 +89,7 @@ private class NonSendableLinkedListNode<T> { // expected-complete-note 3{{}}
 @GlobalActor func useGlobalActor5() async {
   let x = NonSendableLinkedListNode<Int>()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' from global actor 'GlobalActor'-isolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring value of non-Sendable type 'NonSendableLinkedListNode<Int>' from global actor 'GlobalActor'-isolated context to nonisolated context; later accesses could race}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableLinkedListNode<Int>' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{access here could race}}
@@ -104,7 +104,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue()
   x = StructContainingValue()
 
-  await transferToNonIsolated(x) // expected-tns-warning {{passing argument of non-sendable type 'StructContainingValue' from global actor 'GlobalActor'-isolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring value of non-Sendable type 'StructContainingValue' from global actor 'GlobalActor'-isolated context to nonisolated context; later accesses could race}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'StructContainingValue' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 
   useValue(x) // expected-tns-note {{access here could race}}
@@ -124,7 +124,7 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
   x = (NonSendableLinkedList<Int>(), NonSendableLinkedList<Int>())
 
-  await transferToNonIsolated(x) // expected-tns-warning {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' from global actor 'GlobalActor'-isolated context to nonisolated context at this call site could yield a race with accesses later in this function}}
+  await transferToNonIsolated(x) // expected-tns-warning {{transferring value of non-Sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' from global actor 'GlobalActor'-isolated context to nonisolated context; later accesses could race}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'GlobalActor'-isolated context may introduce data races}}
 

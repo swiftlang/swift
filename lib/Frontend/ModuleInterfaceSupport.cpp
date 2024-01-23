@@ -507,7 +507,7 @@ class InheritedProtocolCollector {
         else
           ExtraProtocols.push_back(ProtocolAndAvailability(
               protoDecl, getAvailabilityAttrs(D, availableAttrs),
-              inherited.isUnchecked, getOriginallyDefinedInAttrList(D)));
+              inherited.isUnchecked(), getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -746,7 +746,8 @@ public:
     ASTContext &ctx = M->getASTContext();
     auto inherits = ctx.AllocateCopy(llvm::makeArrayRef(InheritedEntry(
         TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
-        /*isRetroactive=*/false)));
+        /*isRetroactive=*/false,
+        /*isPreconcurrency=*/false)));
     auto extension =
         ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
                               nominal->getModuleScopeContext(), nullptr);

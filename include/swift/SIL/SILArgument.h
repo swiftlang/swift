@@ -434,6 +434,10 @@ public:
     sharedUInt32().SILFunctionArgument.hasResultDependsOn = flag;
   }
 
+  bool isTransferring() const {
+    return getKnownParameterInfo().hasOption(SILParameterInfo::Transferring);
+  }
+
   Lifetime getLifetime() const {
     return getType()
         .getLifetime(*getFunction())

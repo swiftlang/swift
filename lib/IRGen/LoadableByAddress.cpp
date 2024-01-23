@@ -3051,6 +3051,7 @@ void LoadableByAddress::run() {
                 builtinInstrs.insert(instr);
                 break;
               }
+              case SILInstructionKind::StructInst:
               case SILInstructionKind::DebugValueInst:
                 break;
               default:

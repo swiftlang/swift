@@ -528,10 +528,12 @@ GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) c
             Requirement(RequirementKind::SameType, req.getFirstType(),
                         CanType(BuiltinIntegerType::get(bitWidth, C))));
       } else if (layout->isTrivialStride()) {
-        unsigned bitWidth = layout->getTrivialStrideInBits();
         requirementsErased.push_back(
             Requirement(RequirementKind::SameType, req.getFirstType(),
-                        CanType(BuiltinIntegerType::get(bitWidth, C))));
+                        CanType(BuiltinVectorType::get(
+                            Ptr->getASTContext(),
+                            BuiltinIntegerType::get(8, Ptr->getASTContext()),
+                            layout->getTrivialStride()))));
       } else {
         requirementsErased.push_back(req);
       }

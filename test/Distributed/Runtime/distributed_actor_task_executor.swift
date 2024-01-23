@@ -66,7 +66,7 @@ distributed actor Worker {
     // CHECK: | assign id
     // CHECK: | actor ready
 
-    await _withTaskExecutor(executor) {
+    await _withTaskExecutorPreference(executor) {
       try! await worker.test(x: 42)
       // CHECK: test: executed on expected queue
     }

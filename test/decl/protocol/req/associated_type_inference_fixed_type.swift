@@ -108,9 +108,8 @@ protocol Q11 {
 }
 do {
   struct Conformer: Q11, P11b {}
-  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P11b'}}
-  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P11a'}}
-  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'Q11'}}
+  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P11a'}}
+  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'Q11'}}
 }
 
 protocol P12 where A == B {
@@ -151,7 +150,6 @@ protocol P15b: P15a where A == B {}
 do {
   struct Conformer: P15b {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P15a'}}
-  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P15b'}}
 }
 
 protocol P16a where A == B {

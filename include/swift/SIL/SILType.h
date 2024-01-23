@@ -891,9 +891,6 @@ public:
   /// Returns true if this function conforms to the Sendable protocol.
   bool isSendable(SILFunction *fn) const;
 
-  ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
-                                            ProtocolDecl *protocol) const;
-
   /// False if SILValues of this type cannot be used outside the scope of their
   /// lifetime dependence.
   bool isEscapable() const;

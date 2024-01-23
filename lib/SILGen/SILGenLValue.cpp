@@ -1219,7 +1219,7 @@ static bool isReadNoneFunction(const Expr *e) {
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     const DeclName name = dre->getDecl()->getName();
     return (name.getArgumentNames().size() == 1 &&
-            name.getBaseName() == DeclBaseName::createConstructor() &&
+            name.getBaseName().isConstructor() &&
             !name.getArgumentNames()[0].empty() &&
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
@@ -3008,6 +3008,8 @@ public:
         case ParamSpecifier::InOut:
         case ParamSpecifier::LegacyShared:
         case ParamSpecifier::LegacyOwned:
+        // For now, transferring isn't implicitly copyable.
+        case ParamSpecifier::Transferring:
           return false;
         }
         if (pd->hasResultDependsOn()) {

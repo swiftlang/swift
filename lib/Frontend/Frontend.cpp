@@ -585,15 +585,27 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
               ClangOpts.BridgingHeader))
         MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
                        std::move(loadedBuffer));
+      else
+        Diagnostics.diagnose(
+            SourceLoc(), diag::error_load_input_from_cas,
+            Invocation.getClangImporterOptions().BridgingHeader);
     }
     if (!Opts.InputFileKey.empty()) {
-      auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
-      auto Type = file_types::lookupTypeForExtension(
-          llvm::sys::path::extension(InputPath));
-      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-              getObjectStore(), getActionCache(), Diagnostics,
-              Opts.InputFileKey, Type, InputPath))
-        MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+      if (Opts.InputsAndOutputs.getAllInputs().size() != 1)
+        Diagnostics.diagnose(SourceLoc(),
+                             diag::error_wrong_input_num_for_input_file_key);
+      else {
+        auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
+        auto Type = file_types::lookupTypeFromFilename(
+            llvm::sys::path::filename(InputPath));
+        if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
+                getObjectStore(), getActionCache(), Diagnostics,
+                Opts.InputFileKey, Type, InputPath))
+          MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+        else
+          Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                               InputPath);
+      }
     }
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
         new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
@@ -1107,14 +1119,14 @@ bool CompilerInstance::canImportSwiftConcurrency() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportSwiftConcurrencyShims() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_SHIMS_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitStringProcessingImport() {
@@ -1129,7 +1141,7 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitBacktracingImport() {
@@ -1144,15 +1156,16 @@ bool CompilerInstance::canImportSwiftBacktracing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportCxxShim() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(CXX_SHIM_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath) &&
-         !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
+  return getASTContext().testImportModule(modulePath) &&
+         !Invocation.getFrontendOptions()
+              .InputsAndOutputs.hasModuleInterfaceOutputPath();
 }
 
 bool CompilerInstance::supportCaching() const {

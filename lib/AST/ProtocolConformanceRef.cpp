@@ -189,17 +189,6 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   return getConcrete()->getWitnessDeclRef(requirement);
 }
 
-llvm::Optional<ArrayRef<Requirement>>
-ProtocolConformanceRef::getConditionalRequirementsIfAvailable() const {
-  if (isConcrete())
-    return getConcrete()->getConditionalRequirementsIfAvailable();
-  else
-    // An abstract conformance is never conditional: any conditionality in the
-    // concrete types that will eventually pass through this at runtime is
-    // completely pre-checked and packaged up.
-    return ArrayRef<Requirement>();
-}
-
 ArrayRef<Requirement>
 ProtocolConformanceRef::getConditionalRequirements() const {
   if (isConcrete())

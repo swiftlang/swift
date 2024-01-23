@@ -550,6 +550,9 @@ public:
     for (StringRef s : depTracker.getDependencies()) {
       enumerateUse<NodeKind::externalDepend>(enumerator, s, llvm::None);
     }
+    for (const auto &dep : depTracker.getMacroPluginDependencies()) {
+      enumerateUse<NodeKind::externalDepend>(enumerator, dep.path, llvm::None);
+    }
   }
 
 private:

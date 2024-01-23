@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 835; // remove Swift3Inferred
+const uint16_t SWIFTMODULE_VERSION_MINOR = 838; // transferring param
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -359,6 +359,7 @@ enum class ParamDeclSpecifier : uint8_t {
   Consuming = 3,
   LegacyShared = 4,
   LegacyOwned = 5,
+  Transferring = 6,
 };
 using ParamDeclSpecifierField = BCFixed<3>;
 
@@ -1227,7 +1228,8 @@ namespace decls_block {
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
                      BCFixed<1>,              // compileTimeConst
-                     BCFixed<1>               // _resultDependsOn
+                     BCFixed<1>,              // _resultDependsOn
+                     BCFixed<1>               // transferring
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1960,6 +1962,7 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
     BCFixed<1>, // unchecked
+    BCFixed<1>, // preconcurrency
     BCArray<DeclIDField>
     // The array contains requirement signature conformances, then
     // type witnesses, then value witnesses.

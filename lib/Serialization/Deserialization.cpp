@@ -40,7 +40,9 @@
 #include "swift/ClangImporter/SwiftAbstractBasicReader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Attr.h"
 #include "clang/Basic/SourceManager.h"
+#include "clang/Basic/AttributeCommonInfo.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -466,8 +468,9 @@ getActualActorIsolationKind(uint8_t raw) {
   CASE(Nonisolated)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
-  CASE(GlobalActorUnsafe)
 #undef CASE
+  case serialization::ActorIsolation::GlobalActorUnsafe:
+    return swift::ActorIsolation::GlobalActor;
   }
   return llvm::None;
 }
@@ -928,13 +931,15 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount, isUnchecked;
+  unsigned valueCount, typeCount, conformanceCount, isUnchecked,
+      isPreconcurrency;
   ArrayRef<uint64_t> rawIDs;
 
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
                                               isUnchecked,
+                                              isPreconcurrency,
                                               rawIDs);
 
   auto doOrError = MF.getDeclContextChecked(contextID);
@@ -957,7 +962,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
       ProtocolConformanceState::Incomplete,
-      isUnchecked);
+      isUnchecked, isPreconcurrency);
   // Record this conformance.
   if (conformanceEntry.isComplete()) {
     assert(conformanceEntry.get() == conformance);
@@ -2655,10 +2660,10 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
     auto decl = getDecl(bindingID);
     PatternBindingDecl *binding = cast<PatternBindingDecl>(decl);
 
-    if (!declContextOrOffset.isComplete())
-      declContextOrOffset = new (ctx)
-        SerializedPatternBindingInitializer(binding, bindingIndex);
-
+    if (!declContextOrOffset.isComplete()) {
+      declContextOrOffset =
+          PatternBindingInitializer::createDeserialized(binding, bindingIndex);
+    }
     if (!blobData.empty())
       binding->setInitStringRepresentation(bindingIndex, blobData);
     break;
@@ -2672,8 +2677,7 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
                                                               index);
     DeclContext *parent = getDeclContext(parentID);
 
-    declContextOrOffset = new (ctx)
-      SerializedDefaultArgumentInitializer(index, parent);
+    declContextOrOffset = new (ctx) DefaultArgumentInitializer(parent, index);
     break;
   }
 
@@ -2858,6 +2862,7 @@ getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   CASE(Consuming)
   CASE(LegacyShared)
   CASE(LegacyOwned)
+  CASE(Transferring)
   }
 #undef CASE
   return llvm::None;
@@ -3144,10 +3149,15 @@ class DeclDeserializer {
                        ArrayRef<uint64_t> rawInheritedIDs) {
     SmallVector<InheritedEntry, 2> inheritedTypes;
     for (auto rawID : rawInheritedIDs) {
-      // The low bit indicates "@unchecked".
-      bool isUnchecked = rawID & 0x01;
-      TypeID typeID = rawID >> 1;
+      // The first low bit indicates "@preconcurrency".
+      bool isPreconcurrency = rawID & 0x01;
+      rawID = rawID >> 1;
 
+      // The second low bit indicates "@unchecked".
+      bool isUnchecked = rawID & 0x01;
+      rawID = rawID >> 1;
+
+      TypeID typeID = rawID;
       auto maybeType = MF.getTypeChecked(typeID);
       if (!maybeType) {
         MF.diagnoseAndConsumeError(maybeType.takeError());
@@ -3155,7 +3165,7 @@ class DeclDeserializer {
       }
       inheritedTypes.push_back(
           InheritedEntry(TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
-                         /*isRetroactive=*/false));
+                         /*isRetroactive=*/false, isPreconcurrency));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);
@@ -3853,9 +3863,9 @@ public:
         break;
 
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
-        isolation = ActorIsolation::forGlobalActor(
-            globalActor, isoKind == ActorIsolation::GlobalActorUnsafe);
+        // 'unsafe' or 'preconcurrency' doesn't mean anything for isolated
+        // default arguments.
+        isolation = ActorIsolation::forGlobalActor(globalActor);
         break;
 
       case ActorIsolation::ActorInstance:
@@ -4361,8 +4371,9 @@ public:
       binding->setImplicit();
 
     for (unsigned i = 0; i != patterns.size(); ++i) {
-      DeclContext *initContext = MF.getDeclContext(patterns[i].second);
-      binding->setPattern(i, patterns[i].first, initContext);
+      binding->setPattern(i, patterns[i].first);
+      if (auto *context = MF.getDeclContext(patterns[i].second))
+        binding->setInitContext(i, cast<PatternBindingInitializer>(context));
     }
 
     return binding;
@@ -5151,6 +5162,10 @@ public:
         builtinKind = BuiltinMacroKind::ExternalMacro;
         break;
 
+      case 2:
+        builtinKind = BuiltinMacroKind::IsolationMacro;
+        break;
+          
       default:
         break;
       }
@@ -6675,12 +6690,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
         isCompileTimeConst, hasResultDependsOn;
-    bool isNoDerivative;
+    bool isNoDerivative, isTransferring;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst, hasResultDependsOn);
+        isCompileTimeConst, hasResultDependsOn, isTransferring);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -6691,12 +6706,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     if (!paramTy)
       return paramTy.takeError();
 
-    params.emplace_back(
-        paramTy.get(), MF.getIdentifier(labelID),
-        ParameterTypeFlags(isVariadic, isAutoClosure, isNonEphemeral,
-                           *ownership, isIsolated, isNoDerivative,
-                           isCompileTimeConst, hasResultDependsOn),
-        MF.getIdentifier(internalLabelID));
+    params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
+                        ParameterTypeFlags(isVariadic, isAutoClosure,
+                                           isNonEphemeral, *ownership,
+                                           isIsolated, isNoDerivative,
+                                           isCompileTimeConst,
+                                           hasResultDependsOn, isTransferring),
+                        MF.getIdentifier(internalLabelID));
   }
 
   if (!isGeneric) {
@@ -7617,6 +7633,43 @@ public:
     // Unknown kind?
     return nullptr;
   }
+
+  const clang::Attr *readAttr() {
+    auto rawKind = readUInt32();
+    if (!rawKind)
+      return nullptr;
+
+    auto name = readIdentifier();
+    auto scopeName = readIdentifier();
+
+    auto rangeStart = readSourceLocation();
+    auto rangeEnd = readSourceLocation();
+    auto scopeLoc = readSourceLocation();
+
+    auto parsedKind = readEnum<clang::AttributeCommonInfo::Kind>();
+    auto syntax = readEnum<clang::AttributeCommonInfo::Syntax>();
+    unsigned spellingListIndex = readUInt64();
+
+    bool isRegularKeywordAttribute = readBool();
+
+    clang::AttributeCommonInfo info(
+        name, scopeName, {rangeStart, rangeEnd}, scopeLoc, parsedKind,
+        {syntax, spellingListIndex, /*IsAlignas=*/false,
+         isRegularKeywordAttribute});
+
+    bool isInherited = readBool();
+    bool isImplicit = readBool();
+    bool isPackExpansion = readBool();
+    StringRef attribute = MF.getIdentifierText(readUInt64());
+
+    auto *attr =
+        clang::SwiftAttrAttr::Create(getASTContext(), attribute.str(), info);
+    cast<clang::InheritableAttr>(attr)->setInherited(isInherited);
+    attr->setImplicit(isImplicit);
+    attr->setPackExpansion(isPackExpansion);
+
+    return attr;
+  }
 };
 
 } // end anonymous namespace
@@ -7984,7 +8037,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount, isUnchecked;
+  unsigned valueCount, typeCount, conformanceCount, isUnchecked,
+      isPreconcurrency;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -7994,10 +8048,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     fatal(llvm::make_error<InvalidRecordKindError>(kind,
                     "registered lazy loader incorrectly"));
 
-  NormalProtocolConformanceLayout::readRecord(scratch, protoID,
-                                              contextID, typeCount,
-                                              valueCount, conformanceCount,
-                                              isUnchecked, rawIDs);
+  NormalProtocolConformanceLayout::readRecord(
+      scratch, protoID, contextID, typeCount, valueCount, conformanceCount,
+      isUnchecked, isPreconcurrency, rawIDs);
 
   // Read requirement signature conformances.
   SmallVector<ProtocolConformanceRef, 4> reqConformances;

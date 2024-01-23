@@ -1878,7 +1878,7 @@ class HasIBOutlet {
 // CHECK-LABEL: {{^}}class HasIBAction {
 class HasIBAction {
   @IBAction func goodAction(_ sender: AnyObject?) { }
-  // CHECK: {{^}}  @objc @IBAction @MainActor func goodAction(_ sender: AnyObject?) {
+  // CHECK: {{^}}  @objc @IBAction @MainActor @preconcurrency func goodAction(_ sender: AnyObject?) {
 
   @IBAction func badAction(_ sender: PlainStruct?) { }
   // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}

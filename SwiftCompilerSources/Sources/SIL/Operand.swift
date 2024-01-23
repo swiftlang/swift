@@ -134,6 +134,10 @@ extension Sequence where Element == Operand {
 
   public var isSingleUse: Bool { singleUse != nil }
 
+  public var ignoreTypeDependence: LazyFilterSequence<Self> {
+    self.lazy.filter({!$0.isTypeDependent})
+  }
+
   public var ignoreDebugUses: LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is DebugValueInst) }
   }
@@ -154,7 +158,7 @@ extension Sequence where Element == Operand {
     ignoreUsers(ofType: I.self).singleUse?.instruction
   }
 
-  public var lifetimeEndingUses: LazyFilterSequence<Self> {
+  public var endingLifetime: LazyFilterSequence<Self> {
     return self.lazy.filter { $0.endsLifetime }
   }
 }
@@ -217,6 +221,17 @@ public enum OperandOwnership {
   
   /// Reborrow. Ends the borrow scope opened directly by the operand and begins one or multiple disjoint borrow scopes. If a forwarded value is reborrowed, then its base must also be reborrowed at the same point. (br, FIXME: should also include destructure, tuple, struct)
   case reborrow
+
+  public var endsLifetime: Bool {
+    switch self {
+    case .nonUse, .trivialUse, .instantaneousUse, .unownedInstantaneousUse,
+         .forwardingUnowned, .pointerEscape, .bitwiseEscape, .borrow,
+         .interiorPointer, .guaranteedForwarding:
+      return false
+    case .destroyingConsume, .forwardingConsume, .endBorrow, .reborrow:
+      return true
+    }
+  }
 
   public var _bridged: BridgedOperand.OperandOwnership {
     switch self {

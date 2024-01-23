@@ -594,7 +594,10 @@ struct TaskGroupStatus {
     write(STDERR_FILENO, message, strlen(message));
 #endif
 #if defined(SWIFT_STDLIB_HAS_ASL)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#pragma clang diagnostic pop
 #elif defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
@@ -1381,7 +1384,12 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
       return unlock();
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
+    // This _should_ be statically unreachable, but we leave it in as a
+    // safeguard in case the control flow above changes.
     swift_unreachable("expected to early return from when handling offer of last task in group");
+#pragma clang diagnostic pop
   }
 
   assert(!hadErrorResult && "only successfully completed tasks can reach here");

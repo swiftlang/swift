@@ -183,9 +183,8 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
                     SILTokenType>()));
 
   const bool conforms =
-      (bool)TypeChecker::conformsToProtocol(type,
-                                            invertible,
-                                            invertible->getParentModule(),
+      (bool) invertible->getParentModule()->checkConformance(
+          type, invertible,
           /*allowMissing=*/false);
 
   return conforms;
@@ -396,7 +395,7 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     auto conformance = ctx.getNormalConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
         conformanceDC, ProtocolConformanceState::Complete,
-        /*isUnchecked=*/false);
+        /*isUnchecked=*/false, /*isPreconcurrency=*/false);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 

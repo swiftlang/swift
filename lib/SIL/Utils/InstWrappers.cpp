@@ -43,6 +43,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
     return false;
 
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::InitExistentialRefInst:
@@ -51,6 +52,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::TupleExtractInst:

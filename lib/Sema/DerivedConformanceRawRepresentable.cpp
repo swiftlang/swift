@@ -517,7 +517,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   if (requirement->getBaseName() == Context.Id_rawValue)
     return deriveRawRepresentable_raw(*this);
 
-  if (requirement->getBaseName() == DeclBaseName::createConstructor())
+  if (requirement->getBaseName().isConstructor())
     return deriveRawRepresentable_init(*this);
 
   Context.Diags.diagnose(requirement->getLoc(),

@@ -793,7 +793,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     }  
 
     _debugPrecondition(
-      Int(bitPattern: base) % MemoryLayout<S.Element>.stride == 0,
+      Int(bitPattern: base) & (MemoryLayout<S.Element>.alignment-1) == 0,
       "buffer base address must be properly aligned to access S.Element"
     )
 
@@ -853,7 +853,7 @@ extension Unsafe${Mutable}RawBufferPointer {
         return .init(start: nil, count: 0)
       }
       _debugPrecondition(
-        Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+        Int(bitPattern: baseAddress) & (MemoryLayout<C.Element>.alignment-1) == 0,
         "buffer base address must be properly aligned to access C.Element"
       )
       _precondition(
@@ -878,7 +878,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
     _internalInvariant(_end != nil)
     _debugPrecondition(
-      Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+      Int(bitPattern: baseAddress) & (MemoryLayout<C.Element>.alignment-1) == 0,
       "buffer base address must be properly aligned to access C.Element"
     )
     var iterator = source.makeIterator()
@@ -940,7 +940,7 @@ extension Unsafe${Mutable}RawBufferPointer {
       return .init(start: nil, count: 0)
     }
     _debugPrecondition(
-      Int(bitPattern: baseAddress) % MemoryLayout<T>.stride == 0,
+      Int(bitPattern: baseAddress) & (MemoryLayout<T>.alignment-1) == 0,
       "buffer base address must be properly aligned to access T"
     )
     _precondition(

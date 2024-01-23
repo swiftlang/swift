@@ -4148,46 +4148,24 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   ParserStatus status;
   ArgumentList *argList = nullptr;
   if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
-    if (peekToken().is(tok::code_complete)) {
-      auto lParenLoc = consumeToken(tok::l_paren);
-      auto typeE = new (Context) TypeExpr(type.get());
-      auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-      if (CodeCompletionCallbacks) {
-        CodeCompletionCallbacks->completePostfixExprParen(typeE, CCE);
-      }
-      consumeToken(tok::code_complete);
-      skipUntilDeclStmtRBrace(tok::r_paren);
-      auto rParenLoc = PreviousLoc;
-      if (Tok.is(tok::r_paren)) {
-        rParenLoc = consumeToken(tok::r_paren);
-      }
+    // If we have no local context to parse the initial value into, create
+    // one for the PBD we'll eventually create.  This allows us to have
+    // reasonable DeclContexts for any closures that may live inside of
+    // initializers.
+    llvm::Optional<ParseFunctionBody> initParser;
+    if (!CurDeclContext->isLocalContext()) {
+      if (!initContext)
+        initContext = PatternBindingInitializer::create(CurDeclContext);
 
-      argList = ArgumentList::createParsed(
-          Context, lParenLoc, {Argument::unlabeled(CCE)}, rParenLoc,
-          /*trailingClosureIdx=*/llvm::None);
-      status.setHasCodeCompletionAndIsError();
-    } else {
-      // If we have no local context to parse the initial value into, create
-      // one for the PBD we'll eventually create.  This allows us to have
-      // reasonable DeclContexts for any closures that may live inside of
-      // initializers.
-      llvm::Optional<ParseFunctionBody> initParser;
-      if (!CurDeclContext->isLocalContext()) {
-        if (!initContext) {
-          initContext =
-              new (Context) PatternBindingInitializer(CurDeclContext);
-        }
-
-        initParser.emplace(*this, initContext);
-      }
-      auto result = parseArgumentList(tok::l_paren, tok::r_paren,
-                                      /*isExprBasic*/ true,
-                                      /*allowTrailingClosure*/ false);
-      status |= result;
-      argList = result.get();
-      assert(!argList->hasAnyTrailingClosures() &&
-             "Cannot parse a trailing closure here");
+      initParser.emplace(*this, initContext);
     }
+    auto result = parseArgumentList(tok::l_paren, tok::r_paren,
+                                    /*isExprBasic*/ true,
+                                    /*allowTrailingClosure*/ false);
+    status |= result;
+    argList = result.get();
+    assert(!argList->hasAnyTrailingClosures() &&
+           "Cannot parse a trailing closure here");
   }
 
   // Form the attribute.
@@ -5139,6 +5117,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
            Tok.isContextualKeyword("isolated") ||
            Tok.isContextualKeyword("consuming") ||
            Tok.isContextualKeyword("borrowing") ||
+           Tok.isContextualKeyword("transferring") ||
            Tok.isContextualKeyword("_const") ||
            Tok.isContextualKeyword("_resultDependsOn")))) {
 
@@ -5166,6 +5145,15 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       continue;
     }
 
+    // Perform an extra check for transferring. Since it is a specifier, we use
+    // the actual parsing logic below.
+    if (Tok.isContextualKeyword("transferring")) {
+      if (!P.Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
+        P.diagnose(Tok, diag::requires_experimental_feature, "transferring",
+                   false, getFeatureName(Feature::TransferringArgsAndResults));
+      }
+    }
+
     if (SpecifierLoc.isValid()) {
       P.diagnose(Tok, diag::parameter_specifier_repeated)
           .fixItRemove(SpecifierLoc);
@@ -5179,6 +5167,8 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
           Specifier = ParamDecl::Specifier::LegacyOwned;
         } else if (Tok.getRawText().equals("borrowing")) {
           Specifier = ParamDecl::Specifier::Borrowing;
+        } else if (Tok.getRawText().equals("transferring")) {
+          Specifier = ParamDecl::Specifier::Transferring;
         } else if (Tok.getRawText().equals("consuming")) {
           Specifier = ParamDecl::Specifier::Consuming;
         }
@@ -7541,6 +7531,8 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
       P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
     } else if (P.Tok.isContextualKeyword("borrowing")) {
       P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Borrowing);
+    } else if (P.Tok.isContextualKeyword("transferring")) {
+      P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Transferring);
     }
   }
 
@@ -7928,7 +7920,6 @@ void Parser::parseExpandedMemberList(SmallVectorImpl<ASTNode> &items) {
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
 
-  auto *decl = CurDeclContext->getAsDecl();
   bool previousHadSemi = true;
 
   SourceLoc startingLoc = Tok.getLoc();
@@ -8237,7 +8228,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   // In var/let decl with multiple patterns, accumulate them all in this list
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
-  auto BaseContext = CurDeclContext;
+  DeclContext *BindingContext = topLevelDecl ? topLevelDecl : CurDeclContext;
 
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
@@ -8252,13 +8243,12 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
     auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                           VarLoc, PBDEntries, BaseContext);
+                                           VarLoc, PBDEntries, BindingContext);
 
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
     // up in Decls to be returned to caller.
     if (topLevelDecl) {
-      PBD->setDeclContext(topLevelDecl);
       auto range = PBD->getSourceRangeIncludingAttrs();
       topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
                                               ASTNode(PBD), range.End, true));
@@ -8319,9 +8309,10 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       }
     });
 
-    // Check whether we have already established an initializer context.
+    // Check whether we have already established an initializer context for
+    // the first binding entry (subsequent entries need a separate context).
     PatternBindingInitializer *initContext =
-      findAttributeInitContent(Attributes);
+      PBDEntries.empty() ? findAttributeInitContent(Attributes) : nullptr;
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
@@ -8340,7 +8331,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // for the PBD we'll eventually create.  This allows us to have reasonable
       // DeclContexts for any closures that may live inside of initializers.
       if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
-        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+        initContext = PatternBindingInitializer::create(CurDeclContext);
 
       // If we're using a local context (either a TopLevelCodeDecl or a
       // PatternBindingContext) install it now so that CurDeclContext is set

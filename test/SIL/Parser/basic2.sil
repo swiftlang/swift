@@ -2,6 +2,12 @@
 
 import Builtin
 
+class Klass {}
+@_moveOnly struct MoveOnlyPair {
+  var lhs: Klass
+  var rhs: Klass
+}
+
 // CHECK-LABEL: sil [ossa] @test_copy_release_value
 // CHECK: bb0([[T0:%[0-9]+]] : @owned $Builtin.NativeObject):
 // CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_value [[T0]] : $Builtin.NativeObject
@@ -298,6 +304,29 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %md2 = mark_dependence [nonescaping] %md1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
   destroy_value %md2 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: mark_unresolved_non_copyable_value [consumable_and_assignable] %{{[0-9]+}} : $*MoveOnlyPair
+// CHECK: } // end sil function 'testMarkUnresolvedNonCopyableValueInst'
+sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_box ${ var MoveOnlyPair }
+  %2 = project_box %1 : ${ var MoveOnlyPair }, 0
+  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*MoveOnlyPair
+  %3c = begin_access [modify] [static] %3 : $*MoveOnlyPair
+  %3a = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.lhs
+  %3b = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.rhs
+  %0a = copy_value %0 : $Klass
+  %0b = copy_value %0 : $Klass
+  store %0a to [init] %3a : $*Klass
+  store %0b to [init] %3b : $*Klass
+  end_access %3c : $*MoveOnlyPair
+
+  destroy_value %1 : ${ var MoveOnlyPair }
+
   %9999 = tuple()
   return %9999 : $()
 }

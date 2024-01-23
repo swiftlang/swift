@@ -1663,7 +1663,6 @@ bool ActorIsolation::requiresSubstitution() const {
     return false;
 
   case GlobalActor:
-  case GlobalActorUnsafe:
     return getGlobalActor()->hasTypeParameter();
   }
   llvm_unreachable("unhandled actor isolation kind!");
@@ -1678,16 +1677,17 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
     return *this;
 
   case GlobalActor:
-  case GlobalActorUnsafe:
-    return forGlobalActor(
-        getGlobalActor().subst(subs), kind == GlobalActorUnsafe)
-              .withPreconcurrency(preconcurrency());
+    return forGlobalActor(getGlobalActor().subst(subs))
+        .withPreconcurrency(preconcurrency());
   }
   llvm_unreachable("unhandled actor isolation kind!");
 }
 
 void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
+  if (state.preconcurrency())
+    out << "preconcurrency ";
+
   switch (state) {
     case ActorIsolation::ActorInstance:
       out << "actor-isolated to instance of ";
@@ -1715,16 +1715,12 @@ void swift::simple_display(
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       out << "actor-isolated to global actor ";
       if (state.isSILParsed()) {
         out << "SILPARSED";
       } else {
         out << state.getGlobalActor().getString();
       }
-
-      if (state == ActorIsolation::GlobalActorUnsafe)
-        out << "(unsafe)";
       break;
   }
 }

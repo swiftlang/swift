@@ -2058,15 +2058,21 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // After this point we now that we must have an address only type.
   assert(src.getType().isAddressOnly(SGF.F) &&
          "Should have an address only type here");
+  assert(!UncheckedTakeEnumDataAddrInst::isDestructive(src.getType().getEnumOrBoundGenericEnum(),
+                                                       SGF.getModule()) &&
+         "address only enum projection should never be destructive");
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
   // Collect the cases and specialized rows.
   CaseBlocks blocks{SGF, rows, sourceType, SGF.B.getInsertionBB()};
 
-  // We lack a SIL instruction to nondestructively project data from an
+  // We (used to) lack a SIL instruction to nondestructively project data from an
   // address-only enum, so we can only do so in place if we're allowed to take
   // the source always. Copy the source if we can't.
+  //
+  // TODO: This should no longer be necessary now that we guarantee that
+  // potentially address-only enums never use spare bit optimization.
   switch (src.getFinalConsumption()) {
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::CopyOnSuccess:
@@ -2086,8 +2092,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
   }
 
   // Emit the switch_enum_addr instruction.
-  //
-  // NOTE: switch_enum_addr does not actually consume the underlying value.
   SGF.B.createSwitchEnumAddr(loc, src.getValue(), blocks.getDefaultBlock(),
                              blocks.getCaseBlocks(), blocks.getCounts(),
                              defaultCaseCount);
@@ -2171,8 +2175,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
       ManagedValue eltValue;
       // We can only project destructively from an address-only enum, so
       // copy the value if we can't consume it.
-      // TODO: Should have a more efficient way to copy payload
-      // nondestructively from an enum.
+      // TODO: Copying should be avoidable now that we guarantee that address-
+      // only enums never use spare bit optimization.
       switch (eltConsumption) {
       case CastConsumptionKind::TakeAlways: {
         auto finalValue = src.getFinalManagedValue();
@@ -2180,13 +2184,12 @@ void PatternMatchEmission::emitEnumElementDispatch(
                                                          eltDecl, eltTy);
         break;
       }
-      case CastConsumptionKind::BorrowAlways:
-        // If we reach this point, we know that we have a loadable
-        // element type from an enum with mixed address
-        // only/loadable cases. Since we had an address only type,
-        // we assume that we will not have BorrowAlways since
-        // address only types do not support BorrowAlways.
-        llvm_unreachable("not allowed");
+      case CastConsumptionKind::BorrowAlways: {
+        eltValue = ManagedValue::forBorrowedAddressRValue(
+          SGF.B.createUncheckedTakeEnumDataAddr(loc, src.getValue(),
+                                                eltDecl, eltTy));
+        break;
+      }
       case CastConsumptionKind::CopyOnSuccess: {
         auto temp = SGF.emitTemporary(loc, SGF.getTypeLowering(src.getType()));
         SGF.B.createCopyAddr(loc, src.getValue(), temp->getAddress(), IsNotTake,
@@ -2212,12 +2215,22 @@ void PatternMatchEmission::emitEnumElementDispatch(
       if (eltTL->isLoadable()) {
         // If we do not have a loadable value, just use getManagedSubobject
         // Load a loadable data value.
-        if (eltConsumption == CastConsumptionKind::CopyOnSuccess) {
+        switch (eltConsumption) {
+        case CastConsumptionKind::CopyOnSuccess:
           eltValue = SGF.B.createLoadBorrow(loc, eltValue);
           eltConsumption = CastConsumptionKind::BorrowAlways;
-        } else {
-          assert(eltConsumption == CastConsumptionKind::TakeAlways);
+          break;
+
+        case CastConsumptionKind::TakeAlways:
           eltValue = SGF.B.createLoadTake(loc, eltValue);
+          break;
+          
+        case CastConsumptionKind::BorrowAlways:
+          eltValue = SGF.B.createLoadBorrow(loc, eltValue);
+          break;
+          
+        case CastConsumptionKind::TakeOnSuccess:
+          llvm_unreachable("not possible");
         }
         origCMV = {eltValue, eltConsumption};
       } else {
@@ -2847,33 +2860,88 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   ManagedValue subjectMV = emitRValueAsSingleValue(
       S->getSubjectExpr(), SGFContext::AllowGuaranteedPlusZero);
 
+  llvm::Optional<ValueOwnership> noncopyableSwitchOwnership;
+
   // Inline constructor for subject.
   auto subject = ([&]() -> ConsumableManagedValue {
-    // If we have a noImplicitCopy value, ensure plus one and convert
-    // it. Switches always consume move only values.
-    //
-    // NOTE: We purposely do not do this for pure move only types since for them
-    // we emit everything at +0 and then run the BorrowToDestructure transform
-    // upon them. The reason that we do this is that internally to
-    // SILGenPattern, we always attempt to move from +1 -> +0 meaning that even
-    // if we start at +1, we will go back to +0 given enough patterns to go
-    // through. It is simpler to just let SILGenPattern do what it already wants
-    // to do, rather than fight it or try to resusitate the "fake owned borrow"
-    // path that we still use for address only types (and that we want to delete
-    // once we have opaque values).
-    if (subjectMV.getType().isMoveOnly() && subjectMV.getType().isObject()) {
-      if (subjectMV.getType().isMoveOnlyWrapped()) {
-        subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
-            S, subjectMV.ensurePlusOne(*this, S));
-      } else {
-        // If we have a pure move only type and it is owned, borrow it so that
-        // BorrowToDestructure can handle it.
-        if (subjectMV.getOwnershipKind() == OwnershipKind::Owned) {
+    if (subjectMV.getType().isMoveOnly()) {
+      if (getASTContext().LangOpts.hasFeature(Feature::BorrowingSwitch)) {
+        // Determine the overall ownership behavior of the switch, based on the
+        // patterns' ownership behavior.
+        auto ownership = ValueOwnership::Shared;
+        for (auto caseLabel : S->getCases()) {
+          for (auto item : caseLabel->getCaseLabelItems()) {
+            ownership = std::max(ownership, item.getPattern()->getOwnership());
+          }
+        }
+        noncopyableSwitchOwnership = ownership;
+        
+        // Based on the ownership behavior, prepare the subject.
+        // The pattern match itself will always be performed on a borrow, to
+        // ensure that the order of pattern evaluation doesn't prematurely
+        // consume or modify the value until we commit to a match. But if the
+        // match consumes the value, then we need a +1 value to go back to in
+        // order to consume the parts we match to, so we force a +1 value then
+        // borrow that for the pattern match.
+        switch (ownership) {
+        case ValueOwnership::Default:
+          llvm_unreachable("invalid");
+        
+        case ValueOwnership::Shared:
+          if (subjectMV.getType().isAddress() &&
+              subjectMV.getType().isLoadable(F)) {
+            // Load a borrow if the type is loadable.
+            subjectMV = B.createLoadBorrow(S, subjectMV);
+          } else if (!subjectMV.isPlusZero()) {
+            subjectMV = subjectMV.borrow(*this, S);
+          }
+          return {subjectMV, CastConsumptionKind::BorrowAlways};
+          
+        case ValueOwnership::InOut:
+          // TODO: mutating switches
+          llvm_unreachable("not implemented");
+          
+        case ValueOwnership::Owned:
+          // Make sure we own the subject value.
+          subjectMV = subjectMV.ensurePlusOne(*this, S);
+          if (subjectMV.getType().isAddress() &&
+              subjectMV.getType().isLoadable(F)) {
+            // Move the value into memory if it's loadable.
+            subjectMV = B.createLoadTake(S, subjectMV);
+          }
+          // Perform the pattern match on a borrow of the subject.
           subjectMV = subjectMV.borrow(*this, S);
+          return {subjectMV, CastConsumptionKind::BorrowAlways};
+        }
+        llvm_unreachable("unhandled value ownership");
+      } else {
+        // If we have a noImplicitCopy value, ensure plus one and convert
+        // it. Switches always consume move only values.
+        //
+        // NOTE: We purposely do not do this for pure move only types since for them
+        // we emit everything at +0 and then run the BorrowToDestructure transform
+        // upon them. The reason that we do this is that internally to
+        // SILGenPattern, we always attempt to move from +1 -> +0 meaning that even
+        // if we start at +1, we will go back to +0 given enough patterns to go
+        // through. It is simpler to just let SILGenPattern do what it already wants
+        // to do, rather than fight it or try to resusitate the "fake owned borrow"
+        // path that we still use for address only types (and that we want to delete
+        // once we have opaque values).
+        if (subjectMV.getType().isObject()) {
+          if (subjectMV.getType().isMoveOnlyWrapped()) {
+            subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
+                S, subjectMV.ensurePlusOne(*this, S));
+          } else {
+            // If we have a pure move only type and it is owned, borrow it so that
+            // BorrowToDestructure can handle it.
+            if (subjectMV.getOwnershipKind() == OwnershipKind::Owned) {
+              subjectMV = subjectMV.borrow(*this, S);
+            }
+          }
         }
       }
     }
-
+  
     // If we have a plus one value...
     if (subjectMV.isPlusOne(*this)) {
       // And we have an address that is loadable, perform a load [take].

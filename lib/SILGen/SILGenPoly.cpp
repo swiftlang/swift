@@ -6861,7 +6861,8 @@ void SILGenFunction::emitProtocolWitness(
     AbstractionPattern reqtOrigTy, CanAnyFunctionType reqtSubstTy,
     SILDeclRef requirement, SubstitutionMap reqtSubs, SILDeclRef witness,
     SubstitutionMap witnessSubs, IsFreeFunctionWitness_t isFree,
-    bool isSelfConformance, llvm::Optional<ActorIsolation> enterIsolation) {
+    bool isSelfConformance, bool isPreconcurrency,
+    llvm::Optional<ActorIsolation> enterIsolation) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -6905,7 +6906,13 @@ void SILGenFunction::emitProtocolWitness(
       actorSelf = actorSelfVal;
     }
 
-    emitHopToTargetActor(loc, enterIsolation, actorSelf);
+    if (!F.isAsync()) {
+      assert(isPreconcurrency);
+      auto executor = emitExecutor(loc, *enterIsolation, actorSelf);
+      emitPreconditionCheckExpectedExecutor(loc, *executor);
+    } else {
+      emitHopToTargetActor(loc, enterIsolation, actorSelf);
+    }
   }
 
   // Get the type of the witness.

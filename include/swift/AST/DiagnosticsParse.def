@@ -413,8 +413,6 @@ ERROR(subscript_without_get,none,
       "subscript declarations must have a getter", ())
 
 // initializer
-ERROR(invalid_nested_init,none,
-      "missing '%select{super.|self.}0' at initializer invocation", (bool))
 ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
@@ -1365,6 +1363,8 @@ ERROR(expected_rparen_expr_list,none,
       "expected ')' in expression list", ())
 ERROR(expected_rsquare_expr_list,none,
       "expected ']' in expression list", ())
+
+ERROR(expected_label_before_colon,none, "expected argument label before colon", ())
 
 // Array literal expressions
 ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,

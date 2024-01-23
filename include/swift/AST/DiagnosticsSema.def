@@ -1274,8 +1274,7 @@ ERROR(single_value_stmt_branch_empty,none,
       "expected expression in branch of '%0' expression",
       (StmtKind))
 ERROR(single_value_stmt_branch_must_end_in_result,none,
-      "non-expression branch of '%0' expression may only end with a 'throw' "
-      "or 'then'",
+      "non-expression branch of '%0' expression may only end with a 'throw'",
       (StmtKind))
 ERROR(cannot_jump_in_single_value_stmt,none,
       "cannot '%0' in '%1' when used as expression",
@@ -4284,6 +4283,11 @@ ERROR(no_member_of_module,none,
 
 ERROR(super_with_no_base_class,none,
       "'super' members cannot be referenced in a root class", ())
+ERROR(unqualified_init,none,
+      "initializer expression requires explicit access"
+      "%select{|; did you mean to prepend it with|; did you mean to prepend "
+      "it with}0%select{| 'self.'?| 'super.'?}0",
+      (unsigned))
 
 ERROR(bad_init_ref_base, none,
       "'init' can only refer to the initializers of "
@@ -5338,7 +5342,7 @@ ERROR(actor_protocol_illegal_inheritance,none,
       "non-actor type %0 cannot conform to the %1 protocol",
       (DeclName, DeclName))
 ERROR(distributed_actor_conformance_missing_system_type,none,
-      "distributed actor %0 does not declare ActorSystem it can be used with.",
+      "distributed actor %0 does not declare ActorSystem it can be used with",
       (DeclName))
 NOTE(note_distributed_actor_system_can_be_defined_using_defaultdistributedactorsystem,none,
      "you can provide a module-wide default actor system by declaring:\n"
@@ -5552,6 +5556,8 @@ ERROR(isolated_parameter_global_actor_type,none,
 ERROR(isolated_parameter_combined_nonisolated,none,
       "%0 with 'isolated' parameter cannot be 'nonisolated'",
       (DescriptiveDeclKind))
+ERROR(isolation_macro_experimental,none,
+      "#isolation macro is experimental", ())
 
 NOTE(in_derived_conformance, none,
      "in derived conformance to %0",
@@ -5625,6 +5631,15 @@ ERROR(unchecked_not_inheritance_clause,none,
       "'unchecked' attribute only applies in inheritance clauses", ())
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
+
+WARNING(preconcurrency_conformance_not_used,none,
+        "@preconcurrency attribute on conformance to %0 has no effect", (Type))
+ERROR(preconcurrency_not_inheritance_clause,none,
+      "'preconcurrency' attribute only applies in inheritance clauses", ())
+ERROR(preconcurrency_not_existential,none,
+      "'preconcurrency' attribute cannot apply to non-protocol type %0", (Type))
+ERROR(preconcurrency_attr_disabled,none,
+      "attribute requires '-enable-experimental-feature PreconcurrencyConformances'", ())
 
 ERROR(redundant_any_in_existential,none,
        "redundant 'any' in type %0",
@@ -5728,8 +5743,13 @@ ERROR(global_actor_on_local_variable,none,
 ERROR(global_actor_on_storage_of_value_type,none,
       "stored property %0 within struct cannot have a global actor",
       (DeclName))
-ERROR(global_actor_non_unsafe_init,none,
-      "global actor attribute %0 argument can only be '(unsafe)'", (Type))
+ERROR(unsafe_global_actor,none,
+      "'(unsafe)' global actors are deprecated; "
+      "use '@preconcurrency' instead",
+      ())
+ERROR(global_actor_arg,none,
+      "global actor attribute %0 cannot have arguments",
+      (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
 ERROR(global_actor_top_level_var,none,
@@ -7582,6 +7602,24 @@ NOTE(add_explicit_protocol_for_conformance,none,
 ERROR(escapable_requires_feature_flag,none,
       "type '~Escapable' requires -enable-experimental-feature NonescapableTypes",
       ())
+ERROR(non_bitwise_copyable_type_class,none,
+      "class cannot conform to 'BitwiseCopyable'", ())
+ERROR(non_bitwise_copyable_type_member,none,
+      "%select{stored property %2|associated value %2}1 of "
+      "'BitwiseCopyable'-conforming %kind3 has non-bitwise-copyable type %0",
+      (Type, bool, DeclName, const ValueDecl *))
+NOTE(non_bitwise_copyable_nominal,none,
+     "%kind0 does not conform to the 'BitwiseCopyable' protocol",
+      (const ValueDecl *))
+NOTE(non_bitwise_copyable_function_type,none,
+      "a function type must be marked '@convention(thin)' or '@convention(c)' to be bitwise copyable",
+      ())
+NOTE(add_nominal_bitwise_copyable_conformance,none,
+     "consider making %kind0 conform to the 'BitwiseCopyable' protocol",
+     (const ValueDecl *))
+NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
+     "consider making generic parameter %0 conform to the 'BitwiseCopyable' protocol",
+     (Type))
 
 // -- older ones below --
 

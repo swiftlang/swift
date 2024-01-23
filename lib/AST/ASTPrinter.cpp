@@ -2727,11 +2727,13 @@ void PrintAST::printInherited(const Decl *decl) {
   Printer << ": ";
 
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
-    if (inherited.isUnchecked)
+    if (inherited.isUnchecked())
       Printer << "@unchecked ";
-    if (inherited.isRetroactive &&
+    if (inherited.isRetroactive() &&
         !llvm::is_contained(Options.ExcludeAttrList, TAK_retroactive))
       Printer << "@retroactive ";
+    if (inherited.isPreconcurrency())
+      Printer << "@preconcurrency ";
 
     printTypeLoc(inherited);
   }, [&]() {
@@ -3219,11 +3221,9 @@ static bool usesFeatureRetroactiveAttribute(Decl *decl) {
   if (!ext)
     return false;
 
-  ArrayRef<InheritedEntry> entries = ext->getInherited().getEntries();
-  return std::find_if(entries.begin(), entries.end(), 
-    [](const InheritedEntry &entry) {
-      return entry.isRetroactive;
-    }) != entries.end();
+  return llvm::any_of(
+      ext->getInherited().getEntries(),
+      [](const InheritedEntry &entry) { return entry.isRetroactive(); });
 }
 
 static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
@@ -3904,7 +3904,41 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
 
 static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
-static bool usesFeatureTransferringArgsAndResults(Decl *decl) { return false; }
+static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
+  if (auto *pd = dyn_cast<ParamDecl>(decl))
+    if (pd->getSpecifier() == ParamSpecifier::Transferring)
+      return true;
+
+  // TODO: Results.
+
+  return false;
+}
+
+static bool usesFeaturePreconcurrencyConformances(Decl *decl) {
+  auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
+    return llvm::any_of(
+        inherited.getEntries(),
+        [](const InheritedEntry &entry) { return entry.isPreconcurrency(); });
+  };
+
+  if (auto *T = dyn_cast<TypeDecl>(decl))
+    return usesPreconcurrencyConformance(T->getInherited());
+
+  if (auto *E = dyn_cast<ExtensionDecl>(decl)) {
+    // If type has `@preconcurrency` conformance(s) all of its
+    // extensions have to be guarded by the flag too.
+    if (auto *T = dyn_cast<TypeDecl>(E->getExtendedNominal())) {
+      if (usesPreconcurrencyConformance(T->getInherited()))
+        return true;
+    }
+
+    return usesPreconcurrencyConformance(E->getInherited());
+  }
+
+  return false;
+}
+
+static bool usesFeatureBorrowingSwitch(Decl *decl) { return false; }
 
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
@@ -4541,6 +4575,8 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printAttrName("@autoclosure ");
   if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
+  if (flags.isTransferring())
+    printer.printAttrName("@transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -4560,6 +4596,9 @@ static void printParameterFlags(ASTPrinter &printer,
     break;
   case ParamSpecifier::LegacyOwned:
     printer.printKeyword("__owned", options, " ");
+    break;
+  case ParamSpecifier::Transferring:
+    printer.printKeyword("transferring", options, " ");
     break;
   }
   
@@ -5384,6 +5423,9 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         case BuiltinMacroKind::ExternalMacro:
           Printer << "ExternalMacro";
           break;
+        case BuiltinMacroKind::IsolationMacro:
+          Printer << "IsolationMacro";
+          break;
         }
         break;
 
@@ -5651,6 +5693,12 @@ void PrintAST::visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
 }
 
 void PrintAST::visitForceValueExpr(ForceValueExpr *expr) {
+}
+
+void PrintAST::visitCurrentContextIsolationExpr(
+    CurrentContextIsolationExpr *expr) {
+  if (auto actor = expr->getActor())
+    visit(actor);
 }
 
 void PrintAST::visitKeyPathDotExpr(KeyPathDotExpr *expr) {
@@ -8033,6 +8081,11 @@ void SILParameterInfo::print(ASTPrinter &Printer,
     Printer << "@noDerivative ";
   }
 
+  if (options.contains(SILParameterInfo::Transferring)) {
+    options -= SILParameterInfo::Transferring;
+    Printer << "@transferring ";
+  }
+
   // If we did not handle a case in Options, this code was not updated
   // appropriately.
   assert(!bool(options) && "Code not updated for introduced option");
@@ -8308,7 +8361,8 @@ swift::getInheritedForPrinting(
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
                        isUnchecked,
-                       /*isRetroactive=*/false});
+                       /*isRetroactive=*/false,
+                       /*isPreconcurrency=*/false});
   }
 }
 

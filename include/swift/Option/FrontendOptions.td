@@ -77,6 +77,9 @@ def backup_module_interface_path_EQ :
   Joined<["-"], "backup-module-interface-path=">,
   Alias<backup_module_interface_path>;
 
+def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
+  HelpText<"Emit textual output in a parseable format">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 
 def primary_file : Separate<["-"], "primary-file">,
@@ -86,9 +89,6 @@ def primary_file : Separate<["-"], "primary-file">,
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
-
-def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
-  HelpText<"Emit textual output in a parseable format">;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "

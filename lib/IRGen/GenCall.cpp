@@ -3204,26 +3204,6 @@ llvm::CallBase *CallEmission::emitCallSite() {
   return call;
 }
 
-static llvm::AttributeList
-assertTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
-                                         llvm::AttributeList attrList) {
-  auto &context = fnType->getContext();
-  if (context.supportsTypedPointers()) {
-    for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
-      auto paramTy = fnType->getParamType(i);
-      assert(
-          !attrList.hasParamAttr(i, llvm::Attribute::StructRet) ||
-          llvm::cast<llvm::PointerType>(paramTy)->isOpaqueOrPointeeTypeMatches(
-              attrList.getParamStructRetType(i)));
-      assert(
-          !attrList.hasParamAttr(i, llvm::Attribute::ByVal) ||
-          llvm::cast<llvm::PointerType>(paramTy)->isOpaqueOrPointeeTypeMatches(
-              attrList.getParamByValType(i)));
-    }
-  }
-  return attrList;
-}
-
 llvm::CallBase *IRBuilder::CreateCallOrInvoke(
     const FunctionPointer &fn, ArrayRef<llvm::Value *> args,
     llvm::BasicBlock *invokeNormalDest, llvm::BasicBlock *invokeUnwindDest) {
@@ -3265,7 +3245,7 @@ llvm::CallBase *IRBuilder::CreateCallOrInvoke(
       }
     }
   }
-  call->setAttributes(assertTypesInByValAndStructRetAttributes(fnTy, attrs));
+  call->setAttributes(attrs);
   call->setCallingConv(fn.getCallingConv());
   return call;
 }
@@ -3462,10 +3442,6 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
         resultTy = func->getParamStructRetType(0);
       }
       auto temp = IGF.createAlloca(resultTy, Alignment(), "indirect.result");
-      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
-        temp = IGF.Builder.CreateElementBitCast(
-            temp, fnType->getParamType(0)->getNonOpaquePointerElementType());
-      }
       emitToMemory(temp, substResultTI, isOutlined);
       return;
     }
@@ -3492,10 +3468,6 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
         auto resultTy = func->getParamStructRetType(1);
         auto temp = IGF.createAlloca(resultTy, Alignment(/*safe alignment*/ 16),
                                      "indirect.result");
-        if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
-          temp = IGF.Builder.CreateElementBitCast(
-              temp, fnType->getParamType(1)->getNonOpaquePointerElementType());
-        }
         emitToMemory(temp, substResultTI, isOutlined);
         return;
       }
@@ -5940,8 +5912,6 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
   }
 
   if (awaitSignature) {
-    assert(llvm::cast<llvm::PointerType>(Value->getType())
-               ->isOpaqueOrPointeeTypeMatches(awaitSignature));
     return cast<llvm::FunctionType>(awaitSignature);
   }
 
@@ -5949,25 +5919,17 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
   if (auto *constant = dyn_cast<llvm::Constant>(Value)) {
     auto *gv = dyn_cast<llvm::GlobalValue>(Value);
     if (!gv) {
-      assert(llvm::cast<llvm::PointerType>(Value->getType())
-                 ->isOpaqueOrPointeeTypeMatches(Sig.getType()));
       return Sig.getType();
     }
 
     if (useSignature) { // Because of various casting (e.g thin_to_thick) the
                       // signature of the function Value might mismatch
                       // (e.g no context argument).
-      assert(llvm::cast<llvm::PointerType>(Value->getType())
-                 ->isOpaqueOrPointeeTypeMatches(Sig.getType()));
       return Sig.getType();
     }
 
-    assert(llvm::cast<llvm::PointerType>(Value->getType())
-               ->isOpaqueOrPointeeTypeMatches(gv->getValueType()));
     return cast<llvm::FunctionType>(gv->getValueType());
   }
 
-  assert(llvm::cast<llvm::PointerType>(Value->getType())
-             ->isOpaqueOrPointeeTypeMatches(Sig.getType()));
   return Sig.getType();
 }

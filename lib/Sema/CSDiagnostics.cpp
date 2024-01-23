@@ -114,7 +114,9 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
       }
 
       Type GP = typeVar->getImpl().getGenericParameter();
-      return resolvedType->is<UnresolvedType>() && GP ? GP : resolvedType;
+      return resolvedType->is<UnresolvedType>() && GP
+          ? ErrorType::get(GP)
+          : resolvedType;
     }
 
     if (type->hasElementArchetype()) {
@@ -3162,8 +3164,8 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
   if (auto errorCodeProtocol =
           Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
-    auto conformance = TypeChecker::conformsToProtocol(
-        errorCodeType, errorCodeProtocol, getParentModule());
+    auto conformance = getParentModule()->checkConformance(
+        errorCodeType, errorCodeProtocol);
     if (conformance && toErrorExistential) {
       Type errorType =
           conformance
@@ -3403,8 +3405,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   SmallVector<std::string, 8> missingProtoTypeStrings;
   SmallVector<ProtocolDecl *, 8> missingProtocols;
   for (auto protocol : layout.getProtocols()) {
-    if (!TypeChecker::conformsToProtocol(fromType, protocol,
-                                         getParentModule())) {
+    if (!getParentModule()->checkConformance(fromType, protocol)) {
       auto protoTy = protocol->getDeclaredInterfaceType();
       missingProtoTypeStrings.push_back(protoTy->getString());
       missingProtocols.push_back(protocol);
@@ -3452,11 +3453,12 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   {
     llvm::SmallString<128> Text;
     llvm::raw_svector_ostream SS(Text);
-    llvm::SetVector<MissingWitness> missingWitnesses;
+    llvm::SetVector<ASTContext::MissingWitness> missingWitnesses;
     for (auto protocol : missingProtocols) {
       auto conformance = NormalProtocolConformance(
           nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
-          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false);
+          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
+          /*isPreconcurrency=*/false);
       ConformanceChecker checker(getASTContext(), &conformance,
                                  missingWitnesses);
       // Type witnesses must be resolved first.
@@ -4325,7 +4327,7 @@ bool MissingMemberFailure::diagnoseAsError() {
       correction->addFixits(diagnostic);
     } else if ((instanceTy->getAnyNominal() ||
                 instanceTy->is<ExistentialType>()) &&
-               getName().getBaseName() == DeclBaseName::createConstructor()) {
+               getName().getBaseName().isConstructor()) {
       auto &cs = getConstraintSystem();
 
       auto result = cs.performMemberLookup(
@@ -9035,8 +9037,7 @@ bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
     auto *protocol = TypeChecker::getLiteralProtocol(ctx, sub);
     // Special handle for literals conditional checked cast when they can
     // be statically coerced to the cast type.
-    if (protocol && TypeChecker::conformsToProtocol(toType, protocol,
-                                                    dc->getParentModule())) {
+    if (protocol && dc->getParentModule()->checkConformance(toType, protocol)) {
       emitDiagnostic(diag::literal_conditional_downcast_to_coercion, fromType,
                      toType);
       return true;

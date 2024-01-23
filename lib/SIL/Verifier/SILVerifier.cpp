@@ -689,9 +689,7 @@ struct ImmutableAddressUseVerifier {
         }
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        auto type =
-            cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand()->getType();
-        if (type.getOptionalObjectType()) {
+        if (!cast<UncheckedTakeEnumDataAddrInst>(inst)->isDestructive()) {
           for (auto result : inst->getResults()) {
             llvm::copy(result->getUses(), std::back_inserter(worklist));
           }

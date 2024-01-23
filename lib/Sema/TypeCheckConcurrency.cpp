@@ -103,7 +103,6 @@ static bool requiresFlowIsolation(ActorIsolation typeIso,
   // Otherwise, if it's an actor instance, then it depends on async-ness.
   switch (typeIso.getKind()) {
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
@@ -524,7 +523,6 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
   case ActorIsolation::ActorInstance:
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
     // If it's explicitly 'nonisolated', it's okay.
     if (var->getAttrs().hasAttribute<NonisolatedAttr>())
       return true;
@@ -681,31 +679,6 @@ static bool isSendableClosure(
   }
 
   return false;
-}
-
-/// Determine whether the given type is suitable as a concurrent value type.
-bool swift::isSendableType(ModuleDecl *module, Type type) {
-  auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
-  if (!proto)
-    return true;
-
-  // First check if we have a function type. If we do, check if it is
-  // Sendable. We do this since functions cannot conform to protocols.
-  if (auto *fas = type->getCanonicalType()->getAs<SILFunctionType>())
-    return fas->isSendable();
-  if (auto *fas = type->getCanonicalType()->getAs<AnyFunctionType>())
-    return fas->isSendable();
-
-  auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
-  if (conformance.isInvalid())
-    return false;
-
-  // Look for missing Sendable conformances.
-  return !conformance.forEachMissingConformance(
-      [](BuiltinProtocolConformance *missing) {
-        return missing->getProtocol()->isSpecificProtocol(
-            KnownProtocolKind::Sendable);
-      });
 }
 
 /// Add Fix-It text for the given nominal type to adopt Sendable.
@@ -1074,7 +1047,7 @@ bool swift::diagnoseNonSendableTypes(
     return false;
 
   // FIXME: More detail for unavailable conformances.
-  auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
+  auto conformance = module->lookupConformance(type, proto, /*allowMissing=*/true);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);
@@ -1271,8 +1244,7 @@ namespace {
           return true;
 
         auto module = nominal->getParentModule();
-        auto conformance = TypeChecker::conformsToProtocol(
-            type, sendableProto, module);
+        auto conformance = module->checkConformance(type, sendableProto);
         if (conformance.isInvalid())
           return true;
 
@@ -1571,6 +1543,41 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   }
 }
 
+bool swift::shouldIgnoreDeprecationOfConcurrencyDecl(const Decl *decl,
+                                                     DeclContext *declContext) {
+  auto &ctx = decl->getASTContext();
+  auto concurrencyModule = ctx.getLoadedModule(ctx.Id_Concurrency);
+
+  // Only suppress these diagnostics in the implementation of _Concurrency.
+  if (declContext->getParentModule() != concurrencyModule)
+    return false;
+
+  // Only suppress deprecation diagnostics for decls defined in _Concurrency.
+  if (decl->getDeclContext()->getParentModule() != concurrencyModule)
+    return false;
+
+  auto *legacyJobDecl = ctx.getJobDecl();
+  auto *unownedJobDecl = ctx.getUnownedJobDecl();
+
+  if (decl == legacyJobDecl)
+    return true;
+
+  if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
+    auto enqueueDeclName =
+        DeclName(ctx, DeclBaseName(ctx.Id_enqueue), {Identifier()});
+
+    if (funcDecl->getName() == enqueueDeclName &&
+        funcDecl->getParameters()->size() == 1) {
+      auto paramTy = funcDecl->getParameters()->front()->getInterfaceType();
+      if (paramTy->isEqual(legacyJobDecl->getDeclaredInterfaceType()) ||
+          paramTy->isEqual(unownedJobDecl->getDeclaredInterfaceType()))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// Determine whether this is the main actor type.
 static bool isMainActor(Type type) {
   if (auto nominal = type->getAnyNominal())
@@ -1654,7 +1661,6 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       // convenience inits did not have the restriction.
       if (auto *ctor = dyn_cast<ConstructorDecl>(fn))
         if (ctor->isConvenienceInit())
@@ -1878,10 +1884,8 @@ static ActorIsolation getInnermostIsolatedContext(
     return isolation;
 
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
     return ActorIsolation::forGlobalActor(
-        dc->mapTypeIntoContext(isolation.getGlobalActor()),
-        isolation == ActorIsolation::GlobalActorUnsafe)
+        dc->mapTypeIntoContext(isolation.getGlobalActor()))
           .withPreconcurrency(isolation.preconcurrency());
   }
 }
@@ -2099,7 +2103,6 @@ namespace {
           switch (getActorIsolation(fn)) {
           case ActorIsolation::ActorInstance:
           case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe:
           case ActorIsolation::Nonisolated:
           case ActorIsolation::NonisolatedUnsafe:
               return false;
@@ -2430,7 +2433,6 @@ namespace {
         return;
 
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
       case ActorIsolation::ActorInstance:
         break;
       }
@@ -2764,6 +2766,9 @@ namespace {
         }
       }
 
+      if (auto isolationExpr = dyn_cast<CurrentContextIsolationExpr>(expr))
+        recordCurrentContextIsolation(isolationExpr);
+
       return Action::Continue(expr);
     }
 
@@ -2839,7 +2844,6 @@ namespace {
             return ReferencedActor(var, isPotentiallyIsolated, specificNonIsoClosureKind(dc));
 
           case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe:
             return ReferencedActor::forGlobalActor(
                 var, isPotentiallyIsolated, isolation.getGlobalActor());
           }
@@ -2891,7 +2895,6 @@ namespace {
           return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::NonIsolatedContext);
 
         case ActorIsolation::GlobalActor:
-        case ActorIsolation::GlobalActorUnsafe:
           return ReferencedActor::forGlobalActor(
               var, isPotentiallyIsolated, isolation.getGlobalActor());
 
@@ -3226,8 +3229,7 @@ namespace {
         // we are within that global actor already.
         if (!(getContextIsolation().isGlobalActor() &&
             getContextIsolation().getGlobalActor()->isEqual(globalActor))) {
-          unsatisfiedIsolation = ActorIsolation::forGlobalActor(
-              globalActor, /*unsafe=*/false);
+          unsatisfiedIsolation = ActorIsolation::forGlobalActor(globalActor);
         }
 
         mayExitToNonisolated = false;
@@ -3431,6 +3433,62 @@ namespace {
       return false;
     }
 
+    void recordCurrentContextIsolation(
+        CurrentContextIsolationExpr *isolationExpr) {
+      // If an actor has already been assigned, we're done.
+      if (isolationExpr->getActor())
+        return;
+
+      auto loc = isolationExpr->getLoc();
+      auto isolation = getActorIsolationOfContext(
+          const_cast<DeclContext *>(getDeclContext()),
+                                    getClosureActorIsolation);
+      Expr *actorExpr = nullptr;
+      Type optionalAnyActorType = isolationExpr->getType();
+      switch (isolation) {
+      case ActorIsolation::ActorInstance: {
+        const VarDecl *var = isolation.getActorInstance();
+        if (!var) {
+          auto dc = getDeclContext();
+          auto paramIdx = isolation.getActorInstanceParameter();
+          if (paramIdx == 0) {
+            var = cast<AbstractFunctionDecl>(dc)->getImplicitSelfDecl();
+          } else {
+            var = getParameterAt(dc, paramIdx - 1);
+          }
+        }
+        actorExpr = new (ctx) DeclRefExpr(
+            const_cast<VarDecl *>(var), DeclNameLoc(loc),
+            /*Implicit=*/true);
+        break;
+      }
+      case ActorIsolation::GlobalActor: {
+        // Form a <global actor type>.shared reference.
+        Type globalActorType = getDeclContext()->mapTypeIntoContext(
+            isolation.getGlobalActor());
+        auto typeExpr = TypeExpr::createImplicit(globalActorType, ctx);
+        actorExpr = new (ctx) UnresolvedDotExpr(
+            typeExpr, loc, DeclNameRef(ctx.Id_shared), DeclNameLoc(),
+            /*implicit=*/true);
+        break;
+      }
+
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+        actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/true);
+        break;
+      }
+
+      // Convert the actor argument to the appropriate type.
+      (void)TypeChecker::typeCheckExpression(
+          actorExpr, const_cast<DeclContext *>(getDeclContext()),
+          constraints::ContextualTypeInfo(
+            optionalAnyActorType, CTP_CallArgument));
+
+      isolationExpr->setActor(actorExpr);
+    }
+
     /// Find the innermost context in which this declaration was explicitly
     /// captured.
     const DeclContext *findCapturedDeclContext(ValueDecl *value) {
@@ -3545,8 +3603,7 @@ namespace {
           case ActorIsolation::Unspecified:
             break;
 
-          case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe: {
+          case ActorIsolation::GlobalActor: {
             auto result = ActorReferenceResult::forReference(
                 declRef, component.getLoc(), getDeclContext(),
                 kindOfUsage(decl, keyPath));
@@ -3739,7 +3796,6 @@ namespace {
             break;
 
           case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe:
             refGlobalActor = contextIsolation.getGlobalActor();
             refKind = isMainActor(refGlobalActor)
                 ? ReferencedActor::MainActor
@@ -3822,7 +3878,7 @@ namespace {
 
         // If the closure specifies a global actor, use it.
         if (Type globalActor = resolveGlobalActorType(explicitClosure))
-          return ActorIsolation::forGlobalActor(globalActor, /*unsafe=*/false)
+          return ActorIsolation::forGlobalActor(globalActor)
               .withPreconcurrency(preconcurrency);
       }
 
@@ -3854,11 +3910,10 @@ namespace {
                                               ActorIsolation::NonisolatedUnsafe)
             .withPreconcurrency(preconcurrency);
 
-      case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe: {
+      case ActorIsolation::GlobalActor: {
         Type globalActor = closure->mapTypeIntoContext(
             parentIsolation.getGlobalActor()->mapTypeOutOfContext());
-        return ActorIsolation::forGlobalActor(globalActor, /*unsafe=*/false)
+        return ActorIsolation::forGlobalActor(globalActor)
             .withPreconcurrency(preconcurrency);
       }
 
@@ -4043,20 +4098,31 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       return ActorIsolation::forUnspecified();
 
     // Handle @<global attribute type>(unsafe).
-    bool isUnsafe = globalActorAttr->first->isArgUnsafe();
-    if (globalActorAttr->first->hasArgs() && !isUnsafe) {
-      ctx.Diags.diagnose(
-          globalActorAttr->first->getLocation(),
-          diag::global_actor_non_unsafe_init, globalActorType);
+    auto *attr = globalActorAttr->first;
+    bool isUnsafe = attr->isArgUnsafe();
+    if (attr->hasArgs()) {
+      if (isUnsafe) {
+        SourceFile *file = decl->getDeclContext()->getParentSourceFile();
+        bool inSwiftinterface =
+            file && file->Kind == SourceFileKind::Interface;
+        ctx.Diags.diagnose(
+            attr->getLocation(),
+            diag::unsafe_global_actor)
+          .fixItRemove(attr->getArgs()->getSourceRange())
+          .fixItInsert(attr->getLocation(), "@preconcurrency ")
+          .warnUntilSwiftVersion(6)
+          .limitBehaviorIf(inSwiftinterface, DiagnosticBehavior::Ignore);
+      } else {
+        ctx.Diags.diagnose(
+            attr->getLocation(),
+            diag::global_actor_arg, globalActorType)
+          .fixItRemove(attr->getArgs()->getSourceRange());
+      }
     }
 
-    // If the declaration predates concurrency, it has unsafe actor isolation.
-    if (decl->preconcurrency())
-      isUnsafe = true;
-
     return ActorIsolation::forGlobalActor(
-        globalActorType->mapTypeOutOfContext(), isUnsafe)
-        .withPreconcurrency(decl->preconcurrency());
+        globalActorType->mapTypeOutOfContext())
+        .withPreconcurrency(decl->preconcurrency() || isUnsafe);
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -4097,7 +4163,6 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         continue;
 
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
         break;
@@ -4135,8 +4200,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       case ActorIsolation::Unspecified:
         return true;
 
-      case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe: {
+      case ActorIsolation::GlobalActor: {
         // Substitute into the global actor type.
         auto conformance = std::get<0>(isolated);
         auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
@@ -4147,8 +4211,8 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
           return true;
 
         // Update the global actor type, now that we've done this substitution.
-        std::get<1>(isolated) = ActorIsolation::forGlobalActor(
-            globalActor, isolation == ActorIsolation::GlobalActorUnsafe);
+        std::get<1>(isolated) = ActorIsolation::forGlobalActor(globalActor)
+            .withPreconcurrency(isolation.preconcurrency());
         return false;
       }
       }
@@ -4179,7 +4243,6 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       if (!foundIsolation) {
         foundIsolation = protoIsolation;
         continue;
@@ -4237,7 +4300,6 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       if (!foundIsolation) {
         foundIsolation = isolation;
         continue;
@@ -4392,8 +4454,7 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
 
   return isMainFunction && hasMainActor
              ? ActorIsolation::forGlobalActor(
-                   ctx.getMainActorType()->mapTypeOutOfContext(),
-                   /*isUnsafe*/ false)
+                   ctx.getMainActorType()->mapTypeOutOfContext())
              : llvm::Optional<ActorIsolation>();
 }
 
@@ -4433,8 +4494,7 @@ static bool checkClassGlobalActorIsolation(
     // This is an error that will be diagnosed later. Ignore it here.
     return false;
 
-  case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe: {
+  case ActorIsolation::GlobalActor: {
     // If the global actors match, we're fine.
     Type superclassGlobalActor = superIsolation.getGlobalActor();
     auto module = classDecl->getParentModule();
@@ -4586,6 +4646,8 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
 
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
+  auto &ctx = value->getASTContext();
+
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
@@ -4607,7 +4669,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       auto &ctx = value->getASTContext();
       auto conformsTo = [&](KnownProtocolKind kind) {
         if (auto *proto = ctx.getProtocol(kind))
-          return value->getModuleContext()->conformsToProtocol(paramType, proto);
+          return value->getModuleContext()->checkConformance(paramType, proto);
         return ProtocolConformanceRef::forInvalid();
       };
 
@@ -4647,8 +4709,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
           diagVar = originalVar;
         }
         if (var->isLet()) {
-          if (!isSendableType(var->getModuleContext(),
-                              var->getInterfaceType())) {
+          if (!var->getInterfaceType()->isSendableType()) {
             diagVar->diagnose(diag::shared_immutable_state_decl, diagVar)
                 .warnUntilSwiftVersion(6);
           }
@@ -4663,6 +4724,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
   };
 
   auto isolationFromAttr = getIsolationFromAttributes(value);
+  if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
+      !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
+    auto preconcurrency =
+        new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
+    value->getAttrs().add(preconcurrency);
+  }
+
   if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
     // Main.main() and Main.$main are implicitly MainActor-protected.
     // Any other isolation is an error.
@@ -4742,7 +4810,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
       // Add an implicit attribute to capture the actor isolation that was
       // inferred, so that (e.g.) it will be printed and serialized.
-      ASTContext &ctx = value->getASTContext();
       switch (inferred) {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
@@ -4762,7 +4829,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
             inferred == ActorIsolation::NonisolatedUnsafe, /*implicit=*/true));
         break;
 
-      case ActorIsolation::GlobalActorUnsafe:
       case ActorIsolation::GlobalActor: {
         // Stored properties of a struct don't need global-actor isolation.
         if (ctx.isSwiftVersionAtLeast(6))
@@ -4779,9 +4845,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
             TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
         auto attr =
             CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-        if (inferred == ActorIsolation::GlobalActorUnsafe)
-          attr->setArgIsUnsafe(true);
         value->getAttrs().add(attr);
+
+        if (inferred.preconcurrency()) {
+          auto preconcurrency =
+              new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
+          value->getAttrs().add(preconcurrency);
+        }
+
         break;
       }
 
@@ -4817,7 +4888,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
         break;
 
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
         return inferredIsolation(enclosingIsolation);
       }
     }
@@ -4830,14 +4900,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
-    if (var->isTopLevelGlobal() &&
-        (var->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    auto &ctx = var->getASTContext();
+    if (!ctx.LangOpts.isConcurrencyModelTaskToThread() &&
+        var->isTopLevelGlobal() &&
+        (ctx.LangOpts.StrictConcurrencyLevel >=
              StrictConcurrency::Complete ||
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
         return inferredIsolation(
-            ActorIsolation::forGlobalActor(mainActor,
-                                           /*unsafe=*/var->preconcurrency()));
+            ActorIsolation::forGlobalActor(mainActor))
+                .withPreconcurrency(var->preconcurrency());
     }
     if (auto isolation = getActorIsolationFromWrappedProperty(var))
       return inferredIsolation(isolation);
@@ -4923,7 +4995,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     ASTContext &ctx = value->getASTContext();
     if (Type mainActor = ctx.getMainActorType()) {
       return inferredIsolation(
-          ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/true));
+          ActorIsolation::forGlobalActor(mainActor)
+              .withPreconcurrency(true));
     }
   }
 
@@ -4982,7 +5055,6 @@ bool HasIsolatedSelfRequest::evaluate(
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       return false;
 
     case ActorIsolation::ActorInstance:
@@ -5055,7 +5127,8 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
     if (enclosingIsolation != requiredIsolation) {
       var->diagnose(
           diag::isolated_default_argument_context,
-          requiredIsolation, enclosingIsolation);
+          requiredIsolation, enclosingIsolation)
+        .warnUntilSwiftVersionIf(!isa<ParamDecl>(var), 6);
       return ActorIsolation::forUnspecified();
     }
   }
@@ -5357,7 +5430,6 @@ bool swift::checkSendableConformance(
     break;
 
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
     return false;
   }
 
@@ -5521,7 +5593,8 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
       // FIXME: This is a hack--we should give conformances real availability.
       auto inherits = ctx.AllocateCopy(makeArrayRef(
           InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                         /*isUnchecked*/true, /*isRetroactive=*/false)));
+                         /*isUnchecked*/ true, /*isRetroactive=*/false,
+                         /*isPreconcurrency=*/false)));
       // If you change the use of AtLoc in the ExtensionDecl, make sure you
       // update isNonSendableExtension() in ASTPrinter.
       auto extension = ExtensionDecl::create(ctx, attrMakingUnavailable->AtLoc,
@@ -5547,7 +5620,8 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
     auto conformance = ctx.getNormalConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
         conformanceDC, ProtocolConformanceState::Complete,
-        /*isUnchecked=*/attrMakingUnavailable != nullptr);
+        /*isUnchecked=*/attrMakingUnavailable != nullptr,
+        /*isPreconcurrency=*/false);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
@@ -5560,9 +5634,9 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   if (classDecl) {
     if (Type superclass = classDecl->getSuperclass()) {
       auto classModule = classDecl->getParentModule();
-      auto inheritedConformance = TypeChecker::conformsToProtocol(
+      auto inheritedConformance = classModule->checkConformance(
           classDecl->mapTypeIntoContext(superclass),
-          proto, classModule, /*allowMissing=*/false);
+          proto, /*allowMissing=*/false);
       if (inheritedConformance.hasUnavailableConformance())
         inheritedConformance = ProtocolConformanceRef::forInvalid();
 
@@ -5833,15 +5907,12 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     case ActorIsolation::Unspecified:
       return fnType;
 
-    case ActorIsolation::GlobalActorUnsafe:
-      // Only treat as global-actor-qualified within code that has adopted
-      // Swift Concurrency features.
-      if (!strictChecking)
+    case ActorIsolation::GlobalActor:
+      // For preconcurrency, only treat as global-actor-qualified
+      // within code that has adopted Swift Concurrency features.
+      if (!strictChecking && isolation.preconcurrency())
         return fnType;
 
-      LLVM_FALLTHROUGH;
-
-    case ActorIsolation::GlobalActor:
       globalActorType = openType(isolation.getGlobalActor());
       break;
     }
@@ -5985,11 +6056,12 @@ static ActorIsolation getActorIsolationForReference(
     ValueDecl *decl, const DeclContext *fromDC) {
   auto declIsolation = getActorIsolation(decl);
 
-  // If the isolation is "unsafe" global actor isolation, adjust it based on
+  // If the isolation is preconcurrency global actor, adjust it based on
   // context itself. For contexts that require strict checking, treat it as
   // global actor isolation. Otherwise, treat it as unspecified isolation.
-  if (declIsolation == ActorIsolation::GlobalActorUnsafe) {
-    if (contextRequiresStrictConcurrencyChecking(
+  if (declIsolation == ActorIsolation::GlobalActor &&
+      declIsolation.preconcurrency()) {
+    if (!contextRequiresStrictConcurrencyChecking(
             fromDC,
             [](const AbstractClosureExpr *closure) {
               return closure->getType();
@@ -5997,10 +6069,6 @@ static ActorIsolation getActorIsolationForReference(
             [](const ClosureExpr *closure) {
               return closure->isIsolatedByPreconcurrency();
             })) {
-      declIsolation = ActorIsolation::forGlobalActor(
-          declIsolation.getGlobalActor(), /*unsafe=*/false)
-          .withPreconcurrency(declIsolation.preconcurrency());
-    } else {
       declIsolation = ActorIsolation::forUnspecified();
     }
   }
@@ -6120,7 +6188,6 @@ bool swift::isAccessibleAcrossActors(
     case ActorIsolation::Unspecified:
       return true;
 
-    case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor:
       return false;
     }
@@ -6262,7 +6329,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
         (!actorInstance || actorInstance->isSelf())) {
       auto type =
           fromDC->mapTypeIntoContext(declRef.getDecl()->getInterfaceType());
-      if (!isSendableType(fromDC->getParentModule(), type)) {
+      if (!type->isSendableType()) {
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the
         // Swift 5.9 compiler.

@@ -343,8 +343,7 @@ bool BridgedDeclContext_isLocalContext(BridgedDeclContext cDeclContext) {
 
 BridgedPatternBindingInitializer
 BridgedPatternBindingInitializer_create(BridgedDeclContext cDeclContext) {
-  auto *dc = cDeclContext.unbridged();
-  return new (dc->getASTContext()) PatternBindingInitializer(dc);
+  return PatternBindingInitializer::create(cDeclContext.unbridged());
 }
 
 BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
@@ -1704,6 +1703,10 @@ BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
   case BridgedAttributedTypeSpecifierLegacyOwned: {
     return new (context)
         OwnershipTypeRepr(baseType, ParamSpecifier::LegacyOwned, loc);
+  }
+  case BridgedAttributedTypeSpecifierTransferring: {
+    return new (context)
+        OwnershipTypeRepr(baseType, ParamSpecifier::Transferring, loc);
   }
   case BridgedAttributedTypeSpecifierConst: {
     return new (context) CompileTimeConstTypeRepr(baseType, loc);

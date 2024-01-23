@@ -83,6 +83,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_DISPATCH:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
         self.cmake_options.define(
             'SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING:BOOL', 'FALSE')

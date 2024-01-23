@@ -372,8 +372,7 @@ func testOverloadedCallArgs() {
     @ViewBuilder var body: Int {
       overloaded(#^OVERLOADED_CALL_ARG^#, second: 1)
       // OVERLOADED_CALL_ARG: Begin completions
-      // OVERLOADED_CALL_ARG-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#single: Int#}[')'][#Int#];
-      // OVERLOADED_CALL_ARG-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(first): Int#}, {#second: Int#}[')'][#Int#];
+      // OVERLOADED_CALL_ARG-DAG: Pattern/Local/Flair[ArgLabels]: {#single: Int#}[#Int#]; name=single:
       // OVERLOADED_CALL_ARG-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#];
       // OVERLOADED_CALL_ARG: End completions
     }

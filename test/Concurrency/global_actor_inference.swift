@@ -49,7 +49,7 @@ struct Carbon {
 // ----------------------------------------------------------------------
 // Check that @MainActor(blah) doesn't work
 // ----------------------------------------------------------------------
-// expected-error@+1{{global actor attribute 'MainActor' argument can only be '(unsafe)'}}
+// expected-error@+1{{global actor attribute 'MainActor' cannot have arguments}}
 @MainActor(blah) func brokenMainActorAttr() { }
 
 // ----------------------------------------------------------------------
@@ -445,7 +445,7 @@ actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
   @WrapperWithMainActorDefaultInit var property: Int // expected-minimal-targeted-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
-  // expected-complete-tns-error@-1 {{main actor-isolated default value in a actor-isolated context}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated default value in a actor-isolated context; this is an error in Swift 6}}
   func f() {
     _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced on a different actor instance}}
     _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced on a different actor instance}}
@@ -504,7 +504,7 @@ class WrappedContainsNonisolatedAttr {
 // Unsafe global actors
 // ----------------------------------------------------------------------
 protocol UGA {
-  @SomeGlobalActor(unsafe) func req() // expected-note{{calls to instance method 'req()' from outside of its actor context are implicitly asynchronous}}
+  @preconcurrency @SomeGlobalActor func req() // expected-note{{calls to instance method 'req()' from outside of its actor context are implicitly asynchronous}}
 }
 
 struct StructUGA1: UGA {
@@ -524,11 +524,11 @@ struct StructUGA3: UGA {
 
 @GenericGlobalActor<String>
 func testUGA<T: UGA>(_ value: T) {
-  value.req() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'req()' in a synchronous global actor 'GenericGlobalActor<String>'-isolated context}}
+  value.req() // expected-warning{{call to global actor 'SomeGlobalActor'-isolated instance method 'req()' in a synchronous global actor 'GenericGlobalActor<String>'-isolated context}}
 }
 
 class UGAClass {
-  @SomeGlobalActor(unsafe) func method() { }
+  @preconcurrency @SomeGlobalActor func method() { }
 }
 
 class UGASubclass1: UGAClass {
@@ -540,7 +540,7 @@ class UGASubclass2: UGAClass {
 }
 
 @propertyWrapper
-@OtherGlobalActor(unsafe)
+@preconcurrency @OtherGlobalActor
 struct WrapperOnUnsafeActor<Wrapped> {
   private var stored: Wrapped
 
@@ -548,20 +548,24 @@ struct WrapperOnUnsafeActor<Wrapped> {
     stored = wrappedValue
   }
 
-  @MainActor(unsafe) var wrappedValue: Wrapped {
+  @preconcurrency @MainActor var wrappedValue: Wrapped {
     get { }
     set { }
   }
 
-  @SomeGlobalActor(unsafe) var projectedValue: Wrapped {
+  @preconcurrency @SomeGlobalActor var projectedValue: Wrapped {
     get { }
     set { }
   }
 }
 
-// HasWrapperOnUnsafeActor gets an inferred @MainActor attribute.
+// HasWrapperOnUnsafeActor does not have an inferred global actor attribute,
+// because synced and $synced have different global actors.
 struct HasWrapperOnUnsafeActor {
-  @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-tns-error {{global actor 'OtherGlobalActor'-isolated default value in a main actor-isolated context}}
+// expected-complete-tns-warning@-1 {{memberwise initializer for 'HasWrapperOnUnsafeActor' cannot be both nonisolated and global actor 'OtherGlobalActor'-isolated; this is an error in Swift 6}}
+// expected-complete-tns-warning@-2 {{default initializer for 'HasWrapperOnUnsafeActor' cannot be both nonisolated and global actor 'OtherGlobalActor'-isolated; this is an error in Swift 6}}
+
+  @WrapperOnUnsafeActor var synced: Int = 0 // expected-complete-tns-note 2 {{initializer for property '_synced' is global actor 'OtherGlobalActor'-isolated}}
   // expected-note @-1 3{{property declared here}}
   // expected-complete-tns-note @-2 3{{property declared here}}
 
@@ -569,21 +573,25 @@ struct HasWrapperOnUnsafeActor {
     // expected-complete-tns-note @-1 {{add '@OtherGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'OtherGlobalActor'}}
     // expected-complete-tns-note @-2 {{add '@SomeGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'SomeGlobalActor'}}
     // expected-complete-tns-note @-3 {{add '@MainActor' to make instance method 'testUnsafeOkay()' part of global actor 'MainActor'}}
-    _ = synced // expected-complete-tns-error {{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-complete-tns-error {{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
-    _ = _synced // expected-complete-tns-error {{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
+    _ = synced // expected-complete-tns-warning {{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
+    _ = $synced // expected-complete-tns-warning {{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = _synced // expected-complete-tns-warning {{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
   }
 
   nonisolated func testErrors() {
-    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
-    _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
+    _ = synced // expected-warning{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
+    _ = $synced // expected-warning{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = _synced // expected-warning{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
   }
 
   @MainActor mutating func testOnMain() {
     _ = synced
     synced = 17
   }
+}
+
+nonisolated func createHasWrapperOnUnsafeActor() {
+  _ = HasWrapperOnUnsafeActor()
 }
 
 // ----------------------------------------------------------------------
@@ -670,7 +678,9 @@ func replacesDynamicOnMainActor() {
 // Global-actor isolation of stored property initializer expressions
 // ----------------------------------------------------------------------
 
+// expected-complete-tns-warning@+1 {{default initializer for 'Cutter' cannot be both nonisolated and main actor-isolated; this is an error in Swift 6}}
 class Cutter {
+  // expected-complete-tns-note@+1 {{initializer for property 'x' is main actor-isolated}}
   @MainActor var x = useFooInADefer()
   @MainActor var y = { () -> Bool in
       var z = statefulThingy
@@ -681,10 +691,10 @@ class Cutter {
 @SomeGlobalActor
 class Butter {
   var a = useFooInADefer() // expected-minimal-targeted-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
-  // expected-complete-tns-error@-1 {{main actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated default value in a global actor 'SomeGlobalActor'-isolated context; this is an error in Swift 6}}
 
   nonisolated let b = statefulThingy // expected-minimal-targeted-error {{main actor-isolated var 'statefulThingy' can not be referenced from a non-isolated context}}
-  // expected-complete-tns-error@-1 {{main actor-isolated default value in a nonisolated context}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
 
   var c: Int = {
     return getGlobal7()

@@ -21,8 +21,8 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/TargetParser/Host.h"
 
 using namespace swift;
 using namespace swift::driver;

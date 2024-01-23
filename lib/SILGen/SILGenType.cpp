@@ -834,9 +834,21 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // archetypes of the witness thunk generic environment.
   auto witnessSubs = witness.getSubstitutions();
 
+  // If the conformance is marked as `@preconcurrency` instead of
+  // emitting a hop to the executor (when needed) emit a dynamic check
+  // to make sure that witness has been unsed in the expected context.
+  bool isPreconcurrency = false;
+  if (conformance.isConcrete()) {
+    if (auto *C =
+            dyn_cast<NormalProtocolConformance>(conformance.getConcrete()))
+      isPreconcurrency = C->isPreconcurrency();
+  }
+
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree, /*isSelfConformance*/ false,
+                          witnessSubs, isFree,
+                          /*isSelfConformance*/ false,
+                          isPreconcurrency,
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
@@ -910,7 +922,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement, witnessSubs,
-                          isFree, /*isSelfConformance*/ true, llvm::None);
+                          isFree, /*isSelfConformance*/ true,
+                          /*isPreconcurrency*/ false, llvm::None);
 
   SGM.emitLazyConformancesForFunction(f);
 

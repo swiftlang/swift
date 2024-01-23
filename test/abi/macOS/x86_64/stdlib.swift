@@ -45,6 +45,15 @@ Added: _$ss19_getWeakRetainCountySuyXlF
 // Swift._getUnownedRetainCount(Swift.AnyObject) -> Swift.UInt
 Added: _$ss22_getUnownedRetainCountySuyXlF
 
+// Swift.String.init<A, B where A: Swift._UnicodeEncoding, B: Swift.Sequence, A.CodeUnit == B.Element>(validating: B, as: A.Type) -> Swift.String?
+Added: _$sSS10validating2asSSSgq__xmtcs16_UnicodeEncodingRzSTR_7ElementQy_8CodeUnitRtzr0_lufC
+
+// Swift.String.init<A, B where A: Swift._UnicodeEncoding, B: Swift.Sequence, A.CodeUnit == Swift.UInt8, B.Element == Swift.Int8>(validating: B, as: A.Type) -> Swift.String?
+Added: _$sSS10validating2asSSSgq__xmtcs16_UnicodeEncodingRzSTR_s5UInt8V8CodeUnitRtzs4Int8V7ElementRt_r0_lufC
+
+// static Swift.String._validate<A where A: Swift._UnicodeEncoding>(_: Swift.UnsafeBufferPointer<A.CodeUnit>, as: A.Type) -> Swift.String?
+Added: _$sSS9_validate_2asSSSgSRy8CodeUnitQzG_xmts16_UnicodeEncodingRzlFZ
+
 // class __StaticArrayStorage
 Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfC
 Added: _$ss20__StaticArrayStorageC12_doNotCallMeAByt_tcfCTj

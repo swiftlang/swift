@@ -207,6 +207,29 @@ inline void simple_display(llvm::raw_ostream &out, const Requirement &req) {
   req.print(out, PrintOptions());
 }
 
+enum class CheckRequirementsResult : uint8_t {
+  Success,
+
+  /// One of the requirements was unsatisfied.
+  RequirementFailure,
+
+  /// One of the requirements contained error types, either because of an
+  /// invalid conformance or because it contained a member type that was
+  /// dependent on an earlier conformance requirement that failed.
+  SubstitutionFailure
+};
+
+/// Check if each substituted requirement is satisfied. The requirement must
+/// not contain any type parameters.
+CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements);
+
+/// Check if each requirement is satisfied after applying the given
+/// substitutions. The substitutions must replace all type parameters that
+/// appear in the requirement with concrete types or archetypes.
+CheckRequirementsResult checkRequirements(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions, SubstOptions options=llvm::None);
+
 /// A requirement as written in source, together with a source location. See
 /// ProtocolDecl::getStructuralRequirements().
 struct StructuralRequirement {

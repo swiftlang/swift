@@ -170,10 +170,6 @@ public:
   /// is completing after set as its base.
   virtual void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace){};
 
-  /// Complete a given expr-postfix, given that there is a following
-  /// left parenthesis.
-  virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
-
   /// Complete the argument to an Objective-C #keyPath
   /// expression.
   ///

@@ -72,3 +72,12 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 @_silgen_name("swift_task_enqueueMainExecutor")
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)
+
+#if $Macros
+/// Produce a reference to the actor to which the enclosing code is
+/// isolated, or `nil` if the code is nonisolated.
+@available(SwiftStdlib 5.1, *)
+@freestanding(expression)
+public macro isolation() -> (any Actor)? = Builtin.IsolationMacro
+#endif
+

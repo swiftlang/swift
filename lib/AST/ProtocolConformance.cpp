@@ -483,12 +483,6 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
     return { Type(), nullptr };
   }
 
-  // If the conditional requirements aren't known, we can't properly run
-  // inference.
-  if (!getConditionalRequirementsIfAvailable()) {
-    return TypeWitnessAndDecl();
-  }
-
   return evaluateOrDefault(
       assocType->getASTContext().evaluator,
       TypeWitnessRequest{const_cast<NormalProtocolConformance *>(this),
@@ -1258,6 +1252,11 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
       trySynthesize(KnownProtocolKind::Copyable);
       trySynthesize(KnownProtocolKind::Escapable);
     }
+
+    if (nominal->getASTContext().LangOpts.hasFeature(
+            Feature::BitwiseCopyable)) {
+      trySynthesize(KnownProtocolKind::BitwiseCopyable);
+    }
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
@@ -1484,11 +1483,11 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 }
 
 BuiltinProtocolConformance::BuiltinProtocolConformance(
-    Type conformingType, ProtocolDecl *protocol,
-    BuiltinConformanceKind kind
-) : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
-    protocol(protocol), builtinConformanceKind(static_cast<unsigned>(kind))
-{}
+    Type conformingType, ProtocolDecl *protocol, BuiltinConformanceKind kind)
+    : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
+      protocol(protocol) {
+  Bits.BuiltinProtocolConformance.Kind = unsigned(kind);
+}
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing
 // ProtocolConformances, is defined here to avoid too much layering violation /

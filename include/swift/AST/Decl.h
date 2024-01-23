@@ -31,6 +31,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -1598,17 +1599,27 @@ public:
 
 /// An entry in the "inherited" list of a type or extension.
 struct InheritedEntry : public TypeLoc {
+private:
   /// Whether there was an @unchecked attribute.
-  bool isUnchecked = false;
+  bool IsUnchecked : 1;
 
   /// Whether there was an @retroactive attribute.
-  bool isRetroactive = false;
+  bool IsRetroactive : 1;
 
+  /// Whether there was an @preconcurrency attribute.
+  bool IsPreconcurrency : 1;
+
+public:
   InheritedEntry(const TypeLoc &typeLoc);
 
-  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive)
-    : TypeLoc(typeLoc), isUnchecked(isUnchecked), isRetroactive(isRetroactive) {
-    }
+  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
+                 bool isPreconcurrency)
+      : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
+        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency) {}
+
+  bool isUnchecked() const { return IsUnchecked; }
+  bool isRetroactive() const { return IsRetroactive; }
+  bool isPreconcurrency() const { return IsPreconcurrency; }
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -1962,7 +1973,7 @@ class PatternBindingEntry {
     IsFromDebugger = 1 << 2,
   };
   /// The initializer context used for this pattern binding entry.
-  llvm::PointerIntPair<DeclContext *, 3, OptionSet<PatternFlags>>
+  llvm::PointerIntPair<PatternBindingInitializer *, 3, OptionSet<PatternFlags>>
       InitContextAndFlags;
 
   /// Values captured by this initializer.
@@ -2003,7 +2014,7 @@ private:
 public:
   /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
-                      DeclContext *InitContext)
+                      PatternBindingInitializer *InitContext)
       : PatternAndFlags(P, {}),
         InitExpr({E, {E, InitializerStatus::NotChecked}, EqualLoc}),
         InitContextAndFlags({InitContext, llvm::None}) {}
@@ -2107,12 +2118,14 @@ private:
   VarDecl *getAnchoringVarDecl() const;
 
   // Retrieve the declaration context for the initializer.
-  DeclContext *getInitContext() const {
+  PatternBindingInitializer *getInitContext() const {
     return InitContextAndFlags.getPointer();
   }
 
   /// Override the initializer context.
-  void setInitContext(DeclContext *dc) { InitContextAndFlags.setPointer(dc); }
+  void setInitContext(PatternBindingInitializer *init) {
+    InitContextAndFlags.setPointer(init);
+  }
 
   SourceLoc getStartLoc() const;
 
@@ -2310,16 +2323,22 @@ public:
   Pattern *getPattern(unsigned i) const {
     return getPatternList()[i].getPattern();
   }
-  
-  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext,
-                  bool isFullyValidated = false);
+
+  void setPattern(unsigned i, Pattern *P, bool isFullyValidated = false);
 
   bool isFullyValidated(unsigned i) const {
     return getPatternList()[i].isFullyValidated();
   }
 
-  DeclContext *getInitContext(unsigned i) const {
+  PatternBindingInitializer *getInitContext(unsigned i) const {
     return getPatternList()[i].getInitContext();
+  }
+
+  void setInitContext(unsigned i, PatternBindingInitializer *init) {
+    if (init) {
+      init->setBinding(this, i);
+    }
+    getMutablePatternList()[i].setInitContext(init);
   }
 
   CaptureInfo getCaptureInfo(unsigned i) const {
@@ -2475,16 +2494,13 @@ public:
 /// SerializedTopLevelCodeDeclContext - This represents what was originally a
 /// TopLevelCodeDecl during serialization. It is preserved only to maintain the
 /// correct AST structure and remangling after deserialization.
-class SerializedTopLevelCodeDeclContext : public SerializedLocalDeclContext {
+class SerializedTopLevelCodeDeclContext : public DeclContext {
 public:
   SerializedTopLevelCodeDeclContext(DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::TopLevelCodeDecl,
-                                 Parent) {}
+    : DeclContext(DeclContextKind::SerializedTopLevelCodeDecl, Parent) {}
+
   static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::TopLevelCodeDecl;
-    return false;
+    return DC->getContextKind() == DeclContextKind::SerializedTopLevelCodeDecl;
   }
 };
 
@@ -6714,6 +6730,7 @@ public:
       return true;
     case Specifier::Consuming:
     case Specifier::InOut:
+    case Specifier::Transferring:
       return false;
     }
     llvm_unreachable("unhandled specifier");
@@ -6731,6 +6748,7 @@ public:
     case ParamSpecifier::LegacyShared:
       return ValueOwnership::Shared;
     case ParamSpecifier::Consuming:
+    case ParamSpecifier::Transferring:
     case ParamSpecifier::LegacyOwned:
       return ValueOwnership::Owned;
     case ParamSpecifier::Default:

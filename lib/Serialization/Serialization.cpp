@@ -1427,7 +1427,6 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Nonisolated)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
-  CASE(GlobalActorUnsafe)
 #undef CASE
   }
   llvm_unreachable("bad actor isolation");
@@ -1785,6 +1784,7 @@ void Serializer::writeLocalNormalProtocolConformance(
                                               numValueWitnesses,
                                               numSignatureConformances,
                                               conformance->isUnchecked(),
+                                              conformance->isPreconcurrency(),
                                               data);
 }
 
@@ -2056,7 +2056,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::SerializedAbstractClosure:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::MacroDecl:
     llvm_unreachable("cannot cross-reference this context");
@@ -2472,6 +2473,15 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
     break;
   }
 
+  case DeclContextKind::SerializedAbstractClosure: {
+    // We're merging an already serialized module, handle the same as a
+    // regular AbstractClosureExpr.
+    auto *SACE = cast<SerializedAbstractClosureExpr>(DC);
+    writeAbstractClosureExpr(SACE->getParent(), SACE->getType(),
+                             SACE->isImplicit(), SACE->getDiscriminator());
+    return;
+  }
+
   case DeclContextKind::Initializer: {
     if (auto PBI = dyn_cast<PatternBindingInitializer>(DC)) {
       writePatternBindingInitializer(PBI->getBinding(), PBI->getBindingIndex());
@@ -2481,41 +2491,12 @@ void Serializer::writeASTBlockEntity(const DeclContext *DC) {
     break;
   }
 
-  case DeclContextKind::TopLevelCodeDecl: {
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl: {
     auto abbrCode = DeclTypeAbbrCodes[TopLevelCodeDeclContextLayout::Code];
     TopLevelCodeDeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode,
         addDeclContextRef(DC->getParent()).getOpaqueValue());
     break;
-  }
-
-  // If we are merging already serialized modules with local decl contexts,
-  // we handle them here in a similar fashion.
-  case DeclContextKind::SerializedLocal: {
-    auto local = cast<SerializedLocalDeclContext>(DC);
-    switch (local->getLocalDeclContextKind()) {
-    case LocalDeclContextKind::AbstractClosure: {
-      auto SACE = cast<SerializedAbstractClosureExpr>(local);
-      writeAbstractClosureExpr(SACE->getParent(), SACE->getType(),
-                               SACE->isImplicit(), SACE->getDiscriminator());
-      return;
-    }
-    case LocalDeclContextKind::DefaultArgumentInitializer: {
-      auto DAI = cast<SerializedDefaultArgumentInitializer>(local);
-      writeDefaultArgumentInitializer(DAI->getParent(), DAI->getIndex());
-      return;
-    }
-    case LocalDeclContextKind::PatternBindingInitializer: {
-      auto PBI = cast<SerializedPatternBindingInitializer>(local);
-      writePatternBindingInitializer(PBI->getBinding(), PBI->getBindingIndex());
-      return;
-    }
-    case LocalDeclContextKind::TopLevelCodeDecl: {
-      auto abbrCode = DeclTypeAbbrCodes[TopLevelCodeDeclContextLayout::Code];
-      TopLevelCodeDeclContextLayout::emitRecord(Out, ScratchRecord,
-          abbrCode, addDeclContextRef(DC->getParent()).getOpaqueValue());
-      return;
-    }
-    }
   }
 
   default:
@@ -2560,6 +2541,8 @@ static uint8_t getRawStableParamDeclSpecifier(swift::ParamDecl::Specifier sf) {
     return uint8_t(serialization::ParamDeclSpecifier::LegacyShared);
   case swift::ParamDecl::Specifier::LegacyOwned:
     return uint8_t(serialization::ParamDeclSpecifier::LegacyOwned);
+  case swift::ParamDecl::Specifier::Transferring:
+    return uint8_t(serialization::ParamDeclSpecifier::Transferring);
   }
   llvm_unreachable("bad param decl specifier kind");
 }
@@ -3828,7 +3811,9 @@ public:
       TypeID typeRef = S.addTypeRef(inherited.getType());
 
       // Encode "unchecked" in the low bit.
-      typeRef = (typeRef << 1) | (inherited.isUnchecked ? 0x01 : 0x00);
+      typeRef = (typeRef << 1) | (inherited.isUnchecked() ? 0x01 : 0x00);
+      // Encode "preconcurrency" in the low bit.
+      typeRef = (typeRef << 1) | (inherited.isPreconcurrency() ? 0x01 : 0x00);
 
       result.push_back(typeRef);
     }
@@ -4817,6 +4802,9 @@ public:
         case BuiltinMacroKind::ExternalMacro:
           builtinID = 1;
           break;
+        case BuiltinMacroKind::IsolationMacro:
+          builtinID = 2;
+          break;
         }
         break;
       }
@@ -5430,7 +5418,8 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn());
+          paramFlags.isCompileTimeConst(), paramFlags.hasResultDependsOn(),
+          paramFlags.isTransferring());
     }
   }
 
@@ -5763,6 +5752,29 @@ public:
       if (ext.requiresIdentifier(kind))
         Record.push_back(S.addDeclBaseNameRef(elt.second));
     }
+  }
+
+  void writeAttr(const clang::Attr *attr) {
+    auto *swiftAttr = dyn_cast_or_null<clang::SwiftAttrAttr>(attr);
+    if (!swiftAttr) {
+      writeUInt32(/*no attribute*/0);
+      return;
+    }
+
+    writeEnum(swiftAttr->getKind() + 1);
+    writeIdentifier(swiftAttr->getAttrName());
+    writeIdentifier(swiftAttr->getScopeName());
+    writeSourceLocation(swiftAttr->getRange().getBegin());
+    writeSourceLocation(swiftAttr->getRange().getEnd());
+    writeSourceLocation(swiftAttr->getScopeLoc());
+    writeEnum(swiftAttr->getParsedKind());
+    writeEnum(swiftAttr->getSyntax());
+    writeUInt64(swiftAttr->getAttributeSpellingListIndex());
+    writeBool(swiftAttr->isRegularKeywordAttribute());
+    writeBool(swiftAttr->isInherited());
+    writeBool(swiftAttr->isImplicit());
+    writeBool(swiftAttr->isPackExpansion());
+    writeUInt64(S.addUniquedStringRef(swiftAttr->getAttribute()));
   }
 };
 

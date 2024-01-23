@@ -444,6 +444,7 @@ extension _NativeDictionary {
 // This function has a highly visible name to make it stand out in stack traces.
 @usableFromInline
 @inline(never)
+@_unavailableInEmbedded
 internal func KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(
   _ keyType: Any.Type
 ) -> Never {
@@ -472,7 +473,11 @@ extension _NativeDictionary { // Insertions
       // because we'll need to compare elements in case of hash collisions.
       let (bucket, found) = find(key, hashValue: hashValue)
       guard !found else {
+        #if !$Embedded
         KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(Key.self)
+        #else
+        fatalError("duplicate keys in a Dictionary")
+        #endif
       }
       hashTable.insert(bucket)
       uncheckedInitialize(at: bucket, toKey: key, value: value)
@@ -537,7 +542,11 @@ extension _NativeDictionary { // Insertions
     guard rehashed else { return (bucket, found) }
     let (b, f) = find(key)
     if f != found {
+      #if !$Embedded
       KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(Key.self)
+      #else
+      fatalError("duplicate keys in a Dictionary")
+      #endif
     }
     return (b, found)
   }
@@ -767,7 +776,11 @@ extension _NativeDictionary { // High-level operations
           let newValue = try combine(uncheckedValue(at: bucket), value)
           _values[bucket.offset] = newValue
         } catch _MergeError.keyCollision {
+          #if !$Embedded
           fatalError("Duplicate values for key: '\(key)'")
+          #else
+          fatalError("Duplicate values for a key in a Dictionary")
+          #endif
         }
       } else {
         _insert(at: bucket, key: key, value: value)

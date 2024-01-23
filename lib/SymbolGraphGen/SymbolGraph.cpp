@@ -261,11 +261,12 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
     case swift::DeclContextKind::AbstractClosureExpr:
+    case swift::DeclContextKind::SerializedAbstractClosure:
     case swift::DeclContextKind::Initializer:
     case swift::DeclContextKind::TopLevelCodeDecl:
+    case swift::DeclContextKind::SerializedTopLevelCodeDecl:
     case swift::DeclContextKind::SubscriptDecl:
     case swift::DeclContextKind::AbstractFunctionDecl:
-    case swift::DeclContextKind::SerializedLocal:
     case swift::DeclContextKind::Package:
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:

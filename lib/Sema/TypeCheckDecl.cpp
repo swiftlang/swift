@@ -20,12 +20,12 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckBitwise.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
-#include "swift/AST/InverseMarking.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -37,6 +37,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -533,7 +534,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
         arg = CRE->getBase();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
-        if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
+        if (!dotExpr->getName().getBaseName().isConstructor())
           return Action::Continue(E);
 
         arg = dotExpr->getBase();
@@ -2720,8 +2721,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       ProtocolDecl *errorProto = Context.getErrorDecl();
       if (thrownTy && errorProto) {
         Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
-        if (!TypeChecker::conformsToProtocol(
-                thrownTyInContext, errorProto, AFD->getParentModule())) {
+        if (!AFD->getParentModule()->checkConformance(
+                thrownTyInContext, errorProto)) {
           SourceLoc loc;
           if (auto thrownTypeRepr = AFD->getThrownTypeRepr())
             loc = thrownTypeRepr->getLoc();
@@ -3272,6 +3273,8 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
   switch (kp) {
   case KnownProtocolKind::Sendable:
     return deriveImplicitSendableConformance(evaluator, nominal);
+  case KnownProtocolKind::BitwiseCopyable:
+    return deriveImplicitBitwiseCopyableConformance(nominal);
   case KnownProtocolKind::Escapable:
   case KnownProtocolKind::Copyable:
     return deriveConformanceForInvertible(evaluator, nominal, kp);

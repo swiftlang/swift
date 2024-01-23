@@ -1,26 +1,31 @@
 module StdVector {
   header "std-vector.h"
   requires cplusplus
+  export *
 }
 
 module StdMap {
   header "std-map.h"
   requires cplusplus
+  export *
 }
 
 module StdOptional {
   header "std-optional.h"
   requires cplusplus
+  export *
 }
 
 module StdSet {
   header "std-set.h"
   requires cplusplus
+  export *
 }
 
 module StdPair {
   header "std-pair.h"
   requires cplusplus
+  export *
 }
 
 module MsvcUseVecIt {
@@ -32,4 +37,11 @@ module MsvcUseVecIt {
 module StdUniquePtr {
   header "std-unique-ptr.h"
   requires cplusplus
+  export *
+}
+
+module StdFunction {
+  header "std-function.h"
+  requires cplusplus
+  export *
 }

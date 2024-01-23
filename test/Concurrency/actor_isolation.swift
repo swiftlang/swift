@@ -168,9 +168,12 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 }
 
 // check for instance members that do not need global-actor protection
+
+// expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in Swift 6}}
 // expected-note@+1 2 {{consider making struct 'NoGlobalActorValueType' conform to the 'Sendable' protocol}}
 struct NoGlobalActorValueType {
   @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in Swift 6}}
+  // expected-note@-1 {{initializer for property 'point' is global actor 'SomeGlobalActor'-isolated}}
 
   @MainActor let counter: Int // expected-warning {{stored property 'counter' within struct cannot have a global actor; this is an error in Swift 6}}
 
@@ -784,15 +787,15 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l32: Int = v
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l34: Int = self.v
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-error@-1 {{actor-isolated default value in a nonisolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
 
     nonisolated lazy var l41: Int = { l }()
     nonisolated lazy var l42: Int = l

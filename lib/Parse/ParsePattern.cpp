@@ -139,6 +139,8 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("__shared") &&
         !Tok.isContextualKeyword("__owned") &&
         !Tok.isContextualKeyword("borrowing") &&
+        (!Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
+         !Tok.isContextualKeyword("transferring")) &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat) &&
         (!Context.LangOpts.hasFeature(Feature::NonescapableTypes) ||
          !Tok.isContextualKeyword("_resultDependsOn")))
@@ -236,7 +238,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                Tok.isContextualKeyword("isolated") ||
                Tok.isContextualKeyword("_const") ||
                (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-                Tok.isContextualKeyword("_resultDependsOn"))))) {
+                Tok.isContextualKeyword("_resultDependsOn")) ||
+               (Context.LangOpts.hasFeature(
+                   Feature::TransferringArgsAndResults))))) {
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
@@ -288,7 +292,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           } else if (Tok.isContextualKeyword("__owned")) {
             param.SpecifierKind = ParamDecl::Specifier::LegacyOwned;
             param.SpecifierLoc = consumeToken();
+          } else if (Context.LangOpts.hasFeature(
+                         Feature::TransferringArgsAndResults) &&
+                     Tok.isContextualKeyword("transferring")) {
+            param.SpecifierKind = ParamDecl::Specifier::Transferring;
+            param.SpecifierLoc = consumeToken();
           }
+
           hasSpecifier = true;
         } else {
           // Redundant specifiers are fairly common, recognize, reject, and
@@ -406,9 +416,27 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           // Mark current parameter type as invalid so it is possible
           // to diagnose it as destructuring of the closure parameter list.
           param.isPotentiallyDestructured = true;
-          // Unnamed parameters must be written as "_: Type".
-          diagnose(typeStartLoc, diag::parameter_unnamed)
-              .fixItInsert(typeStartLoc, "_: ");
+          if (!isClosure) {
+            // Unnamed parameters must be written as "_: Type".
+            diagnose(typeStartLoc, diag::parameter_unnamed)
+                .fixItInsert(typeStartLoc, "_: ");
+          } else {
+            // Unnamed parameters were accidentally possibly accepted after
+            // SE-110 depending on the kind of declaration.  We now need to
+            // warn about the misuse of this syntax and offer to
+            // fix it.
+            // An exception to this rule is when the type is declared with type sugar
+            // Reference: https://github.com/apple/swift/issues/54133
+            if (isa<OptionalTypeRepr>(param.Type)
+                || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
+                diagnose(typeStartLoc, diag::parameter_unnamed)
+                    .fixItInsert(typeStartLoc, "_: ");
+            } else {
+                diagnose(typeStartLoc, diag::parameter_unnamed)
+                    .warnUntilSwiftVersion(6)
+                    .fixItInsert(typeStartLoc, "_: ");
+            }
+          }
         }
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell
@@ -799,11 +827,11 @@ Parser::parseFunctionSignature(DeclBaseName SimpleName,
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 
-  ParameterContextKind paramContext = SimpleName.isOperator()
-    ? ParameterContextKind::Operator
-    : (SimpleName == DeclBaseName::createConstructor()
-         ? ParameterContextKind::Initializer
-         : ParameterContextKind::Function);
+  ParameterContextKind paramContext =
+      SimpleName.isOperator()
+          ? ParameterContextKind::Operator
+          : (SimpleName.isConstructor() ? ParameterContextKind::Initializer
+                                        : ParameterContextKind::Function);
   Status |= parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);

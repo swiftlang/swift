@@ -76,6 +76,42 @@ func test14() -> Int {
   return fn()
 }
 
+func test15() -> Int {
+  let x = if .random() {
+    do { 0 }
+  } else {
+    1
+  }
+  return x
+}
+
+func test16() -> Int {
+  let x = if .random() {
+    1
+  } else {
+    do { 2 } catch { 3 }
+    // expected-warning@-1 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  }
+  return x
+}
+
+func test17() -> Int {
+  if .random() {
+    do { 0 }
+  } else {
+    1
+  }
+}
+
+func test18() -> Int {
+  if .random() {
+    1
+  } else {
+    do { 2 } catch { 3 }
+    // expected-warning@-1 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  }
+}
+
 func testEmpty1() {
   let _ = do {} // expected-error {{expected expression in branch of 'do' expression}}
 }

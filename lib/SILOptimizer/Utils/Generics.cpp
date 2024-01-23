@@ -2984,7 +2984,8 @@ bool usePrespecialized(
 
     if (specializedReInfo.getSpecializedType() != reInfo.getSpecializedType()) {
       SmallVector<Type, 4> newSubs;
-      auto specializedSig = SA->getUnerasedSpecializedSignature();
+      auto specializedSig =
+          SA->getUnerasedSpecializedSignature().withoutMarkerProtocols();
 
       auto erasedParams = SA->getTypeErasedParams();
       if(!ctxt.LangOpts.hasFeature(Feature::LayoutPrespecialization) || erasedParams.empty()) {
@@ -3053,9 +3054,10 @@ bool usePrespecialized(
               stride = irgen::Size(1);
 
             if (stride.getValueInBits() == layout->getTrivialStrideInBits()) {
-              newSubs.push_back(CanType(
-                  BuiltinIntegerType::get(layout->getTrivialStrideInBits(),
-                                          genericParam->getASTContext())));
+              newSubs.push_back(CanType(BuiltinVectorType::get(
+                  genericParam->getASTContext(),
+                  BuiltinIntegerType::get(8, genericParam->getASTContext()),
+                  layout->getTrivialStride())));
             }
           }
         } else {

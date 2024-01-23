@@ -1,4 +1,3 @@
-// Fixed-layout struct
 package struct Point {
   package var x: Int // read-write stored property
   package let y: Int // read-only stored property
@@ -12,7 +11,6 @@ package struct Point {
   package mutating func mutantMethod() {}
 }
 
-// Resilient-layout struct
 package struct Size {
   package var w: Int // should have getter and setter
   package let h: Int // getter only
@@ -26,7 +24,6 @@ package struct Size {
   package mutating func mutantMethod() {}
 }
 
-// Fixed-layout struct with resilient members
 package struct Rectangle {
   package let p: Point
   package let s: Size
@@ -116,6 +113,69 @@ package struct UnavailableResilientInt {
   package let i: Int
 
   package init(i: Int) {
+    self.i = i
+  }
+}
+
+
+public struct PublicPoint {
+  public var x: Int // read-write stored property
+  public let y: Int // read-only stored property
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+
+  public func method() {}
+  public mutating func mutantMethod() {}
+}
+
+@frozen
+public struct FrozenPublicPoint {
+  public var x: Int // read-write stored property
+  public let y: Int // read-only stored property
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+
+  public func method() {}
+  public mutating func mutantMethod() {}
+}
+
+public struct PublicSize {
+  public var w: Int // should have getter and setter
+  public let h: Int // getter only
+
+  public init(w: Int, h: Int) {
+    self.w = w
+    self.h = h
+  }
+
+  public func method() {}
+  public mutating func mutantMethod() {}
+}
+
+@frozen
+public struct FrozenPublicSize {
+  public var w: Int // should have getter and setter
+  public let h: Int // getter only
+
+  public init(w: Int, h: Int) {
+    self.w = w
+    self.h = h
+  }
+
+  public func method() {}
+  public mutating func mutantMethod() {}
+}
+
+public struct PublicResilientInt {
+  public let i: Int
+
+  public init(i: Int) {
     self.i = i
   }
 }

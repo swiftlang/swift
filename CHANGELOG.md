@@ -5,28 +5,6 @@
 
 ## Swift 5.11
 
-* [SE-0411][]:
-
-  Default value expressions can now have the same isolation as the enclosing
-  function or the corresponding stored property:
-
-  ```swift
-  @MainActor
-  func requiresMainActor() -> Int { ... }
-
-  class C {
-    @MainActor
-    var x: Int = requiresMainActor()
-  }
-
-  @MainActor func defaultArg(value: Int = requiresMainActor()) { ... }
-  ```
-
-  For isolated default values of stored properties, the implicit initialization
-  only happens in the body of an `init` with the same isolation. This closes
-  an important data-race safety hole where global-actor-isolated default values
-  could inadvertently run synchronously from outside the actor.
-
 * [SE-0413][]:
 
   Functions can now specify the type of error that they throw as part of the
@@ -80,6 +58,55 @@
 
   Having been [gated](https://github.com/apple/swift/pull/28171) behind a
   compiler warning since at least Swift 5.2, this syntax is now rejected.
+
+## Swift 5.10
+
+* [SE-0412][]:
+
+  Under strict concurrency checking, every global or static variable must be either isolated to a global actor or be both immutable and of `Sendable` type.
+
+  ```swift
+  var mutableGlobal = 1
+  // warning: var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state
+  // (unless it is top-level code which implicitly isolates to @MainActor)
+
+  final class NonsendableType {
+    init() {}
+  }
+
+  struct S {
+    static let immutableNonsendable = NonsendableType()
+    // warning: static property 'immutableNonsendable' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor
+  }
+  ```
+
+  The attribute `nonisolated(unsafe)` can be used to annotate a global variable (or any form of storage) to disable static checking of data isolation, but note that without correct implementation of a synchronization mechanism to achieve data isolation, dynamic run-time analysis from exclusivity enforcement or tools such as Thread Sanitizer could still identify failures.
+
+  ```swift
+  nonisolated(unsafe) var global: String
+  ```
+
+* [SE-0411][]:
+
+  Default value expressions can now have the same isolation as the enclosing
+  function or the corresponding stored property:
+
+  ```swift
+  @MainActor
+  func requiresMainActor() -> Int { ... }
+
+  class C {
+    @MainActor
+    var x: Int = requiresMainActor()
+  }
+
+  @MainActor func defaultArg(value: Int = requiresMainActor()) { ... }
+  ```
+
+  For isolated default values of stored properties, the implicit initialization
+  only happens in the body of an `init` with the same isolation. This closes
+  an important data-race safety hole where global-actor-isolated default values
+  could inadvertently run synchronously from outside the actor.
 
 ## Swift 5.9.2
 
@@ -9927,6 +9954,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
 [SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
 [SE-0411]: https://github.com/apple/swift-evolution/blob/main/proposals/0411-isolated-default-values.md
+[SE-0412]: https://github.com/apple/swift-evolution/blob/main/proposals/0412-strict-concurrency-for-global-variables.md
 [SE-0413]: https://github.com/apple/swift-evolution/blob/main/proposals/0413-typed-throws.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>

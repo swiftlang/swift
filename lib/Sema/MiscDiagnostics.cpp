@@ -2940,9 +2940,10 @@ public:
                   .getRequirements(),
               [&exprType, this](auto requirement) {
                 if (requirement.getKind() == RequirementKind::Conformance) {
-                  auto conformance = TypeChecker::conformsToProtocol(
-                      exprType->getRValueType(), requirement.getProtocolDecl(),
-                      Implementation->getModuleContext(),
+                  auto conformance = Implementation->getModuleContext()
+                      ->checkConformance(
+                      exprType->getRValueType(),
+                      requirement.getProtocolDecl(),
                       /*allowMissing=*/false);
                   return !conformance.isInvalid();
                 }
@@ -3937,6 +3938,8 @@ private:
               continue;
             }
           }
+          // TODO: If 'then' statements are enabled by default, the wording of
+          // this diagnostic should be tweaked.
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_result,
                          S->getKind());
@@ -4109,7 +4112,8 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
     subjectExpr = load->getSubExpr()->getSemanticsProvidingExpr();
   }
-  if (isa<DeclRefExpr>(subjectExpr)) {
+  if (!C.LangOpts.hasFeature(Feature::BorrowingSwitch)
+      && isa<DeclRefExpr>(subjectExpr)) {
     C.Diags.diagnose(subjectExpr->getLoc(),
                            diag::move_only_pattern_match_not_consumed)
       .fixItInsert(subjectExpr->getStartLoc(), "consume ");

@@ -1584,8 +1584,7 @@ private:
         auto packTy = SILPackType::get(TC.Context, extInfo, {loweredParamTy});
 
         auto origFlags = param.getOrigFlags();
-        addPackParameter(packTy, origFlags.getValueOwnership(),
-                         origFlags.isNoDerivative());
+        addPackParameter(packTy, origFlags.getValueOwnership(), origFlags);
         return;
       }
 
@@ -1615,8 +1614,7 @@ private:
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
       auto origFlags = param.getOrigFlags();
-      addPackParameter(packTy, origFlags.getValueOwnership(),
-                       origFlags.isNoDerivative());
+      addPackParameter(packTy, origFlags.getValueOwnership(), origFlags);
     });
 
     // Process the self parameter.  But if we have a formal foreign self
@@ -1649,23 +1647,20 @@ private:
       bool indirect = true;
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, {substType});
-      return addPackParameter(packTy, flags.getValueOwnership(),
-                              flags.isNoDerivative());
+      return addPackParameter(packTy, flags.getValueOwnership(), flags);
     }
 
-    visit(flags.getValueOwnership(), forSelf, origType, substType,
-          flags.isNoDerivative());
+    visit(flags.getValueOwnership(), forSelf, origType, substType, flags);
   }
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             bool isNonDifferentiable) {
+             ParameterTypeFlags origFlags) {
     assert(!isa<InOutType>(substType));
 
     // Tuples get expanded unless they're inout.
     if (origType.isTuple() && ownership != ValueOwnership::InOut) {
-      expandTuple(ownership, forSelf, origType, substType,
-                  isNonDifferentiable);
+      expandTuple(ownership, forSelf, origType, substType, origFlags);
       return;
     }
 
@@ -1696,20 +1691,20 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
-    addParameter(loweredType, convention, isNonDifferentiable);
+    addParameter(loweredType, convention, origFlags);
   }
 
   /// Recursively expand a tuple type into separate parameters.
   void expandTuple(ValueOwnership ownership, bool forSelf,
                    AbstractionPattern origType, CanType substType,
-                   bool isNonDifferentiable) {
+                   ParameterTypeFlags oldFlags) {
     assert(ownership != ValueOwnership::InOut);
     assert(origType.isTuple());
 
     origType.forEachTupleElement(substType, [&](TupleElementGenerator &elt) {
       if (!elt.isOrigPackExpansion()) {
         visit(ownership, forSelf, elt.getOrigType(), elt.getSubstTypes()[0],
-              isNonDifferentiable);
+              oldFlags);
         return;
       }
 
@@ -1728,27 +1723,30 @@ private:
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
-      addPackParameter(packTy, ownership, isNonDifferentiable);
+      addPackParameter(packTy, ownership, oldFlags);
     });
   }
 
   /// Add a parameter that we derived from deconstructing the
   /// formal type.
   void addParameter(CanType loweredType, ParameterConvention convention,
-                    bool isNonDifferentiable) {
+                    ParameterTypeFlags origFlags) {
     SILParameterInfo param(loweredType, convention);
-    if (isNonDifferentiable)
-      param = param.addingOption(SILParameterInfo::NotDifferentiable);
-    Inputs.push_back(param);
 
+    if (origFlags.isNoDerivative())
+      param = param.addingOption(SILParameterInfo::NotDifferentiable);
+    if (origFlags.isTransferring())
+      param = param.addingOption(SILParameterInfo::Transferring);
+
+    Inputs.push_back(param);
     maybeAddForeignParameters();
   }
 
   void addPackParameter(CanSILPackType packTy, ValueOwnership ownership,
-                        bool isNonDifferentiable) {
+                        ParameterTypeFlags origFlags) {
     unsigned origParamIndex = NextOrigParamIndex++;
     auto convention = Convs.getPack(ownership, origParamIndex);
-    addParameter(packTy, convention, isNonDifferentiable);
+    addParameter(packTy, convention, origFlags);
   }
 
   /// Given that we've just reached an argument index for the
@@ -1803,7 +1801,7 @@ private:
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
             /*forSelf=*/false, ForeignSelf->OrigSelfParam,
-            ForeignSelf->SubstSelfParam.getParameterType(), false);
+            ForeignSelf->SubstSelfParam.getParameterType(), {});
     }
     return true;
   }

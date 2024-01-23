@@ -1799,7 +1799,7 @@ public:
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
       const Diagnostic &diag);
 
-  ParserResult<Expr> parseExprIdentifier();
+  ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
@@ -1868,6 +1868,8 @@ public:
   ParserResult<ArgumentList>
   parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
                     bool allowTrailingClosure = true);
+
+  ParserStatus parseExprListElement(tok rightTok, bool isArgumentList, SourceLoc leftLoc, SmallVectorImpl<ExprListElt> &elts);
 
   /// Parse one or more trailing closures after an argument list.
   ParserStatus parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,

@@ -313,7 +313,10 @@ reportNow(uint32_t flags, const char *message)
   fflush(stderr);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#pragma clang diagnostic pop
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif

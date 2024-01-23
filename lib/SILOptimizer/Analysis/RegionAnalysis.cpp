@@ -57,8 +57,10 @@ using namespace swift::regionanalysisimpl;
 static bool isIsolationBoundaryCrossingApply(SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
     return apply->getIsolationCrossing().has_value();
-  if (auto fas = FullApplySite::isa(inst))
-    return bool(fas.getIsolationCrossing());
+  if (auto fas = FullApplySite::isa(inst)) {
+    if (bool(fas.getIsolationCrossing()))
+      return true;
+  }
 
   // We assume that any instruction that does not correspond to an ApplyExpr
   // cannot cross an isolation domain.
@@ -177,6 +179,85 @@ struct UseDefChainVisitor
 
 } // namespace
 
+/// Classify an instructions as look through when we are looking through
+/// values. We assert that all instructions that are CONSTANT_TRANSLATION
+/// LookThrough to make sure they stay in sync.
+static bool isStaticallyLookThroughInst(SILInstruction *inst) {
+  if (auto cast = SILDynamicCastInst::getAs(inst))
+    if (cast.isRCIdentityPreserving())
+      return true;
+
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::BeginAccessInst:
+  case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginDeallocRefInst:
+  case SILInstructionKind::BridgeObjectToRefInst:
+  case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::DropDeinitInst:
+  case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndInitLetRefInst:
+  case SILInstructionKind::ExplicitCopyValueInst:
+  case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::ProjectBlockStorageInst:
+  case SILInstructionKind::ProjectBoxInst:
+  case SILInstructionKind::RefToBridgeObjectInst:
+  case SILInstructionKind::RefToUnownedInst:
+  case SILInstructionKind::UncheckedRefCastInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UnownedCopyValueInst:
+  case SILInstructionKind::UnownedToRefInst:
+  case SILInstructionKind::UpcastInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
+    return true;
+  }
+}
+
+static bool isLookThroughIfResultNonSendable(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::RawPointerToRefInst:
+    return true;
+  }
+}
+
+static bool isLookThroughIfOperandNonSendable(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::RefToRawPointerInst:
+    return true;
+  }
+}
+
+static bool isLookThroughIfOperandAndResultSendable(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    return false;
+  case SILInstructionKind::UncheckedTrivialBitCastInst:
+  case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::UncheckedValueCastInst:
+    return true;
+  }
+}
+
 static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
   auto *fn = value->getFunction();
   SILValue result = value;
@@ -189,47 +270,37 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
     temp = lookThroughOwnershipInsts(temp);
 
     if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
-      if (isa<ExplicitCopyValueInst, CopyableToMoveOnlyWrapperValueInst,
-              MoveOnlyWrapperToCopyableValueInst,
-              MoveOnlyWrapperToCopyableBoxInst, BeginAccessInst,
-              MarkDependenceInst>(svi) ||
-          isIdentityPreservingRefCast(svi)) {
+      if (isStaticallyLookThroughInst(svi)) {
         temp = svi->getOperand(0);
       }
 
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
-      if (isa<UncheckedTrivialBitCastInst, UncheckedBitwiseCastInst,
-              UncheckedValueCastInst>(svi)) {
+      if (isLookThroughIfOperandAndResultSendable(svi)) {
         if (isNonSendableType(svi->getType(), fn) &&
             isNonSendableType(svi->getOperand(0)->getType(), fn)) {
           temp = svi->getOperand(0);
         }
       }
-    }
 
-    if (auto *r = dyn_cast<RefToRawPointerInst>(temp)) {
-      // If our operand is a non-Sendable type, look through this instruction.
-      if (isNonSendableType(r->getOperand()->getType(), fn)) {
-        temp = r->getOperand();
+      if (isLookThroughIfResultNonSendable(svi)) {
+        if (isNonSendableType(svi->getType(), fn)) {
+          temp = svi->getOperand(0);
+        }
+      }
+
+      if (isLookThroughIfOperandNonSendable(svi)) {
+        // If our operand is a non-Sendable type, look through this instruction.
+        if (isNonSendableType(svi->getOperand(0)->getType(), fn)) {
+          temp = svi->getOperand(0);
+        }
       }
     }
 
-    if (auto *r = dyn_cast<RawPointerToRefInst>(temp)) {
-      // If our result is a non-Sendable type, look through this
-      // instruction. Builtin.RawPointer is always non-Sendable.
-      if (isNonSendableType(r->getType(), fn)) {
-        temp = r->getOperand();
+    if (auto *inst = temp->getDefiningInstruction()) {
+      if (isStaticallyLookThroughInst(inst)) {
+        temp = inst->getOperand(0);
       }
-    }
-
-    if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
-            temp->getDefiningInstruction())) {
-      temp = dsi->getOperand();
-    }
-    if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
-            temp->getDefiningInstruction())) {
-      temp = dti->getOperand();
     }
 
     if (temp != result) {
@@ -249,8 +320,6 @@ static SILValue getUnderlyingTrackedValue(SILValue value) {
   UseDefChainVisitor visitor;
   SILValue base = visitor.visitAll(value);
   assert(base);
-  if (isa<GlobalAddrInst>(base))
-    return value;
   if (base->getType().isObject())
     return getUnderlyingObject(base);
   return base;
@@ -398,6 +467,85 @@ static bool isGlobalActorInit(SILFunction *fn) {
     return false;
 
   return globalDecl->getGlobalActorAttr() != std::nullopt;
+}
+
+/// Returns true if this is a function argument that is able to be transferred
+/// in the body of our function.
+static bool isTransferrableFunctionArgument(SILFunctionArgument *arg) {
+  // Indirect out parameters cannot be an input transferring parameter.
+  if (arg->getArgumentConvention().isIndirectOutParameter())
+    return false;
+
+  // If we have a function argument that is closure captured by a Sendable
+  // closure, allow for the argument to be transferred.
+  //
+  // DISCUSSION: The reason that we do this is that in the case of us
+  // having an actual Sendable closure there are two cases we can see:
+  //
+  // 1. If we have an actual Sendable closure, the AST will emit an
+  // earlier error saying that we are capturing a non-Sendable value in a
+  // Sendable closure. So we want to squelch the error that we would emit
+  // otherwise. This only occurs when we are not in swift-6 mode since in
+  // swift-6 mode we will error on the earlier error... but in the case of
+  // us not being in swift 6 mode lets not emit extra errors.
+  //
+  // 2. If we have an async-let based Sendable closure, we want to allow
+  // for the argument to be transferred in the async let's statement and
+  // not emit an error.
+  if (arg->isClosureCapture() &&
+      arg->getFunction()->getLoweredFunctionType()->isSendable())
+    return true;
+
+  // Otherwise, we only allow for the argument to be transferred if it is
+  // explicitly marked as a strong transferring parameter.
+  return arg->isTransferring();
+}
+
+//===----------------------------------------------------------------------===//
+//                            MARK: TrackableValue
+//===----------------------------------------------------------------------===//
+
+bool TrackableValue::isTransferringParameter() const {
+  // First get our alloc_stack.
+  //
+  // TODO: We should just put a flag on the alloc_stack, so we /know/ 100% that
+  // it is from a consuming parameter. We don't have that so we pattern match.
+  auto *asi =
+      dyn_cast_or_null<AllocStackInst>(representativeValue.maybeGetValue());
+  if (!asi)
+    return false;
+
+  if (asi->getParent() != asi->getFunction()->getEntryBlock())
+    return false;
+
+  // See if we are initialized from a transferring parameter and are the only
+  // use of the parameter.
+  for (auto *use : asi->getUses()) {
+    auto *user = use->getUser();
+
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      // Check if our store inst is from a function argument that is
+      // transferring. If not, then this isn't the consuming parameter
+      // alloc_stack.
+      auto *fArg = dyn_cast<SILFunctionArgument>(si->getSrc());
+      if (!fArg || !fArg->isTransferring())
+        return false;
+      return fArg->getSingleUse();
+    }
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
+      // Check if our store inst is from a function argument that is
+      // transferring. If not, then this isn't the consuming parameter
+      // alloc_stack.
+      auto *fArg = dyn_cast<SILFunctionArgument>(copyAddr->getSrc());
+      if (!fArg || !fArg->isTransferring())
+        return false;
+      return fArg->getSingleUse();
+    }
+  }
+
+  // Otherwise, this isn't a consuming parameter.
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -683,7 +831,8 @@ void InferredCallerArgumentTypeInfo::initForApply(
 
 void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
                                                   ApplyExpr *sourceApply) {
-  auto isolationCrossing = *sourceApply->getIsolationCrossing();
+  auto isolationCrossing = sourceApply->getIsolationCrossing();
+  assert(isolationCrossing && "Should have valid isolation crossing?!");
 
   // Grab out full apply site and see if we can find a better expr.
   SILInstruction *i = const_cast<SILInstruction *>(op->getUser());
@@ -1160,31 +1309,22 @@ public:
     llvm::SmallVector<Element, 8> nonSendableSeparateIndices;
     for (SILArgument *arg : functionArguments) {
       if (auto state = tryToTrackValue(arg)) {
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ");
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": " << *arg);
 
-        // If we have a function argument that is closure captured by a Sendable
-        // closure, allow for the argument to be transferred.
+        // If we can transfer our parameter, just add it to
+        // nonSendableSeparateIndices.
         //
-        // DISCUSSION: The reason that we do this is that in the case of us
-        // having an actual Sendable closure there are two cases we can see:
-        //
-        // 1. If we have an actual Sendable closure, the AST will emit an
-        // earlier error saying that we are capturing a non-Sendable value in a
-        // Sendable closure. So we want to squelch the error that we would emit
-        // otherwise. This only occurs when we are not in swift-6 mode since in
-        // swift-6 mode we will error on the earlier error... but in the case of
-        // us not being in swift 6 mode lets not emit extra errors.
-        //
-        // 2. If we have an async-let based Sendable closure, we want to allow
-        // for the value to be transferred and not emit an error.
-        if (!cast<SILFunctionArgument>(arg)->isClosureCapture() ||
-            !function->getLoweredFunctionType()->isSendable()) {
-          addNeverTransferredValueID(state->getID());
-          nonSendableJoinedIndices.push_back(state->getID());
-        } else {
+        // NOTE: We do not support today the ability to have multiple parameters
+        // transfer together as part of the same region.
+        if (isTransferrableFunctionArgument(cast<SILFunctionArgument>(arg))) {
           nonSendableSeparateIndices.push_back(state->getID());
+          continue;
         }
-        LLVM_DEBUG(llvm::dbgs() << *arg);
+
+        // Otherwise, it is one of our merged parameters. Add it to the never
+        // transfer list and to the region join list.
+        valueMap.addNeverTransferredValueID(state->getID());
+        nonSendableJoinedIndices.push_back(state->getID());
       }
     }
 
@@ -1464,42 +1604,88 @@ public:
     translateSILMultiAssign(applyResults, pai->getOperandValues(), options);
   }
 
-  void translateSILApply(SILInstruction *inst) {
-    if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
-      if (auto kind = bi->getBuiltinKind()) {
-        if (kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
-          return translateAsyncLetStart(bi);
+  void translateSILBuiltin(BuiltinInst *bi) {
+    if (auto kind = bi->getBuiltinKind()) {
+      if (kind == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+        return translateAsyncLetStart(bi);
+      }
+    }
+
+    // If we do not have a special builtin, just do a multi-assign. Builtins do
+    // not cross async boundaries.
+    return translateSILMultiAssign(bi->getResults(), bi->getOperandValues(),
+                                   {});
+  }
+
+  void translateNonIsolationCrossingSILApply(FullApplySite fas) {
+    SILMultiAssignOptions options;
+    if (fas.hasSelfArgument()) {
+      if (auto self = fas.getSelfArgument()) {
+        if (self->getType().isActor())
+          options |= SILMultiAssignFlags::PropagatesActorSelf;
+      }
+    }
+
+    // For non-self parameters, gather all of the transferring parameters and
+    // gather our non-transferring parameters.
+    SmallVector<SILValue, 8> nonTransferringParameters;
+    if (fas.getNumArguments()) {
+      // NOTE: We want to process indirect parameters as if they are
+      // parameters... so we process them in nonTransferringParameters.
+      for (auto &op : fas.getOperandsWithoutSelf()) {
+        if (!fas.getArgumentConvention(op).isIndirectOutParameter() &&
+            fas.getArgumentParameterInfo(op).hasOption(
+                SILParameterInfo::Transferring)) {
+          if (auto value = tryToTrackValue(op.get())) {
+            builder.addTransfer(value->getRepresentative().getValue(), &op);
+          }
+        } else {
+          nonTransferringParameters.push_back(op.get());
         }
       }
     }
 
-    if (auto fas = FullApplySite::isa(inst)) {
-      if (auto *f = fas.getCalleeFunction()) {
-        // Check against the actual SILFunction.
-        if (f->getName() == "swift_asyncLet_get") {
-          return translateAsyncLetGet(cast<ApplyInst>(*fas));
+    // If our self parameter was transferring, transfer it. Otherwise, just
+    // stick it in the non seld operand values array and run multiassign on
+    // it.
+    if (fas.hasSelfArgument()) {
+      auto &selfOperand = fas.getSelfArgumentOperand();
+      if (fas.getArgumentParameterInfo(selfOperand)
+              .hasOption(SILParameterInfo::Transferring)) {
+        if (auto value = tryToTrackValue(selfOperand.get())) {
+          builder.addTransfer(value->getRepresentative().getValue(),
+                              &selfOperand);
         }
+      } else {
+        nonTransferringParameters.push_back(selfOperand.get());
+      }
+    }
+
+    SmallVector<SILValue, 8> applyResults;
+    getApplyResults(*fas, applyResults);
+    return translateSILMultiAssign(applyResults, nonTransferringParameters,
+                                   options);
+  }
+
+  void translateSILApply(SILInstruction *inst) {
+    if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
+      return translateSILBuiltin(bi);
+    }
+
+    auto fas = FullApplySite::isa(inst);
+    assert(bool(fas) && "Builtins should be handled above");
+
+    if (auto *f = fas.getCalleeFunction()) {
+      // Check against the actual SILFunction.
+      if (f->getName() == "swift_asyncLet_get") {
+        return translateAsyncLetGet(cast<ApplyInst>(*fas));
       }
     }
 
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
-    if (!isIsolationBoundaryCrossingApply(inst)) {
-      SILMultiAssignOptions options;
-      if (auto fas = FullApplySite::isa(inst)) {
-        if (fas.hasSelfArgument()) {
-          if (auto self = fas.getSelfArgument()) {
-            if (self->getType().isActor())
-              options |= SILMultiAssignFlags::PropagatesActorSelf;
-          }
-        }
-      }
-
-      SmallVector<SILValue, 8> applyResults;
-      getApplyResults(inst, applyResults);
-      return translateSILMultiAssign(applyResults, inst->getOperandValues(),
-                                     options);
-    }
+    if (!isIsolationBoundaryCrossingApply(inst))
+      return translateNonIsolationCrossingSILApply(fas);
 
     if (auto cast = dyn_cast<ApplyInst>(inst))
       return translateIsolationCrossingSILApply(cast);
@@ -1521,7 +1707,7 @@ public:
            "only ApplyExpr's should cross isolation domains");
 
     // require all operands
-    for (auto op : applySite->getOperandValues())
+    for (auto op : applySite.getArguments())
       if (auto value = tryToTrackValue(op))
         builder.addRequire(value->getRepresentative().getValue());
 
@@ -1632,13 +1818,52 @@ public:
     return translateSILMerge(dest, TinyPtrVector<SILValue>(src));
   }
 
-  /// If tgt is known to be unaliased (computed thropugh a combination of
+  void translateSILAssignmentToTransferringParameter(TrackableValue destRoot,
+                                                     Operand *destOperand,
+                                                     TrackableValue srcRoot,
+                                                     Operand *srcOperand) {
+    assert(isa<AllocStackInst>(destRoot.getRepresentative().getValue()) &&
+           "Destination should always be an alloc_stack");
+
+    // Transfer src. This ensures that we cannot use src again locally in this
+    // function... which makes sense since its value is now in the transferring
+    // parameter.
+    builder.addTransfer(srcRoot.getRepresentative().getValue(), srcOperand);
+
+    // Then check if we are assigning into an aggregate projection. In such a
+    // case, we want to ensure that we keep tracking the elements already in the
+    // region of transferring. This is more conservative than we need to be
+    // (since we could forget anything reachable from the aggregate
+    // field)... but being more conservative is ok.
+    if (isProjectedFromAggregate(destOperand->get()))
+      return;
+
+    // If we are assigning over the entire value though, we perform an assign
+    // fresh since we are guaranteed that any value that could be referenced via
+    // the old value is gone.
+    builder.addAssignFresh(destRoot.getRepresentative().getValue());
+  }
+
+  /// If \p dest is known to be unaliased (computed through a combination of
   /// AccessStorage's inUniquelyIdenfitied check and a custom search for
-  /// captures by applications), then these can be treated as assignments of tgt
-  /// to src. If the tgt could be aliased, then we must instead treat them as
-  /// merges, to ensure any aliases of tgt are also updated.
-  void translateSILStore(SILValue dest, SILValue src) {
-    if (auto nonSendableTgt = tryToTrackValue(dest)) {
+  /// captures by applications), then these can be treated as assignments of \p
+  /// dest to src. If the \p dest could be aliased, then we must instead treat
+  /// them as merges, to ensure any aliases of \p dest are also updated.
+  void translateSILStore(Operand *dest, Operand *src) {
+    SILValue destValue = dest->get();
+    SILValue srcValue = src->get();
+
+    if (auto nonSendableDest = tryToTrackValue(destValue)) {
+      // Before we do anything check if we have an assignment into an
+      // alloc_stack for a consuming transferring parameter... in such a case,
+      // we need to handle this specially.
+      if (nonSendableDest->isTransferringParameter()) {
+        if (auto nonSendableSrc = tryToTrackValue(srcValue)) {
+          return translateSILAssignmentToTransferringParameter(
+              *nonSendableDest, dest, *nonSendableSrc, src);
+        }
+      }
+
       // In the following situations, we can perform an assign:
       //
       // 1. A store to unaliased storage.
@@ -1650,11 +1875,12 @@ public:
       // specifically in this projection... but that is better than
       // miscompiling. For memory like this, we probably need to track it on a
       // per field basis to allow for us to assign.
-      if (nonSendableTgt.value().isNoAlias() && !isProjectedFromAggregate(dest))
-        return translateSILAssign(dest, src);
+      if (nonSendableDest.value().isNoAlias() &&
+          !isProjectedFromAggregate(destValue))
+        return translateSILAssign(destValue, srcValue);
 
       // Stores to possibly aliased storage must be treated as merges.
-      return translateSILMerge(dest, src);
+      return translateSILMerge(destValue, srcValue);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -1787,11 +2013,17 @@ public:
 
     case TranslationSemantics::LookThrough:
       assert(inst->getNumOperands() == 1);
+      assert((isStaticallyLookThroughInst(inst) ||
+              isLookThroughIfResultNonSendable(inst) ||
+              isLookThroughIfOperandNonSendable(inst) ||
+              isLookThroughIfOperandAndResultSendable(inst)) &&
+             "Out of sync... should return true for one of these categories!");
       return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
 
     case TranslationSemantics::Store:
-      return translateSILStore(inst->getOperand(CopyLikeInstruction::Dest),
-                               inst->getOperand(CopyLikeInstruction::Src));
+      return translateSILStore(
+          &inst->getAllOperands()[CopyLikeInstruction::Dest],
+          &inst->getAllOperands()[CopyLikeInstruction::Src]);
 
     case TranslationSemantics::Special:
       return;
@@ -1895,6 +2127,12 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 
 #define CONSTANT_TRANSLATION(INST, Kind)                                       \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    assert((TranslationSemantics::Kind != TranslationSemantics::LookThrough || \
+            isStaticallyLookThroughInst(inst)) &&                              \
+           "Out of sync?!");                                                   \
+    assert((TranslationSemantics::Kind == TranslationSemantics::LookThrough || \
+            !isStaticallyLookThroughInst(inst)) &&                             \
+           "Out of sync?!");                                                   \
     return TranslationSemantics::Kind;                                         \
   }
 
@@ -2008,6 +2246,11 @@ CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
 CONSTANT_TRANSLATION(ProjectBlockStorageInst, LookThrough)
+CONSTANT_TRANSLATION(RefToUnownedInst, LookThrough)
+CONSTANT_TRANSLATION(UnownedToRefInst, LookThrough)
+CONSTANT_TRANSLATION(UnownedCopyValueInst, LookThrough)
+CONSTANT_TRANSLATION(DropDeinitInst, LookThrough)
+CONSTANT_TRANSLATION(ValueToBridgeObjectInst, LookThrough)
 
 //===---
 // Store
@@ -2032,6 +2275,7 @@ CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 // value is within or because even though they are technically a use we would
 // rather emit an error on a better instruction.
 CONSTANT_TRANSLATION(AllocGlobalInst, Ignored)
+CONSTANT_TRANSLATION(AutoreleaseValueInst, Ignored)
 CONSTANT_TRANSLATION(DeallocBoxInst, Ignored)
 CONSTANT_TRANSLATION(DeallocStackInst, Ignored)
 CONSTANT_TRANSLATION(DebugValueInst, Ignored)
@@ -2046,6 +2290,7 @@ CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
 CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
+CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 
 //===---
 // Require
@@ -2053,6 +2298,9 @@ CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 
 // Instructions that only require that the region of the value be live:
 CONSTANT_TRANSLATION(FixLifetimeInst, Require)
+CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Require)
+CONSTANT_TRANSLATION(BridgeObjectToWordInst, Require)
+CONSTANT_TRANSLATION(IsUniqueInst, Require)
 
 //===---
 // Terminators
@@ -2094,20 +2342,12 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(RefToUnownedInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedToRefInst, Unhandled)
-CONSTANT_TRANSLATION(BridgeObjectToWordInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
-CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Unhandled)
-CONSTANT_TRANSLATION(ValueToBridgeObjectInst, Unhandled)
-CONSTANT_TRANSLATION(UnownedCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
-CONSTANT_TRANSLATION(DropDeinitInst, Unhandled)
-CONSTANT_TRANSLATION(IsUniqueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
@@ -2144,14 +2384,12 @@ CONSTANT_TRANSLATION(DeallocPartialRefInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(AutoreleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(AssignInst, Unhandled)
 CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
 CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
 CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
-CONSTANT_TRANSLATION(DebugStepInst, Unhandled)
 CONSTANT_TRANSLATION(TestSpecificationInst, Unhandled)
 CONSTANT_TRANSLATION(StoreUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(DeinitExistentialAddrInst, Unhandled)
@@ -2211,6 +2449,7 @@ CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 // of the Sendable addr. That would require adding more logic though.
 #define LOOKTHROUGH_IF_NONSENDABLE_RESULT_REQUIRE_OTHERWISE(INST)              \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
+    assert(isLookThroughIfResultNonSendable(inst) && "Out of sync?!");         \
     if (isNonSendableType(inst->getType())) {                                  \
       return TranslationSemantics::LookThrough;                                \
     }                                                                          \
@@ -2246,6 +2485,7 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 #define CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(INST)               \
                                                                                \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *cast) {        \
+    assert(isLookThroughIfOperandAndResultSendable(cast) && "Out of sync");    \
     bool isOperandNonSendable =                                                \
         isNonSendableType(cast->getOperand()->getType());                      \
     bool isResultNonSendable = isNonSendableType(cast->getType());             \
@@ -2276,6 +2516,7 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 
 TranslationSemantics
 PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
+  assert(isLookThroughIfResultNonSendable(r) && "Out of sync");
   // If our result is non sendable, perform a look through.
   if (isNonSendableType(r->getType()))
     return TranslationSemantics::LookThrough;
@@ -2286,6 +2527,8 @@ PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
+  assert(isLookThroughIfOperandNonSendable(r) && "Out of sync");
+
   // If our source ref is non sendable, perform a look through.
   if (isNonSendableType(r->getOperand()->getType()))
     return TranslationSemantics::LookThrough;
@@ -2297,7 +2540,8 @@ PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
-  translateSILAssign(mdi, mdi->getValue());
+  assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
+  translateSILLookThrough(mdi->getResults(), mdi->getValue());
   translateSILRequire(mdi->getBase());
   return TranslationSemantics::Special;
 }
@@ -2312,8 +2556,12 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  if (SILDynamicCastInst(ucci).isRCIdentityPreserving())
+  if (SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
+    assert(isStaticallyLookThroughInst(ucci) && "Out of sync");
     return TranslationSemantics::LookThrough;
+  }
+
+  assert(!isStaticallyLookThroughInst(ucci) && "Out of sync");
   return TranslationSemantics::Assign;
 }
 
@@ -2674,6 +2922,17 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
       if (isa<RefElementAddrInst>(storage.base)) {
         if (storage.storage.getRoot()->getType().isActor()) {
           iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+        }
+      }
+
+      // See if the memory base is a global_addr from a global actor protected global.
+      if (auto *ga = dyn_cast<GlobalAddrInst>(storage.base)) {
+        if (auto *global = ga->getReferencedGlobal()) {
+          if (auto *globalDecl = global->getDecl()) {
+            if (getActorIsolation(globalDecl).isGlobalActor()) {
+              iter.first->getSecond().addFlag(TrackableValueFlag::isActorDerived);
+            }
+          }
         }
       }
     }

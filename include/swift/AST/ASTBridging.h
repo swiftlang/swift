@@ -1161,6 +1161,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_Sendable,
   BridgedTypeAttrKind_retroactive,
   BridgedTypeAttrKind_unchecked,
+  BridgedTypeAttrKind_preconcurrency,
   BridgedTypeAttrKind__local,
   BridgedTypeAttrKind__noMetadata,
   BridgedTypeAttrKind__opaqueReturnTypeOf,
@@ -1234,6 +1235,7 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : size_t {
   BridgedAttributedTypeSpecifierConst,
   BridgedAttributedTypeSpecifierIsolated,
   BridgedAttributedTypeSpecifierResultDependsOn,
+  BridgedAttributedTypeSpecifierTransferring,
 };
 
 SWIFT_NAME("BridgedSimpleIdentTypeRepr.createParsed(_:loc:name:)")
@@ -1492,7 +1494,9 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   /// or the new spelling `#externalMacro(module: "Module", type: "Type")`.
   BridgedExternalMacro,
   /// The builtin definition for "externalMacro".
-  BridgedBuiltinExternalMacro
+  BridgedBuiltinExternalMacro,
+  /// The builtin definition for the "isolation" macro.
+  BridgedBuiltinIsolationMacro,
 };
 
 SWIFT_NAME("BridgedGenericParamList.createParsed(_:leftAngleLoc:parameters:"

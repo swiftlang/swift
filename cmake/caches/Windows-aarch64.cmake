@@ -124,8 +124,10 @@ set(LLVM_TOOLCHAIN_TOOLS
 set(CLANG_TOOLS
       clang
       clangd
+      clang-deps-launcher
       clang-format
       clang-resource-headers
+      clang-scan-deps
       clang-tidy
     CACHE STRING "")
 
@@ -139,7 +141,7 @@ set(LLDB_TOOLS
       lldb-argdumper
       lldb-python-scripts
       lldb-server
-      lldb-vscode
+      lldb-dap
       repl_swift
     CACHE STRING "")
 

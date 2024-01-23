@@ -254,7 +254,7 @@ public:
   /// Form a target for the initialization of a pattern binding entry from
   /// an expression.
   static SyntacticElementTarget
-  forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
+  forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 

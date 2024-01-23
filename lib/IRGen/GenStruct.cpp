@@ -463,14 +463,6 @@ namespace {
               clang::QualType(clangDecl->getTypeForDecl(), 0));
       auto *dstValue = dst.getAddress();
       auto *srcValue = src.getAddress();
-      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
-        dstValue = IGF.coerceValue(
-            dst.getAddress(), copyFunction->getFunctionType()->getParamType(0),
-            IGF.IGM.DataLayout);
-        srcValue = IGF.coerceValue(
-            src.getAddress(), copyFunction->getFunctionType()->getParamType(1),
-            IGF.IGM.DataLayout);
-      }
       IGF.Builder.CreateCall(copyFunction->getFunctionType(), copyFunction,
                              {dstValue, srcValue});
     }
@@ -634,12 +626,6 @@ namespace {
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
-      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
-        dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
-                               IGF.IGM.DataLayout);
-        src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
-                              IGF.IGM.DataLayout);
-      }
       llvm::Value *args[] = {dest, src};
       if (clangFnAddr == origClangFnAddr) {
         // Ensure we can use 'invoke' to trap on uncaught exceptions when
@@ -705,10 +691,6 @@ namespace {
 
       SmallVector<llvm::Value *, 2> args;
       auto *thisArg = address.getAddress();
-      if (IGF.IGM.getLLVMContext().supportsTypedPointers())
-        thisArg = IGF.coerceValue(address.getAddress(),
-                                  destructorFnAddr->getArg(0)->getType(),
-                                  IGF.IGM.DataLayout);
       args.push_back(thisArg);
       llvm::Value *implicitParam =
           clang::CodeGen::getCXXDestructorImplicitParam(

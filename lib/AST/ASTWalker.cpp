@@ -202,7 +202,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     for (auto idx : range(PBD->getNumPatternEntries())) {
       if (Pattern *Pat = doIt(PBD->getPattern(idx)))
-        PBD->setPattern(idx, Pat, PBD->getInitContext(idx));
+        PBD->setPattern(idx, Pat);
       else
         return true;
 
@@ -1312,6 +1312,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         break;
       }
     }
+    return E;
+  }
+
+  Expr *visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
+    if (auto actor = E->getActor()) {
+      if (auto newActor = doIt(actor))
+        E->setActor(newActor);
+      else
+        return nullptr;
+    }
+
     return E;
   }
 

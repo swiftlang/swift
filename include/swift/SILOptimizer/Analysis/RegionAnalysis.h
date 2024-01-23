@@ -254,6 +254,10 @@ public:
 
   TrackableValueState getValueState() const { return valueState; }
 
+  /// Returns true if this TrackableValue is an alloc_stack from a transferring
+  /// parameter.
+  bool isTransferringParameter() const;
+
   void print(llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
     valueState.print(os);

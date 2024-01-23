@@ -324,6 +324,14 @@ void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
 /// Warn about deprecated `Executor.enqueue` implementations.
 void tryDiagnoseExecutorConformance(ASTContext &C, const NominalTypeDecl *nominal, ProtocolDecl *proto);
 
+/// Whether to suppress deprecation diagnostics for \p decl in \p declContext
+/// because \p decl is a deprecated decl from the `_Concurrency` module and is
+/// being referenced from the implementation of the `_Concurrency` module. This
+/// prevents unaddressable warnings in the standard library build. Ideally, a
+/// language feature would obviate the need for this.
+bool shouldIgnoreDeprecationOfConcurrencyDecl(const Decl *decl,
+                                              DeclContext *declContext);
+
 // Get a concrete reference to a declaration
 ConcreteDeclRef getDeclRefInContext(ValueDecl *value);
 
@@ -631,7 +639,7 @@ struct DenseMapInfo<swift::ReferencedActor::Kind> {
     }
 
     static unsigned getHashValue(RefActor Val) {
-     return static_cast<unsigned>(Val.getKind());
+     return hash_value(Val);
     }
 
     static bool isEqual(const RefActor &LHS, const RefActor &RHS) {

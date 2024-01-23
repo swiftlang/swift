@@ -1022,12 +1022,13 @@ public func type<T, Metatype>(of value: T) -> Metatype {
 ///   - body: A closure that is executed immediately with an escapable copy of
 ///     `closure` as its argument.
 /// - Returns: The return value, if any, of the `body` closure.
+@_alwaysEmitIntoClient
 @_transparent
 @_semantics("typechecker.withoutActuallyEscaping(_:do:)")
-public func withoutActuallyEscaping<ClosureType, ResultType>(
+public func withoutActuallyEscaping<ClosureType, ResultType, Failure>(
   _ closure: ClosureType,
-  do body: (_ escapingClosure: ClosureType) throws -> ResultType
-) rethrows -> ResultType {
+  do body: (_ escapingClosure: ClosureType) throws(Failure) -> ResultType
+) throws(Failure) -> ResultType {
   // This implementation is never used, since calls to
   // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
   // the type checker.
@@ -1037,12 +1038,43 @@ public func withoutActuallyEscaping<ClosureType, ResultType>(
   Builtin.unreachable()
 }
 
+@_silgen_name("$ss23withoutActuallyEscaping_2doq_x_q_xKXEtKr0_lF")
+@usableFromInline
+func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
+  _ closure: ClosureType,
+  do body: (_ escapingClosure: ClosureType) throws -> ResultType
+) throws -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
+  // the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@_alwaysEmitIntoClient
 @_transparent
 @_semantics("typechecker._openExistential(_:do:)")
-public func _openExistential<ExistentialType, ContainedType, ResultType>(
+public func _openExistential<ExistentialType, ContainedType, ResultType, Failure>(
+  _ existential: ExistentialType,
+  do body: (_ escapingClosure: ContainedType) throws(Failure) -> ResultType
+) throws(Failure) -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift._openExistential(_:do:)` are resolved as a special case by
+  // the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: '_openExistential(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@usableFromInline
+@_silgen_name("$ss16_openExistential_2doq0_x_q0_q_KXEtKr1_lF")
+func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
   _ existential: ExistentialType,
   do body: (_ escapingClosure: ContainedType) throws -> ResultType
-) rethrows -> ResultType {
+) throws -> ResultType {
   // This implementation is never used, since calls to
   // `Swift._openExistential(_:do:)` are resolved as a special case by
   // the type checker.

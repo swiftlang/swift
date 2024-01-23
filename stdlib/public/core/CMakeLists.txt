@@ -65,12 +65,12 @@ split_embedded_sources(
     NORMAL CString.swift
   EMBEDDED CTypes.swift
     NORMAL DebuggerSupport.swift
-    NORMAL Dictionary.swift
-    NORMAL DictionaryBridging.swift
-    NORMAL DictionaryBuilder.swift
-    NORMAL DictionaryCasting.swift
-    NORMAL DictionaryStorage.swift
-    NORMAL DictionaryVariant.swift
+  EMBEDDED Dictionary.swift
+  EMBEDDED DictionaryBridging.swift
+  EMBEDDED DictionaryBuilder.swift
+  EMBEDDED DictionaryCasting.swift
+  EMBEDDED DictionaryStorage.swift
+  EMBEDDED DictionaryVariant.swift
     NORMAL DiscontiguousSlice.swift
     NORMAL DropWhile.swift
     NORMAL Dump.swift
@@ -99,19 +99,19 @@ split_embedded_sources(
     NORMAL Join.swift
     NORMAL KeyPath.swift
     NORMAL KeyValuePairs.swift
-    NORMAL LazyCollection.swift
-    NORMAL LazySequence.swift
+  EMBEDDED LazyCollection.swift
+  EMBEDDED LazySequence.swift
     NORMAL LegacyABI.swift
   EMBEDDED LifetimeManager.swift
     NORMAL Macros.swift
   EMBEDDED ManagedBuffer.swift
     NORMAL Map.swift
   EMBEDDED MemoryLayout.swift
-    NORMAL UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
-    NORMAL NativeDictionary.swift
+  EMBEDDED NativeDictionary.swift
   EMBEDDED NativeSet.swift
     NORMAL NewtypeWrapper.swift
     NORMAL NFC.swift
@@ -263,6 +263,7 @@ endif()
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
+  EmbeddedPrint.swift
   )
 
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)

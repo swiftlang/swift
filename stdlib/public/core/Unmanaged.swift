@@ -34,7 +34,15 @@ public struct Unmanaged<Instance: AnyObject> {
   public static func fromOpaque(
     @_nonEphemeral _ value: UnsafeRawPointer
   ) -> Unmanaged {
-    return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
+    // NOTE: `value` is allowed to represent a dangling reference, so 
+    // this function must not ever try to dereference it. For
+    // example, this function must NOT use the init(_private:) initializer
+    // because doing so requires materializing a strong reference to 'Instance'.
+    // This materialization would be enough to convince the compiler to add
+    // retain/releases which must be avoided for the opaque pointer functions.
+    // 'Unmanaged<Instance>' is layout compatible with 'UnsafeRawPointer' and
+    // casting to that will not attempt to retain the reference held at 'value'.
+    unsafeBitCast(value, to: Unmanaged<Instance>.self)
   }
 
   /// Unsafely converts an unmanaged class reference to a pointer.
@@ -48,7 +56,13 @@ public struct Unmanaged<Instance: AnyObject> {
   /// - Returns: An opaque pointer to the value of this unmanaged reference.
   @_transparent
   public func toOpaque() -> UnsafeMutableRawPointer {
-    return unsafeBitCast(_value, to: UnsafeMutableRawPointer.self)
+    // NOTE: `self` is allowed to be a dangling reference.
+    // Therefore, this function must not unsafeBitCast '_value' because
+    // that will get a strong reference temporary value that the compiler will
+    // try to retain/release. Use 'self' to avoid this. 'Unmanaged<Instance>' is
+    // layout compatible with 'UnsafeRawPointer' and casting from that will not
+    // attempt to retain the reference held at '_value'.
+    unsafeBitCast(self, to: UnsafeMutableRawPointer.self)
   }
 
   /// Creates an unmanaged reference with an unbalanced retain.

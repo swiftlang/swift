@@ -1597,6 +1597,9 @@ public:
            getKind() == Kind::DispatchThunkAllocator ||
            getKind() == Kind::DispatchThunkDerivative;
   }
+  bool isNominalTypeDescriptor() const {
+    return getKind() == Kind::NominalTypeDescriptor;
+  }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;

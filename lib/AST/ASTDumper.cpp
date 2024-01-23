@@ -445,6 +445,7 @@ static unsigned getDumpString(unsigned value) {
 static size_t getDumpString(size_t value) {
   return value;
 }
+static void *getDumpString(void *value) { return value; }
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -1731,8 +1732,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     os << "(file)";
     break;
 
-  case DeclContextKind::SerializedLocal:
-    os << "local context";
+  case DeclContextKind::SerializedAbstractClosure:
+    os << "serialized abstract closure";
     break;
 
   case DeclContextKind::AbstractClosureExpr: {
@@ -1781,6 +1782,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     os << "top-level code";
     break;
 
@@ -2788,7 +2790,6 @@ public:
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       printFieldQuoted(isolation.getGlobalActor().getString(),
                        "global_actor_isolated", CapturesColor);
       break;
@@ -3144,6 +3145,15 @@ public:
         printRec(path, "parsed_path");
       }
     }
+    printFoot();
+  }
+
+  void visitCurrentContextIsolationExpr(
+      CurrentContextIsolationExpr *E, StringRef label) {
+    printCommon(E, "current_context_isolation_expr", label);
+    if (auto actor = E->getActor())
+      printRec(actor);
+
     printFoot();
   }
 

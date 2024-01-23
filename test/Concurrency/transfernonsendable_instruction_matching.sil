@@ -1,5 +1,8 @@
 // RUN: %target-sil-opt -transfer-non-sendable -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
 
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
 // PLEASE READ THIS!
 //
 // This test is specifically to test out individual instruction interactions,
@@ -21,6 +24,8 @@ final class SendableKlass : Sendable {}
 @_moveOnly
 struct NonSendableMoveOnlyStruct {
   var ns: NonSendableKlass
+
+  deinit
 }
 
 struct NonSendableStruct {
@@ -41,6 +46,10 @@ sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_
 sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
 sil @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
+sil @transferMoveOnlyStruct : $@convention(thin) @async (@guaranteed NonSendableMoveOnlyStruct) -> ()
+
+sil @constructStruct : $@convention(thin) () -> @owned NonSendableStruct
+sil @transferStruct : $@convention(thin) @async (@guaranteed NonSendableStruct) -> ()
 
 enum FakeOptional<T> {
 case none
@@ -57,7 +66,7 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
   %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %3(%1) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   // expected-note @-1 {{access here could race}}
@@ -74,7 +83,7 @@ bb0:
   %3 = store_borrow %1 to %2 : $*NonSendableKlass
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   yield %3 : $*NonSendableKlass, resume bb1, unwind bb2
   // expected-note @-1 {{access here could race}}
 
@@ -101,7 +110,7 @@ bb0:
   store %1a to [init] %2 : $*FakeOptional<NonSendableKlass>
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<FakeOptional<NonSendableKlass>>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'FakeOptional<NonSendableKlass>' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'FakeOptional<NonSendableKlass>' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   switch_enum_addr %2 : $*FakeOptional<NonSendableKlass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
   // expected-note @-1 {{access here could race}}
 
@@ -127,7 +136,7 @@ bb0:
   %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   %1a = explicit_copy_value %1 : $NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1a) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %3(%1) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   // expected-note @-1 {{access here could race}}
@@ -144,7 +153,7 @@ bb0:
   %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   %1a = move_value %1 : $NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1a) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   apply %3(%1a) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   // expected-note @-1 {{access here could race}}
@@ -164,7 +173,7 @@ bb0:
 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableMoveOnlyStruct>(%unresolved) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableMoveOnlyStruct' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableMoveOnlyStruct' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableMoveOnlyStruct>(%unresolved) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-note @-1 {{access here could race}}
@@ -184,7 +193,7 @@ bb0:
 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%project) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableKlass>(%project) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   // expected-note @-1 {{access here could race}}
@@ -203,7 +212,7 @@ bb0:
   %0b = begin_borrow %0a : $@moveOnly NonSendableKlass
   %0c = moveonlywrapper_to_copyable [guaranteed] %0b : $@moveOnly NonSendableKlass
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%0c) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   end_borrow %0b : $@moveOnly NonSendableKlass
   %3 = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
   %0bb = begin_borrow %0a : $@moveOnly NonSendableKlass
@@ -228,7 +237,7 @@ bb0:
 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%unwrappedProject) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableKlass>(%unwrappedProject) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -261,7 +270,7 @@ bb0:
   %pa = partial_apply %f2(%copiedUnwrappedBox) : $@convention(thin) (@guaranteed { var NonSendableKlass }) -> ()
   %4 = function_ref @transfer_partial_apply : $@convention(thin) @async (@guaranteed @callee_owned () -> ()) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4(%pa) : $@convention(thin) @async (@guaranteed @callee_owned () -> ()) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type '@callee_owned () -> ()' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type '@callee_owned () -> ()' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   %bb2 = begin_borrow %unwrappedBox : ${ var NonSendableKlass }
   %p2 = project_box %bb2 : ${ var NonSendableKlass }, 0
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -332,7 +341,7 @@ bb0:
   %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
   %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   fix_lifetime %1 : $NonSendableKlass
   // expected-note @-1 {{access here could race}}
   destroy_value %1 : $NonSendableKlass
@@ -350,7 +359,7 @@ bb0:
 
   %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<NonSendableKlass>(%3) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   %5 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   apply %5<NonSendableKlass>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -387,7 +396,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%2) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   // No error here since just a requires on the first.
   %useNonSendableKlass = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
@@ -414,7 +423,7 @@ sil [ossa] @mark_dependence_test_base_has_a_require : $@convention(thin) @async 
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%2) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   // No error here since just a requires on the first.
   %useNonSendableKlass = function_ref @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
@@ -438,7 +447,7 @@ sil [ossa] @mark_dependence_test_base_is_a_require : $@convention(thin) @async (
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   %1a = begin_borrow %1 : $NonSendableKlass
   %2 = mark_dependence %1a : $NonSendableKlass on %0 : $NonSendableKlass
@@ -542,9 +551,9 @@ bb0(%0 : $Builtin.RawPointer):
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%2) : $@convention(thin) @async (Builtin.RawPointer) -> ()
   // expected-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}  
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%3a) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%5a) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   %useRawPointer = function_ref @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
   apply %useRawPointer(%3a) : $@convention(thin) (Builtin.RawPointer) -> ()
@@ -570,7 +579,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   // Test that this is viewed as a use of %construct
   %3 = raw_pointer_to_ref %3a : $Builtin.RawPointer to $SendableKlass
@@ -590,7 +599,7 @@ bb0:
 
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   fix_lifetime %value : $NonSendableKlass
   // expected-note @-1 {{access here could race}}
@@ -609,12 +618,12 @@ bb0:
 
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   fix_lifetime %value : $SendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   // expected-note @-2 {{access here could race}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
@@ -632,7 +641,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   %word = unchecked_trivial_bit_cast %value : $NonSendableKlass to $Builtin.Word
   // expected-note @-1 {{access here could race}}
@@ -666,7 +675,7 @@ bb0:
 
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   fix_lifetime %value : $NonSendableKlass
   // expected-note @-1 {{access here could race}}
@@ -685,12 +694,12 @@ bb0:
 
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   fix_lifetime %value : $SendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   // expected-note @-2 {{access here could race}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
@@ -708,7 +717,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   %word = unchecked_bitwise_cast %value : $NonSendableKlass to $Builtin.Word
   // expected-note @-1 {{access here could race}}
@@ -743,7 +752,7 @@ bb0:
 
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   fix_lifetime %value : $NonSendableKlass
   // expected-note @-1 {{access here could race}}
@@ -764,12 +773,12 @@ bb0:
 
   %transferRawPointer = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   fix_lifetime %value : $SendableKlass
 
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferRawPointer(%rawPointer) : $@convention(thin) @async (Builtin.RawPointer) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
   // expected-note @-2 {{access here could race}}
 
   fix_lifetime %rawPointer : $Builtin.RawPointer
@@ -788,7 +797,7 @@ bb0:
 
   %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
-  // expected-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-warning @-1 {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
 
   %valueB = begin_borrow %value : $NonSendableKlass
   %word = unchecked_value_cast %valueB : $NonSendableKlass to $Builtin.Word
@@ -813,6 +822,192 @@ bb0:
   end_borrow %valueB : $SendableKlass
 
   destroy_value %value : $SendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @ref_to_unowned_test_1 : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %unowned = ref_to_unowned %value : $NonSendableKlass to $@sil_unowned NonSendableKlass
+  %ref = unowned_to_ref %unowned : $@sil_unowned NonSendableKlass to $NonSendableKlass
+  %refCopy = copy_value %ref : $NonSendableKlass
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%refCopy) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  destroy_value %refCopy : $NonSendableKlass
+  destroy_value %value : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @debug_step_test : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %unowned = ref_to_unowned %value : $NonSendableKlass to $@sil_unowned NonSendableKlass
+  %ref = unowned_to_ref %unowned : $@sil_unowned NonSendableKlass to $NonSendableKlass
+  %refCopy = copy_value %ref : $NonSendableKlass
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%refCopy) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  // Just make sure the pass sees the instruction
+  debug_step
+
+  destroy_value %refCopy : $NonSendableKlass
+  destroy_value %value : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @classify_bridge_object_test : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %value2 = unchecked_ref_cast %value : $NonSendableKlass to $Builtin.BridgeObject
+  %1 = classify_bridge_object %value2 : $Builtin.BridgeObject // expected-note {{access here could race}}
+  destroy_value %value2 : $Builtin.BridgeObject
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @bridge_object_to_word_test : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %value2 = unchecked_ref_cast %value : $NonSendableKlass to $Builtin.BridgeObject
+  %1 = bridge_object_to_word %value2 : $Builtin.BridgeObject to $Builtin.Word // expected-note {{access here could race}}
+  destroy_value %value2 : $Builtin.BridgeObject
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @drop_deinit_test : $@convention(thin) @async (@owned NonSendableMoveOnlyStruct) -> () {
+bb0(%0 : @owned $NonSendableMoveOnlyStruct):
+  %1 = drop_deinit %0 : $NonSendableMoveOnlyStruct
+  destroy_value %1 : $NonSendableMoveOnlyStruct
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @is_unique_test : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+  %a = alloc_stack $NonSendableKlass
+  %valueCopy = copy_value %value : $NonSendableKlass
+  store %valueCopy to [init] %a : $*NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  destroy_value %value : $NonSendableKlass
+  %1 = is_unique %a : $*NonSendableKlass // expected-note {{access here could race}}
+  destroy_addr %a : $*NonSendableKlass
+  dealloc_stack %a : $*NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @struct_element_addr_test_1 : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructStruct : $@convention(thin) () -> @owned NonSendableStruct
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableStruct
+
+  %a = alloc_stack $NonSendableStruct
+  %1_copy = copy_value %1 : $NonSendableStruct
+  store %1_copy to [init] %a : $*NonSendableStruct
+
+  %f = function_ref @transferStruct : $@convention(thin) @async (@guaranteed NonSendableStruct) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableStruct) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableStruct' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %s = struct_element_addr %a : $*NonSendableStruct, #NonSendableStruct.ns
+  %f2 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %f2<NonSendableKlass>(%s) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access here could race}}
+
+  destroy_addr %a : $*NonSendableStruct
+  dealloc_stack %a : $*NonSendableStruct
+  destroy_value %1 : $NonSendableStruct
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @tuple_element_addr_test_1 : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %a = alloc_stack $(NonSendableKlass, NonSendableKlass)
+  %1_copy = copy_value %1 : $NonSendableKlass
+  %1_copy_copy = copy_value %1 : $NonSendableKlass
+  %tup = tuple (%1_copy : $NonSendableKlass, %1_copy_copy : $NonSendableKlass)
+  store %tup to [init] %a : $*(NonSendableKlass, NonSendableKlass)
+
+  %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %s = tuple_element_addr %a : $*(NonSendableKlass, NonSendableKlass), 0
+  %f2 = function_ref @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply %f2<NonSendableKlass>(%s) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-note {{access here could race}}
+
+  destroy_addr %a : $*(NonSendableKlass, NonSendableKlass)
+  dealloc_stack %a : $*(NonSendableKlass, NonSendableKlass)
+  destroy_value %1 : $NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @autorelease_value_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %a = alloc_stack $(NonSendableKlass, NonSendableKlass)
+  %1_copy = copy_value %1 : $NonSendableKlass
+  %1_copy_copy = copy_value %1 : $NonSendableKlass
+  %tup = tuple (%1_copy : $NonSendableKlass, %1_copy_copy : $NonSendableKlass)
+  store %tup to [init] %a : $*(NonSendableKlass, NonSendableKlass)
+
+  %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  destroy_addr %a : $*(NonSendableKlass, NonSendableKlass)
+  dealloc_stack %a : $*(NonSendableKlass, NonSendableKlass)
+  autorelease_value %1 : $NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @value_to_bridge_object_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %0() : $@convention(thin) () -> @owned NonSendableKlass
+
+
+  %f = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  %2 = value_to_bridge_object %1 : $NonSendableKlass
+  %3 = copy_value %2 : $Builtin.BridgeObject
+  destroy_value %3 : $Builtin.BridgeObject
+  destroy_value %1 : $NonSendableKlass
+
   %9999 = tuple ()
   return %9999 : $()
 }

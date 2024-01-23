@@ -580,6 +580,7 @@ namespace {
     RValue visitConsumeExpr(ConsumeExpr *E, SGFContext C);
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
+    RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5949,7 +5950,7 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   auto *SM = SGF.getModule().getSwiftModule();
   if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
-    if (SM->conformsToProtocol(eltTy, fixedWidthIntegerDecl))
+    if (SM->checkConformance(eltTy, fixedWidthIntegerDecl))
       return;
   }
 
@@ -6534,6 +6535,11 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
     return RValue();
   }
   return RValue();
+}
+
+RValue RValueEmitter::visitCurrentContextIsolationExpr(
+    CurrentContextIsolationExpr *E, SGFContext C) {
+  return visit(E->getActor(), C);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

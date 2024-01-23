@@ -46,9 +46,9 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(dummy: Void) {
-#if _pointerBitWidth(_64)
+#if _pointerBitWidth(_64) && !$Embedded
       self.object = _BridgeStorage(taggedPayload: 0)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || $Embedded
       self.init(native: _NativeDictionary())
 #else
 #error("Unknown platform")

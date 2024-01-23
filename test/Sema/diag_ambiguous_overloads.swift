@@ -163,3 +163,29 @@ do {
 
   f2(f1) // expected-error {{no 'f1' candidates produce the expected type '(String) -> Void' for parameter #0}}
 }
+
+// https://forums.swift.org/t/1-x-type-inference/69417/15
+protocol N { associatedtype D }
+
+infix operator ++ : AdditionPrecedence
+infix operator -- : AdditionPrecedence
+
+func ++ <T: N> (lhs: T, rhs: T) -> T.D { fatalError() } // expected-note {{found this candidate}}
+func ++ <T: N> (lhs: T, rhs: T) -> T { fatalError() } // expected-note {{found this candidate}}
+
+func -- <T: N> (lhs: T, rhs: T) -> T { fatalError() } // expected-note {{found this candidate}}
+func -- <T: N> (lhs: T, rhs: T) -> T.D { fatalError() } // expected-note {{found this candidate}}
+
+do {
+  struct MyInt16: N { typealias D = MyInt32 }
+  struct MyInt32: N { typealias D = MyInt64 }
+  struct MyInt64 {}
+
+  var i16 = MyInt16()
+
+  let _ = i16 ++ i16
+  // expected-error@-1 {{ambiguous use of operator '++'}}
+
+  let _ = i16 -- i16
+  // expected-error@-1 {{ambiguous use of operator '--'}}
+}
