@@ -61,52 +61,142 @@
 
 ## Swift 5.10
 
+* Swift 5.10 closes all known static data-race safey holes in complete strict
+concurrency checking.
+
+  When writing code against `-strict-concurrency=complete`, Swift 5.10 will
+  diagnose all potential for data races at compile time unless an explicit
+  unsafe opt out, such as `nonisolated(unsafe)` or `@unchecked Sendable`, is
+  used.
+
+  For example, in Swift 5.9, the following code crashes at runtime due to a
+  `@MainActor`-isolated initializer being evaluated outside the actor, but it
+  was not diagnosed under `-strict-concurrency=complete`:
+
+  ```swift
+  @MainActor
+  class MyModel {
+    init() {
+      MainActor.assertIsolated()
+    }
+
+    static let shared = MyModel()
+  }
+
+  func useShared() async {
+    let model = MyModel.shared
+  }
+
+  await useShared()
+  ```
+
+  The above code admits data races because a `@MainActor`-isolated static
+  variable, which evaluates a `@MainActor`-isolated initial value upon first
+  access, is accessed synchronously from a `nonisolated` context. In Swift
+  5.10, compiling the code with `-strict-concurrency=complete` produces a
+  warning that the access must be done asynchronously:
+
+  ```
+  warning: expression is 'async' but is not marked with 'await'
+    let model = MyModel.shared
+                ^~~~~~~~~~~~~~
+                await
+  ```
+
+  Swift 5.10 fixed numerous other bugs in `Sendable` and actor isolation
+  checking to strengthen the guarantees of complete concurrency checking.
+
+  Note that the complete concurrency model in Swift 5.10 is conservative.
+  Several Swift Evolution proposals are in active development to improve the
+  usability of strict concurrency checking ahead of Swift 6.
+
 * [SE-0412][]:
 
-  Under strict concurrency checking, every global or static variable must be either isolated to a global actor or be both immutable and of `Sendable` type.
+  Global and static variables are prone to data races because they provide memory that can be accessed from any program context.  Strict concurrency checking in Swift 5.10 prevents data races on global and static variables by requiring them to be either:
+
+    1. isolated to a global actor, or
+    2. immutable and of `Sendable` type.
+
+  For example:
 
   ```swift
   var mutableGlobal = 1
   // warning: var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state
   // (unless it is top-level code which implicitly isolates to @MainActor)
 
-  final class NonsendableType {
-    init() {}
+  @MainActor func mutateGlobalFromMain() {
+    mutableGlobal += 1
+  }
+
+  nonisolated func mutateGlobalFromNonisolated() async {
+    mutableGlobal += 10
   }
 
   struct S {
-    static let immutableNonsendable = NonsendableType()
-    // warning: static property 'immutableNonsendable' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor
+    static let immutableSendable = 10
+    // okay; 'immutableSendable' is safe to access concurrently because it's immutable and 'Int' is 'Sendable'
   }
   ```
 
-  The attribute `nonisolated(unsafe)` can be used to annotate a global variable (or any form of storage) to disable static checking of data isolation, but note that without correct implementation of a synchronization mechanism to achieve data isolation, dynamic run-time analysis from exclusivity enforcement or tools such as Thread Sanitizer could still identify failures.
+  A new `nonisolated(unsafe)` modifier can be used to annotate a global or static variable to suppress data isolation violations when manual synchronization is provided:
 
   ```swift
-  nonisolated(unsafe) var global: String
+  // This global is only set in one part of the program
+  nonisolated(unsafe) var global: String!
   ```
+
+  `nonisolated(unsafe)` can be used on any form of storage, including stored properties and local variables, as a more granular opt out for `Sendable` checking, eliminating the need for `@unchecked Sendable` wrapper types in many use cases:
+
+  ```swift
+  import Dispatch
+
+  // 'MutableData' is not 'Sendable'
+  class MutableData { ... } 
+
+  final class MyModel: Sendable {
+    private let queue = DispatchQueue(...)
+    // 'protectedState' is manually isolated by 'queue'
+    nonisolated(unsafe) private var protectedState: MutableData
+  }
+  ```
+
+  Note that without correct implementation of a synchronization mechanism to achieve data isolation, dynamic run-time analysis from exclusivity enforcement or tools such as the Thread Sanitizer could still identify failures.
 
 * [SE-0411][]:
 
-  Default value expressions can now have the same isolation as the enclosing
-  function or the corresponding stored property:
+  Swift 5.10 closes a data-race safety hole that previously permitted isolated
+  default stored property values to be synchronously evaluated from outside the
+  actor. For example, the following code compiles warning-free under
+  `-strict-concurrency=complete` in Swift 5.9, but it will crash at runtime at
+  the call to `MainActor.assertIsolated()`:
 
   ```swift
-  @MainActor
-  func requiresMainActor() -> Int { ... }
-
-  class C {
-    @MainActor
-    var x: Int = requiresMainActor()
+  @MainActor func requiresMainActor() -> Int {
+    MainActor.assertIsolated()
+    return 0
   }
 
-  @MainActor func defaultArg(value: Int = requiresMainActor()) { ... }
+  @MainActor struct S {
+    var x = requiresMainActor()
+    var y: Int
+  }
+
+  nonisolated func call() async {
+    let s = await S(y: 10)
+  }
+
+  await call()
   ```
 
-  For isolated default values of stored properties, the implicit initialization
-  only happens in the body of an `init` with the same isolation. This closes
-  an important data-race safety hole where global-actor-isolated default values
-  could inadvertently run synchronously from outside the actor.
+  This happens because `requiresMainActor()` is used as a default argument to
+  the member-wise initializer of `S`, but default arguments are always
+  evaluated in the caller. In this case, the caller runs on the generic
+  executor, so the default argument evaluation crashes.
+
+  Under `-strict-concurrency=complete` in Swift 5.10, default argument values
+  can safely share the same isolation as the enclosing function or stored
+  property. The above code is still valid, but the isolated default argument is
+  guaranteed to be evaluated in the callee's isolation domain.
 
 ## Swift 5.9.2
 
