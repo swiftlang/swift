@@ -105,7 +105,7 @@ public let globalVariable = [ 100, 101, 102 ]
 
 // CHECK-LLVM-LABEL: define {{.*}} @"$s4test11arrayLookupyS2iF"
 // CHECK-LLVM-NOT:  call
-// CHECK-LLVM:      [[E:%[0-9]+]] = getelementptr {{.*}} @"$s4test11arrayLookupyS2iFTv_"
+// CHECK-LLVM:      [[E:%[0-9]+]] = getelementptr {{.*}} @"$s4test11arrayLookupyS2iFTv_{{r*}}"
 // CHECK-LLVM-NEXT: [[L:%[0-9]+]] = load {{.*}} [[E]]
 // CHECK-LLVM-NEXT: ret {{.*}} [[L]]
 // CHECK-LLVM:   }
