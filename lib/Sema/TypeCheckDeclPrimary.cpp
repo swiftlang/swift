@@ -88,27 +88,12 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
 }
 
 bool swift::isInterfaceTypeNoncopyable(Type type, GenericEnvironment *env) {
-  // Turn any type parameters into archetypes.
+  assert(!type->hasTypeParameter() || env && "must have a generic environment");
+
   if (env)
-    type = GenericEnvironment::mapTypeIntoContext(env, type);
+    type = env->mapTypeIntoContext(type);
 
-  if (auto sugar = dyn_cast<SugarType>(type))
-    type = sugar->getDesugaredType();
-
-  if (!type->hasTypeParameter())
-    return type->isNoncopyable();
-
-  // Handle types containing unbound generic parameters.
-  if (auto *generic = type->getAnyGeneric())
-    return generic->canBeCopyable() != swift::TypeDecl::CanBeInvertible::Always;
-  else if (auto gtpt = type->getAs<GenericTypeParamType>())
-    if (auto *gtpd = gtpt->getDecl())
-      return gtpd->canBeCopyable() != swift::TypeDecl::CanBeInvertible::Always;
-
-  #ifndef NDEBUG
-    type->dump();
-  #endif
-  llvm_unreachable("unhandled type kind");
+  return type->isNoncopyable();
 }
 
 /// Check the inheritance clause of a type declaration or extension thereof.
@@ -2796,7 +2781,7 @@ public:
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
     if (isInterfaceTypeNoncopyable(SD->getElementInterfaceType(),
-                                   DC->getGenericEnvironmentOfContext())) {
+                                   SD->getGenericEnvironment())) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {

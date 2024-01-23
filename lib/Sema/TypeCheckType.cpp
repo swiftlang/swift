@@ -3593,7 +3593,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     // Validate the presence of ownership for a noncopyable parameter.
-    if (inStage(TypeResolutionStage::Interface)) {
+    if (inStage(TypeResolutionStage::Interface)
+        && !options.contains(TypeResolutionFlags::SILMode)) {
       diagnoseMissingOwnership(getASTContext(), dc, ownership,
                                eltTypeRepr, ty, options);
 
@@ -4776,6 +4777,7 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   // do not allow move-only types as the element of a vararg
   if (!element->hasError()
       && inStage(TypeResolutionStage::Interface)
+      && !options.contains(TypeResolutionFlags::SILMode)
       && isInterfaceTypeNoncopyable(
           element, getDeclContext()->getGenericEnvironmentOfContext())) {
     diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
@@ -4954,11 +4956,13 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       hadError = true;
     }
     // Tuples with move-only elements aren't yet supported.
-    // Track the presence of a noncopyable field for diagnostic purposes.
+    // Track the presence of a noncopyable field for diagnostic purposes only.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
     if (inStage(TypeResolutionStage::Interface)
+        && !options.contains(TypeResolutionFlags::SILMode)
         && isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext())
+        && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)
         && !moveOnlyElementIndex.has_value() && !isa<TupleTypeRepr>(tyR)) {
       moveOnlyElementIndex = i;
     }
@@ -5011,9 +5015,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       return ParenType::get(ctx, elements[0].getType());
   }
   
-  if (moveOnlyElementIndex.has_value()
-      && !options.contains(TypeResolutionFlags::SILType)
-      && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+  if (moveOnlyElementIndex.has_value()) {
     auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
     auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
     assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
