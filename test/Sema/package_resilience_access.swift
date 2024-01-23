@@ -143,9 +143,8 @@ package class PkgKlass: PkgProto {
 // UTILS-COMMON-LABEL: // default argument 0 of PkgKlass.init(data:)
 // UTILS-COMMON-NEXT: sil [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfcfA_ : $@convention(thin) () -> Int {
 
-// FIXME: __allocating_init for a `package` class should not be serialized in resilient Utils.
 // UTILS-COMMON-LABEL: // PkgKlass.__allocating_init(data:)
-// UTILS-COMMON-NEXT: sil [serialized] [exact_self_class] [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
+// UTILS-COMMON-NEXT: sil [exact_self_class] [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfC : $@convention(method) (Int, @thick PkgKlass.Type) -> @owned PkgKlass {
 
 // UTILS-COMMON-LABEL: // PkgKlass.init(data:)
 // UTILS-COMMON-NEXT: sil [ossa] @$s5Utils8PkgKlassC4dataACSi_tcfc : $@convention(method) (Int, @owned PkgKlass) -> @owned PkgKlass {

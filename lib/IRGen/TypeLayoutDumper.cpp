@@ -83,7 +83,7 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
                                 IRGenModule &IGM,
                                 std::vector<YAMLTypeInfoNode> &Result) {
   // We only care about public and @usableFromInline declarations.
-  if (NTD->getEffectiveAccess() < AccessLevel::Public)
+  if (NTD->getEffectiveAccess() < AccessLevel::Package)
     return;
 
   // We don't care about protocols or classes.
