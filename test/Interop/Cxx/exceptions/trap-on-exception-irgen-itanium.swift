@@ -309,7 +309,7 @@ public func test() {
 // CHECK-NEXT:  ret i32
 // CHECK-NEXT: }
 
-// CHECK: define {{.*}} @"$s4test0A17FreeFunctionCallss5Int32VyF"() #[[#SWIFTUWMETA:]] personality ptr @__gxx_personality_v0
+// CHECK: define {{.*}} @"$s4test0A17FreeFunctionCallss5Int32VyF"() #[[#SWIFTUWMETA:]] personality ptr @swift_exceptionPersonality
 // CHECK:   invoke i32 @_Z18freeFunctionThrowsi(i32 0)
 // CHECK-NEXT:  to label %[[CONT1:.*]] unwind label %[[UNWIND1:.*]]
 // CHECK-EMPTY:
