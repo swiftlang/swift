@@ -467,7 +467,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       auto effectiveAccess =
           VD->getFormalAccessScope(/*useDC=*/nullptr,
                                    /*treatUsableFromInlineAsPublic=*/true);
-      if (effectiveAccess.isPublic() || effectiveAccess.isPackage()) {
+      if (effectiveAccess.isPublic()) {
         return {FragileFunctionKind::DefaultArgument};
       }
 

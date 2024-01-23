@@ -171,7 +171,7 @@ bool SILWitnessTable::conformanceIsSerialized(
   if (normalConformance && normalConformance->isResilient())
     return false;
 
-  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Package)
+  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
     return false;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
