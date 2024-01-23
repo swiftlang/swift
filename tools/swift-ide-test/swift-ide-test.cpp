@@ -407,11 +407,6 @@ static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     llvm::cl::desc(
         "Include initializers when completing a postfix expression"),
     llvm::cl::cat(Category));
-static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
-    "code-complete-call-pattern-heuristics",
-    llvm::cl::desc(
-        "Use heuristics to guess whether we want call pattern completions"),
-    llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
@@ -1408,7 +1403,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionComments,
                  bool CodeCompletionAnnotateResults,
                  bool CodeCompletionAddInitsToTopLevel,
-                 bool CodeCompletionCallPatternHeuristics,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
                  bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
@@ -1420,7 +1414,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-  CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
   CompletionContext.setAddCallWithNoDefaultArgs(
       CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -1451,7 +1444,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
-                                 bool CodeCompletionCallPatternHeuristics,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
@@ -1580,8 +1572,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     ide::CodeCompletionContext CompletionContext(CompletionCache);
     CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-    CompletionContext.setCallPatternHeuristics(
-        CodeCompletionCallPatternHeuristics);
     CompletionContext.setAddCallWithNoDefaultArgs(
         CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -4640,7 +4630,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;
@@ -4656,7 +4645,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;

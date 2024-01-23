@@ -101,7 +101,6 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setAnnotateResult(opts.annotatedDescription);
   CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
   CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
-  CompletionContext.setCallPatternHeuristics(opts.callPatternHeuristics);
   CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
 
   Lang.performWithParamsToCompletionLikeOperation(
@@ -722,7 +721,6 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyAddInnerResults("key.codecomplete.addinnerresults");
   static UIdent KeyAddInnerOperators("key.codecomplete.addinneroperators");
   static UIdent KeyAddInitsToTopLevel("key.codecomplete.addinitstotoplevel");
-  static UIdent KeyCallPatternHeuristics("key.codecomplete.callpatternheuristics");
   static UIdent KeyFuzzyMatching("key.codecomplete.fuzzymatching");
   static UIdent KeyTopNonLiteral("key.codecomplete.showtopnonliteralresults");
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
@@ -747,7 +745,6 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyAddInnerResults, to.addInnerResults);
   from.valueForOption(KeyAddInnerOperators, to.addInnerOperators);
   from.valueForOption(KeyAddInitsToTopLevel, to.addInitsToTopLevel);
-  from.valueForOption(KeyCallPatternHeuristics, to.callPatternHeuristics);
   from.valueForOption(KeyFuzzyMatching, to.fuzzyMatching);
   from.valueForOption(KeyContextWeight, to.semanticContextWeight);
   from.valueForOption(KeyFuzzyWeight, to.fuzzyMatchWeight);
@@ -1103,7 +1100,6 @@ void SwiftLangSupport::codeCompleteOpen(
   unsigned maxResults = 0;
   CodeCompletion::Options CCOpts;
   // Enable "call pattern heuristics" by default for this API.
-  CCOpts.callPatternHeuristics = true;
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
