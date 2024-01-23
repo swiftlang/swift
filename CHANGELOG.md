@@ -56,28 +56,55 @@ concurrency checking.
 
 * [SE-0412][]:
 
-  Under strict concurrency checking, every global or static variable must be either isolated to a global actor or be both immutable and of `Sendable` type.
+  Global and static variables are prone to data races because they provide memory that can be accessed from any program context.  Strict concurrency checking in Swift 5.10 prevents data races on global and static variables by requiring them to be either:
+
+    1. isolated to a global actor, or
+    2. immutable and of `Sendable` type.
+
+  For example:
 
   ```swift
   var mutableGlobal = 1
   // warning: var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state
   // (unless it is top-level code which implicitly isolates to @MainActor)
 
-  final class NonsendableType {
-    init() {}
+  @MainActor func mutateGlobalFromMain() {
+    mutableGlobal += 1
+  }
+
+  nonisolated func mutateGlobalFromNonisolated() async {
+    mutableGlobal += 10
   }
 
   struct S {
-    static let immutableNonsendable = NonsendableType()
-    // warning: static property 'immutableNonsendable' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor
+    static let immutableSendable = 10
+    // okay; 'immutableSendable' is safe to access concurrently because it's immutable and 'Int' is 'Sendable'
   }
   ```
 
-  The attribute `nonisolated(unsafe)` can be used to annotate a global variable (or any form of storage) to disable static checking of data isolation, but note that without correct implementation of a synchronization mechanism to achieve data isolation, dynamic run-time analysis from exclusivity enforcement or tools such as Thread Sanitizer could still identify failures.
+  A new `nonisolated(unsafe)` modifier can be used to annotate a global or static variable to suppress data isolation violations when manual synchronization is provided:
 
   ```swift
-  nonisolated(unsafe) var global: String
+  // This global is only set in one part of the program
+  nonisolated(unsafe) var global: String!
   ```
+
+  `nonisolated(unsafe)` can be used on any form of storage, including stored properties and local variables, as a more granular opt out for `Sendable` checking, eliminating the need for `@unchecked Sendable` wrapper types in many use cases:
+
+  ```swift
+  import Dispatch
+
+  // 'MutableData' is not 'Sendable'
+  class MutableData { ... } 
+
+  final class MyModel: Sendable {
+    private let queue = DispatchQueue(...)
+    // 'protectedState' is manually isolated by 'queue'
+    nonisolated(unsafe) private var protectedState: MutableData
+  }
+  ```
+
+  Note that without correct implementation of a synchronization mechanism to achieve data isolation, dynamic run-time analysis from exclusivity enforcement or tools such as the Thread Sanitizer could still identify failures.
 
 * [SE-0411][]:
 
