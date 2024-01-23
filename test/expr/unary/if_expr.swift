@@ -118,9 +118,10 @@ do {
   // expected-error@-1 {{extraneous argument label 'x:' in call}}
 
   takesValue(_: x: if .random() { 0 } else { 1 })
-  // expected-error@-1 {{expected expression in list of expressions}}
+  // expected-error@-1 {{expected argument label before colon}}
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'x' in scope}}
+  // expected-error@-4 {{extra argument in call}}
 }
 func takesValueWithLabel<T>(x: T) {}
 do {
@@ -128,9 +129,10 @@ do {
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
   takesValueWithLabel(x: y: if .random() { 1 } else { 2 })
-  // expected-error@-1 {{expected expression in list of expressions}}
+  // expected-error@-1 {{expected argument label before colon}}
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'y' in scope}}
+  // expected-error@-4 {{extra argument in call}}
 }
 func takesValueAndTrailingClosure<T>(_ x: T, _ fn: () -> Int) {}
 takesValueAndTrailingClosure(if .random() { 0 } else { 1 }) { 2 }

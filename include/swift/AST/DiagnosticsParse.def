@@ -1364,6 +1364,8 @@ ERROR(expected_rparen_expr_list,none,
 ERROR(expected_rsquare_expr_list,none,
       "expected ']' in expression list", ())
 
+ERROR(expected_label_before_colon,none, "expected argument label before colon", ())
+
 // Array literal expressions
 ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
