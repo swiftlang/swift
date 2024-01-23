@@ -1781,6 +1781,80 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
 
 # pragma mark Witness resolution
 
+/// Retrieve the Objective-C method key from the given function.
+namespace {
+  using ObjCMethodKey = std::pair<ObjCSelector, char>;
+  using ObjCRequirementMap = llvm::SmallDenseMap<ObjCMethodKey,
+                                                 TinyPtrVector<AbstractFunctionDecl *>, 4>;
+}
+
+/// Retrieve the Objective-C method key from the given function.
+static ObjCMethodKey getObjCMethodKey(AbstractFunctionDecl *func) {
+  return std::make_pair(func->getObjCSelector(), func->isInstanceMember());
+}
+
+/// Precompute map for getObjCRequirements().
+static ObjCRequirementMap getObjCRequirementMap(ProtocolDecl *proto) {
+  ObjCRequirementMap map;
+
+  if (!proto->isObjC())
+    return map;
+
+  for (auto requirement : proto->getProtocolRequirements()) {
+    auto funcRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
+    if (!funcRequirement)
+      continue;
+
+    map[getObjCMethodKey(funcRequirement)].push_back(funcRequirement);
+  }
+
+  return map;
+}
+
+/// Retrieve the Objective-C requirements in this protocol that have the
+/// given Objective-C method key.
+static ArrayRef<AbstractFunctionDecl *>
+getObjCRequirements(const ObjCRequirementMap &map, ObjCMethodKey key) {
+  auto known = map.find(key);
+  if (known == map.end())
+    return { };
+
+  return known->second;
+}
+
+/// @returns a non-null requirement if the given requirement is part of a
+/// group of ObjC requirements that share the same ObjC method key.
+/// The first such requirement that the predicate function returns true for
+/// is the requirement required by this function. Otherwise, nullptr is
+/// returned.
+static ValueDecl *getObjCRequirementSibling(
+    ProtocolDecl *proto, ValueDecl *requirement, const ObjCRequirementMap &map,
+    llvm::function_ref<bool(AbstractFunctionDecl*)> predicate) {
+  if (!proto->isObjC())
+    return nullptr;
+
+  assert(requirement->isProtocolRequirement());
+  assert(proto == requirement->getDeclContext()->getAsDecl());
+
+  // We only care about functions
+  if (auto fnRequirement = dyn_cast<AbstractFunctionDecl>(requirement)) {
+    auto fnSelector = getObjCMethodKey(fnRequirement);
+    auto similarRequirements = getObjCRequirements(map, fnSelector);
+    // ... whose selector is one that maps to multiple requirement declarations.
+    for (auto candidate : similarRequirements) {
+      if (candidate == fnRequirement)
+        continue; // skip the requirement we're trying to resolve.
+
+      if (!predicate(candidate))
+        continue; // skip if doesn't match requirements
+
+      return candidate;
+    }
+  }
+
+  return nullptr;
+}
+
 /// This is a wrapper of multiple instances of ConformanceChecker to allow us
 /// to diagnose and fix code from a more global perspective; for instance,
 /// having this wrapper can help issue a fixit that inserts protocol stubs from
@@ -1799,8 +1873,8 @@ class swift::MultiConformanceChecker {
 
   /// Determine whether the given requirement was left unsatisfied.
   bool isUnsatisfiedReq(
-      ConformanceChecker &checker, NormalProtocolConformance *conformance,
-      ValueDecl *req);
+      NormalProtocolConformance *conformance, ValueDecl *req,
+      const ObjCRequirementMap &map);
 public:
   MultiConformanceChecker(ASTContext &ctx) : Context(ctx) {}
 
@@ -1836,8 +1910,8 @@ public:
 };
 
 bool MultiConformanceChecker::
-isUnsatisfiedReq(ConformanceChecker &checker,
-                 NormalProtocolConformance *conformance, ValueDecl *req) {
+isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req,
+                 const ObjCRequirementMap &map) {
   if (conformance->isInvalid()) return false;
   if (isa<TypeDecl>(req)) return false;
 
@@ -1846,10 +1920,12 @@ isUnsatisfiedReq(ConformanceChecker &checker,
                      : nullptr;
 
   if (!witness) {
+    auto *proto = conformance->getProtocol();
+
     // If another @objc requirement refers to the same Objective-C
     // method, this requirement isn't unsatisfied.
-    if (checker.getObjCRequirementSibling(
-            req, [conformance](AbstractFunctionDecl *cand) {
+    if (getObjCRequirementSibling(
+            proto, req, map, [conformance](AbstractFunctionDecl *cand) {
               return static_cast<bool>(conformance->getWitness(cand));
             })) {
       return false;
@@ -1882,23 +1958,12 @@ void MultiConformanceChecker::checkAllConformances() {
       continue;
     // Check whether there are any unsatisfied requirements.
     auto proto = conformance->getProtocol();
-    llvm::Optional<ConformanceChecker> checker;
-    auto getChecker = [&] () -> ConformanceChecker& {
-      if (checker)
-        return *checker;
-
-      if (!AllUsedCheckers.empty() &&
-          AllUsedCheckers.back().Conformance == conformance)
-        return AllUsedCheckers.back();
-
-      checker.emplace(getASTContext(), conformance, MissingWitnesses);
-      return *checker;
-    };
+    ObjCRequirementMap map = getObjCRequirementMap(proto);
 
     for (auto *req : proto->getProtocolRequirements()) {
       // If the requirement is unsatisfied, we might want to warn
       // about near misses; record it.
-      if (isUnsatisfiedReq(getChecker(), conformance, req)) {
+      if (isUnsatisfiedReq(conformance, req, map)) {
         UnsatisfiedReqs.push_back(req);
         continue;
       }
@@ -3518,7 +3583,6 @@ filterProtocolRequirements(
 /// Prune the set of missing witnesses for the given conformance, eliminating
 /// any requirements that do not actually need to satisfied.
 static ArrayRef<ASTContext::MissingWitness> pruneMissingWitnesses(
-    ConformanceChecker &checker,
     ProtocolDecl *proto,
     NormalProtocolConformance *conformance,
     ArrayRef<ASTContext::MissingWitness> missingWitnesses,
@@ -3527,10 +3591,11 @@ static ArrayRef<ASTContext::MissingWitness> pruneMissingWitnesses(
     return missingWitnesses;
   }
 
+  ObjCRequirementMap map = getObjCRequirementMap(proto);
+
   // Consider each of the missing witnesses to remove any that should not
   // longer be considered "missing".
-  llvm::SmallDenseSet<ConformanceChecker::ObjCMethodKey>
-      alreadyReportedAsMissing;
+  llvm::SmallDenseSet<ObjCMethodKey> alreadyReportedAsMissing;
   bool removedAny = false;
   for (unsigned missingWitnessIdx : indices(missingWitnesses)) {
     const auto &missingWitness = missingWitnesses[missingWitnessIdx];
@@ -3582,10 +3647,11 @@ static ArrayRef<ASTContext::MissingWitness> pruneMissingWitnesses(
     }
 
     auto fnRequirement = cast<AbstractFunctionDecl>(missingWitness.requirement);
-    auto key = checker.getObjCMethodKey(fnRequirement);
+    auto key = getObjCMethodKey(fnRequirement);
 
-    if (checker.getObjCRequirementSibling(
-            fnRequirement, [conformance](AbstractFunctionDecl *candidate) {
+    if (getObjCRequirementSibling(
+            proto, fnRequirement, map,
+            [conformance](AbstractFunctionDecl *candidate) {
               return static_cast<bool>(conformance->getWitness(candidate));
             })) {
       skipWitness();
@@ -3617,7 +3683,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
 
   SmallVector<ASTContext::MissingWitness, 4> MissingWitnessScratch;
   LocalMissing = pruneMissingWitnesses(
-      *this, Proto, Conformance, LocalMissing, MissingWitnessScratch);
+      Proto, Conformance, LocalMissing, MissingWitnessScratch);
 
   // If this conformance has nothing to complain, return.
   if (LocalMissing.empty())
@@ -4439,11 +4505,6 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Not a value witness");
   assert(!Conformance->hasWitness(requirement) && "Already resolved");
 
-  // Note that we're resolving this witness.
-  assert(ResolvingWitnesses.count(requirement) == 0 && "Currently resolving");
-  ResolvingWitnesses.insert(requirement);
-  SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
-
   // Make sure we've validated the requirement.
   if (requirement->isInvalid()) {
     Conformance->setInvalid();
@@ -4964,33 +5025,6 @@ void ConformanceChecker::resolveValueWitnesses() {
   }
 }
 
-ValueDecl *ConformanceChecker::getObjCRequirementSibling(ValueDecl *requirement,
-               llvm::function_ref<bool(AbstractFunctionDecl*)> predicate) {
-  if (!Proto->isObjC())
-    return nullptr;
-
-  assert(requirement->isProtocolRequirement());
-  assert(Proto == requirement->getDeclContext()->getAsDecl());
-
-  // We only care about functions
-  if (auto fnRequirement = dyn_cast<AbstractFunctionDecl>(requirement)) {
-    auto fnSelector = getObjCMethodKey(fnRequirement);
-    auto similarRequirements = getObjCRequirements(fnSelector);
-    // ... whose selector is one that maps to multiple requirement declarations.
-    for (auto candidate : similarRequirements) {
-      if (candidate == fnRequirement)
-        continue; // skip the requirement we're trying to resolve.
-
-      if (!predicate(candidate))
-        continue; // skip if doesn't match requirements
-
-      return candidate;
-    }
-  }
-
-  return nullptr;
-}
-
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
@@ -5048,41 +5082,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
       }
     }
   }
-}
-
-/// Retrieve the Objective-C method key from the given function.
-auto ConformanceChecker::getObjCMethodKey(AbstractFunctionDecl *func)
-    -> ObjCMethodKey {
-  return ObjCMethodKey(func->getObjCSelector(), func->isInstanceMember());
-}
-
-/// Retrieve the Objective-C requirements in this protocol that have the
-/// given Objective-C method key.
-ArrayRef<AbstractFunctionDecl *>
-ConformanceChecker::getObjCRequirements(ObjCMethodKey key) {
-  auto proto = Conformance->getProtocol();
-  if (!proto->isObjC())
-    return { };
-
-  // Fill in the data structure if we haven't done so yet.
-  if (!computedObjCMethodRequirements) {
-    for (auto requirement : proto->getProtocolRequirements()) {
-      auto funcRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
-      if (!funcRequirement)
-        continue;
-
-      objcMethodRequirements[getObjCMethodKey(funcRequirement)]
-          .push_back(funcRequirement);
-    }
-
-    computedObjCMethodRequirements = true;
-  }
-
-  auto known = objcMethodRequirements.find(key);
-  if (known == objcMethodRequirements.end())
-    return { };
-
-  return known->second;
 }
 
 void swift::diagnoseConformanceFailure(Type T,

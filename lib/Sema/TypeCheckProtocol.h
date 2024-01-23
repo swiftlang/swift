@@ -77,10 +77,6 @@ protected:
 
   ASTContext &getASTContext() const { return Context; }
 
-  // An auxiliary lookup table to be used for witnesses remapped via
-  // @_implements(Protocol, DeclName)
-  llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>> ImplementsTable;
-
   RequirementEnvironmentCache ReqEnvironmentCache;
 
   WitnessChecker(ASTContext &ctx, ProtocolDecl *proto, Type adoptee,
@@ -135,20 +131,12 @@ class MultiConformanceChecker;
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
-public:
-  /// Key that can be used to uniquely identify a particular Objective-C
-  /// method.
-  using ObjCMethodKey = std::pair<ObjCSelector, char>;
-
 private:
   friend class MultiConformanceChecker;
   friend class AssociatedTypeInference;
 
   NormalProtocolConformance *Conformance;
   SourceLoc Loc;
-
-  /// Witnesses that are currently being resolved.
-  llvm::SmallPtrSet<ValueDecl *, 4> ResolvingWitnesses;
 
   /// Keep track of missing witnesses, either type or value, for later
   /// diagnosis emits. This may contain witnesses that are external to the
@@ -161,14 +149,6 @@ private:
 
   /// Whether we've already complained about problems with this conformance.
   bool AlreadyComplained = false;
-
-  /// Mapping from Objective-C methods to the set of requirements within this
-  /// protocol that have the same selector and instance/class designation.
-  llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
-    objcMethodRequirements;
-
-  /// Whether objcMethodRequirements has been computed.
-  bool computedObjCMethodRequirements = false;
 
   /// Record a (non-type) witness for the given requirement.
   void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -268,21 +248,6 @@ public:
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
   void checkConformance(MissingWitnessDiagnosisKind Kind);
-
-  /// Retrieve the Objective-C method key from the given function.
-  ObjCMethodKey getObjCMethodKey(AbstractFunctionDecl *func);
-
-  /// Retrieve the Objective-C requirements in this protocol that have the
-  /// given Objective-C method key.
-  ArrayRef<AbstractFunctionDecl *> getObjCRequirements(ObjCMethodKey key);
-
-  /// @returns a non-null requirement if the given requirement is part of a
-  /// group of ObjC requirements that share the same ObjC method key.
-  /// The first such requirement that the predicate function returns true for
-  /// is the requirement required by this function. Otherwise, nullptr is
-  /// returned.
-  ValueDecl *getObjCRequirementSibling(ValueDecl *requirement,
-                    llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
 };
 
 /// A system for recording and probing the integrity of a type witness solution
