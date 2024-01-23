@@ -1405,6 +1405,12 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
     return !PA->isOnStack();
   }
+  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
+  // borrow scope. We currently assume that a set of dominated scope-ending uses
+  // can be found.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(this)) {
+    return !MD->isNonEscaping();
+  }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
@@ -1827,6 +1833,18 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   assert(getFunction()->hasOwnership()
          && isOnStack()
          && "only meaningful for OSSA stack closures");
+  bool noUsers = true;
+
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
+    return false;
+  }
+  return !noUsers;
+}
+
+bool MarkDependenceInst::
+visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand *)> func) const {
+  assert(getFunction()->hasOwnership() && isNonEscaping()
+         && "only meaningful for nonescaping dependencies");
   bool noUsers = true;
 
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {

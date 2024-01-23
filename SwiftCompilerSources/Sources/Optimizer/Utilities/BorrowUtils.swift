@@ -145,6 +145,11 @@ import SIL
 ///
 /// Note: This must handle all instructions with a .borrow operand ownership.
 ///
+/// Note: mark_dependence is a BorrowingInstruction because it creates
+/// a borrow scope for its base operand. Its result, however, is not a
+/// BeginBorrowValue. It is instead a ForwardingInstruction relative
+/// to its value operand.
+///
 /// TODO: replace BorrowIntroducingInstruction
 ///
 /// TODO: Add non-escaping MarkDependence.
@@ -153,15 +158,21 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   case storeBorrow(StoreBorrowInst)
   case beginApply(BeginApplyInst)
   case partialApply(PartialApplyInst)
+  case markDependence(MarkDependenceInst)
   case startAsyncLet(BuiltinInst)
 
   init?(_ inst: Instruction) {
     switch inst {
-    case let bbi as BeginBorrowInst: self = .beginBorrow(bbi)
-    case let sbi as StoreBorrowInst: self = .storeBorrow(sbi)
-    case let bai as BeginApplyInst: self = .beginApply(bai)
+    case let bbi as BeginBorrowInst:
+      self = .beginBorrow(bbi)
+    case let sbi as StoreBorrowInst:
+      self = .storeBorrow(sbi)
+    case let bai as BeginApplyInst:
+      self = .beginApply(bai)
     case let pai as PartialApplyInst where pai.isOnStack:
       self = .partialApply(pai)
+    case let mdi as MarkDependenceInst:
+      self = .markDependence(mdi)
     case let bi as BuiltinInst
            where bi.id == .StartAsyncLetWithLocalBuffer:
       self = .startAsyncLet(bi)
@@ -172,11 +183,18 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   
   var instruction: Instruction {
     switch self {
-    case .beginBorrow(let bbi): return bbi
-    case .storeBorrow(let sbi): return sbi
-    case .beginApply(let bai): return bai
-    case .partialApply(let pai): return pai
-    case .startAsyncLet(let bi): return bi
+    case .beginBorrow(let bbi):
+      return bbi
+    case .storeBorrow(let sbi):
+      return sbi
+    case .beginApply(let bai):
+      return bai
+    case .partialApply(let pai):
+      return pai
+    case .markDependence(let mdi):
+      return mdi
+    case .startAsyncLet(let bi):
+      return bi
     }
   }
 
@@ -188,8 +206,16 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   /// incoming value dominates or is consumed by an outer adjacent
   /// phi. See InteriorLiveness.
   ///
-  /// TODO: to hande reborrow-extended uses migrate ExtendedLiveness
+  /// TODO: to hande reborrow-extended uses, migrate ExtendedLiveness
   /// to SwiftCompilerSources.
+  ///
+  /// TODO: Handle .partialApply and .markDependence forwarded uses
+  /// that are phi operands. Currently, partial_apply [on_stack]
+  /// and mark_dependence [nonescaping] cannot be cloned, so walking
+  /// through the phi safely returns dominated scope-ending operands.
+  /// Instead, this could report the phi as a scope-ending use, and
+  /// the client could decide whether to walk through them or to
+  /// construct reborrow-extended liveness.
   ///
   /// TODO: For instructions that are not a BeginBorrowValue, verify
   /// that scope ending instructions exist on all paths. These
@@ -206,8 +232,10 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
       }
     case .beginApply(let bai):
       return bai.token.uses.walk { return visitor($0) }
-    case .partialApply(let pai):
-      return visitForwardedUses(introducer: pai, context) {
+    case .partialApply, .markDependence:
+      let svi = instruction as! SingleValueInstruction
+      assert(svi.ownership == .owned)
+      return visitForwardedUses(introducer: svi, context) {
         switch $0 {
         case let .operand(operand):
           if operand.endsLifetime {
@@ -306,7 +334,7 @@ enum BeginBorrowValue {
       self = BeginBorrowValue(beginBorrow)!
     case let .beginApply(beginApply):
       self = BeginBorrowValue(beginApply.token)!
-    case .storeBorrow, .partialApply, .startAsyncLet:
+    case .storeBorrow, .partialApply, .markDependence, .startAsyncLet:
       return nil
     }
   }

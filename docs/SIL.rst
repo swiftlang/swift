@@ -5523,15 +5523,14 @@ the dependency is on the current value stored in the address.
 The optional ``nonescaping`` attribute indicates that no value derived
 from ``%value`` escapes the lifetime of ``%base``. As with escaping
 ``mark_dependence``, all values transitively forwarded from ``%value``
-must be destroyed within the lifetime of ``%base``. Unlike escaping
+must be destroyed within the lifetime of ` `%base``. Unlike escaping
 ``mark_dependence``, this must be statically verifiable. Additionally,
 unlike escaping ``mark_dependence``, derived values include copies of
 ``%value`` and values transitively forwarded from those copies. If
-``%base`` is identical to ``%value`` this simply means that copies of
-``%value`` do not outlive the original OSSA lifetime of
-``%value``. Furthermore, unlike escaping ``mark_dependence``, no value
-derived from ``%value`` may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use).
+``%base`` must not be identical to ``%value``. Unlike escaping
+``mark_dependence``, no value derived from ``%value`` may have a
+bitwise escape (conversion to UnsafePointer) or pointer escape
+(unknown use).
 
 is_unique
 `````````

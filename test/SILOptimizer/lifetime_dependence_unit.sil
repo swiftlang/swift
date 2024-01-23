@@ -1,0 +1,192 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+class C {}
+class D: C {
+  var object: C
+  @_borrowed var field: C { get }
+}
+
+struct PairC {
+  var first: C
+  var second: C
+}
+
+sil @getC : $@convention(thin) () -> @owned C
+
+sil @d_field_read : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+
+sil_vtable D {
+  #D.field!read: @d_field_read
+}
+
+sil [ossa] @variable_introducer : $@convention(thin) (@owned C) -> () {
+entry(%0 : @owned $C):
+  %1 = move_value [var_decl] %0 : $C
+  %move = move_value %1 : $C
+  specify_test "variable_introducer %move"
+// CHECK-LABEL: variable_introducer: variable_introducer with: %move
+// CHECK: Variable introducers of:   %{{.*}} = move_value %{{.*}} : $C
+// CHECK-NEXT: [  %{{.*}} = move_value [var_decl] %0 : $C
+// CHECK-NEXT: variable_introducer: variable_introducer with: %move
+
+  %3 = begin_borrow [var_decl] %move : $C
+  %borrow = begin_borrow %3 : $C
+  specify_test "variable_introducer %borrow"
+// CHECK-LABEL: variable_introducer: variable_introducer with: %borrow
+// CHECK: Variable introducers of:   %{{.*}} = begin_borrow %{{.*}} : $C
+// CHECK-NEXT: [  %{{.*}} = begin_borrow [var_decl] %{{.*}} : $C
+// CHECK-NEXT: variable_introducer: variable_introducer with: %borrow
+
+  end_borrow %borrow : $C
+  end_borrow %3 : $C
+  destroy_value %move : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+sil [ossa] @dependence_scope : $@convention(thin) (@owned C, @owned D, @guaranteed D, @in_guaranteed D, @inout D) -> () {
+entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
+  %move = move_value %1 : $D
+  %owned_mark = mark_dependence [nonescaping] %0 : $C on %move : $D
+  specify_test "lifetime_dependence_scope %owned_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %owned_mark
+// CHECK-NEXT: Owned:   %{{.*}} = move_value %{{.*}} : $D
+// CHECK-NEXT: Dependent: %0 = argument of bb0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = move_value %{{.*}} : $D
+// CHECK-NEXT: ends:       destroy_value %{{.*}} : $D
+// CHECK: dependence_scope: lifetime_dependence_scope with: %owned_mark
+
+  %borrow = begin_borrow %2 : $D
+  %d2c = upcast %borrow : $D to $C
+  %pair = struct $PairC(%d2c : $C, %d2c : $C)
+  %guaranteed_mark = mark_dependence [nonescaping] %owned_mark : $C on %pair : $PairC
+  specify_test "lifetime_dependence_scope %guaranteed_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %guaranteed_mark
+// CHECK-NEXT: Caller: %{{.*}} = argument of bb0 : $D
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %0 : $C on %{{.*}} : $D
+// CHECK-NEXT: Caller range
+// CHECK: dependence_scope: lifetime_dependence_scope with: %guaranteed_mark
+
+  %m = class_method %2 : $D, #D.field!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+  (%yield, %token) = begin_apply %m(%2) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+  %yield_mark = mark_dependence [nonescaping] %guaranteed_mark : $C on %yield : $C
+  specify_test "lifetime_dependence_scope %yield_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %yield_mark
+// CHECK-NEXT: Yield: (**%{{.*}}**, %{{.*}}) = begin_apply %{{.*}}(%{{.*}}) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $PairC
+// CHECK-NEXT: begin:      (%{{.*}}, %{{.*}}) = begin_apply %{{.*}}(%{{.*}}) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+// CHECK-NEXT: ends:       end_apply %{{.*}}
+// CHECK: dependence_scope: lifetime_dependence_scope with: %yield_mark
+
+  %zero = integer_literal $Builtin.Int1, 0
+  %trivial_mark = mark_dependence [nonescaping] %yield_mark : $C on %zero : $Builtin.Int1
+  specify_test "lifetime_dependence_scope %trivial_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %trivial_mark
+// CHECK-NEXT: Trivial Dependence
+// CHECK: dependence_scope: lifetime_dependence_scope with: %trivial_mark
+
+  %f = ref_element_addr %borrow : $D, #D.object
+  %access = begin_access [read] [static] %f : $*C
+  %access_mark = mark_dependence [nonescaping] %trivial_mark : $C on %access : $*C
+  specify_test "lifetime_dependence_scope %access_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %access_mark
+// CHECK-NEXT: Access:   %{{.*}} = begin_access [read] [static] %{{.*}} : $*C
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $Builtin.Int1
+// CHECK-NEXT: begin:      %{{.*}} = begin_access [read] [static] %{{.*}} : $*C
+// CHECK-NEXT: ends:       end_access %{{.*}} : $*C
+// CHECK: dependence_scope: lifetime_dependence_scope with: %access_mark
+
+  %guaranteed_arg_mark = mark_dependence [nonescaping] %access_mark : $C on %2 : $D
+  specify_test "lifetime_dependence_scope %guaranteed_arg_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %guaranteed_arg_mark
+// CHECK-NEXT: Caller: %{{.*}} = argument of bb0 : $D
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $*C
+// CHECK-NEXT: Caller range
+// CHECK: dependence_scope: lifetime_dependence_scope with: %guaranteed_arg_mark
+
+  %inguaranteed_arg_mark = mark_dependence [nonescaping] %guaranteed_arg_mark : $C on %3 : $*D
+  specify_test "lifetime_dependence_scope %inguaranteed_arg_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
+// CHECK-NEXT: Caller: %{{.*}} = argument of bb0 : $*D
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $D
+// CHECK-NEXT: Caller range
+// CHECK: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
+  
+  %inout_arg_mark = mark_dependence [nonescaping] %inguaranteed_arg_mark : $C on %4 : $*D
+  specify_test "lifetime_dependence_scope %inout_arg_mark"
+// CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
+// CHECK-NEXT: Caller: %{{.*}} = argument of bb0 : $*D
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $*D
+// CHECK-NEXT: Caller range
+// CHECK: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
+
+  destroy_value %inout_arg_mark : $C
+  end_access %access : $*C
+  end_apply %token
+  end_borrow %borrow : $D
+  destroy_value %move : $D
+  %99 = tuple()
+  return %99 : $()
+}
+
+sil [ossa] @dependence_root : $@convention(thin) (@owned D, @owned C) -> () {
+entry(%0 : @owned $D, %1 : @owned $C):
+  %copy = copy_value %0 : $D
+  %move = move_value %copy : $D
+  %borrow = begin_borrow %move : $D
+  %d2c = upcast %borrow : $D to $C
+  %pair = struct $PairC(%d2c : $C, %d2c : $C)
+  %mark_pair = mark_dependence [nonescaping] %1 : $C on %pair : $PairC
+  specify_test "lifetime_dependence_root %mark_pair"
+// CHECK-LABEL: dependence_root: lifetime_dependence_root with: %mark_pair
+// CHECK-NEXT: Scope: Owned: %0 = argument of bb0 : $D
+// CHECK-NEXT: dependence_root: lifetime_dependence_root with: %mark_pair
+
+  %f = ref_element_addr %borrow : $D, #D.object
+  %access = begin_access [read] [static] %f : $*C
+  %load = load [copy] %access : $*C
+  specify_test "lifetime_dependence_root %load"
+// CHECK-LABEL: dependence_root: lifetime_dependence_root with: %load
+// CHECK-NEXT: Scope: Access:   %{{.*}} = begin_access [read] [static] %{{.*}} : $*C
+// CHECK-NEXT: dependence_root: lifetime_dependence_root with: %load
+
+  destroy_value %load : $C
+  end_access %access : $*C
+  destroy_value %mark_pair : $C
+  end_borrow %borrow : $D
+  destroy_value %move : $D
+  destroy_value %0 : $D
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorMarkDepAddressDependent: lifetime_dependence_use with: %0
+// CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $D
+// CHECK-NEXT: Leaf use: operand #0 of   end_access %{{.*}} : $*C
+// CHECK-NEXT: testInteriorMarkDepAddressDependent: lifetime_dependence_use with: %0
+sil [ossa] @testInteriorMarkDepAddressDependent : $@convention(thin) (@guaranteed D, @owned C) -> () {
+bb0(%0 : @guaranteed $D, %1 : @owned $C):
+  specify_test "lifetime_dependence_use %0"
+  %f = ref_element_addr %0 : $D, #D.object
+  %access = begin_access [read] [static] %f : $*C
+  %dependence = mark_dependence [nonescaping] %1: $C on %access: $*C
+  %stack = alloc_stack $C
+  %sb = store_borrow %dependence to %stack : $*C
+  end_borrow %sb : $*C
+  destroy_value %dependence : $C
+  end_access %access : $*C
+  dealloc_stack %stack : $*C
+  %99 = tuple()
+  return %99 : $()
+}

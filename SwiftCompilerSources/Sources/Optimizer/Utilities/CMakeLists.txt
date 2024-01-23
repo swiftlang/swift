@@ -7,11 +7,13 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  AddressUtils.swift
   BorrowUtils.swift
   DiagnosticEngine.swift
   Devirtualization.swift
   EscapeUtils.swift
   ForwardingUtils.swift
+  LifetimeDependenceUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
   SSAUpdater.swift
