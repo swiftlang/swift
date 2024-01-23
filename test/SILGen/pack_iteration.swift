@@ -149,6 +149,44 @@ func iteratePatternMatch<each Element>(over element: repeat E<each Element>) {
   funcEnd()
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s14pack_iteration19iterateTrivialBreak4overyxxQp_tRvzlF : $@convention(thin) <each Element> (@pack_guaranteed Pack{repeat each Element}) -> () {
+// CHECK: bb0([[PACK:%.*]] : $*Pack{repeat each Element}):
+// CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[IDX2:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [[PACK_LENGTH:%.*]] = pack_length $Pack{repeat each Element}
+// CHECK: br [[LOOP_DEST:bb[0-9]+]]([[IDX1]] : $Builtin.Word)
+//
+// CHECK: [[LOOP_DEST]]([[IDX3:%.*]] : $Builtin.Word):
+// CHECK: [[COND:%.*]] = builtin "cmp_eq_Word"([[IDX3]] : $Builtin.Word, [[PACK_LENGTH]] : $Builtin.Word) : $Builtin.Int1
+// CHECK: cond_br [[COND]], [[NONE_BB:bb[0-9]+]], [[SOME_BB:bb[0-9]+]]
+//
+// CHECK: [[SOME_BB]]:
+// CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat each Element}
+// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] $@pack_element("[[UUID]]") each Element, let, name "el"
+// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element("[[UUID]]") each Element
+// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: [[LOOP_END_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
+// CHECK: apply [[LOOP_END_FUNC]]() : $@convention(thin) () -> ()
+// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: br [[FUNC_END_BB:bb[0-9]+]]
+//
+// CHECK: [[NONE_BB]]:
+// CHECK: br [[FUNC_END_BB]]
+//
+// CHECK: [[FUNC_END_BB]]
+// CHECK: [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK: apply [[FUNC_END_FUNC]]() : $@convention(thin) () -> ()
+// CHECK: } // end sil function '$s14pack_iteration19iterateTrivialBreak4overyxxQp_tRvzlF'
+func iterateTrivialBreak<each Element>(over element: repeat each Element) {
+  for el in repeat each element {
+    loopBreakEnd()
+    break
+  }
+  funcEnd()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s14pack_iteration20iterateContinueBreak4overyxxQp_tRvzlF : $@convention(thin) <each Element> (@pack_guaranteed Pack{repeat each Element}) -> () {
 // CHECK: bb0([[PACK:%.*]] : $*Pack{repeat each Element}):
 // CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 0

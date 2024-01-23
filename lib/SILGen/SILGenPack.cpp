@@ -810,7 +810,7 @@ void SILGenFunction::emitDynamicPackLoop(
   {
     FullExpr scope(Cleanups, CleanupLocation(loc));
     emitBody(curIndex, packExpansionIndex, packIndex);
-    if (loopLatch) {
+    if (loopLatch && B.hasValidInsertionPoint()) {
       B.createBranch(loc, loopLatch);
     }
   }
