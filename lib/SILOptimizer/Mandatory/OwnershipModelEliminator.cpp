@@ -836,6 +836,7 @@ struct OwnershipModelEliminator : SILFunctionTransform {
           "ownership. Please re-run with -sil-verify-all to identify the "
           "actual pass that introduced the verification error.");
       f->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
+      getPassManager()->runSwiftFunctionVerification(f);
     }
 
     if (stripOwnership(*f)) {

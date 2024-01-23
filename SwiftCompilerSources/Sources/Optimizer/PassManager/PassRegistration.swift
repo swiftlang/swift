@@ -17,6 +17,7 @@ import OptimizerBridging
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftAnalyses()
+  registerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
@@ -119,4 +120,8 @@ private func registerSwiftPasses() {
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
+}
+
+private func registerUtilities() {
+  registerVerifier()
 }

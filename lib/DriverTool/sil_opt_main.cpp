@@ -558,8 +558,11 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, options.Passes),
       isMandatory, IRGenMod);
 
-  if (Module->getOptions().VerifyAll)
+  if (Module->getOptions().VerifyAll) {
     Module->verify();
+    SILPassManager pm(Module, isMandatory, IRGenMod);
+    pm.runSwiftModuleVerification();
+  }
 }
 
 namespace {
