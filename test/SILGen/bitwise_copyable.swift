@@ -22,3 +22,20 @@ struct B<T> {
 func doit() -> B<Int> {
   return .init(t: 0)
 }
+
+struct Conditional<T> {
+  var t: T
+}
+extension Conditional : _BitwiseCopyable where T : _BitwiseCopyable {}
+
+func doit() -> B<Conditional<Int>> { 
+  .init(t: .init(t: 0)) 
+}
+
+enum Context<T> {
+  struct Here {
+    var t: T
+  }
+}
+
+func doit() -> Context<Int>.Here { .init(t: 0) }
