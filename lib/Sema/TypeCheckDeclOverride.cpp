@@ -1535,7 +1535,6 @@ namespace  {
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(RawLayout)
-    UNINTERESTING_ATTR(ResultDependsOn)
     UNINTERESTING_ATTR(ResultDependsOnSelf)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
@@ -1559,7 +1558,6 @@ namespace  {
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
     UNINTERESTING_ATTR(Preconcurrency)
-    UNINTERESTING_ATTR(Transferring)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)

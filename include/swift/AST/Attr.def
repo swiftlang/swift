@@ -547,12 +547,6 @@ SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
 SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   155)
-CONTEXTUAL_SIMPLE_DECL_ATTR(_resultDependsOn, ResultDependsOn,
-  OnParam | DeclModifier | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  156)
-CONTEXTUAL_SIMPLE_DECL_ATTR(transferring, Transferring,
-  OnParam | DeclModifier | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIStableToRemove,
-  157)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
