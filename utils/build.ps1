@@ -1736,6 +1736,7 @@ function Stage-BuildArtifacts($Arch) {
 }
 
 #-------------------------------------------------------------------
+try {
 
 if (-not $SkipBuild) {
   Fetch-Dependencies
@@ -1829,3 +1830,31 @@ if ($Test -contains "dispatch") { Build-Dispatch $HostArch -Test }
 if ($Test -contains "foundation") { Build-Foundation $HostArch -Test }
 if ($Test -contains "xctest") { Build-XCTest $HostArch -Test }
 if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
+
+# Custom exception printing for more detailed exception information
+} catch {
+  function Write-ErrorLines($Text, $Indent = 0) {
+    $IndentString = " " * $Indent
+    $Text.Replace("`r", "") -split "`n" | ForEach-Object {
+      Write-Host "$IndentString$_" -ForegroundColor Red
+    }
+  }
+
+  Write-ErrorLines "Error: $_"
+  Write-ErrorLines $_.ScriptStackTrace -Indent 4
+
+  # Walk the .NET inner exception chain to print all messages and stack traces
+  $Exception = $_.Exception
+  $Indent = 2
+  while ($Exception -is [Exception]) {
+      Write-ErrorLines "From $($Exception.GetType().FullName): $($Exception.Message)" -Indent $Indent
+      if ($null -ne $Exception.StackTrace) {
+          # .NET exceptions stack traces are already indented by 3 spaces
+          Write-ErrorLines $Exception.StackTrace -Indent ($Indent + 1)
+      }
+      $Exception = $Exception.InnerException
+      $Indent += 2
+  }
+
+  exit 1
+}
