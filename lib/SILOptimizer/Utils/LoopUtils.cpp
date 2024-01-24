@@ -309,6 +309,11 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
     return true;
   }
 
+  if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+    if (bi->getBuiltinInfo().ID == BuiltinValueKind::Once)
+      return false;
+  }
+
   if (isa<DynamicMethodBranchInst>(I))
     return false;
 
