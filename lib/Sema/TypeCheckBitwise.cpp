@@ -219,10 +219,8 @@ void BitwiseCopyableStorageVisitor::emitNonconformingMemberTypeDiagnostic(
 static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
                                                 DeclContext *dc,
                                                 BitwiseCopyableCheck check) {
-  // If the BitwiseCopyable protocol doesn't exist, there's nothing to do.
-  if (!dc->getParentModule()->getASTContext().getProtocol(
-          KnownProtocolKind::BitwiseCopyable))
-    return false;
+  assert(dc->getParentModule()->getASTContext().getProtocol(
+      KnownProtocolKind::BitwiseCopyable));
 
   if (isa<ClassDecl>(nominal)) {
     if (!isImplicit(check)) {
