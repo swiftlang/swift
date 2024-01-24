@@ -104,13 +104,13 @@ public distributed actor MyOtherActor {
 // CHECK: [[ARG_0_SIZE_ADJ:%.*]] = add i64 %size, 15
 // CHECK-NEXT: [[ARG_0_SIZE:%.*]] = and i64 [[ARG_0_SIZE_ADJ]], -16
 // CHECK-NEXT: [[ARG_0_VALUE_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_0_SIZE]])
-// CHECK-NEXT: [[ENCODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %arg_type, ptr @"$sSeMp")
+// CHECK-NEXT: [[ENCODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %arg_type, ptr @"$sSeMp")
 // CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq ptr [[ENCODABLE_WITNESS]], null
 // CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness, label [[CONT:%.*]]
 // CHECK: missing-witness:
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK: [[DECODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %arg_type, ptr @"$sSEMp")
+// CHECK: [[DECODABLE_WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %arg_type, ptr @"$sSEMp")
 // CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq ptr [[DECODABLE_WITNESS]], null
 // CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness1, label [[CONT:%.*]]
 // CHECK: missing-witness1:
