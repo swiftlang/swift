@@ -94,10 +94,6 @@ protected:
                        unsigned &bestIdx,
                        bool &doNotDiagnoseMatches);
 
-  bool checkWitnessAccess(ValueDecl *requirement,
-                          ValueDecl *witness,
-                          bool *isSetter);
-
   bool checkWitnessAvailability(ValueDecl *requirement,
                                 ValueDecl *witness,
                                 AvailabilityContext *requirementInfo);
@@ -135,11 +131,6 @@ public:
   /// Record that the given requirement has no valid witness.
   void recordInvalidWitness(ValueDecl *requirement);
 
-  /// Check for ill-formed uses of Objective-C generics in a type witness.
-  bool checkObjCTypeErasedGenerics(AssociatedTypeDecl *assocType,
-                                   Type type,
-                                   TypeDecl *typeDecl);
-
   /// Check that the witness and requirement have compatible actor contexts.
   ///
   /// \returns the isolation that needs to be enforced to invoke the witness
@@ -166,10 +157,6 @@ public:
   /// of them produces a result.
   ResolveWitnessResult
   resolveWitnessTryingAllStrategies(ValueDecl *requirement);
-
-  /// Check whether all of the protocol's generic requirements are satisfied by
-  /// the chosen type witnesses.
-  void ensureRequirementsAreSatisfied();
 
   ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance);
 
