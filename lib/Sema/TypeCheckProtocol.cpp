@@ -1966,40 +1966,77 @@ isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req,
   return false;
 }
 
+static void
+diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
+              ValueDecl *req, const RequirementMatch &match);
+
+static void diagnoseProtocolStubFixit(
+    ASTContext &ctx,
+    NormalProtocolConformance *conformance,
+    ArrayRef<ASTContext::MissingWitness> missingWitnesses);
+
 void MultiConformanceChecker::checkAllConformances() {
   bool anyInvalid = false;
-  for (unsigned I = 0, N = AllConformances.size(); I < N; ++I) {
-    auto *conformance = AllConformances[I];
-    // Check this conformance and emit fixits if this is the last one in the pool.
+  for (auto *conformance : AllConformances) {
     checkIndividualConformance(conformance);
     anyInvalid |= conformance->isInvalid();
-    if (anyInvalid)
-      continue;
-    // Check whether there are any unsatisfied requirements.
-    auto proto = conformance->getProtocol();
-    ObjCRequirementMap map = getObjCRequirementMap(proto);
+    if (!anyInvalid) {
+      // Check whether there are any unsatisfied requirements.
+      auto proto = conformance->getProtocol();
+      ObjCRequirementMap map = getObjCRequirementMap(proto);
 
-    for (auto *req : proto->getProtocolRequirements()) {
-      // If the requirement is unsatisfied, we might want to warn
-      // about near misses; record it.
-      if (isUnsatisfiedReq(conformance, req, map)) {
-        UnsatisfiedReqs.push_back(req);
-        continue;
+      for (auto *req : proto->getProtocolRequirements()) {
+        // If the requirement is unsatisfied, we might want to warn
+        // about near misses; record it.
+        if (isUnsatisfiedReq(conformance, req, map)) {
+          UnsatisfiedReqs.push_back(req);
+          continue;
+        }
       }
     }
+
+    if (AllUsedCheckers.empty() ||
+        AllUsedCheckers.back().Conformance != conformance) {
+      continue;
+    }
+
+    auto &checker = AllUsedCheckers.back();
+    auto LocalMissing = checker.getLocalMissingWitness();
+    if (LocalMissing.empty())
+      continue;
+
+    // Diagnose the missing witnesses.
+    for (auto &Missing : LocalMissing) {
+      auto requirement = Missing.requirement;
+      auto matches = Missing.matches;
+
+      Context.addDelayedConformanceDiag(conformance, true,
+        [requirement, matches](NormalProtocolConformance *conformance) {
+          auto dc = conformance->getDeclContext();
+          auto *protocol = conformance->getProtocol();
+          auto *nominal = dc->getSelfNominalTypeDecl();
+          // Possibly diagnose reason for automatic derivation failure
+          DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
+          // Diagnose each of the matches.
+          for (const auto &match : matches) {
+            diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
+          }
+        });
+    }
   }
-  // If all missing witnesses are issued with fixits, we are done.
+
+  // If there were no missing witnesses, we're done.
   if (MissingWitnesses.empty())
     return;
 
   // Otherwise, backtrack to the last checker that has missing witnesses
   // and diagnose missing witnesses from there.
-  for (auto It = AllUsedCheckers.rbegin(); It != AllUsedCheckers.rend();
-       ++It) {
-    if (!It->getLocalMissingWitness().empty()) {
-      if (It->diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::FixItOnly,
-                                       /*Delayed=*/false))
-        break;
+  for (auto &checker : llvm::reverse(AllUsedCheckers)) {
+    if (!checker.getLocalMissingWitness().empty()) {
+      diagnoseProtocolStubFixit(Context,
+                                checker.Conformance,
+                                MissingWitnesses.getArrayRef());
+      break;
     }
   }
 }
@@ -3752,58 +3789,19 @@ static void diagnoseProtocolStubFixit(
   }
 }
 
-bool ConformanceChecker::
-diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
-  auto LocalMissing = getLocalMissingWitness();
+static void diagnoseProtocolStubFixit(
+    ASTContext &ctx,
+    NormalProtocolConformance *conformance,
+    ArrayRef<ASTContext::MissingWitness> missingWitnesses) {
+  auto selfInterfaceType = conformance->getDeclContext()->getSelfInterfaceType();
+  const auto filteredWitnesses = filterProtocolRequirements(
+      missingWitnesses, selfInterfaceType);
+  assert(!filteredWitnesses.empty());
 
-  // If this conformance has nothing to complain, return.
-  if (LocalMissing.empty())
-    return false;
-
-  if (Delayed) {
-    // If the diagnostics are suppressed, we register these missing witnesses
-    // for later revisiting.
-    for (auto Missing : LocalMissing) {
-      getASTContext().addDelayedMissingWitness(Conformance, Missing);
-    }
-
-    return true;
-  }
-
-  switch (Kind) {
-  case MissingWitnessDiagnosisKind::FixItOnly: {
-    const auto MissingWitnesses = filterProtocolRequirements(
-        GlobalMissingWitnesses.getArrayRef(), Adoptee);
-    getASTContext().addDelayedConformanceDiag(Conformance, true,
-        [MissingWitnesses](NormalProtocolConformance *Conf) {
-          diagnoseProtocolStubFixit(Conf, MissingWitnesses);
-        });
-    clearGlobalMissingWitnesses();
-    return true;
-  }
-
-  case MissingWitnessDiagnosisKind::ErrorOnly: {
-    // Diagnose the missing witnesses.
-    for (auto &Missing : LocalMissing) {
-      auto requirement = Missing.requirement;
-      auto matches = Missing.matches;
-      auto nominal = DC->getSelfNominalTypeDecl();
-
-      getASTContext().addDelayedConformanceDiag(Conformance, true,
-        [requirement, matches, nominal](NormalProtocolConformance *conformance) {
-          auto dc = conformance->getDeclContext();
-          auto *protocol = conformance->getProtocol();
-          // Possibly diagnose reason for automatic derivation failure
-          DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
-          // Diagnose each of the matches.
-          for (const auto &match : matches) {
-            diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
-          }
-        });
-      }
-    }
-    return true;
-  }
+  ctx.addDelayedConformanceDiag(conformance, true,
+      [filteredWitnesses](NormalProtocolConformance *conf) {
+        diagnoseProtocolStubFixit(conf, filteredWitnesses);
+      });
 }
 
 /// Whether the given protocol requirement has a "Self ==" constraint.
@@ -5071,10 +5069,6 @@ void ConformanceChecker::checkConformance() {
 
   // Check non-type requirements.
   resolveValueWitnesses();
-
-  // Diagnose any missing witnesses.
-  diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorOnly,
-                           /*Delayed=*/false);
 
   // Except in specific hardcoded cases for Foundation/Swift
   // standard library compatibility, an _ObjectiveCBridgeable
@@ -6463,12 +6457,14 @@ Witness
 ValueWitnessRequest::evaluate(Evaluator &eval,
                               NormalProtocolConformance *conformance,
                               ValueDecl *requirement) const {
+  auto &ctx = requirement->getASTContext();
   llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
-  ConformanceChecker checker(requirement->getASTContext(), conformance,
-                             MissingWitnesses);
+  ConformanceChecker checker(ctx, conformance, MissingWitnesses);
   checker.resolveSingleWitness(requirement);
-  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorOnly,
-                                   /*Delayed=*/true);
+  for (auto missing : MissingWitnesses) {
+    ctx.addDelayedMissingWitness(conformance, missing);
+  }
+
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the
   // evaluator's model. All of this should be refactored away.

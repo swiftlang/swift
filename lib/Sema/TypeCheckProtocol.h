@@ -117,11 +117,6 @@ enum class ResolveWitnessResult {
   Missing
 };
 
-enum class MissingWitnessDiagnosisKind {
-  FixItOnly,
-  ErrorOnly,
-};
-
 /// The protocol conformance checker.
 ///
 /// This helper class handles most of the details of checking whether a
@@ -194,17 +189,6 @@ public:
       slice(LocalMissingWitnessesStartIndex,
             GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
   }
-
-  void clearGlobalMissingWitnesses() {
-    GlobalMissingWitnesses.clear();
-    LocalMissingWitnessesStartIndex = GlobalMissingWitnesses.size();
-  }
-
-  /// Call this to diagnose currently known missing witnesses.
-  ///
-  /// \returns true if any witnesses were diagnosed.
-  bool diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind,
-                                bool Delayed);
 
   ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
                      llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses);

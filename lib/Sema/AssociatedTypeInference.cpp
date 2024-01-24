@@ -3995,12 +3995,14 @@ TypeWitnessAndDecl
 TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
                              AssociatedTypeDecl *requirement) const {
+  auto &ctx = requirement->getASTContext();
   llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
-  ConformanceChecker checker(requirement->getASTContext(), conformance,
-                             MissingWitnesses);
+  ConformanceChecker checker(ctx, conformance, MissingWitnesses);
   checker.resolveSingleTypeWitness(requirement);
-  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorOnly,
-                                   /*Delayed=*/true);
+  for (auto missing : MissingWitnesses) {
+    ctx.addDelayedMissingWitness(conformance, missing);
+  }
+
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the
   // evaluator's model. All of this should be refactored away.
