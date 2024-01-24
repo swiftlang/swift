@@ -94,77 +94,77 @@ static InFlightDiagnostic diagnose(const SILInstruction *inst, Diag<T...> diag,
 
 namespace {
 
-enum class UseDiagnosticInfoKind {
-  Invalid = 0,
-
-  /// Used if we have an isolation crossing for our error.
-  IsolationCrossing = 1,
-
-  /// In certain cases, we think a race can happen, but we couldn't find the
-  /// isolation crossing specifically to emit a better error. Still emit an
-  /// error though.
-  RaceWithoutKnownIsolationCrossing = 2,
-
-  /// Used if the error is due to a transfer into an assignment into a
-  /// transferring parameter.
-  AssignmentIntoTransferringParameter = 3,
-
-  /// Set to true if this is a use of a normal value that was strongly
-  /// transferred.
-  UseOfStronglyTransferredValue = 4,
-
-  /// We transferred the value by capturing the value in an isolated closure.
-  IsolationCrossingDueToCapture = 5,
-};
-
-class UseDiagnosticInfo {
-  UseDiagnosticInfoKind kind;
-  std::optional<ApplyIsolationCrossing> isolationCrossing;
-
+class UseAfterTransferDiagnosticInferrer {
 public:
-  static UseDiagnosticInfo
-  forIsolationCrossing(ApplyIsolationCrossing isolationCrossing) {
-    return UseDiagnosticInfo(UseDiagnosticInfoKind::IsolationCrossing,
-                             isolationCrossing);
-  }
+  enum class UseDiagnosticInfoKind {
+    Invalid = 0,
 
-  static UseDiagnosticInfo
-  forIsolationCrossingDueToCapture(ApplyIsolationCrossing isolationCrossing) {
-    return UseDiagnosticInfo(
-        UseDiagnosticInfoKind::IsolationCrossingDueToCapture,
-        isolationCrossing);
-  }
+    /// Used if we have an isolation crossing for our error.
+    IsolationCrossing = 1,
 
-  static UseDiagnosticInfo forIsolationCrossingWithUnknownIsolation() {
-    return UseDiagnosticInfo(
-        UseDiagnosticInfoKind::RaceWithoutKnownIsolationCrossing, {});
-  }
+    /// In certain cases, we think a race can happen, but we couldn't find the
+    /// isolation crossing specifically to emit a better error. Still emit an
+    /// error though.
+    RaceWithoutKnownIsolationCrossing = 2,
 
-  static UseDiagnosticInfo forAssignmentIntoTransferringParameter() {
-    return UseDiagnosticInfo(
-        UseDiagnosticInfoKind::AssignmentIntoTransferringParameter, {});
-  }
+    /// Used if the error is due to a transfer into an assignment into a
+    /// transferring parameter.
+    AssignmentIntoTransferringParameter = 3,
 
-  static UseDiagnosticInfo forUseOfStronglyTransferredValue() {
-    return UseDiagnosticInfo(
-        UseDiagnosticInfoKind::UseOfStronglyTransferredValue, {});
-  }
+    /// Set to true if this is a use of a normal value that was strongly
+    /// transferred.
+    UseOfStronglyTransferredValue = 4,
 
-  UseDiagnosticInfoKind getKind() const { return kind; }
+    /// We transferred the value by capturing the value in an isolated closure.
+    IsolationCrossingDueToCapture = 5,
+  };
 
-  ApplyIsolationCrossing getIsolationCrossing() const {
-    // assert(isolationCrossing && "Isolation crossing must be non-null");
-    return isolationCrossing.value();
-  }
+  class UseDiagnosticInfo {
+    UseDiagnosticInfoKind kind;
+    std::optional<ApplyIsolationCrossing> isolationCrossing;
 
-private:
-  UseDiagnosticInfo(UseDiagnosticInfoKind kind,
-                    std::optional<ApplyIsolationCrossing> isolationCrossing)
-      : kind(kind), isolationCrossing(isolationCrossing) {}
-};
+  public:
+    static UseDiagnosticInfo
+    forIsolationCrossing(ApplyIsolationCrossing isolationCrossing) {
+      return UseDiagnosticInfo(UseDiagnosticInfoKind::IsolationCrossing,
+                               isolationCrossing);
+    }
 
-class InferredCallerArgumentTypeInfo {
-public:
+    static UseDiagnosticInfo
+    forIsolationCrossingDueToCapture(ApplyIsolationCrossing isolationCrossing) {
+      return UseDiagnosticInfo(
+          UseDiagnosticInfoKind::IsolationCrossingDueToCapture,
+          isolationCrossing);
+    }
+
+    static UseDiagnosticInfo forIsolationCrossingWithUnknownIsolation() {
+      return UseDiagnosticInfo(
+          UseDiagnosticInfoKind::RaceWithoutKnownIsolationCrossing, {});
+    }
+
+    static UseDiagnosticInfo forAssignmentIntoTransferringParameter() {
+      return UseDiagnosticInfo(
+          UseDiagnosticInfoKind::AssignmentIntoTransferringParameter, {});
+    }
+
+    static UseDiagnosticInfo forUseOfStronglyTransferredValue() {
+      return UseDiagnosticInfo(
+          UseDiagnosticInfoKind::UseOfStronglyTransferredValue, {});
+    }
+
+    UseDiagnosticInfoKind getKind() const { return kind; }
+
+    ApplyIsolationCrossing getIsolationCrossing() const {
+      // assert(isolationCrossing && "Isolation crossing must be non-null");
+      return isolationCrossing.value();
+    }
+
+  private:
+    UseDiagnosticInfo(UseDiagnosticInfoKind kind,
+                      std::optional<ApplyIsolationCrossing> isolationCrossing)
+        : kind(kind), isolationCrossing(isolationCrossing) {}
+  };
+
   struct ApplyUse {
     SILLocation loc;
     Type inferredType;
@@ -183,8 +183,10 @@ private:
   /// baseInferredType.
   SmallVector<ApplyUse, 4> applyUses;
 
+  struct Walker;
+
 public:
-  InferredCallerArgumentTypeInfo(RegionAnalysisValueMap &valueMap)
+  UseAfterTransferDiagnosticInferrer(RegionAnalysisValueMap &valueMap)
       : valueMap(valueMap) {}
   void init(const Operand *op);
 
@@ -247,7 +249,7 @@ private:
 
 } // namespace
 
-bool InferredCallerArgumentTypeInfo::initForIsolatedPartialApply(
+bool UseAfterTransferDiagnosticInferrer::initForIsolatedPartialApply(
     Operand *op, AbstractClosureExpr *ace) {
   SmallVector<std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>, 8>
       foundCapturedIsolationCrossing;
@@ -268,13 +270,13 @@ bool InferredCallerArgumentTypeInfo::initForIsolatedPartialApply(
   return false;
 }
 
-void InferredCallerArgumentTypeInfo::initForApply(
+void UseAfterTransferDiagnosticInferrer::initForApply(
     ApplyIsolationCrossing isolationCrossing) {
   addApplyUse(UseDiagnosticInfo::forIsolationCrossing(isolationCrossing));
 }
 
-void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
-                                                  ApplyExpr *sourceApply) {
+void UseAfterTransferDiagnosticInferrer::initForApply(const Operand *op,
+                                                      ApplyExpr *sourceApply) {
   auto isolationCrossing = sourceApply->getIsolationCrossing().value();
 
   // Grab out full apply site and see if we can find a better expr.
@@ -303,14 +305,13 @@ void InferredCallerArgumentTypeInfo::initForApply(const Operand *op,
               UseDiagnosticInfo::forIsolationCrossing(isolationCrossing));
 }
 
-namespace {
-
-struct Walker : ASTWalker {
-  InferredCallerArgumentTypeInfo &foundTypeInfo;
+struct UseAfterTransferDiagnosticInferrer::Walker : ASTWalker {
+  UseAfterTransferDiagnosticInferrer &foundTypeInfo;
   ValueDecl *targetDecl;
   SmallPtrSet<Expr *, 8> visitedCallExprDeclRefExprs;
 
-  Walker(InferredCallerArgumentTypeInfo &foundTypeInfo, ValueDecl *targetDecl)
+  Walker(UseAfterTransferDiagnosticInferrer &foundTypeInfo,
+         ValueDecl *targetDecl)
       : foundTypeInfo(foundTypeInfo), targetDecl(targetDecl) {}
 
   Expr *lookThroughExpr(Expr *expr) {
@@ -378,8 +379,6 @@ struct Walker : ASTWalker {
   }
 };
 
-} // namespace
-
 static SILValue getDestOfStoreOrCopyAddr(Operand *op) {
   if (auto *si = dyn_cast<StoreInst>(op->getUser()))
     return si->getDest();
@@ -390,7 +389,7 @@ static SILValue getDestOfStoreOrCopyAddr(Operand *op) {
   return SILValue();
 }
 
-void InferredCallerArgumentTypeInfo::init(const Operand *op) {
+void UseAfterTransferDiagnosticInferrer::init(const Operand *op) {
   baseLoc = op->getUser()->getLoc();
   baseInferredType = op->get()->getType().getASTType();
   auto *nonConstOp = const_cast<Operand *>(op);
@@ -807,8 +806,9 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     ++blockLivenessInfoGeneration;
     liveness.process(requireInsts);
 
-    InferredCallerArgumentTypeInfo argTypeInfo(regionInfo->getValueMap());
-    argTypeInfo.init(transferOp);
+    UseAfterTransferDiagnosticInferrer diagnosticInferrer(
+        regionInfo->getValueMap());
+    diagnosticInferrer.init(transferOp);
 
     // If we were supposed to emit an error and we failed to do so, emit a
     // hard error so that the user knows to file a bug.
@@ -816,12 +816,14 @@ void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
     // DISCUSSION: We do this rather than asserting since users often times do
     // not know what to do if the compiler crashes. This at least shows up in
     // editor UIs providing a more actionable error message.
-    auto applyUses = argTypeInfo.getApplyUses();
+    auto applyUses = diagnosticInferrer.getApplyUses();
     if (applyUses.empty()) {
       diagnose(transferOp, diag::regionbasedisolation_unknown_pattern);
       continue;
     }
 
+    using UseDiagnosticInfoKind =
+        UseAfterTransferDiagnosticInferrer::UseDiagnosticInfoKind;
     for (auto &info : applyUses) {
       switch (info.diagInfo.getKind()) {
       case UseDiagnosticInfoKind::Invalid:
