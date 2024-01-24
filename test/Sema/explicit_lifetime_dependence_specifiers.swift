@@ -16,6 +16,16 @@ struct MutableBufferView : ~Escapable, ~Copyable {
   }
 }
 
+class Klass {}
+
+struct WrapperStruct {
+  let k: Klass
+}
+
+func invalidLifetimeDependenceOnEscapable(_ w: borrowing WrapperStruct) -> Klass {
+  return w.k
+}
+
 func incorrectSelfInvalidLifetimeDependence(_ x: borrowing BufferView) -> _borrow(self) BufferView { // expected-error{{invalid lifetime dependence specifier, self is valid in non-static methods only}}
   return BufferView(x.ptr)
 }
@@ -52,13 +62,11 @@ func borrowingParamInvalidLifetimeDependence2(_ x: borrowing BufferView) -> _mut
   return BufferView(x.ptr)
 }
 
-// Sema cannot diagnose this
-func implicitBorrowingParamInvalidLifetimeDependence1(_ x: BufferView) -> _consume(x) BufferView {
+func implicitBorrowingParamInvalidLifetimeDependence1(_ x: BufferView) -> _consume(x) BufferView { // expected-error{{lifetime dependence can only be specified on parameters with ownership modifiers (borrowing, consuming, inout)}}
   return BufferView(x.ptr)
 }
 
-// Sema cannot diagnose this
-func implicitBorrowingParamInvalidLifetimeDependence2(_ x: BufferView) -> _mutate(x) BufferView {
+func implicitBorrowingParamInvalidLifetimeDependence2(_ x: BufferView) -> _mutate(x) BufferView {// expected-error{{lifetime dependence can only be specified on parameters with ownership modifiers (borrowing, consuming, inout)}}
   return BufferView(x.ptr)
 }
 

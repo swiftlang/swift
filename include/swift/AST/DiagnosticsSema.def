@@ -7786,6 +7786,11 @@ ERROR(pack_iteration_where_clause_not_supported, none,
        "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers",
        ())
-
+ ERROR(lifetime_dependence_invalid_return_type, none,
+       "lifetime dependence specifiers can only be specifier on ~Escapable "
+       "results", ())
+ ERROR(lifetime_dependence_missing_ownership_modifier, none,
+       "lifetime dependence can only be specified on parameters with ownership "
+       "modifiers (borrowing, consuming, inout)", ())
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

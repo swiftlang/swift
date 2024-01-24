@@ -2577,8 +2577,8 @@ static Type validateParameterType(ParamDecl *decl) {
 }
 
 llvm::Optional<LifetimeDependenceInfo> validateLifetimeDependenceInfo(
-    LifetimeDependentReturnTypeRepr *lifetimeDependentRepr, Decl *decl,
-    bool allowIndex) {
+    LifetimeDependentReturnTypeRepr *lifetimeDependentRepr, Type resultTy,
+    Decl *decl, bool allowIndex) {
   auto *afd = cast<AbstractFunctionDecl>(decl);
   auto *dc = decl->getDeclContext();
   auto &ctx = dc->getASTContext();
@@ -2592,26 +2592,35 @@ llvm::Optional<LifetimeDependenceInfo> validateLifetimeDependenceInfo(
     auto loc = specifier.getLoc();
     auto kind = specifier.getLifetimeDependenceKind();
 
-    // Sema cannot diagnose illegal lifetime dependence kinds when no
-    // ownership parameter modifiers are specified. They can be diagnosed
-    // later in SIL.
-    if (ownership != ValueOwnership::Default) {
-      if (kind == LifetimeDependenceKind::Borrow &&
-          ownership != ValueOwnership::Shared) {
-        diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "borrow",
-                       getOwnershipSpelling(ownership));
-        return true;
-      } else if (kind == LifetimeDependenceKind::Mutate &&
-                 ownership != ValueOwnership::InOut) {
-        diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "mutate",
-                       getOwnershipSpelling(ownership));
-        return true;
-      } else if (kind == LifetimeDependenceKind::Consume &&
-                 ownership != ValueOwnership::Owned) {
-        diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind,
-                       "consume", getOwnershipSpelling(ownership));
-        return true;
-      }
+    /* TODO: Enable this
+    if (TypeChecker::conformsToKnownProtocol(resultTy,
+                                             InvertibleProtocolKind::Escapable,
+                                             dc->getParentModule())) {
+      diags.diagnose(loc, diag::lifetime_dependence_invalid_return_type);
+      return true;
+    }
+    */
+    if (ownership == ValueOwnership::Default) {
+      diags.diagnose(loc, diag::lifetime_dependence_missing_ownership_modifier);
+      return true;
+    }
+    if (kind == LifetimeDependenceKind::Borrow &&
+        ownership != ValueOwnership::Shared) {
+      diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "borrow",
+                     getOwnershipSpelling(ownership));
+      return true;
+    }
+    if (kind == LifetimeDependenceKind::Mutate &&
+        ownership != ValueOwnership::InOut) {
+      diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "mutate",
+                     getOwnershipSpelling(ownership));
+      return true;
+    }
+    if (kind == LifetimeDependenceKind::Consume &&
+        ownership != ValueOwnership::Owned) {
+      diags.diagnose(loc, diag::lifetime_dependence_cannot_use_kind, "consume",
+                     getOwnershipSpelling(ownership));
+      return true;
     }
     if (copyLifetimeParamIndices.test(paramIndexToSet) ||
         borrowLifetimeParamIndices.test(paramIndexToSet)) {
@@ -2846,16 +2855,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       }
     }
 
-    auto *returnTypeRepr = AFD->getResultTypeRepr();
-    llvm::Optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
-    if (returnTypeRepr) {
-      if (auto *lifetimeDependentRepr =
-              dyn_cast<LifetimeDependentReturnTypeRepr>(returnTypeRepr)) {
-        lifetimeDependenceInfo = validateLifetimeDependenceInfo(
-            lifetimeDependentRepr, D, /*allowIndex*/ false);
-      }
-    }
-
     // Result
     Type resultTy;
     if (auto fn = dyn_cast<FuncDecl>(D)) {
@@ -2865,6 +2864,16 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     } else {
       assert(isa<DestructorDecl>(D));
       resultTy = TupleType::getEmpty(AFD->getASTContext());
+    }
+
+    auto *returnTypeRepr = AFD->getResultTypeRepr();
+    llvm::Optional<LifetimeDependenceInfo> lifetimeDependenceInfo;
+    if (returnTypeRepr) {
+      if (auto *lifetimeDependentRepr =
+              dyn_cast<LifetimeDependentReturnTypeRepr>(returnTypeRepr)) {
+        lifetimeDependenceInfo = validateLifetimeDependenceInfo(
+            lifetimeDependentRepr, resultTy, D, /*allowIndex*/ false);
+      }
     }
 
     // (Args...) -> Result

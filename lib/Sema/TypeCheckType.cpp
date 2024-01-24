@@ -4608,7 +4608,6 @@ TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
 
 NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
     LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
-
   if (!options.is(TypeResolverContext::FunctionResult)) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(),
