@@ -6871,7 +6871,9 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       // 'nonisolated' can not be applied to mutable stored properties unless
       // qualified as 'unsafe'.
       if (var->supportsMutation() && !attr->isUnsafe()) {
-        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
+        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+            .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+        var->diagnose(diag::nonisolated_mutable_storage_note, var);
         return;
       }
 

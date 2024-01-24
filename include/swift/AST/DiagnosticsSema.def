@@ -5659,8 +5659,12 @@ ERROR(nonisolated_let,none,
       "they are immutable",
       ())
 ERROR(nonisolated_mutable_storage,none,
-      "'nonisolated' can not be applied to stored properties",
+      "'nonisolated' cannot be applied to mutable stored properties",
       ())
+NOTE(nonisolated_mutable_storage_note,none,
+     "convert %0 to a 'let' constant or consider declaring it "
+     "'nonisolated(unsafe)' if manually managing concurrency safety",
+     (const VarDecl *))
 ERROR(nonisolated_local_var,none,
       "'nonisolated' can not be applied to local variables",
       ())
