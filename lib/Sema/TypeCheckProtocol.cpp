@@ -1884,7 +1884,6 @@ class MultiConformanceChecker {
   llvm::SmallVector<ValueDecl*, 16> UnsatisfiedReqs;
   llvm::SmallVector<ConformanceChecker, 4> AllUsedCheckers;
   llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
-  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
   llvm::SmallPtrSet<ValueDecl *, 8> CoveredMembers;
 
   /// Check one conformance.
@@ -1976,6 +1975,8 @@ static void diagnoseProtocolStubFixit(
     ArrayRef<ASTContext::MissingWitness> missingWitnesses);
 
 void MultiConformanceChecker::checkAllConformances() {
+  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
+
   bool anyInvalid = false;
   for (auto *conformance : AllConformances) {
     checkIndividualConformance(conformance);
@@ -1995,15 +1996,11 @@ void MultiConformanceChecker::checkAllConformances() {
       }
     }
 
-    if (AllUsedCheckers.empty() ||
-        AllUsedCheckers.back().Conformance != conformance) {
-      continue;
-    }
-
-    auto &checker = AllUsedCheckers.back();
-    auto LocalMissing = checker.getLocalMissingWitness();
+    auto LocalMissing = Context.takeDelayedMissingWitnesses(conformance);
     if (LocalMissing.empty())
       continue;
+
+    MissingWitnesses.insert(LocalMissing.begin(), LocalMissing.end());
 
     // Diagnose the missing witnesses.
     for (auto &Missing : LocalMissing) {
@@ -2031,10 +2028,9 @@ void MultiConformanceChecker::checkAllConformances() {
 
   // Otherwise, backtrack to the last checker that has missing witnesses
   // and diagnose missing witnesses from there.
-  for (auto &checker : llvm::reverse(AllUsedCheckers)) {
-    if (!checker.getLocalMissingWitness().empty()) {
-      diagnoseProtocolStubFixit(Context,
-                                checker.Conformance,
+  for (auto *conformance : llvm::reverse(AllConformances)) {
+    if (Context.hasDelayedConformanceErrors(conformance)) {
+      diagnoseProtocolStubFixit(Context, conformance,
                                 MissingWitnesses.getArrayRef());
       break;
     }
@@ -2408,15 +2404,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   if (conformance->isComplete())
     return;
 
-  // Revive registered missing witnesses to handle it below.
-  auto revivedMissingWitnesses =
-      getASTContext().takeDelayedMissingWitnesses(conformance);
-
   // The conformance checker we're using.
-  AllUsedCheckers.emplace_back(getASTContext(), conformance, MissingWitnesses);
-  MissingWitnesses.insert(revivedMissingWitnesses.begin(),
-                          revivedMissingWitnesses.end());
-
+  AllUsedCheckers.emplace_back(getASTContext(), conformance);
   AllUsedCheckers.back().checkConformance();
 }
 
@@ -2959,13 +2948,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 }
 
 ConformanceChecker::ConformanceChecker(
-    ASTContext &ctx, NormalProtocolConformance *conformance,
-    llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses)
+    ASTContext &ctx, NormalProtocolConformance *conformance)
     : WitnessChecker(ctx, conformance->getProtocol(), conformance->getType(),
                      conformance->getDeclContext()),
-      Conformance(conformance), Loc(conformance->getLoc()),
-      GlobalMissingWitnesses(GlobalMissingWitnesses),
-      LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()) {}
+      Conformance(conformance), Loc(conformance->getLoc()) {}
 
 ConformanceChecker::~ConformanceChecker() {}
 
@@ -4340,7 +4326,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   if (!numViable) {
     // Save the missing requirement for later diagnosis.
     if (shouldRecordMissingWitness(Proto, Conformance, requirement))
-      GlobalMissingWitnesses.insert({requirement, matches});
+      getASTContext().addDelayedMissingWitness(Conformance, {requirement, matches});
     return ResolveWitnessResult::Missing;
   }
 
@@ -6458,12 +6444,8 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
                               NormalProtocolConformance *conformance,
                               ValueDecl *requirement) const {
   auto &ctx = requirement->getASTContext();
-  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
-  ConformanceChecker checker(ctx, conformance, MissingWitnesses);
+  ConformanceChecker checker(ctx, conformance);
   checker.resolveSingleWitness(requirement);
-  for (auto missing : MissingWitnesses) {
-    ctx.addDelayedMissingWitness(conformance, missing);
-  }
 
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the

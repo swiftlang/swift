@@ -126,15 +126,6 @@ public:
   NormalProtocolConformance *Conformance;
   SourceLoc Loc;
 
-  /// Keep track of missing witnesses, either type or value, for later
-  /// diagnosis emits. This may contain witnesses that are external to the
-  /// protocol under checking.
-  llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses;
-
-  /// Keep track of the slice in GlobalMissingWitnesses that is local to
-  /// this protocol under checking.
-  unsigned LocalMissingWitnessesStartIndex;
-
   /// Record a (non-type) witness for the given requirement.
   void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
 
@@ -184,14 +175,7 @@ public:
   /// the chosen type witnesses.
   void ensureRequirementsAreSatisfied();
 
-  ArrayRef<ASTContext::MissingWitness> getLocalMissingWitness() {
-    return GlobalMissingWitnesses.getArrayRef().
-      slice(LocalMissingWitnessesStartIndex,
-            GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
-  }
-
-  ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
-                     llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses);
+  ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance);
 
   ~ConformanceChecker();
 

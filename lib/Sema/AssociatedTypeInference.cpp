@@ -499,7 +499,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     return ResolveWitnessResult::ExplicitFailed;
   }
   // Save the missing type witness for later diagnosis.
-  GlobalMissingWitnesses.insert({assocType, {}});
+  getASTContext().addDelayedMissingWitness(Conformance, {assocType, {}});
 
   // None of the candidates were viable.
   getASTContext().addDelayedConformanceDiag(Conformance, true,
@@ -3653,7 +3653,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
 
   // Save the missing type witnesses for later diagnosis.
   for (auto assocType : unresolvedAssocTypes) {
-    checker.GlobalMissingWitnesses.insert({assocType, {}});
+    ctx.addDelayedMissingWitness(conformance, {assocType, {}});
   }
 
   return llvm::None;
@@ -3996,12 +3996,8 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
                              AssociatedTypeDecl *requirement) const {
   auto &ctx = requirement->getASTContext();
-  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
-  ConformanceChecker checker(ctx, conformance, MissingWitnesses);
+  ConformanceChecker checker(ctx, conformance);
   checker.resolveSingleTypeWitness(requirement);
-  for (auto missing : MissingWitnesses) {
-    ctx.addDelayedMissingWitness(conformance, missing);
-  }
 
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the
