@@ -25,6 +25,8 @@ distributed actor DA {
 // Test case for: https://github.com/apple/swift/issues/58663
 distributed actor Server { // expected-error 2 {{distributed actor 'Server' does not declare ActorSystem it can be used with}}
   // expected-note@-1{{you can provide a module-wide default actor system by declaring:}}
+  // expected-error@-2{{type 'Server' does not conform to protocol 'Encodable'}}
+  // expected-error@-3{{type 'Server' does not conform to protocol 'Decodable'}}
   typealias ActorSystem = DoesNotExistDataSystem
   // expected-error@-1{{cannot find type 'DoesNotExistDataSystem' in scope}}
   typealias SerializationRequirement = any Codable

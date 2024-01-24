@@ -141,9 +141,6 @@ public:
   /// this protocol under checking.
   unsigned LocalMissingWitnessesStartIndex;
 
-  /// Whether we've already complained about problems with this conformance.
-  bool AlreadyComplained = false;
-
   /// Record a (non-type) witness for the given requirement.
   void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
 
@@ -209,9 +206,6 @@ public:
   /// \returns true if any witnesses were diagnosed.
   bool diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind,
                                 bool Delayed);
-
-  /// Emit any diagnostics that have been delayed.
-  void emitDelayedDiags();
 
   ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
                      llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses);

@@ -1855,6 +1855,24 @@ static ValueDecl *getObjCRequirementSibling(
   return nullptr;
 }
 
+static void emitDelayedDiags(NormalProtocolConformance *conformance) {
+  auto *dc = conformance->getDeclContext();
+  auto diags = dc->getASTContext().takeDelayedConformanceDiags(conformance);
+  bool alreadyComplained = false;
+  for (const auto &diag: diags) {
+    // Complain that the type does not conform, once.
+    if (diag.IsError && !alreadyComplained) {
+      diagnoseConformanceFailure(dc->getSelfInterfaceType(),
+                                 conformance->getProtocol(),
+                                 dc,
+                                 conformance->getLoc());
+      alreadyComplained = true;
+    }
+
+    diag.Callback(conformance);
+  }
+}
+
 namespace {
 
 /// This is a wrapper of multiple instances of ConformanceChecker to allow us
@@ -1881,12 +1899,9 @@ public:
   MultiConformanceChecker(ASTContext &ctx) : Context(ctx) {}
 
   ~MultiConformanceChecker() {
-    // force-flush diagnostics in checkers that have not already complained
+    // Emit diagnostics at the very end.
     for (auto &checker : AllUsedCheckers) {
-      if (checker.AlreadyComplained)
-        continue;
-
-      checker.emitDelayedDiags();
+      emitDelayedDiags(checker.Conformance);
     }
   }
 
@@ -3815,26 +3830,29 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
     return true;
   }
 
-  // Diagnose the missing witnesses.
-  for (auto &Missing : LocalMissing) {
-    auto requirement = Missing.requirement;
-    auto matches = Missing.matches;
-    auto nominal = DC->getSelfNominalTypeDecl();
+  if (Kind != MissingWitnessDiagnosisKind::FixItOnly) {
+    // Diagnose the missing witnesses.
+    for (auto &Missing : LocalMissing) {
+      auto requirement = Missing.requirement;
+      auto matches = Missing.matches;
+      auto nominal = DC->getSelfNominalTypeDecl();
 
-    getASTContext().addDelayedConformanceDiag(Conformance, true,
-      [requirement, matches, nominal](NormalProtocolConformance *conformance) {
-        auto dc = conformance->getDeclContext();
-        auto *protocol = conformance->getProtocol();
-        // Possibly diagnose reason for automatic derivation failure
-        DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
-        // Diagnose each of the matches.
-        for (const auto &match : matches) {
-          diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
-        }
-      });
+      getASTContext().addDelayedConformanceDiag(Conformance, true,
+        [requirement, matches, nominal](NormalProtocolConformance *conformance) {
+          auto dc = conformance->getDeclContext();
+          auto *protocol = conformance->getProtocol();
+          // Possibly diagnose reason for automatic derivation failure
+          DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
+          // Diagnose each of the matches.
+          for (const auto &match : matches) {
+            diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
+          }
+        });
+    }
   }
 
   switch (Kind) {
+  case MissingWitnessDiagnosisKind::FixItOnly:
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
     const auto MissingWitnesses = filterProtocolRequirements(
         GlobalMissingWitnesses.getArrayRef(), Adoptee);
@@ -3845,16 +3863,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
     clearGlobalMissingWitnesses();
     return true;
   }
-  case MissingWitnessDiagnosisKind::ErrorOnly: {
-    getASTContext().addDelayedConformanceDiag(Conformance, true,
-                                              [](NormalProtocolConformance *) {});
-    return true;
-  }
-  case MissingWitnessDiagnosisKind::FixItOnly:
-    diagnoseProtocolStubFixit(Conformance,
-                filterProtocolRequirements(GlobalMissingWitnesses.getArrayRef(),
-                                           Adoptee));
-    clearGlobalMissingWitnesses();
+  case MissingWitnessDiagnosisKind::ErrorOnly:
     return true;
   }
 }
@@ -5115,18 +5124,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   FrontendStatsTracer statsTracer(getASTContext().Stats,
                                   "check-conformance", Conformance);
 
-  // FIXME: Caller checks that this type conforms to all of the
-  // inherited protocols.
-
-  // Emit known diags for this conformance.
-  emitDelayedDiags();
-
-  // If delayed diags have already complained, return.
-  if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
-
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
 
@@ -5138,8 +5135,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Diagnose any missing witnesses.
   diagnoseMissingWitnesses(Kind, /*Delayed=*/false);
-
-  emitDelayedDiags();
 
   // Except in specific hardcoded cases for Foundation/Swift
   // standard library compatibility, an _ObjectiveCBridgeable
@@ -5302,20 +5297,6 @@ void swift::diagnoseConformanceFailure(Type T,
 
   diags.diagnose(ComplainLoc, diag::type_does_not_conform,
                  T, Proto->getDeclaredInterfaceType());
-}
-
-void ConformanceChecker::emitDelayedDiags() {
-  auto diags = getASTContext().takeDelayedConformanceDiags(Conformance);
-
-  for (const auto &diag: diags) {
-    // Complain that the type does not conform, once.
-    if (diag.IsError && !AlreadyComplained) {
-      diagnoseConformanceFailure(Adoptee, Proto, DC, Loc);
-      AlreadyComplained = true;
-    }
-
-    diag.Callback(Conformance);
-  }
 }
 
 ProtocolConformanceRef
