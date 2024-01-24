@@ -264,6 +264,23 @@ function(add_pure_swift_host_library name)
     )
   endif()
 
+  # This replicates he code existing in LLVM llvm/cmake/modules/HandleLLVMOptions.cmake
+  # The second part of the clause replicates the LINKER_IS_LLD_LINK of the
+  # original.
+  if(LLVM_BUILD_INSTRUMENTED AND NOT (SWIFT_COMPILER_IS_MSVC_LIKE AND SWIFT_USE_LINKER STREQUAL "lld"))
+    string(TOUPPER "${LLVM_BUILD_INSTRUMENTED}" uppercase_LLVM_BUILD_INSTRUMENTED)
+    if(LLVM_ENABLE_IR_PGO OR uppercase_LLVM_BUILD_INSTRUMENTED STREQUAL "IR")
+      target_link_options(${name} PRIVATE
+        "SHELL:-Xclang-linker -fprofile-generate=\"${LLVM_PROFILE_DATA_DIR}\"")
+    elseif(uppercase_LLVM_BUILD_INSTRUMENTED STREQUAL "CSIR")
+      target_link_options(${name} PRIVATE
+        "SHELL:-Xclang-linker -fcs-profile-generate=\"${LLVM_CSPROFILE_DATA_DIR}\"")
+    else()
+      target_link_options(${name} PRIVATE
+        "SHELL:-Xclang-linker -fprofile-instr-generate=\"${LLVM_PROFILE_FILE_PATTERN}\"")
+    endif()
+  endif()
+
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
 endfunction()
