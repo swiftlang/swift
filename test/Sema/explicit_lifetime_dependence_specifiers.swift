@@ -70,6 +70,10 @@ func inoutParamInvalidLifetimeDependence2(_ x: inout BufferView) -> _borrow(x) B
   return BufferView(x.ptr)
 }
 
+func invalidSpecifierPosition(_ x: borrowing _borrow(x) BufferView) -> BufferView { // expected-error{{lifetime dependence specifiers may only be used on result of functions, methods, initializers}}
+  return BufferView(x.ptr)
+}
+
 struct Wrapper : ~Escapable {
   let view: BufferView
   borrowing func getView1() -> _borrow(self) BufferView {
@@ -112,3 +116,11 @@ struct Wrapper : ~Escapable {
     return view
   } 
 }
+
+struct ArrayOfBufferView : ~Escapable {
+    let arr: [BufferView]
+    subscript(index: Int) -> _borrow(self) BufferView {
+        return arr[index]
+    }
+}
+

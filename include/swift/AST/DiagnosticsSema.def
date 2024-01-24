@@ -7782,6 +7782,10 @@ ERROR(pack_iteration_where_clause_not_supported, none,
  ERROR(lifetime_dependence_cannot_use_kind, none,
        "invalid use of %0 lifetime dependence for %1 ownership",
        (StringRef, StringRef))
+ ERROR(lifetime_dependence_only_on_function_method_init_result, none,
+       "lifetime dependence specifiers may only be used on result of "
+       "functions, methods, initializers",
+       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
