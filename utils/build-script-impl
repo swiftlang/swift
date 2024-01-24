@@ -116,6 +116,9 @@ KNOWN_SETTINGS=(
     darwin-toolchain-require-use-os-runtime       "0"               "When setting up a plist for a toolchain, require the users of the toolchain to link against the OS instead of the packaged toolchain runtime. 0 for false, 1 for true"
     darwin-xcrun-toolchain                        "default"         "the name of the toolchain to use on Darwin"
 
+    ## Runtime options
+    min-runtime-version                ""                "Used to specify the minimum host runtime version when building the compiler on non-Darwin platforms"
+
     ## WebAssembly/WASI Options
     wasi-sysroot                                  ""                "An absolute path to the wasi-sysroot that will be used as a libc implementation for Wasm builds"
 
@@ -747,6 +750,12 @@ function set_build_options_for_host() {
                 swift_cmake_options+=(
                     -DLLVM_ENABLE_MODULE_DEBUGGING:BOOL=NO
                     "-DSWIFT_PARALLEL_LINK_JOBS=${SWIFT_TOOLS_NUM_PARALLEL_LTO_LINK_JOBS}"
+                )
+            fi
+
+            if [[ ! -z "${MIN_RUNTIME_VERSION}" ]]; then
+                swift_cmake_options+=(
+                    -DSWIFT_MIN_RUNTIME_VERSION="${MIN_RUNTIME_VERSION}"
                 )
             fi
 

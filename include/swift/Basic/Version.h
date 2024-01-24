@@ -64,6 +64,9 @@ public:
   /// Create a literal version from a list of components.
   Version(std::initializer_list<unsigned> Values) : Components(Values) {}
 
+  /// Create a version from an llvm::VersionTuple.
+  Version(const llvm::VersionTuple &version);
+
   /// Return a string to be used as an internal preprocessor define.
   ///
   /// The components of the version are multiplied element-wise by

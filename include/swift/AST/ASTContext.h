@@ -1010,10 +1010,10 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift59Availability();
 
-  /// Get the runtime availability of features introduced in the Swift 5.9
+  /// Get the runtime availability of features introduced in the Swift 5.11
   /// compiler for the target platform.
   AvailabilityContext getSwift511Availability();
-  
+
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
   AvailabilityContext
@@ -1021,7 +1021,9 @@ public:
 
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
-  AvailabilityContext getSwiftFutureAvailability();
+  AvailabilityContext getSwiftFutureAvailability(
+    llvm::VersionTuple swiftVersion = llvm::VersionTuple(99, 99, 0)
+  );
 
   /// Returns `true` if versioned availability annotations are supported for the
   /// target triple.

@@ -100,6 +100,23 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
+Version::Version(const llvm::VersionTuple &version) {
+  if (version.empty())
+    return;
+
+  Components.emplace_back(version.getMajor());
+
+  if (auto minor = version.getMinor()) {
+    Components.emplace_back(*minor);
+    if (auto subminor = version.getSubminor()) {
+      Components.emplace_back(*subminor);
+      if (auto build = version.getBuild()) {
+        Components.emplace_back(*build);
+      }
+    }
+  }
+}
+
 Version::operator llvm::VersionTuple() const
 {
   switch (Components.size()) {

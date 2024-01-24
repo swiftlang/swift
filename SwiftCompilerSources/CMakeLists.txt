@@ -106,7 +106,13 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    if(SWIFT_MIN_RUNTIME_VERSION)
+      list(APPEND swift_compile_options
+        "-Xfrontend" "-min-runtime-version"
+        "-Xfrontend" "${SWIFT_MIN_RUNTIME_VERSION}")
+    endif()
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
   endif()
 

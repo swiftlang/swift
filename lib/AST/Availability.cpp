@@ -771,16 +771,20 @@ AvailabilityContext ASTContext::getSwift59Availability() {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(10, 0, 0)));
   } else {
-    return AvailabilityContext::alwaysAvailable();
+    // Keyed off the Swift runtime version
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(5, 9, 0)));
   }
 }
 
 AvailabilityContext ASTContext::getSwift511Availability() {
   // Placeholder
-  return getSwiftFutureAvailability();
+  return getSwiftFutureAvailability(llvm::VersionTuple(5, 11, 0));
 }
 
-AvailabilityContext ASTContext::getSwiftFutureAvailability() {
+AvailabilityContext ASTContext::getSwiftFutureAvailability(
+  llvm::VersionTuple swiftVersion
+) {
   auto target = LangOpts.Target;
 
   if (target.isMacOSX() ) {
@@ -793,7 +797,8 @@ AvailabilityContext ASTContext::getSwiftFutureAvailability() {
     return AvailabilityContext(
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else {
-    return AvailabilityContext::alwaysAvailable();
+    // For non-MacOS/iOS/WatchOS, this is keyed off the *Swift* version
+    return AvailabilityContext(VersionRange::allGTE(swiftVersion));
   }
 }
 

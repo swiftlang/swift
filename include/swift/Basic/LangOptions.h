@@ -174,6 +174,9 @@ namespace swift {
     /// User-overridable language version to compile for.
     version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
 
+    /// Swift runtime version to compile for.
+    version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
+
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
@@ -589,7 +592,7 @@ namespace swift {
     /// Returns the minimum platform version to which code will be deployed.
     ///
     /// This is only implemented on certain OSs. If no target has been
-    /// configured, returns v0.0.0.
+    /// configured, returns the minimum Swift runtime version.
     llvm::VersionTuple getMinPlatformVersion() const {
       if (Target.isMacOSX()) {
         llvm::VersionTuple OSVersion;
@@ -600,7 +603,7 @@ namespace swift {
       } else if (Target.isWatchOS()) {
         return Target.getOSVersion();
       }
-      return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+      return RuntimeVersion;
     }
 
     /// Sets an implicit platform condition.
