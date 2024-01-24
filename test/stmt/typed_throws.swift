@@ -139,6 +139,17 @@ func testTryIncompatibleTyped(cond: Bool) throws(HomeworkError) {
   }
 }
 
+func doSomethingWithoutThrowing() { }
+
+func testDoCatchWithoutThrowing() {
+  do {
+    try doSomethingWithoutThrowing() // expected-warning{{no calls to throwing functions occur within 'try' expression}}
+  } catch HomeworkError.forgot { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
+    // expected-error@-1{{pattern of type 'HomeworkError' cannot match 'Never'}}
+  } catch {
+  }
+}
+
 // "Rethrow-like" functions are only allowed to be called from rethrows
 // functions as a compatibility hack, which is removed under FullTypedThrows.
 func rethrowsLike<E>(_ body: () throws(E) -> Void) throws(E) { }
