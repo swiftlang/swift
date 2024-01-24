@@ -3465,7 +3465,7 @@ namespace {
         // actor.
         if (isolation.isDistributedActor()) {
           actorExpr = UnresolvedDotExpr::createImplicit(
-              ctx, actorExpr, ctx.getIdentifier("asLocalActor"));
+              ctx, actorExpr, ctx.Id_asLocalActor);
         }
         break;
       }

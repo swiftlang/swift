@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main %import-libdispatch -j2 -parse-as-library -Xfrontend -disable-availability-checking -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -g -o %t/a.out -enable-experimental-feature BuiltinModule
+// RUN: %target-build-swift -module-name main %import-libdispatch -j2 -parse-as-library -Xfrontend -disable-availability-checking -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -g -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
@@ -16,20 +16,11 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows rdar://82593574
 // UNSUPPORTED: OS=windows-msvc
 
-import Builtin // FIXME: Part of a hack to get the protocol conformance defined properly
 import Dispatch
 import Distributed
 import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
-
-extension DistributedActor {
-  func localDistributedAsActor() -> any Actor {
-    // FIXME: Part of a hack that forces the protocol conformance for DistributedActor -> Actor to be defined
-    // FIXME: Drop usage of this once we resolve the issue above
-    Builtin.distributedActorAsAnyActor(self)
-  }
-}
 
 distributed actor Worker {
   var counter: Int = 0

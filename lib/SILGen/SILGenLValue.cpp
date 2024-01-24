@@ -3055,6 +3055,9 @@ public:
                              options, e->isSuper(), accessKind, strategy,
                              getSubstFormalRValueType(e),
                              false /*is on self parameter*/, actorIso);
+
+    SGF.SGM.noteMemberRefExpr(e);
+
     return lv;
   }
 
@@ -3864,6 +3867,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
                            options, e->isSuper(), accessKind, strategy,
                            substFormalRValueType, isOnSelfParameter, actorIso);
+
+  SGF.SGM.noteMemberRefExpr(e);
+
   return lv;
 }
 
