@@ -436,10 +436,13 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     if (!normal->hasComputedAssociatedConformances()) {
       // If we're in the process of checking the type witnesses, fail
       // gracefully.
-      // FIXME: Seems like we should be able to get at the intermediate state
-      // to use that.
-      if (normal->getState() == ProtocolConformanceState::CheckingTypeWitnesses)
+      //
+      // FIXME: This is unsound, because we may not have diagnosed anything but
+      // still end up with an ErrorType in the AST.
+      if (proto->getASTContext().evaluator.hasActiveRequest(
+            ResolveTypeWitnessesRequest{normal})) {
         return ProtocolConformanceRef::forInvalid();
+      }
     }
 
     // Get the associated conformance.

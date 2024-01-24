@@ -3515,12 +3515,7 @@ auto AssociatedTypeInference::solve()
                           << ": " << conformance->getProtocol()->getName()
                           << " ============\n";);
 
-  // Track when we are checking type witnesses.
-  ProtocolConformanceState initialState = conformance->getState();
-  conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
   SWIFT_DEFER {
-    conformance->setState(initialState);
-
     LLVM_DEBUG(llvm::dbgs() << "============ Finish " << conformance->getType()
                             << ": " << conformance->getProtocol()->getName()
                             << " ============\n";);

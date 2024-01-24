@@ -2178,7 +2178,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       // Check the rest of the conformance below.
       break;
 
-    case ProtocolConformanceState::CheckingTypeWitnesses:
     case ProtocolConformanceState::Checking:
     case ProtocolConformanceState::Complete:
       // Nothing to do.

@@ -86,8 +86,6 @@ enum class ProtocolConformanceState {
   Complete = 0,
   /// The conformance is known but is not yet complete.
   Incomplete,
-  /// The conformance's type witnesses are currently being resolved.
-  CheckingTypeWitnesses,
   /// The conformance is being checked.
   Checking,
 
@@ -225,7 +223,6 @@ public:
   /// Determine whether this conformance is incomplete.
   bool isIncomplete() const {
     return getState() == ProtocolConformanceState::Incomplete ||
-           getState() == ProtocolConformanceState::CheckingTypeWitnesses ||
            getState() == ProtocolConformanceState::Checking;
   }
 
