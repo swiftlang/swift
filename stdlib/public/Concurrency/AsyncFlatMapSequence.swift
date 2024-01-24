@@ -282,7 +282,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
     public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> SegmentOfResult.Element? {
       while !finished {
         if var iterator = currentIterator {
-          do throws(any Error) {
+          do {
             let optElement = try await iterator.next(actor)
             guard let element = optElement else {
               currentIterator = nil
@@ -301,7 +301,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
             finished = true
             return nil
           }
-          do throws(any Error) { 
+          do {
             let segment = await transform(item)
             var iterator = segment.makeAsyncIterator()
             let optElement = try await iterator.next(actor)  
