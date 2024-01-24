@@ -3640,103 +3640,6 @@ static bool shouldRecordMissingWitness(
   return true;
 }
 
-/// Prune the set of missing witnesses for the given conformance, eliminating
-/// any requirements that do not actually need to satisfied.
-static ArrayRef<ASTContext::MissingWitness> pruneMissingWitnesses(
-    ProtocolDecl *proto,
-    NormalProtocolConformance *conformance,
-    ArrayRef<ASTContext::MissingWitness> missingWitnesses,
-    SmallVectorImpl<ASTContext::MissingWitness> &scratch) {
-  if (missingWitnesses.empty()) {
-    return missingWitnesses;
-  }
-
-  ObjCRequirementMap map = getObjCRequirementMap(proto);
-
-  // Consider each of the missing witnesses to remove any that should not
-  // longer be considered "missing".
-  llvm::SmallDenseSet<ObjCMethodKey> alreadyReportedAsMissing;
-  bool removedAny = false;
-  for (unsigned missingWitnessIdx : indices(missingWitnesses)) {
-    const auto &missingWitness = missingWitnesses[missingWitnessIdx];
-
-    // Local function to skip this particular witness.
-    auto skipWitness = [&] {
-      if (removedAny) {
-        return;
-      }
-
-      // This is the first witness we skipped. Copy all of the earlier
-      // missing witnesses over.
-      scratch.clear();
-      scratch.append(
-          missingWitnesses.begin(),
-          missingWitnesses.begin() + missingWitnessIdx);
-      removedAny = true;
-    };
-
-    // Local function to add this particular witness.
-    auto addWitness = [&] {
-      if (removedAny)
-        scratch.push_back(missingWitness);
-    };
-
-    // We only care about functions.
-    if (!isa<AbstractFunctionDecl>(missingWitness.requirement)) {
-      addWitness();
-      continue;
-    }
-
-    // For an @objc protocol defined in Objective-C, the Clang importer might
-    // have imported the same underlying Objective-C declaration as more than
-    // one Swift declaration. Only one of those requirements should be witnessed
-    // so if the requirement sibling is witnessed then this requirement is not
-    // missing.
-
-    // Prune requirements that come from other protocols - we don't want to
-    // attempt to diagnose those here since we won't be able to find their
-    // siblings.
-    if (proto != missingWitness.requirement->getDeclContext()->getAsDecl()) {
-      skipWitness();
-      continue;
-    }
-
-    if (!proto->isObjC()) {
-      addWitness();
-      continue;
-    }
-
-    auto fnRequirement = cast<AbstractFunctionDecl>(missingWitness.requirement);
-    auto key = getObjCMethodKey(fnRequirement);
-
-    if (getObjCRequirementSibling(
-            proto, fnRequirement, map,
-            [conformance](AbstractFunctionDecl *candidate) {
-              return static_cast<bool>(conformance->getWitness(candidate));
-            })) {
-      skipWitness();
-      continue;
-    }
-
-    // If we have already reported a function with this selector as missing,
-    // don't do it again.
-    if (alreadyReportedAsMissing.count(key)) {
-      skipWitness();
-      continue;
-    }
-
-    // There is really a missing requirement for this witness.
-    alreadyReportedAsMissing.insert(key);
-    addWitness();
-  }
-
-  if (removedAny) {
-    return scratch;
-  }
-
-  return missingWitnesses;
-}
-
 static void diagnoseProtocolStubFixit(
     NormalProtocolConformance *Conf,
     llvm::SmallVector<ASTContext::MissingWitness, 4> MissingWitnesses) {
@@ -3852,10 +3755,6 @@ static void diagnoseProtocolStubFixit(
 bool ConformanceChecker::
 diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
   auto LocalMissing = getLocalMissingWitness();
-
-  SmallVector<ASTContext::MissingWitness, 4> MissingWitnessScratch;
-  LocalMissing = pruneMissingWitnesses(
-      Proto, Conformance, LocalMissing, MissingWitnessScratch);
 
   // If this conformance has nothing to complain, return.
   if (LocalMissing.empty())
