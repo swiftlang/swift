@@ -1604,12 +1604,30 @@ public:
 
     // First check if our partial_apply is fed into an async let begin. If so,
     // handle it especially.
+    //
+    // NOTE: If it is an async_let, then the closure itself will be Sendable. We
+    // treat passing in a value into the async Sendable closure as transferring
+    // it into the closure.
     if (isAsyncLetBeginPartialApply(pai)) {
       return translateSILPartialApplyAsyncLetBegin(pai);
     }
 
-    // Check if our closure is isolated to a specific actor. If it is, we need
-    // to treat all of the captures as being transferred.
+    // Then check if our partial apply is Sendable. In such a case, we will have
+    // emitted an earlier warning in Sema.
+    //
+    // DISCUSSION: The reason why we can treat values passed into an async let
+    // as transferring safely but it is unsafe to do this for arbitrary Sendable
+    // closures is that we do not know how many times the Sendable closure will
+    // be executed. It is possible to have different invocations of the Sendable
+    // closure to cause races with the captured non-Sendable value. In contrast
+    // since we know an async let runs exactly once, we do not need to worry
+    // about such a possibility. If we had the ability in the language to
+    // specify that a closure is run at most once or that it is always run
+    // serially, we could lift this restriction... so for now we leave in the
+    // Sema warning and just bail here.
+    if (pai->getFunctionType()->isSendableType())
+      return;
+
     if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
       if (ace->getActorIsolation().isActorIsolated()) {
         return translateIsolatedPartialApply(pai);

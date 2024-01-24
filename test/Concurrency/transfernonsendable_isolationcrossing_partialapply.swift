@@ -30,13 +30,24 @@ func useValue<T>(_ t: T) {}
 // MARK: Tests //
 /////////////////
 
+func doSomething(_ x: NonSendableKlass, _ y: NonSendableKlass) { }
+
 actor ProtectsNonSendable {
   var ns: NonSendableKlass = .init()
 
   nonisolated func testParameter(_ ns: NonSendableKlass) async {
     self.assumeIsolated { isolatedSelf in
-      // expected-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-      isolatedSelf.ns = ns
+      isolatedSelf.ns = ns // expected-warning {{task isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
+    }
+  }
+
+  // This should get the note since l is different from 'ns'.
+  nonisolated func testParameterMergedIntoLocal(_ ns: NonSendableKlass) async {
+    // expected-note @-1 {{value is task isolated since it is in the same region as 'ns'}}
+    let l = NonSendableKlass()
+    doSomething(l, ns)
+    self.assumeIsolated { isolatedSelf in
+      isolatedSelf.ns = l // expected-warning {{task isolated value of type 'NonSendableKlass' transferred to actor-isolated context; later accesses to value could race}}
     }
   }
 

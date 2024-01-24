@@ -48,6 +48,7 @@ struct CustomActor {
 }
 
 @MainActor func testTransferGlobalActorGuardedValueWithlet(_ k: Klass) async {
+  // expected-note @-1 {{value is task isolated since it is in the same region as 'k'}}
   globalKlass = k
-  await transferToCustom(k) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToCustom(k) // expected-tns-warning {{task isolated value of type 'Klass' transferred to global actor 'CustomActor'-isolated context; later accesses to value could race}}
 }
