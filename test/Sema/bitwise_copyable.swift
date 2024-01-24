@@ -191,7 +191,7 @@ struct S_Explicit_Nonescapable : ~Escapable, _BitwiseCopyable {} // expected-err
 struct S_Explicit_Noncopyable : ~Copyable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_noncopyable}}
 
 //==============================================================================
-//==========================STDLIB-DEPENDENCY TESTS=(BEGIN)==================={{
+//==========================STDLIB-DEPENDENCY TESTS=(END)=====================}}
 //==============================================================================
 
 //==============================================================================
