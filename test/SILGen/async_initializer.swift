@@ -56,7 +56,7 @@ enum MyEnum {
 }
 
 actor MyActor {
-  // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@owned MyActor) -> @owned MyActor
+  // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@isolated @owned MyActor) -> @owned MyActor
   init() async {}
 }
 
@@ -166,7 +166,7 @@ actor SomeActor {
   // The implicit check-not covers that for us. The hops are inserted later.
   init() async {}
 
-  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@guaranteed SomeActor) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@isolated @guaranteed SomeActor) -> () {
   // CHECK:           hop_to_executor {{%[0-9]+}} : $SomeActor
   // CHECK: } // end sil function '$s12initializers9SomeActorC10someMethodyyYaF'
   func someMethod() async {}

@@ -236,6 +236,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@Sendable") << " ";
   if (hasAttr(TAK_noDerivative))
     Printer.printSimpleAttr("@noDerivative") << " ";
+  if (hasAttr(TAK_isolated))
+    Printer.printSimpleAttr("@isolated") << " ";
 
   if (hasAttr(TAK_differentiable)) {
     Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);

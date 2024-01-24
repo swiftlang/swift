@@ -65,7 +65,7 @@ actor A: P2 {
 actor AnActor {
   func isolatedMethod(_ i: Int) {}
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7AnActorC6calleryyYaF : $@convention(method) @async (@guaranteed AnActor) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7AnActorC6calleryyYaF : $@convention(method) @async (@isolated @guaranteed AnActor) -> () {
   func caller() async {
     // CHECK: hop_to_executor {{..*}} : $AnActor
     //  [[F:%.*]] = function_ref @$s4test7AnActorC6calleryyYaFySicACYicfu_ : $@convention(thin) (@guaranteed AnActor) -> @owned @callee_guaranteed (Int) -> ()

@@ -1619,10 +1619,14 @@ public:
 
   void translateNonIsolationCrossingSILApply(FullApplySite fas) {
     SILMultiAssignOptions options;
+
+    // If self is an actor and we are isolated to it, propagate actor self.
     if (fas.hasSelfArgument()) {
-      if (auto self = fas.getSelfArgument()) {
-        if (self->getType().isActor())
-          options |= SILMultiAssignFlags::PropagatesActorSelf;
+      auto &self = fas.getSelfArgumentOperand();
+      if (self.get()->getType().isActor() &&
+          fas.getArgumentParameterInfo(self).hasOption(
+              SILParameterInfo::Isolated)) {
+        options |= SILMultiAssignFlags::PropagatesActorSelf;
       }
     }
 

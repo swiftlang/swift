@@ -415,7 +415,8 @@ extension ASTGenVisitor {
           .sil_weak, .sil_unowned, .inout, .block_storage, .box,
           .dynamic_self, .sil_unmanaged, .error, .error_indirect,
           .error_unowned, .direct, .inout_aliasable,
-          .in_guaranteed, .in_constant, .captures_generics, .moveOnly:
+          .in_guaranteed, .in_constant, .captures_generics, .moveOnly,
+          .isolated:
           fallthrough
 
         case .autoclosure, .escaping, .noescape, .noDerivative, .async,

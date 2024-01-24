@@ -2998,13 +2998,10 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TypeResolutionFlags::SILType)) {
-    for (auto silOnlyAttr : {TAK_pseudogeneric,
-                             TAK_unimplementable,
-                             TAK_callee_owned,
-                             TAK_callee_guaranteed,
-                             TAK_noescape,
-                             TAK_yield_once,
-                             TAK_yield_many}) {
+    for (auto silOnlyAttr :
+         {TAK_pseudogeneric, TAK_unimplementable, TAK_callee_owned,
+          TAK_callee_guaranteed, TAK_noescape, TAK_yield_once, TAK_yield_many,
+          TAK_isolated}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
   }  
@@ -4102,6 +4099,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     if (attrs.has(TAK_noDerivative)) {
       attrs.clearAttribute(TAK_noDerivative);
       parameterOptions |= SILParameterInfo::NotDifferentiable;
+    }
+    if (attrs.has(TAK_isolated)) {
+      attrs.clearAttribute(TAK_isolated);
+      parameterOptions |= SILParameterInfo::Isolated;
     }
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);

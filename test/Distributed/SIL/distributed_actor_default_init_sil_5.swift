@@ -31,7 +31,7 @@ distributed actor MyDistActor {
     self.localOnlyField = SomeClass()
   }
 
-// CHECK: sil hidden @$s14default_deinit11MyDistActorC12system_async4condAC015FakeDistributedE7Systems0iE6SystemV_SbtYacfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @owned MyDistActor) -> @owned MyDistActor {
+// CHECK: sil hidden @$s14default_deinit11MyDistActorC12system_async4condAC015FakeDistributedE7Systems0iE6SystemV_SbtYacfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @isolated @owned MyDistActor) -> @owned MyDistActor {
 // CHECK: bb0([[SYSTEM:%[0-9]+]] : $FakeActorSystem, [[COND:%[0-9]+]] : $Bool, [[SELF:%[0-9]+]] : $MyDistActor):
 // CHECK:   builtin "initializeDefaultActor"([[SELF]] : $MyDistActor)
 // CHECK:   [[SYS_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem

@@ -1206,7 +1206,8 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_moveOnly,
   BridgedTypeAttrKind_thin,
   BridgedTypeAttrKind_thick,
-  BridgedTypeAttrKind_Count
+  BridgedTypeAttrKind_Count,
+  BridgedTypeAttrKind_isolated,
 };
 
 SWIFT_NAME("BridgedTypeAttrKind.init(from:)")

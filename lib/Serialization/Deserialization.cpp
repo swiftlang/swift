@@ -6378,6 +6378,11 @@ getActualSILParameterOptions(uint8_t raw) {
     result |= SILParameterInfo::NotDifferentiable;
   }
 
+  if (options.contains(serialization::SILParameterInfoFlags::Isolated)) {
+    options -= serialization::SILParameterInfoFlags::Isolated;
+    result |= SILParameterInfo::Isolated;
+  }
+
   // Check if we have any remaining options and return none if we do. We found
   // some option that we did not understand.
   if (bool(options)) {

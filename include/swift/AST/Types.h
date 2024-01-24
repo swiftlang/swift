@@ -4129,6 +4129,9 @@ public:
 
     /// Set if the given parameter is transferring.
     Transferring = 0x2,
+
+    /// Set if the given parameter is isolated.
+    Isolated = 0x4,
   };
 
   using Options = OptionSet<Flag>;

@@ -99,6 +99,7 @@ TYPE_ATTR(yield_many)
 TYPE_ATTR(captures_generics)
 // Used at the SIL level to mark a type as moveOnly.
 TYPE_ATTR(moveOnly)
+TYPE_ATTR(isolated)
 
 // SIL metatype attributes.
 TYPE_ATTR(thin)
