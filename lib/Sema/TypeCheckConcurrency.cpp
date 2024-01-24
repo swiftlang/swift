@@ -3460,6 +3460,13 @@ namespace {
         actorExpr = new (ctx) DeclRefExpr(
             const_cast<VarDecl *>(var), DeclNameLoc(loc),
             /*Implicit=*/true);
+
+        // For a distributed actor, we need to retrieve the local
+        // actor.
+        if (isolation.isDistributedActor()) {
+          actorExpr = UnresolvedDotExpr::createImplicit(
+              ctx, actorExpr, ctx.getIdentifier("asLocalActor"));
+        }
         break;
       }
       case ActorIsolation::GlobalActor: {
@@ -3479,6 +3486,7 @@ namespace {
         actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/true);
         break;
       }
+
 
       // Convert the actor argument to the appropriate type.
       (void)TypeChecker::typeCheckExpression(
