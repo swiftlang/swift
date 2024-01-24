@@ -3072,7 +3072,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
         // Create the wrapping return.
         hasSingleExpressionBody = true;
         auto returnExpr = Element.get<Expr*>();
-        BS->setLastElement(new (Context) ReturnStmt(SourceLoc(), returnExpr));
+        BS->setLastElement(ReturnStmt::createImplicit(Context, returnExpr));
       }
     }
   }

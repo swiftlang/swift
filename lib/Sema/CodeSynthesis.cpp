@@ -519,7 +519,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
 
   SmallVector<ASTNode, 2> stmts;
   stmts.push_back(call);
-  stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr));
+  stmts.push_back(ReturnStmt::createImplicit(ctx, /*Result=*/nullptr));
   return { BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                              /*implicit=*/true),
            /*isTypeChecked=*/true };
@@ -708,7 +708,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   SmallVector<ASTNode, 2> stmts;
   stmts.push_back(rebindSelfExpr);
-  stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr));
+  stmts.push_back(ReturnStmt::createImplicit(ctx, /*Result=*/nullptr));
   return { BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                             /*implicit=*/true),
            /*isTypeChecked=*/true };
@@ -1677,7 +1677,8 @@ static std::pair<BraceStmt *, bool>
 synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
   ASTContext &ctx = afd->getASTContext();
   SmallVector<ASTNode, 1> stmts;
-  stmts.push_back(new (ctx) ReturnStmt(afd->getLoc(), nullptr));
+  stmts.push_back(
+      ReturnStmt::createImplicit(ctx, afd->getLoc(), /*result*/ nullptr));
   return { BraceStmt::create(ctx, afd->getLoc(), stmts, afd->getLoc(), true),
            /*isTypeChecked=*/true };
 }

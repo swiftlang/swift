@@ -367,8 +367,8 @@ protected:
                               {buildBlockResult}, {Identifier()});
       }
 
-      elements.push_back(new (ctx) ReturnStmt(resultLoc, buildBlockResult,
-                                              /*Implicit=*/true));
+      elements.push_back(
+          ReturnStmt::createImplicit(ctx, resultLoc, buildBlockResult));
     }
 
     return std::make_pair(false, UnsupportedElt());

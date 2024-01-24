@@ -8670,8 +8670,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       SourceLoc LBraceLoc, RBraceLoc;
       LBraceLoc = consumeToken(tok::l_brace);
       auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-      auto *Return =
-          new (Context) ReturnStmt(SourceLoc(), CCE, /*implicit=*/true);
+      auto *Return = ReturnStmt::createImplicit(Context, CCE);
       CodeCompletionCallbacks->setParsedDecl(accessor);
       CodeCompletionCallbacks->completeAccessorBeginning(CCE);
       RBraceLoc = Tok.getLoc();
@@ -8725,7 +8724,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
         }
       }
       if (isa<FuncDecl>(AFD)) {
-        auto RS = new (Context) ReturnStmt(SourceLoc(), E);
+        auto RS = ReturnStmt::createImplicit(Context, E);
         BS->setLastElement(RS);
         AFD->setHasSingleExpressionBody();
         AFD->setSingleExpressionBody(E);
@@ -8733,7 +8732,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
         if (F->isFailable() && isa<NilLiteralExpr>(E)) {
           // If it's a nil literal, just insert return.  This is the only
           // legal thing to return.
-          auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+          auto RS = ReturnStmt::createImplicit(Context, E);
           BS->setLastElement(RS);
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);

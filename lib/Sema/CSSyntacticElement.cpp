@@ -2087,8 +2087,7 @@ private:
     auto *resultExpr = getVoidExpr(ctx);
     cs.cacheExprTypes(resultExpr);
 
-    auto *returnStmt = new (ctx) ReturnStmt(SourceLoc(), resultExpr,
-                                            /*implicit=*/true);
+    auto *returnStmt = ReturnStmt::createImplicit(ctx, resultExpr);
 
     // For a target for newly created result and apply a solution
     // to it, to make sure that optional injection happens required
@@ -2200,9 +2199,8 @@ private:
         return resultExpr;
 
       auto &ctx = solution.getConstraintSystem().getASTContext();
-      auto newReturnStmt =
-          new (ctx) ReturnStmt(
-            returnStmt->getStartLoc(), nullptr, /*implicit=*/true);
+      auto *newReturnStmt = ReturnStmt::createImplicit(
+          ctx, returnStmt->getStartLoc(), /*result*/ nullptr);
       ASTNode elements[2] = { resultExpr, newReturnStmt };
       return BraceStmt::create(ctx, returnStmt->getStartLoc(),
                                elements, returnStmt->getEndLoc(),

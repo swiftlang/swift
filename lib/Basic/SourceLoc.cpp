@@ -533,6 +533,23 @@ bool SourceManager::isOwning(SourceLoc Loc) const {
   return findBufferContainingLocInternal(Loc).has_value();
 }
 
+SourceRange SourceRange::combine(ArrayRef<SourceRange> ranges) {
+  if (ranges.empty())
+    return SourceRange();
+
+  SourceRange result = ranges.front();
+  for (auto other : ranges.drop_front()) {
+    if (!other)
+      continue;
+    if (!result) {
+      result = other;
+      continue;
+    }
+    result.widen(other);
+  }
+  return result;
+}
+
 void SourceRange::widen(SourceRange Other) {
   if (Other.Start.Value.getPointer() < Start.Value.getPointer())
     Start = Other.Start;

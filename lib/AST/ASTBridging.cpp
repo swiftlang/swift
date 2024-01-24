@@ -1464,7 +1464,7 @@ BridgedReturnStmt BridgedReturnStmt_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc,
                                                  BridgedNullableExpr expr) {
   ASTContext &context = cContext.unbridged();
-  return new (context) ReturnStmt(cLoc.unbridged(), expr.unbridged());
+  return ReturnStmt::createParsed(context, cLoc.unbridged(), expr.unbridged());
 }
 
 BridgedSwitchStmt BridgedSwitchStmt_createParsed(

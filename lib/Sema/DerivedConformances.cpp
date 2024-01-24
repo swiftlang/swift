@@ -655,8 +655,8 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
                                         Expr *guardReturnValue) {
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
-  
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), guardReturnValue);
+
+  auto *returnStmt = ReturnStmt::createImplicit(C, guardReturnValue);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
@@ -700,7 +700,7 @@ GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
 
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, nilExpr);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
