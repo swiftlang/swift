@@ -1,11 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -parse-as-library -target %target-swift-abi-5.7-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift %S/../Inputs/CustomSerialExecutorAvailability.swift -o %t/a.out
+// RUN: %target-build-swift -parse-as-library -target %target-swift-abi-5.9-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift %S/../Inputs/CustomSerialExecutorAvailability.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out
-
-// These are the only platforms for which compiling a Swift 5.7 aligned deployment target is possible.
-// REQUIRES: OS=macosx || OS=ios || OS=watchos || OS=tvos
+// RUN:  %target-run %t/a.out
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -23,21 +20,22 @@ import Distributed
 @main struct Main {
   static func main() async {
     if #available(SwiftStdlib 5.9, *) {
-      let tests = TestSuite("DistributedActorExecutorAvailability")
+      let tests = TestSuite("DistributedActorExecutorAvailabilitySwift59")
 
       let system = LocalTestingDistributedActorSystem()
 
-      tests.test("5.7 actor, no availability executor property => no custom executor") {
-        expectCrashLater(withMessage: "Fatal error: Incorrect actor executor assumption; Expected 'MainActor' executor.")
+      // On non-apple platforms the SDK comes with the toolchains,
+      // so the feature works because we're executing in a 5.9 context already,
+      // which otherwise could not have been compiled
+      tests.test("non apple platform: 5.7 actor, no availability executor property => no custom executor") {
         try! await FiveSevenActor_NothingExecutor(actorSystem: system).test(x: 42)
       }
 
-      tests.test("5.9 actor, no availability executor property => custom executor") {
+      tests.test("non apple platform: 5.9 actor, no availability executor property => custom executor") {
         try! await FiveNineActor_NothingExecutor(actorSystem: system).test(x: 42)
       }
 
-      tests.test("5.7 actor, 5.9 executor property => no custom executor") {
-        expectCrashLater(withMessage: "Fatal error: Incorrect actor executor assumption; Expected 'MainActor' executor.")
+      tests.test("non apple platform: 5.7 actor, 5.9 executor property => no custom executor") {
         try! await FiveSevenActor_FiveNineExecutor(actorSystem: system).test(x: 42)
       }
 
