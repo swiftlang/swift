@@ -44,7 +44,11 @@ using namespace swift::PatternMatch;
 using namespace swift::regionanalysisimpl;
 
 namespace {
+
 using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
+using TrackableValueID = PartitionPrimitives::Element;
+using Region = PartitionPrimitives::Region;
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -89,7 +93,191 @@ static InFlightDiagnostic diagnose(const SILInstruction *inst, Diag<T...> diag,
 }
 
 //===----------------------------------------------------------------------===//
-//                 MARK: Expr/Type Inference for Diagnostics
+//                           MARK: Require Liveness
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class BlockLivenessInfo {
+  // Generation counter so we do not need to reallocate.
+  unsigned generation = 0;
+  SILInstruction *firstRequireInst = nullptr;
+
+  void resetIfNew(unsigned newGeneration) {
+    if (generation == newGeneration)
+      return;
+    generation = newGeneration;
+    firstRequireInst = nullptr;
+  }
+
+public:
+  SILInstruction *getInst(unsigned callerGeneration) {
+    resetIfNew(callerGeneration);
+    return firstRequireInst;
+  }
+
+  void setInst(unsigned callerGeneration, SILInstruction *newValue) {
+    resetIfNew(callerGeneration);
+    firstRequireInst = newValue;
+  }
+};
+
+/// We only want to emit errors for the first requires along a path from a
+/// transfer instruction. We discover this by walking from user blocks to
+struct RequireLiveness {
+  unsigned generation;
+  SILInstruction *transferInst;
+  BasicBlockData<BlockLivenessInfo> &blockLivenessInfo;
+  InstructionSet allRequires;
+  InstructionSetWithSize finalRequires;
+
+  /// If we have requires in the def block before our transfer, this is the
+  /// first require.
+  SILInstruction *firstRequireBeforeTransferInDefBlock = nullptr;
+
+  RequireLiveness(unsigned generation, Operand *transferOp,
+                  BasicBlockData<BlockLivenessInfo> &blockLivenessInfo)
+      : generation(generation), transferInst(transferOp->getUser()),
+        blockLivenessInfo(blockLivenessInfo),
+        allRequires(transferOp->getParentFunction()),
+        finalRequires(transferOp->getParentFunction()) {}
+
+  template <typename Collection>
+  void process(Collection collection);
+
+  /// Attempt to process requireInst for our def block. Returns false if
+  /// requireInst was before our def and we need to do interprocedural
+  /// processing. Returns true if requireInst was after our transferInst and we
+  /// were able to appropriately determine if we should emit it or not.
+  void processDefBlock();
+
+  /// Process all requires in block, updating blockLivenessInfo.
+  void processNonDefBlock(SILBasicBlock *block);
+};
+
+} // namespace
+
+void RequireLiveness::processDefBlock() {
+  LLVM_DEBUG(llvm::dbgs() << "    Processing def block!\n");
+  // First walk from the beginning of the block to the transfer instruction to
+  // see if we have any requires before our def. Once we find one, we can skip
+  // the traversal and jump straight to the transfer.
+  for (auto ii = transferInst->getParent()->begin(),
+            ie = transferInst->getIterator();
+       ii != ie; ++ii) {
+    if (allRequires.contains(&*ii) && !firstRequireBeforeTransferInDefBlock) {
+      firstRequireBeforeTransferInDefBlock = &*ii;
+      LLVM_DEBUG(llvm::dbgs() << "        Found transfer before def: "
+                              << *firstRequireBeforeTransferInDefBlock);
+      break;
+    }
+  }
+
+  // Then walk from our transferInst to the end of the block looking for the
+  // first require inst. Once we find it... return.
+  for (auto ii = std::next(transferInst->getIterator()),
+            ie = transferInst->getParent()->end();
+       ii != ie; ++ii) {
+    if (!allRequires.contains(&*ii))
+      continue;
+
+    finalRequires.insert(&*ii);
+    LLVM_DEBUG(llvm::dbgs() << "        Found transfer after def: " << *ii);
+    return;
+  }
+}
+
+void RequireLiveness::processNonDefBlock(SILBasicBlock *block) {
+  // Walk from the bottom to the top... assigning to our block state.
+  auto blockState = blockLivenessInfo.get(block);
+  for (auto &inst : llvm::make_range(block->rbegin(), block->rend())) {
+    if (!finalRequires.contains(&inst))
+      continue;
+    blockState.get()->setInst(generation, &inst);
+  }
+}
+
+template <typename Collection>
+void RequireLiveness::process(Collection requireInstList) {
+  LLVM_DEBUG(llvm::dbgs() << "==> Performing Require Liveness for: "
+                          << *transferInst);
+
+  // Then put all of our requires into our allRequires set.
+  BasicBlockWorklist initializingWorklist(transferInst->getFunction());
+  for (auto *require : requireInstList) {
+    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << *require);
+    allRequires.insert(require);
+    initializingWorklist.pushIfNotVisited(require->getParent());
+  }
+
+  // Then process our def block to see if we have any requires before and after
+  // the transferInst...
+  processDefBlock();
+
+  // If we found /any/ requries after the transferInst, we can bail early since
+  // that is guaranteed to dominate all further requires.
+  if (!finalRequires.empty()) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "        Found transfer after def in def block! Exiting early!\n");
+    return;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "        Did not find transfer after def in def "
+                             "block! Walking blocks!\n");
+
+  // If we found a transfer in the def block before our def, add it to the block
+  // state for the def.
+  if (firstRequireBeforeTransferInDefBlock) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "        Found a require before transfer! Adding to block state!\n");
+    auto blockState = blockLivenessInfo.get(transferInst->getParent());
+    blockState.get()->setInst(generation, firstRequireBeforeTransferInDefBlock);
+  }
+
+  // Then for each require block that isn't a def block transfer, find the
+  // earliest transfer inst.
+  while (auto *requireBlock = initializingWorklist.pop()) {
+    auto blockState = blockLivenessInfo.get(requireBlock);
+    for (auto &inst : *requireBlock) {
+      if (!allRequires.contains(&inst))
+        continue;
+      LLVM_DEBUG(llvm::dbgs() << "        Mapping Block bb"
+                              << requireBlock->getDebugID() << " to: " << inst);
+      blockState.get()->setInst(generation, &inst);
+      break;
+    }
+  }
+
+  // Then walk from our def block looking for setInst blocks.
+  auto *transferBlock = transferInst->getParent();
+  BasicBlockWorklist worklist(transferInst->getFunction());
+  for (auto *succBlock : transferBlock->getSuccessorBlocks())
+    worklist.pushIfNotVisited(succBlock);
+
+  while (auto *next = worklist.pop()) {
+    // Check if we found an earliest requires... if so, add that to final
+    // requires and continue. We don't want to visit successors.
+    auto blockState = blockLivenessInfo.get(next);
+    if (auto *inst = blockState.get()->getInst(generation)) {
+      finalRequires.insert(inst);
+      continue;
+    }
+
+    // Do not look at successors of the transfer block.
+    if (next == transferBlock)
+      continue;
+
+    // Otherwise, we did not find a requires and need to search further
+    // successors.
+    for (auto *succBlock : next->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succBlock);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                MARK: UseAfterTransfer Diagnostic Inference
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -449,201 +637,6 @@ void UseAfterTransferDiagnosticInferrer::init(const Operand *op) {
   auto *captureDecl = captureInfo.getDecl();
   Walker walker(*this, captureDecl);
   autoClosureExpr->walk(walker);
-}
-
-//===----------------------------------------------------------------------===//
-//                       MARK: Instruction Level Model
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-using TrackableValueID = PartitionPrimitives::Element;
-using Region = PartitionPrimitives::Region;
-
-} // namespace
-
-//===----------------------------------------------------------------------===//
-//                           MARK: Require Liveness
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class BlockLivenessInfo {
-  // Generation counter so we do not need to reallocate.
-  unsigned generation = 0;
-  SILInstruction *firstRequireInst = nullptr;
-
-  void resetIfNew(unsigned newGeneration) {
-    if (generation == newGeneration)
-      return;
-    generation = newGeneration;
-    firstRequireInst = nullptr;
-  }
-
-public:
-  SILInstruction *getInst(unsigned callerGeneration) {
-    resetIfNew(callerGeneration);
-    return firstRequireInst;
-  }
-
-  void setInst(unsigned callerGeneration, SILInstruction *newValue) {
-    resetIfNew(callerGeneration);
-    firstRequireInst = newValue;
-  }
-};
-
-/// We only want to emit errors for the first requires along a path from a
-/// transfer instruction. We discover this by walking from user blocks to
-struct RequireLiveness {
-  unsigned generation;
-  SILInstruction *transferInst;
-  BasicBlockData<BlockLivenessInfo> &blockLivenessInfo;
-  InstructionSet allRequires;
-  InstructionSetWithSize finalRequires;
-
-  /// If we have requires in the def block before our transfer, this is the
-  /// first require.
-  SILInstruction *firstRequireBeforeTransferInDefBlock = nullptr;
-
-  RequireLiveness(unsigned generation, Operand *transferOp,
-                  BasicBlockData<BlockLivenessInfo> &blockLivenessInfo)
-      : generation(generation), transferInst(transferOp->getUser()),
-        blockLivenessInfo(blockLivenessInfo),
-        allRequires(transferOp->getParentFunction()),
-        finalRequires(transferOp->getParentFunction()) {}
-
-  template <typename Collection>
-  void process(Collection collection);
-
-  /// Attempt to process requireInst for our def block. Returns false if
-  /// requireInst was before our def and we need to do interprocedural
-  /// processing. Returns true if requireInst was after our transferInst and we
-  /// were able to appropriately determine if we should emit it or not.
-  void processDefBlock();
-
-  /// Process all requires in block, updating blockLivenessInfo.
-  void processNonDefBlock(SILBasicBlock *block);
-};
-
-} // namespace
-
-void RequireLiveness::processDefBlock() {
-  LLVM_DEBUG(llvm::dbgs() << "    Processing def block!\n");
-  // First walk from the beginning of the block to the transfer instruction to
-  // see if we have any requires before our def. Once we find one, we can skip
-  // the traversal and jump straight to the transfer.
-  for (auto ii = transferInst->getParent()->begin(),
-            ie = transferInst->getIterator();
-       ii != ie; ++ii) {
-    if (allRequires.contains(&*ii) && !firstRequireBeforeTransferInDefBlock) {
-      firstRequireBeforeTransferInDefBlock = &*ii;
-      LLVM_DEBUG(llvm::dbgs() << "        Found transfer before def: "
-                              << *firstRequireBeforeTransferInDefBlock);
-      break;
-    }
-  }
-
-  // Then walk from our transferInst to the end of the block looking for the
-  // first require inst. Once we find it... return.
-  for (auto ii = std::next(transferInst->getIterator()),
-            ie = transferInst->getParent()->end();
-       ii != ie; ++ii) {
-    if (!allRequires.contains(&*ii))
-      continue;
-
-    finalRequires.insert(&*ii);
-    LLVM_DEBUG(llvm::dbgs() << "        Found transfer after def: " << *ii);
-    return;
-  }
-}
-
-void RequireLiveness::processNonDefBlock(SILBasicBlock *block) {
-  // Walk from the bottom to the top... assigning to our block state.
-  auto blockState = blockLivenessInfo.get(block);
-  for (auto &inst : llvm::make_range(block->rbegin(), block->rend())) {
-    if (!finalRequires.contains(&inst))
-      continue;
-    blockState.get()->setInst(generation, &inst);
-  }
-}
-
-template <typename Collection>
-void RequireLiveness::process(Collection requireInstList) {
-  LLVM_DEBUG(llvm::dbgs() << "==> Performing Require Liveness for: "
-                          << *transferInst);
-
-  // Then put all of our requires into our allRequires set.
-  BasicBlockWorklist initializingWorklist(transferInst->getFunction());
-  for (auto *require : requireInstList) {
-    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << *require);
-    allRequires.insert(require);
-    initializingWorklist.pushIfNotVisited(require->getParent());
-  }
-
-  // Then process our def block to see if we have any requires before and after
-  // the transferInst...
-  processDefBlock();
-
-  // If we found /any/ requries after the transferInst, we can bail early since
-  // that is guaranteed to dominate all further requires.
-  if (!finalRequires.empty()) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "        Found transfer after def in def block! Exiting early!\n");
-    return;
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "        Did not find transfer after def in def "
-                             "block! Walking blocks!\n");
-
-  // If we found a transfer in the def block before our def, add it to the block
-  // state for the def.
-  if (firstRequireBeforeTransferInDefBlock) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "        Found a require before transfer! Adding to block state!\n");
-    auto blockState = blockLivenessInfo.get(transferInst->getParent());
-    blockState.get()->setInst(generation, firstRequireBeforeTransferInDefBlock);
-  }
-
-  // Then for each require block that isn't a def block transfer, find the
-  // earliest transfer inst.
-  while (auto *requireBlock = initializingWorklist.pop()) {
-    auto blockState = blockLivenessInfo.get(requireBlock);
-    for (auto &inst : *requireBlock) {
-      if (!allRequires.contains(&inst))
-        continue;
-      LLVM_DEBUG(llvm::dbgs() << "        Mapping Block bb"
-                              << requireBlock->getDebugID() << " to: " << inst);
-      blockState.get()->setInst(generation, &inst);
-      break;
-    }
-  }
-
-  // Then walk from our def block looking for setInst blocks.
-  auto *transferBlock = transferInst->getParent();
-  BasicBlockWorklist worklist(transferInst->getFunction());
-  for (auto *succBlock : transferBlock->getSuccessorBlocks())
-    worklist.pushIfNotVisited(succBlock);
-
-  while (auto *next = worklist.pop()) {
-    // Check if we found an earliest requires... if so, add that to final
-    // requires and continue. We don't want to visit successors.
-    auto blockState = blockLivenessInfo.get(next);
-    if (auto *inst = blockState.get()->getInst(generation)) {
-      finalRequires.insert(inst);
-      continue;
-    }
-
-    // Do not look at successors of the transfer block.
-    if (next == transferBlock)
-      continue;
-
-    // Otherwise, we did not find a requires and need to search further
-    // successors.
-    for (auto *succBlock : next->getSuccessorBlocks())
-      worklist.pushIfNotVisited(succBlock);
-  }
 }
 
 //===----------------------------------------------------------------------===//
