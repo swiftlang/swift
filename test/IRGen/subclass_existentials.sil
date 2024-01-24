@@ -108,7 +108,7 @@ bb0(%0 : @owned $C, %1 : @owned $C & P):
 // CHECK-NEXT:  br i1 [[IS_SUBCLASS]], label %cont, label %fail
 
 // CHECK:     cont:
-// CHECK-NEXT:  [[WTABLE:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, {{.*}} %3)
+// CHECK-NEXT:  [[WTABLE:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, {{.*}} %3)
 // CHECK-NEXT:  [[IS_NOT_CONFORMING:%.*]] = icmp eq ptr [[WTABLE]], null
 // CHECK-NEXT:  br i1 [[IS_NOT_CONFORMING]], label %fail, label %cont1
 
@@ -141,7 +141,7 @@ bb0(%0 : @owned $C):
 
 // CHECK-LABEL: define linkonce_odr hidden { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %0, ptr
 // CHECK:     entry:
-// CHECK-NEXT:  [[WTABLE:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, {{.*}} %2)
+// CHECK-NEXT:  [[WTABLE:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, {{.*}} %2)
 // CHECK-NEXT:  [[IS_NOT_CONFORMING:%.*]] = icmp eq ptr [[WTABLE]], null
 // CHECK-NEXT:  br i1 [[IS_NOT_CONFORMING]], label %fail, label %cont
 
