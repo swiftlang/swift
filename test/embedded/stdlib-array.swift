@@ -21,9 +21,9 @@ public func test() {
   array.max()
   array.partition(by: { $0 > 0 })
   array.reduce(0, +)
-  // array.shuffle()
-  // array = array.shuffled()
-  // array.randomElement()
+  array.shuffle()
+  array = array.shuffled()
+  array.randomElement()
 }
 
 test()

@@ -951,7 +951,6 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
   @inlinable
-  @_unavailableInEmbedded
   public func randomElement() -> Element? {
     var g = SystemRandomNumberGenerator()
     return randomElement(using: &g)

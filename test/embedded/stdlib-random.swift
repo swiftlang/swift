@@ -3,22 +3,13 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: CODEGENERATOR=ARM
 
 public func test() {
-  var s: Set<Int> = [1, 2, 3]
-  s.insert(42)
-  s.sorted()
-  s.allSatisfy { $0 > 0 }
-  s.contains { $0 > 0 }
-  s.map { $0 * 2 }
-  s.filter { $0 > 0 }
-  s.firstIndex(of: 42)
-  s.min()
-  s.max()
-  s.reduce(0, +)
-  s.shuffled()
-  s.randomElement()
+  Bool.random()
+  Int.random(in: 0 ..< 100)
+  Double.random(in: 0.0 ..< 1.0)
+  [1, 2, 3].shuffled()
+  [1, 2, 3].randomElement()
 }
 
 test()
