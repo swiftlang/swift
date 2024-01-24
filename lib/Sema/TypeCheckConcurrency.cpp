@@ -4631,8 +4631,10 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
-    if (var->isTopLevelGlobal() &&
-        (var->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    auto &ctx = var->getASTContext();
+    if (!ctx.LangOpts.isConcurrencyModelTaskToThread() &&
+        var->isTopLevelGlobal() &&
+        (ctx.LangOpts.StrictConcurrencyLevel >=
              StrictConcurrency::Complete ||
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
