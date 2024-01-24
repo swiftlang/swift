@@ -1889,7 +1889,7 @@ class MultiConformanceChecker {
 
   /// Check one conformance.
   void checkIndividualConformance(
-    NormalProtocolConformance *conformance, bool issueFixit);
+    NormalProtocolConformance *conformance);
 
   /// Determine whether the given requirement was left unsatisfied.
   bool isUnsatisfiedReq(
@@ -1971,7 +1971,7 @@ void MultiConformanceChecker::checkAllConformances() {
   for (unsigned I = 0, N = AllConformances.size(); I < N; ++I) {
     auto *conformance = AllConformances[I];
     // Check this conformance and emit fixits if this is the last one in the pool.
-    checkIndividualConformance(conformance, I == N - 1);
+    checkIndividualConformance(conformance);
     anyInvalid |= conformance->isInvalid();
     if (anyInvalid)
       continue;
@@ -2006,16 +2006,13 @@ void MultiConformanceChecker::checkAllConformances() {
 
 static void diagnoseConformanceImpliedByConditionalConformance(
     DiagnosticEngine &Diags, NormalProtocolConformance *conformance,
-    NormalProtocolConformance *implyingConf, bool issueFixit) {
+    NormalProtocolConformance *implyingConf) {
   auto proto = conformance->getProtocol();
   Type protoType = proto->getDeclaredInterfaceType();
   auto implyingProto = implyingConf->getProtocol()->getDeclaredInterfaceType();
   auto loc = implyingConf->getLoc();
   Diags.diagnose(loc, diag::conditional_conformances_cannot_imply_conformances,
                  conformance->getType(), implyingProto, protoType);
-
-  if (!issueFixit)
-    return;
 
   // Now we get down to business: constructing a few options for new
   // extensions. They all look like:
@@ -2136,8 +2133,7 @@ static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
 /// Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 void MultiConformanceChecker::
-checkIndividualConformance(NormalProtocolConformance *conformance,
-                           bool issueFixit) {
+checkIndividualConformance(NormalProtocolConformance *conformance) {
   PrettyStackTraceConformance trace("type-checking", conformance);
 
   switch (conformance->getState()) {
@@ -2321,7 +2317,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
-  bool impliedDisablesMissingWitnessFixits = false;
   if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
       !Proto->isMarkerProtocol()) {
     // We've got something like:
@@ -2341,13 +2336,13 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
     auto implyingCondReqs = implyingConf->getConditionalRequirements();
     if (!implyingCondReqs.empty()) {
+      // FIXME:
       // We shouldn't suggest including witnesses for the conformance, because
       // those suggestions will go in the current DeclContext, but really they
       // should go into the new extension we (might) suggest here.
-      impliedDisablesMissingWitnessFixits = true;
 
       diagnoseConformanceImpliedByConditionalConformance(
-          C.Diags, conformance, implyingConf, issueFixit);
+          C.Diags, conformance, implyingConf);
 
       conformance->setInvalid();
     }
@@ -2385,10 +2380,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   MissingWitnesses.insert(revivedMissingWitnesses.begin(),
                           revivedMissingWitnesses.end());
 
-  auto missingWitnessFixits = issueFixit && !impliedDisablesMissingWitnessFixits;
-  AllUsedCheckers.back().checkConformance(
-      missingWitnessFixits ? MissingWitnessDiagnosisKind::ErrorFixIt
-                           : MissingWitnessDiagnosisKind::ErrorOnly);
+  AllUsedCheckers.back().checkConformance();
 }
 
 /// Add the next associated type deduction to the string representation
@@ -3830,7 +3822,19 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
     return true;
   }
 
-  if (Kind != MissingWitnessDiagnosisKind::FixItOnly) {
+  switch (Kind) {
+  case MissingWitnessDiagnosisKind::FixItOnly: {
+    const auto MissingWitnesses = filterProtocolRequirements(
+        GlobalMissingWitnesses.getArrayRef(), Adoptee);
+    getASTContext().addDelayedConformanceDiag(Conformance, true,
+        [MissingWitnesses](NormalProtocolConformance *Conf) {
+          diagnoseProtocolStubFixit(Conf, MissingWitnesses);
+        });
+    clearGlobalMissingWitnesses();
+    return true;
+  }
+
+  case MissingWitnessDiagnosisKind::ErrorOnly: {
     // Diagnose the missing witnesses.
     for (auto &Missing : LocalMissing) {
       auto requirement = Missing.requirement;
@@ -3848,22 +3852,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind, bool Delayed) {
             diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
           }
         });
+      }
     }
-  }
-
-  switch (Kind) {
-  case MissingWitnessDiagnosisKind::FixItOnly:
-  case MissingWitnessDiagnosisKind::ErrorFixIt: {
-    const auto MissingWitnesses = filterProtocolRequirements(
-        GlobalMissingWitnesses.getArrayRef(), Adoptee);
-    getASTContext().addDelayedConformanceDiag(Conformance, true,
-        [MissingWitnesses](NormalProtocolConformance *Conf) {
-          diagnoseProtocolStubFixit(Conf, MissingWitnesses);
-        });
-    clearGlobalMissingWitnesses();
-    return true;
-  }
-  case MissingWitnessDiagnosisKind::ErrorOnly:
     return true;
   }
 }
@@ -5118,7 +5108,7 @@ void ConformanceChecker::resolveValueWitnesses() {
   }
 }
 
-void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
+void ConformanceChecker::checkConformance() {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
   FrontendStatsTracer statsTracer(getASTContext().Stats,
@@ -5134,7 +5124,8 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   resolveValueWitnesses();
 
   // Diagnose any missing witnesses.
-  diagnoseMissingWitnesses(Kind, /*Delayed=*/false);
+  diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorOnly,
+                           /*Delayed=*/false);
 
   // Except in specific hardcoded cases for Foundation/Swift
   // standard library compatibility, an _ObjectiveCBridgeable
@@ -6527,7 +6518,7 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
   ConformanceChecker checker(requirement->getASTContext(), conformance,
                              MissingWitnesses);
   checker.resolveSingleWitness(requirement);
-  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt,
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorOnly,
                                    /*Delayed=*/true);
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the

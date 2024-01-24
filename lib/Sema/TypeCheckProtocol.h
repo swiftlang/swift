@@ -120,7 +120,6 @@ enum class ResolveWitnessResult {
 enum class MissingWitnessDiagnosisKind {
   FixItOnly,
   ErrorOnly,
-  ErrorFixIt,
 };
 
 /// The protocol conformance checker.
@@ -232,9 +231,8 @@ public:
   /// directly as possible.
   void resolveSingleTypeWitness(AssociatedTypeDecl *assocType);
 
-  /// Check the entire protocol conformance, ensuring that all
-  /// witnesses are resolved and emitting any diagnostics.
-  void checkConformance(MissingWitnessDiagnosisKind Kind);
+  /// Check the entire protocol conformance.
+  void checkConformance();
 };
 
 /// Match the given witness to the given requirement.

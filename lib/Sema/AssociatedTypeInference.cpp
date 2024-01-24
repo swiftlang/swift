@@ -3999,7 +3999,7 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
   ConformanceChecker checker(requirement->getASTContext(), conformance,
                              MissingWitnesses);
   checker.resolveSingleTypeWitness(requirement);
-  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt,
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorOnly,
                                    /*Delayed=*/true);
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the
