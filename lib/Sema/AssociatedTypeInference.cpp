@@ -344,13 +344,17 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
 }
 
 /// Attempt to resolve a type witness via member name lookup.
-ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
+static ResolveWitnessResult resolveTypeWitnessViaLookup(
+                       NormalProtocolConformance *conformance,
                        AssociatedTypeDecl *assocType) {
+  auto *dc = conformance->getDeclContext();
+  auto &ctx = dc->getASTContext();
+
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
-  if (isa<ClangModuleUnit>(Conformance->getDeclContext()->getModuleScopeContext())) {
+  if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
     llvm::errs() << "Cannot look up associated type for imported conformance:\n";
-    Conformance->getType().dump(llvm::errs());
+    conformance->getType().dump(llvm::errs());
     assocType->dump(llvm::errs());
     abort();
   }
@@ -360,10 +364,9 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // Look for a member type with the same name as the associated type.
   SmallVector<ValueDecl *, 4> candidates;
 
-  DC->lookupQualified(DC->getSelfNominalTypeDecl(),
-                      assocType->createNameRef(),
-                      DC->getSelfNominalTypeDecl()->getLoc(),
-                      subOptions, candidates);
+  dc->lookupQualified(dc->getSelfNominalTypeDecl(), assocType->createNameRef(),
+                      dc->getSelfNominalTypeDecl()->getLoc(), subOptions,
+                      candidates);
 
   // If there aren't any candidates, we're done.
   if (candidates.empty()) {
@@ -402,7 +405,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
           typeAliasDecl->getParentSourceFile()->Kind == SourceFileKind::Interface) {
         if (typeAliasDecl->getUnderlyingType()->isNever()) {
           if (typeAliasDecl->getDeclContext()->getSelfNominalTypeDecl() ==
-              DC->getSelfNominalTypeDecl()) {
+              dc->getSelfNominalTypeDecl()) {
             skipRequirementCheck = true;
           }
         }
@@ -429,13 +432,13 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     // clause, check those requirements now.
     if (!skipRequirementCheck &&
         !TypeChecker::checkContextualRequirements(
-            genericDecl, Adoptee, SourceLoc(), DC->getParentModule(),
-            DC->getGenericSignatureOfContext())) {
+            genericDecl, dc->getSelfInterfaceType(), SourceLoc(),
+            dc->getParentModule(), dc->getGenericSignatureOfContext())) {
       continue;
     }
 
-    auto memberType = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
-                                                           typeDecl, Adoptee);
+    auto memberType = TypeChecker::substMemberTypeWithBase(
+        dc->getParentModule(), typeDecl, dc->getSelfInterfaceType());
 
     // Type witnesses that resolve to constraint types are always
     // existential types. This can only happen when the type witness
@@ -455,7 +458,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
     // Check this type against the protocol requirements.
     if (auto checkResult =
-            checkTypeWitness(memberType, assocType, Conformance, llvm::None)) {
+            checkTypeWitness(memberType, assocType, conformance, llvm::None)) {
       nonViable.push_back({typeDecl, checkResult});
     } else {
       viable.push_back({typeDecl, memberType, nullptr});
@@ -475,18 +478,18 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
     auto interfaceType = viable.front().MemberType;
-    recordTypeWitness(Conformance, assocType, interfaceType,
+    recordTypeWitness(conformance, assocType, interfaceType,
                       viable.front().Member);
     return ResolveWitnessResult::Success;
   }
 
   // Record an error.
-  recordTypeWitness(Conformance, assocType,
-                    ErrorType::get(getASTContext()), nullptr);
+  recordTypeWitness(conformance, assocType,
+                    ErrorType::get(ctx), nullptr);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
-    getASTContext().addDelayedConformanceDiag(Conformance, true,
+    ctx.addDelayedConformanceDiag(conformance, true,
       [assocType, viable](NormalProtocolConformance *conformance) {
         auto &diags = assocType->getASTContext().Diags;
         diags.diagnose(assocType, diag::ambiguous_witnesses_type,
@@ -499,10 +502,10 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     return ResolveWitnessResult::ExplicitFailed;
   }
   // Save the missing type witness for later diagnosis.
-  getASTContext().addDelayedMissingWitness(Conformance, {assocType, {}});
+  ctx.addDelayedMissingWitness(conformance, {assocType, {}});
 
   // None of the candidates were viable.
-  getASTContext().addDelayedConformanceDiag(Conformance, true,
+  ctx.addDelayedConformanceDiag(conformance, true,
     [nonViable](NormalProtocolConformance *conformance) {
       auto &diags = conformance->getDeclContext()->getASTContext().Diags;
       for (auto candidate : nonViable) {
@@ -1063,7 +1066,7 @@ public:
   /// Perform associated type inference.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
-  llvm::Optional<InferredTypeWitnesses> solve(ConformanceChecker &checker);
+  llvm::Optional<InferredTypeWitnesses> solve();
 };
 
 }
@@ -3506,7 +3509,7 @@ bool AssociatedTypeInference::canAttemptEagerTypeWitnessDerivation(
   return false;
 }
 
-auto AssociatedTypeInference::solve(ConformanceChecker &checker)
+auto AssociatedTypeInference::solve()
     -> llvm::Optional<InferredTypeWitnesses> {
   LLVM_DEBUG(llvm::dbgs() << "============ Start " << conformance->getType()
                           << ": " << conformance->getProtocol()->getName()
@@ -3542,7 +3545,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
 
     // Try to resolve this type witness via name lookup, which is the
     // most direct mechanism, overriding all others.
-    switch (checker.resolveTypeWitnessViaLookup(assocType)) {
+    switch (resolveTypeWitnessViaLookup(conformance, assocType)) {
     case ResolveWitnessResult::Success:
       // Success. Move on to the next.
       LLVM_DEBUG(llvm::dbgs() << "Associated type " << assocType->getName()
@@ -3598,7 +3601,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   // new type declaration.
   // FIXME: This is ridiculous.
   for (auto assocType : unresolvedAssocTypes) {
-    switch (checker.resolveTypeWitnessViaLookup(assocType)) {
+    switch (resolveTypeWitnessViaLookup(conformance, assocType)) {
     case ResolveWitnessResult::Success:
     case ResolveWitnessResult::ExplicitFailed:
       // A declaration that can become a witness has shown up. Go
@@ -3606,7 +3609,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
       // information.
       LLVM_DEBUG(llvm::dbgs() << "Associated type " << assocType->getName()
                               << " now has a valid witness\n";);
-      return solve(checker);
+      return solve();
 
     case ResolveWitnessResult::Missing:
       // The type witness is still missing. Keep going.
@@ -3950,7 +3953,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
   // Attempt to infer associated type witnesses.
   AssociatedTypeInference inference(getASTContext(), Conformance);
-  if (auto inferred = inference.solve(*this)) {
+  if (auto inferred = inference.solve()) {
     for (const auto &inferredWitness : *inferred) {
       recordTypeWitness(Conformance,
                         inferredWitness.first,
@@ -3978,7 +3981,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
 void ConformanceChecker::resolveSingleTypeWitness(
        AssociatedTypeDecl *assocType) {
-  switch (resolveTypeWitnessViaLookup(assocType)) {
+  switch (resolveTypeWitnessViaLookup(Conformance, assocType)) {
   case ResolveWitnessResult::Success:
   case ResolveWitnessResult::ExplicitFailed:
     // We resolved this type witness one way or another.

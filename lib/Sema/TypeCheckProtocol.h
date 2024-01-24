@@ -167,10 +167,6 @@ public:
   ResolveWitnessResult
   resolveWitnessTryingAllStrategies(ValueDecl *requirement);
 
-  /// Attempt to resolve a type witness via member name lookup.
-  ResolveWitnessResult resolveTypeWitnessViaLookup(
-                         AssociatedTypeDecl *assocType);
-
   /// Check whether all of the protocol's generic requirements are satisfied by
   /// the chosen type witnesses.
   void ensureRequirementsAreSatisfied();
