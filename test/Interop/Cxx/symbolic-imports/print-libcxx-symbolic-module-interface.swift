@@ -6,6 +6,7 @@
 
 // REQUIRES: asserts
 // REQUIRES: OS=macosx
+// REQUIRES: rdar119869070
 
 // CHECK: enum std {
 // CHECK: enum __1 {

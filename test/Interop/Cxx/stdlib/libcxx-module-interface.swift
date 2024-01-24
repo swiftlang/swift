@@ -5,6 +5,7 @@
 
 // This test is specific to libc++ and therefore only runs on Darwin platforms.
 // REQUIRES: OS=macosx || OS=ios
+// REQUIRES: rdar119869070
 
 // CHECK-STD: import CxxStdlib.iosfwd
 // CHECK-STD: import CxxStdlib.string

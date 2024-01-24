@@ -4,6 +4,7 @@
 // RUN: find %t/cache | %FileCheck %s
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: rdar119869070
 
 //--- Inputs/module.modulemap
 module CxxModule {
