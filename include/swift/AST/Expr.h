@@ -3519,6 +3519,19 @@ public:
   }
 };
 
+/// ActorIsolationErasureExpr - A special kind of function conversion that
+/// drops actor isolation.
+class ActorIsolationErasureExpr : public ImplicitConversionExpr {
+public:
+  ActorIsolationErasureExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::ActorIsolationErasure, subExpr, type) {
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ActorIsolationErasure;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,

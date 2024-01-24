@@ -484,6 +484,8 @@ namespace {
     }
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
+    RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
+                                          SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
              CovariantFunctionConversionExpr *E,
              SGFContext C);
@@ -2113,6 +2115,11 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
   ManagedValue result = SGF.B.createUncheckedRefCast(e, original, resultType);
 
   return RValue(SGF, e, result);
+}
+
+RValue RValueEmitter::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
+                                                     SGFContext C) {
+  llvm_unreachable("not implemented");
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {

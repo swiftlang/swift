@@ -2695,6 +2695,13 @@ public:
     printFoot();
   }
 
+  void visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
+                                      StringRef label) {
+    printCommon(E, "actor_isolation_erasure_expr", label);
+    printRec(E->getSubExpr());
+    printFoot();
+  }
+
   void visitInOutExpr(InOutExpr *E, StringRef label) {
     printCommon(E, "inout_expr", label);
     printRec(E->getSubExpr());

@@ -5924,6 +5924,9 @@ void PrintAST::visitLinearFunctionExtractOriginalExpr(swift::LinearFunctionExtra
 void PrintAST::visitLinearToDifferentiableFunctionExpr(swift::LinearToDifferentiableFunctionExpr *expr) {
 }
 
+void PrintAST::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *expr) {
+}
+
 void PrintAST::visitPropertyWrapperValuePlaceholderExpr(swift::PropertyWrapperValuePlaceholderExpr *expr) {
 }
 
