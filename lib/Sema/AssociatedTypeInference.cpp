@@ -3947,64 +3947,62 @@ TypeWitnessSystem::compareResolvedTypes(Type ty1, Type ty2) {
   return ResolvedTypeComparisonResult::EquivalentOrWorse;
 }
 
-void ConformanceChecker::resolveTypeWitnesses() {
-  PrettyStackTraceConformance trace("performing associated type inference on",
-                                    Conformance);
-
+evaluator::SideEffect
+ResolveTypeWitnessesRequest::evaluate(Evaluator &evaluator,
+                                      NormalProtocolConformance *conformance) const {
   // Attempt to infer associated type witnesses.
-  AssociatedTypeInference inference(getASTContext(), Conformance);
+  auto &ctx = conformance->getDeclContext()->getASTContext();
+
+  AssociatedTypeInference inference(ctx, conformance);
   if (auto inferred = inference.solve()) {
     for (const auto &inferredWitness : *inferred) {
-      recordTypeWitness(Conformance,
+      recordTypeWitness(conformance,
                         inferredWitness.first,
                         inferredWitness.second,
                         /*typeDecl=*/nullptr);
     }
 
-    return;
+    return evaluator::SideEffect();
   }
 
   // Conformance failed. Record errors for each of the witnesses.
-  Conformance->setInvalid();
+  conformance->setInvalid();
 
   // We're going to produce an error below. Mark each unresolved
   // associated type witness as erroneous.
-  for (auto assocType : Proto->getAssociatedTypeMembers()) {
+  for (auto assocType : conformance->getProtocol()->getAssociatedTypeMembers()) {
     // If we already have a type witness, do nothing.
-    if (Conformance->hasTypeWitness(assocType))
+    if (conformance->hasTypeWitness(assocType))
       continue;
 
-    recordTypeWitness(Conformance, assocType,
-                      ErrorType::get(getASTContext()), nullptr);
+    recordTypeWitness(conformance, assocType, ErrorType::get(ctx), nullptr);
   }
-}
 
-void ConformanceChecker::resolveSingleTypeWitness(
-       AssociatedTypeDecl *assocType) {
-  switch (resolveTypeWitnessViaLookup(Conformance, assocType)) {
-  case ResolveWitnessResult::Success:
-  case ResolveWitnessResult::ExplicitFailed:
-    // We resolved this type witness one way or another.
-    return;
-
-  case ResolveWitnessResult::Missing:
-    // The type witness is still missing. Resolve all of the type witnesses.
-    resolveTypeWitnesses();
-    return;
-  }
+  return evaluator::SideEffect();
 }
 
 TypeWitnessAndDecl
 TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
                              AssociatedTypeDecl *requirement) const {
-  auto &ctx = requirement->getASTContext();
-  ConformanceChecker checker(ctx, conformance);
-  checker.resolveSingleTypeWitness(requirement);
+  switch (resolveTypeWitnessViaLookup(conformance, requirement)) {
+  case ResolveWitnessResult::Success:
+  case ResolveWitnessResult::ExplicitFailed:
+    // We resolved this type witness one way or another.
+    break;
 
-  // FIXME: ConformanceChecker and the other associated WitnessCheckers have
-  // an extremely convoluted caching scheme that doesn't fit nicely into the
-  // evaluator's model. All of this should be refactored away.
+  case ResolveWitnessResult::Missing: {
+    // The type witness is still missing. Resolve all of the type witnesses.
+    auto &ctx = requirement->getASTContext();
+    evaluateOrDefault(ctx.evaluator,
+                      ResolveTypeWitnessesRequest{conformance},
+                      evaluator::SideEffect());
+    break;
+  }
+  }
+
+  // FIXME: resolveTypeWitnessViaLookup() and ResolveTypeWitnessesRequest
+  // pre-populate the type witnesses in this manner. This should be cleaned up.
   const auto known = conformance->TypeWitnesses.find(requirement);
   assert(known != conformance->TypeWitnesses.end() &&
          "Didn't resolve witness?");

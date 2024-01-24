@@ -4014,7 +4014,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   auto *nominal = DC->getSelfNominalTypeDecl();
 
   // Resolve all associated types before trying to resolve this witness.
-  resolveTypeWitnesses();
+  evaluateOrDefault(getASTContext().evaluator,
+                    ResolveTypeWitnessesRequest{Conformance},
+                    evaluator::SideEffect());
 
   // If any of the type witnesses was erroneous, don't bother to check
   // this value witness: it will fail.
@@ -4531,7 +4533,9 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
 
   // Resolve all associated types before trying to resolve this witness.
-  resolveTypeWitnesses();
+  evaluateOrDefault(getASTContext().evaluator,
+                    ResolveTypeWitnessesRequest{Conformance},
+                    evaluator::SideEffect());
 
   // If any of the type witnesses was erroneous, don't bother to check
   // this value witness: it will fail.
@@ -5048,7 +5052,9 @@ void ConformanceChecker::checkConformance() {
                                   "check-conformance", Conformance);
 
   // Resolve all of the type witnesses.
-  resolveTypeWitnesses();
+  evaluateOrDefault(getASTContext().evaluator,
+                    ResolveTypeWitnessesRequest{Conformance},
+                    evaluator::SideEffect());
 
   // Check the requirements from the requirement signature.
   ensureRequirementsAreSatisfied();

@@ -175,9 +175,6 @@ public:
 
   ~ConformanceChecker();
 
-  /// Resolve all of the type witnesses.
-  void resolveTypeWitnesses();
-
   /// Resolve all of the non-type witnesses.
   void resolveValueWitnesses();
 
@@ -190,10 +187,6 @@ public:
   /// particular requirement and adoptee is required, before the
   /// conformance has been completed checked.
   void resolveSingleWitness(ValueDecl *requirement);
-
-  /// Resolve the type witness for the given associated type as
-  /// directly as possible.
-  void resolveSingleTypeWitness(AssociatedTypeDecl *assocType);
 
   /// Check the entire protocol conformance.
   void checkConformance();

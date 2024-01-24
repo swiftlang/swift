@@ -3459,9 +3459,11 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
           nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
           ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
           /*isPreconcurrency=*/false);
-      ConformanceChecker checker(getASTContext(), conformance);
       // Type witnesses must be resolved first.
-      checker.resolveTypeWitnesses();
+      evaluateOrDefault(getASTContext().evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+      ConformanceChecker checker(getASTContext(), conformance);
       checker.resolveValueWitnesses();
       fakeConformances.push_back(conformance);
     }

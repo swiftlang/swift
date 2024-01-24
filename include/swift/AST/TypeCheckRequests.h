@@ -2870,6 +2870,24 @@ public:
   bool isCached() const { return true; }
 };
 
+class ResolveTypeWitnessesRequest
+    : public SimpleRequest<ResolveTypeWitnessesRequest,
+                           evaluator::SideEffect(NormalProtocolConformance *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class ValueWitnessRequest
     : public SimpleRequest<ValueWitnessRequest,
                            Witness(NormalProtocolConformance *, ValueDecl *),
