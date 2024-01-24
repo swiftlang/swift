@@ -250,26 +250,4 @@ AssociatedTypeDecl *findDefaultedAssociatedType(
 
 }
 
-namespace llvm {
-
-template<>
-struct DenseMapInfo<swift::ASTContext::MissingWitness> {
-  using MissingWitness = swift::ASTContext::MissingWitness;
-  using RequirementPointerTraits = DenseMapInfo<swift::ValueDecl *>;
-
-  static inline MissingWitness getEmptyKey() {
-    return MissingWitness(RequirementPointerTraits::getEmptyKey(), {});
-  }
-  static inline MissingWitness getTombstoneKey() {
-    return MissingWitness(RequirementPointerTraits::getTombstoneKey(), {});
-  }
-  static inline unsigned getHashValue(MissingWitness missing) {
-    return RequirementPointerTraits::getHashValue(missing.requirement);
-  }
-  static bool isEqual(MissingWitness a, MissingWitness b) {
-    return a.requirement == b.requirement;
-  }
-};
-
-}
 #endif // SWIFT_SEMA_PROTOCOL_H

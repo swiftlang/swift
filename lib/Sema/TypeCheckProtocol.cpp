@@ -1882,7 +1882,6 @@ namespace {
 class MultiConformanceChecker {
   ASTContext &Context;
   llvm::SmallVector<ValueDecl*, 16> UnsatisfiedReqs;
-  llvm::SmallVector<ConformanceChecker, 4> AllUsedCheckers;
   llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
   llvm::SmallPtrSet<ValueDecl *, 8> CoveredMembers;
 
@@ -1896,13 +1895,6 @@ class MultiConformanceChecker {
       const ObjCRequirementMap &map);
 public:
   MultiConformanceChecker(ASTContext &ctx) : Context(ctx) {}
-
-  ~MultiConformanceChecker() {
-    // Emit diagnostics at the very end.
-    for (auto &checker : AllUsedCheckers) {
-      emitDelayedDiags(checker.Conformance);
-    }
-  }
 
   ASTContext &getASTContext() const { return Context; }
 
@@ -1975,7 +1967,7 @@ static void diagnoseProtocolStubFixit(
     ArrayRef<ASTContext::MissingWitness> missingWitnesses);
 
 void MultiConformanceChecker::checkAllConformances() {
-  llvm::SetVector<ASTContext::MissingWitness> MissingWitnesses;
+  llvm::SmallVector<ASTContext::MissingWitness, 2> MissingWitnesses;
 
   bool anyInvalid = false;
   for (auto *conformance : AllConformances) {
@@ -1996,11 +1988,18 @@ void MultiConformanceChecker::checkAllConformances() {
       }
     }
 
+    // Don't diagnose missing witnesses if we can't conform to the protocol
+    // at all.
+    if (conformance->getProtocol()->hasMissingRequirements()) {
+      assert(conformance->isInvalid());
+      continue;
+    }
+
     auto LocalMissing = Context.takeDelayedMissingWitnesses(conformance);
     if (LocalMissing.empty())
       continue;
 
-    MissingWitnesses.insert(LocalMissing.begin(), LocalMissing.end());
+    MissingWitnesses.append(LocalMissing.begin(), LocalMissing.end());
 
     // Diagnose the missing witnesses.
     for (auto &Missing : LocalMissing) {
@@ -2022,18 +2021,20 @@ void MultiConformanceChecker::checkAllConformances() {
     }
   }
 
-  // If there were no missing witnesses, we're done.
-  if (MissingWitnesses.empty())
-    return;
-
-  // Otherwise, backtrack to the last checker that has missing witnesses
-  // and diagnose missing witnesses from there.
-  for (auto *conformance : llvm::reverse(AllConformances)) {
-    if (Context.hasDelayedConformanceErrors(conformance)) {
-      diagnoseProtocolStubFixit(Context, conformance,
-                                MissingWitnesses.getArrayRef());
-      break;
+  // Emit missing witness fixits for all conformances in the batch.
+  if (!MissingWitnesses.empty()) {
+    for (auto *conformance : llvm::reverse(AllConformances)) {
+      if (Context.hasDelayedConformanceErrors(conformance)) {
+        diagnoseProtocolStubFixit(Context, conformance,
+                                  MissingWitnesses);
+        break;
+      }
     }
+  }
+
+  // Emit diagnostics at the very end.
+  for (auto *conformance : AllConformances) {
+      emitDelayedDiags(conformance);
   }
 }
 
@@ -2404,9 +2405,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   if (conformance->isComplete())
     return;
 
-  // The conformance checker we're using.
-  AllUsedCheckers.emplace_back(getASTContext(), conformance);
-  AllUsedCheckers.back().checkConformance();
+  ConformanceChecker checker(getASTContext(), conformance);
+  checker.checkConformance();
 }
 
 /// Add the next associated type deduction to the string representation
