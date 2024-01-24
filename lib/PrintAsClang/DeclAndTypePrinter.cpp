@@ -247,7 +247,7 @@ private:
         continue;
       if (isa<AccessorDecl>(VD))
         continue;
-      if (!AllowDelayed && owningPrinter.delayedMembers.count(VD)) {
+      if (!AllowDelayed && owningPrinter.objcDelayedMembers.count(VD)) {
         os << "// '" << VD->getName()
            << ((outputLang == OutputLanguageMode::Cxx) ? "' cannot be printed\n"
                                                        : "' below\n");

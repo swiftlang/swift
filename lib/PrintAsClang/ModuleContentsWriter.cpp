@@ -130,7 +130,7 @@ class ModuleWriter {
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   llvm::DenseSet<const clang::Type *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
-  DelayedMemberSet delayedMembers;
+  DelayedMemberSet objcDelayedMembers;
   CxxDeclEmissionScope topLevelEmissionScope;
   PrimitiveTypeMapping typeMapping;
   std::string outOfLineDefinitions;
@@ -147,7 +147,7 @@ public:
                OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
         outOfLineDefinitionsOS(outOfLineDefinitions),
-        printer(M, os, prologueOS, outOfLineDefinitionsOS, delayedMembers,
+        printer(M, os, prologueOS, outOfLineDefinitionsOS, objcDelayedMembers,
                 topLevelEmissionScope, typeMapping, interopContext, access,
                 requiresExposedAttribute, exposedModules, outputLang),
         outputLangMode(outputLang) {}
@@ -440,7 +440,7 @@ public:
 
       if (needsToBeIndividuallyDelayed) {
         assert(isa<ClassDecl>(container));
-        delayedMembers.insert(VD);
+        objcDelayedMembers.insert(VD);
       }
     }
 
@@ -797,16 +797,16 @@ public:
     }
 
     if (outputLangMode == OutputLanguageMode::ObjC)
-      if (!delayedMembers.empty()) {
-        auto groupBegin = delayedMembers.begin();
-        for (auto i = groupBegin, e = delayedMembers.end(); i != e; ++i) {
+      if (!objcDelayedMembers.empty()) {
+        auto groupBegin = objcDelayedMembers.begin();
+        for (auto i = groupBegin, e = objcDelayedMembers.end(); i != e; ++i) {
           if ((*i)->getDeclContext() != (*groupBegin)->getDeclContext()) {
             printer.printAdHocCategory(make_range(groupBegin, i));
             groupBegin = i;
           }
         }
         printer.printAdHocCategory(
-            make_range(groupBegin, delayedMembers.end()));
+            make_range(groupBegin, objcDelayedMembers.end()));
       }
 
     // Print any out of line definitions.
