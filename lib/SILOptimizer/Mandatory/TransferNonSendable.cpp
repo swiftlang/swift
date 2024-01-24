@@ -658,15 +658,18 @@ struct DiagnosticEvaluator final
   RegionAnalysisFunctionInfo *info;
   SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
       &transferOpToRequireInstMultiMap;
+  SmallVectorImpl<Operand *> &transferredNonTransferrable;
 
   DiagnosticEvaluator(Partition &workingPartition,
                       RegionAnalysisFunctionInfo *info,
                       SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
-                          &transferOpToRequireInstMultiMap)
+                          &transferOpToRequireInstMultiMap,
+                      SmallVectorImpl<Operand *> &transferredNonTransferrable)
       : PartitionOpEvaluatorBaseImpl(workingPartition,
                                      info->getOperandSetFactory()),
         info(info),
-        transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap) {}
+        transferOpToRequireInstMultiMap(transferOpToRequireInstMultiMap),
+        transferredNonTransferrable(transferredNonTransferrable) {}
 
   void handleFailure(const PartitionOp &partitionOp,
                      TrackableValueID transferredVal,
@@ -710,7 +713,8 @@ struct DiagnosticEvaluator final
                << "        ID:  %%" << transferredVal << "\n"
                << "        Rep: "
                << *info->getValueMap().getRepresentative(transferredVal));
-    diagnose(partitionOp, diag::regionbasedisolation_selforargtransferred);
+    auto *self = const_cast<DiagnosticEvaluator *>(this);
+    self->transferredNonTransferrable.push_back(partitionOp.getSourceOp());
   }
 
   bool isActorDerived(Element element) const {
@@ -727,17 +731,30 @@ struct DiagnosticEvaluator final
 
 } // namespace
 
-/// Once we have reached a fixpoint, this routine runs over all blocks again
-/// reporting any failures by applying our ops to the converged dataflow
-/// state.
-static void emitDiagnostics(RegionAnalysisFunctionInfo *regionInfo) {
-  auto *function = regionInfo->getFunction();
-  LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
-                          << function->getName() << "\n");
+namespace {
 
+class TransferNonSendableImpl {
+  RegionAnalysisFunctionInfo *regionInfo;
   SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
       transferOpToRequireInstMultiMap;
+  SmallVector<Operand *, 8> transferredNonTransferrable;
 
+public:
+  TransferNonSendableImpl(RegionAnalysisFunctionInfo *regionInfo)
+      : regionInfo(regionInfo) {}
+
+  void run();
+
+private:
+  void runDiagnosticEvaluator();
+
+  void emitUseAfterTransferDiagnostics();
+  void emitTransferredNonTransferrableDiagnostics();
+};
+
+} // namespace
+
+void TransferNonSendableImpl::runDiagnosticEvaluator() {
   // Then for each block...
   LLVM_DEBUG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
   for (auto [block, blockState] : regionInfo->getRange()) {
@@ -749,7 +766,8 @@ static void emitDiagnostics(RegionAnalysisFunctionInfo *regionInfo) {
     // has callbacks that emit diagnsotics...
     Partition workingPartition = blockState.getEntryPartition();
     DiagnosticEvaluator eval(workingPartition, regionInfo,
-                             transferOpToRequireInstMultiMap);
+                             transferOpToRequireInstMultiMap,
+                             transferredNonTransferrable);
 
     // And then evaluate all of our partition ops on the entry partition.
     for (auto &partitionOp : blockState.getPartitionOps()) {
@@ -762,7 +780,10 @@ static void emitDiagnostics(RegionAnalysisFunctionInfo *regionInfo) {
 
   // Now that we have found all of our transferInsts/Requires emit errors.
   transferOpToRequireInstMultiMap.setFrozen();
+}
 
+void TransferNonSendableImpl::emitUseAfterTransferDiagnostics() {
+  auto *function = regionInfo->getFunction();
   BasicBlockData<BlockLivenessInfo> blockLivenessInfo(function);
   // We use a generation counter so we can lazily reset blockLivenessInfo
   // since we cannot clear it without iterating over it.
@@ -872,6 +893,25 @@ static void emitDiagnostics(RegionAnalysisFunctionInfo *regionInfo) {
   }
 }
 
+void TransferNonSendableImpl::emitTransferredNonTransferrableDiagnostics() {
+  for (auto *op : transferredNonTransferrable) {
+    diagnose(op->getUser(), diag::regionbasedisolation_selforargtransferred);
+  }
+}
+
+/// Once we have reached a fixpoint, this routine runs over all blocks again
+/// reporting any failures by applying our ops to the converged dataflow
+/// state.
+void TransferNonSendableImpl::run() {
+  auto *function = regionInfo->getFunction();
+  LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
+                          << function->getName() << "\n");
+
+  runDiagnosticEvaluator();
+  emitTransferredNonTransferrableDiagnostics();
+  emitUseAfterTransferDiagnostics();
+}
+
 //===----------------------------------------------------------------------===//
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
@@ -893,7 +933,8 @@ class TransferNonSendable : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs()
                << "===> PROCESSING: " << function->getName() << '\n');
 
-    emitDiagnostics(functionInfo);
+    TransferNonSendableImpl impl(functionInfo);
+    impl.run();
   }
 };
 
