@@ -83,7 +83,8 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                      ":", options::OPT_L, context.Args,
                                      runtimeLibraryPaths);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
-                                     ":", options::OPT_F, context.Args);
+                                     ":", options::OPT_F, context.Args,
+                                     {"/System/Library/Frameworks"});
   // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.
   return II;
 }
