@@ -3628,8 +3628,17 @@ Type TypeChecker::catchErrorType(DeclContext *dc, DoCatchStmt *stmt) {
       stmt->getBody(), EffectKind::Throws);
 
   // If it doesn't throw at all, the type is Never.
-  if (!classification.hasThrows())
+  if (!classification.hasThrows()) {
+    // Source compatibility: if the do..catch was already exhaustive,
+    // and we aren't doing full typed throws, treat the caught error
+    // type as 'any Error' to allow pattern-matches to continue to
+    // type check.
+    if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows) &&
+        stmt->isSyntacticallyExhaustive())
+      return ctx.getErrorExistentialType();
+
     return ctx.getNeverType();
+  }
 
   return classification.getThrownError();
 }
