@@ -1615,28 +1615,18 @@ struct CopiedLoadBorrowEliminationVisitor
 //                   MARK: Partial Consume/Reinit Checking
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// When partial consumption is enabled, we only allow for destructure through
-/// deinits. When partial consumption is disabled, we error on /all/ partial
-/// consumption.
-enum class IsPartialConsumeOrReinit_t {
-  IsPartialConsume,
-  IsPartialReinit,
-};
-
-} // namespace
-
-static std::pair<SILType, NominalTypeDecl *>
-shouldEmitPartialError(UseState &useState, SILInstruction *user,
-                       SILType useType, TypeTreeLeafTypeRange usedBits) {
+/// Whether an error should be emitted in response to a partial consumption.
+static llvm::Optional<PartialMutationError>
+shouldEmitPartialMutationError(UseState &useState, SILInstruction *user,
+                               SILType useType,
+                               TypeTreeLeafTypeRange usedBits) {
   SILFunction *fn = useState.getFunction();
 
   // We walk down from our ancestor to our projection, emitting an error if
   // any of our types have a deinit.
   auto iterType = useState.address->getType();
   if (iterType.isMoveOnlyWrapped())
-    return {SILType(), nullptr};
+    return {};
 
   TypeOffsetSizePair pair(usedBits);
   auto targetType = useType;
@@ -1652,12 +1642,14 @@ shouldEmitPartialError(UseState &useState, SILInstruction *user,
     if (iterType == targetType) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
                                  "without emitting error!\n");
-      return {SILType(), nullptr};
+      return {};
     }
 
     // Emit the error.
-    return {iterType, nullptr};
+    return {PartialMutationError::featureDisabled(iterType)};
   }
+
+  LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
 
   // Otherwise, walk the type looking for the deinit.
   while (iterType != targetType) {
@@ -1671,7 +1663,7 @@ shouldEmitPartialError(UseState &useState, SILInstruction *user,
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
         // actual projection string.
-        return {iterType, nom};
+        return {PartialMutationError::hasDeinit(iterType, *nom)};
       }
     }
 
@@ -1681,103 +1673,24 @@ shouldEmitPartialError(UseState &useState, SILInstruction *user,
         *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
   }
 
-  return {SILType(), nullptr};
+  return {};
 }
 
-static void
-checkForPartialConsume(UseState &useState, DiagnosticEmitter &diagnosticEmitter,
-                       SILInstruction *user, SILType useType,
-                       TypeTreeLeafTypeRange usedBits,
-                       IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
-  SILFunction *fn = useState.getFunction();
-
+static bool checkForPartialMutation(UseState &useState,
+                                    DiagnosticEmitter &diagnosticEmitter,
+                                    SILInstruction *user, SILType useType,
+                                    TypeTreeLeafTypeRange usedBits,
+                                    PartialMutation partialMutateKind) {
   // We walk down from our ancestor to our projection, emitting an error if
   // any of our types have a deinit.
-  TypeOffsetSizePair pair(usedBits);
-  SILType errorIterType;
-  NominalTypeDecl *nom;
-  std::tie(errorIterType, nom) =
-      shouldEmitPartialError(useState, user, useType, usedBits);
-  if (!errorIterType)
-    return;
+  auto error =
+      shouldEmitPartialMutationError(useState, user, useType, usedBits);
+  if (!error)
+    return false;
 
-  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
-          Feature::MoveOnlyPartialConsumption)) {
-    // Otherwise, build up the path string and emit the error.
-    SmallString<128> pathString;
-    auto rootType = useState.address->getType();
-    if (errorIterType != rootType) {
-      llvm::raw_svector_ostream os(pathString);
-      pair.constructPathString(errorIterType, {rootType, fn}, rootType, fn, os);
-    }
-
-    diagnosticEmitter.emitCannotPartiallyConsumeError(
-        useState.address, pathString, nullptr /*nominal*/, user,
-        false /*deinit only*/);
-    return;
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
-
-  SmallString<128> pathString;
-  auto rootType = useState.address->getType();
-  if (errorIterType != rootType) {
-    llvm::raw_svector_ostream os(pathString);
-    pair.constructPathString(errorIterType, {rootType, fn}, rootType, fn, os);
-  }
-
-  diagnosticEmitter.emitCannotPartiallyConsumeError(
-      useState.address, pathString, nom, user, true /*deinit only*/);
-}
-
-static void
-checkForPartialConsume(UseState &useState, DiagnosticEmitter &diagnosticEmitter,
-                       Operand *op, TypeTreeLeafTypeRange usedBits,
-                       IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
-  return checkForPartialConsume(useState, diagnosticEmitter, op->getUser(),
-                                op->get()->getType(), usedBits,
-                                isPartialConsumeOrReinit);
-}
-
-static void diagnosePartialReinitError(UseState &useState,
-                                       DiagnosticEmitter &diagnosticEmitter,
-                                       SILInstruction *user, SILType errorType,
-                                       NominalTypeDecl *nom,
-                                       SILInstruction *earlierConsumingUse,
-                                       TypeTreeLeafTypeRange usedBits) {
-  SILFunction *fn = useState.getFunction();
-
-  // We walk down from our ancestor to our projection, emitting an error if
-  // any of our types have a deinit.
-  TypeOffsetSizePair pair(usedBits);
-  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
-          Feature::MoveOnlyPartialConsumption)) {
-    // Otherwise, build up the path string and emit the error.
-    SmallString<128> pathString;
-    auto rootType = useState.address->getType();
-    if (errorType != rootType) {
-      llvm::raw_svector_ostream os(pathString);
-      pair.constructPathString(errorType, {rootType, fn}, rootType, fn, os);
-    }
-
-    diagnosticEmitter.emitCannotPartiallyReinitError(
-        useState.address, pathString, nullptr /*nominal*/, user,
-        earlierConsumingUse, false /*deinit only*/);
-    return;
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
-
-  SmallString<128> pathString;
-  auto rootType = useState.address->getType();
-  if (errorType != rootType) {
-    llvm::raw_svector_ostream os(pathString);
-    pair.constructPathString(errorType, {rootType, fn}, rootType, fn, os);
-  }
-
-  diagnosticEmitter.emitCannotPartiallyReinitError(
-      useState.address, pathString, nom, user, earlierConsumingUse,
-      true /*deinit only*/);
+  diagnosticEmitter.emitCannotPartiallyMutateError(
+      useState.address, error.value(), user, usedBits, partialMutateKind);
+  return true;
 }
 
 namespace {
@@ -1791,14 +1704,6 @@ struct PartialReinitChecker {
 
   void
   performPartialReinitChecking(FieldSensitiveMultiDefPrunedLiveRange &liveness);
-
-private:
-  void checkForPartialConsumeOrInitError(
-      SILInstruction *user, SILType useType, TypeTreeLeafTypeRange usedBits,
-      IsPartialConsumeOrReinit_t isPartialConsumeOrReinit) {
-    ::checkForPartialConsume(useState, diagnosticEmitter, user, useType,
-                             usedBits, isPartialConsumeOrReinit);
-  }
 };
 
 } // namespace
@@ -1819,18 +1724,10 @@ void PartialReinitChecker::performPartialReinitChecking(
         emittedError = !liveness.findEarlierConsumingUse(
             initToValues.first, index,
             [&](SILInstruction *consumingInst) -> bool {
-              SILType errorType;
-              NominalTypeDecl *nom;
-              std::tie(errorType, nom) = shouldEmitPartialError(
-                  useState, initToValues.first, value->getType(),
-                  TypeTreeLeafTypeRange(index, index + 1));
-              if (!errorType)
-                return true;
-
-              diagnosePartialReinitError(
-                  useState, diagnosticEmitter, initToValues.first, errorType,
-                  nom, consumingInst, TypeTreeLeafTypeRange(index, index + 1));
-              return false;
+              return !checkForPartialMutation(
+                  useState, diagnosticEmitter, initToValues.first,
+                  value->getType(), TypeTreeLeafTypeRange(index, index + 1),
+                  PartialMutation::reinit(*consumingInst));
             });
 
         // If we emitted an error for this index break. We only want to emit one
@@ -1862,18 +1759,10 @@ void PartialReinitChecker::performPartialReinitChecking(
         emittedError = !liveness.findEarlierConsumingUse(
             reinitToValues.first, index,
             [&](SILInstruction *consumingInst) -> bool {
-              SILType errorType;
-              NominalTypeDecl *nom;
-              std::tie(errorType, nom) = shouldEmitPartialError(
-                  useState, reinitToValues.first, value->getType(),
-                  TypeTreeLeafTypeRange(index, index + 1));
-              if (!errorType)
-                return true;
-
-              diagnosePartialReinitError(
-                  useState, diagnosticEmitter, reinitToValues.first, errorType,
-                  nom, consumingInst, TypeTreeLeafTypeRange(index, index + 1));
-              return false;
+              return !checkForPartialMutation(
+                  useState, diagnosticEmitter, reinitToValues.first,
+                  value->getType(), TypeTreeLeafTypeRange(index, index + 1),
+                  PartialMutation::reinit(*consumingInst));
             });
         if (emittedError)
           break;
@@ -2102,8 +1991,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // If we have a copy_addr, we are either going to have a take or a
     // copy... in either case, this copy_addr /is/ going to be a consuming
     // operation. Make sure to check if we semantically destructure.
-    checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
-                           IsPartialConsumeOrReinit_t::IsPartialConsume);
+    checkForPartialMutation(useState, diagnosticEmitter, op->getUser(),
+                            op->get()->getType(), *leafRange,
+                            PartialMutation::consume());
 
     if (copyAddr->isTakeOfSrc()) {
       LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
@@ -2296,8 +2186,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     } else {
       // Now that we know that we are going to perform a take, perform a
       // checkForDestructure.
-      checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
-                             IsPartialConsumeOrReinit_t::IsPartialConsume);
+      checkForPartialMutation(useState, diagnosticEmitter, op->getUser(),
+                              op->get()->getType(), *leafRange,
+                              PartialMutation::consume());
 
       // If we emitted an error diagnostic, do not transform further and instead
       // mark that we emitted an early diagnostic and return true.
@@ -2352,8 +2243,9 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // error.
     unsigned numDiagnostics =
         moveChecker.diagnosticEmitter.getDiagnosticCount();
-    checkForPartialConsume(useState, diagnosticEmitter, op, *leafRange,
-                           IsPartialConsumeOrReinit_t::IsPartialConsume);
+    checkForPartialMutation(useState, diagnosticEmitter, op->getUser(),
+                            op->get()->getType(), *leafRange,
+                            PartialMutation::consume());
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Emitting destructure through deinit error!\n");

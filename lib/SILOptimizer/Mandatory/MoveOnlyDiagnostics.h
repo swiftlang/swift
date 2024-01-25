@@ -20,6 +20,7 @@
 #define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYDIAGNOSTICS_H
 
 #include "MoveOnlyObjectCheckerUtils.h"
+#include "MoveOnlyTypeUtils.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
@@ -187,15 +188,10 @@ public:
   emitPromotedBoxArgumentError(MarkUnresolvedNonCopyableValueInst *markedValue,
                                SILFunctionArgument *arg);
 
-  void emitCannotPartiallyConsumeError(
-      MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-      NominalTypeDecl *nominal, SILInstruction *consumingUser,
-      bool dueToDeinit);
-
-  void emitCannotPartiallyReinitError(
-      MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-      NominalTypeDecl *nominal, SILInstruction *initUser,
-      SILInstruction *consumingUser, bool dueToDeinit);
+  void emitCannotPartiallyMutateError(
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      PartialMutationError error, SILInstruction *user,
+      TypeTreeLeafTypeRange usedBits, PartialMutation kind);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
