@@ -30,8 +30,7 @@ func testInt(positive: Stringified<UInt64> = #stringify(1_000_001),
              negative: Stringified<Int32> = #stringify(-0o21)) {}
 func testFloat(double: Stringified<Double> = #stringify(-0xC.3p0),
                float: Stringified<Float> = #stringify(00003.14159)) {}
-func testString(literal: Stringified<MyLiteral> = #stringify("🐨"),
-                interpolated: Stringified<String> = #stringify("Hello \(0b10001)")) {}
+func testString(literal: Stringified<MyLiteral> = #stringify("🐨")) {}
 func testMagic(fileID: Stringified<String> = #stringify(#fileID),
                filePath: Stringified<String> = #stringify(#filePath),
                file: Stringified<String> = #stringify(#file),
@@ -51,3 +50,6 @@ let myString = "oops"
 
 // expected-error@+1{{argument to macro used as default argument must be literal}}
 func testIdentifier(notOkay: Stringified<String> = #stringify(myString)) {}
+
+// expected-error@+1{{argument to macro used as default argument must be literal}}
+func testString(interpolated: Stringified<String> = #stringify("Hello \(0b10001)")) {}

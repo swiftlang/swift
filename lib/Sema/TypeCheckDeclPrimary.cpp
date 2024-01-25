@@ -1037,7 +1037,8 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
   // only allow arguments that are literals
   auto args = macroExpansionExpr->getArgs();
   for (auto arg : *args)
-    if (!dyn_cast<LiteralExpr>(arg.getExpr())) {
+    if (!isa<LiteralExpr>(arg.getExpr()) ||
+        isa<InterpolatedStringLiteralExpr>(arg.getExpr())) {
       ctx.Diags.diagnose(
           arg.getExpr()->getLoc(),
           diag::macro_as_default_argument_arguments_must_be_literal);
