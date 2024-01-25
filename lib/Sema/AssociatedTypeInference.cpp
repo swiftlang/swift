@@ -12,6 +12,23 @@
 //
 // This file implements type witness lookup and associated type inference.
 //
+// There are three entry points into the code here, all via request evaluation:
+//
+// - TypeWitnessRequest resolves a type witness in a normal conformance.
+//   - First, we perform a qualified lookup into the conforming type to find a
+//     member type with the same name as the associated type.
+//   - If the lookup succeeds, we record the type witness.
+//   - If the lookup fails, we attempt to resolve all type witnesses.
+//
+// - ResolveTypeWitnessesRequest resolves all type witnesses of a normal
+//   conformance.
+//   - First, we attempt to resolve each associated type via lookup.
+//   - For any witnesses still unresolved, we perform associated type inference.
+//
+// - AssociatedConformanceRequest resolves an associated conformance of a
+//   normal conformance. This computes the substituted subject type and performs
+//   a global conformance lookup.
+//
 //===----------------------------------------------------------------------===//
 #include "TypeCheckProtocol.h"
 #include "DerivedConformances.h"
@@ -3941,6 +3958,10 @@ TypeWitnessSystem::compareResolvedTypes(Type ty1, Type ty2) {
   // concrete type).
   return ResolvedTypeComparisonResult::EquivalentOrWorse;
 }
+
+//
+// Request evaluator entry points
+//
 
 evaluator::SideEffect
 ResolveTypeWitnessesRequest::evaluate(Evaluator &evaluator,
