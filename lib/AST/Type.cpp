@@ -549,6 +549,10 @@ NominalTypeDecl *TypeBase::getAnyActor() {
     return nullptr;
   }
 
+  if (auto self = getAs<DynamicSelfType>()) {
+    return self->getSelfType()->getAnyActor();
+  }
+
   // Existential types: check for Actor protocol.
   if (isExistentialType()) {
     auto layout = getExistentialLayout();

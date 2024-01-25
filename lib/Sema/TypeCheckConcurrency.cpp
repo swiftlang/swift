@@ -141,7 +141,8 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
       return true;
 
     // construct an isolation corresponding to the type.
-    auto actorTypeIso = ActorIsolation::forActorInstanceSelf(nominal);
+    auto actorTypeIso = ActorIsolation::forActorInstanceSelf(
+        const_cast<AbstractFunctionDecl *>(fn));
 
     return requiresFlowIsolation(actorTypeIso, cast<ConstructorDecl>(fn));
   }
@@ -3280,6 +3281,17 @@ namespace {
           continue;
 
         auto *arg = args->getExpr(paramIdx);
+
+        // FIXME: CurrentContextIsolationExpr does not have its actor set
+        // at this point.
+        if (auto *macro = dyn_cast<MacroExpansionExpr>(arg)) {
+          auto *expansion = macro->getRewritten();
+          if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expansion)) {
+            recordCurrentContextIsolation(isolation);
+            arg = isolation->getActor();
+          }
+        }
+
         argForIsolatedParam = arg;
         if (getIsolatedActor(arg))
           continue;
@@ -3290,17 +3302,20 @@ namespace {
         // that can talk about specific parameters.
         auto nominal = getType(arg)->getAnyNominal();
         if (!nominal) {
+          // FIXME: This is wrong for distributed actors.
           nominal = getType(arg)->getASTContext().getProtocol(
               KnownProtocolKind::Actor);
         }
 
-        // FIXME: Also allow 'Optional.none'
-        if (dyn_cast<NilLiteralExpr>(arg->findOriginalValue())) {
-          mayExitToNonisolated = true;
-        } else {
-          unsatisfiedIsolation =
-              ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
-          mayExitToNonisolated = false;
+        auto calleeIsolation = ActorIsolation::forActorInstanceParameter(
+            const_cast<Expr *>(arg->findOriginalValue()), paramIdx);
+
+        if (getContextIsolation() != calleeIsolation) {
+          if (calleeIsolation.isNonisolated()) {
+            mayExitToNonisolated = true;
+          } else {
+            unsatisfiedIsolation = calleeIsolation;
+          }
         }
 
         if (!fnType->getExtInfo().isAsync())
@@ -3447,6 +3462,11 @@ namespace {
       Type optionalAnyActorType = isolationExpr->getType();
       switch (isolation) {
       case ActorIsolation::ActorInstance: {
+        if (auto *instance = isolation.getActorInstanceExpr()) {
+          actorExpr = instance;
+          break;
+        }
+
         const VarDecl *var = isolation.getActorInstance();
         if (!var) {
           auto dc = getDeclContext();
@@ -4661,7 +4681,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
     auto actor = value->getDeclContext()->getSelfNominalTypeDecl();
     assert(actor && "could not find the actor that 'self' is isolated to");
-    return ActorIsolation::forActorInstanceSelf(actor);
+    return ActorIsolation::forActorInstanceSelf(value);
   }
 
   // If this declaration has an isolated parameter, it's isolated to that
@@ -4698,7 +4718,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       actorType = paramType;
     }
     if (auto actor = actorType->getAnyActor())
-      return ActorIsolation::forActorInstanceParameter(actor, *paramIdx);
+      return ActorIsolation::forActorInstanceParameter(param, *paramIdx);
   }
 
   // Diagnose global state that is not either immutable plus Sendable or
@@ -6092,7 +6112,7 @@ static ActorIsolation getActorIsolationForReference(
     // as needing to enter the actor.
     if (auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominal->isAnyActor())
-        return ActorIsolation::forActorInstanceSelf(nominal);
+        return ActorIsolation::forActorInstanceSelf(decl);
     }
 
     // Fall through to treat initializers like any other declaration.
@@ -6108,7 +6128,7 @@ static ActorIsolation getActorIsolationForReference(
         declIsolation.isNonisolated()) {
       if (auto nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
         if (nominal->isAnyActor())
-          return ActorIsolation::forActorInstanceSelf(nominal);
+          return ActorIsolation::forActorInstanceSelf(decl);
 
         auto nominalIsolation = getActorIsolation(nominal);
         if (nominalIsolation.isGlobalActor())

@@ -11271,9 +11271,62 @@ ActorIsolation::ActorIsolation(Kind kind, NominalTypeDecl *actor,
     : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
       silParsed(false), parameterIndex(parameterIndex) {}
 
-ActorIsolation::ActorIsolation(Kind kind, VarDecl *capturedActor)
-    : actorInstance(capturedActor), kind(kind), isolatedByPreconcurrency(false),
-      silParsed(false), parameterIndex(0) {}
+ActorIsolation::ActorIsolation(Kind kind, VarDecl *actor,
+                               unsigned parameterIndex)
+    : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
+      silParsed(false), parameterIndex(parameterIndex) {}
+
+ActorIsolation::ActorIsolation(Kind kind, Expr *actor,
+                               unsigned parameterIndex)
+    : actorInstance(actor), kind(kind), isolatedByPreconcurrency(false),
+      silParsed(false), parameterIndex(parameterIndex) {}
+
+ActorIsolation
+ActorIsolation::forActorInstanceParameter(Expr *actor,
+                                          unsigned parameterIndex) {
+  auto &ctx = actor->getType()->getASTContext();
+
+  // An isolated value of `nil` is statically nonisolated.
+  // FIXME: Also allow 'Optional.none'
+  if (dyn_cast<NilLiteralExpr>(actor))
+    return ActorIsolation::forNonisolated(/*unsafe*/false);
+
+  // An isolated value of `<global actor type>.shared` is statically
+  // global actor isolated.
+  if (auto *memberRef = dyn_cast<MemberRefExpr>(actor)) {
+    // Check that the member declaration witnesses the `shared`
+    // requirement of the `GlobalActor` protocol.
+    auto declRef = memberRef->getDecl();
+    auto baseType =
+        memberRef->getBase()->getType()->getMetatypeInstanceType();
+    if (auto globalActor = ctx.getProtocol(KnownProtocolKind::GlobalActor)) {
+      auto *dc = declRef.getDecl()->getDeclContext();
+      auto *module = dc->getParentModule();
+      auto conformance = module->checkConformance(baseType, globalActor);
+      if (conformance &&
+          conformance.getWitnessByName(baseType, ctx.Id_shared) == declRef) {
+        return ActorIsolation::forGlobalActor(baseType);
+      }
+    }
+  }
+
+  return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+}
+
+ActorIsolation
+ActorIsolation::forActorInstanceSelf(ValueDecl *decl) {
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl))
+    return ActorIsolation(ActorInstance, fn->getImplicitSelfDecl(), 0);
+
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
+    if (auto *fn = storage->getAccessor(AccessorKind::Get)) {
+      return ActorIsolation(ActorInstance, fn->getImplicitSelfDecl(), 0);
+    }
+  }
+
+  auto *dc = decl->getDeclContext();
+  return ActorIsolation(ActorInstance, dc->getSelfNominalTypeDecl(), 0);
+}
 
 NominalTypeDecl *ActorIsolation::getActor() const {
   assert(getKind() == ActorInstance);
@@ -11281,8 +11334,19 @@ NominalTypeDecl *ActorIsolation::getActor() const {
   if (silParsed)
     return nullptr;
 
+  Type actorType;
+
   if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
-    return instance->getTypeInContext()
+    actorType = instance->getTypeInContext();
+  } else if (auto *instance = actorInstance.dyn_cast<Expr *>()) {
+    actorType = instance->getType();
+  }
+
+  if (actorType) {
+    if (auto wrapped = actorType->getOptionalObjectType()) {
+      actorType = wrapped;
+    }
+    return actorType
         ->getReferenceStorageReferent()->getAnyActor();
   }
 
@@ -11296,6 +11360,15 @@ VarDecl *ActorIsolation::getActorInstance() const {
     return nullptr;
 
   return actorInstance.dyn_cast<VarDecl *>();
+}
+
+Expr *ActorIsolation::getActorInstanceExpr() const {
+  assert(getKind() == ActorInstance);
+
+  if (silParsed)
+    return nullptr;
+
+  return actorInstance.dyn_cast<Expr *>();
 }
 
 bool ActorIsolation::isMainActor() const {
@@ -11315,6 +11388,39 @@ bool ActorIsolation::isDistributedActor() const {
     return false;
 
   return getKind() == ActorInstance && getActor()->isDistributedActor();
+}
+
+bool ActorIsolation::isEqual(const ActorIsolation &lhs,
+                             const ActorIsolation &rhs) {
+  if (lhs.getKind() != rhs.getKind())
+    return false;
+
+  switch (lhs.getKind()) {
+  case Nonisolated:
+  case NonisolatedUnsafe:
+  case Unspecified:
+    return true;
+
+  case ActorInstance: {
+    auto *lhsActor = lhs.getActorInstance();
+    auto *rhsActor = rhs.getActorInstance();
+    if (lhsActor && rhsActor) {
+      // FIXME: This won't work for arbitrary isolated parameter captures.
+      if ((lhsActor->isSelfParameter() && rhsActor->isSelfParamCapture()) ||
+          (lhsActor->isSelfParamCapture() && rhsActor->isSelfParameter())) {
+        return true;
+      }
+    }
+
+    // The parameter index doesn't matter; only the actor instance
+    // values must be equal.
+    return (lhs.getActor() == rhs.getActor() &&
+            lhs.actorInstance == rhs.actorInstance);
+  }
+
+  case GlobalActor:
+    return areTypesEqual(lhs.globalActor, rhs.globalActor);
+  }
 }
 
 BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)

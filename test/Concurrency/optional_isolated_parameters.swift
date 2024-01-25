@@ -23,5 +23,5 @@ func optionalIsolated(to actor: isolated (any Actor)?) {
 // CHECK: isolated to Swift.MainActor
 // CHECK: isolated to MyActor
 optionalIsolated(to: nil)
-await optionalIsolated(to: MainActor.shared)
+optionalIsolated(to: MainActor.shared)
 await optionalIsolated(to: MyActor())

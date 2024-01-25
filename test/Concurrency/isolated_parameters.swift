@@ -363,6 +363,7 @@ func isolated_generic_ok_1<T: Actor>(_ t: isolated T) {}
 
 
 class NotSendable {} // expected-complete-note 5 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+// expected-note@-1 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 
 func optionalIsolated(_ ns: NotSendable, to actor: isolated (any Actor)?) async {}
 func optionalIsolatedSync(_ ns: NotSendable, to actor: isolated (any Actor)?) {}
@@ -392,7 +393,7 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
   let myActor = A()
 
   await optionalIsolated(ns, to: myActor)
-  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' outside of main actor-isolated context may introduce data races}}
 
   optionalIsolatedSync(ns, to: myActor)
   // expected-error@-1 {{expression is 'async' but is not marked with 'await'}}
@@ -414,5 +415,49 @@ actor A2 {
     await { (self: isolated Self) in }(self)
     await { (self: isolated Self?) in }(self)
     return self
+  }
+}
+
+func testNonSendableCaptures(ns: NotSendable, a: isolated MyActor) {
+  Task {
+    _ = a
+    _ = ns
+  }
+
+  // FIXME: The `a` in the capture list and `isolated a` are the same,
+  // but the actor isolation checker doesn't know that.
+  Task { [a] in
+    _ = a
+    _ = ns // expected-warning {{capture of 'ns' with non-sendable type 'NotSendable' in a `@Sendable` closure}}
+  }
+}
+
+
+@globalActor actor MyGlobal {
+  static let shared = MyGlobal()
+}
+
+func sync(isolatedTo actor: isolated (any Actor)?) {}
+
+func preciseIsolated(a: isolated MyActor) async {
+  sync(isolatedTo: a)
+  sync(isolatedTo: nil) // okay from anywhere
+  sync(isolatedTo: #isolation)
+
+  Task { @MainActor in
+    sync(isolatedTo: MainActor.shared)
+    sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
+  }
+
+  Task { @MyGlobal in
+    sync(isolatedTo: MyGlobal.shared)
+    sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
+  }
+
+  Task.detached {
+    sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
   }
 }
