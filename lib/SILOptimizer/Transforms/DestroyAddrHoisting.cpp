@@ -560,6 +560,13 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
 bool HoistDestroys::foldBarrier(SILInstruction *barrier,
                                 const AccessStorage &storage,
                                 const DeinitBarriers &deinitBarriers) {
+  auto rootPath = AccessPath::compute(storageRoot);
+  if (!rootPath.isValid()) {
+    // [invalid_access_path] The access path to storageRoot isn't understood.
+    // It can't be determined whether all of its leaves have been visited, so
+    // foldability can't be determined. Bail.
+    return false;
+  }
 
   // The load [copy]s which will be folded into load [take]s if folding is
   // possible.
@@ -592,7 +599,8 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
   // it.
   SmallPtrSet<AccessPath::PathNode, 16> trivialLeaves;
 
-  visitProductLeafAccessPathNodes(storageRoot, typeExpansionContext, module,
+  visitProductLeafAccessPathNodes(rootPath, storageRoot, typeExpansionContext,
+                                  module,
                                   [&](AccessPath::PathNode node, SILType ty) {
                                     if (ty.isTrivial(*function))
                                       return;
@@ -744,10 +752,16 @@ bool HoistDestroys::checkFoldingBarrier(
     // of the root storage which would be folded if folding were possible.
     // Find its nontrivial product leaves and remove them from the set of
     // leaves of the root storage which we're wating to see.
+    auto rootPath = AccessPath::compute(address);
+    // [invalid_access_path] The access path to storageRoot was understood, and
+    // address has identical storage to its storage.  The access path to address
+    // must be valid.
+    assert(rootPath.isValid());
+
     bool alreadySawLeaf = false;
     bool alreadySawTrivialSubleaf = false;
     visitProductLeafAccessPathNodes(
-        address, typeExpansionContext, module,
+        rootPath, address, typeExpansionContext, module,
         [&](AccessPath::PathNode node, SILType ty) {
           if (ty.isTrivial(*function)) {
             bool inserted = !trivialLeaves.insert(node).second;

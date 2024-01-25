@@ -1179,3 +1179,23 @@ entry(%addr : $*MoE):
   %retval = tuple ()
   return %retval : $()
 }
+
+sil @getPointer : $@convention(thin) () -> Builtin.RawPointer
+
+struct Nontrivial {
+  var guts: Builtin.AnyObject
+}
+
+sil [ossa] @rdar121327964 : $@convention(method) (@owned Nontrivial) -> () {
+bb0(%0 : @owned $Nontrivial):
+  %6 = function_ref @getPointer : $@convention(thin) () -> Builtin.RawPointer
+  %7 = apply %6() : $@convention(thin) () -> Builtin.RawPointer
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Nontrivial
+  %9 = copy_value %0 : $Nontrivial
+  %10 = begin_access [modify] [dynamic] %8 : $*Nontrivial
+  store %9 to [assign] %10 : $*Nontrivial
+  end_access %10 : $*Nontrivial
+  destroy_value %0 : $Nontrivial
+  %14 = tuple ()
+  return %14 : $()
+}

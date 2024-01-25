@@ -1272,7 +1272,8 @@ struct AccessPathWithBase {
 // The "product leaves" are the leaves obtained by only looking through type
 // products (structs and tuples) and NOT type sums (enums).
 void visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+    AccessPath rootPath, SILValue address, TypeExpansionContext tec,
+    SILModule &module,
     std::function<void(AccessPath::PathNode, SILType)> visitor);
 
 inline AccessPath AccessPath::compute(SILValue address) {
