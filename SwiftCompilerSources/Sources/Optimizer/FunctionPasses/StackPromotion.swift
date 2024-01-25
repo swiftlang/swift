@@ -68,6 +68,12 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
     return false
   }
 
+  // Usually resilient classes cannot be promoted anyway, because their initializers are
+  // not visible and let the object appear to escape.
+  if allocRef.type.nominal.isResilient(in: allocRef.parentFunction) {
+    return false
+  }
+
   // The most important check: does the object escape the current function?
   if allocRef.isEscaping(context) {
     return false
