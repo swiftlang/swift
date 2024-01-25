@@ -84,7 +84,8 @@ public:
                      llvm::StringSet<> &exposedModules,
                      OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS),
-        outOfLineDefinitionsOS(outOfLineDefinitionsOS), objcDelayedMembers(delayed),
+        outOfLineDefinitionsOS(outOfLineDefinitionsOS),
+        objcDelayedMembers(delayed),
         cxxDeclEmissionScope(&topLevelEmissionScope), typeMapping(typeMapping),
         interopContext(interopContext), minRequiredAccess(access),
         requiresExposedAttribute(requiresExposedAttribute),
