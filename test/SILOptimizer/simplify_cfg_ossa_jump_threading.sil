@@ -229,3 +229,49 @@ bb4:
   destroy_value %4 : $FakeOptional<Klass>
   return %5 : $Builtin.Int1
 }
+
+sil_global @my_global : $S
+
+sil @globalinit_func11 :  $@convention(thin) () -> ()
+
+struct S {
+}
+
+// This test is not optimized because the dest bb of the branch has a single predecessor
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading_sil_token :
+// CHECK: switch_enum
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading_sil_token'
+sil [ossa] @test_simplify_switch_enum_jump_threading_sil_token : $@convention(thin) (@owned Klass, Builtin.RawPointer) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.RawPointer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  specify_test "simplify-cfg-try-jump-threading @instruction[2]"
+  %s = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  br bb3(%s : $FakeOptional<Klass>)
+
+bb2:
+  destroy_value %0 : $Klass
+  %n = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%n : $FakeOptional<Klass>)
+
+bb3(%3 : @owned $FakeOptional<Klass>):
+  %f = function_ref @globalinit_func11 : $@convention(thin) () -> ()
+  %b = builtin "once"(%1 : $Builtin.RawPointer, %f : $@convention(thin) () -> ()) : $Builtin.SILToken 
+  %g = global_addr @my_global : $*S depends_on %b
+  switch_enum %3 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb5, case #FakeOptional.none!enumelt: bb4
+
+bb4:
+  br bb6
+
+bb5(%6 : @owned $Klass):
+  %ld = load [trivial] %g : $*S
+  apply undef(%ld) : $@convention(thin) (S) -> () 
+  destroy_value %6 : $Klass
+  br bb6
+
+bb6:
+  %t = tuple ()
+  return %t : $()
+}

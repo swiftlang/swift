@@ -347,10 +347,19 @@ struct One<Two> { // expected-note{{'Two' declared as parameter to type 'One'}}
     }
 }
 
+enum HomeworkError: Error {
+case dogAteIt
+case forgot
+}
+
 func testOne() {
   do {
   } catch let error { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
     if case One.E.SomeError = error {} // expected-error{{generic parameter 'Two' could not be inferred}}
+  }
+  do {
+  } catch HomeworkError.forgot { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  } catch {
   }
 }
 

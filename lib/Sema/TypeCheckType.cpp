@@ -2148,6 +2148,8 @@ namespace {
                                                   TypeResolutionOptions options);
     NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
                                                  TypeResolutionOptions options);
+    NeverNullType resolveLifetimeDependentReturnTypeRepr(
+        LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2637,6 +2639,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::ResultDependsOn:
     return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
                                           options);
+
+  case TypeReprKind::LifetimeDependentReturn:
+    return resolveLifetimeDependentReturnTypeRepr(
+        cast<LifetimeDependentReturnTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -3761,9 +3767,11 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  // TODO: Handle LifetimeDependenceInfo here.
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
-      diffKind, /*clangFunctionType*/ nullptr, Type());
+      diffKind, /*clangFunctionType*/ nullptr, Type(),
+      LifetimeDependenceInfo());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4594,6 +4602,17 @@ TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
     }
 
     diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, "_resultDependsOn");
+    return ErrorType::get(getASTContext());
+  }
+  return resolveType(repr->getBase(), options);
+}
+
+NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
+    LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::FunctionResult)) {
+    diagnoseInvalid(
+        repr, repr->getSpecifierLoc(),
+        diag::lifetime_dependence_only_on_function_method_init_result);
     return ErrorType::get(getASTContext());
   }
   return resolveType(repr->getBase(), options);
@@ -5497,6 +5516,7 @@ public:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::ResultDependsOn:
+    case TypeReprKind::LifetimeDependentReturn:
       return false;
     }
   }
