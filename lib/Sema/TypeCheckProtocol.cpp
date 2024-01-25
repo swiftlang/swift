@@ -5343,12 +5343,6 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   return !M->checkConformance(type, Proto).isInvalid();
 }
 
-void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
-  MultiConformanceChecker checker(conformance->getProtocol()->getASTContext());
-  checker.addConformance(conformance);
-  checker.checkAllConformances();
-}
-
 /// Determine the score when trying to match two identifiers together.
 static unsigned scoreIdentifiers(Identifier lhs, Identifier rhs,
                                  unsigned limit) {
