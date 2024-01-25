@@ -157,21 +157,30 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
     if (classDecl->isActor()) {
       ASTContext &ctx = decl->getASTContext();
 
-      if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
-        SmallVector<ProtocolConformance *, 1> conformances;
-        classDecl->lookupConformance(actorProto, conformances);
-        for (auto conformance : conformances)
-          TypeChecker::checkConformance(conformance->getRootNormalConformance());
-      }
+      auto evaluateConformance = [&](KnownProtocolKind Kind) {
+        if (auto actorProto = ctx.getProtocol(Kind)) {
+          SmallVector<ProtocolConformance *, 1> conformances;
+          classDecl->lookupConformance(actorProto, conformances);
+          for (auto conformance : conformances) {
+            // FIXME: This is too much. Instead, we should force the witnesses.
+            // that we actually need.
+
+            auto *normal = conformance->getRootNormalConformance();
+            evaluateOrDefault(ctx.evaluator,
+                              ResolveTypeWitnessesRequest{normal},
+                              evaluator::SideEffect());
+            evaluateOrDefault(ctx.evaluator,
+                              ResolveValueWitnessesRequest{normal},
+                              evaluator::SideEffect());
+          }
+        }
+      };
+
+      evaluateConformance(KnownProtocolKind::Actor);
 
       // If this is a distributed actor, synthesize its special stored properties.
       if (classDecl->isDistributedActor()) {
-        if (auto actorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor)) {
-          SmallVector<ProtocolConformance *, 1> conformances;
-          classDecl->lookupConformance(actorProto, conformances);
-          for (auto conformance : conformances)
-            TypeChecker::checkConformance(conformance->getRootNormalConformance());
-        }
+        evaluateConformance(KnownProtocolKind::DistributedActor);
       }
     }
   }
