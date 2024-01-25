@@ -3454,19 +3454,24 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     llvm::raw_svector_ostream SS(Text);
     llvm::SmallVector<NormalProtocolConformance *, 2> fakeConformances;
     for (auto protocol : missingProtocols) {
+      // Create a fake conformance for this type to the given protocol.
       auto conformance = getASTContext().getNormalConformance(
           nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
           ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
           /*isPreconcurrency=*/false);
-      // Type witnesses must be resolved first.
+
+      // Resolve the conformance to generate fixits.
       evaluateOrDefault(getASTContext().evaluator,
                         ResolveTypeWitnessesRequest{conformance},
                         evaluator::SideEffect());
-      ConformanceChecker checker(getASTContext(), conformance);
-      checker.resolveValueWitnesses();
+      evaluateOrDefault(getASTContext().evaluator,
+                        ResolveValueWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+
       fakeConformances.push_back(conformance);
     }
 
+    // Collect all of the fixits generated above.
     for (auto conformance : fakeConformances) {
       auto missingWitnesses = getASTContext().takeDelayedMissingWitnesses(conformance);
       for (auto decl : missingWitnesses) {
