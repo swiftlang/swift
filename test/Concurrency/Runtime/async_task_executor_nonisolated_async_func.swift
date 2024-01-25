@@ -11,7 +11,7 @@ import Dispatch
 import StdlibUnittest
 import _Concurrency
 
-final class NaiveQueueExecutor: _TaskExecutor {
+final class NaiveQueueExecutor: TaskExecutor {
   let queue: DispatchQueue
 
   init(_ queue: DispatchQueue) {
@@ -39,7 +39,7 @@ nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
       let queue = DispatchQueue(label: "example-queue")
       let executor = NaiveQueueExecutor(queue)
 
-      await Task(_executorPreference: executor) {
+      await Task(executorPreference: executor) {
         await nonisolatedFunc(expectedExecutor: executor)
       }.value
     }

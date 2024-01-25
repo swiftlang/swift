@@ -1450,8 +1450,8 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
   ExecutorTrackingInfo trackingInfo;
   trackingInfo.enterAndShadow(
       SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
-      /*taskExecutor, will be replaced per each job. */ TaskExecutorRef::
-          undefined());
+      /*taskExecutor, will be replaced per each job. */
+      TaskExecutorRef::undefined());
 
   while (true) {
     if (shouldYieldThread()) {
