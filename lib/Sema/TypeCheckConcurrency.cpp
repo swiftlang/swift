@@ -3281,6 +3281,17 @@ namespace {
           continue;
 
         auto *arg = args->getExpr(paramIdx);
+
+        // FIXME: CurrentContextIsolationExpr does not have its actor set
+        // at this point.
+        if (auto *macro = dyn_cast<MacroExpansionExpr>(arg)) {
+          auto *expansion = macro->getRewritten();
+          if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(expansion)) {
+            recordCurrentContextIsolation(isolation);
+            arg = isolation->getActor();
+          }
+        }
+
         argForIsolatedParam = arg;
         if (getIsolatedActor(arg))
           continue;

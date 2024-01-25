@@ -11238,9 +11238,6 @@ ActorIsolation::forActorInstanceParameter(Expr *actor,
                                           unsigned parameterIndex) {
   auto &ctx = actor->getType()->getASTContext();
 
-  if (auto *isolation = dyn_cast<CurrentContextIsolationExpr>(actor))
-    actor = isolation->getActor();
-
   // An isolated value of `nil` is statically nonisolated.
   // FIXME: Also allow 'Optional.none'
   if (dyn_cast<NilLiteralExpr>(actor))

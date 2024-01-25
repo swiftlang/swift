@@ -442,18 +442,22 @@ func sync(isolatedTo actor: isolated (any Actor)?) {}
 func preciseIsolated(a: isolated MyActor) async {
   sync(isolatedTo: a)
   sync(isolatedTo: nil) // okay from anywhere
+  sync(isolatedTo: #isolation)
 
   Task { @MainActor in
     sync(isolatedTo: MainActor.shared)
     sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
   }
 
   Task { @MyGlobal in
     sync(isolatedTo: MyGlobal.shared)
     sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
   }
 
   Task.detached {
     sync(isolatedTo: nil) // okay from anywhere
+    sync(isolatedTo: #isolation)
   }
 }
