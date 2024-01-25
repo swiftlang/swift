@@ -74,13 +74,17 @@ std::string LifetimeDependenceInfo::getString() const {
     }
     return result;
   };
-  if (!copyLifetimeParamIndices->isEmpty()) {
+  if (!inheritLifetimeParamIndices->isEmpty()) {
     lifetimeDependenceString =
-        "_copy(" + getOnIndices(copyLifetimeParamIndices) + ")";
+        "_inherit(" + getOnIndices(inheritLifetimeParamIndices) + ")";
   }
   if (!borrowLifetimeParamIndices->isEmpty()) {
     lifetimeDependenceString +=
         "_borrow(" + getOnIndices(borrowLifetimeParamIndices) + ")";
+  }
+  if (!mutateLifetimeParamIndices->isEmpty()) {
+    lifetimeDependenceString +=
+        "_mutate(" + getOnIndices(mutateLifetimeParamIndices) + ")";
   }
   return lifetimeDependenceString;
 }

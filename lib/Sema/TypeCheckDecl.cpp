@@ -2583,8 +2583,9 @@ llvm::Optional<LifetimeDependenceInfo> validateLifetimeDependenceInfo(
   auto *dc = decl->getDeclContext();
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
-  SmallBitVector copyLifetimeParamIndices(afd->getParameters()->size() + 1);
+  SmallBitVector inheritLifetimeParamIndices(afd->getParameters()->size() + 1);
   SmallBitVector borrowLifetimeParamIndices(afd->getParameters()->size() + 1);
+  SmallBitVector mutateLifetimeParamIndices(afd->getParameters()->size() + 1);
 
   auto updateLifetimeDependenceInfo = [&](LifetimeDependenceSpecifier specifier,
                                           unsigned paramIndexToSet,
@@ -2619,18 +2620,19 @@ llvm::Optional<LifetimeDependenceInfo> validateLifetimeDependenceInfo(
                      getOwnershipSpelling(ownership));
       return true;
     }
-    if (copyLifetimeParamIndices.test(paramIndexToSet) ||
+    if (inheritLifetimeParamIndices.test(paramIndexToSet) ||
         borrowLifetimeParamIndices.test(paramIndexToSet)) {
       diags.diagnose(loc, diag::lifetime_dependence_duplicate_param_id);
       return true;
     }
     if (kind == LifetimeDependenceKind::Copy ||
         kind == LifetimeDependenceKind::Consume) {
-      copyLifetimeParamIndices.set(paramIndexToSet);
-    } else {
-      assert(kind == LifetimeDependenceKind::Borrow ||
-             kind == LifetimeDependenceKind::Mutate);
+      inheritLifetimeParamIndices.set(paramIndexToSet);
+    } else if (kind == LifetimeDependenceKind::Borrow) {
       borrowLifetimeParamIndices.set(paramIndexToSet);
+    } else {
+      assert(kind == LifetimeDependenceKind::Mutate);
+      mutateLifetimeParamIndices.set(paramIndexToSet);
     }
     return false;
   };
@@ -2691,8 +2693,9 @@ llvm::Optional<LifetimeDependenceInfo> validateLifetimeDependenceInfo(
   }
 
   return LifetimeDependenceInfo(
-      IndexSubset::get(ctx, copyLifetimeParamIndices),
-      IndexSubset::get(ctx, borrowLifetimeParamIndices));
+      IndexSubset::get(ctx, inheritLifetimeParamIndices),
+      IndexSubset::get(ctx, borrowLifetimeParamIndices),
+      IndexSubset::get(ctx, mutateLifetimeParamIndices));
 }
 
 static void maybeAddParameterIsolation(AnyFunctionType::ExtInfoBuilder &infoBuilder,

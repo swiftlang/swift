@@ -158,23 +158,28 @@ public:
 };
 
 class LifetimeDependenceInfo {
-  IndexSubset *copyLifetimeParamIndices;
+  IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *borrowLifetimeParamIndices;
+  IndexSubset *mutateLifetimeParamIndices;
 
 public:
   LifetimeDependenceInfo()
-      : copyLifetimeParamIndices(nullptr), borrowLifetimeParamIndices(nullptr) {
-  }
-  LifetimeDependenceInfo(IndexSubset *copyLifetimeParamIndices,
-                         IndexSubset *borrowLifetimeParamIndices)
-      : copyLifetimeParamIndices(copyLifetimeParamIndices),
-        borrowLifetimeParamIndices(borrowLifetimeParamIndices) {}
+      : inheritLifetimeParamIndices(nullptr),
+        borrowLifetimeParamIndices(nullptr),
+        mutateLifetimeParamIndices(nullptr) {}
+  LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
+                         IndexSubset *borrowLifetimeParamIndices,
+                         IndexSubset *mutateLifetimeParamIndices)
+      : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
+        borrowLifetimeParamIndices(borrowLifetimeParamIndices),
+        mutateLifetimeParamIndices(mutateLifetimeParamIndices) {}
 
   operator bool() const { return empty(); }
 
   bool empty() const {
-    return copyLifetimeParamIndices == nullptr &&
-           borrowLifetimeParamIndices == nullptr;
+    return inheritLifetimeParamIndices == nullptr &&
+           borrowLifetimeParamIndices == nullptr &&
+           mutateLifetimeParamIndices == nullptr;
   }
   std::string getString() const;
 };
