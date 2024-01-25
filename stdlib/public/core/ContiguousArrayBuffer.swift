@@ -354,12 +354,12 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       #endif
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-       let allocSize: Int?
-       #if !$Embedded
-       allocSize = _mallocSize(ofAllocation: storageAddr)
-       #else
-       allocSize = nil
-       #endif
+      let allocSize: Int?
+      #if !$Embedded
+      allocSize = _mallocSize(ofAllocation: storageAddr)
+      #else
+      allocSize = nil
+      #endif
       if let allocSize {
         let endAddr = storageAddr + allocSize
         let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
