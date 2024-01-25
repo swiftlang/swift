@@ -85,11 +85,11 @@ func invalidSpecifier1(_ x: borrowing BufferView) -> _borrow BufferView { // exp
   return BufferView(x.ptr)
 }
 
-func invalidSpecifier2(_ x: borrowing BufferView) -> _borrow() BufferView {// expected-error{{expected identifier or index or self in lifetime dependence specifier}}
+func invalidSpecifier2(_ x: borrowing BufferView) -> _borrow() BufferView {// expected-error{{expected identifier, index or self in lifetime dependence specifier}}
   return BufferView(x.ptr)
 }
 
-func invalidSpecifier3(_ x: borrowing BufferView) -> _borrow(*) BufferView { // expected-error{{expected identifier or index or self in lifetime dependence specifier}}
+func invalidSpecifier3(_ x: borrowing BufferView) -> _borrow(*) BufferView { // expected-error{{expected identifier, index or self in lifetime dependence specifier}}
   return BufferView(x.ptr)
 } 
 
