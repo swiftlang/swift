@@ -12,9 +12,9 @@
 // RUN:   -Xcc -I%t/empty.hmap
 // RUN: %validate-json %t/deps.json &>/dev/null
 
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps casFSRootID > %t/fs.casid
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps casFSRootID > %t/fs.casid
 // RUN: llvm-cas --cas %t/cas --ls-tree-recursive @%t/fs.casid | %FileCheck %s -DDIR=%basename_t -check-prefix FS_ROOT
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:Dummy clangIncludeTree > %t/tree.casid
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:Dummy clangIncludeTree > %t/tree.casid
 // RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/tree.casid | %FileCheck %s -DDIR=%basename_t -check-prefix INCLUDE_TREE
 
 // FS_ROOT: [[DIR]].tmp/empty.hmap

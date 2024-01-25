@@ -2266,6 +2266,11 @@ bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitLifetimeDependentReturnTypeRepr(
+    LifetimeDependentReturnTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

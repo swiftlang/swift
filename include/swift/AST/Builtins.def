@@ -1083,6 +1083,12 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetEnumTag, "getEnumTag", "", Special)
 /// tag's payload is already initialized with the given source.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(InjectEnumTag, "injectEnumTag", "", Special)
 
+/// distributedActorAsAnyActor: <DA: DistributedActor>(_: DA) -> any Actor
+///
+/// For a given distributed actor that is known to be local, extract an
+/// `any Actor` existential that refers to the local actor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActorAsAnyActor", "n", Special)
+
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 
 #undef BUILTIN_MISC_OPERATION

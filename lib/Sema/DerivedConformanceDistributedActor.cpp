@@ -664,7 +664,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   auto builtinCall =
       DerivedConformance::createBuiltinCall(ctx,
                                             BuiltinValueKind::BuildDefaultActorExecutorRef,
-                                            {selfType}, {}, {selfArg});
+                                            {selfType}, {selfArg});
   // Turn that into an UnownedSerialExecutor.
   auto initCall = constructDistributedUnownedSerialExecutor(ctx, builtinCall);
   if (!initCall) return failure();
@@ -727,7 +727,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
     buildRemoteExecutorCall->setThrows(nullptr);
 
     SmallVector<ASTNode, 1> statements = {
-        new(ctx) ReturnStmt(SourceLoc(), buildRemoteExecutorCall)
+      ReturnStmt::createImplicit(ctx, buildRemoteExecutorCall)
     };
 
     SmallVector<StmtConditionElement, 1> conditions = {
@@ -742,7 +742,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
 
   // Finalize preparing the unowned executor for returning.
   // auto wrappedCall = new (ctx) InjectIntoOptionalExpr(initCall, initCall->getType());
-  auto returnDefaultExec = new (ctx) ReturnStmt(SourceLoc(), initCall, /*implicit=*/true);
+  auto *returnDefaultExec = ReturnStmt::createImplicit(ctx, initCall);
 
   auto body = BraceStmt::create(
       ctx, SourceLoc(), { guardElseRemoteReturnExec, returnDefaultExec }, SourceLoc(), /*implicit=*/true);

@@ -307,9 +307,18 @@ final public class AssignByWrapperInst : Instruction {}
 
 final public class AssignOrInitInst : Instruction {}
 
-final public class CopyAddrInst : Instruction {
+/// Instruction that copy or move from a source to destination address.
+public protocol SourceDestAddrInstruction : Instruction {
+  var sourceOperand: Operand { get }
+  var destinationOperand: Operand { get }
+}
+
+extension SourceDestAddrInstruction {
   public var sourceOperand: Operand { return operands[0] }
   public var destinationOperand: Operand { return operands[1] }
+}
+
+final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
   
@@ -321,9 +330,7 @@ final public class CopyAddrInst : Instruction {
   }
 }
 
-final public class ExplicitCopyAddrInst : Instruction {
-  public var sourceOperand: Operand { return operands[0] }
-  public var destinationOperand: Operand { return operands[1] }
+final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction {
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
 }
@@ -396,7 +403,11 @@ public struct VarDecl {
     guard let decl = bridged.raw else { return nil }
     self.bridged = BridgedVarDecl(raw: decl)
   }
-  
+
+  public var sourceLoc: SourceLoc? {
+    return SourceLoc(bridged: bridged.getSourceLocation())
+  }
+
   public var userFacingName: String { String(bridged.getUserFacingName()) }
 }
 
@@ -579,7 +590,7 @@ class UncheckedRefCastInst : SingleValueInstruction, ConversionInstruction {
 }
 
 final public
-class UncheckedRefCastAddrInst : Instruction {}
+class UncheckedRefCastAddrInst : Instruction, SourceDestAddrInstruction {}
 
 final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruction {
   public var fromAddress: Value { operand.value }
@@ -943,6 +954,8 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
   public var borrowedValue: Value { operand.value }
 
   public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
+
+  public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
@@ -956,6 +969,10 @@ final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {
 
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
+
+  public var isLexical: Bool { bridged.MoveValue_isLexical() }
+
+  public var isFromVarDecl: Bool { bridged.MoveValue_isFromVarDecl() }
 }
 
 final public class DropDeinitInst : SingleValueInstruction, UnaryInstruction {
@@ -1010,8 +1027,7 @@ final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruct
 final public
 class MarkUnresolvedNonCopyableValueInst : SingleValueInstruction, UnaryInstruction {}
 
-final public
-  class MarkUnresolvedMoveAddrInst : Instruction {}
+final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstruction {}
 
 final public
 class CopyableToMoveOnlyWrapperAddrInst : SingleValueInstruction, UnaryInstruction {}

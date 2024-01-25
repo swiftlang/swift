@@ -863,6 +863,9 @@ ERROR(serialization_target_too_new_repl,none,
       "deployment target of %0 %3: %4",
       (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
+ERROR(serialization_noncopyable_generics_mismatch,none,
+      "module %0 was not compiled with NoncopyableGenerics",
+      (Identifier))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
@@ -5659,8 +5662,12 @@ ERROR(nonisolated_let,none,
       "they are immutable",
       ())
 ERROR(nonisolated_mutable_storage,none,
-      "'nonisolated' can not be applied to stored properties",
+      "'nonisolated' cannot be applied to mutable stored properties",
       ())
+NOTE(nonisolated_mutable_storage_note,none,
+     "convert %0 to a 'let' constant or consider declaring it "
+     "'nonisolated(unsafe)' if manually managing concurrency safety",
+     (const VarDecl *))
 ERROR(nonisolated_local_var,none,
       "'nonisolated' can not be applied to local variables",
       ())
@@ -7770,5 +7777,32 @@ ERROR(result_depends_on_no_result,none,
 ERROR(pack_iteration_where_clause_not_supported, none,
       "'where' clause in pack iteration is not supported", ())
 
+
+ //------------------------------------------------------------------------------
+ // MARK: Lifetime Dependence Diagnostics
+ //------------------------------------------------------------------------------
+
+ ERROR(lifetime_dependence_invalid_param_name, none,
+       "invalid parameter name specified %0", (Identifier))
+ ERROR(lifetime_dependence_invalid_param_index, none,
+       "invalid parameter index specified %0", (unsigned))
+ ERROR(lifetime_dependence_invalid_self, none,
+       "invalid lifetime dependence specifier, self is valid in non-static "
+       "methods only", ())
+ ERROR(lifetime_dependence_duplicate_param_id, none,
+       "duplicate lifetime dependence specifier", ())
+ ERROR(lifetime_dependence_cannot_use_kind, none,
+       "invalid use of %0 lifetime dependence for %1 ownership",
+       (StringRef, StringRef))
+ ERROR(lifetime_dependence_only_on_function_method_init_result, none,
+       "lifetime dependence specifiers may only be used on result of "
+       "functions, methods, initializers",
+       ())
+ ERROR(lifetime_dependence_invalid_return_type, none,
+       "lifetime dependence specifiers can only be specifier on ~Escapable "
+       "results", ())
+ ERROR(lifetime_dependence_missing_ownership_modifier, none,
+       "lifetime dependence can only be specified on parameters with ownership "
+       "modifiers (borrowing, consuming, inout)", ())
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

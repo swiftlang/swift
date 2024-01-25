@@ -278,24 +278,6 @@ macro(swift_common_unified_build_config product)
 
   include_directories(${CLANG_INCLUDE_DIRS})
 
-  # If cmark was checked out into tools/cmark, expect to build it as
-  # part of the unified build.
-  if(EXISTS "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
-    set(${product}_PATH_TO_CMARK_SOURCE "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
-    set(${product}_PATH_TO_CMARK_BUILD "${CMAKE_BINARY_DIR}/tools/cmark")
-    set(${product}_CMARK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/lib")
-
-    get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
-      ABSOLUTE)
-    get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-      ABSOLUTE)
-    get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
-      ABSOLUTE)
-
-    include_directories(${PATH_TO_CMARK_BUILD}/src
-      ${CMARK_MAIN_SRC_DIR}/src/include)
-  endif()
-
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
 endmacro()
 

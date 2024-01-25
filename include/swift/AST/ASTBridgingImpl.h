@@ -58,6 +58,11 @@ BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl) {
 // MARK: BridgedVarDecl
 //===----------------------------------------------------------------------===//
 
+BridgedSourceLoc BridgedVarDecl_getSourceLocation(BridgedVarDecl decl) {
+  swift::SourceLoc sourceLoc = decl.unbridged()->getNameLoc();
+  return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
+}
+
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl) {
   return decl.unbridged()->getBaseName().userFacingName();
 }

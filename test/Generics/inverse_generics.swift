@@ -97,6 +97,12 @@ struct NeverCopyableDeinit<T: ~Copyable>: ~Copyable {
   deinit {}
 }
 
+protocol Test: ~Copyable {
+  init?() // expected-error {{noncopyable types cannot have failable initializers yet}}
+}
+
+struct NoncopyableAndSendable: ~Copyable, Sendable {}
+
 /// ---------------
 
 // expected-note@+2 {{consider adding '~Copyable' to generic enum 'Maybe'}}
@@ -106,7 +112,6 @@ enum Maybe<Wrapped: ~Copyable> {
   case none
 
   deinit {} // expected-error {{deinitializer cannot be declared in generic enum 'Maybe' that conforms to 'Copyable'}}
-  // expected-error@-1 {{deinitializers are not yet supported on noncopyable enums}}
 }
 
 // expected-note@+4{{requirement specified as 'NC' : 'Copyable'}}
@@ -390,3 +395,45 @@ func checkExistentialAndClasses(
     _ b: any Soup & Copyable & ~Escapable & ~Copyable, // expected-error {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
     _ c: some (~Escapable & Removed) & Soup // expected-error {{composition involving class requirement 'Soup' cannot contain '~Escapable'}}
     ) {}
+
+protocol HasNCBuddy: ~Copyable {
+  associatedtype NCBuddy: HasNCBuddy, ~Copyable
+
+  associatedtype Buddy: HasMember
+}
+
+protocol HasMember : HasNCBuddy {
+  associatedtype Member: HasMember
+
+  associatedtype NCMember: ~Copyable
+}
+
+func checkOwnership<T: HasMember>(_ t: T,
+                                  _ l: T.NCBuddy.Buddy.Member.Buddy,
+                                  _ m: T.Member.Member,
+                                  _ n: T.Member.NCMember,
+// expected-error@-1 {{parameter of noncopyable type 'T.Member.NCMember' must specify ownership}} // expected-note@-1 3{{add}}
+
+                                  _ o: T.Member.NCBuddy.NCBuddy
+// expected-error@-1 {{parameter of noncopyable type 'T.Member.NCBuddy.NCBuddy' must specify ownership}} // expected-note@-1 3{{add}}
+) {}
+
+// Covers an issue when building Combine from its interface.
+public struct Record<Output> {
+  public init(recording: Record<Output>) {}
+}
+protocol P {}
+extension Record : Decodable where Output : P {}
+
+// Expect that if Copyable is an inherited protocol, then conditional
+// conformances carry that through, making the Blahaj conditionally Copyable.
+struct Blahaj<Value>: ~Copyable {
+  deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'Blahaj' that conforms to 'Copyable'}}
+}
+extension Blahaj: Q where Value: Q {}
+protocol Q: Copyable {}
+
+// expected-note@+2 3{{add}}
+// expected-error@+1 {{parameter of noncopyable type 'Blahaj<T>' must specify ownership}}
+func testBlahaj<T, U: Q>(_ x: Blahaj<T>,
+                         _ y: Blahaj<U>) {}

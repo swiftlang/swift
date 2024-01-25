@@ -162,21 +162,15 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   auto &ctx = type->getASTContext();
 
   auto *invertible = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(invertible);
+  assert(invertible && "failed to load Copyable/Escapable from stdlib!");
 
-  // Pack expansions such as `repeat T` themselves do not have conformances,
-  // so check its pattern type for conformance.
-  if (auto *pet = type->getAs<PackExpansionType>()) {
-    type = pet->getPatternType()->getCanonicalType();
-  }
+  // Must not have a type parameter!
+  assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
 
-  // Must either not have a type parameter, or in the case of a
-  // BoundGenericXType, have a nominal available.
-  assert(!type->hasTypeParameter() || type.getAnyNominal()
-          && "caller forgot to mapTypeIntoContext!");
+  assert(!type->is<PackExpansionType>());
 
   // The SIL types in the AST do not have real conformances, and should have
-  // been handled earlier.
+  // been handled in SILType instead.
   assert(!(type->is<SILBoxType,
                     SILMoveOnlyWrappedType,
                     SILPackType,
@@ -281,11 +275,11 @@ static bool checkInvertibleConformanceCommon(ProtocolConformance *conformance,
       // For a type conforming to IP, ensure that the storage conforms to IP.
       switch (IP) {
       case InvertibleProtocolKind::Copyable:
-        if (!type->isNoncopyable(DC))
+        if (!type->isNoncopyable())
           return false;
         break;
       case InvertibleProtocolKind::Escapable:
-        if (type->isEscapable(DC))
+        if (type->isEscapable())
           return false;
         break;
       }
@@ -470,6 +464,14 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     return generateConditionalConformance();
 
   case InverseMarking::Kind::None:
+    // All types already start with conformances to the invertible protocols in
+    // this case, within `NominalTypeDecl::prepareConformanceTable`.
+    //
+    // I'm currently unsure what happens when rebuilding a module from its
+    // interface, so this might not be unreachable code just yet.
+    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+      llvm_unreachable("when can this actually happen??");
+
     // If there's no inverse, we infer a positive IP conformance.
     return generateConformance(nominal);
   }

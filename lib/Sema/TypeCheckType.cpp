@@ -2148,6 +2148,8 @@ namespace {
                                                   TypeResolutionOptions options);
     NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
                                                  TypeResolutionOptions options);
+    NeverNullType resolveLifetimeDependentReturnTypeRepr(
+        LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2371,7 +2373,7 @@ bool swift::diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
   if (options.hasBase(TypeResolverContext::EnumElementDecl))
     return false; // no need for ownership in enum cases.
 
-  if (!ty->isNoncopyable(dc))
+  if (!isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext()))
     return false; // copyable types do not need ownership
 
   if (ownership != ParamSpecifier::Default)
@@ -2637,6 +2639,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::ResultDependsOn:
     return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
                                           options);
+
+  case TypeReprKind::LifetimeDependentReturn:
+    return resolveLifetimeDependentReturnTypeRepr(
+        cast<LifetimeDependentReturnTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -2998,13 +3004,10 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TypeResolutionFlags::SILType)) {
-    for (auto silOnlyAttr : {TAK_pseudogeneric,
-                             TAK_unimplementable,
-                             TAK_callee_owned,
-                             TAK_callee_guaranteed,
-                             TAK_noescape,
-                             TAK_yield_once,
-                             TAK_yield_many}) {
+    for (auto silOnlyAttr :
+         {TAK_pseudogeneric, TAK_unimplementable, TAK_callee_owned,
+          TAK_callee_guaranteed, TAK_noescape, TAK_yield_once, TAK_yield_many,
+          TAK_isolated}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
   }  
@@ -3596,7 +3599,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     // Validate the presence of ownership for a noncopyable parameter.
-    if (inStage(TypeResolutionStage::Interface)) {
+    if (inStage(TypeResolutionStage::Interface)
+        && !options.contains(TypeResolutionFlags::SILMode)) {
       diagnoseMissingOwnership(getASTContext(), dc, ownership,
                                eltTypeRepr, ty, options);
 
@@ -3764,9 +3768,11 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  // TODO: Handle LifetimeDependenceInfo here.
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
-      diffKind, /*clangFunctionType*/ nullptr, Type());
+      diffKind, /*clangFunctionType*/ nullptr, Type(),
+      LifetimeDependenceInfo());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4102,6 +4108,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     if (attrs.has(TAK_noDerivative)) {
       attrs.clearAttribute(TAK_noDerivative);
       parameterOptions |= SILParameterInfo::NotDifferentiable;
+    }
+    if (attrs.has(TAK_isolated)) {
+      attrs.clearAttribute(TAK_isolated);
+      parameterOptions |= SILParameterInfo::Isolated;
     }
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
@@ -4598,6 +4608,17 @@ TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
   return resolveType(repr->getBase(), options);
 }
 
+NeverNullType TypeResolver::resolveLifetimeDependentReturnTypeRepr(
+    LifetimeDependentReturnTypeRepr *repr, TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::FunctionResult)) {
+    diagnoseInvalid(
+        repr, repr->getSpecifierLoc(),
+        diag::lifetime_dependence_only_on_function_method_init_result);
+    return ErrorType::get(getASTContext());
+  }
+  return resolveType(repr->getBase(), options);
+}
+
 NeverNullType
 TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                     TypeResolutionOptions options) {
@@ -4775,7 +4796,9 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   // do not allow move-only types as the element of a vararg
   if (!element->hasError()
       && inStage(TypeResolutionStage::Interface)
-      && element->isNoncopyable(getDeclContext())) {
+      && !options.contains(TypeResolutionFlags::SILMode)
+      && isInterfaceTypeNoncopyable(
+          element, getDeclContext()->getGenericEnvironmentOfContext())) {
     diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
                     element);
     return ErrorType::get(getASTContext());
@@ -4952,10 +4975,13 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       hadError = true;
     }
     // Tuples with move-only elements aren't yet supported.
-    // Track the presence of a noncopyable field for diagnostic purposes.
+    // Track the presence of a noncopyable field for diagnostic purposes only.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
-    if (inStage(TypeResolutionStage::Interface) && ty->isNoncopyable(dc)
+    if (inStage(TypeResolutionStage::Interface)
+        && !options.contains(TypeResolutionFlags::SILMode)
+        && isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext())
+        && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)
         && !moveOnlyElementIndex.has_value() && !isa<TupleTypeRepr>(tyR)) {
       moveOnlyElementIndex = i;
     }
@@ -5008,9 +5034,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       return ParenType::get(ctx, elements[0].getType());
   }
   
-  if (moveOnlyElementIndex.has_value()
-      && !options.contains(TypeResolutionFlags::SILType)
-      && !ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
+  if (moveOnlyElementIndex.has_value()) {
     auto noncopyableTy = elements[*moveOnlyElementIndex].getType();
     auto loc = repr->getElementType(*moveOnlyElementIndex)->getLoc();
     assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
@@ -5496,6 +5520,7 @@ public:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::ResultDependsOn:
+    case TypeReprKind::LifetimeDependentReturn:
       return false;
     }
   }

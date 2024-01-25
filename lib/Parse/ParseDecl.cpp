@@ -23,6 +23,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
@@ -4889,6 +4890,102 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
   return makeParserSuccess();
 }
 
+static llvm::Optional<LifetimeDependenceKind>
+getLifetimeDependenceKind(const Token &T) {
+  if (T.isContextualKeyword("_copy")) {
+    return LifetimeDependenceKind::Copy;
+  }
+  if (T.isContextualKeyword("_consume")) {
+    return LifetimeDependenceKind::Consume;
+  }
+  if (T.isContextualKeyword("_borrow")) {
+    return LifetimeDependenceKind::Borrow;
+  }
+  if (T.isContextualKeyword("_mutate")) {
+    return LifetimeDependenceKind::Mutate;
+  }
+  return llvm::None;
+}
+
+ParserStatus Parser::parseLifetimeDependenceSpecifiers(
+    SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList) {
+  ParserStatus status;
+  // TODO: Add fixits for diagnostics in this function.
+  do {
+    auto lifetimeDependenceKind = getLifetimeDependenceKind(Tok);
+    if (!lifetimeDependenceKind.has_value()) {
+      break;
+    }
+    // consume the lifetime dependence kind
+    consumeToken();
+
+    if (!Tok.isFollowingLParen()) {
+      diagnose(Tok, diag::expected_lparen_after_lifetime_dependence);
+      status.setIsParseError();
+      continue;
+    }
+    // consume the l_paren
+    auto lParenLoc = consumeToken();
+    SourceLoc rParenLoc;
+    bool foundParamId = false;
+    status = parseList(
+        tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast*/ false,
+        diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
+          ParserStatus listStatus;
+          foundParamId = true;
+          switch (Tok.getKind()) {
+          case tok::identifier: {
+            Identifier paramName;
+            auto paramLoc =
+                consumeIdentifier(paramName, /*diagnoseDollarPrefix=*/false);
+            specifierList.push_back(
+                LifetimeDependenceSpecifier::
+                    getNamedLifetimeDependenceSpecifier(
+                        paramLoc, *lifetimeDependenceKind, paramName));
+            break;
+          }
+          case tok::integer_literal: {
+            SourceLoc paramLoc;
+            unsigned paramNum;
+            if (parseUnsignedInteger(
+                    paramNum, paramLoc,
+                    diag::expected_param_index_lifetime_dependence)) {
+              listStatus.setIsParseError();
+              return listStatus;
+            }
+            specifierList.push_back(
+                LifetimeDependenceSpecifier::
+                    getOrderedLifetimeDependenceSpecifier(
+                        paramLoc, *lifetimeDependenceKind, paramNum));
+            break;
+          }
+          case tok::kw_self: {
+            auto paramLoc = consumeToken(tok::kw_self);
+            specifierList.push_back(
+                LifetimeDependenceSpecifier::getSelfLifetimeDependenceSpecifier(
+                    paramLoc, *lifetimeDependenceKind));
+            break;
+          }
+          default:
+            diagnose(
+                Tok,
+                diag::
+                    expected_identifier_or_index_or_self_after_lifetime_dependence);
+            listStatus.setIsParseError();
+            return listStatus;
+          }
+          return listStatus;
+        });
+
+      if (!foundParamId) {
+        diagnose(Tok, diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        status.setIsParseError();
+      }
+  } while (true);
+
+  return status;
+}
+
 ParserStatus Parser::parseDeclAttributeList(
     DeclAttributes &Attributes, bool ifConfigsAreDeclAttrs,
     PatternBindingInitializer *initContext) {
@@ -5108,6 +5205,7 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
 ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
+  ParserStatus status;
   PatternBindingInitializer *initContext = nullptr;
   auto &Tok = P.Tok;
   while (Tok.is(tok::kw_inout) ||
@@ -5119,7 +5217,8 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
            Tok.isContextualKeyword("borrowing") ||
            Tok.isContextualKeyword("transferring") ||
            Tok.isContextualKeyword("_const") ||
-           Tok.isContextualKeyword("_resultDependsOn")))) {
+           Tok.isContextualKeyword("_resultDependsOn") ||
+           Tok.isLifetimeDependenceToken()))) {
 
     if (Tok.isContextualKeyword("isolated")) {
       if (IsolatedLoc.isValid()) {
@@ -5149,9 +5248,20 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     // the actual parsing logic below.
     if (Tok.isContextualKeyword("transferring")) {
       if (!P.Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults)) {
-        P.diagnose(Tok, diag::requires_experimental_feature, "transferring",
+        P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
                    false, getFeatureName(Feature::TransferringArgsAndResults));
       }
+    }
+
+    if (Tok.isLifetimeDependenceToken()) {
+      if (!P.Context.LangOpts.hasFeature(Feature::NonescapableTypes)) {
+        P.diagnose(Tok, diag::requires_experimental_feature,
+                   "lifetime dependence specifier", false,
+                   getFeatureName(Feature::NonescapableTypes));
+      }
+      status |=
+          P.parseLifetimeDependenceSpecifiers(lifetimeDependenceSpecifiers);
+      continue;
     }
 
     if (SpecifierLoc.isValid()) {
@@ -5178,7 +5288,6 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     SpecifierLoc = P.consumeToken();
   }
 
-  ParserStatus status;
   while (Tok.is(tok::at_sign)) {
     // Ignore @substituted in SIL mode and leave it for the type parser.
     if (P.isInSILMode() && P.peekToken().getText() == "substituted")
@@ -8670,8 +8779,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       SourceLoc LBraceLoc, RBraceLoc;
       LBraceLoc = consumeToken(tok::l_brace);
       auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-      auto *Return =
-          new (Context) ReturnStmt(SourceLoc(), CCE, /*implicit=*/true);
+      auto *Return = ReturnStmt::createImplicit(Context, CCE);
       CodeCompletionCallbacks->setParsedDecl(accessor);
       CodeCompletionCallbacks->completeAccessorBeginning(CCE);
       RBraceLoc = Tok.getLoc();
@@ -8725,7 +8833,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
         }
       }
       if (isa<FuncDecl>(AFD)) {
-        auto RS = new (Context) ReturnStmt(SourceLoc(), E);
+        auto RS = ReturnStmt::createImplicit(Context, E);
         BS->setLastElement(RS);
         AFD->setHasSingleExpressionBody();
         AFD->setSingleExpressionBody(E);
@@ -8733,7 +8841,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
         if (F->isFailable() && isa<NilLiteralExpr>(E)) {
           // If it's a nil literal, just insert return.  This is the only
           // legal thing to return.
-          auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+          auto RS = ReturnStmt::createImplicit(Context, E);
           BS->setLastElement(RS);
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);

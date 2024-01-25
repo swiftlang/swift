@@ -70,7 +70,7 @@ public:
 
 private:
   union {
-    llvm::PointerUnion<NominalTypeDecl *, VarDecl *> actorInstance;
+    llvm::PointerUnion<NominalTypeDecl *, VarDecl *, Expr *> actorInstance;
     Type globalActor;
     void *pointer;
   };
@@ -84,7 +84,9 @@ private:
 
   ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
 
-  ActorIsolation(Kind kind, VarDecl *capturedActor);
+  ActorIsolation(Kind kind, VarDecl *actor, unsigned parameterIndex);
+
+  ActorIsolation(Kind kind, Expr *actor, unsigned parameterIndex);
 
   ActorIsolation(Kind kind, Type globalActor)
       : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
@@ -104,17 +106,23 @@ public:
     return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
   }
 
-  static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
-    return ActorIsolation(ActorInstance, actor, 0);
-  }
+  static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
 
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
     return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
   }
 
+  static ActorIsolation forActorInstanceParameter(VarDecl *actor,
+                                                  unsigned parameterIndex) {
+    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+  }
+
+  static ActorIsolation forActorInstanceParameter(Expr *actor,
+                                                  unsigned parameterIndex);
+
   static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
-    return ActorIsolation(ActorInstance, capturedActor);
+    return ActorIsolation(ActorInstance, capturedActor, 0);
   }
 
   static ActorIsolation forGlobalActor(Type globalActor) {
@@ -179,6 +187,8 @@ public:
 
   VarDecl *getActorInstance() const;
 
+  Expr *getActorInstanceExpr() const;
+
   bool isGlobalActor() const {
     return getKind() == GlobalActor;
   }
@@ -213,27 +223,12 @@ public:
   /// Substitute into types within the actor isolation.
   ActorIsolation subst(SubstitutionMap subs) const;
 
+  static bool isEqual(const ActorIsolation &lhs,
+               const ActorIsolation &rhs);
+
   friend bool operator==(const ActorIsolation &lhs,
                          const ActorIsolation &rhs) {
-    if (lhs.isGlobalActor() && rhs.isGlobalActor())
-      return areTypesEqual(lhs.globalActor, rhs.globalActor);
-
-    if (lhs.getKind() != rhs.getKind())
-      return false;
-
-    switch (lhs.getKind()) {
-    case Nonisolated:
-    case NonisolatedUnsafe:
-    case Unspecified:
-      return true;
-
-    case ActorInstance:
-      return (lhs.getActor() == rhs.getActor() &&
-              lhs.parameterIndex == rhs.parameterIndex);
-
-    case GlobalActor:
-      llvm_unreachable("Global actors handled above");
-    }
+    return ActorIsolation::isEqual(lhs, rhs);
   }
 
   friend bool operator!=(const ActorIsolation &lhs,

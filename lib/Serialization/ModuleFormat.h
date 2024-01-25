@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 838; // transferring param
+const uint16_t SWIFTMODULE_VERSION_MINOR = 841; // NoncopyableGenerics versioning
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -400,6 +400,7 @@ enum class SILParameterDifferentiability : uint8_t {
 /// module version.
 enum class SILParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
+  Isolated = 0x2,
 };
 
 using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
@@ -848,7 +849,8 @@ namespace control_block {
     SDK_NAME,
     REVISION,
     IS_OSSA,
-    ALLOWABLE_CLIENT_NAME
+    ALLOWABLE_CLIENT_NAME,
+    HAS_NONCOPYABLE_GENERICS,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -892,6 +894,11 @@ namespace control_block {
   using AllowableClientLayout = BCRecordLayout<
     ALLOWABLE_CLIENT_NAME,
     BCBlob
+  >;
+
+  using HasNoncopyableGenerics = BCRecordLayout<
+      HAS_NONCOPYABLE_GENERICS,
+      BCFixed<1>
   >;
 }
 
@@ -2087,6 +2094,16 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
+  using ImplementsDeclAttrLayout = BCRecordLayout<
+    Implements_DECL_ATTR,
+    BCFixed<1>,  // implicit flag
+    DeclContextIDField,// context decl
+    DeclIDField, // protocol
+    BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
+                  // components plus one
+    BCArray<IdentifierIDField> // name components
+  >;
+
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<
     SPIAccessControl_DECL_ATTR,
     BCArray<IdentifierIDField>  // SPI names
@@ -2183,7 +2200,6 @@ namespace decls_block {
   using ObjCBridgedDeclAttrLayout = BCRecordLayout<ObjCBridged_DECL_ATTR>;
   using SynthesizedProtocolDeclAttrLayout
     = BCRecordLayout<SynthesizedProtocol_DECL_ATTR>;
-  using ImplementsDeclAttrLayout = BCRecordLayout<Implements_DECL_ATTR>;
   using ObjCRuntimeNameDeclAttrLayout
     = BCRecordLayout<ObjCRuntimeName_DECL_ATTR>;
   using RestatedObjCConformanceDeclAttrLayout

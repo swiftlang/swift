@@ -104,6 +104,20 @@ A set of utilities for analyzing memory accesses. It defines the following conce
 **Related C++ utilities:** `AccessPath`  and other access utilities.
 **Status:** done
 
+### Address Utils
+
+* `AddressUseVisitor`: classify address uses. This can be used by def-use walkers to ensure complete handling of all legal SIL patterns.
+
+**Related Swift Utilities**
+`AddressDefUseWalker`
+
+**Related C++ Utilities**
+`Projection::isAddressProjection`
+`isAccessStorageCast`
+`transitiveAddressWalker`
+
+TODO: Refactor AddressDefUseWalker to implement AddressUseVisitor.
+
 ### Ownership Utils
 
 #### BorrowUtils.swift has utilities for traversing borrow scopes:
@@ -118,12 +132,9 @@ A set of utilities for analyzing memory accesses. It defines the following conce
 * `computeLinearLiveness`: compute an InstructionRange from the immediate lifetime ending uses.
 * `computeInteriorLiveness`: complete def-use walk to compute an InstructionRange from all transitive use points that must be within an OSSA lifetime.
 * `InteriorUseWalker`: def-use walker for all transitive use points that must be within an OSSA lifetime.
-* `AddressLifetimeDefUseWalker`: def-use address walker to categorize all legal address uses by ownership effect.
 * `OwnershipUseVistor`: categorize all uses of an owned or guaranteed use by ownership effect. Use this within a recursive def-use walker to decide how to follow each use.
 
-`AddressLifetimeDefUseWalker` currently differs from `AddressDefUseWalker`. It visits all uses regardless of whether they are projections, has callbacks for handling inner scopes, and automatically handles the lifetime effect of inner scopes and dependent values.
-
-TODO: Define address projections in a single place rather than in both `AddressDefUseWalker` and `AddressUseVisitor`. This can be done with a simple `AddressProjection` protocol.
+`InteriorUseWalker`, like `AddressDefUseWalker`, walks def-use address projections. The difference is that it visits and classifies all uses regardless of whether they are projections, it has callbacks for handling inner scopes, and it automatically handles the lifetime effect of inner scopes and dependent values.
 
 #### ForwardingUtils.swift has utilities for traversing forward-extended  lifetimes:
 
@@ -131,6 +142,10 @@ Forward-extended lifetimes may include multiple OSSA lifetimes joined by Forward
 
 * `ForwardingUseDefWalker`: Find the introducer of a forward-extended lifetime
 * `ForwardingDefUseWalker`: Find all OSSA lifetimes within a forward-extended lifetime.
+
+#### LifetimeDependence
+
+Model lifetime dependencies in SIL, as required be ~Escapable types.
 
 ## Control- and Dataflow
 

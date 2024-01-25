@@ -34,12 +34,12 @@ enum E {
 }
 
 actor A {
- // CHECK-DAG: sil hidden [transparent] [ossa] @$s9accessors1AC10normalPropSivg : $@convention(method) (@guaranteed A) -> Int {
+ // CHECK-DAG: sil hidden [transparent] [ossa] @$s9accessors1AC10normalPropSivg : $@convention(method) (@isolated @guaranteed A) -> Int {
   var normalProp : Int = 0
-  // CHECK-DAG: sil hidden [ossa] @$s9accessors1AC12computedPropSivg : $@convention(method) (@guaranteed A) -> Int {
+  // CHECK-DAG: sil hidden [ossa] @$s9accessors1AC12computedPropSivg : $@convention(method) (@isolated @guaranteed A) -> Int {
   var computedProp : Int { get { 0 } }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s9accessors1AC9asyncPropSivg : $@convention(method) @async (@guaranteed A) -> Int {
+  // CHECK-LABEL: sil hidden [ossa] @$s9accessors1AC9asyncPropSivg : $@convention(method) @async (@isolated @guaranteed A) -> Int {
   // CHECK:       bb0([[SELF:%[0-9]+]] : @guaranteed $A):
   // CHECK:         hop_to_executor [[SELF]] : $A
   // CHECK:       } // end sil function '$s9accessors1AC9asyncPropSivg'
@@ -51,7 +51,7 @@ actor A {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9accessors19testImplicitlyAsync1aSiAA1AC_tYaF : $@convention(thin) @async (@guaranteed A) -> Int {
 // CHECK:         hop_to_executor
-// CHECK:         apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed A) -> Int
+// CHECK:         apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@isolated @guaranteed A) -> Int
 // CHECK:         hop_to_executor
 // CHECK:       } // end sil function '$s9accessors19testImplicitlyAsync1aSiAA1AC_tYaF'
 func testImplicitlyAsync(a : A) async -> Int {
@@ -60,7 +60,7 @@ func testImplicitlyAsync(a : A) async -> Int {
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s9accessors15testNormalAsync1aSiAA1AC_tYaF : $@convention(thin) @async (@guaranteed A) -> Int {
-// CHECK:          apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) @async (@guaranteed A) -> Int
+// CHECK:          apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) @async (@isolated @guaranteed A) -> Int
 // CHECK:       } // end sil function '$s9accessors15testNormalAsync1aSiAA1AC_tYaF'
 func testNormalAsync(a : A) async -> Int {
   return await a.asyncProp

@@ -99,6 +99,7 @@ TYPE_ATTR(yield_many)
 TYPE_ATTR(captures_generics)
 // Used at the SIL level to mark a type as moveOnly.
 TYPE_ATTR(moveOnly)
+TYPE_ATTR(isolated)
 
 // SIL metatype attributes.
 TYPE_ATTR(thin)
@@ -235,7 +236,7 @@ SIMPLE_DECL_ATTR(GKInspectable, GKInspectable,
   OnVar | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   66)
 DECL_ATTR(_implements, Implements,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnTypeAlias | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnTypeAlias | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   67)
 DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
   OnClass | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,

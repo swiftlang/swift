@@ -15,7 +15,7 @@ public func takesIsolated(_: isolated A) { }
 public func takeClosureWithIsolatedParam(body: (isolated A) async -> Void) { }
 
 // Emit the unnamed parameter when it's isolated, so that we can hop to it.
-// CHECK-LABEL: sil private [ossa] @$s4test0A24ClosureWithIsolatedParamyyFyAA1ACYiYaXEfU_ : $@convention(thin) @async (@guaranteed A)
+// CHECK-LABEL: sil private [ossa] @$s4test0A24ClosureWithIsolatedParamyyFyAA1ACYiYaXEfU_ : $@convention(thin) @async (@isolated @guaranteed A)
 // CHECK: bb0(%0 : @guaranteed $A):
 // CHECK: [[COPY:%.*]] = copy_value %0 : $A
 // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[COPY]] : $A

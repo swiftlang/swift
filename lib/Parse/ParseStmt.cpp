@@ -764,7 +764,8 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
 
   if (Tok.is(tok::code_complete)) {
     auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-    auto Result = makeParserResult(new (Context) ReturnStmt(ReturnLoc, CCE));
+    auto Result =
+        makeParserResult(ReturnStmt::createParsed(Context, ReturnLoc, CCE));
     if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeReturnStmt(CCE);
     }
@@ -825,13 +826,15 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     }
 
     return makeParserResult(
-        Result, new (Context) ReturnStmt(ReturnLoc, Result.getPtrOrNull()));
+        Result,
+        ReturnStmt::createParsed(Context, ReturnLoc, Result.getPtrOrNull()));
   }
 
   if (tryLoc.isValid())
     diagnose(tryLoc, diag::try_on_stmt, "return");
 
-  return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
+  return makeParserResult(
+      ReturnStmt::createParsed(Context, ReturnLoc, nullptr));
 }
 
 /// parseStmtYield

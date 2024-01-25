@@ -63,7 +63,14 @@ extension ForwardingInstruction {
 
 // An instruction that forwards a single value to a single result.
 //
-// For legacy reasons, some ForwardingInstructions that fit the SingleValueInstruction and UnaryInstruction requirements are not considered ConversionInstructions because certain routines do not want to see through them (InitExistentialValueInst, InitExistentialValueInst, OpenExistentialValueInst, OpenExistentialValueInst). This most likely has to do with type-dependent operands, although any ConversionInstruction should support type-dependent operands.
+// For legacy reasons, some ForwardingInstructions that fit the
+// SingleValueInstruction and UnaryInstruction requirements are not
+// considered ConversionInstructions because certain routines do not
+// want to see through them (InitExistentialValueInst,
+// DeinitExistentialValueInst, OpenExistentialValueInst,
+// OpenExistentialValueInst). This most likely has to do with
+// type-dependent operands, although any ConversionInstruction should
+// support type-dependent operands.
 public protocol ConversionInstruction : SingleValueInstruction,
                                         UnaryInstruction,
                                         ForwardingInstruction

@@ -654,9 +654,14 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
 OperandOwnership
 OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
-  if (getValue() == mdi->getValue()) {
+  if (getOperandIndex() == MarkDependenceInst::Value) {
     return getOwnershipKind().getForwardingOperandOwnership(
       /*allowUnowned*/true);
+  }
+  if (getOperandIndex() == MarkDependenceInst::Base && mdi->isNonEscaping()) {
+    // This creates a "dependent value", just like on-stack partial_apply, which
+    // we treat like a borrow.
+    return OperandOwnership::Borrow;
   }
   // FIXME: Add an end_dependence instruction so we can treat mark_dependence as
   // a borrow of the base (mark_dependence %base -> end_dependence is analogous
@@ -880,6 +885,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DistributedActorAsAnyActor)
 OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
                                                               StringRef) {
   if (bi->getFunction()->getConventions().useLoweredAddresses()) {

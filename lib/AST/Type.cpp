@@ -161,7 +161,7 @@ bool TypeBase::isMarkerExistential() {
 /// that does not rely on conformances.
 static bool alwaysNoncopyable(Type ty) {
   if (auto *nominal = ty->getNominalOrBoundGenericNominal())
-    return nominal->canBeNoncopyable();
+    return !nominal->canBeCopyable();
 
   if (auto *expansion = ty->getAs<PackExpansionType>()) {
     return alwaysNoncopyable(expansion->getPatternType());
@@ -178,21 +178,17 @@ static bool alwaysNoncopyable(Type ty) {
 }
 
 /// Preprocesses a type before querying whether it conforms to an invertible.
-static CanType preprocessTypeForInvertibleQuery(GenericEnvironment *env,
-                                                Type orig) {
+static CanType preprocessTypeForInvertibleQuery(Type orig) {
   Type type = orig;
 
   // Strip off any StorageType wrapper.
   type = type->getReferenceStorageReferent();
 
-  // Always strip off SILMoveOnlyWrapper.
-  if (auto wrapper = type->getAs<SILMoveOnlyWrappedType>())
-    type = wrapper->getInnerType();
-
-  // Turn any type parameters into archetypes.
-  if (env)
-    if (!type->hasArchetype() || type->hasOpenedExistential())
-      type = GenericEnvironment::mapTypeIntoContext(env, type);
+  // Pack expansions such as `repeat T` themselves do not have conformances,
+  // so check its pattern type for conformance.
+  if (auto *pet = type->getAs<PackExpansionType>()) {
+    type = pet->getPatternType()->getCanonicalType();
+  }
 
   // Strip @lvalue and canonicalize.
   auto canType = type->getRValueType()->getCanonicalType();
@@ -200,30 +196,34 @@ static CanType preprocessTypeForInvertibleQuery(GenericEnvironment *env,
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
-bool TypeBase::isNoncopyable(GenericEnvironment *env) {
-  auto canType = preprocessTypeForInvertibleQuery(env, this);
+bool TypeBase::isNoncopyable() {
+  auto canType = preprocessTypeForInvertibleQuery(this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return alwaysNoncopyable(canType);
 
+  assert(!hasTypeParameter()
+             && "requires a contextual type; use mapTypeIntoContext");
   IsNoncopyableRequest request{canType};
   return evaluateOrDefault(ctx.evaluator, request, /*default=*/true);
 }
 
-bool TypeBase::isEscapable(GenericEnvironment *env) {
-  auto canType = preprocessTypeForInvertibleQuery(env, this);
+bool TypeBase::isEscapable() {
+  auto canType = preprocessTypeForInvertibleQuery(this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Escapable
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     if (auto nom = canType.getAnyNominal())
-      return nom->isEscapable();
+      return nom->canBeEscapable();
     else
       return true;
   }
 
+  assert(!hasTypeParameter()
+    && "requires a contextual type; use mapTypeIntoContext");
   IsEscapableRequest request{canType};
   return evaluateOrDefault(ctx.evaluator, request, /*default=*/false);
 }
@@ -547,6 +547,10 @@ NominalTypeDecl *TypeBase::getAnyActor() {
     }
 
     return nullptr;
+  }
+
+  if (auto self = getAs<DynamicSelfType>()) {
+    return self->getSelfType()->getAnyActor();
   }
 
   // Existential types: check for Actor protocol.
@@ -4208,6 +4212,19 @@ Type AnyFunctionType::getGlobalActor() const {
   }
 }
 
+LifetimeDependenceInfo AnyFunctionType::getLifetimeDependenceInfo() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getLifetimeDependenceInfo();
+  case TypeKind::GenericFunction:
+    // TODO: Handle GenericFunction
+    return LifetimeDependenceInfo();
+
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
@@ -4247,7 +4264,7 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
-                 globalActor, thrownError);
+                 globalActor, thrownError, getLifetimeDependenceInfo());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {

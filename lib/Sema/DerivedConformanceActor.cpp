@@ -112,13 +112,13 @@ deriveBodyActor_unownedExecutor(AbstractFunctionDecl *getter, void *) {
   auto builtinCall =
     DerivedConformance::createBuiltinCall(ctx,
                         BuiltinValueKind::BuildDefaultActorExecutorRef,
-                                          {selfType}, {}, {selfArg});
+                                          {selfType}, {selfArg});
 
   // Turn that into an UnownedSerialExecutor.
   auto initCall = constructUnownedSerialExecutor(ctx, builtinCall);
   if (!initCall) return failure();
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), initCall, /*implicit*/ true);
+  auto *ret = ReturnStmt::createImplicit(ctx, initCall);
 
   auto body = BraceStmt::create(
     ctx, SourceLoc(), { ret }, SourceLoc(), /*implicit=*/true);

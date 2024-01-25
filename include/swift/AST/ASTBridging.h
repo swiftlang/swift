@@ -735,6 +735,9 @@ BridgedSubscriptDecl_asAbstractStorageDecl(BridgedSubscriptDecl decl);
 // MARK: VarDecl
 //===----------------------------------------------------------------------===//
 
+SWIFT_NAME("BridgedVarDecl.getSourceLocation(self:)")
+BRIDGED_INLINE BridgedSourceLoc BridgedVarDecl_getSourceLocation(BridgedVarDecl decl);
+
 SWIFT_NAME("BridgedVarDecl.getUserFacingName(self:)")
 BRIDGED_INLINE
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
@@ -1203,7 +1206,8 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_moveOnly,
   BridgedTypeAttrKind_thin,
   BridgedTypeAttrKind_thick,
-  BridgedTypeAttrKind_Count
+  BridgedTypeAttrKind_Count,
+  BridgedTypeAttrKind_isolated,
 };
 
 SWIFT_NAME("BridgedTypeAttrKind.init(from:)")

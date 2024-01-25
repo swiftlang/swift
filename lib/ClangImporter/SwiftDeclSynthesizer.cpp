@@ -373,7 +373,7 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   }
 
   // Create the return statement.
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), expr);
+  auto ret = ReturnStmt::createImplicit(ctx, expr);
 
   return {BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc()),
           /*isTypeChecked=*/true};
@@ -471,7 +471,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), call, /*implicit*/ true);
   assign->setType(emptyTuple);
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
+  auto *ret = ReturnStmt::createImplicit(ctx, /*expr*/ nullptr);
 
   // Create the function body.
   auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
@@ -565,8 +565,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
     }
   }
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
-  stmts.push_back(ret);
+  stmts.push_back(ReturnStmt::createImplicit(ctx, /*expr*/ nullptr));
 
   // Create the function body.
   auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc());
@@ -689,7 +688,7 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
                                      /*Implicit=*/true);
   assign->setType(TupleType::getEmpty(ctx));
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
+  auto *ret = ReturnStmt::createImplicit(ctx, /*expr*/ nullptr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
   return {body, /*isTypeChecked=*/true};
@@ -852,7 +851,7 @@ synthesizeUnionFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
       CallExpr::createImplicit(ctx, reinterpretCastRefExpr, argList);
   reinterpreted->setType(importedFieldDecl->getInterfaceType());
   reinterpreted->setThrows(nullptr);
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), reinterpreted);
+  auto *ret = ReturnStmt::createImplicit(ctx, reinterpreted);
   auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   return {body, /*isTypeChecked*/ true};
@@ -1118,7 +1117,7 @@ synthesizeIndirectFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
                                  DeclNameLoc(), /*implicit*/ true);
   expr->setType(anonymousInnerFieldDecl->getInterfaceType());
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), expr);
+  auto *ret = ReturnStmt::createImplicit(ctx, expr);
   auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   return {body, /*isTypeChecked=*/true};
@@ -1242,7 +1241,7 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
                                      /*implicit*/ true);
   assign->setType(TupleType::getEmpty(ctx));
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), nullptr, /*Implicit=*/true);
+  auto *ret = ReturnStmt::createImplicit(ctx, /*expr*/ nullptr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc(),
                                 /*implicit*/ true);
@@ -1310,7 +1309,7 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
   reinterpreted->setType(rawTy);
   reinterpreted->setThrows(nullptr);
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), reinterpreted);
+  auto *ret = ReturnStmt::createImplicit(ctx, reinterpreted);
   auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   return {body, /*isTypeChecked=*/true};
@@ -1380,7 +1379,7 @@ synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
     result = CoerceExpr::createImplicit(ctx, bridge, computedType);
   }
 
-  auto ret = new (ctx) ReturnStmt(SourceLoc(), result);
+  auto ret = ReturnStmt::createImplicit(ctx, result);
   auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   return {body, /*isTypeChecked=*/true};
@@ -1565,8 +1564,7 @@ synthesizeUnwrappingGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
     propertyExpr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
         ctx, getterImpl->getResultInterfaceType(), elementTy, propertyExpr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), propertyExpr,
-                                         /*implicit*/ true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, propertyExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
@@ -1645,8 +1643,7 @@ synthesizeUnwrappingAddressSetterBody(AbstractFunctionDecl *afd,
   auto *setterImplCallExpr =
       createAccessorImplCallExpr(setterImpl, selfArg, nullptr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), setterImplCallExpr,
-                                         /*implicit*/ true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, setterImplCallExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
@@ -1756,9 +1753,10 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                              : rawElementTy;
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
-  bool isImplicit = !elementTy->isNoncopyable(dc);
+  bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
+  bool isImplicit = !isNoncopyable;
   bool useAddress =
-      rawElementTy->getAnyPointerElementType() && elementTy->isNoncopyable(dc);
+      rawElementTy->getAnyPointerElementType() && isNoncopyable;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -1884,8 +1882,7 @@ synthesizeSuccessorFuncBody(AbstractFunctionDecl *afd, void *context) {
                                                  /*implicit*/ true);
   copyRefRValueExpr->setType(copyDecl->getInterfaceType());
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), copyRefRValueExpr,
-                                         /*implicit*/ true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, copyRefRValueExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(),
                                 {
@@ -1974,8 +1971,7 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   callExpr->setType(funcDecl->getResultInterfaceType());
   callExpr->setThrows(nullptr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), callExpr,
-                                         /*implicit*/ true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, callExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
@@ -2061,10 +2057,9 @@ synthesizeComputedGetterFromCXXMethod(AbstractFunctionDecl *afd,
   auto selfArg = createSelfArg(accessor);
 
   auto *getterImplCallExpr = createAccessorImplCallExpr(method, selfArg);
-  auto returnStmt =
-      new (method->getASTContext()) ReturnStmt(SourceLoc(), getterImplCallExpr);
-  auto body = BraceStmt::create(method->getASTContext(), SourceLoc(),
-                                {returnStmt}, SourceLoc());
+  auto &ctx = method->getASTContext();
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, getterImplCallExpr);
+  auto *body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc());
 
   return {body, /*isTypeChecked*/ true};
 }
@@ -2218,8 +2213,7 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   initCall->setThrows(nullptr);
 
   // Synthesize `return __cxx__defaultArg_XYZ()`.
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), initCall,
-                                         /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, initCall);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);

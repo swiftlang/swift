@@ -455,13 +455,14 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
-  auto einfo =
-      FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
-                                   thrownError, resultDiffKind,
-                                   clangFunctionType, globalActor)
-          .withAsync(flags.isAsync())
-          .withConcurrent(flags.isSendable())
-          .build();
+  // TODO: Handle LifetimeDependenceInfo here.
+  auto einfo = FunctionType::ExtInfoBuilder(
+                   representation, noescape, flags.isThrowing(), thrownError,
+                   resultDiffKind, clangFunctionType, globalActor,
+                   LifetimeDependenceInfo())
+                   .withAsync(flags.isAsync())
+                   .withConcurrent(flags.isSendable())
+                   .build();
 
   return FunctionType::get(funcParams, output, einfo);
 }

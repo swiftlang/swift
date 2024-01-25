@@ -394,7 +394,8 @@ std::error_code SerializedModuleLoaderBase::openModuleFile(
 llvm::ErrorOr<SerializedModuleLoaderBase::BinaryModuleImports>
 SerializedModuleLoaderBase::getImportsOfModule(
     Twine modulePath, ModuleLoadingBehavior transitiveBehavior,
-    bool isFramework, bool isRequiredOSSAModules, StringRef SDKName,
+    bool isFramework, bool isRequiredOSSAModules,
+    bool isRequiredNoncopyableGenerics, StringRef SDKName,
     StringRef packageName, llvm::vfs::FileSystem *fileSystem,
     PathObfuscator &recoverer) {
   auto moduleBuf = fileSystem->getBufferForFile(modulePath);
@@ -407,7 +408,8 @@ SerializedModuleLoaderBase::getImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules, SDKName, recoverer, loadedModuleFile);
+      isRequiredOSSAModules, isRequiredNoncopyableGenerics,
+      SDKName, recoverer, loadedModuleFile);
 
   for (const auto &dependency : loadedModuleFile->getDependencies()) {
     if (dependency.isHeader()) {
@@ -451,7 +453,8 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
       ModuleLoadingBehavior::Required;
   auto binaryModuleImports = getImportsOfModule(
       modulePath, transitiveLoadingBehavior, isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
+      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SourceMgr.getFileSystem().get(),
       Ctx.SearchPathOpts.DeserializedPathRecoverer);
   if (!binaryModuleImports)
@@ -460,7 +463,8 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   // Lookup optional imports of this module also
   auto binaryModuleOptionalImports = getImportsOfModule(
       modulePath, ModuleLoadingBehavior::Optional, isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
+      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
       Ctx.SourceMgr.getFileSystem().get(),
       Ctx.SearchPathOpts.DeserializedPathRecoverer);
   if (!binaryModuleOptionalImports)
@@ -882,7 +886,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       moduleInterfacePath, moduleInterfaceSourcePath,
       std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
       std::move(moduleSourceInfoInputBuffer), isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      isRequiredOSSAModules(), isRequiredNoncopyableGenerics(),
+      Ctx.LangOpts.SDKName,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
@@ -1018,6 +1023,10 @@ bool SerializedModuleLoaderBase::isRequiredOSSAModules() const {
   return Ctx.SILOpts.EnableOSSAModules;
 }
 
+bool SerializedModuleLoaderBase::isRequiredNoncopyableGenerics() const {
+  return Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
+}
+
 void swift::serialization::diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc,
     const serialization::ValidationInfo &loadInfo,
@@ -1054,6 +1063,11 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
       break;
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
+    break;
+  case serialization::Status::NotUsingNoncopyableGenerics:
+    Ctx.Diags.diagnose(diagLoc,
+                       diag::serialization_noncopyable_generics_mismatch,
+                       ModuleName);
     break;
   case serialization::Status::NotInOSSA:
     // soft reject, silently ignore.
@@ -1147,6 +1161,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::FormatTooNew:
   case serialization::Status::FormatTooOld:
   case serialization::Status::NotInOSSA:
+  case serialization::Status::NotUsingNoncopyableGenerics:
   case serialization::Status::RevisionIncompatible:
   case serialization::Status::Malformed:
   case serialization::Status::MalformedDocumentation:
@@ -1388,7 +1403,9 @@ bool SerializedModuleLoaderBase::canImportModule(
   // binary module format, if present.
   if (swiftInterfaceVersion.empty() && moduleInputBuffer) {
     auto metaData = serialization::validateSerializedAST(
-        moduleInputBuffer->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+        moduleInputBuffer->getBuffer(),
+        Ctx.SILOpts.EnableOSSAModules,
+        Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
         Ctx.LangOpts.SDKName);
     versionInfo->setVersion(metaData.userModuleVersion,
                             ModuleVersionSourceKind::SwiftBinaryModule);

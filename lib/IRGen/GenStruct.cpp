@@ -589,9 +589,18 @@ namespace {
       //   void (%struct.T* %this, %struct.T* %0)
       auto ptrTypeDecl =
           IGF.getSILModule().getASTContext().getUnsafePointerDecl();
-      auto subst = SubstitutionMap::get(ptrTypeDecl->getGenericSignature(),
-                                        {T.getASTType()},
-                                        ArrayRef<ProtocolConformanceRef>{});
+      auto sig = ptrTypeDecl->getGenericSignature();
+
+      // Map the generic parameter to T
+      auto params = sig.getGenericParams();
+      assert(params.size() == 1);
+      auto param = params[0]->getCanonicalType()->castTo<SubstitutableType>();
+      TypeSubstitutionMap map;
+      map[param] = T.getASTType();
+
+      auto subst = SubstitutionMap::get(sig,
+                              QueryTypeSubstitutionMap{map},
+                              LookUpConformanceInModule{IGF.getSwiftModule()});
       auto ptrType = ptrTypeDecl->getDeclaredInterfaceType().subst(subst);
       SILParameterInfo ptrParam(ptrType->getCanonicalType(),
                                 ParameterConvention::Direct_Unowned);
@@ -1684,7 +1693,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
                                             TypeExpansionContext::minimal())
             .getRecursiveProperties().isInfinite()) {
-    auto copyable = D->canBeNoncopyable()
+    auto copyable = !D->canBeCopyable()
       ? IsNotCopyable : IsCopyable;
     auto structAccessible =
       IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));

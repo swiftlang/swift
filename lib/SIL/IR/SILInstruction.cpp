@@ -1405,6 +1405,12 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this)) {
     return !PA->isOnStack();
   }
+  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
+  // borrow scope. We currently assume that a set of dominated scope-ending uses
+  // can be found.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(this)) {
+    return !MD->isNonEscaping();
+  }
 
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
@@ -1429,6 +1435,12 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // instructions must directly operate on the BeginAccess.
   if (isa<BeginAccessInst>(this))
     return false;
+
+  // All users of builtin "once" should directly operate on it (no phis etc)
+  if (auto *bi = dyn_cast<BuiltinInst>(this)) {
+    if (bi->getBuiltinInfo().ID == BuiltinValueKind::Once)
+      return false;
+  }
 
   // begin_apply creates a token that has to be directly used by the
   // corresponding end_apply and abort_apply.
@@ -1827,6 +1839,18 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   assert(getFunction()->hasOwnership()
          && isOnStack()
          && "only meaningful for OSSA stack closures");
+  bool noUsers = true;
+
+  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {
+    return false;
+  }
+  return !noUsers;
+}
+
+bool MarkDependenceInst::
+visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand *)> func) const {
+  assert(getFunction()->hasOwnership() && isNonEscaping()
+         && "only meaningful for nonescaping dependencies");
   bool noUsers = true;
 
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func)) {

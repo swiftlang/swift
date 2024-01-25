@@ -371,14 +371,7 @@ ThenStmt *ThenStmt::createImplicit(ASTContext &ctx, Expr *result) {
 }
 
 SourceRange ThenStmt::getSourceRange() const {
-  auto range = getResult()->getSourceRange();
-  if (!range)
-    return ThenLoc;
-
-  if (ThenLoc)
-    range.widen(ThenLoc);
-
-  return range;
+  return SourceRange::combine(ThenLoc, getResult()->getSourceRange());
 }
 
 SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }

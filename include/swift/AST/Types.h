@@ -412,7 +412,7 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
@@ -420,6 +420,7 @@ protected:
     HasClangTypeInfo : 1,
     HasGlobalActor : 1,
     HasThrownError : 1,
+    HasLifetimeDependenceInfo : 1,
     : NumPadBits,
     NumParams : 16
   );
@@ -650,21 +651,12 @@ public:
 
   bool isPlaceholder();
 
-  /// Returns true if this type lacks conformance to Copyable in the context,
-  /// if provided.
-  bool isNoncopyable(GenericEnvironment *env = nullptr);
-  bool isNoncopyable(const DeclContext *dc) {
-    assert(dc);
-    return isNoncopyable(dc->getGenericEnvironmentOfContext());
-  };
+  /// Returns true if this contextual type does not satisfy a conformance to
+  /// Copyable.
+  bool isNoncopyable();
 
-  /// Returns true if this type conforms to Escapable in the context,
-  /// if provided.
-  bool isEscapable(GenericEnvironment *env = nullptr);
-  bool isEscapable(const DeclContext *dc) {
-    assert(dc);
-    return isEscapable(dc->getGenericEnvironmentOfContext());
-  };
+  /// Returns true if this contextual type satisfies a conformance to Escapable.
+  bool isEscapable();
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -3377,6 +3369,8 @@ protected:
           !Info.value().getGlobalActor().isNull();
       Bits.AnyFunctionType.HasThrownError =
           !Info.value().getThrownError().isNull();
+      Bits.AnyFunctionType.HasLifetimeDependenceInfo =
+          !Info.value().getLifetimeDependenceInfo().empty();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3389,6 +3383,7 @@ protected:
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasGlobalActor = false;
       Bits.AnyFunctionType.HasThrownError = false;
+      Bits.AnyFunctionType.HasLifetimeDependenceInfo = false;
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -3435,11 +3430,17 @@ public:
     return Bits.AnyFunctionType.HasThrownError;
   }
 
+  bool hasLifetimeDependenceInfo() const {
+    return Bits.AnyFunctionType.HasLifetimeDependenceInfo;
+  }
+
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
   Type getGlobalActor() const;
   Type getThrownError() const;
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const;
 
   /// Retrieve the "effective" thrown interface type, or llvm::None if
   /// this function cannot throw.
@@ -3478,7 +3479,8 @@ public:
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
-                   getGlobalActor(), getThrownError());
+                   getGlobalActor(), getThrownError(),
+                   getLifetimeDependenceInfo());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -3699,7 +3701,8 @@ class FunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
-                                    ClangTypeInfo, Type> {
+                                    ClangTypeInfo, Type,
+                                    LifetimeDependenceInfo> {
   friend TrailingObjects;
 
 
@@ -3713,6 +3716,10 @@ class FunctionType final
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
     return hasGlobalActor() + hasThrownError();
+  }
+
+  size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
+    return hasLifetimeDependenceInfo() ? 1 : 0;
   }
 
 public:
@@ -3745,7 +3752,17 @@ public:
       return Type();
     return getTrailingObjects<Type>()[hasGlobalActor()];
   }
-                                      
+
+  LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    if (!hasLifetimeDependenceInfo()) {
+      return LifetimeDependenceInfo();
+    }
+    auto *info = getTrailingObjects<LifetimeDependenceInfo>();
+    assert(!info->empty() && "If the LifetimeDependenceInfo was empty, we "
+                             "shouldn't have stored it.");
+    return *info;
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     llvm::Optional<ExtInfo> info = llvm::None;
     if (hasExtInfo())
@@ -4129,6 +4146,9 @@ public:
 
     /// Set if the given parameter is transferring.
     Transferring = 0x2,
+
+    /// Set if the given parameter is isolated.
+    Isolated = 0x4,
   };
 
   using Options = OptionSet<Flag>;
@@ -5545,7 +5565,9 @@ class SILMoveOnlyWrappedType final : public TypeBase,
       : TypeBase(TypeKind::SILMoveOnlyWrapped, &innerType->getASTContext(),
                  innerType->getRecursiveProperties()),
         innerType(innerType) {
-    assert(!innerType->isNoncopyable() && "Inner type must be copyable");
+    // If it has a type parameter, we can't check whether it's copyable.
+    assert(innerType->hasTypeParameter() ||
+           !innerType->isNoncopyable() && "Inner type must be copyable");
   }
 
 public:

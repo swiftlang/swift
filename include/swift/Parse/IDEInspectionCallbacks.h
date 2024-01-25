@@ -246,7 +246,7 @@ public:
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
                                         SourceLoc DotLoc) {};
 
-  virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
+  virtual void completeCallArg(CodeCompletionExpr *E) {};
 
   virtual bool canPerformCompleteLabeledTrailingClosure() const {
     return false;

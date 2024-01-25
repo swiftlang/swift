@@ -251,7 +251,7 @@ void verifyKeyPathComponent(SILModule &M,
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = component.getStoredPropertyDecl();
     if (expansion == ResilienceExpansion::Minimal) {
-      require(property->getEffectiveAccess() >= AccessLevel::Public,
+      require(property->getEffectiveAccess() >= AccessLevel::Package,
               "Key path in serialized function cannot reference non-public "
               "property");
     }
@@ -1967,6 +1967,14 @@ public:
     }
   }
 
+  void checkMarkDependencInst(MarkDependenceInst *MDI) {
+    if (MDI->isNonEscaping()) {
+      require(F.hasOwnership(), "mark_dependence [nonescaping] requires OSSA");
+      require(MDI->getOwnershipKind() == OwnershipKind::Owned,
+              "mark_dependence [nonescaping] must be an owned value");
+    }
+  }
+  
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
@@ -6215,7 +6223,7 @@ public:
     auto type = ddi->getType();
     require(type == ddi->getOperand()->getType(),
             "Result and operand must have the same type.");
-    require(type.getASTType()->isNoncopyable(),
+    require(type.isMoveOnly(/*orWrapped=*/false),
             "drop_deinit only allowed for move-only types");
     require(type.getNominalOrBoundGenericNominal()
             ->getValueTypeDestructor(), "drop_deinit only allowed for "

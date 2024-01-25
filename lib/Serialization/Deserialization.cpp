@@ -972,7 +972,10 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
 
-  dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
+  // Note: the DistributedActor -> Actor pseudo-conformance can be deserialized
+  // but must not be registered, so don't register it here.
+  if (!dc->getSelfProtocolDecl())
+    dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
 
   // If the conformance is complete, we're done.
   if (conformance->isComplete())
@@ -5440,6 +5443,47 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Implements_DECL_ATTR: {
+        bool isImplicit;
+        DeclContextID contextID;
+        DeclID protocolID;
+        unsigned numNameComponentsBiased;
+        ArrayRef<uint64_t> nameIDs;
+        serialization::decls_block::ImplementsDeclAttrLayout::readRecord(
+            scratch, isImplicit, contextID, protocolID, numNameComponentsBiased,
+            nameIDs);
+
+        // Resolve the context.
+        auto dcOrError = MF.getDeclContextChecked(contextID);
+        if (!dcOrError)
+          return dcOrError.takeError();
+        DeclContext *dc = dcOrError.get();
+
+        // Resolve the member name.
+        DeclName memberName;
+        Identifier baseName = MF.getIdentifier(nameIDs.front());
+        if (numNameComponentsBiased != 0) {
+          SmallVector<Identifier, 2> names;
+          for (auto nameID : nameIDs.slice(1, numNameComponentsBiased-1)) {
+            names.push_back(MF.getIdentifier(nameID));
+          }
+          memberName = DeclName(ctx, baseName, names);
+        } else {
+          memberName = baseName;
+        }
+
+        Expected<Decl *> protocolOrError = MF.getDeclChecked(protocolID);
+        ProtocolDecl *protocol;
+        if (protocolOrError) {
+          protocol = cast<ProtocolDecl>(protocolOrError.get());
+        } else {
+          return protocolOrError.takeError();
+        }
+
+        Attr = ImplementsAttr::create(dc, protocol, memberName);
+        break;
+      }
+
       case decls_block::CDecl_DECL_ATTR: {
         bool isImplicit;
         serialization::decls_block::CDeclDeclAttrLayout::readRecord(
@@ -6334,6 +6378,11 @@ getActualSILParameterOptions(uint8_t raw) {
     result |= SILParameterInfo::NotDifferentiable;
   }
 
+  if (options.contains(serialization::SILParameterInfoFlags::Isolated)) {
+    options -= serialization::SILParameterInfoFlags::Isolated;
+    result |= SILParameterInfo::Isolated;
+  }
+
   // Check if we have any remaining options and return none if we do. We found
   // some option that we did not understand.
   if (bool(options)) {
@@ -6660,13 +6709,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     globalActor = globalActorTy.get();
   }
 
-  auto info =
-      FunctionType::ExtInfoBuilder(*representation, noescape, throws,
-                                   thrownError, *diffKind,
-                                   clangFunctionType, globalActor)
-          .withConcurrent(concurrent)
-          .withAsync(async)
-          .build();
+  // TODO: Handle LifetimeDependenceInfo here.
+  auto info = FunctionType::ExtInfoBuilder(
+                  *representation, noescape, throws, thrownError, *diffKind,
+                  clangFunctionType, globalActor, LifetimeDependenceInfo())
+                  .withConcurrent(concurrent)
+                  .withAsync(async)
+                  .build();
 
   auto resultTy = MF.getTypeChecked(resultID);
   if (!resultTy)

@@ -1067,7 +1067,7 @@ void IRGenModule::addObjCClassStub(llvm::Constant *classPtr) {
 
 void IRGenModule::addRuntimeResolvableType(GenericTypeDecl *type) {
   // Collect the nominal type records we emit into a special section.
-  if (type->canBeNoncopyable()) {
+  if (!type->canBeCopyable()) {
     // Older runtimes should not be allowed to discover noncopyable types, since
     // they will try to expose them dynamically as copyable types. Record
     // noncopyable type descriptors in a separate vector so that future
@@ -1423,6 +1423,7 @@ void IRGenerator::emitLazyDefinitions() {
     assert(LazySpecializedTypeMetadataRecords.empty());
     assert(LazyTypeContextDescriptors.empty());
     assert(LazyOpaqueTypeDescriptors.empty());
+    assert(LazyExtensionDescriptors.empty());
     assert(LazyFieldDescriptors.empty());
     // LazyFunctionDefinitions are allowed, but they must not be generic
     for (SILFunction *f : LazyFunctionDefinitions) {
@@ -1438,7 +1439,9 @@ void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
          !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
-         !LazyOpaqueTypeDescriptors.empty() || !LazyFieldDescriptors.empty() ||
+         !LazyOpaqueTypeDescriptors.empty() ||
+         !LazyExtensionDescriptors.empty() ||
+         !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
@@ -1493,6 +1496,15 @@ void IRGenerator::emitLazyDefinitions() {
       entry.IsDescriptorEmitted = true;
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
       IGM->emitOpaqueTypeDecl(type);
+    }
+    while (!LazyExtensionDescriptors.empty()) {
+      ExtensionDecl *ext = LazyExtensionDescriptors.back();
+      LazyExtensionDescriptors.pop_back();
+      auto &entry = LazyExtensions.find(ext)->second;
+      assert(entry.IsDescriptorUsed && !entry.IsDescriptorEmitted);
+      entry.IsDescriptorEmitted = true;
+      CurrentIGMPtr IGM = getGenModule(ext->getDeclContext());
+      IGM->getAddrOfExtensionContextDescriptor(ext);
     }
     while (!LazyFieldDescriptors.empty()) {
       NominalTypeDecl *type = LazyFieldDescriptors.pop_back_val();
@@ -1801,6 +1813,18 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
   
   if (isNovelUseOfDescriptor) {
     LazyOpaqueTypeDescriptors.push_back(opaque);
+  }
+}
+
+void IRGenerator::noteUseOfExtensionDescriptor(ExtensionDecl *ext) {
+  auto insertResult = LazyExtensions.try_emplace(ext);
+  auto &entry = insertResult.first->second;
+
+  bool isNovelUseOfDescriptor = !entry.IsDescriptorUsed;
+  entry.IsDescriptorUsed = true;
+  
+  if (isNovelUseOfDescriptor) {
+    LazyExtensionDescriptors.push_back(ext);
   }
 }
 
@@ -4065,11 +4089,11 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   return indirect();
 }
 
-static TypeEntityReference
-getContextDescriptorEntityReference(IRGenModule &IGM, const LinkEntity &entity){
+TypeEntityReference
+IRGenModule::getContextDescriptorEntityReference(const LinkEntity &entity) {
   // TODO: consider using a symbolic reference (i.e. a symbol string
   // to be looked up dynamically) for types defined outside the module.
-  auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
+  auto ref = getAddrOfLLVMVariableOrGOTEquivalent(entity);
   auto kind = ref.isIndirect()
                 ? TypeReferenceKind::IndirectTypeDescriptor
                 : TypeReferenceKind::DirectTypeDescriptor;
@@ -4081,7 +4105,7 @@ getTypeContextDescriptorEntityReference(IRGenModule &IGM,
                                         NominalTypeDecl *decl) {
   auto entity = LinkEntity::forNominalTypeDescriptor(decl);
   IGM.IRGen.noteUseOfTypeContextDescriptor(decl, DontRequireMetadata);
-  return getContextDescriptorEntityReference(IGM, entity);
+  return IGM.getContextDescriptorEntityReference(entity);
 }
 
 static TypeEntityReference
@@ -4089,7 +4113,7 @@ getProtocolDescriptorEntityReference(IRGenModule &IGM, ProtocolDecl *protocol) {
   assert(!protocol->hasClangNode() &&
          "objc protocols don't have swift protocol descriptors");
   auto entity = LinkEntity::forProtocolDescriptor(protocol);
-  return getContextDescriptorEntityReference(IGM, entity);
+  return IGM.getContextDescriptorEntityReference(entity);
 }
 
 static TypeEntityReference
@@ -4113,7 +4137,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
   if (auto opaque = dyn_cast<OpaqueTypeDecl>(decl)) {
     auto entity = LinkEntity::forOpaqueTypeDescriptor(opaque);
     IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
-    return getContextDescriptorEntityReference(*this, entity);
+    return getContextDescriptorEntityReference(entity);
   }
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
@@ -4360,12 +4384,28 @@ llvm::Constant *IRGenModule::emitSwiftProtocols(bool asContiguousArray) {
   return nullptr;
 }
 
+/// Determine whether the given protocol conformance can be found via
+/// metadata for dynamic lookup.
+static bool conformanceIsVisibleViaMetadata(
+            RootProtocolConformance *conformance) {
+  auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normal)
+    return true;
+
+  // Conformances of a protocol to another protocol cannot be looked up
+  // dynamically.
+  return !normal->isConformanceOfProtocol();
+}
+
+
 void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 
   emitProtocolConformance(record);
 
-  // Add this conformance to the conformance list.
-  ProtocolConformances.push_back(std::move(record));
+  if (conformanceIsVisibleViaMetadata(record.conformance)) {
+    // Add this conformance to the conformance list.
+    ProtocolConformances.push_back(std::move(record));
+  }
 }
 
 void IRGenModule::addAccessibleFunction(SILFunction *func) {
@@ -5955,7 +5995,7 @@ bool IRGenModule::hasResilientMetadata(ClassDecl *D,
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == getSwiftModule() &&
-      decl->getEffectiveAccess() < AccessLevel::Public)
+      decl->getEffectiveAccess() < AccessLevel::Package)
     return ResilienceExpansion::Maximal;
   return ResilienceExpansion::Minimal;
 }

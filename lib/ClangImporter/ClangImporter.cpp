@@ -5155,8 +5155,7 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
   baseMemberCallExpr->setThrows(nullptr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
-                                         /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, baseMemberCallExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
@@ -5450,8 +5449,7 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
         ctx, baseGetterMethod->getResultInterfaceType(), resultType,
         returnExpr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), returnExpr,
-                                         /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, returnExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
@@ -5545,10 +5543,11 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
                              AbstractStorageDecl *baseClassVar) {
   auto &ctx = declContext->getASTContext();
   auto computedType = computedVar->getInterfaceType();
+  auto contextTy = declContext->mapTypeIntoContext(computedType);
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types, unless the base accessor returns it by value.
-  bool useAddress = computedType->isNoncopyable(declContext) &&
+  bool useAddress = contextTy->isNoncopyable() &&
                     (baseClassVar->getReadImpl() == ReadImplKind::Stored ||
                      baseClassVar->getAccessor(AccessorKind::Address));
 
@@ -5699,9 +5698,11 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
   }
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto contextTy =
+        newContext->mapTypeIntoContext(subscript->getElementInterfaceType());
     // Subscripts that return non-copyable types are not yet supported.
     // See: https://github.com/apple/swift/issues/70047.
-    if (subscript->getElementInterfaceType()->isNoncopyable(newContext))
+    if (contextTy->isNoncopyable())
       return nullptr;
     auto out = SubscriptDecl::create(
         subscript->getASTContext(), subscript->getName(), subscript->getStaticLoc(),
@@ -6763,8 +6764,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
         ctx, specializedFuncCallExpr, thunkDecl->getResultInterfaceType());
   }
 
-  auto returnStmt = new (ctx)
-      ReturnStmt(SourceLoc(), resultExpr, /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, resultExpr);
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
   return {body, /*isTypeChecked=*/true};
@@ -6886,8 +6886,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
   specializedFuncCallExpr->setType(thunkDecl->getResultInterfaceType());
   specializedFuncCallExpr->setThrows(nullptr);
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), specializedFuncCallExpr,
-                                         /*implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, specializedFuncCallExpr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);

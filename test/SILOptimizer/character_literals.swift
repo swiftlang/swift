@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -emit-ir  %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -disable-readonly-static-objects -O -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
 // REQUIRES: PTRSIZE=64

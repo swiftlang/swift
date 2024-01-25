@@ -2168,5 +2168,19 @@ ERROR(requires_experimental_feature, none,
       "%2 is enabled",
       (StringRef, bool, StringRef))
 
+ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected '(' after lifetime dependence specifier", ())
+
+ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
+      PointsToFirstBadToken,
+      "expected identifier, index or self in lifetime dependence specifier",
+      ())
+
+ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected ')' after parameter list in lifetime dependence specifier", ())
+
+ERROR(expected_param_index_lifetime_dependence, PointsToFirstBadToken,
+      "expected unsigned parameter index in lifetime dependence specifier", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -835,6 +835,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, REVISION);
   BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
+  BLOCK_RECORD(control_block, HAS_NONCOPYABLE_GENERICS);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -982,6 +983,7 @@ void Serializer::writeHeader() {
     control_block::RevisionLayout Revision(Out);
     control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
+    control_block::HasNoncopyableGenerics HasNoncopyableGenerics(Out);
 
     // Write module 'real name', which can be different from 'name'
     // in case module aliasing is used (-module-alias flag)
@@ -1033,6 +1035,9 @@ void Serializer::writeHeader() {
     Revision.emit(ScratchRecord, revision);
 
     IsOSSA.emit(ScratchRecord, Options.IsOSSA);
+
+    HasNoncopyableGenerics.emit(ScratchRecord,
+            getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics));
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
@@ -2681,7 +2686,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_SetterAccess:
     case DAK_ObjCBridged:
     case DAK_SynthesizedProtocol:
-    case DAK_Implements:
     case DAK_ObjCRuntimeName:
     case DAK_RestatedObjCConformance:
     case DAK_ClangImporterSynthesizedType:
@@ -2706,6 +2710,29 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       SILGenNameDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
   	                                       theAttr->isImplicit(),
   	                                       theAttr->Name);
+      return;
+    }
+
+    case DAK_Implements: {
+      auto *theAttr = cast<ImplementsAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ImplementsDeclAttrLayout::Code];
+
+      DeclName memberName = theAttr->getMemberName();
+      SmallVector<IdentifierID, 4> nameComponents;
+      nameComponents.push_back(
+          S.addDeclBaseNameRef(memberName.getBaseName()));
+      for (auto argName : memberName.getArgumentNames())
+        nameComponents.push_back(S.addDeclBaseNameRef(argName));
+
+      auto dc = D->getDeclContext();
+      ImplementsDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(),
+          S.addDeclContextRef(dc).getOpaqueValue(),
+          S.addDeclRef(theAttr->getProtocol(dc)),
+          memberName.getArgumentNames().size() +
+            memberName.isCompoundName(),
+          nameComponents);
       return;
     }
 
@@ -5054,6 +5081,11 @@ getRawSILParameterInfoOptions(swift::SILParameterInfo::Options options) {
   if (options.contains(SILParameterInfo::NotDifferentiable)) {
     options -= SILParameterInfo::NotDifferentiable;
     result |= SILParameterInfoFlags::NotDifferentiable;
+  }
+
+  if (options.contains(SILParameterInfo::Isolated)) {
+    options -= SILParameterInfo::Isolated;
+    result |= SILParameterInfoFlags::Isolated;
   }
 
   // If we still have options left, this code is out of sync... return none.

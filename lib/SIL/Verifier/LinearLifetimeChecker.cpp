@@ -37,6 +37,14 @@
 
 using namespace swift;
 
+/// Return true if \p operand can legally be consumed by another operand of the
+/// same instruction (in parallel).
+bool isParallelOperand(Operand *operand) {
+  return isa<MarkDependenceInst>(operand->getUser())
+    || operand->getOperandOwnership() == OperandOwnership::Reborrow
+    || operand->getOperandOwnership() == OperandOwnership::GuaranteedForwarding;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Declarations
 //===----------------------------------------------------------------------===//
@@ -309,16 +317,14 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
   // user is strictly before the consuming user.
   for (auto *nonConsumingUse : nonConsumingUsesInBlock) {
     if (nonConsumingUse->getUser() != consumingUse->getUser()) {
-      if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
+      if (std::find_if(consumingUse->getUser()->getIterator(),
+                       userBlock->end(),
                        [&nonConsumingUse](const SILInstruction &i) -> bool {
                          return nonConsumingUse->getUser() == &i;
                        }) == userBlock->end()) {
         continue;
       }
-    } else if (nonConsumingUse->getOperandOwnership() ==
-                   OperandOwnership::Reborrow ||
-               nonConsumingUse->getOperandOwnership() ==
-                   OperandOwnership::GuaranteedForwarding) {
+    } else if (isParallelOperand(nonConsumingUse)) {
       continue;
     }
 

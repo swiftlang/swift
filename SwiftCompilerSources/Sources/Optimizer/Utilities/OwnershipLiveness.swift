@@ -118,209 +118,41 @@ func computeInteriorLiveness(for definingValue: Value,
   return range
 }
 
-
-/// Visit all uses of an interior address that keep the parent object alive.
+/// Classify ownership uses. This reduces operand ownership to a
+/// visitor API that can be used by def-use walkers to ensure complete
+/// handling of all legal SIL patterns.
 ///
-/// See C++ TransitiveAddressWalker.
+/// Code that relies on the ownership effect of a use should conform
+/// to this visitor. This facilitates correct handling of special cases
+/// involving borrow scopes and interior pointers.
 ///
-/// Requires:
-///   mutating func leafUse(address:) -> WalkResult
-///   mutating func dependent(value:dependsOn:) -> WalkResult
-///   mutating func pointerEscape(address:) -> WalkResult
-///   mutating func unknown(address:) -> WalkResult
+/// The top-level entry points are:
+/// - `classify(operand:)`
+/// - `visitUsesOfOuter(value:)`
 ///
-/// TODO: Verify that pointerEscape is only called for live ranges in which
-/// `findPointerEscape()` returns true.
-protocol AddressLifetimeDefUseWalker {
-  var _context: Context { get }
-
-  /// Start a def-use walk from and address.
-  mutating func walkDownUses(ofAddress: Value) -> WalkResult 
-
-  /// Start a def-use walk from an address operand.
-  mutating func walkDown(address: Operand) -> WalkResult
-
-  /// An address projection produces a single address result and does not
-  /// escape its address operand in any other way.
-  ///
-  /// If this returns .continueWalk then the uses of the address
-  /// result will be transitively visited.
-  mutating func projection(of address: Operand) -> WalkResult
-
-  /// A address leaf use cannot propagate the address bits beyond the
-  /// instruction.
-  ///
-  /// An apply or builtin, which propagates an address into the
-  /// callee, can be a leaf use if the argument does not escape.
-  mutating func leafUse(address: Operand) -> WalkResult
-
-  /// A non-address `value` whose ownership depends on the in-memory
-  /// value at `address`, such as `mark_dependence %value on %address`.
-  mutating func dependent(value: Value, dependsOn address: Operand)
-    -> WalkResult
-
-  /// A pointer escape may propagate the address beyond the current instruction.
-  mutating func pointerEscape(address: Operand) -> WalkResult
-
-  /// A unknown address use. This should never be called in valid SIL.
-  mutating func unknown(address: Operand) -> WalkResult
-
-  /// Handle begin_access.
-  ///
-  /// If this returns .continueWalk, then leafUse(address:) will be called
-  /// on the scope ending operands.
-  ///
-  /// Allows the implementation to complete inner scopes before considering
-  /// their scope ending operations as uses of the outer scope.
-  ///
-  /// This may add uses to the inner scope, but it may not modify the use-list
-  /// containing \p address or in any outer scopes.
-  mutating func handle(access: BeginAccessInst) -> WalkResult
-
-  /// Handle load_borrow
-  ///
-  /// If this returns .continueWalk, then leafUse(address:) will be called
-  /// on the scope ending operands.
-  ///
-  /// Allows the implementation to complete inner scopes before considering
-  /// their scope ending operations as uses of the outer scope.
-  ///
-  /// This may add uses to the inner scope, but it may not modify the use-list
-  /// containing \p address or in any outer scopes.
-  mutating func handle(borrow: LoadBorrowInst) -> WalkResult
-}
-
-extension AddressLifetimeDefUseWalker {
-  mutating func projection(of address: Operand) -> WalkResult {
-    return .continueWalk
-  }
-
-  mutating func handle(access: BeginAccessInst) -> WalkResult {
-    return .continueWalk
-  }
-
-  mutating func handle(borrow: LoadBorrowInst) -> WalkResult {
-    return .continueWalk
-  }
-
-  mutating func walkDownUses(ofAddress address: Value) -> WalkResult {
-    address.uses.ignoreTypeDependence.walk { walkDown(address: $0) }
-  }
-
-  private mutating func walkDown(projection value: Value, of operand: Operand)
-    -> WalkResult {
-    if projection(of: operand) == .abortWalk {
-      return .abortWalk
-    }
-    return walkDownUses(ofAddress: value)
-  }
-
-  mutating func walkDown(address: Operand) -> WalkResult {
-    switch address.instruction {
-    case let ba as BeginAccessInst:
-      if handle(access: ba) == .abortWalk {
-        return .abortWalk
-      }
-      return ba.endOperands.walk { leafUse(address: $0) }
-
-    case let load as LoadBorrowInst:
-      if handle(borrow: load) == .abortWalk {
-        return .abortWalk
-      }
-      return BeginBorrowValue(load)!.scopeEndingOperands.walk {
-        leafUse(address: $0)
-      }
-    case let markDep as MarkDependenceInst:
-      if markDep.valueOperand == address {
-        return walkDown(projection: markDep, of: address)
-      }
-      assert(markDep.baseOperand == address)
-      // If another address depends on the current address,
-      // optimisticaly handle it like a projection.
-      if markDep.type.isAddress {
-        return walkDown(projection: markDep, of: address)
-      }
-      /* TODO: Check LifetimeDependence
-      if LifetimeDependence(markDependenceInst: markDep, _context) != nil {
-        return dependent(value: markDep, dependsOn: address)
-      }
-      */
-      // A potentially escaping value depends on this address.
-      return pointerEscape(address: address)
-
-    case let pai as PartialApplyInst where pai.isOnStack:
-      return dependent(value: pai, dependsOn: address)
-
-    case is StructElementAddrInst, is TupleElementAddrInst,
-         is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst,
-         is InitExistentialAddrInst, is OpenExistentialAddrInst,
-         is IndexAddrInst, is MarkUnresolvedNonCopyableValueInst,
-         is ProjectBlockStorageInst, is TailAddrInst, is StoreBorrowInst,
-         is UncheckedAddrCastInst, is MarkUninitializedInst, is DropDeinitInst,
-         is TuplePackElementAddrInst, is CopyableToMoveOnlyWrapperAddrInst,
-         is MoveOnlyWrapperToCopyableAddrInst:
-      let svi = address.instruction as! SingleValueInstruction
-      return walkDown(projection: svi, of: address)
-
-    case is ReturnInst, is ThrowInst, is YieldInst, is TryApplyInst,
-         is SwitchEnumAddrInst, is CheckedCastAddrBranchInst,
-         is SelectEnumAddrInst, is InjectEnumAddrInst,
-         is LoadInst, is CopyAddrInst, is StoreInst, is DestroyAddrInst,
-         is LoadUnownedInst, is StoreUnownedInst,
-         is LoadWeakInst, is StoreWeakInst,
-         is AssignInst, is AssignByWrapperInst, is AssignOrInitInst,
-         is MarkUnresolvedMoveAddrInst, is ExplicitCopyAddrInst,
-         is RetainValueAddrInst, is ReleaseValueAddrInst,
-         is UncheckedRefCastAddrInst, is UnconditionalCheckedCastAddrInst,
-         is TupleAddrConstructorInst, is InitBlockStorageHeaderInst,
-         is DeallocStackInst, is EndApplyInst,
-         is IsUniqueInst, is MarkFunctionEscapeInst,
-         is WitnessMethodInst, is ValueMetatypeInst, is ExistentialMetatypeInst,
-         is DeinitExistentialAddrInst,
-         is GetAsyncContinuationAddrInst, is KeyPathInst,
-         is PackElementSetInst, is PackElementGetInst:
-      return leafUse(address: address)
-
-    case let builtin as BuiltinInst:
-      switch builtin.id {
-      case .TSanInoutAccess, .ResumeThrowingContinuationReturning,
-           .ResumeNonThrowingContinuationReturning, .Copy, .GenericAdd,
-           .GenericFAdd, .GenericAnd, .GenericAShr, .GenericLShr, .GenericOr,
-           .GenericFDiv, .GenericMul, .GenericFMul, .GenericSDiv,
-           .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
-           .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,
-           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer,
-           .GetEnumTag, .InjectEnumTag:
-        return leafUse(address: address)
-      default:
-        // TODO: SIL verification should check that this exhaustively
-        // recognizes all builtin address uses.
-        return .abortWalk
-      }
-
-    case is AddressToPointerInst:
-      return pointerEscape(address: address)
-
-    case let pai as PartialApplyInst where !pai.isOnStack:
-      return pointerEscape(address: address)
-
-    case is BranchInst, is CondBranchInst:
-      fatalError("address phi is not allowed")
-
-    default:
-      if address.instruction.isIncidentalUse {
-        return leafUse(address: address)
-      }
-      // Unkown instruction.
-      return unknown(address: address)
-    }
-  }
-}
-
-/// For OwnershipUseVisitor API entry points that operate on a
-/// use, Isinnerlifetime indicates whether the value being used is
+/// The implementation may recursively call back to the top-level
+/// entry points. Additionally, the implementation may recurse into inner
+/// borrow scopes, skipping over the uses within inner scopes using:
+/// - `visitInnerBorrowUses(of:)`
+/// - `visitUsesOfInner(value:)`
+///
+/// Visitors implement:
+///
+/// - ownershipLeafUse(of:isInnerlifetime:)
+/// - forwardingUse(of:isInnerlifetime:)
+/// - interiorPointerUse(of:into:)
+/// - pointerEscapingUse(of:)
+/// - dependentUse(of:into:)
+/// - borrowingUse(of:by:)
+/// - reborrowingUse(of:isInnerlifetime:)
+///
+/// This only visits the first level of uses. The implementation may
+/// transitively visit forwarding operations in its implementation of
+/// `forwardingUse(of:isInnerlifetime:)` and
+/// `reborrowingUse(of:isInnerlifetime:)`.
+///
+/// `isInnerlifetime` indicates whether the value being used is
 /// defined by the "outer" OSSA lifetime or an inner borrow scope.
-///
 /// When the OwnershipUseVisitor is invoked on an outer value
 /// (visitUsesOfOuter(value:)), it visits all the uses of that value
 /// and also visits the lifetime-ending uses of any inner borrow
@@ -332,7 +164,7 @@ extension AddressLifetimeDefUseWalker {
 ///   end_borrow %0        // outer use of %0
 ///
 /// This becomes more complicated with reborrows and closures. The
-/// implementation can simply rely on IsInnerLifetime to know whether
+/// implementation can simply rely on isInnerLifetime to know whether
 /// the value being used is part of the outer lifetimes vs. its inner
 /// lifetimes. This is important, for example, if the implementation
 /// wants to know if the use ends the lifetime of the outer value.
@@ -340,124 +172,75 @@ extension AddressLifetimeDefUseWalker {
 /// Visitor implementations treat inner and outer uses differently. It
 /// may, for example, assume that inner lifetimes are complete
 /// and therefore only care about the lifetime-ending uses.
-enum IsInnerLifetime {
-case outerLifetime
-case innerLifetime
-}
-
-/// Package operand ownership into a visitor API.
-///
-/// Code that relies on effect of a use on ownership of its value
-/// should conform to this visitor. This ensures correct handling for
-/// special cases involving borrow scopes and interior pointers.
-///
-/// `visitUsesOfOuter(value:)` is the main entry point.
-///
-/// `visitUsesOfInner(value:)` is called back for each inner borrow
-/// scope. The implementation may or may not decide to recurse through
-/// reborrows and nested borrow scopes, calling back to
-/// `visitUsesOfInner(value:)` as needed.
-///
-/// Visitors need to implement:
-///
-/// - visit(use:_),
-/// - visitForwarding(operand:_)
-/// - visitReborrow(operand:_)
-/// - visitPointerEscape(use:)
-///
-/// This only visits the first level of uses. The implementation may
-/// transitively visit forwarding operations in its implementation of
-/// `visitForwarding(operand:_)` and `visitReborrow(operand:_)`, which
-/// can recursively call back to `visitUsesOfOuter(value:)` or
-/// `visitUsesOfInner(value:)`.
-///
-/// For uses that begin a borrow or access scope, this correctly
-/// "skips ahead" to the end of the scope. To record incomplete or
-/// dead inner scopes (no scope-ending use on some path), the
-/// implementation must override `handleInner(borrow:)`.
 protocol OwnershipUseVisitor {
-  var _context: Context { get }
+  var context: Context { get }
 
-  /// Visit a non-forwarding use. For uses that are guarded by a
-  /// handler, this is only called if the handler returns .continueWalk.
+  /// A non-forwarding use.
   ///
-  /// IsInnerLifetime indicates whether `operand` uses the original
+  /// `isInnerLifetime` indicates whether `operand` uses the original
   /// OSSA lifetime. This use ends the original lifetime if
-  /// (IsInnerLifetime == .outerLifetime && use.endsLifetime).
-  func visit(use: Operand, _: IsInnerLifetime) -> WalkResult
+  /// (!isInnerLifetime && use.endsLifetime).
+  mutating func ownershipLeafUse(of operand: Operand, isInnerLifetime: Bool)
+    -> WalkResult
 
-  /// Visit a forwarding operand. For uses that are guarded by a
-  /// handler, this is only called if the handler returns .continueWalk.
+  /// A forwarding operand.
   ///
   /// Use ForwardingInstruction or ForwardingDefUseWalker to handle
   /// downstream uses.
-  mutating func visitForwarding(operand: Operand, _: IsInnerLifetime)
-  -> WalkResult
+  ///
+  /// If `isInnerLifetime` is true, then the value depends on an inner borrow.
+  mutating func forwardingUse(of operand: Operand, isInnerLifetime: Bool)
+    -> WalkResult
 
-  /// Visit a reborrow operand. For uses that are guarded by a
-  /// handler, this is only called if the handler returns .continueWalk.
-  ///
-  /// Use visitUsesOfInner to visit downstream borrow scopes.
-  mutating func visitReborrow(operand: Operand, _: IsInnerLifetime)
-  -> WalkResult
+  /// A use that projects an address.
+  mutating func interiorPointerUse(of: Operand, into address: Value)
+    -> WalkResult
 
-  /// Visit a use that propagates its operand to some trivial
-  /// value such as an address that depends on the operand's value.
-  mutating func visitInteriorPointer(use: Operand) -> WalkResult
+  /// A use that escapes information from its operand's value.
+  ///
+  /// Note: this may not find all relevant pointer escapes, such as
+  /// from owned forwarded values. Clients should generally check
+  /// findPointerEscape() before relying on a liveness result and
+  /// implement this as a fatalError.
+  mutating func pointerEscapingUse(of operand: Operand) -> WalkResult
 
-  /// Visit a use that escapes information from its operand's value.
-  ///
-  /// Note: visitPointerEscape may not find all relevant pointer
-  /// escapes, such as from owned forwarded values. Clients should
-  /// generally check findPointerEscape() before relying on a liveness
-  /// result and implement this as a fatalError.
-  mutating func visitPointerEscape(use: Operand) -> WalkResult
+  /// A use that creates an implicit borrow scope over the lifetime of
+  /// an owned dependent value. The operand owership is .borrow, but
+  /// there are no explicit scope-ending operations. Instead
+  /// BorrowingInstruction.scopeEndingOperands will return the final
+  /// consumes in the dependent value's forwaring chain.
+  mutating func dependentUse(of operand: Operand, into value: Value)
+    -> WalkResult
 
-  /// Handles any of:
+  /// A use that is scoped to an inner borrow scope.
   ///
-  /// - begin_borrow, load_borrow, store_borrow, begin_apply.
-  ///
-  /// - an inner adjacent phi (where the value currently being visited is an
-  /// outer adjacent phi in the same block).
-  ///
-  /// - a reborrow of an inner borrow scope or a reborrow of an inner
-  /// adjacent phi.
-  ///
-  /// If this returns .continueWalk, then visit(use:) will be called
-  /// on the scope-ending operands.
-  ///
-  /// Allows the implementation to complete an inner scope before
-  /// visiting its scope-ending operations as uses of the outer
-  /// scope. The implementation may add uses to the inner scope, but
-  /// it may not modify the use-list containing \p address or in any
-  /// outer scopes.
-  mutating func handleInner(borrow: BeginBorrowValue) -> WalkResult
+  /// Call `visitInnerBorrowUses(of:)` to recursively classify any
+  /// scope-ending uses and forwarded dependent values.
+  mutating func borrowingUse(of operand: Operand,
+                             by borrowInst: BorrowingInstruction) -> WalkResult
 
-  /// Handle begin_access.
+  /// A reborrow operand.
   ///
-  /// If this returns .continueWalk, then visit(use:) will be called
-  /// on the scope ending operands.
-  ///
-  /// Allows the implementation to complete an inner scope before
-  /// visiting its scope-ending operations as uses of the outer
-  /// scope. The implementation may add uses to the inner scope, but
-  /// it may not modify the use-list containing \p address or in any
-  /// outer scopes.
-  mutating func handleAccess(address: BeginAccessInst) -> WalkResult
-}
-
-// Default requirements: Visit everything as a regular use except escapes.
-extension OwnershipUseVisitor {
-  mutating func handleInner(borrow: BeginBorrowValue) -> WalkResult {
-    return .continueWalk
-  }
-
-  mutating func handleAccess(address: BeginAccessInst) -> WalkResult {
-    return .continueWalk
-  }
+  /// Call `visitUsesOfInner()` to recursively classify scope-ending
+  /// uses (reborrow and end_borrow).
+  mutating func reborrowingUse(of operand: Operand, isInnerLifetime: Bool)
+    -> WalkResult
 }
 
 extension OwnershipUseVisitor {
+  /// Classify a non-address type operand, dispatching to one of the
+  /// protocol methods below.
+  mutating func classify(operand: Operand) -> WalkResult {
+    switch operand.value.ownership {
+    case .owned:
+      return classifyOwned(operand: operand)
+    case .guaranteed:
+      return classifyGuaranteed(operand: operand)
+    case .none, .unowned:
+      return .continueWalk
+    }
+  }
+
   /// Visit all uses that contribute to the ownership live
   /// range of `value`. This does not assume that `value` has a
   /// complete lifetime, and non-lifetime-ending uses are visited.
@@ -467,26 +250,12 @@ extension OwnershipUseVisitor {
   ///
   /// This is only called for uses in the outer lifetime.
   mutating func visitUsesOfOuter(value: Value) -> WalkResult {
-    // If the outer value is an owned phi or reborrow, consider inner
-    // adjacent phis part of its lifetime.
-    if let phi = Phi(value), phi.endsLifetime {
-      var innerPhis = Stack<Phi>(_context)
-      defer { innerPhis.deinitialize() }
-      gatherInnerAdjacentPhis(for: phi, in: &innerPhis, _context)
-      // Inner adjacent reborrows are considered inner borrow scopes.
-      // Inner adjacent guaranteed phis are consider part of the outer lifetime.
-      return innerPhis.walk { innerPhi in
-        innerPhi.isReborrow ? visitUsesOfInner(value: innerPhi.value)
-          : innerPhi.value.uses.ignoreTypeDependence.walk {
-            visitGuaranteed(use: $0)
-          }
-      }
-    }
     switch value.ownership {
     case .owned:
-      return value.uses.ignoreTypeDependence.walk { visitOwned(use: $0) }
+      return value.uses.ignoreTypeDependence.walk { classifyOwned(operand: $0) }
     case .guaranteed:
-      return value.uses.ignoreTypeDependence.walk { visitGuaranteed(use: $0) }
+      return value.uses.ignoreTypeDependence.walk {
+        classifyGuaranteed(operand: $0) }
     case .none, .unowned:
       return .continueWalk
     }
@@ -500,15 +269,12 @@ extension OwnershipUseVisitor {
   /// def is a phi in the same block).
   mutating func visitUsesOfInner(value: Value) -> WalkResult {
     if let beginBorrow = BeginBorrowValue(value) {
-      if handleInner(borrow: beginBorrow) == .abortWalk {
-        return .abortWalk
-      }
       return beginBorrow.scopeEndingOperands.walk {
         switch $0.ownership {
         case .endBorrow:
-          return visit(use: $0, .innerLifetime)
+          return ownershipLeafUse(of: $0, isInnerLifetime: true)
         case .reborrow:
-          return visitReborrow(operand: $0, .innerLifetime)
+          return reborrowingUse(of: $0, isInnerLifetime: true)
         default:
           fatalError("invalid borrow scope ending operand ownership")
         }
@@ -522,51 +288,59 @@ extension OwnershipUseVisitor {
     return value.uses.endingLifetime.walk {
       switch $0.ownership {
       case .forwardingConsume:
-        return visitForwarding(operand: $0, .innerLifetime)
+        return forwardingUse(of: $0, isInnerLifetime: true)
       case .destroyingConsume:
-        return visit(use: $0, .innerLifetime)
+        return ownershipLeafUse(of: $0, isInnerLifetime: true)
       default:
         fatalError("invalid owned lifetime ending operand ownership")
       }
     }
   }
-}
 
-extension OwnershipUseVisitor {
-  // Visit a borrowing operand (operandOwnerhip == .borrow).
-  private mutating func visitInnerBorrow(operand: Operand) -> WalkResult {
+  // Visit uses of borrowing instruction (operandOwnerhip == .borrow),
+  // skipping uses within the borrow scope.
+  mutating func visitInnerBorrowUses(of borrowInst: BorrowingInstruction)
+    -> WalkResult {
     // If a borrowed value is introduced, then handle the inner scope.
-    if let beginBorrow = BeginBorrowValue(using: operand) {
+    if let beginBorrow = BeginBorrowValue(resultOf: borrowInst) {
       return visitUsesOfInner(value: beginBorrow.value)
     }
     // Otherwise, directly visit the scope ending uses.
-    let borrowInst = BorrowingInstruction(operand.instruction)!
-    return borrowInst.visitScopeEndingOperands(_context) { [self] in 
-      visit(use: $0, .innerLifetime)
+    //
+    // TODO: change visitScopeEndingOperands to take a non-escaping
+    // closure and call ownershipLeafUse directly.
+    var stack = Stack<Operand>(context)
+    defer { stack.deinitialize() }
+    _ = borrowInst.visitScopeEndingOperands(context) {
+      stack.push($0)
+      return .continueWalk
     }
+    return stack.walk { ownershipLeafUse(of: $0, isInnerLifetime: true) }
   }
+}
 
+extension OwnershipUseVisitor {
   // This is only called for uses in the outer lifetime.
-  private mutating func visitOwned(use: Operand) -> WalkResult {
-    switch use.ownership {
+  private mutating func classifyOwned(operand: Operand) -> WalkResult {
+    switch operand.ownership {
     case .nonUse:
       return .continueWalk
 
     case .destroyingConsume:
-      return visit(use: use, .outerLifetime)
+      return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .forwardingConsume:
-      return visitForwarding(operand: use, .outerLifetime)
+      return forwardingUse(of: operand, isInnerLifetime: false)
 
     case .pointerEscape:
-      return visitPointerEscape(use: use)
+      return pointerEscapingUse(of: operand)
 
     case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse,
       .bitwiseEscape:
-      return visit(use: use, .outerLifetime)
+      return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .borrow:
-      return visitInnerBorrow(operand: use)
+      return visitBorrowingUse(of: operand)
 
     // TODO: Eventually, visit owned InteriorPointers as implicit borrows.
     case .interiorPointer, .trivialUse, .endBorrow, .reborrow,
@@ -576,36 +350,62 @@ extension OwnershipUseVisitor {
   }
 
   // This is only called for uses in the outer lifetime.
-  private mutating func visitGuaranteed(use: Operand)
-  -> WalkResult {
-    switch use.ownership {
+  private mutating func classifyGuaranteed(operand: Operand)
+    -> WalkResult {
+    switch operand.ownership {
     case .nonUse:
       return .continueWalk
 
     case .pointerEscape:
-      return visitPointerEscape(use: use)
+      return pointerEscapingUse(of: operand)
 
     case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse,
-      .bitwiseEscape:
-      return visit(use: use, .outerLifetime)
-
-    case .endBorrow:
-      return visit(use: use, .outerLifetime)
+         .bitwiseEscape, .endBorrow:
+      return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .reborrow:
-      return visitReborrow(operand: use, .outerLifetime)
+      return reborrowingUse(of: operand, isInnerLifetime: false)
 
     case .guaranteedForwarding:
-      return visitForwarding(operand: use, .outerLifetime)
+      return forwardingUse(of: operand, isInnerLifetime: false)
 
     case .borrow:
-      return visitInnerBorrow(operand: use)
+      return visitBorrowingUse(of: operand)
 
     case .interiorPointer:
-      return visitInteriorPointer(use: use)
+      return visitInteriorPointerUse(of: operand)
 
     case .trivialUse, .forwardingConsume, .destroyingConsume:
       fatalError("ownership incompatible with a guaranteed value")
+    }
+  }
+
+  private mutating func visitBorrowingUse(of operand: Operand)
+    -> WalkResult {
+    switch operand.instruction {
+    case let pai as PartialApplyInst:
+      assert(pai.isOnStack)
+      return dependentUse(of: operand, into: pai)
+    case let mdi as MarkDependenceInst:
+      assert(operand == mdi.baseOperand && mdi.isNonEscaping)
+      return dependentUse(of: operand, into: mdi)
+    default:
+      return borrowingUse(of: operand,
+                          by: BorrowingInstruction(operand.instruction)!)
+    }
+  }
+
+  // TODO: Change ProjectBox ownership to InteriorPointer and allow
+  // owned interior pointers.
+  private mutating func visitInteriorPointerUse(of operand: Operand)
+    -> WalkResult {
+    switch operand.instruction {
+    case is RefTailAddrInst, is RefElementAddrInst, is ProjectBoxInst,
+         is OpenExistentialBoxInst:
+      let svi = operand.instruction as! SingleValueInstruction
+      return interiorPointerUse(of: operand, into: svi)
+    default:
+      return pointerEscapingUse(of: operand)
     }
   }
 }
@@ -651,14 +451,21 @@ extension OwnershipUseVisitor {
 ///
 /// TODO: Change the operandOwnership of MarkDependenceInst base operand.
 /// It should be a borrowing operand, not a pointer escape.
-struct InteriorUseWalker: OwnershipUseVisitor, AddressLifetimeDefUseWalker {
-  let context: FunctionPassContext
-  var _context: Context { context }
+struct InteriorUseWalker {
+  let functionContext: FunctionPassContext
+  var context: Context { functionContext }
 
   let definingValue: Value
   let useVisitor: (Operand) -> WalkResult
 
   var innerScopeHandler: InnerScopeHandler? = nil
+
+  private func handleInner(borrowed value: Value) -> WalkResult  {
+    guard let innerScopeHandler else {
+      return .continueWalk
+    }
+    return innerScopeHandler(value)
+  }
 
   var unenclosedPhis: [Phi] = []
 
@@ -689,24 +496,47 @@ struct InteriorUseWalker: OwnershipUseVisitor, AddressLifetimeDefUseWalker {
   init(definingValue: Value, _ context: FunctionPassContext,
     visitor: @escaping (Operand) -> WalkResult) {
     assert(!definingValue.type.isAddress, "address values have no ownership")
-    self.context = context
+    self.functionContext = context
     self.definingValue = definingValue
     self.useVisitor = visitor
     self.visited = ValueSet(context)
   }
 
   mutating func visitUses() -> WalkResult {
-    visitUsesOfOuter(value: definingValue)
+    // If the outer value is an owned phi or reborrow, consider inner
+    // adjacent phis part of its lifetime.
+    if let phi = Phi(definingValue), phi.endsLifetime {
+      var innerPhis = Stack<Phi>(context)
+      defer { innerPhis.deinitialize() }
+      gatherInnerAdjacentPhis(for: phi, in: &innerPhis, context)
+      let result = innerPhis.walk { innerPhi in
+        if innerPhi.isReborrow {
+          // Inner adjacent reborrows are considered inner borrow scopes.
+          if handleInner(borrowed: innerPhi.value) == .abortWalk {
+            return .abortWalk
+          }
+          return visitUsesOfInner(value: innerPhi.value)
+        } else {
+          // Inner adjacent guaranteed phis are uses of the outer borrow.
+          return visitUsesOfOuter(value: innerPhi.value)
+        }
+      }
+      if result == .abortWalk {
+        return .abortWalk
+      }
+    }
+    return visitUsesOfOuter(value: definingValue)
   }
+}
 
-  /// This is invoked for all uses of the outer lifetime, even if the
-  /// use forwards a value or produces an interior pointer. This is
-  /// not invoked for address-to-address projections. This is only
-  /// invoked for uses of an inner lifetime if `use` ends the
-  /// lifetime.
-  func visit(use: Operand, _ isInnerLifetime: IsInnerLifetime)
-  -> WalkResult {
-    useVisitor(use)
+extension InteriorUseWalker: OwnershipUseVisitor {
+  /// This is invoked for all non-address uses of the outer lifetime,
+  /// even if the use forwards a value or produces an interior
+  /// pointer. This is only invoked for uses of an inner lifetime
+  /// if it ends the lifetime.
+  mutating func ownershipLeafUse(of operand: Operand, isInnerLifetime: Bool)
+    -> WalkResult {
+    useVisitor(operand)
   }
 
   // Visit owned and guaranteed forwarding operands.
@@ -715,106 +545,163 @@ struct InteriorUseWalker: OwnershipUseVisitor, AddressLifetimeDefUseWalker {
   //
   // Owned forwarding operands end the outer lifetime but extend the
   // inner lifetime (e.g. from a PartialApply or MarkDependence).
-  mutating func visitForwarding(operand: Operand,
-    _ isInnerLifetime: IsInnerLifetime) -> WalkResult {
+  mutating func forwardingUse(of operand: Operand, isInnerLifetime: Bool)
+    -> WalkResult {
     switch operand.value.ownership {
     case .guaranteed:
-      assert(isInnerLifetime == .outerLifetime,
-        "inner guaranteed forwards are not walked")
+      assert(!isInnerLifetime, "inner guaranteed forwards are not walked")
       return walkDown(operand: operand)
     case .owned:
-      switch isInnerLifetime {
-      case .outerLifetime:
-        return visit(use: operand, .outerLifetime)
-      case .innerLifetime:
-        return walkDown(operand: operand)
-      }
+      return isInnerLifetime ? walkDown(operand: operand) : useVisitor(operand)
     default:
       fatalError("forwarded values must have a lifetime")
     }
   }
 
+  mutating func interiorPointerUse(of operand: Operand, into address: Value)
+    -> WalkResult {
+    // OSSA lifetime ignores trivial types.
+    if operand.value.type.isTrivial(in: function) {
+      return .continueWalk
+    }
+    if useVisitor(operand) == .abortWalk {
+      return .abortWalk
+    }
+    return walkDownAddressUses(of: address)
+  }  
+
+  // Handle partial_apply [on_stack] and mark_dependence [nonescaping].
+  //
+  // TODO: Rather than walking down the owned uses, this could call
+  // visitInnerBorrowUses, but we need to ensure all dependent values
+  // are complete first:
+  //
+  //   if let svi = borrowInst as! SingleValueInstruction,
+  //          svi.ownership == .owned {
+  //     if handleInner(borrowed: beginBorrow.value) == .abortWalk {
+  //       return .abortWalk
+  //     }
+  //     return visitInnerBorrowUses(of: borrowInst)
+  //   }
+  mutating func dependentUse(of operand: Operand, into value: Value)
+    -> WalkResult {
+    // OSSA lifetime ignores trivial types.
+    if operand.value.type.isTrivial(in: function) {
+      return .continueWalk
+    }
+    if useVisitor(operand) == .abortWalk {
+      return .abortWalk
+    }
+    return walkDownUses(of: value)
+  }  
+
+  mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
+    if useVisitor(operand) == .abortWalk {
+      return .abortWalk
+    }
+    pointerStatus = .escaping(operand)
+    return .abortWalk
+  }
+
+  // Call the innerScopeHandler before visiting the scope-ending uses.
+  mutating func borrowingUse(of operand: Operand,
+                             by borrowInst: BorrowingInstruction)
+    -> WalkResult {
+    if let beginBorrow = BeginBorrowValue(resultOf: borrowInst) {
+      if handleInner(borrowed: beginBorrow.value) == .abortWalk {
+        return .abortWalk
+      }
+    }
+    return visitInnerBorrowUses(of: borrowInst)
+  }
+
   // Visit a reborrow operand. This ends an outer lifetime and extends
   // an inner lifetime.
-  mutating func visitReborrow(operand: Operand,
-    _ isInnerLifetime: IsInnerLifetime) -> WalkResult {
-    switch isInnerLifetime {
-    case .outerLifetime:
-      return visit(use: operand, .outerLifetime)
-    case .innerLifetime:
-      return walkDown(operand: operand)
-    }
-  }
-
-  mutating func visitPointerEscape(use: Operand) -> WalkResult {
-    if useVisitor(use) == .abortWalk {
-      return .abortWalk
-    }
-    pointerStatus = .escaping(use)
-    return .abortWalk
-  }
-
-  // TODO: Change ProjectBox ownership to InteriorPointer
-  mutating func visitInteriorPointer(use: Operand) -> WalkResult {
-    // OSSA lifetime ignores trivial types.
-    if use.value.type.isTrivial(in: function) {
-      return .continueWalk
-    }
-    if useVisitor(use) == .abortWalk {
-      return .abortWalk
-    }
-    let instruction = use.instruction
-    switch instruction {
-    case let rta as RefTailAddrInst:
-      return walkDownUses(ofAddress: rta)
-    case let rea as RefElementAddrInst:
-      return walkDownUses(ofAddress: rea)
-    case let pb as ProjectBoxInst:
-      return walkDownUses(ofAddress: pb)
-    default:
-      return walkDown(address: use)
-    }
-  }
-
-  mutating func projection(of address: Operand) -> WalkResult {
-    visit(use: address, .outerLifetime)
-  }
-
-  mutating func leafUse(address: Operand) -> WalkResult {
-    visit(use: address, .outerLifetime)
-  }
-
-  mutating func pointerEscape(address: Operand) -> WalkResult {
-    visitPointerEscape(use: address)
-  }
-
-  mutating func unknown(address: Operand) -> WalkResult {
-    pointerStatus = .unknown(address)
-    return .abortWalk
-  }
-
-  mutating func dependent(value: Value, dependsOn address: Operand)
+  mutating func reborrowingUse(of operand: Operand, isInnerLifetime: Bool)
     -> WalkResult {
-    if visit(use: address, .outerLifetime) == .abortWalk {
-      return .abortWalk
-    }
-    // If `value` is owned, then `visit(use:, .innerLifetime)` will be
-    // invoked for each leaf use.
-    return walkDownUses(of: value)
+    return isInnerLifetime ? walkDown(operand: operand) : useVisitor(operand)
+  }
+}
+
+extension InteriorUseWalker: AddressUseVisitor {
+  /// An address projection produces a single address result and does not
+  /// escape its address operand in any other way.
+  mutating func projectedAddressUse(of operand: Operand, into value: Value)
+    -> WalkResult {
+    return walkDownAddressUses(of: value)
   }
 
-  func handleInner(borrow: BeginBorrowValue) -> WalkResult  {
-    guard let innerScopeHandler else {
-      return .continueWalk
+  mutating func scopedAddressUse(of operand: Operand) -> WalkResult {
+    switch operand.instruction {
+    case let ba as BeginAccessInst:
+      if handleInner(borrowed: ba) == .abortWalk {
+        return .abortWalk
+      }
+      return ba.endOperands.walk { useVisitor($0) }
+    case let ba as BeginApplyInst:
+      if handleInner(borrowed: ba.token) == .abortWalk {
+        return .abortWalk
+      }
+      return ba.token.uses.walk {
+        useVisitor($0)
+      }
+    case let sb as StoreBorrowInst:
+      if handleInner(borrowed: sb) == .abortWalk {
+        return .abortWalk
+      }
+      return sb.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+        useVisitor($0)
+      }
+    case let load as LoadBorrowInst:
+      if handleInner(borrowed: load) == .abortWalk {
+        return .abortWalk
+      }
+      return load.uses.endingLifetime.walk {
+        useVisitor($0)
+      }
+    default:
+      fatalError("Unrecognized scoped address use: \(operand.instruction)")
     }
-    return innerScopeHandler(borrow.value)
   }
 
-  func handleAccess(address: BeginAccessInst) -> WalkResult {
-    guard let innerScopeHandler else {
-      return .continueWalk
+  mutating func leafAddressUse(of operand: Operand) -> WalkResult {
+    return .continueWalk
+  }
+
+  mutating func loadedAddressUse(of operand: Operand, into value: Value)
+    -> WalkResult {
+    return .continueWalk
+  }    
+
+  mutating func loadedAddressUse(of operand: Operand, into address: Operand)
+    -> WalkResult {
+    return .continueWalk
+  }    
+
+  mutating func dependentAddressUse(of operand: Operand, into value: Value)
+    -> WalkResult {
+    walkDownUses(of: value)
+  }    
+
+  mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
+    pointerStatus = .escaping(operand)
+    return .abortWalk
+  }
+
+  mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
+    pointerStatus = .unknown(operand)
+    return .abortWalk
+  }
+
+  private mutating func walkDownAddressUses(of address: Value) -> WalkResult {
+    assert(address.type.isAddress)
+    return address.uses.ignoreTypeDependence.walk {
+      // Record all uses
+      if useVisitor($0) == .abortWalk {
+        return .abortWalk
+      }
+      return classifyAddress(operand: $0)
     }
-    return innerScopeHandler(address)
   }
 }
 
@@ -833,6 +720,12 @@ extension InteriorUseWalker {
       if phi.value.ownership == .guaranteed {
         return walkDown(guaranteedPhi: phi)
       }
+      // This is a phi of a dependent value. partial_apply [on_stack]
+      // and mark_dependence [nonescaping] cannot be cloned, so all
+      // dependent phis must be dominated.
+      assert(definingValue.parentBlock.dominates(phi.successor,
+                                                 functionContext.dominatorTree),
+             "on-stack partial apply cannot be cloned")
       return walkDownUses(of: phi.value)
     }
     // TODO: verify that ForwardInstruction handles all .forward
@@ -917,7 +810,7 @@ extension InteriorUseWalker {
     // this algorithm to detect redundant phis, similar to the
     // SSAUpdater.
     if !definingValue.parentBlock.dominates(guaranteedPhi.successor,
-      context.dominatorTree) {
+      functionContext.dominatorTree) {
       // definingValue does not dominate guaranteedPhi. Record this
       // unenclosed phi so the liveness client can insert the missing
       // outer adjacent phi.
@@ -972,7 +865,6 @@ struct LivenessBoundary : CustomStringConvertible {
 let linearLivenessTest = FunctionTest("linear_liveness_swift") {
   function, arguments, context in
   let value = arguments.takeValue()
-  print(function)
   print("Linear liveness: \(value)")
   var range = computeLinearLiveness(for: value, context)
   defer { range.deinitialize() }
@@ -986,7 +878,6 @@ let linearLivenessTest = FunctionTest("linear_liveness_swift") {
 let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   function, arguments, context in
   let value = arguments.takeValue()
-  print(function)
   print("Interior liveness: \(value)")
 
   var range = InstructionRange(for: value, context)
@@ -1019,40 +910,4 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   var boundary = LivenessBoundary(value: value, range: range, context)
   defer { boundary.deinitialize() }
   print(boundary)
-}
-
-// Print the uses of an address.
-struct AddressLifetimeUsePrinter: AddressLifetimeDefUseWalker {
-  let _context: Context
-
-  mutating func leafUse(address: Operand) -> WalkResult {
-    print("Leaf use: \(address)")
-    return .continueWalk
-  }
-
-  mutating func pointerEscape(address: Operand) -> WalkResult {
-    print("Pointer escape: \(address)")
-    return .continueWalk
-  }
-
-  mutating func unknown(address: Operand) -> WalkResult {
-    print("Unknown: \(address)")
-    return .continueWalk
-  }
-
-  mutating func dependent(value: Value, dependsOn address: Operand)
-    -> WalkResult {
-    print("Dependent: \(value) on \(address)")
-    return .continueWalk
-  }
-}
-
-let addressUseTest = FunctionTest("address_use_test") {
-    function, arguments, context in
-  let address = arguments.takeValue()
-  assert(address.type.isAddress)
-  print(function)
-  print("Uses of address: \(address)")
-  var printer = AddressLifetimeUsePrinter(_context: context)
-  _ = printer.walkDownUses(ofAddress: address)
 }

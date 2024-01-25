@@ -142,7 +142,6 @@ void CodeCompletionContext::addResultsFromModules(
       CodeCompletionResultSink Sink;
       Sink.annotateResult = getAnnotateResult();
       Sink.addInitsToTopLevel = getAddInitsToTopLevel();
-      Sink.enableCallPatternHeuristics = getCallPatternHeuristics();
       Sink.includeObjectLiterals = includeObjectLiterals();
       Sink.addCallWithNoDefaultArgs = addCallWithNoDefaultArgs();
       Sink.setProduceContextFreeResults((*V)->USRTypeArena);

@@ -13,7 +13,7 @@ extension DA {
   // CHECK: function_ref @swift_distributed_actor_is_remote
 
   // Call the actor function
-  // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@guaranteed DA) -> ()
+  // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@isolated @guaranteed DA) -> ()
 
   distributed func f() { }
 }

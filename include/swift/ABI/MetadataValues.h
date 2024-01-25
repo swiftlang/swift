@@ -673,6 +673,7 @@ private:
 
     HasResilientWitnessesMask = 0x01u << 16,
     HasGenericWitnessTableMask = 0x01u << 17,
+    IsConformanceOfProtocolMask = 0x01u << 18,
 
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
@@ -724,6 +725,14 @@ public:
                                  : 0));
   }
 
+  ConformanceFlags withIsConformanceOfProtocol(
+                                           bool isConformanceOfProtocol) const {
+    return ConformanceFlags((Value & ~IsConformanceOfProtocolMask)
+                            | (isConformanceOfProtocol
+                                 ? IsConformanceOfProtocolMask
+                                 : 0));
+  }
+  
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -749,6 +758,20 @@ public:
     return Value & IsSynthesizedNonUniqueMask;
   }
 
+  /// Is this a conformance of a protocol to another protocol?
+  ///
+  /// The Swift compiler can synthesize a conformance of one protocol to
+  /// another, meaning that every type that conforms to the first protocol
+  /// can also produce a witness table conforming to the second. Such
+  /// conformances cannot generally be written in the surface language, but
+  /// can be made available for specific tasks. The only such instance at the
+  /// time of this writing is that a (local) distributed actor can conform to
+  /// a local actor, but the witness table can only be used via a specific
+  /// builtin to form an existential.
+  bool isConformanceOfProtocol() const {
+    return Value & IsConformanceOfProtocolMask;
+  }
+  
   /// Retrieve the # of conditional requirements.
   unsigned getNumConditionalRequirements() const {
     return (Value & NumConditionalRequirementsMask)

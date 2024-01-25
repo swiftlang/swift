@@ -197,32 +197,39 @@ enum ForwardingUseResult: CustomStringConvertible {
   }
 }
 
-/// Visit all the uses in a forward-extended lifetime
+/// Visit all the non-forwarding uses in a forward-extended lifetime
 /// (LifetimeIntroducer -> Operand).
 ///
 /// Minimal requirements:
 ///   needWalk(for value: Value) -> Bool
-///   leafUse(_ operand: Operand) -> WalkResult
+///   nonForwardingUse(_ operand: Operand) -> WalkResult
 ///   deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 ///
 /// Start walking:
 ///   walkDown(root: Value)
+///
 protocol ForwardingDefUseWalker {
-  // Minimally, check a ValueSet. This walker may traverse chains of
-  // aggregation and destructuring by default. Implementations may
-  // handle phis.
+  /// Minimally, check a ValueSet. This walker may traverse chains of
+  /// aggregation and destructuring by default. Implementations may
+  /// handle phis.
   mutating func needWalk(for value: Value) -> Bool
 
-  mutating func leafUse(_ operand: Operand) -> WalkResult
+  /// A nonForwarding use does not forward ownership, but may
+  /// propagate the lifetime in other ways, such as an interior
+  /// pointer.
+  mutating func nonForwardingUse(_ operand: Operand) -> WalkResult
 
-  // Report any initial or forwarded value with no uses. Only relevant for
-  // guaranteed values or incomplete OSSA. This could be a dead
-  // instruction, a terminator in which the result is dead on one
-  // path, or a dead phi.
-  //
-  // \p operand is nil if \p value is the root.
+  /// Report any initial or forwarded value with no uses. Only relevant for
+  /// guaranteed values or incomplete OSSA. This could be a dead
+  /// instruction, a terminator in which the result is dead on one
+  /// path, or a dead phi.
+  ///
+  /// \p operand is nil if \p value is the root.
   mutating func deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 
+  /// This is called for every forwarded value. If the root was an
+  /// owned value, then this identifies all OSSA lifetimes in the
+  /// forward-extendd lifetime.
   mutating func walkDownUses(of: Value, using: Operand?) -> WalkResult
     
   mutating func walkDown(operand: Operand) -> WalkResult
@@ -235,7 +242,7 @@ extension ForwardingDefUseWalker {
   }
 
   mutating func walkDownUses(of value: Value, using operand: Operand?)
-  -> WalkResult {
+    -> WalkResult {
     return walkDownUsesDefault(forwarding: value, using: operand)
   }
 
@@ -245,8 +252,8 @@ extension ForwardingDefUseWalker {
     if !needWalk(for: value) { return .continueWalk }
 
     var hasUse = false
-    for operand in value.uses where !operand.isTypeDependent {
-      if walkDown(operand: operand) == .abortWalk {
+    for use in value.uses where !use.isTypeDependent {
+      if walkDown(operand: use) == .abortWalk {
         return .abortWalk
       }
       hasUse = true
@@ -263,12 +270,17 @@ extension ForwardingDefUseWalker {
 
   mutating func walkDownDefault(forwarding operand: Operand) -> WalkResult {
     if let inst = operand.instruction as? ForwardingInstruction {
-      return inst.forwardedResults.walk { walkDownUses(of: $0, using: operand) }
+      let singleOper = inst.singleForwardedOperand
+      if singleOper == nil || singleOper! == operand {
+        return inst.forwardedResults.walk {
+          walkDownUses(of: $0, using: operand)
+        }
+      }
     }
     if let phi = Phi(using: operand) {
       return walkDownUses(of: phi.value, using: operand)
     }
-    return leafUse(operand)
+    return nonForwardingUse(operand)
   }
 }
 
@@ -301,7 +313,7 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
     visitedValues.insert(value)
   }
   
-  mutating func leafUse(_ operand: Operand) -> WalkResult {
+  mutating func nonForwardingUse(_ operand: Operand) -> WalkResult {
     return visitor(.operand(operand))
   }
 

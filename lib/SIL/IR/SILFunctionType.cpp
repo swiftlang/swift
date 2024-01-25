@@ -1737,6 +1737,8 @@ private:
       param = param.addingOption(SILParameterInfo::NotDifferentiable);
     if (origFlags.isTransferring())
       param = param.addingOption(SILParameterInfo::Transferring);
+    if (origFlags.isIsolated())
+      param = param.addingOption(SILParameterInfo::Isolated);
 
     Inputs.push_back(param);
     maybeAddForeignParameters();

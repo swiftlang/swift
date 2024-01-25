@@ -51,7 +51,7 @@ internal struct UsableFromInlineStruct : PublicProtocol, UsableFromInlineProtoco
 // CHECK-NONRESILIENT-DAG: sil_witness_table PublicResilientStruct: PackageProtocol
 // CHECK-NONRESILIENT-DAG: sil_witness_table hidden PublicResilientStruct: InternalProtocol
 
-// CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] PackageStruct: PublicProtocol
-// CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] PackageStruct: UsableFromInlineProtocol
+// CHECK-NONRESILIENT-DAG: sil_witness_table PackageStruct: PublicProtocol
+// CHECK-NONRESILIENT-DAG: sil_witness_table PackageStruct: UsableFromInlineProtocol
 // CHECK-NONRESILIENT-DAG: sil_witness_table PackageStruct: PackageProtocol
 // CHECK-NONRESILIENT-DAG: sil_witness_table hidden PackageStruct: InternalProtocol

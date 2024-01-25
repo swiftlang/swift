@@ -784,8 +784,13 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  auto *dc = storage->getDeclContext();
-  if (storage->getValueInterfaceType()->isNoncopyable(dc))
+  GenericEnvironment *env = nullptr;
+  if (auto *gc = storage->getAsGenericContext())
+    env = gc->getGenericEnvironment();
+  else
+    env = storage->getDeclContext()->getGenericEnvironmentOfContext();
+
+  if (isInterfaceTypeNoncopyable(storage->getValueInterfaceType(), env))
     return usesBorrowed(DiagKind::NoncopyableType);
 
   return OpaqueReadOwnership::Owned;
@@ -1501,9 +1506,7 @@ synthesizeTrivialGetterBody(AccessorDecl *getter, TargetImpl target,
 
   SmallVector<ASTNode, 2> body;
   if (result != nullptr) {
-    ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result,
-                                              /*IsImplicit=*/true);
-    body.push_back(returnStmt);
+    body.push_back(ReturnStmt::createImplicit(ctx, result));
   }
 
   return { BraceStmt::create(ctx, loc, body, loc, true),
@@ -1647,8 +1650,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                         AccessSemantics::Ordinary);
   Tmp1DRE->setType(Tmp1VD->getTypeInContext());
-  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
-                                      /*implicit*/true);
+  auto *Return = ReturnStmt::createImplicit(Ctx, Tmp1DRE);
   auto *ReturnBranch = BraceStmt::createImplicit(Ctx, {Return});
 
   // Build the "if" around the early return.
@@ -1713,7 +1715,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                                   AccessSemantics::DirectToStorage);
   Tmp2DRE->setType(Tmp2VD->getTypeInContext());
 
-  Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
+  Body.push_back(ReturnStmt::createImplicit(Ctx, Tmp2DRE));
 
   auto Range = InitValue->getSourceRange();
   return { BraceStmt::create(Ctx, Range.Start, Body, Range.End,

@@ -209,6 +209,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::AddressOfBorrowOpaque:
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
+    case BuiltinValueKind::DistributedActorAsAnyActor:
       return true;
     }
   }

@@ -2684,8 +2684,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     returnedExpr = callExpr;
   }
 
-  auto *returnStmt =
-      new (context) ReturnStmt(SourceLoc(), returnedExpr, /*Implicit=*/true);
+  auto *returnStmt = ReturnStmt::createImplicit(context, returnedExpr);
 
   SmallVector<ASTNode, 1> stmts;
   stmts.push_back(returnStmt);
@@ -3892,7 +3891,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   // conforms to the specified protocol.
   NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
   if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
-    if (!OtherPD->inheritsFrom(PD)) {
+    if (!OtherPD->inheritsFrom(PD) &&
+        !(OtherPD->isSpecificProtocol(KnownProtocolKind::DistributedActor) ||
+          PD->isSpecificProtocol(KnownProtocolKind::Actor))) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_not_conformed_to, NTD, PD)
         .highlight(attr->getProtocolTypeRepr()->getSourceRange());
@@ -6831,7 +6832,14 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 }
 
 void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
-  if (!D->isImplicit()) {
+  auto &ctx = D->getASTContext();
+  auto *module = D->getDeclContext()->getParentModule();
+  auto *distributed = ctx.getLoadedModule(ctx.Id_Distributed);
+
+  // FIXME: An explicit `_local` is used in the implementation of
+  // `DistributedActor.whenLocal`, which otherwise violates actor
+  // isolation checking.
+  if (!D->isImplicit() && (module != distributed)) {
     diagnoseAndRemoveAttr(attr, diag::distributed_local_cannot_be_used);
   }
 }
@@ -6870,7 +6878,9 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       // 'nonisolated' can not be applied to mutable stored properties unless
       // qualified as 'unsafe'.
       if (var->supportsMutation() && !attr->isUnsafe()) {
-        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
+        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+            .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+        var->diagnose(diag::nonisolated_mutable_storage_note, var);
         return;
       }
 
@@ -7259,7 +7269,7 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
     return;
   }
   
-  if (!sd->canBeNoncopyable()) {
+  if (sd->canBeCopyable()) {
     diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_be_copyable);
   }
   
@@ -7317,8 +7327,7 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   // Can only be applied to structs.
   auto structDecl = cast<StructDecl>(D);
 
-  if (!structDecl->getDeclaredInterfaceType()
-                 ->isNoncopyable(D->getDeclContext())) {
+  if (structDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never) {
     diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_noncopyable);
   }
 }

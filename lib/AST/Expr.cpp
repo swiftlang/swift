@@ -2072,7 +2072,7 @@ FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {
   auto &Context = getASTContext();
-  auto *RS = new (Context) ReturnStmt(SourceLoc(), E);
+  auto *RS = ReturnStmt::createImplicit(Context, E);
   Body = BraceStmt::create(Context, E->getStartLoc(), { RS }, E->getEndLoc());
 }
 
@@ -2715,19 +2715,8 @@ SourceRange TapExpr::getSourceRange() const {
   if (!SubExpr)
     return Body->getSourceRange();
 
-  SourceLoc start = SubExpr->getStartLoc();
-  if (!start.isValid())
-    start = Body->getStartLoc();
-  if (!start.isValid())
-    return SourceRange();
-
-  SourceLoc end = Body->getEndLoc();
-  if (!end.isValid())
-    end = SubExpr->getEndLoc();
-  if (!end.isValid())
-    return SourceRange();
-
-  return SourceRange(start, end);
+  return SourceRange::combine(SubExpr->getSourceRange(),
+                              Body->getSourceRange());
 }
 
 RegexLiteralExpr *

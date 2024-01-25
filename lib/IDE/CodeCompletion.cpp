@@ -130,7 +130,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   bool AttrParamHasLabel;
   bool IsInSil = false;
   bool HasSpace = false;
-  bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
   llvm::Optional<DeclKind> AttTargetDK;
@@ -284,7 +283,7 @@ public:
   void completeImportDecl(ImportPath::Builder &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
 
   bool canPerformCompleteLabeledTrailingClosure() const override {
     return true;
@@ -546,26 +545,10 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(CodeCompletionExpr *E
   this->DotLoc = DotLoc;
 }
 
-void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
-                                                  bool isFirst) {
+void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::CallArg;
-
-  ShouldCompleteCallPatternAfterParen = false;
-  if (isFirst) {
-    ShouldCompleteCallPatternAfterParen = true;
-    if (CompletionContext.getCallPatternHeuristics()) {
-      // Lookahead one token to decide what kind of call completions to provide.
-      // When it appears that there is already code for the call present, just
-      // complete values and/or argument labels.  Otherwise give the entire call
-      // pattern.
-      Token next = P.peekToken();
-      if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
-        ShouldCompleteCallPatternAfterParen = false;
-      }
-    }
-  }
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {

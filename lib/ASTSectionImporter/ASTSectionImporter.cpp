@@ -57,7 +57,9 @@ swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
   // headers. Iterate over all AST modules.
   while (!buf.empty()) {
     auto info = serialization::validateSerializedAST(
-        buf, Loader.isRequiredOSSAModules(), /*requiredSDK*/StringRef());
+        buf, Loader.isRequiredOSSAModules(),
+        Loader.isRequiredNoncopyableGenerics(),
+        /*requiredSDK*/StringRef());
 
     assert(info.name.size() < (2 << 10) && "name failed sanity check");
 

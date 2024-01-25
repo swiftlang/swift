@@ -139,31 +139,6 @@ do {
   }
 }
 
-// rdar://119008852
-do {
-  struct LazyPageView: View {
-    @State var currentOffset = 0
-    @State private var tabViewSelection = 0
-    let minIndex: Int?
-    let maxIndex: Int?
-    let contentGen: (Int) -> any View
-
-    var body: some View {
-      TabView(selection: $tabViewSelection) {
-        Group {
-          if minIndex == nil || currentOffset - 1 >= minIndex! {
-            // expected-error@-1 {{type 'any View' cannot conform to 'View'}}
-            // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-            // expected-note@-3 {{required by static method 'buildIf' where 'Content' = 'any View'}}
-            contentGen(currentOffset - 1)
-          }
-        }
-        contentGen(currentOffset)
-      }
-    }
-  }
-}
-
 // rdar://118374670
 do {
   struct MissingWrapperInnerView: View {

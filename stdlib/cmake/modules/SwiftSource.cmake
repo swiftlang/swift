@@ -607,8 +607,9 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
-  if(SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+  if(SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
     list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
+    list(APPEND swift_flags "-Xfrontend" "-enable-experimental-associated-type-inference")
     list(APPEND swift_flags "-Xfrontend" "-disable-round-trip-debug-types") # NOTE: temporary until we fix mangling!
   endif()
 

@@ -1049,21 +1049,24 @@ bool SILType::isEscapable() const {
   return getASTType()->isEscapable();
 }
 
-bool SILType::isMoveOnly() const {
+bool SILType::isMoveOnly(bool orWrapped) const {
+  // If it's inside the move-only wrapper, return true iff we want to include
+  // such types as "move-only" in this query. Such values are typically
+  // just "no-implicit-copy" and not "move-only".
+  if (isMoveOnlyWrapped())
+    return orWrapped;
+
   // Legacy check.
   if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    return getASTType()->isNoncopyable() || isMoveOnlyWrapped();
+    return getASTType()->isNoncopyable();
   }
 
-  // Anything within the move-only wrapper is move-only.
-  if (isMoveOnlyWrapped())
-    return true;
+  // NOTE: getASTType strips the MoveOnlyWrapper off!
+  CanType ty = getASTType();
 
-  auto ty = getASTType();
-
-  // All kinds of references are copyable.
-  if (isa<ReferenceStorageType>(ty))
-    return false;
+  // For storage with reference ownership, check the referent.
+  if (auto refStorage = ty->getAs<ReferenceStorageType>())
+    ty = refStorage->getReferentType()->getCanonicalType();
 
   // TODO: Nonescaping closures ought to be treated as move-only in SIL.
   // They aren't marked move-only now, because the necessary move-only passes

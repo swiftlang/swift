@@ -23,6 +23,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -290,6 +291,13 @@ bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(hasWitness, (requirement))
 }
 
+bool RootProtocolConformance::isSynthesized() const {
+  if (auto normal = dyn_cast<NormalProtocolConformance>(this))
+    return normal->isSynthesizedNonUnique() || normal->isConformanceOfProtocol();
+
+  return false;
+}
+
 bool NormalProtocolConformance::isRetroactive() const {
   auto module = getDeclContext()->getParentModule();
 
@@ -321,9 +329,15 @@ bool NormalProtocolConformance::isRetroactive() const {
 }
 
 bool NormalProtocolConformance::isSynthesizedNonUnique() const {
+  // Check if the conformance was synthesized by the ClangImporter.
   if (auto *file = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext()))
     return file->getKind() == FileUnitKind::ClangModule;
+
   return false;
+}
+
+bool NormalProtocolConformance::isConformanceOfProtocol() const {
+  return getDeclContext()->getSelfProtocolDecl() != nullptr;
 }
 
 bool NormalProtocolConformance::isResilient() const {
@@ -1057,13 +1071,15 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
+  const bool haveNoncopyableGenerics =
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   auto addSynthesized = [&](ProtocolDecl *proto) {
     if (!proto)
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (canBeNoncopyable()) {
+    if (!haveNoncopyableGenerics && !canBeCopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;
@@ -1075,6 +1091,16 @@ void NominalTypeDecl::prepareConformanceTable() const {
       protocols.insert(proto);
     }
   };
+
+  // Synthesize the unconditional conformances to invertible protocols.
+  // For conditional ones, see findSynthesizedConformances .
+  if (haveNoncopyableGenerics) {
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto invertible = getMarking(ip);
+      if (!invertible.getInverse() || bool(invertible.getPositive()))
+        addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+    }
+  }
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
@@ -1248,9 +1274,12 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
 
-    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-      trySynthesize(KnownProtocolKind::Copyable);
-      trySynthesize(KnownProtocolKind::Escapable);
+    // Triggers synthesis of a possibly conditional conformance.
+    // For the unconditional ones, see NominalTypeDecl::prepareConformanceTable
+    if (nominal->getASTContext().LangOpts.hasFeature(
+            Feature::NoncopyableGenerics)) {
+      for (auto ip : InvertibleProtocolSet::full())
+        trySynthesize(getKnownProtocolKind(ip));
     }
 
     if (nominal->getASTContext().LangOpts.hasFeature(

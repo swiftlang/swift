@@ -17,8 +17,8 @@ public func test() {
   s.min()
   s.max()
   s.reduce(0, +)
-  // s.shuffled()
-  // s.randomElement()
+  s.shuffled()
+  s.randomElement()
 }
 
 test()

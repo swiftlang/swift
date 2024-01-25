@@ -763,9 +763,13 @@ public:
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
 
-  /// Returns true if this type is a first class move only type or a move only
-  /// wrapped type.
-  bool isMoveOnly() const;
+  /// Returns true if this type is a noncopyable type. Otherwise, if the type
+  /// satisfies \c isMoveOnlyWrapped(), then it returns true iff \c orWrapped
+  /// is true. That is,
+  ///
+  /// orWrapped == false -->  isNoncopyable
+  /// orWrapped == true  -->  isNoncopyable || isMoveOnlyWrapped
+  bool isMoveOnly(bool orWrapped=true) const;
 
   /// Return true if this is a value type (struct/enum) that requires
   /// deinitialization beyond destruction of its members.

@@ -847,6 +847,22 @@ function Build-WiXProject() {
   Invoke-Program $msbuild @MSBuildArgs
 }
 
+function Build-CMark($Arch) {
+  $ArchName = $Arch.ShortName
+
+  Build-CMakeProject `
+    -Src $SourceCache\cmark `
+    -Bin "$($Arch.BinaryCache)\cmark-gfm-0.29.0.gfm.13" `
+    -InstallTo "$LibraryRoot\cmark-0.29.0.gfm.13\usr" `
+    -Arch $Arch `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP = "YES";
+    }
+}
+
 function Build-BuildTools($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
@@ -878,6 +894,7 @@ function Build-BuildTools($Arch) {
       SWIFT_INCLUDE_APINOTES = "NO";
       SWIFT_INCLUDE_DOCS = "NO";
       SWIFT_INCLUDE_TESTS = "NO";
+      "cmark-gfm_DIR" = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13";
     }
 }
 
@@ -941,7 +958,6 @@ function Build-Compilers() {
         LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
         LLDB_TABLEGEN = "$BinaryCache\0\bin\lldb-tblgen.exe";
         LLVM_CONFIG_PATH = "$BinaryCache\0\bin\llvm-config.exe";
-        LLVM_EXTERNAL_CMARK_SOURCE_DIR = "$SourceCache\cmark";
         LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
         LLVM_NATIVE_TOOL_DIR = "$BinaryCache\0\bin";
         LLVM_TABLEGEN = "$BinaryCache\0\bin\llvm-tblgen.exe";
@@ -959,6 +975,7 @@ function Build-Compilers() {
         SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
         SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
+        "cmark-gfm_DIR" = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13";
       })
   }
 }
@@ -1736,12 +1753,14 @@ function Stage-BuildArtifacts($Arch) {
 }
 
 #-------------------------------------------------------------------
+try {
 
 if (-not $SkipBuild) {
   Fetch-Dependencies
 }
 
 if (-not $SkipBuild) {
+  Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-BuildTools $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
 }
@@ -1829,3 +1848,31 @@ if ($Test -contains "dispatch") { Build-Dispatch $HostArch -Test }
 if ($Test -contains "foundation") { Build-Foundation $HostArch -Test }
 if ($Test -contains "xctest") { Build-XCTest $HostArch -Test }
 if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
+
+# Custom exception printing for more detailed exception information
+} catch {
+  function Write-ErrorLines($Text, $Indent = 0) {
+    $IndentString = " " * $Indent
+    $Text.Replace("`r", "") -split "`n" | ForEach-Object {
+      Write-Host "$IndentString$_" -ForegroundColor Red
+    }
+  }
+
+  Write-ErrorLines "Error: $_"
+  Write-ErrorLines $_.ScriptStackTrace -Indent 4
+
+  # Walk the .NET inner exception chain to print all messages and stack traces
+  $Exception = $_.Exception
+  $Indent = 2
+  while ($Exception -is [Exception]) {
+      Write-ErrorLines "From $($Exception.GetType().FullName): $($Exception.Message)" -Indent $Indent
+      if ($null -ne $Exception.StackTrace) {
+          # .NET exceptions stack traces are already indented by 3 spaces
+          Write-ErrorLines $Exception.StackTrace -Indent ($Indent + 1)
+      }
+      $Exception = $Exception.InnerException
+      $Indent += 2
+  }
+
+  exit 1
+}

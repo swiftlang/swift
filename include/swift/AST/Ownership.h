@@ -142,6 +142,19 @@ enum class ValueOwnership : uint8_t {
 enum : unsigned { NumValueOwnershipBits =
   countBitsUsed(static_cast<unsigned>(ValueOwnership::Last_Kind)) };
 
+static inline llvm::StringRef getOwnershipSpelling(ValueOwnership ownership) {
+  switch (ownership) {
+  case ValueOwnership::Default:
+    return "";
+  case ValueOwnership::InOut:
+    return "inout";
+  case ValueOwnership::Shared:
+    return "borrowing";
+  case ValueOwnership::Owned:
+    return "consuming";
+  }
+  llvm_unreachable("Invalid ValueOwnership");
+}
 } // end namespace swift
 
 #endif

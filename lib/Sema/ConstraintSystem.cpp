@@ -2269,7 +2269,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
             return parameterized->getBaseType();
         }
       }
-
+      /*
       if (auto lvalue = dyn_cast<LValueType>(t)) {
         auto objTy = lvalue->getObjectType();
         auto erasedTy =
@@ -2283,6 +2283,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
 
         return erasedTy;
       }
+      */
 
       if (!predicateFn(t)) {
         // Recurse.

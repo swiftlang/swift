@@ -3072,7 +3072,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
         // Create the wrapping return.
         hasSingleExpressionBody = true;
         auto returnExpr = Element.get<Expr*>();
-        BS->setLastElement(new (Context) ReturnStmt(SourceLoc(), returnExpr));
+        BS->setLastElement(ReturnStmt::createImplicit(Context, returnExpr));
       }
     }
   }
@@ -3276,8 +3276,7 @@ ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, Sou
     // Handle call arguments specially because it may need argument labels.
     auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
     if (this->CodeCompletionCallbacks)
-      this->CodeCompletionCallbacks->completeCallArg(CCExpr,
-                                                     PreviousLoc == leftLoc);
+      this->CodeCompletionCallbacks->completeCallArg(CCExpr);
     consumeIf(tok::code_complete);
     elts.push_back({FieldNameLoc, FieldName, CCExpr});
     Status.setHasCodeCompletionAndIsError();

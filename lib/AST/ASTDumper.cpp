@@ -447,6 +447,20 @@ static size_t getDumpString(size_t value) {
 }
 static void *getDumpString(void *value) { return value; }
 
+static StringRef getDumpString(LifetimeDependenceKind kind) {
+  switch (kind) {
+  case LifetimeDependenceKind::Copy:
+    return "copy";
+  case LifetimeDependenceKind::Consume:
+    return "consume";
+  case LifetimeDependenceKind::Borrow:
+    return "borrow";
+  case LifetimeDependenceKind::Mutate:
+    return "mutate";
+  }
+  llvm_unreachable("Invalid lifetime dependence kind\n");
+}
+
 //===----------------------------------------------------------------------===//
 //  Decl printing.
 //===----------------------------------------------------------------------===//
@@ -3512,6 +3526,21 @@ public:
     for (auto arg : T->getGenericArguments())
       printRec(arg);
 
+    printFoot();
+  }
+
+  void visitLifetimeDependentReturnTypeRepr(LifetimeDependentReturnTypeRepr *T,
+                                            StringRef label) {
+    printCommon("type_lifetime_dependent_return", label);
+    for (auto &dep : T->getLifetimeDependencies()) {
+      printFieldRaw(
+          [&](raw_ostream &out) {
+            out << getDumpString(dep.getLifetimeDependenceKind()) << "(";
+            out << dep.getParamString() << ")";
+          },
+          "");
+    }
+    printRec(T->getBase());
     printFoot();
   }
 };

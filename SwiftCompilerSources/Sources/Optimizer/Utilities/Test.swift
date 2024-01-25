@@ -142,7 +142,11 @@ public func registerOptimizerTests() {
       borrowIntroducersTest,
       enclosingValuesTest,
       linearLivenessTest,
-      interiorLivenessTest
+      interiorLivenessTest,
+      variableIntroducerTest,
+      lifetimeDependenceScopeTest,
+      lifetimeDependenceRootTest,
+      lifetimeDependenceUseTest
     )
 
   // Finally register the thunk they all call through.

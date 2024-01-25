@@ -28,7 +28,7 @@ actor MyActor {
     print(x)
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A13AsyncFunctionyyYaKF : $@convention(method) @async (@guaranteed MyActor) -> @error any Error {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A13AsyncFunctionyyYaKF : $@convention(method) @async (@isolated @guaranteed MyActor) -> @error any Error {
   // CHECK:        hop_to_executor %0 : $MyActor 
   // CHECK:        = apply {{.*}} : $@convention(method) @async (Int, @guaranteed MyActor) -> ()
   // CHECK-NEXT:   hop_to_executor %0 : $MyActor 
@@ -43,7 +43,7 @@ actor MyActor {
     try await throwingCallee(p)
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A22ConsumingAsyncFunctionyyYaF : $@convention(method) @async (@owned MyActor) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A22ConsumingAsyncFunctionyyYaF : $@convention(method) @async (@isolated @owned MyActor) -> () {
   // CHECK:        [[BORROWED_SELF:%[0-9]+]] = begin_borrow %0 : $MyActor
   // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor 
   // CHECK:        = apply {{.*}} : $@convention(method) @async (Int, @guaranteed MyActor) -> ()
@@ -54,7 +54,7 @@ actor MyActor {
   }
 
   ///// MyActor.testClosure()
-  // CHECK: sil hidden [ossa] @$s4test7MyActorC0A7ClosureSiyYaF : $@convention(method) @async (@guaranteed MyActor) -> Int {
+  // CHECK: sil hidden [ossa] @$s4test7MyActorC0A7ClosureSiyYaF : $@convention(method) @async (@isolated @guaranteed MyActor) -> Int {
   // CHECK:     hop_to_executor [[A:%[0-9]+]] : $MyActor
   // CHECK:     {{%[0-9]+}} = apply
   // CHECK:     hop_to_executor [[A]] : $MyActor
@@ -71,7 +71,7 @@ actor MyActor {
     return await { () async in p }()
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC13dontInsertHTESiyF : $@convention(method) (@guaranteed MyActor) -> Int {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC13dontInsertHTESiyF : $@convention(method) (@isolated @guaranteed MyActor) -> Int {
   // CHECK-NOT:   hop_to_executor
   // CHECK:     } // end sil function '$s4test7MyActorC13dontInsertHTESiyF'
   func dontInsertHTE() -> Int {
@@ -195,36 +195,36 @@ func testGenericGlobalActorWithGetter() async {
 }
 
 actor RedActorImpl {
-  // CHECK-LABEL: sil hidden [ossa] @$s4test12RedActorImplC5helloyySiF : $@convention(method) (Int, @guaranteed RedActorImpl) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test12RedActorImplC5helloyySiF : $@convention(method) (Int, @isolated @guaranteed RedActorImpl) -> () {
   // CHECK-NOT: hop_to_executor
   // CHECK: } // end sil function '$s4test12RedActorImplC5helloyySiF'
   func hello(_ x : Int) {}
 }
 
 actor BlueActorImpl {
-// CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC4poke6personyAA03RedcD0C_tYaF : $@convention(method) @async (@guaranteed RedActorImpl, @guaranteed BlueActorImpl) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC4poke6personyAA03RedcD0C_tYaF : $@convention(method) @async (@guaranteed RedActorImpl, @isolated @guaranteed BlueActorImpl) -> () {
 // CHECK:       bb0([[RED:%[0-9]+]] : @guaranteed $RedActorImpl, [[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
 // CHECK:         hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK:         [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:         [[METH:%[0-9]+]] = class_method [[RED]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK:         [[METH:%[0-9]+]] = class_method [[RED]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @isolated @guaranteed RedActorImpl) -> ()
 // CHECK:         hop_to_executor [[RED]] : $RedActorImpl
-// CHECK-NEXT:    {{%[0-9]+}} = apply [[METH]]([[INTARG]], [[RED]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NEXT:    {{%[0-9]+}} = apply [[METH]]([[INTARG]], [[RED]]) : $@convention(method) (Int, @isolated @guaranteed RedActorImpl) -> ()
 // CHECK-NEXT:    hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK: } // end sil function '$s4test13BlueActorImplC4poke6personyAA03RedcD0C_tYaF'
   func poke(person red : RedActorImpl) async {
     await red.hello(42)
   }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC14createAndGreetyyYaF : $@convention(method) @async (@guaranteed BlueActorImpl) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC14createAndGreetyyYaF : $@convention(method) @async (@isolated @guaranteed BlueActorImpl) -> () {
 // CHECK:     bb0([[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
 // CHECK:       hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK:       [[RED:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@thick RedActorImpl.Type) -> @owned RedActorImpl
 // CHECK:       [[REDMOVE:%[0-9]+]] = move_value [lexical] [var_decl] [[RED]] : $RedActorImpl
 // CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [[REDMOVE]] : $RedActorImpl
 // CHECK:       [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:       [[METH:%[0-9]+]] = class_method [[REDBORROW]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK:       [[METH:%[0-9]+]] = class_method [[REDBORROW]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @isolated @guaranteed RedActorImpl) -> ()
 // CHECK:       hop_to_executor [[REDBORROW]] : $RedActorImpl
-// CHECK-NEXT:  = apply [[METH]]([[INTARG]], [[REDBORROW]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NEXT:  = apply [[METH]]([[INTARG]], [[REDBORROW]]) : $@convention(method) (Int, @isolated @guaranteed RedActorImpl) -> ()
 // CHECK-NEXT:  end_borrow [[REDBORROW]] : $RedActorImpl
 // CHECK-NEXT:  hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK:       destroy_value [[REDMOVE]] : $RedActorImpl
@@ -301,9 +301,9 @@ func unspecifiedAsyncFunc() async {
 // CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]] :
 // CHECK:         [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:         [[METH:%[0-9]+]] = class_method [[RED]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK:         [[METH:%[0-9]+]] = class_method [[RED]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @isolated @guaranteed RedActorImpl) -> ()
 // CHECK-NEXT:    hop_to_executor [[RED]] : $RedActorImpl
-// CHECK-NEXT:    {{%[0-9]+}} = apply [[METH]]([[INTARG]], [[RED]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NEXT:    {{%[0-9]+}} = apply [[METH]]([[INTARG]], [[RED]]) : $@convention(method) (Int, @isolated @guaranteed RedActorImpl) -> ()
 // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK: } // end sil function '$s4test27anotherUnspecifiedAsyncFuncyyAA12RedActorImplCYaF'
 func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
@@ -423,18 +423,18 @@ func testImplicitAsyncIsolatedParam(
   // CHECK-NEXT: hop_to_executor [[GENERIC_EXEC]] :
   // CHECK: [[FN1:%.*]] = function_ref @$s4test19acceptIsolatedParamyySi_AA7MyActorCYiSdtF
   // CHECK-NEXT: hop_to_executor [[ACTOR:%.*]] : $MyActor
-  // CHECK-NEXT: apply [[FN1]](%0, %2, %1) : $@convention(thin) (Int, @guaranteed MyActor, Double) -> ()
+  // CHECK-NEXT: apply [[FN1]](%0, %2, %1) : $@convention(thin) (Int, @isolated @guaranteed MyActor, Double) -> ()
   // CHECK-NEXT: hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
   await acceptIsolatedParam(i, actor, d)
 
-  // CHECK: [[FN2:%.*]] = function_ref @$s4test7MyActorC13otherIsolatedyySi_ACYiSdtF : $@convention(method) (Int, @guaranteed MyActor, Double, @guaranteed MyActor) -> ()
+  // CHECK: [[FN2:%.*]] = function_ref @$s4test7MyActorC13otherIsolatedyySi_ACYiSdtF : $@convention(method) (Int, @isolated @guaranteed MyActor, Double, @guaranteed MyActor) -> ()
   // CHECK-NEXT: hop_to_executor [[ACTOR:%.*]] : $MyActor
-  // CHECK-NEXT: apply [[FN2]](%0, %2, %1, %3) : $@convention(method) (Int, @guaranteed MyActor, Double, @guaranteed MyActor) -> ()
+  // CHECK-NEXT: apply [[FN2]](%0, %2, %1, %3) : $@convention(method) (Int, @isolated @guaranteed MyActor, Double, @guaranteed MyActor) -> ()
   // CHECK-NEXT: hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
   await otherActor.otherIsolated(i, actor, d)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test22asyncWithIsolatedParam1i5actor1dySi_AA7MyActorCYiSdtYaF : $@convention(thin) @async (Int, @guaranteed MyActor, Double) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s4test22asyncWithIsolatedParam1i5actor1dySi_AA7MyActorCYiSdtYaF : $@convention(thin) @async (Int, @isolated @guaranteed MyActor, Double) -> ()
 func asyncWithIsolatedParam(i: Int, actor: isolated MyActor, d: Double) async {
   // CHECK: [[ACTOR:%.*]] = copy_value %1 : $MyActor
   // CHECK-NEXT: [[BORROWED:%.*]] = begin_borrow [[ACTOR]] : $MyActor

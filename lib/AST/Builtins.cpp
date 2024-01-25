@@ -1975,6 +1975,19 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto *distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+  auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+
+  // Create type parameters and add conformance constraints.
+  auto actorParam = makeGenericParam();
+  builder.addParameter(actorParam);
+  builder.addConformanceRequirement(actorParam, distributedActorProto);
+  builder.setResult(makeConcrete(actorProto->getDeclaredExistentialType()));
+  return builder.build(id);
+}
+
 static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1,
                                  /* anyObject */ false,
@@ -3055,6 +3068,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::InjectEnumTag:
     return getInjectEnumTag(Context, Id);
+
+  case BuiltinValueKind::DistributedActorAsAnyActor:
+    return getDistributedActorAsAnyActor(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

@@ -266,6 +266,12 @@ public:
   bool isMultilineString() const {
     return MultilineString;
   }
+
+  bool isLifetimeDependenceToken() const {
+    return isContextualKeyword("_copy") || isContextualKeyword("_consume") ||
+           isContextualKeyword("_borrow") || isContextualKeyword("_mutate");
+  }
+
   /// Count of extending escaping '#'.
   unsigned getCustomDelimiterLen() const {
     return CustomDelimiterLen;

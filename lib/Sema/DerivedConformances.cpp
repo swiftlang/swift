@@ -462,8 +462,6 @@ CallExpr *
 DerivedConformance::createBuiltinCall(ASTContext &ctx,
                                       BuiltinValueKind builtin,
                                       ArrayRef<Type> typeArgs,
-                                      ArrayRef<ProtocolConformanceRef>
-                                        conformances,
                                       ArrayRef<Expr *> args) {
   auto name = ctx.getIdentifier(getBuiltinName(builtin));
   auto decl = getBuiltinValueDecl(ctx, name);
@@ -472,8 +470,21 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   ConcreteDeclRef declRef = decl;
   auto fnType = decl->getInterfaceType();
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
+    auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
-    auto subs = SubstitutionMap::get(generics, typeArgs, conformances);
+
+    auto genericParams = generics.getGenericParams();
+    assert(genericParams.size() == typeArgs.size());
+
+    TypeSubstitutionMap map;
+    for (auto i : indices(genericParams))
+      map.insert({genericParams[i]->getCanonicalType()
+                                  ->getAs<SubstitutableType>(),
+                  typeArgs[i]});
+
+    auto subs = SubstitutionMap::get(generics,
+                                     QueryTypeSubstitutionMap{map},
+                                     LookUpConformanceInModule{builtinModule});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
   } else {
@@ -655,8 +666,8 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
                                         Expr *guardReturnValue) {
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
-  
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), guardReturnValue);
+
+  auto *returnStmt = ReturnStmt::createImplicit(C, guardReturnValue);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
@@ -700,7 +711,7 @@ GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
 
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, nilExpr);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.

@@ -77,9 +77,8 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 SILLinkage
 swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
                                         ForDefinition_t definition) {
-  // If the conformance was synthesized by the ClangImporter, give it
-  // shared linkage.
-  if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
+  // If the conformance was synthesized, give it shared linkage.
+  if (C->isSynthesized())
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();

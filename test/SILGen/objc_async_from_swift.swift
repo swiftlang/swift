@@ -202,12 +202,12 @@ class ActorConstrained: NSObject {
 
 actor Dril: NSObject {
     // Dril.postTo(twitter:)
-    // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}4DrilC6postTo7twitter{{.*}} : $@convention(method) @async (@guaranteed String, @guaranteed Dril) -> Bool {
+    // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}4DrilC6postTo7twitter{{.*}} : $@convention(method) @async (@guaranteed String, @isolated @guaranteed Dril) -> Bool {
     // CHECK:           hop_to_executor {{%.*}} : $Dril
 
     // @objc Dril.postTo(twitter:)
-    // CHECK-LABEL: sil private [thunk] [ossa] @$s{{.*}}4DrilC6postTo7twitter{{.*}}To : $@convention(objc_method) (NSString, @convention(block) (Bool) -> (), Dril) -> () {
-    // CHECK:         [[ASYNC_CLOS:%[0-9]+]] = function_ref @$s{{.*}}4DrilC6postTo7twitter{{.*}}U_To : $@convention(thin) @Sendable @async (NSString, @convention(block) (Bool) -> (), Dril) -> ()
+    // CHECK-LABEL: sil private [thunk] [ossa] @$s{{.*}}4DrilC6postTo7twitter{{.*}}To : $@convention(objc_method) (NSString, @convention(block) (Bool) -> (), @isolated Dril) -> () {
+    // CHECK:         [[ASYNC_CLOS:%[0-9]+]] = function_ref @$s{{.*}}4DrilC6postTo7twitter{{.*}}U_To : $@convention(thin) @Sendable @async (NSString, @convention(block) (Bool) -> (), @isolated Dril) -> ()
     // CHECK:         [[PRIMED_CLOS:%[0-9]+]] = partial_apply [callee_guaranteed] [[ASYNC_CLOS]](
     // CHECK:         [[TASK_RUNNER:%[0-9]+]] = function_ref @$ss29_runTaskForBridgedAsyncMethodyyyyYaYbcnF
     // CHECK:         apply [[TASK_RUNNER]]([[PRIMED_CLOS]])
