@@ -101,6 +101,18 @@
 ///     print(emptyDoubles[0])
 ///     // Triggers runtime error: Index out of range
 ///
+///     - print(oddNumbers[-1])
+///     	- Using a negative number
+///     	- Triggers runtime error: Index out of range
+///
+///     - print(oddNumbers[8])
+///     	- Equal to `count`
+///     	- Triggers runtime error: Index out of range
+///
+///     - print(oddNumbers[9])
+///     	- Greater than `count`
+///     	- Triggers runtime error: Index out of range
+///
 /// Adding and Removing Elements
 /// ============================
 ///
