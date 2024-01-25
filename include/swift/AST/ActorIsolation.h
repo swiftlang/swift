@@ -106,9 +106,7 @@ public:
     return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
   }
 
-  static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
-    return ActorIsolation(ActorInstance, actor, 0);
-  }
+  static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
 
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
@@ -121,9 +119,7 @@ public:
   }
 
   static ActorIsolation forActorInstanceParameter(Expr *actor,
-                                                  unsigned parameterIndex) {
-    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
-  }
+                                                  unsigned parameterIndex);
 
   static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
     return ActorIsolation(ActorInstance, capturedActor, 0);
@@ -227,27 +223,12 @@ public:
   /// Substitute into types within the actor isolation.
   ActorIsolation subst(SubstitutionMap subs) const;
 
+  static bool isEqual(const ActorIsolation &lhs,
+               const ActorIsolation &rhs);
+
   friend bool operator==(const ActorIsolation &lhs,
                          const ActorIsolation &rhs) {
-    if (lhs.isGlobalActor() && rhs.isGlobalActor())
-      return areTypesEqual(lhs.globalActor, rhs.globalActor);
-
-    if (lhs.getKind() != rhs.getKind())
-      return false;
-
-    switch (lhs.getKind()) {
-    case Nonisolated:
-    case NonisolatedUnsafe:
-    case Unspecified:
-      return true;
-
-    case ActorInstance:
-      return (lhs.getActor() == rhs.getActor() &&
-              lhs.parameterIndex == rhs.parameterIndex);
-
-    case GlobalActor:
-      llvm_unreachable("Global actors handled above");
-    }
+    return ActorIsolation::isEqual(lhs, rhs);
   }
 
   friend bool operator!=(const ActorIsolation &lhs,
