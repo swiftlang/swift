@@ -530,7 +530,7 @@ static ManagedValue createInputFunctionArgument(
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
-    if (!arg->getType().getASTType()->isNoncopyable()) {
+    if (!arg->getType().isMoveOnly()) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
     }

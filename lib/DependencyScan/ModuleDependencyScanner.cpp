@@ -161,7 +161,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
       FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.shouldTrackSystemDependencies(), RequireOSSAModules_t(SILOptions));
+      FEOpts.shouldTrackSystemDependencies(), RequireOSSAModules_t(SILOptions),
+      RequireNoncopyableGenerics_t(ScanASTContext));
 
   // Set up the Clang importer.
   clangScannerModuleLoader = ClangImporter::create(

@@ -379,7 +379,7 @@ public:
     // analysis assumes memory is deinitialized on all paths, which is not the
     // case for discarded values. Eventually copyable types may also be
     // discarded; to support that, we will leave a drop_deinit_addr in place.
-    if (ASI->getType().getASTType()->isNoncopyable()) {
+    if (ASI->getType().isMoveOnly(/*orWrapped=*/false)) {
       LegalUsers = false;
       return;
     }

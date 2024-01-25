@@ -835,6 +835,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, REVISION);
   BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
+  BLOCK_RECORD(control_block, HAS_NONCOPYABLE_GENERICS);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -982,6 +983,7 @@ void Serializer::writeHeader() {
     control_block::RevisionLayout Revision(Out);
     control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
+    control_block::HasNoncopyableGenerics HasNoncopyableGenerics(Out);
 
     // Write module 'real name', which can be different from 'name'
     // in case module aliasing is used (-module-alias flag)
@@ -1033,6 +1035,9 @@ void Serializer::writeHeader() {
     Revision.emit(ScratchRecord, revision);
 
     IsOSSA.emit(ScratchRecord, Options.IsOSSA);
+
+    HasNoncopyableGenerics.emit(ScratchRecord,
+            getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics));
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);

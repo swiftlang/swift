@@ -431,6 +431,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
       RequireOSSAModules_t(Invocation.getSILOptions()),
+      RequireNoncopyableGenerics_t(Invocation.getLangOptions()),
       IgnoreAdjacentModules);
 }
 

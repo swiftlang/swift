@@ -4930,14 +4930,52 @@ InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
   );
 }
 
-bool TypeDecl::canBeNoncopyable() const {
-  auto copyable = getMarking(InvertibleProtocolKind::Copyable);
-  return bool(copyable.getInverse()) && !copyable.getPositive();
+static TypeDecl::CanBeInvertible::Result
+conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
+  auto *proto = decl->getASTContext().getProtocol(getKnownProtocolKind(ip));
+  assert(proto);
+
+  // Handle protocols specially, without building a GenericSignature.
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl))
+    return protoDecl->requiresInvertible(ip)
+         ? TypeDecl::CanBeInvertible::Always
+         : TypeDecl::CanBeInvertible::Never;
+
+  Type selfTy = decl->getDeclaredInterfaceType();
+  assert(selfTy);
+
+  auto conformance = decl->getModuleContext()->lookupConformance(selfTy, proto,
+      /*allowMissing=*/false);
+
+  if (conformance.isInvalid())
+    return TypeDecl::CanBeInvertible::Never;
+
+  if (!conformance.getConditionalRequirements().empty())
+    return TypeDecl::CanBeInvertible::Conditionally;
+
+  return TypeDecl::CanBeInvertible::Always;
 }
 
-bool TypeDecl::isEscapable() const {
-  auto escapable = getMarking(InvertibleProtocolKind::Escapable);
-  return !escapable.getInverse() || bool(escapable.getPositive());
+TypeDecl::CanBeInvertible::Result TypeDecl::canBeCopyable() const {
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    auto copyable = getMarking(InvertibleProtocolKind::Copyable);
+    return !copyable.getInverse() || bool(copyable.getPositive())
+         ? CanBeInvertible::Always
+         : CanBeInvertible::Never;
+  }
+
+  return conformanceExists(this, InvertibleProtocolKind::Copyable);
+}
+
+TypeDecl::CanBeInvertible::Result TypeDecl::canBeEscapable() const {
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    auto escapable = getMarking(InvertibleProtocolKind::Escapable);
+    return !escapable.getInverse() || bool(escapable.getPositive())
+         ? CanBeInvertible::Always
+         : CanBeInvertible::Never;
+  }
+
+  return conformanceExists(this, InvertibleProtocolKind::Escapable);
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
@@ -6588,10 +6626,20 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
-  // HACK: until we enable Feature::NoncopyableGenerics in the stdlib,
-  // hardcode the fact that an invertible protocol does not require any other!
-  if (getInvertibleProtocolKind())
-    return false;
+  // Specially handle when asking if an invertible protocol requires another.
+  if (auto thisIP = getInvertibleProtocolKind()) {
+    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+      // Hardcode that the invertible protocols do not require themselves.
+      // Otherwise, defer to what the stdlib says by walking the protocol.
+      if (thisIP == ip)
+        return false;
+    } else {
+      // The stdlib was NOT built with noncopyable generics, so claim that
+      // this invertible protocol require no others.
+      // FIXME: this configuration will eventually go away.
+      return false;
+    }
+  }
 
   auto kp = ::getKnownProtocolKind(ip);
   return walkInheritedProtocols([kp, ip](ProtocolDecl *proto) {

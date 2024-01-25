@@ -46,11 +46,12 @@ using namespace llvm::MachO;
 
 static bool validateModule(
     llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
+    bool requiresNoncopyableGenerics,
     swift::serialization::ValidationInfo &info,
     swift::serialization::ExtendedValidationInfo &extendedInfo,
     llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
   info = swift::serialization::validateSerializedAST(
-      data, requiresOSSAModules,
+      data, requiresOSSAModules, requiresNoncopyableGenerics,
       /*requiredSDK*/ StringRef(), &extendedInfo, /* dependencies*/ nullptr,
       &searchPaths);
   if (info.status != swift::serialization::Status::Valid) {
@@ -282,6 +283,12 @@ int main(int argc, char **argv) {
   opt<bool> EnableOSSAModules("enable-ossa-modules", init(false),
                               desc("Serialize modules in OSSA"), cat(Visible));
 
+  opt<bool> EnableNoncopyableGenerics(
+      "enable-noncopyable-generics",
+      init(false),
+      desc("Serialize modules with NoncopyableGenerics"),
+      cat(Visible));
+
   ParseCommandLineOptions(argc, argv);
 
   // Unregister our options so they don't interfere with the command line
@@ -326,7 +333,8 @@ int main(int argc, char **argv) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules, info, extendedInfo, searchPaths)) {
+                        EnableOSSAModules, EnableNoncopyableGenerics,
+                        info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
     }
@@ -350,6 +358,13 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getSILOptions().EnableOSSAModules = EnableOSSAModules;
+
+  if (EnableNoncopyableGenerics)
+    Invocation.getLangOptions()
+      .enableFeature(swift::Feature::NoncopyableGenerics);
+  else
+    Invocation.getLangOptions()
+      .disableFeature(swift::Feature::NoncopyableGenerics);
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);

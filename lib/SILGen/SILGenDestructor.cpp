@@ -170,7 +170,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   auto *nom = dd->getDeclContext()->getSelfNominalTypeDecl();
   if (isa<ClassDecl>(nom))
     return emitDeallocatingClassDestructor(dd);
-  assert(nom->canBeNoncopyable());
+  assert(!nom->canBeCopyable());
   return emitDeallocatingMoveOnlyDestructor(dd);
 }
 

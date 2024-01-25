@@ -515,11 +515,14 @@ public:
     auto instanceType = SGF.SGM.Types.getLoweredRValueType(
         TypeExpansionContext::minimal(), decl->getTypeInContext());
 
-    // If we have a no implicit copy param decl, make our instance type
-    // @moveOnly.
-    if (!instanceType->isNoncopyable()) {
+
+    bool isNoImplicitCopy = instanceType->is<SILMoveOnlyWrappedType>();
+
+    // If our instance type is not already @moveOnly wrapped, and it's a
+    // no-implicit-copy parameter, wrap it.
+    if (!isNoImplicitCopy && !instanceType->isNoncopyable()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
-        bool isNoImplicitCopy = pd->isNoImplicitCopy();
+        isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
         if (pd->isSelfParameter()) {
           auto *dc = pd->getDeclContext();
@@ -533,9 +536,11 @@ public:
       }
     }
 
+    const bool isCopyable = isNoImplicitCopy || !instanceType->isNoncopyable();
+
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
         decl, instanceType, SGF.F.getGenericEnvironment(),
-        /*mutable*/ !instanceType->isNoncopyable() || !decl->isLet());
+        /*mutable=*/ isCopyable || !decl->isLet());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
@@ -689,7 +694,7 @@ public:
       // For noncopyable types, we always need to box them.
       needsTemporaryBuffer =
           (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
-              lowering->getLoweredType().getASTType()->isNoncopyable();
+              lowering->getLoweredType().isMoveOnly(/*orWrapped=*/false);
     }
 
     // Make sure that we have a non-address only type when binding a
@@ -774,7 +779,7 @@ public:
     if (value->getOwnershipKind() == OwnershipKind::None) {
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
-      if (value->getType().getASTType()->isNoncopyable()) {
+      if (value->getType().isMoveOnly(/*orWrapped=*/false)) {
         value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
         return SGF.B.createMarkUnresolvedNonCopyableValueInst(
             PrologueLoc, value,
@@ -824,7 +829,7 @@ public:
     // We do this before the begin_borrow "normal" path below since move only
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
-        value->getType().getASTType()->isNoncopyable()) {
+        value->getType().isMoveOnly(/*orWrapped=*/false)) {
       value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,

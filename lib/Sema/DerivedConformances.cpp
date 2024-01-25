@@ -462,8 +462,6 @@ CallExpr *
 DerivedConformance::createBuiltinCall(ASTContext &ctx,
                                       BuiltinValueKind builtin,
                                       ArrayRef<Type> typeArgs,
-                                      ArrayRef<ProtocolConformanceRef>
-                                        conformances,
                                       ArrayRef<Expr *> args) {
   auto name = ctx.getIdentifier(getBuiltinName(builtin));
   auto decl = getBuiltinValueDecl(ctx, name);
@@ -472,8 +470,21 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   ConcreteDeclRef declRef = decl;
   auto fnType = decl->getInterfaceType();
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
+    auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
-    auto subs = SubstitutionMap::get(generics, typeArgs, conformances);
+
+    auto genericParams = generics.getGenericParams();
+    assert(genericParams.size() == typeArgs.size());
+
+    TypeSubstitutionMap map;
+    for (auto i : indices(genericParams))
+      map.insert({genericParams[i]->getCanonicalType()
+                                  ->getAs<SubstitutableType>(),
+                  typeArgs[i]});
+
+    auto subs = SubstitutionMap::get(generics,
+                                     QueryTypeSubstitutionMap{map},
+                                     LookUpConformanceInModule{builtinModule});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
   } else {

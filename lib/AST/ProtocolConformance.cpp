@@ -23,6 +23,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -1070,13 +1071,15 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
+  const bool haveNoncopyableGenerics =
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   auto addSynthesized = [&](ProtocolDecl *proto) {
     if (!proto)
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (canBeNoncopyable()) {
+    if (!haveNoncopyableGenerics && !canBeCopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;
@@ -1088,6 +1091,16 @@ void NominalTypeDecl::prepareConformanceTable() const {
       protocols.insert(proto);
     }
   };
+
+  // Synthesize the unconditional conformances to invertible protocols.
+  // For conditional ones, see findSynthesizedConformances .
+  if (haveNoncopyableGenerics) {
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto invertible = getMarking(ip);
+      if (!invertible.getInverse() || bool(invertible.getPositive()))
+        addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+    }
+  }
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
@@ -1261,9 +1274,12 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
 
-    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-      trySynthesize(KnownProtocolKind::Copyable);
-      trySynthesize(KnownProtocolKind::Escapable);
+    // Triggers synthesis of a possibly conditional conformance.
+    // For the unconditional ones, see NominalTypeDecl::prepareConformanceTable
+    if (nominal->getASTContext().LangOpts.hasFeature(
+            Feature::NoncopyableGenerics)) {
+      for (auto ip : InvertibleProtocolSet::full())
+        trySynthesize(getKnownProtocolKind(ip));
     }
 
     if (nominal->getASTContext().LangOpts.hasFeature(

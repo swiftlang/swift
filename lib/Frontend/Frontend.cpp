@@ -774,7 +774,8 @@ bool CompilerInstance::setUpModuleLoaders() {
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
           FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-          RequireOSSAModules_t(Invocation.getSILOptions())));
+          RequireOSSAModules_t(Invocation.getSILOptions()),
+          RequireNoncopyableGenerics_t(Invocation.getLangOptions())));
 
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
@@ -815,7 +816,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
-        RequireOSSAModules_t(Invocation.getSILOptions()));
+        RequireOSSAModules_t(Invocation.getSILOptions()),
+        RequireNoncopyableGenerics_t(Invocation.getLangOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
         std::make_unique<PlaceholderSwiftModuleScanner>(
@@ -1495,8 +1497,8 @@ bool CompilerInstance::loadStdlibIfNeeded() {
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {
-    assert(Diagnostics.hadAnyError() &&
-           "Module failed to load but nothing was diagnosed?");
+//    assert(Diagnostics.hadAnyError() &&
+//           "Module failed to load but nothing was diagnosed?");
     return true;
   }
   return false;

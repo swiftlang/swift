@@ -137,7 +137,7 @@ checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     return CheckTypeWitnessResult::forError();
 
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
-      && type->isNoncopyable(dc)) {
+      && type->isNoncopyable()) {
     // No move-only type can witness an associatedtype requirement.
     // Pretend the failure is a lack of Copyable conformance.
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);

@@ -1141,6 +1141,15 @@ void ASTMangler::appendExistentialLayout(
   bool DroppedRequiresClass = false;
   bool SawRequiresClass = false;
   for (auto proto : layout.getProtocols()) {
+    // Skip invertible protocols
+    //
+    // TODO: reconsituteInverses so the absence of such protocols gets mangled.
+    // I think here we need to see if any protocols inheritsFrom
+    // Copyable/Escapable, and if not, and none of those are found in the layout
+    // then it must have had an inverse.
+    if (proto->getInvertibleProtocolKind())
+      continue;
+
     // If we aren't allowed to emit marker protocols, suppress them here.
     if (!AllowMarkerProtocols && proto->isMarkerProtocol()) {
       if (proto->requiresClass())
@@ -2996,14 +3005,28 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
     appendOperator("d");
 }
 
+/// Filters out requirements stating that a type conforms to one of the
+/// invertible protocols.
+/// TODO: reconsituteInverses so the absence of conformances gets mangled
+static void withoutInvertibleRequirements(ArrayRef<Requirement> requirements,
+                                          SmallVector<Requirement, 4> &output) {
+  for (auto req : requirements) {
+    // Skip conformance requirements for invertible protocols.
+    if (req.getKind() == RequirementKind::Conformance
+        && req.getProtocolDecl()->getInvertibleProtocolKind())
+      continue;
+
+    output.push_back(req);
+  }
+}
+
 bool ASTMangler::appendGenericSignature(GenericSignature sig,
                                         GenericSignature contextSig) {
   auto canSig = sig.getCanonicalSignature();
 
   unsigned initialParamDepth;
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> genericParams;
-  ArrayRef<Requirement> requirements;
-  SmallVector<Requirement, 4> requirementsBuffer;
+  SmallVector<Requirement, 4> requirements;
   if (contextSig) {
     // If the signature is the same as the context signature, there's nothing
     // to do.
@@ -3033,16 +3056,16 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
         contextSig.getRequirements().empty()) {
       initialParamDepth = 0;
       genericParams = canSig.getGenericParams();
-      requirements = canSig.getRequirements();
+      withoutInvertibleRequirements(canSig.getRequirements(), requirements);
     } else {
-      requirementsBuffer = canSig.requirementsNotSatisfiedBy(contextSig);
-      requirements = requirementsBuffer;
+      withoutInvertibleRequirements(
+          canSig.requirementsNotSatisfiedBy(contextSig), requirements);
     }
   } else {
     // Use the complete canonical signature.
     initialParamDepth = 0;
     genericParams = canSig.getGenericParams();
-    requirements = canSig.getRequirements();
+    withoutInvertibleRequirements(canSig.getRequirements(), requirements);
   }
 
   if (genericParams.empty() && requirements.empty())

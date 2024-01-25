@@ -895,6 +895,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.enableFeature(Feature::LayoutPrespecialization);
 
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
+    Opts.enableFeature(Feature::NoncopyableGenerics);
+    Opts.EnableExperimentalAssociatedTypeInference = true;
+  }
+
   Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
   Opts.EnableAppExtensionRestrictions |= Opts.EnableAppExtensionLibraryRestrictions;
@@ -2649,6 +2654,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
     Opts.DisableClangModuleSkeletonCUs = true;
 
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+    Opts.DisableRoundTripDebugTypes = true; // temporary until we fix mangling!
+
   if (auto A = Args.getLastArg(OPT_enable_round_trip_debug_types,
                                OPT_disable_round_trip_debug_types)) {
     Opts.DisableRoundTripDebugTypes =
@@ -3239,8 +3247,13 @@ bool CompilerInvocation::parseArgs(
 serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
-  serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
+  serialization::ValidationInfo info =
+      serialization::validateSerializedAST(
+        data,
+        getSILOptions().EnableOSSAModules,
+        LangOpts.hasFeature(Feature::NoncopyableGenerics),
+        LangOpts.SDKName,
+        &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -3275,8 +3288,11 @@ CompilerInvocation::setUpInputForSILTool(
       InputFile(inputFilename, bePrimary, fileBufOrErr.get().get(), file_types::TY_SIL));
 
   auto result = serialization::validateSerializedAST(
-      fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      LangOpts.SDKName, &extendedInfo);
+      fileBufOrErr.get()->getBuffer(),
+      getSILOptions().EnableOSSAModules,
+      LangOpts.hasFeature(Feature::NoncopyableGenerics),
+      LangOpts.SDKName,
+      &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

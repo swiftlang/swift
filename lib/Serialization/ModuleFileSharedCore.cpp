@@ -209,7 +209,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 
 static ValidationInfo validateControlBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
-    std::pair<uint16_t, uint16_t> expectedVersion, bool requiresOSSAModules,
+    std::pair<uint16_t, uint16_t> expectedVersion,
+    bool requiresOSSAModules,
+    bool requiresNoncopyableGenerics,
     bool requiresRevisionMatch,
     StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo,
@@ -422,6 +424,18 @@ static ValidationInfo validateControlBlock(
         result.status = Status::NotInOSSA;
       break;
     }
+    case control_block::HAS_NONCOPYABLE_GENERICS: {
+      // FIXME: temporary hack until the stdlib is actually building.
+      // This skips over the module mismatch error if the stdlib wasn't built
+      // with noncopyable generics, so that tests may still run in CI.
+      if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+        break;
+
+      auto hasNoncopyableGenerics = scratch[0];
+      if (requiresNoncopyableGenerics && !hasNoncopyableGenerics)
+        result.status = Status::NotUsingNoncopyableGenerics;
+      break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -525,6 +539,8 @@ std::string serialization::StatusToString(Status S) {
   case Status::FormatTooNew: return "FormatTooNew";
   case Status::RevisionIncompatible: return "RevisionIncompatible";
   case Status::NotInOSSA: return "NotInOSSA";
+  case Status::NotUsingNoncopyableGenerics:
+    return "NotUsingNoncopyableGenerics";
   case Status::MissingDependency: return "MissingDependency";
   case Status::MissingUnderlyingModule: return "MissingUnderlyingModule";
   case Status::CircularDependency: return "CircularDependency";
@@ -546,7 +562,8 @@ bool serialization::isSerializedAST(StringRef data) {
 }
 
 ValidationInfo serialization::validateSerializedAST(
-    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
+    StringRef data, bool requiresOSSAModules, bool requiresNoncopyableGenerics,
+    StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
     SmallVectorImpl<SearchPath> *searchPaths) {
@@ -590,7 +607,9 @@ ValidationInfo serialization::validateSerializedAST(
       result = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          requiresOSSAModules, /*requiresRevisionMatch=*/true,
+          requiresOSSAModules,
+          requiresNoncopyableGenerics,
+          /*requiresRevisionMatch=*/true,
           requiredSDK,
           extendedInfo, localObfuscator);
       if (result.status != Status::Valid)
@@ -1122,7 +1141,9 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
 
       info = validateControlBlock(
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
-          RequiresOSSAModules, /*requiresRevisionMatch*/false,
+          RequiresOSSAModules,
+          RequiresNoncopyableGenerics,
+          /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1266,7 +1287,9 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
       info = validateControlBlock(
           infoCursor, scratch,
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
-          RequiresOSSAModules, /*requiresRevisionMatch*/false,
+          RequiresOSSAModules,
+          RequiresNoncopyableGenerics,
+          /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1341,12 +1364,16 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-    bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
+    bool isFramework,
+    bool requiresOSSAModules,
+    bool requiresNoncopyableGenerics,
+    StringRef requiredSDK,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
-      RequiresOSSAModules(requiresOSSAModules) {
+      RequiresOSSAModules(requiresOSSAModules),
+      RequiresNoncopyableGenerics(requiresNoncopyableGenerics) {
   assert(!hasError());
   Bits.IsFramework = isFramework;
 
@@ -1393,7 +1420,9 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       info = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          RequiresOSSAModules, /*requiresRevisionMatch=*/true, requiredSDK,
+          RequiresOSSAModules,
+          RequiresNoncopyableGenerics,
+          /*requiresRevisionMatch=*/true, requiredSDK,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);

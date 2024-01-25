@@ -1753,9 +1753,10 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                              : rawElementTy;
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
-  bool isImplicit = !elementTy->isNoncopyable(dc);
+  bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
+  bool isImplicit = !isNoncopyable;
   bool useAddress =
-      rawElementTy->getAnyPointerElementType() && elementTy->isNoncopyable(dc);
+      rawElementTy->getAnyPointerElementType() && isNoncopyable;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,

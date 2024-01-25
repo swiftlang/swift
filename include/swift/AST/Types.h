@@ -651,21 +651,12 @@ public:
 
   bool isPlaceholder();
 
-  /// Returns true if this type lacks conformance to Copyable in the context,
-  /// if provided.
-  bool isNoncopyable(GenericEnvironment *env = nullptr);
-  bool isNoncopyable(const DeclContext *dc) {
-    assert(dc);
-    return isNoncopyable(dc->getGenericEnvironmentOfContext());
-  };
+  /// Returns true if this contextual type does not satisfy a conformance to
+  /// Copyable.
+  bool isNoncopyable();
 
-  /// Returns true if this type conforms to Escapable in the context,
-  /// if provided.
-  bool isEscapable(GenericEnvironment *env = nullptr);
-  bool isEscapable(const DeclContext *dc) {
-    assert(dc);
-    return isEscapable(dc->getGenericEnvironmentOfContext());
-  };
+  /// Returns true if this contextual type satisfies a conformance to Escapable.
+  bool isEscapable();
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -5574,7 +5565,9 @@ class SILMoveOnlyWrappedType final : public TypeBase,
       : TypeBase(TypeKind::SILMoveOnlyWrapped, &innerType->getASTContext(),
                  innerType->getRecursiveProperties()),
         innerType(innerType) {
-    assert(!innerType->isNoncopyable() && "Inner type must be copyable");
+    // If it has a type parameter, we can't check whether it's copyable.
+    assert(innerType->hasTypeParameter() ||
+           !innerType->isNoncopyable() && "Inner type must be copyable");
   }
 
 public:

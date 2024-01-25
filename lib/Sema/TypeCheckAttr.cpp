@@ -7262,7 +7262,7 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
     return;
   }
   
-  if (!sd->canBeNoncopyable()) {
+  if (sd->canBeCopyable()) {
     diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_be_copyable);
   }
   
@@ -7320,8 +7320,7 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   // Can only be applied to structs.
   auto structDecl = cast<StructDecl>(D);
 
-  if (!structDecl->getDeclaredInterfaceType()
-                 ->isNoncopyable(D->getDeclContext())) {
+  if (structDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never) {
     diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_noncopyable);
   }
 }

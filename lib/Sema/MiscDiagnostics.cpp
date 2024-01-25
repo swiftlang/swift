@@ -325,7 +325,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                 tupleExpr->getElementNames());
                                 
         // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isNoncopyable(DC)
+        if (E->getType()->isNoncopyable()
             && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
           auto noncopyableTy = E->getType();
           assert(noncopyableTy->is<TupleType>() && "will use poor wording");
@@ -388,7 +388,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!castType)
         return;
 
-      if (castType->isNoncopyable(DC)) {
+      if (castType->isNoncopyable()) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
@@ -398,7 +398,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // as of now there is no type it could be cast to except itself, so
       // there's no reason for it to happen at runtime.
       if (auto fromType = cast->getSubExpr()->getType()) {
-        if (fromType->isNoncopyable(DC)) {
+        if (fromType->isNoncopyable()) {
           // can't cast move-only to anything.
           Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
           return;
@@ -4103,7 +4103,7 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   auto subjectType = subjectExpr->getType();
   if (!subjectType
       || subjectType->hasError()
-      || !subjectType->isNoncopyable(DC)) {
+      || !subjectType->isNoncopyable()) {
     return;
   }
 
@@ -6267,7 +6267,7 @@ void swift::diagnoseCopyableTypeContainingMoveOnlyType(
 
   // If we already have a move only type, just bail, we have no further work to
   // do.
-  if (copyableNominalType->canBeNoncopyable())
+  if (!copyableNominalType->canBeCopyable())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "DiagnoseCopyableType for: "
