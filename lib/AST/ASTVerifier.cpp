@@ -2794,22 +2794,6 @@ public:
         return;
       }
 
-      switch (conformance->getState()) {
-      case ProtocolConformanceState::Complete:
-        // More checking below.
-        break;
-        
-      case ProtocolConformanceState::Incomplete:
-        // Ignore incomplete conformances; we didn't need them.
-        return;
-
-      case ProtocolConformanceState::Checking:
-        dumpRef(decl);
-        Out << " has a protocol conformance that is still being checked "
-            << conformance->getProtocol()->getName().str() << "\n";
-        abort();
-      }
-
       auto normal = dyn_cast<NormalProtocolConformance>(conformance);
       if (!normal)
         return;

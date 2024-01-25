@@ -2525,7 +2525,6 @@ ASTContext::getNormalConformance(Type conformingType,
                                  ProtocolDecl *protocol,
                                  SourceLoc loc,
                                  DeclContext *dc,
-                                 ProtocolConformanceState state,
                                  bool isUnchecked,
                                  bool isPreconcurrency) {
   assert(dc->isTypeContext());
@@ -2542,7 +2541,7 @@ ASTContext::getNormalConformance(Type conformingType,
 
   // Build a new normal protocol conformance.
   auto result = new (*this, AllocationArena::Permanent)
-      NormalProtocolConformance(conformingType, protocol, loc, dc, state,
+      NormalProtocolConformance(conformingType, protocol, loc, dc,
                                 isUnchecked, isPreconcurrency);
   normalConformances.InsertNode(result, insertPos);
 

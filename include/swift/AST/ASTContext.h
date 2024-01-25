@@ -119,7 +119,6 @@ namespace swift {
   class SpecializedProtocolConformance;
   enum class BuiltinConformanceKind;
   class BuiltinProtocolConformance;
-  enum class ProtocolConformanceState;
   class Pattern;
   enum PointerTypeKind : unsigned;
   class PrecedenceGroupDecl;
@@ -1296,7 +1295,6 @@ public:
                        ProtocolDecl *protocol,
                        SourceLoc loc,
                        DeclContext *dc,
-                       ProtocolConformanceState state,
                        bool isUnchecked,
                        bool isPreconcurrency);
 

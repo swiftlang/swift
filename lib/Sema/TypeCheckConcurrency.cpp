@@ -5619,7 +5619,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
     auto conformance = ctx.getNormalConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        conformanceDC, ProtocolConformanceState::Complete,
+        conformanceDC,
         /*isUnchecked=*/attrMakingUnavailable != nullptr,
         /*isPreconcurrency=*/false);
     conformance->setSourceKindAndImplyingConformance(

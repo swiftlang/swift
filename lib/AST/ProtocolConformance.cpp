@@ -117,11 +117,6 @@ DeclContext *ProtocolConformance::getDeclContext() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getDeclContext, ())
 }
 
-/// Retrieve the state of this conformance.
-ProtocolConformanceState ProtocolConformance::getState() const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getState, ())
-}
-
 ConformanceEntryKind ProtocolConformance::getSourceKind() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getSourceKind, ())
 }
@@ -512,7 +507,6 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
   assert((TypeWitnesses.count(assocType) == 0 ||
           TypeWitnesses[assocType].getWitnessType().isNull()) &&
          "Type witness already known");
-  assert((!isComplete() || isInvalid()) && "Conformance already complete?");
   assert(!type->hasArchetype() && "type witnesses must be interface types");
   TypeWitnesses[assocType] = {type, typeDecl};
 }
@@ -700,11 +694,6 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
   assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
          "requirement in wrong protocol");
   assert(Mapping.count(requirement) == 0 && "Witness already known");
-  assert((!isComplete() || isInvalid() ||
-          requirement->getAttrs().hasAttribute<OptionalAttr>() ||
-          requirement->getAttrs().isUnavailable(
-                                        requirement->getASTContext())) &&
-         "Conformance already complete?");
   Mapping[requirement] = witness;
 }
 

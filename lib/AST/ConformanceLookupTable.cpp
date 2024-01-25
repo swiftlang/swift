@@ -962,7 +962,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     // Create or find the normal conformance.
     auto normalConf = ctx.getNormalConformance(
         conformingType, protocol, conformanceLoc, conformingDC,
-        ProtocolConformanceState::Incomplete,
         entry->Source.getUncheckedLoc().isValid(),
         entry->Source.getPreconcurrencyLoc().isValid());
     // Invalid code may cause the getConformance call below to loop, so break

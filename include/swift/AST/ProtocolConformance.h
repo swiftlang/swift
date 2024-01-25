@@ -79,19 +79,6 @@ enum : unsigned {
       countBitsUsed(static_cast<unsigned>(ProtocolConformanceKind::Last_Kind))
 };
 
-/// Describes the state of a protocol conformance, which may be complete,
-/// incomplete, or currently being checked.
-enum class ProtocolConformanceState {
-  /// The conformance has been fully checked.
-  Complete = 0,
-  /// The conformance is known but is not yet complete.
-  Incomplete,
-  /// The conformance is being checked.
-  Checking,
-
-  Last_State = Checking
-};
-
 /// Describes the kind of a builtin conformance.
 enum class BuiltinConformanceKind {
   // A builtin conformance that has been synthesized by the implementation.
@@ -101,11 +88,6 @@ enum class BuiltinConformanceKind {
   Missing,
 
   Last_Kind = Missing
-};
-
-enum : unsigned {
-  NumProtocolConformanceStateBits =
-      countBitsUsed(static_cast<unsigned>(ProtocolConformanceState::Last_State))
 };
 
 enum : unsigned {
@@ -146,8 +128,7 @@ protected:
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
 
     SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
-                               1+1+1+1+bitmax(NumProtocolConformanceStateBits,8)+
-                               bitmax(NumConformanceEntryKindBits,8),
+                               1+1+1+1+bitmax(NumConformanceEntryKindBits,8),
       /// Indicates whether the conformance is invalid.
       IsInvalid : 1,
       /// The conformance was labeled with @unchecked.
@@ -160,8 +141,6 @@ protected:
 
       : NumPadBits,
 
-      /// The current state of the conformance.
-      State : bitmax(NumProtocolConformanceStateBits, 8),
       /// The reason that this conformance exists.
       ///
       /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
@@ -204,27 +183,13 @@ public:
   /// nominal type declaration.
   DeclContext *getDeclContext() const;
 
-  /// Retrieve the state of this conformance.
-  ProtocolConformanceState getState() const;
-
   /// Get the kind of source from which this conformance comes.
   ConformanceEntryKind getSourceKind() const;
   /// Get the protocol conformance which implied this implied conformance.
   NormalProtocolConformance *getImplyingConformance() const;
 
-  /// Determine whether this conformance is complete.
-  bool isComplete() const {
-    return getState() == ProtocolConformanceState::Complete;
-  }
-
   /// Determine whether this conformance is invalid.
   bool isInvalid() const;
-
-  /// Determine whether this conformance is incomplete.
-  bool isIncomplete() const {
-    return getState() == ProtocolConformanceState::Incomplete ||
-           getState() == ProtocolConformanceState::Checking;
-  }
 
   /// Determine whether this conformance is canonical.
   bool isCanonical() const;
@@ -557,14 +522,12 @@ class NormalProtocolConformance : public RootProtocolConformance,
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
-                            ProtocolConformanceState state, bool isUnchecked,
-                            bool isPreconcurrency)
+                            bool isUnchecked, bool isPreconcurrency)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
         Protocol(protocol), Loc(loc), Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
     Bits.NormalProtocolConformance.IsUnchecked = isUnchecked;
     Bits.NormalProtocolConformance.IsPreconcurrency = isPreconcurrency;
@@ -590,17 +553,6 @@ public:
 
   llvm::Optional<ArrayRef<Requirement>>
   getConditionalRequirementsIfAvailable() const;
-
-  /// Retrieve the state of this conformance.
-  ProtocolConformanceState getState() const {
-    return static_cast<ProtocolConformanceState>(
-        Bits.NormalProtocolConformance.State);
-  }
-
-  /// Set the state of this conformance.
-  void setState(ProtocolConformanceState state) {
-    Bits.NormalProtocolConformance.State = unsigned(state);
-  }
 
   /// Determine whether this conformance is invalid.
   bool isInvalid() const { return Bits.NormalProtocolConformance.IsInvalid; }
@@ -792,10 +744,6 @@ public:
     return getProtocol()->getLoc();
   }
 
-  ProtocolConformanceState getState() const {
-    return ProtocolConformanceState::Complete;
-  }
-
   bool isInvalid() const {
     return false;
   }
@@ -941,11 +889,6 @@ public:
     return GenericConformance->getDeclContext();
   }
 
-  /// Retrieve the state of this conformance.
-  ProtocolConformanceState getState() const {
-    return GenericConformance->getState();
-  }
-
   /// Get the kind of source from which this conformance comes.
   ConformanceEntryKind getSourceKind() const {
     return GenericConformance->getSourceKind();
@@ -1058,11 +1001,6 @@ public:
     return bgc ? bgc : InheritedConformance->getDeclContext();
   }
 
-  /// Retrieve the state of this conformance.
-  ProtocolConformanceState getState() const {
-    return InheritedConformance->getState();
-  }
-
   /// Get the kind of source from which this conformance comes.
   ConformanceEntryKind getSourceKind() const {
     return ConformanceEntryKind::Inherited;
@@ -1157,11 +1095,6 @@ public:
   /// Get the declaration context that contains the nominal type declaration.
   DeclContext *getDeclContext() const {
     return getProtocol();
-  }
-
-  /// Retrieve the state of this conformance.
-  ProtocolConformanceState getState() const {
-    return ProtocolConformanceState::Complete;
   }
 
   /// Get the kind of source from which this conformance comes.

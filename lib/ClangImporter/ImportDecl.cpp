@@ -8685,12 +8685,7 @@ void ClangImporter::Implementation::finishNormalConformance(
   if (!proto->isObjC())
     return;
 
-  assert(conformance->isComplete());
-  conformance->setState(ProtocolConformanceState::Incomplete);
-
   finishMissingOptionalWitnesses(conformance);
-
-  conformance->setState(ProtocolConformanceState::Complete);
 }
 
 Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
@@ -9467,11 +9462,9 @@ void ClangImporter::Implementation::loadAllConformances(
     auto conformance = SwiftContext.getNormalConformance(
         dc->getDeclaredInterfaceType(),
         protocol, SourceLoc(), dc,
-        ProtocolConformanceState::Incomplete,
         protocol->isSpecificProtocol(KnownProtocolKind::Sendable),
         /*isPreconcurrency=*/false);
     conformance->setLazyLoader(this, /*context*/0);
-    conformance->setState(ProtocolConformanceState::Complete);
     Conformances.push_back(conformance);
   }
 }

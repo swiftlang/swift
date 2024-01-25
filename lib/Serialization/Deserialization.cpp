@@ -961,7 +961,6 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
-      ProtocolConformanceState::Incomplete,
       isUnchecked, isPreconcurrency);
   // Record this conformance.
   if (conformanceEntry.isComplete()) {
@@ -974,11 +973,6 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
 
-  // If the conformance is complete, we're done.
-  if (conformance->isComplete())
-    return conformance;
-
-  conformance->setState(ProtocolConformanceState::Complete);
   conformance->setLazyLoader(&MF, offset);
   return conformance;
 }
@@ -8020,11 +8014,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   PrettyStackTraceConformance trace("finishing conformance for",
                                     conformance);
   ++NumNormalProtocolConformancesCompleted;
-
-  assert(conformance->isComplete());
-
-  conformance->setState(ProtocolConformanceState::Incomplete);
-  SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
   // Find the conformance record.
   BCOffsetRAII restoreOffset(DeclTypeCursor);

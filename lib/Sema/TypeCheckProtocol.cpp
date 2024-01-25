@@ -2176,27 +2176,12 @@ void MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance) {
   PrettyStackTraceConformance trace("type-checking", conformance);
 
-  switch (conformance->getState()) {
-    case ProtocolConformanceState::Incomplete:
-      // Check the rest of the conformance below.
-      break;
-
-    case ProtocolConformanceState::Checking:
-    case ProtocolConformanceState::Complete:
-      // Nothing to do.
-      return;
-  }
-
   // Dig out some of the fields from the conformance.
   Type T = conformance->getType();
   DeclContext *DC = conformance->getDeclContext();
   auto Proto = conformance->getProtocol();
   auto ProtoType = Proto->getDeclaredInterfaceType();
   SourceLoc ComplainLoc = conformance->getLoc();
-
-  // Note that we are checking this conformance now.
-  conformance->setState(ProtocolConformanceState::Checking);
-  SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
@@ -2428,9 +2413,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       return;
     }
   }
-
-  if (conformance->isComplete())
-    return;
 
   // Resolve all of the type witnesses.
   evaluateOrDefault(Context.evaluator,
@@ -6463,11 +6445,8 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
   // an extremely convoluted caching scheme that doesn't fit nicely into the
   // evaluator's model. All of this should be refactored away.
   const auto known = conformance->Mapping.find(requirement);
-  if (known == conformance->Mapping.end()) {
-    assert((!conformance->isComplete() || conformance->isInvalid()) &&
-           "Resolver did not resolve requirement");
+  if (known == conformance->Mapping.end())
     return Witness();
-  }
   return known->second;
 }
 

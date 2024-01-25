@@ -395,7 +395,6 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
 
   // Assert that the conformance is complete.
   auto *ConcreteConformance = ConformanceRef.getConcrete();
-  assert(ConcreteConformance->isComplete());
 
   ConcreteType = ConcreteTypeCandidate;
   // There is no ConcreteValue in this case.
