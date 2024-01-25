@@ -184,8 +184,7 @@ namespace swift {
     bool DisableAvailabilityChecking = false;
 
     /// Optimization mode for unavailable declarations.
-    UnavailableDeclOptimization UnavailableDeclOptimizationMode =
-        UnavailableDeclOptimization::Stub;
+    llvm::Optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
 
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.

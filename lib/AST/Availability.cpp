@@ -323,10 +323,18 @@ static bool isUnconditionallyUnavailable(const Decl *D) {
   return false;
 }
 
+static UnavailableDeclOptimization
+getEffectiveUnavailableDeclOptimization(ASTContext &ctx) {
+  if (ctx.LangOpts.UnavailableDeclOptimizationMode.has_value())
+    return *ctx.LangOpts.UnavailableDeclOptimizationMode;
+
+  return UnavailableDeclOptimization::Stub;
+}
+
 bool Decl::isAvailableDuringLowering() const {
   // Unconditionally unavailable declarations should be skipped during lowering
   // when -unavailable-decl-optimization=complete is specified.
-  if (getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+  if (getEffectiveUnavailableDeclOptimization(getASTContext()) !=
       UnavailableDeclOptimization::Complete)
     return true;
 
@@ -339,7 +347,7 @@ bool Decl::isAvailableDuringLowering() const {
 bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
   // Code associated with unavailable declarations should trap at runtime if
   // -unavailable-decl-optimization=stub is specified.
-  if (getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+  if (getEffectiveUnavailableDeclOptimization(getASTContext()) !=
       UnavailableDeclOptimization::Stub)
     return false;
 
