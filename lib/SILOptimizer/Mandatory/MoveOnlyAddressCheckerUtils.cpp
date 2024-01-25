@@ -404,9 +404,16 @@ static bool visitScopeEndsRequiringInit(
   SILValue operand = markedAddr->getOperand();
 
   // TODO: This should really be a property of the marker instruction.
-  if (markedAddr->getCheckKind() !=
-      MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable) {
+  switch (markedAddr->getCheckKind()) {
+  case MarkUnresolvedNonCopyableValueInst::CheckKind::
+      AssignableButNotConsumable:
+  case MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable:
+    break;
+  case MarkUnresolvedNonCopyableValueInst::CheckKind::InitableButNotConsumable:
+  case MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign:
     return false;
+  case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
+    llvm_unreachable("invalid check!?");
   }
 
   // Check for inout types of arguments that are marked with consumable and
@@ -776,18 +783,6 @@ struct UseState {
                  << "    Adding scope end as liveness user: " << *inst);
       scopeEndsRequiringInit[inst] = kind;
     });
-    if (address->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
-                                       CheckKind::AssignableButNotConsumable) {
-      if (auto *bai = dyn_cast<BeginAccessInst>(address->getOperand())) {
-        for (auto *eai : bai->getEndAccesses()) {
-          LLVM_DEBUG(llvm::dbgs() << "    Adding end_access as implicit end of "
-                                     "lifetime liveness user: "
-                                  << *eai);
-          scopeEndsRequiringInit[eai] =
-              ScopeRequiringFinalInit::ModifyMemoryAccess;
-        }
-      }
-    }
   }
 
   bool isConsume(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
