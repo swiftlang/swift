@@ -22,7 +22,7 @@ struct WrapperStruct {
   let k: Klass
 }
 
-func invalidLifetimeDependenceOnEscapable(_ w: borrowing WrapperStruct) -> Klass {
+func invalidLifetimeDependenceOnEscapableResult(_ w: borrowing WrapperStruct) -> _borrow(w) Klass { // expected-error{{lifetime dependence can only be specified on ~Escapable results}}
   return w.k
 }
 

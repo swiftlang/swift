@@ -2592,14 +2592,11 @@ llvm::Optional<LifetimeDependenceInfo> validateLifetimeDependenceInfo(
     auto loc = specifier.getLoc();
     auto kind = specifier.getLifetimeDependenceKind();
 
-    /* TODO: Enable this
-    if (TypeChecker::conformsToKnownProtocol(resultTy,
-                                             InvertibleProtocolKind::Escapable,
-                                             dc->getParentModule())) {
+    if (resultTy->isEscapable()) {
       diags.diagnose(loc, diag::lifetime_dependence_invalid_return_type);
       return true;
     }
-    */
+
     if (ownership == ValueOwnership::Default) {
       diags.diagnose(loc, diag::lifetime_dependence_missing_ownership_modifier);
       return true;
