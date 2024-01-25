@@ -52,7 +52,7 @@ entry(%n : $Builtin.NativeObject):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @u_cast_to_class_existential(ptr %0)
 // CHECK:         call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr {{%.*}}, ptr {{%.*}}, {{.*}} @"$s5casts2CPMp"
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %0, ptr %1, ptr %2) {{.*}} {
-// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, ptr %2)
+// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, ptr %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq ptr [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
 // CHECK:       cont:
@@ -78,11 +78,11 @@ entry(%a : $@thick Any.Type):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr, ptr } @u_cast_to_class_existential_2(ptr %0)
 // CHECK:         call { ptr, ptr, ptr } @dynamic_cast_existential_2_unconditional(ptr {{%.*}}, ptr {{%.*}}, {{.*}} @"$s5casts2CPMp"{{[^,]*}}, {{.*}} @"$s5casts3CP2Mp"
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden { ptr, ptr, ptr } @dynamic_cast_existential_2_unconditional(ptr %0, ptr %1, ptr %2, ptr %3)
-// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, ptr %2)
+// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, ptr %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq ptr [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
 // CHECK:       cont:
-// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, ptr %3)
+// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, ptr %3)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq ptr [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
 // CHECK:       cont1:
@@ -119,7 +119,7 @@ entry(%a : $@thick Any.Type):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @c_cast_to_class_existential(ptr %0)
 // CHECK:         call { ptr, ptr } @dynamic_cast_existential_1_conditional(ptr {{.*}}, ptr %.Type, {{.*}} @"$s5casts2CPMp"
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden { ptr, ptr } @dynamic_cast_existential_1_conditional(ptr %0, ptr %1, ptr %2)
-// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, ptr %2)
+// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, ptr %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq ptr [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
 // CHECK:       cont:
@@ -149,11 +149,11 @@ nay:
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr, ptr } @c_cast_to_class_existential_2(ptr %0)
 // CHECK:         call { ptr, ptr, ptr } @dynamic_cast_existential_2_conditional(ptr {{%.*}}, ptr {{%.*}}, {{.*}} @"$s5casts2CPMp"{{[^,]*}}, {{.*}} @"$s5casts3CP2Mp"
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden { ptr, ptr, ptr } @dynamic_cast_existential_2_conditional(ptr %0, ptr %1, ptr %2, ptr %3)
-// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, ptr %2)
+// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, ptr %2)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq ptr [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont
 // CHECK:       cont:
-// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol(ptr %1, ptr %3)
+// CHECK:         [[WITNESS:%.*]] = call ptr @swift_conformsToProtocol{{(2)?}}(ptr %1, ptr %3)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq ptr [[WITNESS]], null
 // CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
 // CHECK:       cont1:
