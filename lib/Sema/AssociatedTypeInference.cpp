@@ -3997,6 +3997,36 @@ ResolveTypeWitnessesRequest::evaluate(Evaluator &evaluator,
   return evaluator::SideEffect();
 }
 
+static NormalProtocolConformance *
+getBetterConformanceForResolvingTypeWitnesses(NormalProtocolConformance *conformance,
+                                              AssociatedTypeDecl *requirement) {
+  auto *dc = conformance->getDeclContext();
+  assert(dc->getParentSourceFile() && "What are you doing?");
+  auto *proto = conformance->getProtocol();
+
+  IterableDeclContext *idc;
+  if (auto *extensionDecl = dyn_cast<ExtensionDecl>(dc))
+    idc = extensionDecl;
+  else
+    idc = cast<NominalTypeDecl>(dc);
+
+  auto otherConformances = idc->getLocalConformances(ConformanceLookupKind::NonStructural);
+  for (auto *otherConformance : otherConformances) {
+    auto *otherNormal = dyn_cast<NormalProtocolConformance>(
+        otherConformance->getRootConformance());
+    if (otherNormal == nullptr)
+      continue;
+
+    auto *otherProto = otherNormal->getProtocol();
+    if (otherProto->inheritsFrom(proto) &&
+        otherProto->getAssociatedType(requirement->getName())) {
+      return otherNormal;
+    }
+  }
+
+  return conformance;
+}
+
 TypeWitnessAndDecl
 TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
@@ -4008,8 +4038,30 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
     break;
 
   case ResolveWitnessResult::Missing: {
-    // The type witness is still missing. Resolve all of the type witnesses.
     auto &ctx = requirement->getASTContext();
+
+    if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+      // Let's see if there is a better conformance we can perform associated
+      // type inference on.
+      auto *better = getBetterConformanceForResolvingTypeWitnesses(
+          conformance, requirement);
+
+      if (better != conformance &&
+          !ctx.evaluator.hasActiveRequest(ResolveTypeWitnessesRequest{better})) {
+        // Let's try to resolve type witnesses in the better conformance.
+        evaluateOrDefault(ctx.evaluator,
+                          ResolveTypeWitnessesRequest{better},
+                          evaluator::SideEffect());
+
+        // Check whether the above populated the type witness of our conformance.
+        auto known = conformance->TypeWitnesses.find(requirement);
+        if (known != conformance->TypeWitnesses.end())
+          return known->second;
+      }
+    }
+
+    // The type witness is still missing. Resolve all of the type witnesses
+    // in this conformance.
     evaluateOrDefault(ctx.evaluator,
                       ResolveTypeWitnessesRequest{conformance},
                       evaluator::SideEffect());
