@@ -4208,6 +4208,19 @@ Type AnyFunctionType::getGlobalActor() const {
   }
 }
 
+LifetimeDependenceInfo AnyFunctionType::getLifetimeDependenceInfo() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getLifetimeDependenceInfo();
+  case TypeKind::GenericFunction:
+    // TODO: Handle GenericFunction
+    return LifetimeDependenceInfo();
+
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
@@ -4247,7 +4260,7 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
-                 globalActor, thrownError);
+                 globalActor, thrownError, getLifetimeDependenceInfo());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {

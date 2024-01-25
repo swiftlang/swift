@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
@@ -1198,6 +1199,7 @@ public:
     SourceLoc ConstLoc;
     SourceLoc ResultDependsOnLoc;
     TypeAttributes Attributes;
+    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
 
     /// Main entry point for parsing.
     ///
@@ -1215,7 +1217,8 @@ public:
             Tok.getRawText().equals("transferring") ||
             Tok.isContextualKeyword("isolated") ||
             Tok.isContextualKeyword("_const") ||
-            Tok.getRawText().equals("_resultDependsOn"))))
+            Tok.getRawText().equals("_resultDependsOn") ||
+            Tok.isLifetimeDependenceToken())))
         return slowParse(P);
       return makeParserSuccess();
     }
@@ -1234,6 +1237,9 @@ public:
   ParserStatus parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
                                   PatternBindingInitializer *&initContext,
                                   bool justChecking = false);
+
+  ParserStatus parseLifetimeDependenceSpecifiers(
+      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);

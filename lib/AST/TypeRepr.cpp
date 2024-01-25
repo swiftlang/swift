@@ -472,6 +472,31 @@ SourceLoc SILBoxTypeRepr::getLocImpl() const {
   return LBraceLoc;
 }
 
+LifetimeDependentReturnTypeRepr *LifetimeDependentReturnTypeRepr::create(
+    ASTContext &C, TypeRepr *base,
+    ArrayRef<LifetimeDependenceSpecifier> specifiers) {
+  auto size = totalSizeToAlloc<LifetimeDependenceSpecifier>(specifiers.size());
+  auto mem = C.Allocate(size, alignof(LifetimeDependenceSpecifier));
+  return new (mem) LifetimeDependentReturnTypeRepr(base, specifiers);
+}
+
+SourceLoc LifetimeDependentReturnTypeRepr::getStartLocImpl() const {
+  return getLifetimeDependencies().front().getLoc();
+}
+
+SourceLoc LifetimeDependentReturnTypeRepr::getEndLocImpl() const {
+  return getLifetimeDependencies().back().getLoc();
+}
+
+SourceLoc LifetimeDependentReturnTypeRepr::getLocImpl() const {
+  return getBase()->getLoc();
+}
+
+void LifetimeDependentReturnTypeRepr::printImpl(
+    ASTPrinter &Printer, const PrintOptions &Opts) const {
+  printTypeRepr(getBase(), Printer, Opts);
+}
+
 void VarargTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   printTypeRepr(Element, Printer, Opts);
