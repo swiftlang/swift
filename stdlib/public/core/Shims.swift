@@ -51,6 +51,7 @@ internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
  */
 @_effects(readnone) @inline(__always)
 internal func _mallocGoodSize(for size: Int) -> Int {
+  precondition(size >= 0)
   // Not all allocators will see benefits from rounding up to 16/32 byte aligned
   // but it'll never cause misbehavior, and many reasonable ones will benefit
   if (size <= 128) {
@@ -64,5 +65,7 @@ internal func _mallocGoodSize(for size: Int) -> Int {
 
 @_effects(readnone)
 internal func _mallocGoodSizeLarge(for size: Int) -> Int {
-  return _swift_stdlib_malloc_good_size(size)
+  let goodSize = _swift_stdlib_malloc_good_size(size)
+  precondition(goodSize >= size)
+  return goodSize
 }
