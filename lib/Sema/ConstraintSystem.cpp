@@ -2817,6 +2817,11 @@ ConstraintSystem::getTypeOfMemberReference(
       info = info.withConcurrent();
     }
 
+    // We'll do other adjustment later, but we need to handle parameter
+    // isolation to avoid assertions.
+    if (fullFunctionType->getIsolation().isParameter())
+      info = info.withIsolation(FunctionTypeIsolation::forParameter());
+
     openedType =
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
   }

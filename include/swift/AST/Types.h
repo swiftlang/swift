@@ -384,7 +384,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 11 };
+  enum { NumAFTExtInfoBits = 14 };
   enum { NumSILExtInfoBits = 13 };
 
   // clang-format off
@@ -412,13 +412,12 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
-    HasGlobalActor : 1,
     HasThrownError : 1,
     HasLifetimeDependenceInfo : 1,
     : NumPadBits,
@@ -3365,10 +3364,9 @@ protected:
       Bits.AnyFunctionType.ExtInfoBits = Info.value().getBits();
       Bits.AnyFunctionType.HasClangTypeInfo =
           !Info.value().getClangTypeInfo().empty();
-      Bits.AnyFunctionType.HasGlobalActor =
-          !Info.value().getGlobalActor().isNull();
       Bits.AnyFunctionType.HasThrownError =
           !Info.value().getThrownError().isNull();
+      assert(!Bits.AnyFunctionType.HasThrownError || Info->isThrowing());
       Bits.AnyFunctionType.HasLifetimeDependenceInfo =
           !Info.value().getLifetimeDependenceInfo().empty();
       // The use of both assert() and static_assert() is intentional.
@@ -3381,7 +3379,6 @@ protected:
       Bits.AnyFunctionType.HasExtInfo = false;
       Bits.AnyFunctionType.HasClangTypeInfo = false;
       Bits.AnyFunctionType.ExtInfoBits = 0;
-      Bits.AnyFunctionType.HasGlobalActor = false;
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependenceInfo = false;
     }
@@ -3423,7 +3420,7 @@ public:
   }
 
   bool hasGlobalActor() const {
-    return Bits.AnyFunctionType.HasGlobalActor;
+    return ExtInfoBuilder::hasGlobalActorFromBits(Bits.AnyFunctionType.ExtInfoBits);
   }
 
   bool hasThrownError() const {
@@ -3441,6 +3438,15 @@ public:
   Type getThrownError() const;
 
   LifetimeDependenceInfo getLifetimeDependenceInfo() const;
+
+  FunctionTypeIsolation getIsolation() const {
+    if (hasExtInfo())
+      return getExtInfo().getIsolation();
+    return FunctionTypeIsolation::forNonIsolated();
+  }
+  bool isDynamicallyIsolated() const {
+    return getIsolation().isDynamic();
+  }
 
   /// Retrieve the "effective" thrown interface type, or llvm::None if
   /// this function cannot throw.
@@ -3693,6 +3699,15 @@ END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 inline AnyFunctionType::CanYield AnyFunctionType::Yield::getCanonical() const {
   return CanYield(getType()->getCanonicalType(), getFlags());
 }
+
+/// A convenience function to find out if any of the given parameters is
+/// isolated.
+///
+/// You generally shouldn't need to call this when you're starting from a
+/// function type; you can just check if the isolation on the type is
+/// parameter isolation.
+bool hasIsolatedParameter(ArrayRef<AnyFunctionType::Param> params);
+
 /// FunctionType - A monomorphic function type, specified with an arrow.
 ///
 /// For example:

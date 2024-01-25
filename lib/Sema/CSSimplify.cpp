@@ -11586,6 +11586,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
+  bool hasIsolatedParam = false;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
     auto param = inferredClosureType->getParams()[i];
     auto *paramDecl = paramList->get(i);
@@ -11719,6 +11720,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
+    hasIsolatedParam |= param.isIsolated();
+
     setType(paramDecl, internalType);
     parameters.push_back(param);
   }
@@ -11728,6 +11731,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (contextualFnType->isSendable())
       closureExtInfo = closureExtInfo.withConcurrent();
+  }
+
+  // Isolated parameters override any other kind of isolation we might infer.
+  if (hasIsolatedParam) {
+    closureExtInfo = closureExtInfo.withIsolation(
+      FunctionTypeIsolation::forParameter());
   }
 
   auto closureType =

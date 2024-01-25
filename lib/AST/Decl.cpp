@@ -10661,12 +10661,14 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
+  AnyFunctionType::ExtInfo info;
+  if (initSelfParam.isIsolated())
+    info = info.withIsolation(FunctionTypeIsolation::forParameter());
+
   Type initFuncTy;
   if (auto sig = getGenericSignature()) {
-    GenericFunctionType::ExtInfo info;
     initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy, info);
   } else {
-    FunctionType::ExtInfo info;
     initFuncTy = FunctionType::get({initSelfParam}, funcTy, info);
   }
   InitializerInterfaceType = initFuncTy;

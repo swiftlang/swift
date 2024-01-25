@@ -5741,13 +5741,14 @@ static Type applyUnsafeConcurrencyToParameterType(
   if (!fnType)
     return type;
 
-  Type globalActor;
+  auto isolation = fnType->getIsolation();
   if (mainActor)
-    globalActor = type->getASTContext().getMainActorType();
+    isolation = FunctionTypeIsolation::forGlobalActor(
+                  type->getASTContext().getMainActorType());
 
   return fnType->withExtInfo(fnType->getExtInfo()
                                .withConcurrent(sendable)
-                               .withGlobalActor(globalActor));
+                               .withIsolation(isolation));
 }
 
 /// Determine whether the given name is that of a DispatchQueue operation that
@@ -5931,14 +5932,17 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
   fnType = applyUnsafeConcurrencyToFunctionType(
       fnType, decl, strictChecking, numApplies, isMainDispatchQueue);
-
   Type globalActorType;
   if (decl) {
     switch (auto isolation = getActorIsolation(decl)) {
     case ActorIsolation::ActorInstance:
+      // The function type may or may not have parameter isolation.
+      return fnType;
+
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
+      assert(fnType->getIsolation().isNonIsolated());
       return fnType;
 
     case ActorIsolation::GlobalActor:
@@ -5952,14 +5956,15 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     }
   }
 
-  // If there's no implicit "self" declaration, apply the global actor to
+  auto isolation = FunctionTypeIsolation::forGlobalActor(globalActorType);
+
+  // If there's no implicit "self" declaration, apply the isolation to
   // the outermost function type.
   bool hasImplicitSelfDecl = decl && (isa<EnumElementDecl>(decl) ||
       (isa<AbstractFunctionDecl>(decl) &&
        cast<AbstractFunctionDecl>(decl)->hasImplicitSelfDecl()));
   if (!hasImplicitSelfDecl) {
-    return fnType->withExtInfo(
-        fnType->getExtInfo().withGlobalActor(globalActorType));
+    return fnType->withExtInfo(fnType->getExtInfo().withIsolation(isolation));
   }
 
   // Dig out the inner function type.
@@ -5967,9 +5972,9 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   if (!innerFnType)
     return fnType;
 
-  // Update the inner function type with the global actor.
+  // Update the inner function type with the isolation.
   innerFnType = innerFnType->withExtInfo(
-      innerFnType->getExtInfo().withGlobalActor(globalActorType));
+      innerFnType->getExtInfo().withIsolation(isolation));
 
   // Rebuild the outer function type around it.
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {

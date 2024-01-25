@@ -2698,6 +2698,12 @@ llvm::Optional<LifetimeDependenceInfo> validateLifetimeDependenceInfo(
       IndexSubset::get(ctx, borrowLifetimeParamIndices));
 }
 
+static void maybeAddParameterIsolation(AnyFunctionType::ExtInfoBuilder &infoBuilder,
+                                       ArrayRef<AnyFunctionType::Param> params) {
+  if (hasIsolatedParameter(params))
+    infoBuilder = infoBuilder.withIsolation(FunctionTypeIsolation::forParameter());
+}
+
 Type
 InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   auto &Context = D->getASTContext();
@@ -2883,6 +2889,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
 
+      maybeAddParameterIsolation(infoBuilder, argTy);
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       infoBuilder = infoBuilder.withConcurrent(AFD->isSendable());
       // 'throws' only applies to the innermost function.
@@ -2906,13 +2913,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (hasSelf) {
       // Substitute in our own 'self' parameter.
       auto selfParam = computeSelfParam(AFD);
+      AnyFunctionType::ExtInfoBuilder selfInfoBuilder;
+      maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
       // FIXME: Verify ExtInfo state is correct, not working by accident.
+      auto selfInfo = selfInfoBuilder.build();
       if (sig) {
-        GenericFunctionType::ExtInfo info;
-        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy, info);
+        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy, selfInfo);
       } else {
-        FunctionType::ExtInfo info;
-        funcTy = FunctionType::get({selfParam}, funcTy, info);
+        funcTy = FunctionType::get({selfParam}, funcTy, selfInfo);
       }
     }
 
@@ -2927,13 +2935,15 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     SmallVector<AnyFunctionType::Param, 2> argTy;
     SD->getIndices()->getParams(argTy);
 
+    AnyFunctionType::ExtInfoBuilder infoBuilder;
+    maybeAddParameterIsolation(infoBuilder, argTy);
+
     Type funcTy;
     // FIXME: Verify ExtInfo state is correct, not working by accident.
+    auto info = infoBuilder.build();
     if (auto sig = SD->getGenericSignature()) {
-      GenericFunctionType::ExtInfo info;
       funcTy = GenericFunctionType::get(sig, argTy, elementTy, info);
     } else {
-      FunctionType::ExtInfo info;
       funcTy = FunctionType::get(argTy, elementTy, info);
     }
 

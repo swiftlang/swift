@@ -1957,6 +1957,7 @@ public:
   createFunctionType(
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
+      ExtendedFunctionTypeFlags extFlags,
       FunctionMetadataDifferentiabilityKind diffKind,
       BuiltType globalActorType, BuiltType thrownError) const {
     assert(
@@ -1991,12 +1992,6 @@ public:
                                      "the global actor type is a pack");
       }
       flags = flags.withGlobalActor(true);
-    }
-
-    ExtendedFunctionTypeFlags extFlags;
-    if (thrownError) {
-      flags = flags.withExtendedFlags(true);
-      extFlags = extFlags.withTypedThrows(true);
     }
 
     return BuiltType(

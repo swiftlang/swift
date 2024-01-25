@@ -4263,6 +4263,14 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   return funcTy;
 }
 
+#ifndef NDEBUG
+static bool isConsistentAboutIsolation(const llvm::Optional<ASTExtInfo> &info,
+                                       ArrayRef<AnyFunctionType::Param> params) {
+  return (hasIsolatedParameter(params)
+            == (info && info->getIsolation().isParameter()));
+}
+#endif
+
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
                            llvm::Optional<ExtInfo> info, const ASTContext *ctx,
@@ -4271,6 +4279,7 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
                       params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  assert(isConsistentAboutIsolation(info, params));
   if (info.has_value()) {
     auto clangTypeInfo = info.value().getClangTypeInfo();
     if (!clangTypeInfo.empty())
@@ -4389,6 +4398,7 @@ GenericFunctionType::GenericFunctionType(
       Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  assert(isConsistentAboutIsolation(info, params));
   if (info) {
     unsigned thrownErrorIndex = 0;
     if (Type globalActor = info->getGlobalActor()) {

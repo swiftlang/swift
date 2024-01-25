@@ -812,6 +812,7 @@ protected:
                                     Node->getNumChildren());
 
       FunctionTypeFlags flags;
+      ExtendedFunctionTypeFlags extFlags;
       if (Node->getKind() == NodeKind::ObjCBlock ||
           Node->getKind() == NodeKind::EscapingObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
@@ -846,6 +847,8 @@ protected:
         globalActorType = globalActorResult.getType();
         ++firstChildIdx;
       }
+
+      // FIXME: other kinds of isolation
 
       FunctionMetadataDifferentiabilityKind diffKind;
       if (Node->getChild(firstChildIdx)->getKind() ==
@@ -895,6 +898,8 @@ protected:
 
         thrownErrorType = thrownErrorResult.getType();
         ++firstChildIdx;
+
+        extFlags = extFlags.withTypedThrows(true);
       }
 
       bool isSendable = false;
@@ -941,8 +946,11 @@ protected:
       if (result.isError())
         return result;
 
+      if (extFlags != ExtendedFunctionTypeFlags())
+        flags = flags.withExtendedFlags(true);
+
       return Builder.createFunctionType(
-          parameters, result.getType(), flags, diffKind, globalActorType,
+          parameters, result.getType(), flags, extFlags, diffKind, globalActorType,
           thrownErrorType);
     }
     case NodeKind::ImplFunctionType: {

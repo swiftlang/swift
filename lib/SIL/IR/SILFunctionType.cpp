@@ -4660,6 +4660,10 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withAsync(true).withThrows(true, Type());
   }
 
+  // The uncurried function is parameter-isolated if the inner type is.
+  if (innerExtInfo.getIsolation().isParameter())
+    extInfo = extInfo.withIsolation(innerExtInfo.getIsolation());
+
   // If this is a C++ constructor, don't add the metatype "self" parameter
   // because we'll never use it and it will cause problems in IRGen.
   if (isa_and_nonnull<clang::CXXConstructorDecl>(

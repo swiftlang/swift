@@ -5455,6 +5455,21 @@ public:
     }
   }
 
+  TypeID encodeIsolation(swift::FunctionTypeIsolation isolation) {
+    switch (isolation.getKind()) {
+    case swift::FunctionTypeIsolation::Kind::NonIsolated:
+      return unsigned(FunctionTypeIsolation::NonIsolated);
+    case swift::FunctionTypeIsolation::Kind::Parameter:
+      return unsigned(FunctionTypeIsolation::Parameter);
+    case swift::FunctionTypeIsolation::Kind::Dynamic:
+      return unsigned(FunctionTypeIsolation::Dynamic);
+    case swift::FunctionTypeIsolation::Kind::GlobalActor:
+      return unsigned(FunctionTypeIsolation::GlobalActorOffset)
+               + S.addTypeRef(isolation.getGlobalActorType());
+    }
+    llvm_unreachable("bad kind");
+  }
+
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
 
@@ -5463,7 +5478,8 @@ public:
       S.getASTContext().LangOpts.UseClangFunctionTypes
       ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
       : ClangTypeID(0);
-    auto globalActor = S.addTypeRef(fnTy->getGlobalActor());
+
+    auto isolation = encodeIsolation(fnTy->getIsolation());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -5476,7 +5492,7 @@ public:
         fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        globalActor);
+        isolation);
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -5485,6 +5501,7 @@ public:
     using namespace decls_block;
     assert(!fnTy->isNoEscape());
     auto genericSig = fnTy->getGenericSignature();
+    auto isolation = encodeIsolation(fnTy->getIsolation());
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
@@ -5492,7 +5509,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        S.addTypeRef(fnTy->getGlobalActor()),
+        isolation,
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);

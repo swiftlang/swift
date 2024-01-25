@@ -1034,7 +1034,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
         fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
     extInfo = extInfo.withConcurrent(false);
     if (dropGlobalActor)
-      extInfo = extInfo.withGlobalActor(Type());
+      extInfo = extInfo.withoutIsolation();
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
@@ -4281,6 +4281,14 @@ bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
   return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
+bool swift::hasIsolatedParameter(ArrayRef<AnyFunctionType::Param> params) {
+  for (auto &param : params) {
+    if (param.isIsolated())
+      return true;
+  }
+  return false;
+}
+
 ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
   if (!Bits.SILFunctionType.HasClangTypeInfo)
     return ClangTypeInfo();
@@ -5148,48 +5156,49 @@ case TypeKind::Id:
     if (resultTy.getPointer() != function->getResult().getPointer())
       isUnchanged = false;
 
-    // Transform the thrown error.
-    Type thrownError;
-    if (Type origThrownError = function->getThrownError()) {
-      thrownError = origThrownError.transformWithPosition(pos, fn);
-      if (!thrownError)
-        return Type();
-
-      if (thrownError.getPointer() != origThrownError.getPointer())
-        isUnchanged = false;
-    }
-    
-    // Transform the global actor.
-    Type globalActorType;
-    if (Type origGlobalActorType = function->getGlobalActor()) {
-      globalActorType = origGlobalActorType.transformWithPosition(
-          TypePosition::Invariant, fn);
-      if (!globalActorType)
-        return Type();
-
-      if (globalActorType.getPointer() != origGlobalActorType.getPointer())
-        isUnchanged = false;
-    }
-
+    // Transform the extended info.
     llvm::Optional<ASTExtInfo> extInfo;
     if (function->hasExtInfo()) {
-      extInfo = function->getExtInfo()
-                    .withGlobalActor(globalActorType)
-                    .withThrows(function->isThrowing(), thrownError);
+      auto origExtInfo = function->getExtInfo();
+      extInfo = origExtInfo;
 
-      // If there was a generic thrown error and it substituted with
-      // 'any Error' or 'Never', map to 'throws' or non-throwing rather than
-      // maintaining the sugar.
-      if (auto origThrownError = function->getThrownError()) {
+      // Transform the thrown error.
+      if (Type origThrownError = origExtInfo.getThrownError()) {
+        Type thrownError = origThrownError.transformWithPosition(pos, fn);
+        if (!thrownError)
+          return Type();
+
+        if (thrownError.getPointer() != origThrownError.getPointer())
+          isUnchanged = false;
+
+        extInfo = extInfo->withThrows(true, thrownError);
+
+        // If there was a generic thrown error and it substituted with
+        // 'any Error' or 'Never', map to 'throws' or non-throwing rather than
+        // maintaining the sugar.
         if (origThrownError->isTypeParameter() ||
             origThrownError->isTypeVariableOrMember()) {
           // 'any Error'
           if (thrownError->isEqual(
-                  thrownError->getASTContext().getErrorExistentialType()))
+                  thrownError->getASTContext().getErrorExistentialType())) {
             extInfo = extInfo->withThrows(true, Type());
-          else if (thrownError->isNever())
+          } else if (thrownError->isNever()) {
             extInfo = extInfo->withThrows(false, Type());
+          }
         }
+      }
+
+      // Transform the global actor.
+      if (Type origGlobalActorType = origExtInfo.getGlobalActor()) {
+        Type globalActorType = origGlobalActorType.transformWithPosition(
+            TypePosition::Invariant, fn);
+        if (!globalActorType)
+          return Type();
+
+        if (globalActorType.getPointer() != origGlobalActorType.getPointer())
+          isUnchanged = false;
+
+        extInfo = extInfo->withGlobalActor(globalActorType);
       }
     }
 
