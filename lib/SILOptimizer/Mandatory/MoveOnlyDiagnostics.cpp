@@ -669,7 +669,7 @@ void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
 void DiagnosticEmitter::emitAddressDiagnostic(
     MarkUnresolvedNonCopyableValueInst *markedValue,
     SILInstruction *lastLiveUser, SILInstruction *violatingUser,
-    bool isUseConsuming, bool isInOutEndOfFunction) {
+    bool isUseConsuming, llvm::Optional<ScopeRequiringFinalInit> scopeKind) {
   if (!useWithDiagnostic.insert(violatingUser).second)
     return;
   registerDiagnosticEmitted(markedValue);
@@ -695,12 +695,24 @@ void DiagnosticEmitter::emitAddressDiagnostic(
     return;
   }
 
-  if (isInOutEndOfFunction) {
-    diagnose(
-        astContext, markedValue,
-        diag::
-            sil_movechecking_not_reinitialized_before_end_of_function,
-        varName, isClosureCapture(markedValue));
+  if (scopeKind.has_value()) {
+    switch (scopeKind.value()) {
+    case ScopeRequiringFinalInit::InoutArgument:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_function,
+               varName, isClosureCapture(markedValue));
+      break;
+    case ScopeRequiringFinalInit::Coroutine:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_coroutine,
+               varName);
+      break;
+    case ScopeRequiringFinalInit::ModifyMemoryAccess:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_access,
+               varName, isClosureCapture(markedValue));
+      break;
+    }
     diagnose(astContext, violatingUser,
              diag::sil_movechecking_consuming_use_here);
     return;

@@ -368,15 +368,39 @@ static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
   }
 }
 
-/// Returns true if \p value a function argument from an inout argument or a
-/// value extracted from a closure captured box that we did not convert to an
-/// address.
+using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
+
+/// If \p markedAddr's operand must be initialized at the end of the scope it
+/// introduces, visit those scope ending ends.
 ///
-/// These are cases where we want to treat the end of the function as a liveness
-/// use to ensure that we reinitialize \p value before the end of the function
-/// if we consume \p value in the function body.
-static bool isInOutDefThatNeedsEndOfFunctionLiveness(
-    MarkUnresolvedNonCopyableValueInst *markedAddr) {
+/// Examples:
+/// (1) inout function argument.  Must be initialized at function exit.
+///
+///     sil [ossa] @f : $(inout MOV) -> ()
+///     entry(%addr : $*MOV):
+///     ...
+///       return %t : $() // %addr must be initialized here
+///
+/// (2) coroutine.  Must be initialized at end_apply/abort_apply.
+///
+///     (%addr, %token) = begin_apply ... -> @yields @inout MOV
+///     bbN:
+///       end_apply %token // %addr must be initialized here
+///     bbM:
+///       abort_apply %token // %addr must be initialized here
+///
+/// (3) modify access.  Must be initialized at end_access.
+///
+///     %addr = begin_access [modify] %location
+///
+///     end_access %addr // %addr must be initialized here
+///
+/// To enforce this requirement, function exiting instructions are treated as
+/// liveness uses of such addresses, ensuring that the address is initialized at
+/// that point.
+static bool visitScopeEndsRequiringInit(
+    MarkUnresolvedNonCopyableValueInst *markedAddr,
+    llvm::function_ref<void(SILInstruction *, ScopeRequiringFinalInit)> visit) {
   SILValue operand = markedAddr->getOperand();
 
   // TODO: This should really be a property of the marker instruction.
@@ -403,17 +427,32 @@ static bool isInOutDefThatNeedsEndOfFunctionLiveness(
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Pack_Inout:
       LLVM_DEBUG(llvm::dbgs() << "Found inout arg: " << *fArg);
+      SmallVector<SILBasicBlock *, 8> exitBlocks;
+      markedAddr->getFunction()->findExitingBlocks(exitBlocks);
+      for (auto *block : exitBlocks) {
+        visit(block->getTerminator(), ScopeRequiringFinalInit::InoutArgument);
+      }
       return true;
     }
   }
   // Check for yields from a modify coroutine.
   if (auto bai =
           dyn_cast_or_null<BeginApplyInst>(operand->getDefiningInstruction())) {
+    for (auto *inst : bai->getTokenResult()->getUsers()) {
+      assert(isa<EndApplyInst>(inst) || isa<AbortApplyInst>(inst));
+      visit(inst, ScopeRequiringFinalInit::Coroutine);
+    }
     return true;
   }
   // Check for modify accesses.
   if (auto access = dyn_cast<BeginAccessInst>(operand)) {
-    return access->getAccessKind() == SILAccessKind::Modify;
+    if (access->getAccessKind() != SILAccessKind::Modify) {
+      return false;
+    }
+    for (auto *inst : access->getEndAccesses()) {
+      visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
+    }
+    return true;
   }
 
   return false;
@@ -534,12 +573,15 @@ struct UseState {
   /// The set of drop_deinits of this mark_unresolved_non_copyable_value
   llvm::SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
 
-  /// A "inout terminator use" is an implicit liveness use of the entire value
-  /// placed on a terminator. We use this both so we add liveness for the
-  /// terminator user and so that we can use the set to quickly identify later
-  /// while emitting diagnostics that a liveness use is a terminator user and
-  /// emit a specific diagnostic message.
-  llvm::SmallSetVector<SILInstruction *, 2> implicitEndOfLifetimeLivenessUses;
+  /// Instructions indicating the end of a scope at which addr must be
+  /// initialized.
+  ///
+  /// Adding such instructions to liveness forces the value to be initialized at
+  /// them as required.
+  ///
+  /// See visitScopeEndsRequiringInit.
+  llvm::MapVector<SILInstruction *, ScopeRequiringFinalInit>
+      scopeEndsRequiringInit;
 
   /// We add debug_values to liveness late after we diagnose, but before we
   /// hoist destroys to ensure that we do not hoist destroys out of access
@@ -604,8 +646,13 @@ struct UseState {
   /// instruction.
   /// 2. In the case of a ref_element_addr or a global, this will contain the
   /// end_access.
-  bool isImplicitEndOfLifetimeLivenessUses(SILInstruction *inst) const {
-    return implicitEndOfLifetimeLivenessUses.count(inst);
+  llvm::Optional<ScopeRequiringFinalInit>
+  isImplicitEndOfLifetimeLivenessUses(SILInstruction *inst) const {
+    auto iter = scopeEndsRequiringInit.find(inst);
+    if (iter == scopeEndsRequiringInit.end()) {
+      return llvm::None;
+    }
+    return {iter->second};
   }
 
   /// Returns true if the given instruction is within the same block as a reinit
@@ -647,7 +694,7 @@ struct UseState {
     reinitInsts.clear();
     reinitToValueMultiMap.reset();
     dropDeinitInsts.clear();
-    implicitEndOfLifetimeLivenessUses.clear();
+    scopeEndsRequiringInit.clear();
     debugValue = nullptr;
   }
 
@@ -686,8 +733,8 @@ struct UseState {
       llvm::dbgs() << *inst;
     }
     llvm::dbgs() << "Implicit End Of Lifetime Liveness Users:\n";
-    for (auto *inst : implicitEndOfLifetimeLivenessUses) {
-      llvm::dbgs() << *inst;
+    for (auto pair : scopeEndsRequiringInit) {
+      llvm::dbgs() << pair.first;
     }
     llvm::dbgs() << "Debug Value User:\n";
     if (debugValue) {
@@ -724,17 +771,11 @@ struct UseState {
   initializeLiveness(FieldSensitiveMultiDefPrunedLiveRange &prunedLiveness);
 
   void initializeImplicitEndOfLifetimeLivenessUses() {
-    if (isInOutDefThatNeedsEndOfFunctionLiveness(address)) {
-      SmallVector<SILBasicBlock *, 8> exitBlocks;
-      address->getFunction()->findExitingBlocks(exitBlocks);
-      for (auto *block : exitBlocks) {
-        LLVM_DEBUG(llvm::dbgs() << "    Adding term as liveness user: "
-                                << *block->getTerminator());
-        implicitEndOfLifetimeLivenessUses.insert(block->getTerminator());
-      }
-      return;
-    }
-
+    visitScopeEndsRequiringInit(address, [&](auto *inst, auto kind) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    Adding scope end as liveness user: " << *inst);
+      scopeEndsRequiringInit[inst] = kind;
+    });
     if (address->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
                                        CheckKind::AssignableButNotConsumable) {
       if (auto *bai = dyn_cast<BeginAccessInst>(address->getOperand())) {
@@ -742,7 +783,8 @@ struct UseState {
           LLVM_DEBUG(llvm::dbgs() << "    Adding end_access as implicit end of "
                                      "lifetime liveness user: "
                                   << *eai);
-          implicitEndOfLifetimeLivenessUses.insert(eai);
+          scopeEndsRequiringInit[eai] =
+              ScopeRequiringFinalInit::ModifyMemoryAccess;
         }
       }
     }
@@ -804,7 +846,7 @@ struct UseState {
     // An "inout terminator use" is an implicit liveness use of the entire
     // value. This is because we need to ensure that our inout value is
     // reinitialized along exit paths.
-    if (implicitEndOfLifetimeLivenessUses.count(inst))
+    if (scopeEndsRequiringInit.count(inst))
       return true;
 
     return false;
@@ -1191,10 +1233,10 @@ void UseState::initializeLiveness(
   // ref_element_addr or global_addr, add a liveness use of the entire value on
   // the implicit end lifetime instruction. For inout this is terminators for
   // ref_element_addr, global_addr it is the end_access instruction.
-  for (auto *inst : implicitEndOfLifetimeLivenessUses) {
-    liveness.updateForUse(inst, TypeTreeLeafTypeRange(address),
+  for (auto pair : scopeEndsRequiringInit) {
+    liveness.updateForUse(pair.first, TypeTreeLeafTypeRange(address),
                           false /*lifetime ending*/);
-    LLVM_DEBUG(llvm::dbgs() << "Added liveness for inoutTermUser: " << *inst;
+    LLVM_DEBUG(llvm::dbgs() << "Added liveness for scope end: " << pair.first;
                liveness.print(llvm::dbgs()));
   }
 
