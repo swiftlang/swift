@@ -366,7 +366,8 @@ extension DistributedActor {
     _ body: @Sendable (isolated Self) async throws -> T
   ) async rethrows -> T? {
     if __isLocalActor(self) {
-       return try await body(self)
+       _local let localSelf = self
+       return try await body(localSelf)
     } else {
       return nil
     }

@@ -3290,16 +3290,19 @@ namespace {
         // that can talk about specific parameters.
         auto nominal = getType(arg)->getAnyNominal();
         if (!nominal) {
+          // FIXME: This is wrong for distributed actors.
           nominal = getType(arg)->getASTContext().getProtocol(
               KnownProtocolKind::Actor);
         }
 
+        auto origArg = const_cast<Expr *>(arg->findOriginalValue());
+
         // FIXME: Also allow 'Optional.none'
-        if (dyn_cast<NilLiteralExpr>(arg->findOriginalValue())) {
+        if (dyn_cast<NilLiteralExpr>(origArg)) {
           mayExitToNonisolated = true;
         } else {
           unsatisfiedIsolation =
-              ActorIsolation::forActorInstanceParameter(nominal, paramIdx);
+              ActorIsolation::forActorInstanceParameter(origArg, paramIdx);
           mayExitToNonisolated = false;
         }
 
@@ -3447,6 +3450,11 @@ namespace {
       Type optionalAnyActorType = isolationExpr->getType();
       switch (isolation) {
       case ActorIsolation::ActorInstance: {
+        if (auto *instance = isolation.getActorInstanceExpr()) {
+          actorExpr = instance;
+          break;
+        }
+
         const VarDecl *var = isolation.getActorInstance();
         if (!var) {
           auto dc = getDeclContext();
@@ -4690,7 +4698,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       actorType = paramType;
     }
     if (auto actor = actorType->getAnyActor())
-      return ActorIsolation::forActorInstanceParameter(actor, *paramIdx);
+      return ActorIsolation::forActorInstanceParameter(param, *paramIdx);
   }
 
   // Diagnose global state that is not either immutable plus Sendable or

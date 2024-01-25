@@ -70,7 +70,7 @@ public:
 
 private:
   union {
-    llvm::PointerUnion<NominalTypeDecl *, VarDecl *> actorInstance;
+    llvm::PointerUnion<NominalTypeDecl *, VarDecl *, Expr *> actorInstance;
     Type globalActor;
     void *pointer;
   };
@@ -84,7 +84,9 @@ private:
 
   ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
 
-  ActorIsolation(Kind kind, VarDecl *capturedActor);
+  ActorIsolation(Kind kind, VarDecl *actor, unsigned parameterIndex);
+
+  ActorIsolation(Kind kind, Expr *actor, unsigned parameterIndex);
 
   ActorIsolation(Kind kind, Type globalActor)
       : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
@@ -113,8 +115,18 @@ public:
     return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
   }
 
+  static ActorIsolation forActorInstanceParameter(VarDecl *actor,
+                                                  unsigned parameterIndex) {
+    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+  }
+
+  static ActorIsolation forActorInstanceParameter(Expr *actor,
+                                                  unsigned parameterIndex) {
+    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+  }
+
   static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
-    return ActorIsolation(ActorInstance, capturedActor);
+    return ActorIsolation(ActorInstance, capturedActor, 0);
   }
 
   static ActorIsolation forGlobalActor(Type globalActor) {
@@ -178,6 +190,8 @@ public:
   NominalTypeDecl *getActor() const;
 
   VarDecl *getActorInstance() const;
+
+  Expr *getActorInstanceExpr() const;
 
   bool isGlobalActor() const {
     return getKind() == GlobalActor;
