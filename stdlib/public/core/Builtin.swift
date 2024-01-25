@@ -718,7 +718,7 @@ internal func _isUnique<T>(_ object: inout T) -> Bool {
 }
 
 /// Returns `true` if `object` is uniquely referenced.
-/// This provides sanity checks on top of the Builtin.
+/// This provides soundness checks on top of the Builtin.
 @_transparent
 public // @testable
 func _isUnique_native<T>(_ object: inout T) -> Bool {
