@@ -1363,6 +1363,10 @@ def create_argument_parser():
            default=True,
            help='Enable Swift Synchronization.')
 
+    option('--enable-experimental-parser-validation', toggle_true,
+           default=False,
+           help='Enable experimental Swift Parser validation by default.')
+
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
 
