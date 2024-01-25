@@ -103,7 +103,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   public var argumentConventions: ArgumentConventions {
-    ArgumentConventions(functionConvention: convention)
+    ArgumentConventions(originalFunctionConvention: convention,
+                        substitutedFunctionConvention: nil)
   }
 
   public var returnInstruction: ReturnInst? {

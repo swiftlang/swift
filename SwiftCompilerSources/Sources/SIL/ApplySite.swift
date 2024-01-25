@@ -59,10 +59,31 @@ public struct ApplyOperandConventions : Collection {
   }
 
   public func convention(of operand: Operand) -> ArgumentConvention? {
-    guard let argIdx = calleeArgumentIndex(of: operand) else { return nil }
+    guard let argIdx = calleeArgumentIndex(of: operand) else {
+      return nil
+    }
     return calleeArgumentConventions[argIdx]
   }
 
+  public func originalParameter(of operand: Operand) -> ParameterInfo? {
+    guard let argIdx = calleeArgumentIndex(of: operand) else {
+      return nil
+    }
+    guard argIdx >= calleeArgumentConventions.firstParameterIndex else {
+      return nil
+    }
+    return calleeArgumentConventions.originalParameters[argIdx]
+  }
+
+  public var firstParameterOperandIndex: Int {
+    return ApplyOperandConventions.firstArgumentIndex +
+      calleeArgumentConventions.firstParameterIndex
+  }
+
+  // TODO: rewrite uses of this API to pass an Operand instead, and
+  // make this private. No client should have multiple integer
+  // indices, some of which are caller indices, and some of which are
+  // callee indices.
   public func calleeArgumentIndex(ofOperandIndex index: Int) -> Int? {
     let callerArgIdx = index - ApplyOperandConventions.firstArgumentIndex
     guard callerArgIdx >= 0 else { return nil }
@@ -108,22 +129,24 @@ extension ApplySite {
     argumentOperands.values
   }
 
+  /// Indirect results including the error result.
+  public var indirectResultOperands: OperandArray {
+    let offset = ApplyOperandConventions.firstArgumentIndex
+    return operands[offset..<operandConventions.firstParameterOperandIndex]
+  }
+
   public var substitutionMap: SubstitutionMap {
     SubstitutionMap(bridged.ApplySite_getSubstitutionMap())
   }
 
-  /// Get the conventions of the callee without the applied substitutions.
-  public var originalCalleeConvention: FunctionConvention {
-    FunctionConvention(for: callee.type.bridged.getASTType(), in: parentFunction)
-  }
-
-  /// Get the conventions of the callee with the applied substitutions.
-  public var substitutedCalleeConvention: FunctionConvention {
-    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(), in: parentFunction)
-  }
-
   public var calleeArgumentConventions: ArgumentConventions {
-    ArgumentConventions(functionConvention: substitutedCalleeConvention)
+    let originalConv = FunctionConvention(for: callee.type.bridged.getASTType(),
+                                          in: parentFunction)
+    let substConv = FunctionConvention(
+      for: bridged.ApplySite_getSubstitutedCalleeType(),
+      in: parentFunction)
+    return ArgumentConventions(originalFunctionConvention: originalConv,
+                               substitutedFunctionConvention: substConv)
   }
 
   public var operandConventions: ApplyOperandConventions {

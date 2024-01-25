@@ -170,22 +170,34 @@ public struct TerminatorResult {
 /// ArgumentConventions indexed on a SIL function's argument index.
 /// When derived from an ApplySite, this corresponds to the callee index.
 public struct ArgumentConventions : Collection, CustomStringConvertible {
-  public let functionConvention: FunctionConvention
+  public let originalFunctionConvention: FunctionConvention
+  public let substitutedFunctionConvention: FunctionConvention?
 
-  public var bridgedFunctionType: BridgedASTType { functionConvention.bridgedFunctionType }
-
-  /// Indirect results including the error result.
+  /// Indirect results including the error result. Apply type
+  /// substitution if it is available.
   public var indirectSILResults: LazyFilterSequence<FunctionConvention.Results> {
-    functionConvention.indirectSILResults
+    if let substitutedFunctionConvention {
+      return substitutedFunctionConvention.indirectSILResults
+    }
+    return originalFunctionConvention.indirectSILResults
   }
 
   /// Number of SIL arguments for the function type's results
   /// including the error result. Use this to avoid lazy iteration.
   var indirectSILResultCount: Int {
-    functionConvention.indirectSILResultCount
+    originalFunctionConvention.indirectSILResultCount
   }
 
-  public var parameters: FunctionConvention.Parameters { functionConvention.parameters }
+  public var originalParameters: FunctionConvention.Parameters {
+    originalFunctionConvention.parameters
+  }
+
+  public var parameters: FunctionConvention.Parameters {
+    if let substitutedFunctionConvention {
+      return substitutedFunctionConvention.parameters
+    }
+    return originalFunctionConvention.parameters
+  }
 
   public var startIndex: Int { 0 }
 
@@ -207,17 +219,22 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
 
   /// The SIL argument index of the 'self' paramter.
   var selfIndex: Int? {
-    guard functionConvention.hasSelfParameter else { return nil }
+    guard originalFunctionConvention.hasSelfParameter else { return nil }
     // self is the last parameter
     return endIndex - 1
   }
 
   public var description: String {
-    var str = String(taking: bridgedFunctionType.getDebugDescription())
+    var str = String(taking: originalFunctionConvention.bridgedFunctionType.getDebugDescription())
+    if let substitutedFunctionConvention {
+      str += "\n" + String(taking: substitutedFunctionConvention.bridgedFunctionType.getDebugDescription())
+    }
     indirectSILResults.forEach {
       str += "\nindirect result: " + $0.description
     }
-    parameters.forEach { str += "\n      parameter: " + $0.description }
+    parameters.forEach {
+      str += "\n      parameter: " + $0.description
+    }
     return str
   }
 }
