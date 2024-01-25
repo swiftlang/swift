@@ -48,8 +48,6 @@ actor A2: DistributedActor {
 // FIXME(distributed): error reporting is a bit whacky here; needs cleanup
 // expected-error@-2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
 // expected-error@-3{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
-// expected-error@-4{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
-// expected-note@-5{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = A2]}}
   nonisolated var id: ID {
     fatalError()
   }
