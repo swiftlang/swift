@@ -330,7 +330,7 @@ func getContiguousArrayStorageType<Element>(
 internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @usableFromInline
   internal var _storage: __ContiguousArrayStorageBase
-  
+
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
   /// result's `.firstElementAddress` or set the result's `.count`
