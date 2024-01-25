@@ -4950,7 +4950,6 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
             if (parseUnsignedInteger(
                     paramNum, paramLoc,
                     diag::expected_param_index_lifetime_dependence)) {
-              skipUntil(tok::r_paren);
               listStatus.setIsParseError();
               return listStatus;
             }
@@ -4972,7 +4971,6 @@ ParserStatus Parser::parseLifetimeDependenceSpecifiers(
                 Tok,
                 diag::
                     expected_identifier_or_index_or_self_after_lifetime_dependence);
-            skipUntil(tok::r_paren);
             listStatus.setIsParseError();
             return listStatus;
           }

@@ -267,10 +267,9 @@ public:
     return MultilineString;
   }
 
-  bool isLifetimeDependenceToken() {
-    auto tokenRawText = getRawText();
-    return tokenRawText.equals("_copy") || tokenRawText.equals("_consume") ||
-           tokenRawText.equals("_borrow") || tokenRawText.equals("_mutate");
+  bool isLifetimeDependenceToken() const {
+    return isContextualKeyword("_copy") || isContextualKeyword("_consume") ||
+           isContextualKeyword("_borrow") || isContextualKeyword("_mutate");
   }
 
   /// Count of extending escaping '#'.
