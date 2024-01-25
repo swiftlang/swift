@@ -1391,9 +1391,14 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
 
     if (auto *conformance = dyn_cast<NormalProtocolConformance>(
             ref.getConcrete()->getRootConformance())) {
-      if (conformance->getState() == ProtocolConformanceState::Incomplete) {
-        TypeChecker::checkConformance(conformance);
-      }
+      // Complete evaluate the conformance.
+      evaluateOrDefault(evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+
+      evaluateOrDefault(evaluator,
+                        ResolveValueWitnessesRequest{conformance},
+                        evaluator::SideEffect());
     }
 
     return true;
