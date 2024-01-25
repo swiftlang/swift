@@ -1435,12 +1435,13 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
       .findAccessPath(address);
 }
 
-void swift::visitProductLeafAccessPathNodes(
-    AccessPath rootPath, SILValue address, TypeExpansionContext tec,
-    SILModule &module,
+bool swift::visitProductLeafAccessPathNodes(
+    SILValue address, TypeExpansionContext tec, SILModule &module,
     std::function<void(AccessPath::PathNode, SILType)> visitor) {
-  assert(rootPath.isValid());
-  assert(AccessPath::compute(address) == rootPath);
+  auto rootPath = AccessPath::compute(address);
+  if (!rootPath.isValid()) {
+    return false;
+  }
   SmallVector<std::pair<SILType, IndexTrieNode *>, 32> worklist;
   auto *node = rootPath.getPathNode().node;
   worklist.push_back({address->getType(), node});
@@ -1474,6 +1475,7 @@ void swift::visitProductLeafAccessPathNodes(
       visitor(AccessPath::PathNode(node), silType);
     }
   }
+  return true;
 }
 
 void AccessPath::Index::print(raw_ostream &os) const {
