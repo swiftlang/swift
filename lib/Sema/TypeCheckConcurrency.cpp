@@ -2343,14 +2343,13 @@ namespace {
 
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
-    void checkFunctionConversion(FunctionConversionExpr *funcConv) {
-      auto subExprType = funcConv->getSubExpr()->getType();
-      if (auto fromType = subExprType->getAs<FunctionType>()) {
-        if (auto fromActor = fromType->getGlobalActor()) {
-          if (auto toType = funcConv->getType()->getAs<FunctionType>()) {
+    void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
+      if (auto fromFnType = fromType->getAs<FunctionType>()) {
+        if (auto fromActor = fromFnType->getGlobalActor()) {
+          if (auto toFnType = toType->getAs<FunctionType>()) {
 
             // ignore some kinds of casts, as they're diagnosed elsewhere.
-            if (toType->hasGlobalActor() || toType->isAsync())
+            if (toFnType->hasGlobalActor() || toFnType->isAsync())
               return;
 
             auto dc = const_cast<DeclContext*>(getDeclContext());
@@ -2732,7 +2731,15 @@ namespace {
 
       // The constraint solver may not have chosen legal casts.
       if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
-        checkFunctionConversion(funcConv);
+        checkFunctionConversion(funcConv,
+                                funcConv->getSubExpr()->getType(),
+                                funcConv->getType());
+      }
+
+      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
+        checkFunctionConversion(isolationErasure,
+                                isolationErasure->getSubExpr()->getType(),
+                                isolationErasure->getType());
       }
 
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
