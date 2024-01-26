@@ -51,6 +51,15 @@ int swift_ASTGen_emitParserDiagnostics(
     void *_Nonnull diagEngine, void *_Nonnull sourceFile, int emitOnlyErrors,
     int downgradePlaceholderErrorsToWarnings);
 
+/// For every `TypeSyntax` node in the syntax tree of the given source file,
+/// validate the result of translating the node against the legacy parser and
+/// emit errors on unexpected mismatches.
+void swift_ASTGen_validateTypeReprGeneration(BridgedDiagnosticEngine diagEngine,
+                                             void *_Nonnull sourceFile,
+                                             BridgedDeclContext declContext,
+                                             BridgedASTContext astContext,
+                                             BridgedLegacyParser legacyParser);
+
 // Build AST nodes for the top-level entities in the syntax.
 void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,

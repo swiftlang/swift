@@ -62,7 +62,7 @@ func isTypeMigrated(_ node: TypeSyntax) -> Bool {
 extension ASTGenVisitor {
   func generate(type node: TypeSyntax) -> BridgedTypeRepr {
     guard isTypeMigrated(node) else {
-      return self.generateWithLegacy(node)
+      return self.generateWithLegacy(node, generateChildrenWithASTGen: true)
     }
     switch node.as(TypeSyntaxEnum.self) {
     case .arrayType(let node):

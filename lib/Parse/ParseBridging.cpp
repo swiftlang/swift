@@ -72,17 +72,25 @@ BridgedStmt BridgedLegacyParser_parseStmt(BridgedLegacyParser p,
 
 BridgedTypeRepr BridgedLegacyParser_parseType(BridgedLegacyParser p,
                                               BridgedSourceLoc loc,
-                                              BridgedDeclContext DC) {
+                                              BridgedDeclContext DC,
+                                              bool generateChildrenWithASTGen) {
   auto &P = p.unbridged();
   auto PP =
       P.getParserPosition(loc.unbridged(), /*PreviousLoc=*/loc.unbridged());
   P.CurDeclContext = DC.unbridged();
   P.restoreParserPosition(PP);
 
+  if (!generateChildrenWithASTGen) {
+    P.IsForASTGen = false;
+  }
+
   // FIXME: Calculate 'ParseTypeReason' in ASTGen.
   ParserResult<TypeRepr> result =
       P.parseType(diag::expected_type, Parser::ParseTypeReason::Unspecified,
                   /*fromASTGen=*/true);
+
+  P.IsForASTGen = true;
+
   return result.getPtrOrNull();
 }
 
