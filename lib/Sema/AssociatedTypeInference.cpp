@@ -1339,6 +1339,9 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
   InferredAssociatedTypesByWitnesses result;
 
+  LLVM_DEBUG(llvm::dbgs() << "Considering requirement:\n";
+             req->dump(llvm::dbgs()));
+
   for (auto witness :
        lookupValueWitnesses(dc, req, /*ignoringNames=*/nullptr)) {
     LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
@@ -1620,6 +1623,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
     conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
   Type type = witness->getInterfaceType()->getReferenceStorageReferent();
+  LLVM_DEBUG(llvm::dbgs() << "Witness interface type is " << type << "\n";);
 
   if (substitutions.empty())
     return type;
@@ -2139,9 +2143,14 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
     if (ctx.isRecursivelyConstructingRequirementMachine(
             conformedProto->getGenericSignature().getCanonicalSignature()) ||
         ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
-        conformedProto->isComputingRequirementSignature())
+        conformedProto->isComputingRequirementSignature()) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping circular protocol "
+                 << conformedProto->getName() << "\n");
       return;
+    }
 
+    LLVM_DEBUG(llvm::dbgs() << "Collecting same-type requirements from "
+               << conformedProto->getName() << "\n");
     for (const auto &req :
          conformedProto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::SameType)
