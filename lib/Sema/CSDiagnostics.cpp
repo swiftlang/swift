@@ -3453,22 +3453,27 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   {
     llvm::SmallString<128> Text;
     llvm::raw_svector_ostream SS(Text);
-    llvm::SetVector<ASTContext::MissingWitness> missingWitnesses;
+    llvm::SmallVector<NormalProtocolConformance *, 2> fakeConformances;
     for (auto protocol : missingProtocols) {
-      auto conformance = NormalProtocolConformance(
-          nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
+      auto conformance = getASTContext().getNormalConformance(
+          nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
           ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
           /*isPreconcurrency=*/false);
-      ConformanceChecker checker(getASTContext(), &conformance,
-                                 missingWitnesses);
       // Type witnesses must be resolved first.
-      checker.resolveTypeWitnesses();
+      evaluateOrDefault(getASTContext().evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+      ConformanceChecker checker(getASTContext(), conformance);
       checker.resolveValueWitnesses();
+      fakeConformances.push_back(conformance);
     }
 
-    for (auto decl : missingWitnesses) {
-      swift::printRequirementStub(decl.requirement, nominal, nominal->getDeclaredType(),
-                                  nominal->getStartLoc(), SS);
+    for (auto conformance : fakeConformances) {
+      auto missingWitnesses = getASTContext().takeDelayedMissingWitnesses(conformance);
+      for (auto decl : missingWitnesses) {
+        swift::printRequirementStub(decl.requirement, nominal, nominal->getDeclaredType(),
+                                    nominal->getStartLoc(), SS);
+      }
     }
 
     if (!Text.empty()) {

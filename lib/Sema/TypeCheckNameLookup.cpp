@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
 
@@ -496,13 +497,15 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
 
       // Use the type witness.
-      auto concrete = conformance.getConcrete();
+      auto *concrete = conformance.getConcrete();
+      auto *normal = concrete->getRootNormalConformance();
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
-      if (concrete->getState() ==
-          ProtocolConformanceState::CheckingTypeWitnesses)
+      if (dc->getASTContext().evaluator.hasActiveRequest(
+            ResolveTypeWitnessesRequest{normal})) {
         continue;
+      }
 
       auto *typeDecl =
         concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();

@@ -295,7 +295,7 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       for (auto *decl : synthesizedSF->getTopLevelDecls()) {
         auto extension = cast<ExtensionDecl>(decl);
 
-        // Limit typechecking of synthesized _impicit_ extensions to conformance
+        // Limit typechecking of synthesized _implicit_ extensions to conformance
         // checking. This is done because a conditional conformance to Copyable
         // is synthesized as an extension, based on the markings of `~Copyable`
         // in a value type. This call to `checkConformancesInContext` will

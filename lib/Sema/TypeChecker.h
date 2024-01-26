@@ -834,13 +834,6 @@ ValueDecl *deriveProtocolRequirement(DeclContext *DC,
                                      NominalTypeDecl *TypeDecl,
                                      ValueDecl *Requirement);
 
-/// Derive an implicit type witness for the given associated type in
-/// the conformance of the given nominal type to some known
-/// protocol.
-std::pair<Type, TypeDecl *>
-deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
-                  AssociatedTypeDecl *assocType);
-
 /// \name Name lookup
 ///
 /// Routines that perform name lookup.

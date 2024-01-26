@@ -77,10 +77,6 @@ protected:
 
   ASTContext &getASTContext() const { return Context; }
 
-  // An auxiliary lookup table to be used for witnesses remapped via
-  // @_implements(Protocol, DeclName)
-  llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>> ImplementsTable;
-
   RequirementEnvironmentCache ReqEnvironmentCache;
 
   WitnessChecker(ASTContext &ctx, ProtocolDecl *proto, Type adoptee,
@@ -97,10 +93,6 @@ protected:
                        unsigned &numViable,
                        unsigned &bestIdx,
                        bool &doNotDiagnoseMatches);
-
-  bool checkWitnessAccess(ValueDecl *requirement,
-                          ValueDecl *witness,
-                          bool *isSetter);
 
   bool checkWitnessAvailability(ValueDecl *requirement,
                                 ValueDecl *witness,
@@ -121,54 +113,14 @@ enum class ResolveWitnessResult {
   Missing
 };
 
-enum class MissingWitnessDiagnosisKind {
-  FixItOnly,
-  ErrorOnly,
-  ErrorFixIt,
-};
-
-class AssociatedTypeInference;
-class MultiConformanceChecker;
-
 /// The protocol conformance checker.
 ///
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
 public:
-  /// Key that can be used to uniquely identify a particular Objective-C
-  /// method.
-  using ObjCMethodKey = std::pair<ObjCSelector, char>;
-
-private:
-  friend class MultiConformanceChecker;
-  friend class AssociatedTypeInference;
-
   NormalProtocolConformance *Conformance;
   SourceLoc Loc;
-
-  /// Witnesses that are currently being resolved.
-  llvm::SmallPtrSet<ValueDecl *, 4> ResolvingWitnesses;
-
-  /// Keep track of missing witnesses, either type or value, for later
-  /// diagnosis emits. This may contain witnesses that are external to the
-  /// protocol under checking.
-  llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses;
-
-  /// Keep track of the slice in GlobalMissingWitnesses that is local to
-  /// this protocol under checking.
-  unsigned LocalMissingWitnessesStartIndex;
-
-  /// Whether we've already complained about problems with this conformance.
-  bool AlreadyComplained = false;
-
-  /// Mapping from Objective-C methods to the set of requirements within this
-  /// protocol that have the same selector and instance/class designation.
-  llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
-    objcMethodRequirements;
-
-  /// Whether objcMethodRequirements has been computed.
-  bool computedObjCMethodRequirements = false;
 
   /// Record a (non-type) witness for the given requirement.
   void recordWitness(ValueDecl *requirement, const RequirementMatch &match);
@@ -178,11 +130,6 @@ private:
 
   /// Record that the given requirement has no valid witness.
   void recordInvalidWitness(ValueDecl *requirement);
-
-  /// Check for ill-formed uses of Objective-C generics in a type witness.
-  bool checkObjCTypeErasedGenerics(AssociatedTypeDecl *assocType,
-                                   Type type,
-                                   TypeDecl *typeDecl);
 
   /// Check that the witness and requirement have compatible actor contexts.
   ///
@@ -211,42 +158,9 @@ private:
   ResolveWitnessResult
   resolveWitnessTryingAllStrategies(ValueDecl *requirement);
 
-  /// Attempt to resolve a type witness via member name lookup.
-  ResolveWitnessResult resolveTypeWitnessViaLookup(
-                         AssociatedTypeDecl *assocType);
-
-  /// Check whether all of the protocol's generic requirements are satisfied by
-  /// the chosen type witnesses.
-  void ensureRequirementsAreSatisfied();
-
-  ArrayRef<ASTContext::MissingWitness> getLocalMissingWitness() {
-    return GlobalMissingWitnesses.getArrayRef().
-      slice(LocalMissingWitnessesStartIndex,
-            GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
-  }
-
-  void clearGlobalMissingWitnesses() {
-    GlobalMissingWitnesses.clear();
-    LocalMissingWitnessesStartIndex = GlobalMissingWitnesses.size();
-  }
-
-public:
-  /// Call this to diagnose currently known missing witnesses.
-  ///
-  /// \returns true if any witnesses were diagnosed.
-  bool diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind,
-                                bool Delayed);
-
-  /// Emit any diagnostics that have been delayed.
-  void emitDelayedDiags();
-
-  ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance,
-                     llvm::SetVector<ASTContext::MissingWitness> &GlobalMissingWitnesses);
+  ConformanceChecker(ASTContext &ctx, NormalProtocolConformance *conformance);
 
   ~ConformanceChecker();
-
-  /// Resolve all of the type witnesses.
-  void resolveTypeWitnesses();
 
   /// Resolve all of the non-type witnesses.
   void resolveValueWitnesses();
@@ -261,157 +175,8 @@ public:
   /// conformance has been completed checked.
   void resolveSingleWitness(ValueDecl *requirement);
 
-  /// Resolve the type witness for the given associated type as
-  /// directly as possible.
-  void resolveSingleTypeWitness(AssociatedTypeDecl *assocType);
-
-  /// Check the entire protocol conformance, ensuring that all
-  /// witnesses are resolved and emitting any diagnostics.
-  void checkConformance(MissingWitnessDiagnosisKind Kind);
-
-  /// Retrieve the Objective-C method key from the given function.
-  ObjCMethodKey getObjCMethodKey(AbstractFunctionDecl *func);
-
-  /// Retrieve the Objective-C requirements in this protocol that have the
-  /// given Objective-C method key.
-  ArrayRef<AbstractFunctionDecl *> getObjCRequirements(ObjCMethodKey key);
-
-  /// @returns a non-null requirement if the given requirement is part of a
-  /// group of ObjC requirements that share the same ObjC method key.
-  /// The first such requirement that the predicate function returns true for
-  /// is the requirement required by this function. Otherwise, nullptr is
-  /// returned.
-  ValueDecl *getObjCRequirementSibling(ValueDecl *requirement,
-                    llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
-};
-
-/// A system for recording and probing the integrity of a type witness solution
-/// for a set of unresolved associated type declarations.
-///
-/// Right now can reason only about abstract type witnesses, i.e., same-type
-/// constraints, default type definitions, and bindings to generic parameters.
-class TypeWitnessSystem final {
-  /// Equivalence classes are used on demand to express equivalences between
-  /// witness candidates and reflect changes to resolved types across their
-  /// members.
-  class EquivalenceClass final {
-    /// The pointer:
-    /// - The resolved type for witness candidates belonging to this equivalence
-    ///   class. The resolved type may be a type parameter, but cannot directly
-    ///   pertain to a name variable in the owning system; instead, witness
-    ///   candidates that should resolve to the same type share an equivalence
-    ///   class.
-    /// The int:
-    /// - A flag indicating whether the resolved type is ambiguous. When set,
-    ///   the resolved type is null.
-    llvm::PointerIntPair<Type, 1, bool> ResolvedTyAndIsAmbiguous;
-
-  public:
-    EquivalenceClass(Type ty) : ResolvedTyAndIsAmbiguous(ty, false) {}
-
-    EquivalenceClass(const EquivalenceClass &) = delete;
-    EquivalenceClass(EquivalenceClass &&) = delete;
-    EquivalenceClass &operator=(const EquivalenceClass &) = delete;
-    EquivalenceClass &operator=(EquivalenceClass &&) = delete;
-
-    Type getResolvedType() const {
-      return ResolvedTyAndIsAmbiguous.getPointer();
-    }
-    void setResolvedType(Type ty);
-
-    bool isAmbiguous() const {
-      return ResolvedTyAndIsAmbiguous.getInt();
-    }
-    void setAmbiguous() {
-      ResolvedTyAndIsAmbiguous = {nullptr, true};
-    }
-  };
-
-  /// A type witness candidate for a name variable.
-  struct TypeWitnessCandidate final {
-    /// The defaulted associated type declaration correlating with this
-    /// candidate, if present.
-    AssociatedTypeDecl *DefaultedAssocType;
-
-    /// The equivalence class of this candidate.
-    EquivalenceClass *EquivClass;
-  };
-
-  /// The set of equivalence classes in the system.
-  llvm::SmallPtrSet<EquivalenceClass *, 4> EquivalenceClasses;
-
-  /// The mapping from name variables (the names of unresolved associated
-  /// type declarations) to their corresponding type witness candidates.
-  llvm::SmallDenseMap<Identifier, TypeWitnessCandidate, 4> TypeWitnesses;
-
-public:
-  TypeWitnessSystem(ArrayRef<AssociatedTypeDecl *> assocTypes);
-  ~TypeWitnessSystem();
-
-  TypeWitnessSystem(const TypeWitnessSystem &) = delete;
-  TypeWitnessSystem(TypeWitnessSystem &&) = delete;
-  TypeWitnessSystem &operator=(const TypeWitnessSystem &) = delete;
-  TypeWitnessSystem &operator=(TypeWitnessSystem &&) = delete;
-
-  /// Get the resolved type witness for the associated type with the given name.
-  Type getResolvedTypeWitness(Identifier name) const;
-  bool hasResolvedTypeWitness(Identifier name) const;
-
-  /// Get the defaulted associated type relating to the resolved type witness
-  /// for the associated type with the given name, if present.
-  AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
-
-  /// Record a type witness for the given associated type name.
-  ///
-  /// \note This need not lead to the resolution of a type witness, e.g.
-  /// an associated type may be defaulted to another.
-  void addTypeWitness(Identifier name, Type type);
-
-  /// Record a default type witness.
-  ///
-  /// \param defaultedAssocType The specific associated type declaration that
-  /// defines the given default type.
-  ///
-  /// \note This need not lead to the resolution of a type witness.
-  void addDefaultTypeWitness(Type type, AssociatedTypeDecl *defaultedAssocType);
-
-  /// Record the given same-type requirement, if regarded of interest to
-  /// the system.
-  ///
-  /// \note This need not lead to the resolution of a type witness.
-  void addSameTypeRequirement(const Requirement &req);
-
-  void dump(llvm::raw_ostream &out,
-            const NormalProtocolConformance *conformance) const;
-
-private:
-  /// Form an equivalence between the given name variables.
-  void addEquivalence(Identifier name1, Identifier name2);
-
-  /// Merge \p equivClass2 into \p equivClass1.
-  ///
-  /// \note This will delete \p equivClass2 after migrating its members to
-  /// \p equivClass1.
-  void mergeEquivalenceClasses(EquivalenceClass *equivClass1,
-                               const EquivalenceClass *equivClass2);
-
-  /// The result of comparing two resolved types targeting a single equivalence
-  /// class, in terms of their relative impact on solving the system.
-  enum class ResolvedTypeComparisonResult {
-    /// The first resolved type is a better choice than the second one.
-    Better,
-
-    /// The first resolved type is an equivalent or worse choice than the
-    /// second one.
-    EquivalentOrWorse,
-
-    /// Both resolved types are concrete and mutually exclusive.
-    Ambiguity
-  };
-
-  /// Compare the given resolved types as targeting a single equivalence class,
-  /// in terms of the their relative impact on solving the system.
-  static ResolvedTypeComparisonResult compareResolvedTypes(Type ty1, Type ty2);
+  /// Check the entire protocol conformance.
+  void checkConformance();
 };
 
 /// Match the given witness to the given requirement.
@@ -430,11 +195,6 @@ RequirementMatch
 matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
              ProtocolDecl *proto, RootProtocolConformance *conformance,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness);
-
-/// If the given type is a direct reference to an associated type of
-/// the given protocol, return the referenced associated type.
-AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
-                                                     ProtocolDecl *proto);
 
 enum class TypeAdjustment : uint8_t {
   NoescapeToEscaping, NonsendableToSendable
@@ -477,26 +237,4 @@ AssociatedTypeDecl *findDefaultedAssociatedType(
 
 }
 
-namespace llvm {
-
-template<>
-struct DenseMapInfo<swift::ASTContext::MissingWitness> {
-  using MissingWitness = swift::ASTContext::MissingWitness;
-  using RequirementPointerTraits = DenseMapInfo<swift::ValueDecl *>;
-
-  static inline MissingWitness getEmptyKey() {
-    return MissingWitness(RequirementPointerTraits::getEmptyKey(), {});
-  }
-  static inline MissingWitness getTombstoneKey() {
-    return MissingWitness(RequirementPointerTraits::getTombstoneKey(), {});
-  }
-  static inline unsigned getHashValue(MissingWitness missing) {
-    return RequirementPointerTraits::getHashValue(missing.requirement);
-  }
-  static bool isEqual(MissingWitness a, MissingWitness b) {
-    return a.requirement == b.requirement;
-  }
-};
-
-}
 #endif // SWIFT_SEMA_PROTOCOL_H

@@ -11,6 +11,8 @@ distributed actor Fish {
   // expected-error@-1{{distributed actor 'Fish' does not declare ActorSystem it can be used with}}
   // expected-error@-2{{distributed actor 'Fish' does not declare ActorSystem it can be used with}}
   // expected-note@-3{{you can provide a module-wide default actor system by declaring:\ntypealias DefaultDistributedActorSystem = <#ConcreteActorSystem#>}}
+  // expected-error@-4{{type 'Fish' does not conform to protocol 'Encodable'}}
+  // expected-error@-5{{type 'Fish' does not conform to protocol 'Decodable'}}
 
   distributed func tell(_ text: String, by: Fish) {
     // What would the fish say, if it could talk?
