@@ -53,6 +53,7 @@ static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   case StringLiteralInst::Encoding::Bytes: return SIL_BYTES;
   case StringLiteralInst::Encoding::UTF8: return SIL_UTF8;
   case StringLiteralInst::Encoding::ObjCSelector: return SIL_OBJC_SELECTOR;
+  case StringLiteralInst::Encoding::UTF8_OSLOG: return SIL_UTF8_OSLOG;
   }
   llvm_unreachable("bad string encoding");
 }

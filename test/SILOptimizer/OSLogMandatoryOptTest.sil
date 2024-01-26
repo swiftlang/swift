@@ -38,7 +38,7 @@ sil @useFormatString: $@convention(thin) (@guaranteed String) -> ()
 // CHECK-DAG: [[BORROW]] = begin_borrow [[STRINGCONST:%[0-9]+]]
 // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
 // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-// CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+// CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
 // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 sil [ossa] @testConstantFoldingOfStructExtract : $@convention(thin) () -> () {
 bb0:
@@ -98,7 +98,7 @@ bb0:
   dealloc_stack %11 : $*String
   %15 = tuple ()
   return %15 : $()
-    // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "some long message: %llx"
+    // CHECK: [[LIT:%[0-9]+]] = string_literal oslog "some long message: %llx"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST:%[0-9]+]] = apply [[STRINGINIT]]([[LIT]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[STRINGCONST]]
@@ -136,7 +136,7 @@ bb0:
     // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
     // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
     // FIXME: function_ref @extractFormatStringAsOwned will not be removed as of
     // now by OSLogOptimization pass even though it is folded as function calls
     // are not dead-code eliminated.
@@ -177,7 +177,7 @@ bb0:
     // CHECK-DAG {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
     // CHECK-DAG [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK-DAG [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG [[LIT]] = string_literal oslog "test message: %lld"
     // CHECK-DAG destroy_value [[STRINGCONST]] : $String
 }
 
@@ -219,7 +219,7 @@ bb0:
     // CHECK-DAG: [[BORROW2]] = begin_borrow [[STRINGCONST:%[0-9]+]]
     // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
     // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 }
 
@@ -271,12 +271,12 @@ bb5:
     // We must have all string literals at the beginning of the borrowed scope,
     // and destroys of the literals at the end of the borrow scope.
 
-    // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "test message: %lld"
+    // CHECK: [[LIT:%[0-9]+]] = string_literal oslog "test message: %lld"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST:%[0-9]+]] = apply [[STRINGINIT]]([[LIT]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[STRINGCONST]]
 
-    // CHECK: [[LIT2:%[0-9]+]] = string_literal utf8 "test message: %lld"
+    // CHECK: [[LIT2:%[0-9]+]] = string_literal oslog "test message: %lld"
     // CHECK: [[STRINGINIT2:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST2:%[0-9]+]] = apply [[STRINGINIT2]]([[LIT2]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[BORROW2:%[0-9]+]] = begin_borrow [[STRINGCONST2]]
@@ -324,7 +324,7 @@ bb0:
     // CHECK-DAG: [[BORROW]] = begin_borrow [[STRINGCONST:%[0-9]+]]
     // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
     // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 }
 
@@ -532,7 +532,7 @@ bb0:
   %8 = tuple ()
   return %8 : $()
     // The first instance of "ab" will be dead code eliminated.
-    // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "ab"
+    // CHECK: [[LIT:%[0-9]+]] = string_literal oslog "ab"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST:%[0-9]+]] = apply [[STRINGINIT]]([[LIT]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[NUMELEMS:%[0-9]+]] = integer_literal $Builtin.Word, 1

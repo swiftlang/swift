@@ -5878,9 +5878,15 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
 llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                               bool willBeRelativelyAddressed) {
+                                               bool willBeRelativelyAddressed,
+                                               bool useOSLogSection) {
+  useOSLogSection = useOSLogSection &&
+    TargetInfo.OutputObjectFormat == llvm::Triple::MachO;
+
   // Check whether this string already exists.
-  auto &entry = GlobalStrings[data];
+  auto &entry = useOSLogSection ? GlobalOSLogStrings[data] :
+    GlobalStrings[data];
+
   if (entry.second) {
     // FIXME: Clear unnamed_addr if the global will be relative referenced
     // to work around an ld64 bug. rdar://problem/22674524
@@ -5900,9 +5906,12 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     name[i] = '_';
     (llvm::Twine(".nul") + llvm::Twine(i)).toVector(name);
   }
-  
+
+  auto sectionName =
+    useOSLogSection ? "__TEXT,__oslogstring,cstring_literals" : "";
+
   entry = createStringConstant(data, willBeRelativelyAddressed,
-                               /*sectionName*/ "", name);
+                               sectionName, name);
   return entry.second;
 }
 

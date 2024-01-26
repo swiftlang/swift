@@ -2729,6 +2729,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       encoding = StringLiteralInst::Encoding::ObjCSelector;
     } else if (P.Tok.getText() == "bytes") {
       encoding = StringLiteralInst::Encoding::Bytes;
+    } else if (P.Tok.getText() == "oslog") {
+      encoding = StringLiteralInst::Encoding::UTF8_OSLOG;
     } else {
       P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
       return true;

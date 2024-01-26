@@ -60,6 +60,7 @@ fromStableStringEncoding(unsigned value) {
   case SIL_BYTES: return StringLiteralInst::Encoding::Bytes;
   case SIL_UTF8: return StringLiteralInst::Encoding::UTF8;
   case SIL_OBJC_SELECTOR: return StringLiteralInst::Encoding::ObjCSelector;
+  case SIL_UTF8_OSLOG: return StringLiteralInst::Encoding::UTF8_OSLOG;
   default:
     return llvm::None;
   }
