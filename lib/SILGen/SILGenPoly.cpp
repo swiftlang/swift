@@ -5228,7 +5228,9 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                            CanAnyFunctionType inputSubstType,
                            AbstractionPattern outputOrigType,
                            CanAnyFunctionType outputSubstType,
-                           CanType dynamicSelfType) {
+                           CanType dynamicSelfType,
+                           llvm::function_ref<void(SILGenFunction &)> emitProlog
+                               = [](SILGenFunction &){}) {
   PrettyStackTraceSILFunction stackTrace("emitting reabstraction thunk in",
                                          &SGF.F);
   auto thunkType = SGF.F.getLoweredFunctionType();
@@ -5257,6 +5259,8 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
       SGF.emitPrologGlobalActorHop(loc, globalActor);
     }
   }
+
+  emitProlog(SGF);
 
   // Translate the argument values.  Function parameters are
   // contravariant: we want to switch the direction of transformation
@@ -7086,4 +7090,82 @@ void SILGenFunction::emitProtocolWitness(
 
   // Now that we have finished emitting the function, verify it!
   F.verify();
+}
+
+ManagedValue SILGenFunction::emitActorIsolationErasureThunk(
+    SILLocation loc, ManagedValue func,
+    CanAnyFunctionType isolatedType, CanAnyFunctionType nonIsolatedType) {
+  auto globalActor = isolatedType->getGlobalActor();
+
+  assert(globalActor);
+  assert(!nonIsolatedType->getGlobalActor());
+
+  CanSILFunctionType loweredIsolatedType =
+      func.getType().castTo<SILFunctionType>();
+  CanSILFunctionType loweredNonIsolatedType =
+      getLoweredType(nonIsolatedType).castTo<SILFunctionType>();
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "=== Generating actor isolation erasure thunk for:";
+      loweredIsolatedType.dump(llvm::dbgs()); llvm::dbgs() << "\n");
+
+  if (loweredIsolatedType->getPatternSubstitutions()) {
+    loweredIsolatedType = loweredIsolatedType->getUnsubstitutedType(SGM.M);
+    func = B.createConvertFunction(
+        loc, func, SILType::getPrimitiveObjectType(loweredIsolatedType));
+  }
+
+  auto expectedType = loweredNonIsolatedType->getUnsubstitutedType(SGM.M);
+
+  SubstitutionMap interfaceSubs;
+  GenericEnvironment *genericEnv = nullptr;
+  CanType dynamicSelfType;
+
+  auto thunkType = buildThunkType(loweredIsolatedType,
+                                  expectedType,
+                                  isolatedType,
+                                  nonIsolatedType,
+                                  genericEnv,
+                                  interfaceSubs,
+                                  dynamicSelfType);
+
+  auto *thunk = SGM.getOrCreateReabstractionThunk(
+      thunkType, loweredIsolatedType, expectedType, dynamicSelfType,
+      globalActor->getCanonicalType());
+
+  if (thunk->empty()) {
+    thunk->setGenericEnvironment(genericEnv);
+    SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
+
+    buildThunkBody(
+        thunkSGF, loc, AbstractionPattern(isolatedType), isolatedType,
+        AbstractionPattern(nonIsolatedType), nonIsolatedType, dynamicSelfType,
+        [&loc, &globalActor](SILGenFunction &thunkSGF) {
+          auto expectedExecutor =
+              thunkSGF.emitLoadGlobalActorExecutor(globalActor);
+          thunkSGF.emitPreconditionCheckExpectedExecutor(loc, expectedExecutor);
+        });
+
+    SGM.emitLazyConformancesForFunction(thunk);
+  }
+
+  // Create it in the current function.
+  ManagedValue thunkedFn = createPartialApplyOfThunk(
+      *this, loc, thunk, interfaceSubs, dynamicSelfType, loweredNonIsolatedType,
+      func.ensurePlusOne(*this, loc));
+
+  if (expectedType != loweredNonIsolatedType) {
+    auto escapingExpectedType = loweredNonIsolatedType->getWithExtInfo(
+        loweredNonIsolatedType->getExtInfo().withNoEscape(false));
+    thunkedFn = B.createConvertFunction(
+        loc, thunkedFn, SILType::getPrimitiveObjectType(escapingExpectedType));
+  }
+
+  if (loweredIsolatedType->isNoEscape()) {
+    thunkedFn = B.createConvertEscapeToNoEscape(
+        loc, thunkedFn,
+        SILType::getPrimitiveObjectType(loweredNonIsolatedType));
+  }
+
+  return thunkedFn;
 }
