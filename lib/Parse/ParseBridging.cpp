@@ -11,8 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/ParseBridging.h"
+#include "swift/AST/ASTMatcher.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -178,4 +182,38 @@ ParserResult<Stmt> Parser::parseStmtFromSyntaxTree() {
 #else
   llvm_unreachable("ASTGen is not supported");
 #endif
+}
+
+// MARK: ASTGen validation.
+
+namespace {
+
+class Matcher final : public ASTMatcher<Matcher> {
+  const ASTContext &ctx;
+  ASTNode legacyParserResult;
+  ASTNode astgenResult;
+
+public:
+  Matcher(ASTContext &ctx, ASTNode legacyParserResult, ASTNode astgenResult)
+      : ctx(ctx), legacyParserResult(legacyParserResult),
+        astgenResult(astgenResult) {}
+
+  MismatchAction mismatch(ASTNode lhs, ASTNode rhs) const {
+    ctx.Diags.diagnose(this->getLhsMatchingLoc(), diag::astgen_ast_mismatch);
+
+    return MismatchAction::Continue;
+  }
+};
+
+} // end anonymous namespace
+
+void validateGeneratedTypeRepr(BridgedASTContext cContext,
+                               BridgedTypeRepr legacyParserResult,
+                               BridgedTypeRepr astgenResult) {
+  auto &ctx = cContext.unbridged();
+
+  Matcher matcher(ctx, legacyParserResult.unbridged(),
+                  astgenResult.unbridged());
+  matcher.match</*LocatedMismatches=*/true>(legacyParserResult.unbridged(),
+                                            astgenResult.unbridged(), &ctx);
 }

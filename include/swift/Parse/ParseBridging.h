@@ -58,6 +58,14 @@ BridgedTypeRepr BridgedLegacyParser_parseType(BridgedLegacyParser,
                                               BridgedSourceLoc loc,
                                               BridgedDeclContext DC);
 
+/// Validate the `TypeRepr` translated from a `TypeSyntax` by ASTGen against the
+/// `TypeRepr` parsed at it by the legacy parser, and emit errors on unexpected
+/// mismatches.
+SWIFT_NAME("validateGeneratedTypeRepr(_:legacyParserResult:astgenResult:)")
+void validateGeneratedTypeRepr(BridgedASTContext cContext,
+                               BridgedTypeRepr legacyParserResult,
+                               BridgedTypeRepr astgenResult);
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // SWIFT_PARSE_PARSEBRIDGING_H
