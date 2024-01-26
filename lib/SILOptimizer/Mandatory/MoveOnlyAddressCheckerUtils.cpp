@@ -1654,8 +1654,8 @@ struct CopiedLoadBorrowEliminationVisitor
 
 /// Whether an error should be emitted in response to a partial consumption.
 static llvm::Optional<PartialMutationError>
-shouldEmitPartialMutationError(UseState &useState, SILInstruction *user,
-                               SILType useType,
+shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
+                               SILInstruction *user, SILType useType,
                                TypeTreeLeafTypeRange usedBits) {
   SILFunction *fn = useState.getFunction();
 
@@ -1672,18 +1672,19 @@ shouldEmitPartialMutationError(UseState &useState, SILInstruction *user,
   LLVM_DEBUG(llvm::dbgs() << "    Iter Type: " << iterType << '\n'
                           << "    Target Type: " << targetType << '\n');
 
-  if (!fn->getModule().getASTContext().LangOpts.hasFeature(
-          Feature::MoveOnlyPartialConsumption)) {
-    LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption disabled!\n");
-    // If the types equal, just bail early.
-    if (iterType == targetType) {
-      LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
-                                 "without emitting error!\n");
-      return {};
-    }
+  if (iterType == targetType) {
+    LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType! Exiting early "
+                               "without emitting error!\n");
+    return {};
+  }
 
+  auto feature = partialMutationFeature(kind);
+  if (!fn->getModule().getASTContext().LangOpts.hasFeature(feature)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "    " << getFeatureName(feature) << " disabled!\n");
+    // If the types equal, just bail early.
     // Emit the error.
-    return {PartialMutationError::featureDisabled(iterType)};
+    return {PartialMutationError::featureDisabled(iterType, kind)};
   }
 
   LLVM_DEBUG(llvm::dbgs() << "    MoveOnlyPartialConsumption enabled!\n");
@@ -1715,13 +1716,14 @@ shouldEmitPartialMutationError(UseState &useState, SILInstruction *user,
 
 static bool checkForPartialMutation(UseState &useState,
                                     DiagnosticEmitter &diagnosticEmitter,
+                                    PartialMutation::Kind kind,
                                     SILInstruction *user, SILType useType,
                                     TypeTreeLeafTypeRange usedBits,
                                     PartialMutation partialMutateKind) {
   // We walk down from our ancestor to our projection, emitting an error if
   // any of our types have a deinit.
   auto error =
-      shouldEmitPartialMutationError(useState, user, useType, usedBits);
+      shouldEmitPartialMutationError(useState, kind, user, useType, usedBits);
   if (!error)
     return false;
 
@@ -1762,8 +1764,9 @@ void PartialReinitChecker::performPartialReinitChecking(
             initToValues.first, index,
             [&](SILInstruction *consumingInst) -> bool {
               return !checkForPartialMutation(
-                  useState, diagnosticEmitter, initToValues.first,
-                  value->getType(), TypeTreeLeafTypeRange(index, index + 1),
+                  useState, diagnosticEmitter, PartialMutation::Kind::Reinit,
+                  initToValues.first, value->getType(),
+                  TypeTreeLeafTypeRange(index, index + 1),
                   PartialMutation::reinit(*consumingInst));
             });
 
@@ -1797,8 +1800,9 @@ void PartialReinitChecker::performPartialReinitChecking(
             reinitToValues.first, index,
             [&](SILInstruction *consumingInst) -> bool {
               return !checkForPartialMutation(
-                  useState, diagnosticEmitter, reinitToValues.first,
-                  value->getType(), TypeTreeLeafTypeRange(index, index + 1),
+                  useState, diagnosticEmitter, PartialMutation::Kind::Reinit,
+                  reinitToValues.first, value->getType(),
+                  TypeTreeLeafTypeRange(index, index + 1),
                   PartialMutation::reinit(*consumingInst));
             });
         if (emittedError)
@@ -2028,7 +2032,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // If we have a copy_addr, we are either going to have a take or a
     // copy... in either case, this copy_addr /is/ going to be a consuming
     // operation. Make sure to check if we semantically destructure.
-    checkForPartialMutation(useState, diagnosticEmitter, op->getUser(),
+    checkForPartialMutation(useState, diagnosticEmitter,
+                            PartialMutation::Kind::Consume, op->getUser(),
                             op->get()->getType(), *leafRange,
                             PartialMutation::consume());
 
@@ -2223,7 +2228,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     } else {
       // Now that we know that we are going to perform a take, perform a
       // checkForDestructure.
-      checkForPartialMutation(useState, diagnosticEmitter, op->getUser(),
+      checkForPartialMutation(useState, diagnosticEmitter,
+                              PartialMutation::Kind::Consume, op->getUser(),
                               op->get()->getType(), *leafRange,
                               PartialMutation::consume());
 
@@ -2280,7 +2286,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // error.
     unsigned numDiagnostics =
         moveChecker.diagnosticEmitter.getDiagnosticCount();
-    checkForPartialMutation(useState, diagnosticEmitter, op->getUser(),
+    checkForPartialMutation(useState, diagnosticEmitter,
+                            PartialMutation::Kind::Consume, op->getUser(),
                             op->get()->getType(), *leafRange,
                             PartialMutation::consume());
     if (numDiagnostics != moveChecker.diagnosticEmitter.getDiagnosticCount()) {
