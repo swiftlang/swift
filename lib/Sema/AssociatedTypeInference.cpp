@@ -4121,6 +4121,14 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
       auto *better = getBetterConformanceForResolvingTypeWitnesses(
           conformance, requirement);
 
+      if (better == conformance) {
+        LLVM_DEBUG(llvm::dbgs() << "Conformance to " << conformance->getProtocol()
+                                << " is best\n";);
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "Conformance to " << better->getProtocol()
+                                << " is better than " << conformance->getProtocol()
+                                << "\n";);
+      }
       if (better != conformance &&
           !ctx.evaluator.hasActiveRequest(ResolveTypeWitnessesRequest{better})) {
         // Let's try to resolve type witnesses in the better conformance.
