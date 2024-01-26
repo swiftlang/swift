@@ -109,7 +109,7 @@ public typealias CLongDouble = Float80
 #else
 #error("CLongDouble needs to be defined for this FreeBSD architecture")
 #endif
-#elseif $Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
+#elseif $Embedded
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Double
 #endif
