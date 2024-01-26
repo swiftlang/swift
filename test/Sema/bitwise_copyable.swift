@@ -1,7 +1,9 @@
-// RUN: %target-typecheck-verify-swift                   \
-// RUN:     -disable-availability-checking               \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
-// RUN:     -enable-builtin-module                       \
+// RUN: %target-typecheck-verify-swift                       \
+// RUN:     -disable-availability-checking                   \
+// RUN:     -enable-experimental-feature NonescapableTypes   \
+// RUN:     -enable-experimental-feature NoncopyableGenerics \
+// RUN:     -enable-experimental-feature BitwiseCopyable     \
+// RUN:     -enable-builtin-module                           \
 // RUN:     -debug-diagnostic-names
 
 //==============================================================================
@@ -154,8 +156,8 @@ func passAnyAny(_ a: any Any) { take3(a) } // expected-error {{type_does_not_con
 func passString(_ s: String) { take3(s) } // expected-error    {{type_does_not_conform_decl_owner}}
                                           // expected-note@-17 {{where_requirement_failure_one_subst}}
 
-extension Optional {
-  struct Some : _BitwiseCopyable {
+extension Optional where Wrapped : Copyable & Escapable {
+  struct Some : _BitwiseCopyable & Copyable & Escapable {
     var wrapped: Wrapped // expected-error {{non_bitwise_copyable_type_member}}
   }
 }
@@ -184,8 +186,12 @@ struct S_Explicit_With_2_BitwiseCopyable_Generic_Optional<T : _BitwiseCopyable> 
   var o2: T?
 }
 
+struct S_Explicit_Nonescapable : ~Escapable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_nonescapable}}
+
+struct S_Explicit_Noncopyable : ~Copyable, _BitwiseCopyable {} // expected-error{{non_bitwise_copyable_type_noncopyable}}
+
 //==============================================================================
-//==========================STDLIB-DEPENDENCY TESTS=(BEGIN)==================={{
+//==========================STDLIB-DEPENDENCY TESTS=(END)=====================}}
 //==============================================================================
 
 //==============================================================================
