@@ -430,7 +430,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx,
+  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker,
                  DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
@@ -840,6 +840,9 @@ private:
   /// DWARFImporter delegate.
   bool DisableSourceImport;
   
+  /// File dependency tracker, if installed.
+  DependencyTracker *SwiftDependencyTracker = nullptr;
+
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 

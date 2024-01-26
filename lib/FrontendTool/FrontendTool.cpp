@@ -418,7 +418,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
         Invocation.getOutputFilename(),
-        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        /* shouldSerializeDeps */ true,
         Invocation.getSearchPathOptions().CandidateCompiledModules);
   else
     return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(

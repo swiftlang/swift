@@ -433,7 +433,7 @@ ClangImporter::ClangImporter(ASTContext &ctx,
                              DependencyTracker *tracker,
                              DWARFImporterDelegate *dwarfImporterDelegate)
     : ClangModuleLoader(tracker),
-      Impl(*new Implementation(ctx, dwarfImporterDelegate)) {
+      Impl(*new Implementation(ctx, tracker, dwarfImporterDelegate)) {
 }
 
 ClangImporter::~ClangImporter() {
@@ -2252,6 +2252,22 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     (void) namelookup::getAllImports(result);
   }
 
+  // Register '.h' inputs of each Clang module dependency with
+  // the dependency tracker. In implicit builds such dependencies are registered
+  // during the on-demand construction of Clang module. In Explicit Module
+  // Builds, since we load pre-built PCMs directly, we do not get to do so. So
+  // instead, manually register all `.h` inputs of Clang module dependnecies.
+  if (SwiftDependencyTracker &&
+      !Instance->getInvocation().getLangOpts().ImplicitModules) {
+    auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
+        clangModule->getASTFile());
+    Instance->getASTReader()->visitInputFileInfos(
+        *moduleFile, /*IncludeSystem=*/true,
+        [&](const clang::serialization::InputFileInfo &IFI, bool isSystem) {
+          SwiftDependencyTracker->addDependency(IFI.Filename, isSystem);
+        });
+  }
+
   if (clangModule->isSubModule()) {
     finishLoadingClangModule(clangModule->getTopLevelModule(), importLoc);
   } else {
@@ -2452,7 +2468,8 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 }
 
 ClangImporter::Implementation::Implementation(
-    ASTContext &ctx, DWARFImporterDelegate *dwarfImporterDelegate)
+    ASTContext &ctx, DependencyTracker *dependencyTracker,
+    DWARFImporterDelegate *dwarfImporterDelegate)
     : SwiftContext(ctx), ImportForwardDeclarations(
                              ctx.ClangImporterOpts.ImportForwardDeclarations),
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
@@ -2468,6 +2485,7 @@ ClangImporter::Implementation::Implementation(
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
+      SwiftDependencyTracker(dependencyTracker),
       DWARFImporter(dwarfImporterDelegate) {}
 
 ClangImporter::Implementation::~Implementation() {
