@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/LibPrespecialized.h"
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -366,6 +367,10 @@ namespace {
 
     AllocationResult allocate(const TypeContextDescriptor *description,
                               const void * const *arguments) {
+      if (auto *prespecialized =
+              getLibPrespecializedMetadata(description, arguments))
+        return {prespecialized, PrivateMetadataState::Complete};
+
       // Find a pattern.  Currently we always use the default pattern.
       auto &generics = description->getFullGenericContextHeader();
       auto pattern = generics.DefaultInstantiationPattern.get();

@@ -135,6 +135,8 @@ class BuildScriptInvocation(object):
             '--build-swift-libexec', str(args.build_swift_libexec).lower(),
             '--swift-enable-backtracing', str(args.swift_enable_backtracing).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
+            '--build-swift-external-generic-metadata-builder', str(
+                args.build_swift_external_generic_metadata_builder).lower(),
         ]
 
         # Compute any product specific cmake arguments.

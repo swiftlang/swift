@@ -151,7 +151,7 @@ template <typename Runtime>
 struct TargetTypeMetadataHeaderBase {
   /// A pointer to the value-witnesses for this type.  This is only
   /// present for type metadata.
-  TargetPointer<Runtime, const ValueWitnessTable> ValueWitnesses;
+  TargetPointer<Runtime, const TargetValueWitnessTable<Runtime>> ValueWitnesses;
 };
 
 template <typename Runtime>
@@ -329,7 +329,7 @@ public:
     return asFullMetadata(this)->layoutString;
   }
 
-  const ValueWitnessTable *getValueWitnesses() const {
+  const TargetValueWitnessTable<Runtime> *getValueWitnesses() const {
     return asFullMetadata(this)->ValueWitnesses;
   }
 
@@ -2979,7 +2979,7 @@ template <typename Runtime>
 struct swift_ptrauth_struct_context_descriptor(ModuleContextDescriptor)
     TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
   /// The module name.
-  RelativeDirectPointer<const char, /*nullable*/ false> Name;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
 
   /// Is this module a special C-imported module?
   bool isCImportedContext() const {
@@ -3036,7 +3036,7 @@ public:
   ///
   /// Note that the Parent of the extension will be the module context the
   /// extension is declared inside.
-  RelativeDirectPointer<const char> ExtendedContext;
+  TargetRelativeDirectPointer<Runtime, const char> ExtendedContext;
 
   using TrailingGenericContextObjects::getGenericContext;
 
@@ -3527,10 +3527,10 @@ struct TargetGenericValueMetadataPattern final :
 
   /// The value-witness table.  Indirectable so that we can re-use tables
   /// from other libraries if that seems wise.
-  TargetRelativeIndirectablePointer<Runtime, const ValueWitnessTable>
+  TargetRelativeIndirectablePointer<Runtime, const TargetValueWitnessTable<Runtime>>
     ValueWitnesses;
 
-  const ValueWitnessTable *getValueWitnessesPattern() const {
+  const TargetValueWitnessTable<Runtime> *getValueWitnessesPattern() const {
     return ValueWitnesses.get();
   }
 
@@ -3825,9 +3825,11 @@ public:
                               /*Nullable*/ true> AccessFunctionPtr;
   
   /// A pointer to the field descriptor for the type, if any.
-  TargetRelativeDirectPointer<Runtime, const reflection::FieldDescriptor,
-                              /*nullable*/ true> Fields;
-      
+  TargetRelativeDirectPointer<Runtime,
+                              const reflection::TargetFieldDescriptor<Runtime>,
+                              /*nullable*/ true>
+      Fields;
+
   bool isReflectable() const { return (bool)Fields; }
 
   MetadataAccessFunction getAccessFunction() const {

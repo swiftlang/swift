@@ -147,6 +147,7 @@ KNOWN_SETTINGS=(
     build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
     build-swift-examples                          "1"               "set to 1 to build examples"
     build-swift-remote-mirror                     "1"               "set to 1 to build the Swift Remote Mirror library"
+    build-swift-external-generic-metadata-builder "1"               "set to 1 to build the Swift External Generic Metadata Builder library"
     build-swift-static-sdk-overlay                ""                "set to 1 to build static variants of the Swift SDK overlay"
     build-swift-static-stdlib                     ""                "set to 1 to build static variants of the Swift standard library"
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
@@ -1861,6 +1862,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
                     -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
+                    -DSWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER:BOOL=$(true_false "${BUILD_SWIFT_EXTERNAL_GENERIC_METADATA_BUILDER}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
                     -DSWIFT_ENABLE_ARRAY_COW_CHECKS:BOOL=$(true_false "${ENABLE_ARRAY_COW_CHECKS}")

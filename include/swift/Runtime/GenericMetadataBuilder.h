@@ -16,6 +16,7 @@
 
 #ifndef SWIFT_RUNTIME_GENERIC_METADATA_BUILDER_H
 #define SWIFT_RUNTIME_GENERIC_METADATA_BUILDER_H
+
 #include "swift/ABI/Metadata.h"
 #include "swift/Basic/MathUtils.h"
 #include "swift/Demangling/TypeLookupError.h"
@@ -26,8 +27,16 @@
 #include <string>
 #include <variant>
 
+// Use __FILE_NAME__ for logs when it's available, __FILE__ as a fallback.
+#ifdef __FILE_NAME__
+#define METADATA_BUILDER_LOG_FILE_NAME __FILE_NAME__
+#else
+#define METADATA_BUILDER_LOG_FILE_NAME __FILE__
+#endif
+
 #define METADATA_BUILDER_LOG(...)                                              \
-  readerWriter.log(__FILE_NAME__, __LINE__, __func__, __VA_ARGS__)
+  readerWriter.log(METADATA_BUILDER_LOG_FILE_NAME, __LINE__, __func__,         \
+                   __VA_ARGS__)
 
 namespace swift {
 
@@ -49,7 +58,7 @@ public:
   BuilderError(char *string) : errorString(string) {}
 
   /// Make a BuilderError using a standard printf format string and arguments.
-  [[gnu::format(printf, 2, 3)]] BuilderError(const char *fmt, ...) {
+  SWIFT_FORMAT(2, 3) BuilderError(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -99,24 +108,24 @@ public:
   /// Get a pointer to the wrapped error, or NULL if the value is a success
   /// value.
   BuilderError *getError() { return std::get_if<BuilderError>(&storage); }
-};
 
-/// This macro takes a value of BuilderErrorOr<T>. and produces an expression of
-/// type T. If this value is success, then the value of the expression is the
-/// wrapped success value. If it's an error, then this expression immediately
-/// returns the error from the enclosing function. This works by doing a return
-/// from the middle of a statement expression, which is scary, but works. We
-/// ultimately end up with something that looks a bit like a Swift `try`
-/// expression. Like Swift, we avoid using exceptions to propagate the error.
-#pragma clang diagnostic ignored                                               \
-    "-Wgnu-statement-expression-from-macro-expansion"
-#define ERROR_CHECK(errorOrT)                                                  \
-  ({                                                                           \
-    auto error_check_tmp = (errorOrT);                                         \
-    if (auto *error = error_check_tmp.getError())                              \
-      return *error;                                                           \
-    *error_check_tmp.getValue();                                               \
-  })
+  /// Allow manipulating the value with ->. `this` must not contain an error.
+  T *operator->() {
+    T *ptr = getValue();
+    assert(ptr);
+    return ptr;
+  }
+
+  /// Get the value using *. `this` must not contain an error.
+  T &operator*() {
+    T *ptr = getValue();
+    assert(ptr);
+    return *ptr;
+  }
+
+  /// Objects are truthy if they contain a value, falsy for errors.
+  operator bool() { return getValue() != nullptr; }
+};
 
 /// A generic metadata builder. This is templatized on a ReaderWriter, which
 /// abstracts the various operations we need for building generic metadata, such
@@ -194,9 +203,10 @@ class GenericMetadataBuilder {
   template <typename DescriptorType>
   BuilderErrorOr<const char *>
   getDescriptorName(Buffer<DescriptorType> descriptionBuffer) {
-    auto name = ERROR_CHECK(
-        descriptionBuffer.resolvePointer(&descriptionBuffer.ptr->Name));
-    return name.ptr ? name.ptr : "<unknown>";
+    auto name = descriptionBuffer.resolvePointer(&descriptionBuffer.ptr->Name);
+    if (!name)
+      return *name.getError();
+    return name->ptr ? name->ptr : "<unknown>";
   }
 
   /// Utility function for getting the location of an offset into a given
@@ -278,13 +288,13 @@ public:
           "Writing %" PRIu16 " words of extra data from offset %" PRIu16,
           extraDataPattern->SizeInWords, extraDataPattern->OffsetInWords);
       auto patternPointers =
-          ERROR_CHECK(patternBuffer.resolvePointer(&extraDataPattern->Pattern));
+          patternBuffer.resolvePointer(&extraDataPattern->Pattern);
       for (unsigned i = 0; i < extraDataPattern->SizeInWords; i++) {
-        auto patternPointer = ERROR_CHECK(
-            patternPointers.resolvePointer(&patternPointers.ptr[i]));
+        auto patternPointer =
+            patternPointers->resolvePointer(&patternPointers->ptr[i]);
         data.writePointer(
             &metadataExtraData[i + extraDataPattern->OffsetInWords],
-            patternPointer.template cast<const StoredPointer>());
+            patternPointer->template cast<const StoredPointer>());
       }
     }
 
@@ -292,9 +302,9 @@ public:
     // The various initialization functions will instantiate this as
     // necessary.
     auto valueWitnesses =
-        ERROR_CHECK(patternBuffer.resolvePointer(&pattern->ValueWitnesses));
+        patternBuffer.resolvePointer(&pattern->ValueWitnesses);
     METADATA_BUILDER_LOG("Setting initial value witnesses");
-    data.writePointer(&fullMetadata->ValueWitnesses, valueWitnesses);
+    data.writePointer(&fullMetadata->ValueWitnesses, *valueWitnesses);
 
     // Set the metadata kind.
     METADATA_BUILDER_LOG("Setting metadata kind %#x",
@@ -313,9 +323,11 @@ public:
   installGenericArguments(WritableData<FullMetadata<Metadata>> data,
                           Size metadataOffset,
                           Buffer<const ValueTypeDescriptor> descriptionBuffer,
-                          const GenericArgument *arguments) {
-    METADATA_BUILDER_LOG("Building %s",
-                         ERROR_CHECK(getDescriptorName(descriptionBuffer)));
+                          llvm::ArrayRef<GenericArgument> arguments) {
+    auto name = getDescriptorName(descriptionBuffer);
+    if (!name)
+      return *name.getError();
+    METADATA_BUILDER_LOG("Building %s", *name);
     char *metadataBase = reinterpret_cast<char *>(data.ptr);
     auto metadata =
         reinterpret_cast<ValueMetadata *>(metadataBase + metadataOffset);
@@ -325,6 +337,11 @@ public:
         (reinterpret_cast<Pointer<const Metadata> *>(metadata) +
          getGenericArgumentOffset(
              descriptionBuffer.template cast<const TypeContextDescriptor>()));
+
+    if (arguments.size() < header.NumKeyArguments) {
+      return BuilderError("Not enough generic arguments, %zu provided, %" PRId32 " required", arguments.size(), header.NumKeyArguments);
+    }
+
     METADATA_BUILDER_LOG(
         "Installing %" PRIu16 " generic arguments at offset %" PRId32,
         header.NumKeyArguments,
@@ -353,7 +370,7 @@ public:
   /// Allocate and build a metadata structure.
   BuilderErrorOr<ConstructedMetadata>
   buildGenericMetadata(Buffer<const TypeContextDescriptor> descriptionBuffer,
-                       const GenericArgument *arguments,
+                       llvm::ArrayRef<GenericArgument> arguments,
                        Buffer<const GenericMetadataPattern> patternBuffer,
                        size_t extraDataSize) {
     auto description = descriptionBuffer.ptr;
@@ -377,7 +394,7 @@ public:
 
   BuilderErrorOr<ConstructedMetadata> buildGenericValueMetadata(
       Buffer<const ValueTypeDescriptor> descriptionBuffer,
-      const GenericArgument *arguments,
+      llvm::ArrayRef<GenericArgument> arguments,
       Buffer<const GenericValueMetadataPattern> patternBuffer,
       size_t extraDataSize) {
     auto *pattern = patternBuffer.ptr;
@@ -393,12 +410,16 @@ public:
         readerWriter.template allocate<FullMetadata<Metadata>>(totalSize);
     auto metadataOffset = sizeof(typename ValueMetadata::HeaderType);
 
-    ERROR_CHECK(initializeValueMetadataFromPattern(
-        metadataBuffer, metadataOffset, descriptionBuffer, patternBuffer));
+    auto initializeResult = initializeValueMetadataFromPattern(
+        metadataBuffer, metadataOffset, descriptionBuffer, patternBuffer);
+    if (!initializeResult)
+      return *initializeResult.getError();
 
     // Copy the generic arguments into place.
-    ERROR_CHECK(installGenericArguments(metadataBuffer, metadataOffset,
-                                        descriptionBuffer, arguments));
+    auto installResult = installGenericArguments(metadataBuffer, metadataOffset,
+                                                 descriptionBuffer, arguments);
+    if (!installResult)
+      return *installResult.getError();
 
     return ConstructedMetadata{metadataBuffer,
                                static_cast<Size>(metadataOffset)};
@@ -416,26 +437,36 @@ public:
           static_cast<uint32_t>(metadataBuffer.ptr->getKind()));
 
     auto descriptionBuffer =
-        ERROR_CHECK(metadataBuffer.resolvePointer(&valueMetadata->Description));
-    auto patternBuffer = ERROR_CHECK(descriptionBuffer.resolvePointer(
-        &descriptionBuffer.ptr->getFullGenericContextHeader()
-             .DefaultInstantiationPattern));
-    auto completionFunction = ERROR_CHECK(patternBuffer.resolveFunctionPointer(
-        &patternBuffer.ptr->CompletionFunction));
+        metadataBuffer.resolvePointer(&valueMetadata->Description);
+    if (!descriptionBuffer)
+      return *descriptionBuffer.getError();
+    auto patternBuffer = descriptionBuffer->resolvePointer(
+        &descriptionBuffer->ptr->getFullGenericContextHeader()
+             .DefaultInstantiationPattern);
+    if (!patternBuffer)
+      return *patternBuffer.getError();
+    auto completionFunction = patternBuffer->resolveFunctionPointer(
+        &patternBuffer->ptr->CompletionFunction);
+    if (!completionFunction)
+      return *completionFunction.getError();
 
-    if (completionFunction.isNull()) {
+    if (completionFunction->isNull()) {
       METADATA_BUILDER_LOG(
           "Type has no completion function, skipping initialization");
       return {{}};
     }
 
-    if (auto structmd = llvm::dyn_cast<StructMetadata>(metadata))
-      ERROR_CHECK(initializeStructMetadata(metadataBuffer, structmd,
-                                           metadataMangleNode));
-    else if (auto enummd = llvm::dyn_cast<EnumMetadata>(metadata))
-      ERROR_CHECK(
-          initializeEnumMetadata(metadataBuffer, enummd, metadataMangleNode));
-    else
+    if (auto structmd = llvm::dyn_cast<StructMetadata>(metadata)) {
+      auto result = initializeStructMetadata(metadataBuffer, structmd,
+                                             metadataMangleNode);
+      if (!result)
+        return *result.getError();
+    } else if (auto enummd = llvm::dyn_cast<EnumMetadata>(metadata)) {
+      auto result =
+          initializeEnumMetadata(metadataBuffer, enummd, metadataMangleNode);
+      if (!result)
+        return *result.getError();
+    } else
       return BuilderError(
           "Don't know how to initialize metadata kind %#" PRIx32,
           static_cast<uint32_t>(metadataBuffer.ptr->getKind()));
@@ -455,9 +486,10 @@ public:
           Buffer<const ValueWitnessTable> from) {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID)                                      \
-  auto LOWER_ID##_Buffer =                                                     \
-      ERROR_CHECK(from.resolveFunctionPointer(&from.ptr->LOWER_ID));           \
-  vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->LOWER_ID, LOWER_ID##_Buffer);
+  auto LOWER_ID##_Buffer = from.resolveFunctionPointer(&from.ptr->LOWER_ID);   \
+  if (!LOWER_ID##_Buffer)                                                      \
+    return *LOWER_ID##_Buffer.getError();                                      \
+  vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->LOWER_ID, *LOWER_ID##_Buffer);
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
 
@@ -488,56 +520,98 @@ public:
         METADATA_BUILDER_LOG("Uncommon layout case, flags.isInlineStorage=%s",
                              flags.isInlineStorage() ? "true" : "false");
         if (flags.isInlineStorage()) {
+          if (!pod_direct_initializeBufferWithCopyOfBuffer)
+            return *pod_direct_initializeBufferWithCopyOfBuffer.getError();
           vwtBuffer.writeFunctionPointer(
               &vwtBuffer.ptr->initializeBufferWithCopyOfBuffer,
-              ERROR_CHECK(pod_direct_initializeBufferWithCopyOfBuffer));
+              *pod_direct_initializeBufferWithCopyOfBuffer);
         } else {
+          if (!pod_indirect_initializeBufferWithCopyOfBuffer)
+            return *pod_indirect_initializeBufferWithCopyOfBuffer.getError();
           vwtBuffer.writeFunctionPointer(
               &vwtBuffer.ptr->initializeBufferWithCopyOfBuffer,
-              ERROR_CHECK(pod_indirect_initializeBufferWithCopyOfBuffer));
+              *pod_indirect_initializeBufferWithCopyOfBuffer);
         }
-        vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->destroy,
-                                       ERROR_CHECK(pod_destroy));
+        if (!pod_destroy)
+          return *pod_destroy.getError();
+        if (!pod_copy)
+          return *pod_copy.getError();
+        vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->destroy, *pod_destroy);
         vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->initializeWithCopy,
-                                       ERROR_CHECK(pod_copy));
+                                       *pod_copy);
         vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->initializeWithTake,
-                                       ERROR_CHECK(pod_copy));
+                                       *pod_copy);
         vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->assignWithCopy,
-                                       ERROR_CHECK(pod_copy));
+                                       *pod_copy);
         vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->assignWithTake,
-                                       ERROR_CHECK(pod_copy));
+                                       *pod_copy);
         // getEnumTagSinglePayload and storeEnumTagSinglePayload are not
         // interestingly optimizable based on POD-ness.
         return {{}};
 
-      case sizeWithAlignmentMask(1, 0, 0):
+      case sizeWithAlignmentMask(1, 0, 0): {
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(1, 0, 0)");
-        ERROR_CHECK(copyVWT(vwtBuffer, ERROR_CHECK(VWT_Bi8_)));
+        if (!VWT_Bi8_)
+          return *VWT_Bi8_.getError();
+        auto result = copyVWT(vwtBuffer, *VWT_Bi8_);
+        if (!result)
+          return *result.getError();
         break;
-      case sizeWithAlignmentMask(2, 1, 0):
+      }
+      case sizeWithAlignmentMask(2, 1, 0): {
+        if (!VWT_Bi16_)
+          return *VWT_Bi16_.getError();
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(2, 1, 0)");
-        ERROR_CHECK(copyVWT(vwtBuffer, ERROR_CHECK(VWT_Bi16_)));
+        auto result = copyVWT(vwtBuffer, *VWT_Bi16_);
+        if (!result)
+          return *result.getError();
         break;
-      case sizeWithAlignmentMask(4, 3, 0):
+      }
+      case sizeWithAlignmentMask(4, 3, 0): {
+        if (!VWT_Bi32_)
+          return *VWT_Bi32_.getError();
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(4, 3, 0)");
-        ERROR_CHECK(copyVWT(vwtBuffer, ERROR_CHECK(VWT_Bi32_)));
+        auto result = copyVWT(vwtBuffer, *VWT_Bi32_);
+        if (!result)
+          return *result.getError();
         break;
-      case sizeWithAlignmentMask(8, 7, 0):
+      }
+      case sizeWithAlignmentMask(8, 7, 0): {
+        if (!VWT_Bi64_)
+          return *VWT_Bi64_.getError();
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(8, 7, 0)");
-        ERROR_CHECK(copyVWT(vwtBuffer, ERROR_CHECK(VWT_Bi64_)));
+        auto result = copyVWT(vwtBuffer, *VWT_Bi64_);
+        if (!result)
+          return *result.getError();
         break;
-      case sizeWithAlignmentMask(16, 15, 0):
+      }
+      case sizeWithAlignmentMask(16, 15, 0): {
+        if (!VWT_Bi128_)
+          return *VWT_Bi128_.getError();
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(16, 15, 0)");
-        ERROR_CHECK(copyVWT(vwtBuffer, ERROR_CHECK(VWT_Bi128_)));
+        auto result = copyVWT(vwtBuffer, *VWT_Bi128_);
+        if (!result)
+          return *result.getError();
         break;
-      case sizeWithAlignmentMask(32, 31, 0):
+      }
+      case sizeWithAlignmentMask(32, 31, 0): {
+        if (!VWT_Bi256_)
+          return *VWT_Bi256_.getError();
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(32, 31, 0)");
-        ERROR_CHECK(copyVWT(vwtBuffer, ERROR_CHECK(VWT_Bi256_)));
+        auto result = copyVWT(vwtBuffer, *VWT_Bi256_);
+        if (!result)
+          return *result.getError();
         break;
-      case sizeWithAlignmentMask(64, 63, 0):
+      }
+      case sizeWithAlignmentMask(64, 63, 0): {
+        if (!VWT_Bi512_)
+          return *VWT_Bi512_.getError();
         METADATA_BUILDER_LOG("case sizeWithAlignmentMask(64, 63, 0)");
-        ERROR_CHECK(copyVWT(vwtBuffer, ERROR_CHECK(VWT_Bi512_)));
+        auto result = copyVWT(vwtBuffer, *VWT_Bi512_);
+        if (!result)
+          return *result.getError();
         break;
+      }
       }
 
       return {{}};
@@ -547,8 +621,10 @@ public:
       METADATA_BUILDER_LOG(
           "Is bitwise takable, setting pod_copy as initializeWithTake");
       // Use POD value witnesses for operations that do an initializeWithTake.
+      if (!pod_copy)
+        return *pod_copy.getError();
       vwtBuffer.writeFunctionPointer(&vwtBuffer.ptr->initializeWithTake,
-                                     ERROR_CHECK(pod_copy));
+                                     *pod_copy);
     }
     return {{}};
   }
@@ -561,13 +637,17 @@ public:
     METADATA_BUILDER_LOG("Initializing struct");
 
     auto descriptionBuffer =
-        ERROR_CHECK(metadataBuffer.resolvePointer(&metadata->Description));
+        metadataBuffer.resolvePointer(&metadata->Description);
+    if (!descriptionBuffer)
+      return *descriptionBuffer.getError();
     auto description =
-        reinterpret_cast<const StructDescriptor *>(descriptionBuffer.ptr);
+        reinterpret_cast<const StructDescriptor *>(descriptionBuffer->ptr);
 
     auto fieldDescriptorBuffer =
-        ERROR_CHECK(descriptionBuffer.resolvePointer(&description->Fields));
-    auto fieldDescriptor = fieldDescriptorBuffer.ptr;
+        descriptionBuffer->resolvePointer(&description->Fields);
+    if (!fieldDescriptorBuffer)
+      return *fieldDescriptorBuffer.getError();
+    auto fieldDescriptor = fieldDescriptorBuffer->ptr;
     auto fields = fieldDescriptor->getFields();
     METADATA_BUILDER_LOG("%zu fields", fields.size());
 
@@ -587,25 +667,32 @@ public:
 
     for (unsigned i = 0; i != fields.size(); ++i) {
       auto &field = fields[i];
-      auto nameBuffer =
-          ERROR_CHECK(fieldDescriptorBuffer.resolvePointer(&field.FieldName));
-      auto mangledTypeNameBuffer = ERROR_CHECK(
-          fieldDescriptorBuffer.resolvePointer(&field.MangledTypeName));
+      auto nameBuffer = fieldDescriptorBuffer->resolvePointer(&field.FieldName);
+      if (!nameBuffer)
+        return *nameBuffer.getError();
+      auto mangledTypeNameBuffer =
+          fieldDescriptorBuffer->resolvePointer(&field.MangledTypeName);
+      if (!mangledTypeNameBuffer)
+        return *mangledTypeNameBuffer.getError();
       auto mangledTypeName = swift::Demangle::makeSymbolicMangledNameStringRef(
-          mangledTypeNameBuffer.ptr);
+          mangledTypeNameBuffer->ptr);
       METADATA_BUILDER_LOG(
           "Examining field %u '%s' type '%.*s' (mangled name is %zu bytes)", i,
-          nameBuffer.ptr, (int)mangledTypeName.size(), mangledTypeName.data(),
+          nameBuffer->ptr, (int)mangledTypeName.size(), mangledTypeName.data(),
           mangledTypeName.size());
 
-      auto fieldTypeBuffer = ERROR_CHECK(readerWriter.getTypeByMangledName(
-          metadataBuffer, metadataMangleNode, mangledTypeName));
-      auto *fieldType = fieldTypeBuffer.ptr;
+      auto fieldTypeBuffer = readerWriter.getTypeByMangledName(
+          metadataBuffer, metadataMangleNode, mangledTypeName);
+      if (!fieldTypeBuffer)
+        return *fieldTypeBuffer.getError();
+      auto *fieldType = fieldTypeBuffer->ptr;
       METADATA_BUILDER_LOG("Looked up field type metadata %p", fieldType);
 
-      auto fieldWitnessTableBuffer = ERROR_CHECK(fieldTypeBuffer.resolvePointer(
-          &asFullMetadata(fieldType)->ValueWitnesses));
-      auto *fieldWitnessTable = fieldWitnessTableBuffer.ptr;
+      auto fieldWitnessTableBuffer = fieldTypeBuffer->resolvePointer(
+          &asFullMetadata(fieldType)->ValueWitnesses);
+      if (!fieldWitnessTableBuffer)
+        return *fieldWitnessTableBuffer.getError();
+      auto *fieldWitnessTable = fieldWitnessTableBuffer->ptr;
       auto *fieldLayout = fieldWitnessTable->getTypeLayout();
       size = roundUpToAlignMask(size, fieldLayout->flags.getAlignmentMask());
 
@@ -637,15 +724,17 @@ public:
     layout.extraInhabitantCount = extraInhabitantCount;
     layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 
-    auto oldVWTBuffer = ERROR_CHECK(metadataBuffer.resolvePointer(
-        &asFullMetadata(metadata)->ValueWitnesses));
-    auto *oldVWT = oldVWTBuffer.ptr;
+    auto oldVWTBuffer = metadataBuffer.resolvePointer(
+        &asFullMetadata(metadata)->ValueWitnesses);
+    if (!oldVWTBuffer)
+      return *oldVWTBuffer.getError();
+    auto *oldVWT = oldVWTBuffer->ptr;
 
     if (readerWriter.isLoggingEnabled()) {
-      auto info = readerWriter.getSymbolInfo(oldVWTBuffer);
+      auto info = readerWriter.getSymbolInfo(*oldVWTBuffer);
       METADATA_BUILDER_LOG("Initializing new VWT from old VWT %#" PRIx64
                            " - %s (%s + %" PRIu64 ")",
-                           oldVWTBuffer.getAddress(), info.symbolName.c_str(),
+                           oldVWTBuffer->getAddress(), info.symbolName.c_str(),
                            info.libraryName.c_str(), info.pointerOffset);
     }
 
@@ -662,12 +751,17 @@ public:
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)                           \
   // This macro intentionally left blank.
 #define FUNCTION_VALUE_WITNESS(LOWER_ID, UPPER_ID, RETURN_TYPE, PARAM_TYPES)   \
-  newVWTData.writeFunctionPointer(                                             \
-      &newVWT->LOWER_ID,                                                       \
-      ERROR_CHECK(oldVWTBuffer.resolveFunctionPointer(&oldVWT->LOWER_ID)));
+  {                                                                            \
+    auto fptr = oldVWTBuffer->resolveFunctionPointer(&oldVWT->LOWER_ID);       \
+    if (!fptr)                                                                 \
+      return *fptr.getError();                                                 \
+    newVWTData.writeFunctionPointer(&newVWT->LOWER_ID, *fptr);                 \
+  }
 #include "swift/ABI/ValueWitness.def"
 
-    ERROR_CHECK(installCommonValueWitnesses(layout, newVWTData));
+    auto installResult = installCommonValueWitnesses(layout, newVWTData);
+    if (!installResult)
+      return *installResult.getError();
 
     newVWT->size = layout.size;
     newVWT->stride = layout.stride;
@@ -694,8 +788,8 @@ public:
   BuilderErrorOr<size_t>
   extraDataSize(Buffer<const TypeContextDescriptor> descriptionBuffer,
                 Buffer<const GenericMetadataPattern> patternBuffer) {
-    METADATA_BUILDER_LOG("Getting extra data size for %s",
-                         ERROR_CHECK(getDescriptorName(descriptionBuffer)));
+    auto name = getDescriptorName(descriptionBuffer);
+    METADATA_BUILDER_LOG("Getting extra data size for %s", *name);
 
     auto *pattern = patternBuffer.ptr;
 
@@ -801,20 +895,31 @@ public:
 
       auto fullMetadata = asFullMetadata(metadataBuffer.ptr);
 
-      auto valueWitnesses = ERROR_CHECK(
-          metadataBuffer.resolvePointer(&fullMetadata->ValueWitnesses));
-      printPointer("  value witnesses: ", valueWitnesses);
-      ERROR_CHECK(dumpVWT(valueWitnesses));
+      auto valueWitnesses =
+          metadataBuffer.resolvePointer(&fullMetadata->ValueWitnesses);
+      if (!valueWitnesses)
+        return *valueWitnesses.getError();
+      printPointer("  value witnesses: ", *valueWitnesses);
+      auto dumpResult = dumpVWT(*valueWitnesses);
+      if (!dumpResult)
+        return *dumpResult.getError();
 
       auto kind = fullMetadata->getKind();
       auto kindString = getStringForMetadataKind(kind);
       print("  kind: %#" PRIx32 " (%s)\n", static_cast<uint32_t>(kind),
             kindString.str().c_str());
 
-      if (auto classmd = llvm::dyn_cast<ClassMetadataType>(metadataBuffer.ptr))
-        ERROR_CHECK(dumpClassMetadata(metadataBuffer, classmd));
-      else if (auto valuemd = llvm::dyn_cast<ValueMetadata>(metadataBuffer.ptr))
-        ERROR_CHECK(dumpValueMetadata(metadataBuffer, valuemd));
+      if (auto classmd =
+              llvm::dyn_cast<ClassMetadataType>(metadataBuffer.ptr)) {
+        auto dumpResult = dumpClassMetadata(metadataBuffer, classmd);
+        if (!dumpResult)
+          return *dumpResult.getError();
+      } else if (auto valuemd =
+                     llvm::dyn_cast<ValueMetadata>(metadataBuffer.ptr)) {
+        auto dumpResult = dumpValueMetadata(metadataBuffer, valuemd);
+        if (!dumpResult)
+          return *dumpResult.getError();
+      }
 
       return {{}};
     }
@@ -829,25 +934,36 @@ public:
     dumpValueMetadata(Buffer<const Metadata> metadataBuffer,
                       const ValueMetadata *metadata) {
       auto descriptionBuffer =
-          ERROR_CHECK(metadataBuffer.resolvePointer(&metadata->Description));
-      auto description = descriptionBuffer.ptr;
-      printPointer("  description: ", descriptionBuffer);
+          metadataBuffer.resolvePointer(&metadata->Description);
+      if (!descriptionBuffer)
+        return *descriptionBuffer.getError();
+      auto description = descriptionBuffer->ptr;
+      printPointer("  description: ", *descriptionBuffer);
 
       if (description->hasLayoutString()) {
-        auto layoutStringBuffer = ERROR_CHECK(metadataBuffer.resolvePointer(
-            &asFullMetadata(metadata)->layoutString));
-        printPointer("  layout string: ", layoutStringBuffer);
+        auto layoutStringBuffer = metadataBuffer.resolvePointer(
+            &asFullMetadata(metadata)->layoutString);
+        if (!layoutStringBuffer)
+          return *layoutStringBuffer.getError();
+        printPointer("  layout string: ", *layoutStringBuffer);
       }
 
-      auto name =
-          ERROR_CHECK(descriptionBuffer.resolvePointer(&description->Name));
-      printPointer("  name: ", name);
-      print("        \"%s\"\n", name.ptr);
+      auto name = descriptionBuffer->resolvePointer(&description->Name);
+      if (!name)
+        return *name.getError();
+      printPointer("  name: ", *name);
+      print("        \"%s\"\n", name->ptr);
 
-      if (auto structmd = llvm::dyn_cast<StructMetadata>(metadataBuffer.ptr))
-        ERROR_CHECK(dumpStructMetadata(metadataBuffer, structmd));
-      else if (auto enummd = llvm::dyn_cast<EnumMetadata>(metadataBuffer.ptr))
-        ERROR_CHECK(dumpEnumMetadata(metadataBuffer, enummd));
+      if (auto structmd = llvm::dyn_cast<StructMetadata>(metadataBuffer.ptr)) {
+        auto dumpResult = dumpStructMetadata(metadataBuffer, structmd);
+        if (!dumpResult)
+          return *dumpResult.getError();
+      } else if (auto enummd =
+                     llvm::dyn_cast<EnumMetadata>(metadataBuffer.ptr)) {
+        auto dumpResult = dumpEnumMetadata(metadataBuffer, enummd);
+        if (!dumpResult)
+          return *dumpResult.getError();
+      }
 
       if (description->isGeneric()) {
         auto numGenericParams =
@@ -856,10 +972,11 @@ public:
             ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>>(
             metadata, description->getGenericArgumentOffset());
         for (unsigned i = 0; i < numGenericParams; i++) {
-          auto arg =
-              ERROR_CHECK(metadataBuffer.resolvePointer(&genericArguments[i]));
+          auto arg = metadataBuffer.resolvePointer(&genericArguments[i]);
+          if (!arg)
+            return *arg.getError();
           print("  genericArg[%u]: ", i);
-          printPointer(arg);
+          printPointer(*arg);
           print("\n");
         }
       }
@@ -871,9 +988,11 @@ public:
     dumpStructMetadata(Buffer<const Metadata> metadataBuffer,
                        const StructMetadata *metadata) {
       auto descriptionBuffer =
-          ERROR_CHECK(metadataBuffer.resolvePointer(&metadata->Description));
+          metadataBuffer.resolvePointer(&metadata->Description);
+      if (!descriptionBuffer)
+        return *descriptionBuffer.getError();
       auto structDescription =
-          reinterpret_cast<const StructDescriptor *>(descriptionBuffer.ptr);
+          reinterpret_cast<const StructDescriptor *>(descriptionBuffer->ptr);
       if (structDescription->hasFieldOffsetVector()) {
         auto *offsetsStart = wordsOffset<StoredPointer>(
             metadata, structDescription->FieldOffsetVectorOffset);
@@ -888,9 +1007,11 @@ public:
     dumpEnumMetadata(Buffer<const Metadata> metadataBuffer,
                      const EnumMetadata *metadata) {
       auto descriptionBuffer =
-          ERROR_CHECK(metadataBuffer.resolvePointer(&metadata->Description));
+          metadataBuffer.resolvePointer(&metadata->Description);
+      if (!descriptionBuffer)
+        return *descriptionBuffer.getError();
       auto description =
-          reinterpret_cast<const EnumDescriptor *>(descriptionBuffer.ptr);
+          reinterpret_cast<const EnumDescriptor *>(descriptionBuffer->ptr);
 
       if (description->hasPayloadSizeOffset()) {
         auto payloadSizeOffset = description->getPayloadSizeOffset();
@@ -909,17 +1030,36 @@ public:
 
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)                           \
-  ERROR_CHECK(dumpVWTDataField(#LOWER_ID, vwt->LOWER_ID));
+  {                                                                            \
+    auto dumpResult = dumpVWTDataField(#LOWER_ID, vwt->LOWER_ID);              \
+    if (!dumpResult)                                                           \
+      return *dumpResult.getError();                                           \
+  }
+
 #define FUNCTION_VALUE_WITNESS(LOWER_ID, UPPER_ID, RETURN_TYPE, PARAM_TYPES)   \
-  ERROR_CHECK(dumpVWTFunctionField(vwtBuffer, #LOWER_ID, &vwt->LOWER_ID));
+  {                                                                            \
+    auto dumpResult =                                                          \
+        dumpVWTFunctionField(vwtBuffer, #LOWER_ID, &vwt->LOWER_ID);            \
+    if (!dumpResult)                                                           \
+      return *dumpResult.getError();                                           \
+  }
 #include "swift/ABI/ValueWitness.def"
 
       if (auto *enumVWT = llvm::dyn_cast<EnumValueWitnessTable>(vwt)) {
 #define WANT_ONLY_ENUM_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)                           \
-  ERROR_CHECK(dumpVWTDataField(#LOWER_ID, enumVWT->LOWER_ID));
+  {                                                                            \
+    auto dumpResult = dumpVWTDataField(#LOWER_ID, enumVWT->LOWER_ID);          \
+    if (!dumpResult)                                                           \
+      return *dumpResult.getError();                                           \
+  }
 #define FUNCTION_VALUE_WITNESS(LOWER_ID, UPPER_ID, RETURN_TYPE, PARAM_TYPES)   \
-  ERROR_CHECK(dumpVWTFunctionField(vwtBuffer, #LOWER_ID, &enumVWT->LOWER_ID));
+  {                                                                            \
+    auto dumpResult =                                                          \
+        dumpVWTFunctionField(vwtBuffer, #LOWER_ID, &enumVWT->LOWER_ID);        \
+    if (!dumpResult)                                                           \
+      return *dumpResult.getError();                                           \
+  }
 #include "swift/ABI/ValueWitness.def"
       }
 
@@ -941,9 +1081,11 @@ public:
     BuilderErrorOr<std::monostate>
     dumpVWTFunctionField(Buffer<const ValueWitnessTable> vwtBuffer,
                          const char *name, T *ptr) {
-      auto function = ERROR_CHECK(vwtBuffer.resolveFunctionPointer(ptr));
+      auto function = vwtBuffer.resolveFunctionPointer(ptr);
+      if (!function)
+        return *function.getError();
       print("    %s: ", name);
-      printPointer(function);
+      printPointer(*function);
       print("\n");
 
       return {{}};

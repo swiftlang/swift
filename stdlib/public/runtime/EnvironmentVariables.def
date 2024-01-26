@@ -88,6 +88,12 @@ VARIABLE(SWIFT_DEBUG_VALIDATE_EXTERNAL_GENERIC_METADATA_BUILDER, uint8_t, 0,
          "unless a validation failure occurs. Level 2 enables full debug "
          "logging in the builder.")
 
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED, bool, true,
+         "Enable use of prespecializations library.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH, string, "",
+         "A path to a prespecializations library to use at runtime.")
+
 VARIABLE(SWIFT_ROOT, string, "",
          "Overrides the root directory of the Swift installation. "
          "This is used to locate auxiliary files relative to the runtime "

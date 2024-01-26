@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Threading/Once.h"
+#include "swift/shims/Visibility.h"
 
 namespace swift {
 namespace runtime {
@@ -54,4 +55,4 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
 
 } // end namespace environment
 } // end namespace runtime
-} // end namespace Swift
+} // end namespace swift
