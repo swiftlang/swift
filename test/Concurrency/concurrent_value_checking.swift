@@ -350,15 +350,15 @@ struct SomeActor {
 class NotSendable {}
 
 // actor-isolated mutable properties are valid
-final class C10: Sendable {
+final class C10: Sendable { // expected-warning{{default initializer for 'C10' cannot be both nonisolated and main actor-isolated}}
   @MainActor var x = 0
-  @MainActor var ns1 : NotSendable?
+  @MainActor var ns1 : NotSendable? // expected-note{{initializer for property 'ns1' is main actor-isolated}}
   @MainActor let ns : NotSendable? = nil
 }
 
-final class C14: Sendable {
+final class C14: Sendable { // expected-warning{{default initializer for 'C14' cannot be both nonisolated and global actor 'SomeActor'-isolated}}
   @SomeActor var y = 1
-  @SomeActor var nc = NotConcurrent()
+  @SomeActor var nc = NotConcurrent() // expected-note{{initializer for property 'nc' is global actor 'SomeActor'-isolated}}
   @SomeActor let nc1 = NotConcurrent()
 }
 
