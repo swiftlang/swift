@@ -1122,6 +1122,7 @@ public:
   const FunctionTypeRef *createFunctionType(
       llvm::ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags,
+      ExtendedFunctionTypeFlags extFlags,
       FunctionMetadataDifferentiabilityKind diffKind,
       const TypeRef *globalActor, const TypeRef *thrownError) {
     return FunctionTypeRef::create(*this, params, result, flags, diffKind,

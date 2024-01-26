@@ -2776,22 +2776,20 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
+      auto extInfo = ASTExtInfoBuilder().withIsolation(
+          FunctionTypeIsolation::forGlobalActor(mainActor));
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
-          ASTExtInfoBuilder().withGlobalActor(mainActor).build()));
+          extInfo.build()));
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
-          ASTExtInfoBuilder().withAsync().withGlobalActor(mainActor).build()));
+          extInfo.withAsync().build()));
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
-          ASTExtInfoBuilder().withThrows().withGlobalActor(mainActor).build()));
-      mainTypes.push_back(FunctionType::get(/*params*/ {},
-                                            context.TheEmptyTupleType,
-                                            ASTExtInfoBuilder()
-                                                .withAsync()
-                                                .withThrows()
-                                                .withGlobalActor(mainActor)
-                                                .build()));
+          extInfo.withThrows().build()));
+      mainTypes.push_back(FunctionType::get(
+          /*params*/ {}, context.TheEmptyTupleType,
+          extInfo.withAsync().withThrows().build()));
     }
     TypeVariableType *mainType =
         CS.createTypeVariable(locator, /*options=*/0);

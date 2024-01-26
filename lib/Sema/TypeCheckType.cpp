@@ -2113,7 +2113,8 @@ namespace {
                            const clang::Type *parsedClangFunctionType = nullptr,
                            DifferentiabilityKind diffKind =
                                DifferentiabilityKind::NonDifferentiable,
-                           Type globalActor = Type());
+                           FunctionTypeIsolation isolation =
+                               FunctionTypeIsolation::forNonIsolated());
     SmallVector<AnyFunctionType::Param, 8>
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
@@ -2802,18 +2803,23 @@ TypeResolver::resolvePackElementArchetype(
   return archetypeType;
 }
 
-/// \returns true iff the # of isolated params is > \c lowerBound
-static bool hasMoreIsolatedParamsThan(FunctionTypeRepr* fnTy, unsigned lowerBound) {
+static unsigned countIsolatedParamsUpTo(FunctionTypeRepr* fnTy,
+                                        unsigned bound) {
   unsigned count = 0;
   for (auto arg : fnTy->getArgsTypeRepr()->getElements()) {
-    if (isa<IsolatedTypeRepr>(arg.Type))
+    if (isa<IsolatedTypeRepr>(arg.Type)) {
       count += 1;
-
-    if (count > lowerBound)
-      break;
+      if (count >= bound)
+        break;
+    }
   }
+  return count;
+}
 
-  return count > lowerBound;
+/// \returns true iff the # of isolated params is > \c lowerBound
+static bool hasMoreIsolatedParamsThan(FunctionTypeRepr* fnTy,
+                                      unsigned lowerBound) {
+  return countIsolatedParamsUpTo(fnTy, lowerBound + 1) > lowerBound;
 }
 
 NeverNullType
@@ -2844,7 +2850,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   
   // Resolve global actor.
   CustomAttr *globalActorAttr = nullptr;
-  Type globalActor;
+  auto isolation = FunctionTypeIsolation::forNonIsolated();
   if (auto fnTy = dyn_cast<FunctionTypeRepr>(repr)) {
     auto foundGlobalActor = checkGlobalActorAttributes(
         repr->getLoc(), getDeclContext(),
@@ -2852,13 +2858,14 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           attrs.getCustomAttrs().begin(), attrs.getCustomAttrs().end()));
     if (foundGlobalActor) {
       globalActorAttr = foundGlobalActor->first;
-      globalActor = resolveType(globalActorAttr->getTypeRepr(), options);
-      if (globalActor->hasError())
-        globalActor = Type();
+      auto globalActor = resolveType(globalActorAttr->getTypeRepr(), options);
+      if (!globalActor->hasError()) {
+        isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
+      }
 
       // make sure there is no `isolated` parameter in the type
       if (globalActorAttr->isValid()) {
-        if (globalActor && hasMoreIsolatedParamsThan(fnTy, 0)) {
+        if (isolation.isGlobalActor() && hasMoreIsolatedParamsThan(fnTy, 0)) {
           diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
               .warnUntilSwiftVersion(6);
           globalActorAttr->setInvalid();
@@ -3031,7 +3038,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     }
   }
 
-  bool hasFunctionAttr = globalActor ||
+  bool hasFunctionAttr = !isolation.isNonIsolated() ||
       llvm::any_of(FunctionAttrs, [&attrs](const TypeAttrKind &attr) {
         return attrs.has(attr);
       });
@@ -3198,7 +3205,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
                                   concurrent, parsedClangFunctionType,
-                                  diffKind, globalActor);
+                                  diffKind, isolation);
       if (!ty || ty->hasError())
         return ty;
     }
@@ -3685,10 +3692,14 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     AnyFunctionType::Representation representation, bool noescape,
     bool concurrent, const clang::Type *parsedClangFunctionType,
-    DifferentiabilityKind diffKind, Type globalActor) {
+    DifferentiabilityKind diffKind,
+    FunctionTypeIsolation isolationFromAttrs) {
 
-  // can't have more than 1 isolated parameter.
-  if (!repr->isWarnedAbout() && hasMoreIsolatedParamsThan(repr, 1)) {
+  FunctionTypeIsolation isolation = isolationFromAttrs;
+
+  // Check that we don't have more than one isolated parameter.
+  unsigned numIsolatedParams = countIsolatedParamsUpTo(repr, 2);
+  if (!repr->isWarnedAbout() && numIsolatedParams > 1) {
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
         .warnUntilSwiftVersion(6);
 
@@ -3696,6 +3707,13 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       return ErrorType::get(getASTContext());
     else
       repr->setWarned();
+  }
+
+  // Use parameter isolation if we have any.  If we already have
+  // isolation from attributes, that should be ignored; that's diagnosed
+  // by the code processing the attribute.
+  if (numIsolatedParams > 0) {
+    isolation = FunctionTypeIsolation::forParameter();
   }
 
   // Diagnose a couple of things that we can parse in SIL mode but we don't
@@ -3771,7 +3789,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: Handle LifetimeDependenceInfo here.
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
-      diffKind, /*clangFunctionType*/ nullptr, Type(),
+      diffKind, /*clangFunctionType*/ nullptr, isolation,
       LifetimeDependenceInfo());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
@@ -3783,7 +3801,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withConcurrent(concurrent)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
-                     .withGlobalActor(globalActor)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.

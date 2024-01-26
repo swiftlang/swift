@@ -2539,10 +2539,22 @@ namespace {
                 : 0));
       }();
 
-      // For a non-async function type, add the global actor if present.
-      if (!extInfo.isAsync()) {
-        extInfo = extInfo.withGlobalActor(getExplicitGlobalActor(closure));
-      }
+      // Determine the isolation of the closure.
+      auto isolation = [&] {
+        // Priority goes to an explicit isolated parameter.
+        if (hasIsolatedParameter(closureParams))
+          return FunctionTypeIsolation::forParameter();
+
+        // Honor an explicit global actor.  This is suppressed if the
+        // closure is async (but should it be?).
+        if (!extInfo.isAsync()) {
+          if (auto actorType = getExplicitGlobalActor(closure))
+            return FunctionTypeIsolation::forGlobalActor(actorType);
+        }
+
+        return FunctionTypeIsolation::forNonIsolated();
+      }();
+      extInfo = extInfo.withIsolation(isolation);
 
       auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);
       return CS.replaceInferableTypesWithTypeVars(

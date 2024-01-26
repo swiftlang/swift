@@ -14,7 +14,7 @@ extension Actor {
   func g() { }
 }
 
-@MainActor func mainActorFn() {}
+@MainActor func mainActorFn() {} // expected-note {{calls to global function 'mainActorFn()' from outside of its actor context are implicitly asynchronous}}
 
 @available(SwiftStdlib 5.1, *)
 func testA<T: Actor>(
@@ -232,7 +232,7 @@ func checkIsolatedAndGlobalClosures(_ a: A) {
   let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}
       = {
     $0.f()
-    mainActorFn()
+    mainActorFn() // expected-error {{call to main actor-isolated global function 'mainActorFn()' in a synchronous actor-isolated context}}
   }
 
   let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in Swift 6}}

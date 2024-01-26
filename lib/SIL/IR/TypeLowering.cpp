@@ -3681,6 +3681,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
                                       funcType->getThrownError())
           .withConcurrent(funcType->isSendable())
           .withAsync(funcType->isAsync())
+          .withIsolation(funcType->getIsolation())
           .build();
 
   return CanAnyFunctionType::get(

@@ -6660,17 +6660,17 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
-  TypeID globalActorTypeID;
+  TypeID rawIsolation;
 
   if (!isGeneric) {
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, concurrent,
-        async, throws, thrownErrorID, rawDiffKind, globalActorTypeID);
+        async, throws, thrownErrorID, rawDiffKind, rawIsolation);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, concurrent, async, throws,
-        thrownErrorID, rawDiffKind, globalActorTypeID, rawGenericSig);
+        thrownErrorID, rawDiffKind, rawIsolation, rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
   }
@@ -6700,19 +6700,27 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     clangFunctionType = loadedClangType.get();
   }
 
-  Type globalActor;
-  if (globalActorTypeID) {
+  auto isolation = swift::FunctionTypeIsolation::forNonIsolated();
+  if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
+    // do nothing
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
+    isolation = swift::FunctionTypeIsolation::forParameter();
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::Dynamic)) {
+    isolation = swift::FunctionTypeIsolation::forDynamic();
+  } else {
+    TypeID globalActorTypeID =
+      rawIsolation - unsigned(FunctionTypeIsolation::GlobalActorOffset);
+
     auto globalActorTy = MF.getTypeChecked(globalActorTypeID);
     if (!globalActorTy)
       return globalActorTy.takeError();
-
-    globalActor = globalActorTy.get();
+    isolation = swift::FunctionTypeIsolation::forGlobalActor(globalActorTy.get());
   }
 
   // TODO: Handle LifetimeDependenceInfo here.
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
-                  clangFunctionType, globalActor, LifetimeDependenceInfo())
+                  clangFunctionType, isolation, LifetimeDependenceInfo())
                   .withConcurrent(concurrent)
                   .withAsync(async)
                   .build();
