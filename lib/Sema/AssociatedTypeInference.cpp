@@ -2167,6 +2167,18 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   return llvm::None;
 }
 
+static SmallVector<ProtocolConformance *, 2>
+getPeerConformances(NormalProtocolConformance *conformance) {
+  auto *dc = conformance->getDeclContext();
+  IterableDeclContext *idc = dyn_cast<ExtensionDecl>(dc);
+  if (!idc)
+    idc = cast<NominalTypeDecl>(dc);
+
+  // NonStructural skips the Sendable synthesis which can cycle, and Sendable
+  // doesn't have associated types anyway.
+  return idc->getLocalConformances(ConformanceLookupKind::NonStructural);
+}
+
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
     TypeWitnessSystem &system,
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
@@ -2212,10 +2224,13 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
   // are less likely to cause request cycles.
   considerProtocolRequirements(conformance->getProtocol());
 
-  // Also look through all other protocols the conforming type conforms to.
-  for (auto *const conformedProto :
-       dc->getSelfNominalTypeDecl()->getAllProtocols(/*sorted=*/true)) {
-    considerProtocolRequirements(conformedProto);
+  // Look through all conformances in the same DeclContext as ours.
+  for (auto *otherConformance : getPeerConformances(conformance)) {
+    // Don't visit this one twice.
+    if (otherConformance->getProtocol() == conformance->getProtocol())
+      continue;
+
+    considerProtocolRequirements(otherConformance->getProtocol());
   }
 
   // If the same-type constraints weren't enough to resolve an associated type,
@@ -4070,18 +4085,8 @@ ResolveTypeWitnessesRequest::evaluate(Evaluator &evaluator,
 static NormalProtocolConformance *
 getBetterConformanceForResolvingTypeWitnesses(NormalProtocolConformance *conformance,
                                               AssociatedTypeDecl *requirement) {
-  auto *dc = conformance->getDeclContext();
-  assert(dc->getParentSourceFile() && "What are you doing?");
   auto *proto = conformance->getProtocol();
-
-  IterableDeclContext *idc;
-  if (auto *extensionDecl = dyn_cast<ExtensionDecl>(dc))
-    idc = extensionDecl;
-  else
-    idc = cast<NominalTypeDecl>(dc);
-
-  auto otherConformances = idc->getLocalConformances(ConformanceLookupKind::NonStructural);
-  for (auto *otherConformance : otherConformances) {
+  for (auto *otherConformance : getPeerConformances(conformance)) {
     auto *otherNormal = dyn_cast<NormalProtocolConformance>(
         otherConformance->getRootConformance());
     if (otherNormal == nullptr)
