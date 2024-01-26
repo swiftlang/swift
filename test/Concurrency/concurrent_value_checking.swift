@@ -188,7 +188,7 @@ func testConcurrency() {
   acceptConcurrent {
     print(x) // expected-warning{{capture of 'x' with non-sendable type 'NotConcurrent' in a `@Sendable` closure}}
     print(y) // expected-warning{{capture of 'y' with non-sendable type 'NotConcurrent' in a `@Sendable` closure}}
-    // expected-error@-1{{reference to captured var 'y' in concurrently-executing code}}
+    // expected-warning@-1{{reference to captured var 'y' in concurrently-executing code}}
   }
 }
 

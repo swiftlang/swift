@@ -21,7 +21,7 @@ actor MyActor {
     async let z = synchronous()
 
     var localText = text
-    async let w = localText.removeLast() // expected-error{{mutation of captured var 'localText' in concurrently-executing code}}
+    async let w = localText.removeLast() // expected-warning{{mutation of captured var 'localText' in concurrently-executing code}}
 
     _ = await x
     _ = await y

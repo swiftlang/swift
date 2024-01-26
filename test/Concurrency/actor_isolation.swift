@@ -325,8 +325,8 @@ extension MyActor {
       acceptInout(&self.mutable) // expected-error{{actor-isolated property 'mutable' can not be used 'inout' from a Sendable closure}}
       _ = self.immutable
       _ = self.synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
-      _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
-      localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
+      _ = localVar // expected-warning{{reference to captured var 'localVar' in concurrently-executing code}}
+      localVar = 25 // expected-warning{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
 
       _ = otherLocalVar
@@ -357,8 +357,8 @@ extension MyActor {
     @Sendable func localFn1() {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a Sendable function}}
       _ = self.synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
-      _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
-      localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
+      _ = localVar // expected-warning{{reference to captured var 'localVar' in concurrently-executing code}}
+      localVar = 25 // expected-warning{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
     }
 
@@ -366,8 +366,8 @@ extension MyActor {
       acceptClosure {
         _ = text[0]  // expected-error{{actor-isolated property 'text' can not be referenced from a non-isolated context}}
         _ = self.synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
-        _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
-        localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
+        _ = localVar // expected-warning{{reference to captured var 'localVar' in concurrently-executing code}}
+        localVar = 25 // expected-warning{{mutation of captured var 'localVar' in concurrently-executing code}}
         _ = localConstant
       }
     }
@@ -640,8 +640,8 @@ func testGlobalRestrictions(actor: MyActor) async {
   // code.
   var i = 17
   acceptConcurrentClosure {
-    _ = i // expected-error{{reference to captured var 'i' in concurrently-executing code}}
-    i = 42 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
+    _ = i // expected-warning{{reference to captured var 'i' in concurrently-executing code}}
+    i = 42 // expected-warning{{mutation of captured var 'i' in concurrently-executing code}}
   }
   print(i)
 
@@ -738,7 +738,7 @@ func checkLocalFunctions() async {
   }
 
   func local3() { // expected-warning{{concurrently-executed local function 'local3()' must be marked as '@Sendable'}}
-    k = 25 // expected-error{{mutation of captured var 'k' in concurrently-executing code}}
+    k = 25 // expected-warning{{mutation of captured var 'k' in concurrently-executing code}}
   }
 
   print(k)
@@ -1158,12 +1158,12 @@ extension MyActor {
       _ = synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}
       // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
 
-      counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
+      counter += 1 // expected-warning{{mutation of captured var 'counter' in concurrently-executing code}}
     }
 
     acceptAsyncSendableClosure {
       _ = await synchronous() // ok
-      counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
+      counter += 1 // expected-warning{{mutation of captured var 'counter' in concurrently-executing code}}
     }
 
     acceptAsyncSendableClosureInheriting {
@@ -1184,7 +1184,7 @@ func testGlobalActorInheritance() {
   var counter = 0
 
   acceptAsyncSendableClosure {
-    counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
+    counter += 1 // expected-warning{{mutation of captured var 'counter' in concurrently-executing code}}
   }
 
   acceptAsyncSendableClosure { @SomeGlobalActor in
