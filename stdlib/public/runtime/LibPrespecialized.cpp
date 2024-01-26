@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/LibPrespecialized.h"
+#include "Private.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
@@ -74,36 +75,35 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
   if (!data)
     return nullptr;
 
-  auto *metadataMap = data->getMetadataMap();
-
-  // TODO: This linear search is a stopgap until we work out the right
-  // representation for the string keys.
-  size_t count = metadataMap->arraySize;
-  auto *entries = metadataMap->array();
-  for (size_t i = 0; i < count; i++) {
-    if (entries[i].key == nullptr)
-      continue;
-
-    Metadata *candidate = entries[i].value;
-    auto *candidateDescription = candidate->getDescription();
-    if (description != candidateDescription)
-      continue;
-
-    auto *candidateArguments = candidate->getGenericArgs();
-
-    bool match = true;
-
-    const auto &genericContext = *description->getGenericContext();
-    const auto &header = genericContext.getGenericContextHeader();
-    for (unsigned param = 0; param < header.NumParams; param++)
-      if (arguments[param] != candidateArguments[param]) {
-        match = false;
-        break;
-      }
-
-    if (match)
-      return candidate;
+  Demangler dem;
+  auto mangleNode = _buildDemanglingForGenericType(description, arguments, dem);
+  if (mangleNode->getKind() != Node::Kind::Global) {
+    auto wrapper = dem.createNode(Node::Kind::Global);
+    wrapper->addChild(mangleNode, dem);
+    mangleNode = wrapper;
+  }
+  auto resolver = [](SymbolicReferenceKind kind,
+                     const void *ref) -> NodePointer {
+    swift::fatalError(0,
+                      "Unexpected symbolic reference %p in generated mangle "
+                      "tree for generic type lookup.",
+                      ref);
+  };
+  auto mangling = Demangle::mangleNode(mangleNode, resolver, dem);
+  if (!mangling.isSuccess()) {
+    swift::warning(0,
+                   "Mangling for prespecialized metadata failed with code %d",
+                   mangling.error().code);
+    return nullptr;
   }
 
-  return nullptr;
+  auto key = mangling.result();
+  auto *metadataMap = data->getMetadataMap();
+  auto *element = metadataMap->find(key.data(), key.size());
+  auto *result = element ? element->value : nullptr;
+  if (SWIFT_UNLIKELY(runtime::environment::
+                         SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING()))
+    fprintf(stderr, "Prespecializations library: found %p for key '%.*s'.\n",
+            result, (int)key.size(), key.data());
+  return result;
 }

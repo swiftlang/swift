@@ -94,6 +94,9 @@ VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED, bool, true,
 VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH, string, "",
          "A path to a prespecializations library to use at runtime.")
 
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING, bool, false,
+         "Enable debug logging of prespecializations library use.")
+
 VARIABLE(SWIFT_ROOT, string, "",
          "Overrides the root directory of the Swift installation. "
          "This is used to locate auxiliary files relative to the runtime "
