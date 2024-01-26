@@ -7640,8 +7640,6 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
       P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
     } else if (P.Tok.isContextualKeyword("borrowing")) {
       P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Borrowing);
-    } else if (P.Tok.isContextualKeyword("transferring")) {
-      P.parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Transferring);
     }
   }
 
