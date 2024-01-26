@@ -3578,15 +3578,11 @@ namespace {
         }
 
         // Otherwise, we have concurrent access. Complain.
-        bool preconcurrencyContext =
-            getActorIsolationOfContext(
-              const_cast<DeclContext *>(getDeclContext())).preconcurrency();
-
         ctx.Diags.diagnose(
             loc, diag::concurrent_access_of_local_capture,
             parent.dyn_cast<LoadExpr *>(),
             var)
-          .warnUntilSwiftVersionIf(preconcurrencyContext, 6);
+          .warnUntilSwiftVersion(6);
         return true;
       }
 
