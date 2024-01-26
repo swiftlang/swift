@@ -1,7 +1,12 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STD
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t -module-print-submodules | %FileCheck %s  -check-prefix=CHECK-STD-WITH-SUBMODULES
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib.iosfwd -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-IOSFWD
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib.string -source-filename=x -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STRING
+// Only run this test with older libc++, before the top-level std module got split into multiple top-level modules.
+// RUN: %empty-directory(%t)
+// RUN: %target-clangxx %S/Inputs/check-libcxx-version.cpp -o %t/check-libcxx-version
+// RUN: %target-codesign %t/check-libcxx-version
+
+// RUN: %target-run %t/check-libcxx-version || %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STD
+// RUN: %target-run %t/check-libcxx-version || %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t -module-print-submodules | %FileCheck %s  -check-prefix=CHECK-STD-WITH-SUBMODULES
+// RUN: %target-run %t/check-libcxx-version || %target-swift-ide-test -print-module -module-to-print=CxxStdlib.iosfwd -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-IOSFWD
+// RUN: %target-run %t/check-libcxx-version || %target-swift-ide-test -print-module -module-to-print=CxxStdlib.string -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STRING
 
 // This test is specific to libc++ and therefore only runs on Darwin platforms.
 // REQUIRES: OS=macosx || OS=ios
