@@ -57,6 +57,7 @@ final class Klass {
 class C {}
 
 sil @getC : $@convention(thin) () -> (@owned C)
+sil @borrowC : $@convention(thin) (@guaranteed C) -> ()
 
 extension Klass : MyFakeAnyObject {
   func myFakeMethod()
@@ -1636,4 +1637,17 @@ entry:
     dealloc_stack %addr : $*C
     %retval = tuple ()
     return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_promote_load_copy_of_inout_aliasable : {{.*}} {
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_promote_load_copy_of_inout_aliasable'
+sil [ossa] @dont_promote_load_copy_of_inout_aliasable : $@convention(thin) (@inout_aliasable C) -> () {
+bb0(%addr : $*C):
+  %c = load [copy] %addr : $*C
+  %borrowC = function_ref @borrowC : $@convention(thin) (@guaranteed C) -> ()
+  apply %borrowC(%c) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %c : $C
+  %5 = tuple ()
+  return %5 : $()
 }
