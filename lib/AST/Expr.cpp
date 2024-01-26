@@ -2942,10 +2942,10 @@ void AbstractClosureExpr::getIsolationCrossing(
 
     auto declIsolation = swift::getActorIsolation(capture.getDecl());
 
-    // Then see if we have an opaque value.
-    if (auto *opaqueValue = capture.getOpaqueValue()) {
-      continue;
-    }
+    // Assert that we do not have an opaque value capture. These only appear in
+    // TypeLowering and should never appear in the AST itself.
+    assert(!capture.getOpaqueValue() &&
+           "This should only be created in TypeLowering");
 
     // If our decl is actor isolated...
     if (declIsolation.isActorIsolated()) {
