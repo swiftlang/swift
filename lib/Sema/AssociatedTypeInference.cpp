@@ -4002,19 +4002,31 @@ void TypeWitnessSystem::mergeEquivalenceClasses(
 TypeWitnessSystem::ResolvedTypeComparisonResult
 TypeWitnessSystem::compareResolvedTypes(Type ty1, Type ty2) {
   assert(ty1 && ty2);
-  if (!ty1->isTypeParameter()) {
-    if (ty2->isTypeParameter()) {
-      // A concrete type is better than a type parameter.
-      return ResolvedTypeComparisonResult::Better;
-    } else if (!ty1->isEqual(ty2)) {
-      return ResolvedTypeComparisonResult::Ambiguity;
-    }
+
+  // Prefer shorter type parameters. This is just a heuristic and has no
+  // theoretical basis at all.
+  if (ty1->isTypeParameter() && ty2->isTypeParameter()) {
+    return compareDependentTypes(ty1, ty2) < 0
+        ? ResolvedTypeComparisonResult::Better
+        : ResolvedTypeComparisonResult::EquivalentOrWorse;
   }
 
-  // Anything else is either equivalent (i.e. actually equal concrete types or
-  // type parameter vs. type parameter), or worse (i.e. type parameter vs.
-  // concrete type).
-  return ResolvedTypeComparisonResult::EquivalentOrWorse;
+  // A concrete type is better than a type parameter.
+  if (!ty1->isTypeParameter() && ty2->isTypeParameter()) {
+    return ResolvedTypeComparisonResult::Better;
+  }
+
+  // A type parameter is worse than a concrete type.
+  if (ty1->isTypeParameter() && !ty2->isTypeParameter()) {
+    return ResolvedTypeComparisonResult::EquivalentOrWorse;
+  }
+
+  // Ambiguous concrete types.
+  if (ty1->isEqual(ty2)) {
+    return ResolvedTypeComparisonResult::EquivalentOrWorse;
+  }
+
+  return ResolvedTypeComparisonResult::Ambiguity;
 }
 
 //
