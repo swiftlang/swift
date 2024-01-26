@@ -3580,6 +3580,10 @@ namespace {
                   bodyName, Impl.ImportedHeaderUnit);
               paramInfo->setSpecifier(ParamSpecifier::Default);
               paramInfo->setInterfaceType(Impl.SwiftContext.TheAnyType);
+              if (param->hasDefaultArg()) {
+                paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+                paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");
+              }
               params.push_back(paramInfo);
             }
             bodyParams = ParameterList::create(Impl.SwiftContext, params);
