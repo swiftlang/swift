@@ -5,7 +5,9 @@
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -enable-experimental-feature ExpressionMacroDefaultArguments -enable-bare-slash-regex
 
-typealias Stringified<T> = (T, String)
+public typealias Stringified<T> = (T, String)
+
+// expected-note@+2{{macro 'stringify' is not '@usableFromInline' or public}}
 @freestanding(expression)
 macro stringify<T>(_ value: T) -> Stringified<T> = #externalMacro(
     module: "MacroDefinition", type: "StringifyMacro"
@@ -53,3 +55,9 @@ func testIdentifier(notOkay: Stringified<String> = #stringify(myString)) {}
 
 // expected-error@+1{{argument to macro used as default argument must be literal}}
 func testString(interpolated: Stringified<String> = #stringify("Hello \(0b10001)")) {}
+
+// expected-error@+1{{macro 'stringify' is internal and cannot be referenced from a default argument value}}
+public func testAccess(internal: Stringified<Int> = #stringify(0)) {}
+
+// expected-error@+1{{default argument value of type '(Int, String)' cannot be converted to type 'Int'}}
+func testReturn(wrongType: Int = #stringify(0)) {}
