@@ -22,6 +22,12 @@ module StdSet {
   export *
 }
 
+module StdString {
+  header "std-string.h"
+  requires cplusplus
+  export *
+}
+
 module StdPair {
   header "std-pair.h"
   requires cplusplus
