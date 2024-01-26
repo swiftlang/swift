@@ -16,6 +16,7 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
@@ -332,6 +333,25 @@ void BridgedDiagnostic_fixItReplace(BridgedDiagnostic cDiag,
 void BridgedDiagnostic_finish(BridgedDiagnostic cDiag) {
   BridgedDiagnostic::Impl *diag = cDiag.unbridged();
   delete diag;
+}
+
+BridgedDiagnosticSuppression::BridgedDiagnosticSuppression(
+    BridgedDiagnosticEngine cDiag)
+    : diagEngine(cDiag.unbridged()), isSuppressing(false) {
+  this->suppression = (DiagnosticSuppression *)std::malloc(
+      sizeof(swift::DiagnosticSuppression));
+}
+
+void BridgedDiagnosticSuppression::start() {
+  assert(!this->isSuppressing && "Unbalanced 'start' call");
+  new (this->suppression) DiagnosticSuppression(*this->diagEngine);
+  this->isSuppressing = true;
+}
+
+void BridgedDiagnosticSuppression::stop() {
+  assert(this->isSuppressing && "Unbalanced 'stop' call");
+  this->suppression->~DiagnosticSuppression();
+  this->isSuppressing = false;
 }
 
 //===----------------------------------------------------------------------===//
