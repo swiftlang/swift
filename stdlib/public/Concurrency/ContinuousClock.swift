@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-/// A clock that measures time that always increments but does not stop 
+/// A clock that measures time that always increments and does not stop 
 /// incrementing while the system is asleep. 
 ///
 /// `ContinuousClock` can be considered as a stopwatch style time. The frame of
