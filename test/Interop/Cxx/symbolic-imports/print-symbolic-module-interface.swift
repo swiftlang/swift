@@ -37,6 +37,7 @@ namespace ns {
         template<class T2>
         struct InnerTemplate {
             void innerTemplateMethod();
+            void innerTemplateMethodWithDefaultArg(T2 x = 123);
         };
 
         InnerTemplate<int> returnsTemplateMethod();
@@ -78,6 +79,7 @@ public:
 // CHECK-NEXT:      @available(*, deprecated, message:
 // CHECK-NEXT:      init()
 // CHECK-NEXT:      mutating func innerTemplateMethod()
+// CHECK-NEXT:      mutating func innerTemplateMethodWithDefaultArg(_ x: Any = cxxDefaultArg)
 // CHECK-NEXT:    }
 // CHECK-NEXT:    mutating func returnsTemplateMethod()
 // CHECK-NEXT:  }
