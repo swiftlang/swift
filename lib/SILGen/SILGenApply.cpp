@@ -1852,6 +1852,7 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
     break;
 
   case StringLiteralInst::Encoding::Bytes:
+  case StringLiteralInst::Encoding::UTF8_OSLOG:
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("these cannot be formed here");
   }

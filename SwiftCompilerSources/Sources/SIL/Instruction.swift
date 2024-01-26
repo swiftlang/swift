@@ -750,6 +750,7 @@ final public class StringLiteralInst : SingleValueInstruction {
     case UTF8
     /// UTF-8 encoding of an Objective-C selector.
     case ObjCSelector
+    case UTF8_OSLOG
   }
 
   public var value: StringRef { StringRef(bridged: bridged.StringLiteralInst_getValue()) }
@@ -759,6 +760,7 @@ final public class StringLiteralInst : SingleValueInstruction {
     case 0: return .Bytes
     case 1: return .UTF8
     case 2: return .ObjCSelector
+    case 3: return .UTF8_OSLOG
     default: fatalError("invalid encoding in StringLiteralInst")
     }
   }

@@ -33,7 +33,8 @@ using SILValueOwnershipField = BCFixed<2>;
 enum SILStringEncoding : uint8_t {
   SIL_UTF8,
   SIL_OBJC_SELECTOR,
-  SIL_BYTES
+  SIL_BYTES,
+  SIL_UTF8_OSLOG
 };
 
 enum SILLinkageEncoding : uint8_t {

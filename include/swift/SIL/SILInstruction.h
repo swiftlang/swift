@@ -4328,6 +4328,7 @@ public:
     UTF8 = 1,
     /// UTF-8 encoding of an Objective-C selector.
     ObjCSelector = 2,
+    UTF8_OSLOG = 3,
   };
 
 private:

@@ -106,10 +106,14 @@ llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
 
 llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
                                                 StringLiteralInst *SLI) {
-  switch (SLI->getEncoding()) {
+  auto encoding = SLI->getEncoding();
+  bool useOSLogEncoding = encoding == StringLiteralInst::Encoding::UTF8_OSLOG;
+
+  switch (encoding) {
   case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
-    return IGM.getAddrOfGlobalString(SLI->getValue());
+  case StringLiteralInst::Encoding::UTF8_OSLOG:
+    return IGM.getAddrOfGlobalString(SLI->getValue(), false, useOSLogEncoding);
 
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("cannot get the address of an Objective-C selector");
