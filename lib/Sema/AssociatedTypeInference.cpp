@@ -12,6 +12,23 @@
 //
 // This file implements type witness lookup and associated type inference.
 //
+// There are three entry points into the code here, all via request evaluation:
+//
+// - TypeWitnessRequest resolves a type witness in a normal conformance.
+//   - First, we perform a qualified lookup into the conforming type to find a
+//     member type with the same name as the associated type.
+//   - If the lookup succeeds, we record the type witness.
+//   - If the lookup fails, we attempt to resolve all type witnesses.
+//
+// - ResolveTypeWitnessesRequest resolves all type witnesses of a normal
+//   conformance.
+//   - First, we attempt to resolve each associated type via lookup.
+//   - For any witnesses still unresolved, we perform associated type inference.
+//
+// - AssociatedConformanceRequest resolves an associated conformance of a
+//   normal conformance. This computes the substituted subject type and performs
+//   a global conformance lookup.
+//
 //===----------------------------------------------------------------------===//
 #include "TypeCheckProtocol.h"
 #include "DerivedConformances.h"
@@ -1304,6 +1321,108 @@ static bool isExtensionUsableForInference(const ExtensionDecl *extension,
   return true;
 }
 
+namespace {
+
+enum class InferenceCandidateKind {
+  /// Nothing weird going on.
+  Good,
+
+  /// T := T. Always satisfied.
+  Tautological,
+
+  /// T := G<T>. Cannot be satisfied.
+  Infinite
+};
+
+}
+
+static InferenceCandidateKind checkInferenceCandidate(
+    std::pair<AssociatedTypeDecl *, Type> *result,
+    bool *canInferFromOtherAssociatedType,
+    NormalProtocolConformance *conformance,
+    ValueDecl *witness) {
+  auto isTautological = [&](Type t) -> bool {
+    auto dmt = t->getAs<DependentMemberType>();
+    if (!dmt)
+      return false;
+    if (!associatedTypesAreSameEquivalenceClass(dmt->getAssocType(),
+                                                result->first))
+      return false;
+
+    auto typeInContext =
+      conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
+
+    if (!dmt->getBase()->isEqual(typeInContext))
+      return false;
+
+    return true;
+  };
+
+  if (isTautological(result->second)) {
+    auto *dmt = result->second->castTo<DependentMemberType>();
+
+    // If this associated type is same-typed to another associated type
+    // on `Self`, then it may still be an interesting candidate if we find
+    // an answer for that other type.
+    auto witnessContext = witness->getDeclContext();
+    if (witnessContext->getExtendedProtocolDecl()
+        && witnessContext->getGenericSignatureOfContext()) {
+      auto selfTy = witnessContext->getSelfInterfaceType();
+      auto selfAssocTy = DependentMemberType::get(selfTy,
+                                                  dmt->getAssocType());
+      for (auto &reqt : witnessContext->getGenericSignatureOfContext()
+                                      .getRequirements()) {
+        switch (reqt.getKind()) {
+        case RequirementKind::SameShape:
+          llvm_unreachable("Same-shape requirement not supported here");
+
+        case RequirementKind::Conformance:
+        case RequirementKind::Superclass:
+        case RequirementKind::Layout:
+          break;
+
+        case RequirementKind::SameType:
+          Type other;
+          if (reqt.getFirstType()->isEqual(selfAssocTy)) {
+            other = reqt.getSecondType();
+          } else if (reqt.getSecondType()->isEqual(selfAssocTy)) {
+            other = reqt.getFirstType();
+          } else {
+            break;
+          }
+
+          if (auto otherAssoc = other->getAs<DependentMemberType>()) {
+            if (otherAssoc->getBase()->isEqual(selfTy)) {
+              auto otherDMT = DependentMemberType::get(dmt->getBase(),
+                                              otherAssoc->getAssocType());
+
+              // We may be able to infer one associated type from the
+              // other.
+              result->second = result->second.transform([&](Type t) -> Type{
+                if (t->isEqual(dmt))
+                  return otherDMT;
+                return t;
+              });
+              *canInferFromOtherAssociatedType = true;
+              LLVM_DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
+                         result->second->dump(llvm::dbgs()));
+              return InferenceCandidateKind::Good;
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    return InferenceCandidateKind::Tautological;
+  }
+
+  if (result->second.findIf(isTautological))
+    return InferenceCandidateKind::Infinite;
+
+  return InferenceCandidateKind::Good;
+}
+
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                     const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
@@ -1321,6 +1440,9 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved);
 
   InferredAssociatedTypesByWitnesses result;
+
+  LLVM_DEBUG(llvm::dbgs() << "Considering requirement:\n";
+             req->dump(llvm::dbgs()));
 
   for (auto witness :
        lookupValueWitnesses(dc, req, /*ignoringNames=*/nullptr)) {
@@ -1377,80 +1499,23 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       // AssocType == S.AssocType or
       // AssocType == Foo<S.AssocType>.
       bool canInferFromOtherAssociatedType = false;
-      bool containsTautologicalType =
-        result.second.findIf([&](Type t) -> bool {
-          auto dmt = t->getAs<DependentMemberType>();
-          if (!dmt)
-            return false;
-          if (!associatedTypesAreSameEquivalenceClass(dmt->getAssocType(),
-                                                      result.first))
-            return false;
 
-          auto typeInContext =
-            conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
+      switch (checkInferenceCandidate(&result,
+                                      &canInferFromOtherAssociatedType,
+                                      conformance, witness)) {
+      case InferenceCandidateKind::Good:
+        // Continued below.
+        break;
 
-          if (!dmt->getBase()->isEqual(typeInContext))
-            return false;
-
-          // If this associated type is same-typed to another associated type
-          // on `Self`, then it may still be an interesting candidate if we find
-          // an answer for that other type.
-          auto witnessContext = witness->getDeclContext();
-          if (witnessContext->getExtendedProtocolDecl()
-              && witnessContext->getGenericSignatureOfContext()) {
-            auto selfTy = witnessContext->getSelfInterfaceType();
-            auto selfAssocTy = DependentMemberType::get(selfTy,
-                                                        dmt->getAssocType());
-            for (auto &reqt : witnessContext->getGenericSignatureOfContext()
-                                            .getRequirements()) {
-              switch (reqt.getKind()) {
-              case RequirementKind::SameShape:
-                llvm_unreachable("Same-shape requirement not supported here");
-
-              case RequirementKind::Conformance:
-              case RequirementKind::Superclass:
-              case RequirementKind::Layout:
-                break;
-
-              case RequirementKind::SameType:
-                Type other;
-                if (reqt.getFirstType()->isEqual(selfAssocTy)) {
-                  other = reqt.getSecondType();
-                } else if (reqt.getSecondType()->isEqual(selfAssocTy)) {
-                  other = reqt.getFirstType();
-                } else {
-                  break;
-                }
-
-                if (auto otherAssoc = other->getAs<DependentMemberType>()) {
-                  if (otherAssoc->getBase()->isEqual(selfTy)) {
-                    auto otherDMT = DependentMemberType::get(dmt->getBase(),
-                                                    otherAssoc->getAssocType());
-
-                    // We may be able to infer one associated type from the
-                    // other.
-                    result.second = result.second.transform([&](Type t) -> Type{
-                      if (t->isEqual(dmt))
-                        return otherDMT;
-                      return t;
-                    });
-                    canInferFromOtherAssociatedType = true;
-                    LLVM_DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
-                               result.second->dump(llvm::dbgs()));
-                    return false;
-                  }
-                }
-                break;
-              }
-            }
-          }
-
-          return true;
-        });
-
-      if (containsTautologicalType) {
+      case InferenceCandidateKind::Tautological: {
         LLVM_DEBUG(llvm::dbgs() << "-- tautological\n");
         REJECT;
+      }
+
+      case InferenceCandidateKind::Infinite: {
+        LLVM_DEBUG(llvm::dbgs() << "-- infinite\n");
+        goto next_witness;
+      }
       }
 
       // Check that the type witness doesn't contradict an
@@ -1603,6 +1668,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
     conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
   Type type = witness->getInterfaceType()->getReferenceStorageReferent();
+  LLVM_DEBUG(llvm::dbgs() << "Witness interface type is " << type << "\n";);
 
   if (substitutions.empty())
     return type;
@@ -1847,12 +1913,16 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       if (!inferredType->isMaterializable())
         return true;
 
-      // If the type contains a type parameter, there is nothing we can infer
-      // from it.
-      // FIXME: This is a weird state introduced by associated type inference
-      // that should not exist.
-      if (inferredType->hasTypeParameter())
+      // Type parameters of the conforming type become archetypes here, so
+      // any remaining type parameters correspond to the innermost generic
+      // parameter list of the witness. A generic parameter gives us a
+      // tautological match.
+      if (inferredType->is<GenericTypeParamType>())
         return true;
+
+      // A type containing a type parameter cannot match.
+      if (inferredType->hasTypeParameter())
+        return false;
 
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
@@ -2122,9 +2192,14 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
     if (ctx.isRecursivelyConstructingRequirementMachine(
             conformedProto->getGenericSignature().getCanonicalSignature()) ||
         ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
-        conformedProto->isComputingRequirementSignature())
+        conformedProto->isComputingRequirementSignature()) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping circular protocol "
+                 << conformedProto->getName() << "\n");
       return;
+    }
 
+    LLVM_DEBUG(llvm::dbgs() << "Collecting same-type requirements from "
+               << conformedProto->getName() << "\n");
     for (const auto &req :
          conformedProto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::SameType)
@@ -3927,20 +4002,36 @@ void TypeWitnessSystem::mergeEquivalenceClasses(
 TypeWitnessSystem::ResolvedTypeComparisonResult
 TypeWitnessSystem::compareResolvedTypes(Type ty1, Type ty2) {
   assert(ty1 && ty2);
-  if (!ty1->isTypeParameter()) {
-    if (ty2->isTypeParameter()) {
-      // A concrete type is better than a type parameter.
-      return ResolvedTypeComparisonResult::Better;
-    } else if (!ty1->isEqual(ty2)) {
-      return ResolvedTypeComparisonResult::Ambiguity;
-    }
+
+  // Prefer shorter type parameters. This is just a heuristic and has no
+  // theoretical basis at all.
+  if (ty1->isTypeParameter() && ty2->isTypeParameter()) {
+    return compareDependentTypes(ty1, ty2) < 0
+        ? ResolvedTypeComparisonResult::Better
+        : ResolvedTypeComparisonResult::EquivalentOrWorse;
   }
 
-  // Anything else is either equivalent (i.e. actually equal concrete types or
-  // type parameter vs. type parameter), or worse (i.e. type parameter vs.
-  // concrete type).
-  return ResolvedTypeComparisonResult::EquivalentOrWorse;
+  // A concrete type is better than a type parameter.
+  if (!ty1->isTypeParameter() && ty2->isTypeParameter()) {
+    return ResolvedTypeComparisonResult::Better;
+  }
+
+  // A type parameter is worse than a concrete type.
+  if (ty1->isTypeParameter() && !ty2->isTypeParameter()) {
+    return ResolvedTypeComparisonResult::EquivalentOrWorse;
+  }
+
+  // Ambiguous concrete types.
+  if (ty1->isEqual(ty2)) {
+    return ResolvedTypeComparisonResult::EquivalentOrWorse;
+  }
+
+  return ResolvedTypeComparisonResult::Ambiguity;
 }
+
+//
+// Request evaluator entry points
+//
 
 evaluator::SideEffect
 ResolveTypeWitnessesRequest::evaluate(Evaluator &evaluator,
@@ -3976,6 +4067,36 @@ ResolveTypeWitnessesRequest::evaluate(Evaluator &evaluator,
   return evaluator::SideEffect();
 }
 
+static NormalProtocolConformance *
+getBetterConformanceForResolvingTypeWitnesses(NormalProtocolConformance *conformance,
+                                              AssociatedTypeDecl *requirement) {
+  auto *dc = conformance->getDeclContext();
+  assert(dc->getParentSourceFile() && "What are you doing?");
+  auto *proto = conformance->getProtocol();
+
+  IterableDeclContext *idc;
+  if (auto *extensionDecl = dyn_cast<ExtensionDecl>(dc))
+    idc = extensionDecl;
+  else
+    idc = cast<NominalTypeDecl>(dc);
+
+  auto otherConformances = idc->getLocalConformances(ConformanceLookupKind::NonStructural);
+  for (auto *otherConformance : otherConformances) {
+    auto *otherNormal = dyn_cast<NormalProtocolConformance>(
+        otherConformance->getRootConformance());
+    if (otherNormal == nullptr)
+      continue;
+
+    auto *otherProto = otherNormal->getProtocol();
+    if (otherProto->inheritsFrom(proto) &&
+        otherProto->getAssociatedType(requirement->getName())) {
+      return otherNormal;
+    }
+  }
+
+  return conformance;
+}
+
 TypeWitnessAndDecl
 TypeWitnessRequest::evaluate(Evaluator &eval,
                              NormalProtocolConformance *conformance,
@@ -3987,8 +4108,30 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
     break;
 
   case ResolveWitnessResult::Missing: {
-    // The type witness is still missing. Resolve all of the type witnesses.
     auto &ctx = requirement->getASTContext();
+
+    if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+      // Let's see if there is a better conformance we can perform associated
+      // type inference on.
+      auto *better = getBetterConformanceForResolvingTypeWitnesses(
+          conformance, requirement);
+
+      if (better != conformance &&
+          !ctx.evaluator.hasActiveRequest(ResolveTypeWitnessesRequest{better})) {
+        // Let's try to resolve type witnesses in the better conformance.
+        evaluateOrDefault(ctx.evaluator,
+                          ResolveTypeWitnessesRequest{better},
+                          evaluator::SideEffect());
+
+        // Check whether the above populated the type witness of our conformance.
+        auto known = conformance->TypeWitnesses.find(requirement);
+        if (known != conformance->TypeWitnesses.end())
+          return known->second;
+      }
+    }
+
+    // The type witness is still missing. Resolve all of the type witnesses
+    // in this conformance.
     evaluateOrDefault(ctx.evaluator,
                       ResolveTypeWitnessesRequest{conformance},
                       evaluator::SideEffect());
