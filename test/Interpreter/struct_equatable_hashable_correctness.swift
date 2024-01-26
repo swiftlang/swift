@@ -19,7 +19,7 @@ StructSynthesisTests.test("BasicEquatability/Hashability") {
   checkHashable([Value(v: 1), Value(v: 2)], equalityOracle: { $0 == $1 })
 }
 
-// Not guaranteed by the semantics of Hashable, but we sanity check that the
+// Not guaranteed by the semantics of Hashable, but we soundness check that the
 // synthesized hash function is good enough to not let nearby values collide.
 StructSynthesisTests.test("CloseValuesDoNotCollide") {
   expectNotEqual(Value(v: 1).hashValue, Value(v: 2).hashValue)

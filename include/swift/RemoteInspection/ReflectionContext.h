@@ -1177,7 +1177,7 @@ public:
   bool projectEnumValue(RemoteAddress EnumAddress, const TypeRef *EnumTR,
                         int *CaseIndex,
                         remote::TypeInfoProvider *ExternalTypeInfo) {
-    // Get the TypeInfo and sanity-check it
+    // Get the TypeInfo and soundness-check it
     if (EnumTR == nullptr) {
       return false;
     }

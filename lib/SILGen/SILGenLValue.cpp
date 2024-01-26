@@ -4259,7 +4259,7 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
   // Visit the subexpression.
   LValue lv = visitRec(e->getSubExpr(), accessKind, options);
 
-  // Sanity check that we did see the OpaqueValueExpr.
+  // Soundness check that we did see the OpaqueValueExpr.
   assert(SGF.OpaqueValueExprs.count(e->getOpaqueValue()) == 0 &&
          "opened existential not removed?");
   return lv;

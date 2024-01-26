@@ -1046,7 +1046,7 @@ class FieldSensitivePrunedLivenessBoundary {
 public:
   FieldSensitivePrunedLivenessBoundary(unsigned numBits) : numBits(numBits) {}
 
-  /// Sanity check meant for NDEBUG mode.
+  /// Soundness check meant for NDEBUG mode.
   unsigned getNumLastUsersAndDeadDefs(unsigned bitNo) const {
 #ifdef NDEBUG
     llvm_unreachable("Only call in asserts build!\n");

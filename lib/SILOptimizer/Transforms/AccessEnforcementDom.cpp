@@ -396,7 +396,7 @@ bool DominatedAccessRemoval::checkDominatedAccess(
   // location as the key.
   //
   // Cast this DomAccessStorage back to a plain storage location. The
-  // pass-specific bits will be ignored, but reset them anyway for sanity.
+  // pass-specific bits will be ignored, but reset them anyway for soundness.
   AccessStorage storage = static_cast<AccessStorage>(currDomStorage);
   storage.resetSubclassData();
   auto iterAndInserted =

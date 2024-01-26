@@ -323,7 +323,7 @@ private:
       return false;
     }
 
-    // Otherwise, all of our users are sane. The array does not escape.
+    // Otherwise, all of our users are sound. The array does not escape.
     return true;
   }
 

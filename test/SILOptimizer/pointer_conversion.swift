@@ -131,7 +131,7 @@ func takeStringPointer(_: UnsafePointer<String>)
 @_silgen_name("takeDictionaryPointer")
 func takeDictionaryPointer(_: UnsafePointer<Dictionary<Int, Int>>)
 
-// Test conversion of a dictionary to a raw pointer. This is not a sane
+// Test conversion of a dictionary to a raw pointer. This is not a sound
 // conversion, but the compiler must still generate memory-safe code.
 //
 // A dictionary is an eager-move type, so it will be destroyed at its

@@ -148,7 +148,7 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 }
 
 #ifndef NDEBUG
-/// Sanity check to make sure that a noescape partial apply is only ultimately
+/// Soundness check to make sure that a noescape partial apply is only ultimately
 /// used by directly calling it or passing it as argument, but not using it as a
 /// partial_apply callee.
 ///

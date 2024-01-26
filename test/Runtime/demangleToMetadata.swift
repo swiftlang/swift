@@ -512,7 +512,7 @@ if #available(SwiftStdlib 5.3, *) {
   }
 
   DemangleToMetadataTests.test("Check _mangledTypeName, _typeName use appropriate cache keys") {
-    // sanity check that name functions use the right keys to store cached names:
+    // soundness check that name functions use the right keys to store cached names:
     for _ in 1...2 {
       expectEqual("Si", _mangledTypeName(Int.self)!)
       expectEqual("Swift.Int", _typeName(Int.self, qualified: true))

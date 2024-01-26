@@ -803,7 +803,7 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
   withStatusRecordLock(parent, [&](ActiveTaskStatus parentStatus) {
     group->addChildTask(child);
 
-    // After getting parent's status record lock, do some sanity checks to
+    // After getting parent's status record lock, do some soundness checks to
     // see if parent task or group has state changes that need to be
     // propagated to the child.
     //

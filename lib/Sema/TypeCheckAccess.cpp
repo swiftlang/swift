@@ -877,7 +877,7 @@ public:
             ty = superclass;
         return ty->getAnyNominal() == superclassDecl;
       });
-      // Sanity check: we couldn't find the superclass for whatever reason
+      // Soundness check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother
       // checking it.
       if (superclassLocIter == inheritedEntries.end())
@@ -1611,7 +1611,7 @@ public:
             ty = superclass;
         return ty->getAnyNominal() == superclassDecl;
       });
-      // Sanity check: we couldn't find the superclass for whatever reason
+      // Soundness check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother
       // checking it.
       if (superclassLocIter == inheritedEntries.end())

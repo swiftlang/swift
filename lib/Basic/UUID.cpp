@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This is an interface over the standard OSF uuid library that gives UUIDs
-// sane value semantics and operators.
+// sound value semantics and operators.
 //
 //===----------------------------------------------------------------------===//
 

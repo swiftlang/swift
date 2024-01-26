@@ -467,7 +467,7 @@ public:
 private:
 
 #ifndef NDEBUG
-  /// Perform a couple of sanity checks on scopes.
+  /// Perform a couple of soundness checks on scopes.
   static bool parentScopesAreSane(const SILDebugScope *DS) {
     auto *Parent = DS;
     while ((Parent = Parent->Parent.dyn_cast<const SILDebugScope *>())) {
@@ -742,7 +742,7 @@ private:
     return DBuilder.getOrCreateTypeArray(Parameters);
   }
 
-  /// FIXME: replace this condition with something more sane.
+  /// FIXME: replace this condition with something more sound.
   static bool isAllocatingConstructor(SILFunctionTypeRepresentation Rep,
                                       DeclContext *DeclCtx) {
     return Rep != SILFunctionTypeRepresentation::Method && DeclCtx &&
@@ -2135,7 +2135,7 @@ private:
     // Incrementally build the DIRefMap.
     if (auto *CTy = dyn_cast<llvm::DICompositeType>(DITy)) {
 #ifndef NDEBUG
-      // Sanity check.
+      // Soundness check.
       if (llvm::Metadata *V = DIRefMap.lookup(UID)) {
         auto *CachedTy = cast<llvm::DIType>(V);
         assert(CachedTy == DITy && "conflicting types for one UID");
@@ -2969,7 +2969,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       if (!AlignInBits)
         AlignInBits = SizeOfByte;
 
-      // Sanity checks.
+      // Soundness checks.
 #ifndef NDEBUG
       assert(SizeInBits && "zero-sized piece");
       if (getSizeInBits(Var)) {

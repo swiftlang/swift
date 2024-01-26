@@ -84,7 +84,7 @@ function(fix_imported_targets_for_xcode imported_targets)
     endif()
 
     # First check that we actually imported the configuration that LLVM said
-    # that we did. This is just a sanity check.
+    # that we did. This is just a soundness check.
     check_imported_target_has_imported_configuration(${target} ${LLVM_BUILD_TYPE_UPPER})
 
     # Then loop through all of the imported properties and translate.

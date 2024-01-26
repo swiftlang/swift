@@ -468,7 +468,7 @@ func testThrowsInCatchInRethrows(_ fn: () throws -> Void) rethrows {
   }
 }
 
-// Sanity-check that throwing in catch blocks behaves as expected outside of
+// Soundness-check that throwing in catch blocks behaves as expected outside of
 // rethrows functions
 
 func testThrowsInCatch(_ fn: () throws -> Void) {

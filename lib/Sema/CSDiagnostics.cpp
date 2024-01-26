@@ -2008,7 +2008,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
     const ParameterList *paramList = callee->getParameters();
     const ParamDecl *param = paramList->getArray().back();
 
-    // Sanity-check that the trailing closure corresponds to this parameter.
+    // Soundness-check that the trailing closure corresponds to this parameter.
     if (!param->hasInterfaceType() ||
         !param->getInterfaceType()->is<AnyFunctionType>())
       return false;
