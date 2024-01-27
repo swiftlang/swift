@@ -418,6 +418,7 @@ static StringRef getDumpString(ValueOwnership ownership) {
 
   llvm_unreachable("Unhandled ValueOwnership in switch.");
 }
+
 static StringRef getDumpString(ForeignErrorConvention::IsOwned_t owned) {
   switch (owned) {
   case swift::ForeignErrorConvention::IsNotOwned:
@@ -446,20 +447,6 @@ static size_t getDumpString(size_t value) {
   return value;
 }
 static void *getDumpString(void *value) { return value; }
-
-static StringRef getDumpString(LifetimeDependenceKind kind) {
-  switch (kind) {
-  case LifetimeDependenceKind::Copy:
-    return "copy";
-  case LifetimeDependenceKind::Consume:
-    return "consume";
-  case LifetimeDependenceKind::Borrow:
-    return "borrow";
-  case LifetimeDependenceKind::Mutate:
-    return "mutate";
-  }
-  llvm_unreachable("Invalid lifetime dependence kind\n");
-}
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -3535,7 +3522,7 @@ public:
     for (auto &dep : T->getLifetimeDependencies()) {
       printFieldRaw(
           [&](raw_ostream &out) {
-            out << getDumpString(dep.getLifetimeDependenceKind()) << "(";
+            out << dep.getLifetimeDependenceKindString() << "(";
             out << dep.getParamString() << ")";
           },
           "");

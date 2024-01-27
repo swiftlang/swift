@@ -104,6 +104,21 @@ public:
     }
     llvm_unreachable("Invalid LifetimeDependenceSpecifier::SpecifierKind");
   }
+
+  StringRef getLifetimeDependenceKindString() const {
+    switch (lifetimeDependenceKind) {
+    case LifetimeDependenceKind::Borrow:
+      return "_borrow";
+    case LifetimeDependenceKind::Consume:
+      return "_consume";
+    case LifetimeDependenceKind::Copy:
+      return "_copy";
+    case LifetimeDependenceKind::Mutate:
+      return "_mutate";
+    }
+    llvm_unreachable(
+        "Invalid LifetimeDependenceSpecifier::LifetimeDependenceKind");
+  }
 };
 } // namespace swift
 

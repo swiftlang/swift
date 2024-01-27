@@ -469,6 +469,11 @@ SourceLoc LifetimeDependentReturnTypeRepr::getLocImpl() const {
 
 void LifetimeDependentReturnTypeRepr::printImpl(
     ASTPrinter &Printer, const PrintOptions &Opts) const {
+  for (auto &dep : getLifetimeDependencies()) {
+    Printer << dep.getLifetimeDependenceKindString() << "(";
+    Printer << dep.getParamString() << ")";
+  }
+
   printTypeRepr(getBase(), Printer, Opts);
 }
 
