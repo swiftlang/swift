@@ -181,8 +181,9 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 
 SyntacticElementTarget
 SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
-                                       bool ignoreWhereClause) {
-  SyntacticElementTarget target(stmt, dc, ignoreWhereClause);
+                                       bool ignoreWhereClause,
+                                       GenericEnvironment *packElementEnv) {
+  SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
   return target;
 }
 
