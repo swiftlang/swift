@@ -53,6 +53,7 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message: "Use String(decoding: array, as: UTF8.self) instead")
   public init(cString nullTerminatedUTF8: [CChar]) {
     self = nullTerminatedUTF8.withUnsafeBufferPointer {
       $0.withMemoryRebound(to: UInt8.self, String.init(_checkingCString:))
@@ -99,6 +100,7 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message: "Use String(decoding: array, as: UTF8.self) instead")
   public init(cString nullTerminatedUTF8: [UInt8]) {
     self = nullTerminatedUTF8.withUnsafeBufferPointer {
       String(_checkingCString: $0)
@@ -200,6 +202,7 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message: "Use String(validating: array, as: UTF8.self) instead")
   public init?(validatingCString nullTerminatedUTF8: [CChar]) {
     guard let length = nullTerminatedUTF8.firstIndex(of: 0) else {
       _preconditionFailure(
@@ -215,7 +218,7 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
-  @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
+  @available(swift, deprecated: 6, message: "Use String(validating: array, as: UTF8.self) instead")
   public init?(validatingUTF8 cString: [CChar]) {
     self.init(validatingCString: cString)
   }
@@ -423,6 +426,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   @_alwaysEmitIntoClient
+  @available(swift, deprecated: 6, message: "Use String(decoding: array, as: Encoding.self) instead")
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: [Encoding.CodeUnit],
     as sourceEncoding: Encoding.Type
