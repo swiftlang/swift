@@ -77,3 +77,32 @@ do {
     }
   }
 }
+
+// rdar://121692664 - compiler doesn't respect contravariance of the variadic function parameters
+do {
+  class Value<T> {
+    init<each V>(_ v: repeat Value<each V>,
+                 transform: @escaping (repeat each V) -> T) {
+    }
+  }
+
+  func coerce(_: Int) {}
+
+  func test(first: Value<Int?>, second: Value<(a: Int, b: Int)>) {
+    let _ = Value(first, second) { first, second in
+      coerce(first)
+      // expected-error@-1 {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+      // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+      // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    }
+
+    // multi-statement closure
+    let _ = Value(first, second) { first, second in
+      _ = 42
+      coerce(first)
+      // expected-error@-1 {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+      // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+      // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    }
+  }
+}

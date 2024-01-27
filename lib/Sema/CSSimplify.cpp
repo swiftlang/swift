@@ -3411,7 +3411,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
 
     for (auto pair : matcher.pairs) {
-      auto result = matchTypes(pair.lhs, pair.rhs, subKind, subflags,
+      // Compare the parameter types, taking contravariance into account.
+      auto result = matchTypes(pair.rhs, pair.lhs, subKind, subflags,
                                (func1Params.size() == 1
                                 ? argumentLocator
                                 : argumentLocator.withPathElement(
