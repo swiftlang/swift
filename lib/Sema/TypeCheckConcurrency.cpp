@@ -3307,6 +3307,7 @@ namespace {
               KnownProtocolKind::Actor);
         }
 
+        mayExitToNonisolated = false;
         auto calleeIsolation = ActorIsolation::forActorInstanceParameter(
             const_cast<Expr *>(arg->findOriginalValue()), paramIdx);
 
