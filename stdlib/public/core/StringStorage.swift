@@ -183,7 +183,7 @@ fileprivate func _allocate<T: AnyObject>(
 
   let numBytes = numHeaderBytes + numTailBytes
 
-  let linearBucketThreshold = 256
+  let linearBucketThreshold = 160 //128 + 32
   if _fastPath(numBytes < linearBucketThreshold) {
     // Allocate up to the nearest bucket of 16/32
     let realNumBytes = _mallocGoodSize(for: numBytes)
