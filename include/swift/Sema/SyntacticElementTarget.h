@@ -160,6 +160,7 @@ private:
       DeclContext *dc;
       Pattern *pattern;
       bool ignoreWhereClause;
+      GenericEnvironment *packElementEnv;
       ForEachStmtInfo info;
     } forEachStmt;
 
@@ -239,11 +240,13 @@ public:
   }
 
   SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
-                         bool ignoreWhereClause)
+                         bool ignoreWhereClause,
+                         GenericEnvironment *packElementEnv)
       : kind(Kind::forEachStmt) {
     forEachStmt.stmt = stmt;
     forEachStmt.dc = dc;
     forEachStmt.ignoreWhereClause = ignoreWhereClause;
+    forEachStmt.packElementEnv = packElementEnv;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
@@ -259,9 +262,10 @@ public:
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
   /// Form a target for a for-in loop.
-  static SyntacticElementTarget forForEachStmt(ForEachStmt *stmt,
-                                               DeclContext *dc,
-                                               bool ignoreWhereClause = false);
+  static SyntacticElementTarget
+  forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
+                 bool ignoreWhereClause = false,
+                 GenericEnvironment *packElementEnv = nullptr);
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -534,6 +538,11 @@ public:
   bool ignoreForEachWhereClause() const {
     assert(isForEachStmt());
     return forEachStmt.ignoreWhereClause;
+  }
+
+  GenericEnvironment *getPackElementEnv() const {
+    assert(isForEachStmt());
+    return forEachStmt.packElementEnv;
   }
 
   const ForEachStmtInfo &getForEachStmtInfo() const {

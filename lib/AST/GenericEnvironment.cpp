@@ -793,6 +793,8 @@ Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
     auto param = type->castTo<GenericTypeParamType>();
     if (!param->isParameterPack())
       return resultType;
+    if (resultType->is<PackType>())
+      return resultType;
     return PackType::getSingletonPackExpansion(resultType);
   }
   return Type();

@@ -1543,6 +1543,10 @@ public:
   llvm::MapVector<PackElementExpr *, PackExpansionExpr *>
       PackEnvironments;
 
+  /// The outer pack element generic environment to use when dealing with nested
+  /// pack iteration (see \c getPackElementEnvironment).
+  llvm::SmallVector<GenericEnvironment *> PackElementGenericEnvironments;
+
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
 
@@ -2344,6 +2348,8 @@ private:
   llvm::SmallMapVector<PackElementExpr *, PackExpansionExpr *, 2>
       PackEnvironments;
 
+  llvm::SmallVector<GenericEnvironment *, 4> PackElementGenericEnvironments;
+
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
@@ -2832,6 +2838,9 @@ public:
 
     /// The length of \c PackEnvironments.
     unsigned numPackEnvironments;
+
+    /// The length of \c PackElementGenericEnvironments.
+    unsigned numPackElementGenericEnvironments;
 
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;

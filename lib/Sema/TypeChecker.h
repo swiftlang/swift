@@ -759,7 +759,8 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 /// Type-check a for-each loop's pattern binding and sequence together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
+bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt,
+                             GenericEnvironment *packElementEnv);
 
 /// Compute the set of captures for the given function or closure.
 void computeCaptures(AnyFunctionRef AFR);
