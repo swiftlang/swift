@@ -215,7 +215,7 @@ extension String {
 
   @inlinable
   @_alwaysEmitIntoClient
-  @available(*, deprecated, renamed: "String.init(validatingCString:)")
+  @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
   public init?(validatingUTF8 cString: [CChar]) {
     self.init(validatingCString: cString)
   }
