@@ -3,6 +3,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_swift_parser
 
 @available(SwiftStdlib 5.1, *)
 actor A {

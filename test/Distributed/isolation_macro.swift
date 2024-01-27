@@ -5,6 +5,7 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 // REQUIRES: distributed
+// REQUIRES: swift_swift_parser
 
 import Distributed
 
