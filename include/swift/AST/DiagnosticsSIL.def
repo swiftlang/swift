@@ -910,6 +910,9 @@ ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, non
 ERROR(regionbasedisolation_arg_transferred, none,
       "task isolated value of type %0 transferred to %1 context; later accesses to value could race",
       (Type, ActorIsolation))
+ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
+      "task isolated value of type %0 passed as a strongly transferred parameter; later accesses could race",
+      (Type))
 NOTE(regionbasedisolation_maybe_race, none,
      "access here could race", ())
 NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
