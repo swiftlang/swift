@@ -734,10 +734,11 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
 
   type = type->mapTypeOutOfContext();
 
+  auto interfaceType = element->getInterfaceType();
+
   llvm::SmallDenseMap<GenericParamKey, GenericTypeParamType *>
       packParamForElement;
-  auto elementDepth =
-      sig.getInnermostGenericParams().front()->getDepth() + 1;
+  auto elementDepth = interfaceType->getRootGenericParam()->getDepth();
 
   for (auto *genericParam : sig.getGenericParams()) {
     if (!genericParam->isParameterPack())
