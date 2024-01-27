@@ -898,14 +898,23 @@ WARNING(regionbasedisolation_transfer_yields_race_no_isolation, none,
 WARNING(regionbasedisolation_transfer_yields_race_with_isolation, none,
         "transferring value of non-Sendable type %0 from %1 context to %2 context; later accesses could race",
         (Type, ActorIsolation, ActorIsolation))
+WARNING(regionbasedisolation_isolated_capture_yields_race, none,
+        "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
+        (Type, ActorIsolation, ActorIsolation))
 WARNING(regionbasedisolation_transfer_yields_race_transferring_parameter, none,
         "transferring value of non-Sendable type %0 into transferring parameter; later accesses could race",
         (Type))
 WARNING(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
         "binding of non-Sendable type %0 accessed after being transferred; later accesses could race",
         (Type))
+WARNING(regionbasedisolation_arg_transferred, none,
+        "task isolated value of type %0 transferred to %1 context; later accesses to value could race",
+        (Type, ActorIsolation))
 NOTE(regionbasedisolation_maybe_race, none,
      "access here could race", ())
+NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
+     "value is %0 since it is in the same region as %1",
+     (StringRef, DeclBaseName))
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())

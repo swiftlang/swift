@@ -16,7 +16,8 @@
 
 /// Classes are always non-sendable, so this is non-sendable
 class NonSendableKlass { // expected-complete-note 35{{}}
-  // expected-typechecker-only-note @-1 2{{}}
+  // expected-typechecker-only-note @-1 4{{}}
+  // expected-tns-note @-2 2{{}}
   var field: NonSendableKlass? = nil
 
   func asyncCall() async {}
@@ -38,6 +39,11 @@ actor Actor {
 final actor FinalActor {
   var klass = NonSendableKlass()
   func useKlass(_ x: NonSendableKlass) {}
+}
+
+@MainActor
+final class MainActorIsolatedKlass {
+  var klass = NonSendableKlass()
 }
 
 func useInOut<T>(_ x: inout T) {}
@@ -495,9 +501,9 @@ extension Actor {
   }
 }
 
-/////////////////////////////
-// Sendable Function Tests //
-/////////////////////////////
+///////////////////////////////////
+// MARK: Sendable Function Tests //
+///////////////////////////////////
 
 // Make sure that we do not error on function values that are Sendable... even
 // if the function is converted to a non-Sendable form by a function conversion.
@@ -509,14 +515,28 @@ func testConversionsAndSendable(a: Actor, f: @Sendable () -> Void, f2: () -> Voi
   await a.useNonSendableFunction(f)
 
   // Show that we error if we are not sendable.
-  await a.useNonSendableFunction(f2) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await a.useNonSendableFunction(f2) // expected-tns-warning {{task isolated value of type '@noescape @callee_guaranteed () -> ()' transferred to actor-isolated context; later accesses to value could race}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> Void' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
 
-///////////////////////////////////////////////
-// Multiple Field Var Assignment Merge Tests //
-///////////////////////////////////////////////
+func testSendableClosureCapturesNonSendable(a: Actor) {
+  let klass = NonSendableKlass()
+  let _ = { @Sendable in
+    _ = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+  }
+}
+
+func testSendableClosureCapturesNonSendable2(a: MainActorIsolatedKlass) {
+  let klass = NonSendableKlass()
+  let _ = { @Sendable @MainActor in
+    a.klass = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+  }
+}
+
+/////////////////////////////////////////////////////
+// MARK: Multiple Field Var Assignment Merge Tests //
+/////////////////////////////////////////////////////
 
 func singleFieldVarMergeTest() async {
   var box = SingleFieldKlassBox()

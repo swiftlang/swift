@@ -3846,6 +3846,20 @@ public:
     Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
+  /// If we find that a capture x of this AbstractClosureExpr belongs to a
+  /// different isolation domain than the closure, add an ApplyIsolationCrossing
+  /// to foundIsolationCrossing.
+  ///
+  /// \p foundIsolationCrossings an out parameter that contains the
+  /// ApplyIsolationCrossing if any of the captures are isolation crossing and
+  /// the index of the capture in the capture array. We return the index since
+  /// all captures may not cross isolation boundaries and we may need to be able
+  /// to look up the corresponding capture at the SIL level by index.
+  void getIsolationCrossing(
+      SmallVectorImpl<
+          std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>>
+          &foundIsolationCrossings);
+
   CaptureInfo getCaptureInfo() const { return Captures; }
   void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 

@@ -2927,3 +2927,55 @@ Type ThrownErrorDestination::getContextErrorType() const {
   auto conversion = storage.get<Conversion *>();
   return conversion->conversion->getType();
 }
+
+void AbstractClosureExpr::getIsolationCrossing(
+    SmallVectorImpl<std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>>
+        &foundIsolationCrossings) {
+  /// For each capture...
+  for (auto pair : llvm::enumerate(getCaptureInfo().getCaptures())) {
+    auto capture = pair.value();
+
+    // First check quickly if we have dynamic self metadata. This is Sendable
+    // data so we don't care about it.
+    if (capture.isDynamicSelfMetadata())
+      continue;
+
+    auto declIsolation = swift::getActorIsolation(capture.getDecl());
+
+    // Assert that we do not have an opaque value capture. These only appear in
+    // TypeLowering and should never appear in the AST itself.
+    assert(!capture.getOpaqueValue() &&
+           "This should only be created in TypeLowering");
+
+    // If our decl is actor isolated...
+    if (declIsolation.isActorIsolated()) {
+      // And our closure is also actor isolated, then add the apply isolation
+      // crossing if the actors are different.
+      if (actorIsolation.isActorIsolated()) {
+        if (declIsolation.getActor() == actorIsolation.getActor()) {
+          continue;
+        }
+
+        foundIsolationCrossings.emplace_back(
+            capture, pair.index(),
+            ApplyIsolationCrossing(declIsolation, actorIsolation));
+        continue;
+      }
+
+      // Otherwise, our closure is not actor isolated but our decl is actor
+      // isolated. Add it.
+      foundIsolationCrossings.emplace_back(
+          capture, pair.index(),
+          ApplyIsolationCrossing(declIsolation, actorIsolation));
+      continue;
+    }
+
+    if (!actorIsolation.isActorIsolated()) {
+      continue;
+    }
+
+    foundIsolationCrossings.emplace_back(
+        capture, pair.index(),
+        ApplyIsolationCrossing(declIsolation, actorIsolation));
+  }
+}

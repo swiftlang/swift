@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -disable-availability-checking -enable-experimental-feature TransferringArgsAndResults -verify -enable-experimental-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -emit-sil -disable-availability-checking -enable-experimental-feature TransferringArgsAndResults -verify -enable-experimental-feature RegionBasedIsolation %s -o /dev/null
 
 // REQUIRES: asserts
 
@@ -84,8 +84,9 @@ func testNonStrongTransferDoesntMerge() async {
 //////////////////////////////////
 
 func testTransferringParameter_canTransfer(_ x: transferring Klass, _ y: Klass) async {
+  // expected-note @-1:71 {{value is task isolated since it is in the same region as 'y'}}
   await transferToMain(x)
-  await transferToMain(y) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  await transferToMain(y) // expected-warning {{task isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
 }
 
 func testTransferringParameter_cannotTransferTwice(_ x: transferring Klass, _ y: Klass) async {
@@ -102,8 +103,9 @@ actor MyActor {
   var field = Klass()
 
   func canTransferWithTransferringMethodArg(_ x: transferring Klass, _ y: Klass) async {
+    // expected-note @-1:72 {{value is task isolated since it is in the same region as 'y'}}
     await transferToMain(x)
-    await transferToMain(y) // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    await transferToMain(y) // expected-warning {{task isolated value of type 'Klass' transferred to main actor-isolated context; later accesses to value could race}}
   }
 
   func getNormalErrorIfTransferTwice(_ x: transferring Klass) async {

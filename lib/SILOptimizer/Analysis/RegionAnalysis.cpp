@@ -1574,13 +1574,64 @@ public:
     }
   }
 
+  /// Handles the semantics for SIL applies that cross isolation.
+  ///
+  /// Semantically this causes all arguments of the applysite to be transferred.
+  void translateIsolatedPartialApply(PartialApplyInst *pai) {
+    ApplySite applySite(pai);
+
+    // For each argument operand.
+    for (auto &op : applySite.getArgumentOperands()) {
+      // See if we tracked it.
+      if (auto value = tryToTrackValue(op.get())) {
+        // If we are tracking it, transfer it and if it is actor derived, mark
+        // our partial apply as actor derived.
+        builder.addTransfer(value->getRepresentative().getValue(), &op);
+      }
+    }
+
+    // Now that we have transferred everything into the partial_apply, perform
+    // an assign fresh for the partial_apply. If we use any of the transferred
+    // values later, we will error, so it is safe to just create a new value.
+    auto paiValue = tryToTrackValue(pai).value();
+    SILValue rep = paiValue.getRepresentative().getValue();
+    markValueAsActorDerived(rep);
+    translateSILAssignFresh(rep);
+  }
+
   void translateSILPartialApply(PartialApplyInst *pai) {
     assert(!isIsolationBoundaryCrossingApply(pai));
 
     // First check if our partial_apply is fed into an async let begin. If so,
     // handle it especially.
+    //
+    // NOTE: If it is an async_let, then the closure itself will be Sendable. We
+    // treat passing in a value into the async Sendable closure as transferring
+    // it into the closure.
     if (isAsyncLetBeginPartialApply(pai)) {
       return translateSILPartialApplyAsyncLetBegin(pai);
+    }
+
+    // Then check if our partial apply is Sendable. In such a case, we will have
+    // emitted an earlier warning in Sema.
+    //
+    // DISCUSSION: The reason why we can treat values passed into an async let
+    // as transferring safely but it is unsafe to do this for arbitrary Sendable
+    // closures is that we do not know how many times the Sendable closure will
+    // be executed. It is possible to have different invocations of the Sendable
+    // closure to cause races with the captured non-Sendable value. In contrast
+    // since we know an async let runs exactly once, we do not need to worry
+    // about such a possibility. If we had the ability in the language to
+    // specify that a closure is run at most once or that it is always run
+    // serially, we could lift this restriction... so for now we leave in the
+    // Sema warning and just bail here.
+    if (pai->getFunctionType()->isSendableType())
+      return;
+
+    if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
+      if (ace->getActorIsolation().isActorIsolated()) {
+        return translateIsolatedPartialApply(pai);
+      }
     }
 
     SILMultiAssignOptions options;
