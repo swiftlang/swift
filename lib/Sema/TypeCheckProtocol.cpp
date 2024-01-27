@@ -4018,22 +4018,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
   auto *nominal = DC->getSelfNominalTypeDecl();
 
-  // Resolve all associated types before trying to resolve this witness.
-  evaluateOrDefault(getASTContext().evaluator,
-                    ResolveTypeWitnessesRequest{Conformance},
-                    evaluator::SideEffect());
-
-  // If any of the type witnesses was erroneous, don't bother to check
-  // this value witness: it will fail.
-  auto referenced = evaluateOrDefault(getASTContext().evaluator,
-                                      ReferencedAssociatedTypesRequest{requirement},
-                                      TinyPtrVector<AssociatedTypeDecl *>());
-  for (auto assocType : referenced) {
-    if (Conformance->getTypeWitness(assocType)->hasError()) {
-      return ResolveWitnessResult::ExplicitFailed;
-    }
-  }
-
   // Determine whether we can derive a witness for this requirement.
   bool canDerive = false;
 
@@ -4537,18 +4521,13 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   if (!requirement->isProtocolRequirement())
     return;
 
-  // Resolve all associated types before trying to resolve this witness.
-  evaluateOrDefault(getASTContext().evaluator,
-                    ResolveTypeWitnessesRequest{Conformance},
-                    evaluator::SideEffect());
-
-  // If any of the type witnesses was erroneous, don't bother to check
-  // this value witness: it will fail.
-  auto assocTypes = evaluateOrDefault(getASTContext().evaluator,
+  // Resolve the type witnesses for all associated types referenced by
+  // the requirement. If any are erroneous, don't bother resolving the
+  // witness.
+  auto referenced = evaluateOrDefault(getASTContext().evaluator,
                                       ReferencedAssociatedTypesRequest{requirement},
                                       TinyPtrVector<AssociatedTypeDecl *>());
-
-  for (auto assocType : assocTypes) {
+  for (auto assocType : referenced) {
     if (Conformance->getTypeWitness(assocType)->hasError()) {
       Conformance->setInvalid();
       return;
