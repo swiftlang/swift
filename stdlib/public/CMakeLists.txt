@@ -194,6 +194,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "i686    i686-unknown-none-elf       i686-unknown-none-elf"
       "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+      "i686    i686-pc-windows-coff       i686-pc-windows-coff"
+      "x86_64  x86_64-pc-windows-coff     x86_64-pc-windows-coff"
     )
   endif()
 
