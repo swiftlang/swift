@@ -88,11 +88,9 @@ public func validateTypeReprGeneration(
 ) {
   class TypeVisitor: SwiftSyntax.SyntaxAnyVisitor {
     let astgen: ASTGenVisitor
-    var suppression: BridgedDiagnosticSuppression
 
-    init(astgen: ASTGenVisitor, suppression: BridgedDiagnosticSuppression, viewMode: SyntaxTreeViewMode) {
+    init(astgen: ASTGenVisitor, viewMode: SyntaxTreeViewMode) {
       self.astgen = astgen
-      self.suppression = suppression
 
       super.init(viewMode: viewMode)
     }
@@ -103,9 +101,9 @@ public func validateTypeReprGeneration(
       }
 
       // We are generating just for validation; suppress diagnostics.
-      suppression.start()
+      self.astgen.diagnosticSuppression.start()
       let astgenResult = self.astgen.generate(type: type)
-      suppression.stop()
+      self.astgen.diagnosticSuppression.stop()
 
       self.astgen.validateGeneratedTypeRepr(astgenResult, from: type)
 
@@ -121,9 +119,9 @@ public func validateTypeReprGeneration(
       sourceBuffer: sourceFile.pointee.buffer,
       declContext: declContext,
       astContext: astContext,
-      legacyParser: legacyParser
+      legacyParser: legacyParser,
+      validateTypeReprGeneration: false
     ),
-    suppression: BridgedDiagnosticSuppression.init(diagnosticEngine: diagnosticEngine),
     viewMode: .sourceAccurate
   )
   .walk(sourceFile.pointee.syntax)

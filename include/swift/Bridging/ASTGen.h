@@ -64,7 +64,8 @@ void swift_ASTGen_validateTypeReprGeneration(BridgedDiagnosticEngine diagEngine,
 void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedDeclContext declContext, BridgedASTContext astContext,
-    BridgedLegacyParser legacyParser, void *_Nonnull outputContext,
+    BridgedLegacyParser legacyParser, int validateTypeReprGeneration,
+    void *_Nonnull outputContext,
     void (*_Nonnull)(void *_Nonnull, void *_Nonnull));
 
 void *_Nullable swift_ASTGen_resolveMacroType(const void *_Nonnull macroType);
@@ -123,7 +124,7 @@ swift::TypeRepr *_Nullable swift_ASTGen_buildTypeRepr(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
     BridgedASTContext astContext, BridgedLegacyParser legacyParser,
-    BridgedSourceLoc *_Nonnull endSourceLoc);
+    int validateTypeReprGeneration, BridgedSourceLoc *_Nonnull endSourceLoc);
 
 /// Build a Decl for AST node for the type at the given source location in the
 /// specified file.

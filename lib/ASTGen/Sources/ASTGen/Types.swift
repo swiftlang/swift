@@ -61,6 +61,27 @@ func isTypeMigrated(_ node: TypeSyntax) -> Bool {
 
 extension ASTGenVisitor {
   func generate(type node: TypeSyntax) -> BridgedTypeRepr {
+    guard self.validateTypeReprGeneration else {
+      return _generate(type: node)
+    }
+
+    // Validate the entire type, not its children.
+    if self.isGeneratingTypeReprForValidation {
+      return _generate(type: node)
+    }
+
+    self.isGeneratingTypeReprForValidation = true
+    defer {
+      self.isGeneratingTypeReprForValidation = false
+    }
+
+    let result = self._generate(type: node)
+    self.validateGeneratedTypeRepr(result, from: node)
+
+    return result
+  }
+
+  private func _generate(type node: TypeSyntax) -> BridgedTypeRepr {
     guard isTypeMigrated(node) else {
       return self.generateWithLegacy(node, generateChildrenWithASTGen: true)
     }
@@ -108,7 +129,9 @@ extension ASTGenVisitor {
     }
     preconditionFailure("isTypeMigrated() mismatch")
   }
+}
 
+extension ASTGenVisitor {
   func generate(identifierType node: IdentifierTypeSyntax) -> BridgedTypeRepr {
     let loc = self.generateSourceLoc(node.name)
 
