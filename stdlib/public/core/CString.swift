@@ -240,7 +240,7 @@ extension String {
   public init?(validatingCString nullTerminatedUTF8: inout CChar) {
     guard nullTerminatedUTF8 == 0 else {
       _preconditionFailure(
-        "input of String.init(validatingUTF8:) must be null-terminated"
+        "input of String.init(validatingCString:) must be null-terminated"
       )
     }
     self = ""
