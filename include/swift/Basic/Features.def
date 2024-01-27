@@ -245,6 +245,12 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// parser also produces no diagnostics.
 EXPERIMENTAL_FEATURE(ValidateNewParserDiagnostics, false)
 
+/// Run the Swift (swift-syntax) parser on the file, and for every
+/// `TypeSyntax` node in the parsed syntax tree, validate the result of
+/// translating the node to compiler AST against the legacy parser and emit
+/// errors on unexpected mismatches.
+EXPERIMENTAL_FEATURE(ValidateTypeReprASTGen, false)
+
 /// Whether to emit diagnostics from the new parser first, and only emit
 /// diagnostics from the existing parser when there are none from the new
 /// parser.

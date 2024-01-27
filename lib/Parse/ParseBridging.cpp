@@ -145,9 +145,12 @@ ParserResult<TypeRepr> Parser::parseTypeReprFromSyntaxTree() {
   return parseASTFromSyntaxTree<TypeRepr>(*this, [&](void *exportedSourceFile,
                                                      BridgedSourceLoc sourceLoc,
                                                      BridgedSourceLoc &endLoc) {
+    const auto parsingOpts = this->SF.getParsingOptions();
     return swift_ASTGen_buildTypeRepr(
         &Diags, exportedSourceFile, sourceLoc, CurDeclContext, Context, *this,
-        /*validateTypeReprGeneration=*/false, &endLoc);
+        /*validateTypeReprGeneration=*/
+        parsingOpts.contains(SourceFile::ParsingFlags::ValidateTypeReprASTGen),
+        &endLoc);
   });
 #else
   llvm_unreachable("ASTGen is not supported");
