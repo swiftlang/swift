@@ -26,11 +26,11 @@
 
 using namespace swift;
 
-static LibPrespecializedData<InProcess> *findLibPrespecialized() {
+static const LibPrespecializedData<InProcess> *findLibPrespecialized() {
   if (!runtime::environment::SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED())
     return nullptr;
 
-  void *dataPtr = nullptr;
+  const void *dataPtr = nullptr;
 #if USE_DLOPEN
   auto path = runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH();
   if (path && path[0]) {
@@ -41,13 +41,13 @@ static LibPrespecializedData<InProcess> *findLibPrespecialized() {
     dataPtr = dlsym(handle, LIB_PRESPECIALIZED_TOP_LEVEL_SYMBOL_NAME);
   }
 #if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
-  else {
+  else if (SWIFT_RUNTIME_WEAK_CHECK(_dyld_get_swift_prespecialized_data)) {
     // Disable the prespecializations library if anything in the shared cache is
     // overridden. Eventually we want to be cleverer and only disable the
     // prespecializations that have been invalidated, but we'll start with the
     // simplest approach.
     if (!dyld_shared_cache_some_image_overridden())
-      dataPtr = _dyld_get_swift_prespecialized_data();
+      dataPtr = SWIFT_RUNTIME_WEAK_USE(_dyld_get_swift_prespecialized_data());
   }
 #endif
 #endif
@@ -55,7 +55,8 @@ static LibPrespecializedData<InProcess> *findLibPrespecialized() {
   if (!dataPtr)
     return nullptr;
 
-  auto *data = reinterpret_cast<LibPrespecializedData<InProcess> *>(dataPtr);
+  auto *data =
+      reinterpret_cast<const LibPrespecializedData<InProcess> *>(dataPtr);
   if (data->majorVersion !=
       LibPrespecializedData<InProcess>::currentMajorVersion)
     return nullptr;
@@ -63,7 +64,7 @@ static LibPrespecializedData<InProcess> *findLibPrespecialized() {
   return data;
 }
 
-LibPrespecializedData<InProcess> *swift::getLibPrespecializedData() {
+const LibPrespecializedData<InProcess> *swift::getLibPrespecializedData() {
   return SWIFT_LAZY_CONSTANT(findLibPrespecialized());
 }
 
