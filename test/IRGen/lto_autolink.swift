@@ -46,3 +46,4 @@ import AutolinkModuleMapLink
 // UNSUPPORTED: OS=macosx && CPU=arm64
 // UNSUPPORTED: OS=watchos && CPU=arm64_32
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+// UNSUPPORTED: CPU=wasm32
