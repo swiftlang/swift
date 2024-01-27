@@ -4897,7 +4897,7 @@ InverseMarking TypeDecl::getMarking(InvertibleProtocolKind ip) const {
 static TypeDecl::CanBeInvertible::Result
 conformanceExists(TypeDecl const *decl, InvertibleProtocolKind ip) {
   auto *proto = decl->getASTContext().getProtocol(getKnownProtocolKind(ip));
-  assert(proto);
+  assert(proto && "missing Copyable/Escapable from stdlib!");
 
   // Handle protocols specially, without building a GenericSignature.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl))

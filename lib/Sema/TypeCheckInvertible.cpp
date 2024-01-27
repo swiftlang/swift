@@ -161,8 +161,8 @@ static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
 static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   auto &ctx = type->getASTContext();
 
-  auto *invertible = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(invertible && "failed to load Copyable/Escapable from stdlib!");
+  auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+  assert(proto && "missing Copyable/Escapable from stdlib!");
 
   // Must not have a type parameter!
   assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
@@ -177,8 +177,8 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
                     SILTokenType>()));
 
   const bool conforms =
-      (bool) invertible->getParentModule()->checkConformance(
-          type, invertible,
+      (bool) proto->getParentModule()->checkConformance(
+          type, proto,
           /*allowMissing=*/false);
 
   return conforms;
