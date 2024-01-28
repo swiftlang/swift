@@ -140,6 +140,7 @@ actor ExampleFromProposal {
   let immutableSendable = SendableType()
   var mutableSendable = SendableType()
   let nonSendable = NonSendableType()
+  nonisolated(unsafe) let unsafeNonSendable = NonSendableType()
   var nsItems: [NonSendableType] = []
   var sItems: [SendableType] = []
 
@@ -147,12 +148,14 @@ actor ExampleFromProposal {
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // ok
     _ = self.nonSendable        // ok
+    _ = self.unsafeNonSendable
 
     f() // expected-note 2 {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
 
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // expected-warning {{cannot access property 'mutableSendable' here in non-isolated initializer; this is an error in Swift 6}}
     _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' here in non-isolated initializer; this is an error in Swift 6}}
+    _ = self.unsafeNonSendable // ok
   }
 
 

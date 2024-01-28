@@ -86,7 +86,9 @@ extension A1 {
     _ = await self.asynchronous(nil)
 
     // Across to a different actor, so Sendable restriction is enforced.
-    _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' in asynchronous access to actor-isolated property 'localLet' cannot cross actor boundary}}
+    _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' in implicitly asynchronous access to actor-isolated property 'localLet' cannot cross actor boundary}}
+    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-2 {{property access is 'async'}}
     _ = await other.synchronous() // expected-warning{{non-sendable type 'NotConcurrent?' returned by call to actor-isolated function cannot cross actor boundary}}
     _ = await other.asynchronous(nil) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into actor-isolated context may introduce data races}}
   }
@@ -230,7 +232,7 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
 // Sendable restriction on nonisolated declarations.
 // ----------------------------------------------------------------------
 actor ANI {
-  nonisolated let nc = NC()
+  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in Swift 6}}
   nonisolated func f() -> NC? { nil }
 }
 

@@ -5602,9 +5602,6 @@ WARNING(non_sendable_property_type,none,
 WARNING(non_sendable_keypath_capture,none,
         "cannot form key path that captures non-sendable type %0",
         (Type))
-WARNING(non_sendable_keypath_access,none,
-        "cannot form key path that accesses non-sendable type %0",
-        (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %2|associated value %2}1 of "
       "'Sendable'-conforming %kind3 has non-sendable type %0",
@@ -5668,6 +5665,10 @@ NOTE(nonisolated_mutable_storage_note,none,
      "convert %0 to a 'let' constant or consider declaring it "
      "'nonisolated(unsafe)' if manually managing concurrency safety",
      (const VarDecl *))
+ERROR(nonisolated_non_sendable,none,
+      "'nonisolated' can not be applied to variable with non-'Sendable' "
+      "type %0",
+      (Type))
 ERROR(nonisolated_local_var,none,
       "'nonisolated' can not be applied to local variables",
       ())

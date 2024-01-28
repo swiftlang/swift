@@ -6880,6 +6880,17 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         return;
       }
 
+      // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable variables.
+      auto type = var->getTypeInContext();
+      if (!attr->isUnsafe() && !type->hasError() &&
+          !type->isSendableType()) {
+        Ctx.Diags.diagnose(attr->getLocation(),
+                           diag::nonisolated_non_sendable,
+                           type)
+          .warnUntilSwiftVersion(6);
+        return;
+      }
+
       if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
         // 'nonisolated' can not be applied to stored properties inside
         // distributed actors. Attempts of nonisolated access would be

@@ -114,7 +114,9 @@ func checkAsyncPropertyAccess() async {
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
 
-  _ = act.point  // expected-warning{{non-sendable type 'Point' in asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
+  _ = act.point  // expected-warning{{non-sendable type 'Point' in implicitly asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
+  // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-2 {{property access is 'async'}}
 }
 
 /// ------------------------------------------------------------------
@@ -1538,11 +1540,11 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
   }
 }
 
-// expected-note@+1 2 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+// expected-note@+1 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
 class NonSendable {}
 
 actor ProtectNonSendable {
-  // expected-note@+1 {{property declared here}}
+  // expected-note@+1 2 {{property declared here}}
   let ns = NonSendable()
 
   init() {}
@@ -1560,7 +1562,9 @@ class ReferenceActor {
   init() async {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    // expected-warning@+3 {{non-sendable type 'NonSendable' in implicitly asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
+    // expected-note@+1 {{property access is 'async'}}
     _ = a.ns
   }
 }
@@ -1571,7 +1575,7 @@ actor AnotherActor {
   init() {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from a non-isolated context}}
     _ = a.ns
   }
 }
