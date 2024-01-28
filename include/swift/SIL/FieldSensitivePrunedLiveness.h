@@ -1362,66 +1362,59 @@ public:
     }
   }
 
-  bool isDef(SILInstruction *inst, unsigned bit) const {
+  bool isDef(SILNode *node, unsigned bit) const {
     assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(inst));
+    auto iter = defs.find(node);
     if (!iter)
       return false;
     return llvm::any_of(
         *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
+  }
+
+  bool isDef(SILInstruction *inst, unsigned bit) const {
+    return isDef(cast<SILNode>(inst), bit);
   }
 
   bool isDef(SILValue value, unsigned bit) const {
+    return isDef(cast<SILNode>(value), bit);
+  }
+
+  bool isDef(SILNode *node, SmallBitVector const &bits) const {
     assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(value));
+    auto iter = defs.find(node);
     if (!iter)
       return false;
-    return llvm::any_of(
-        *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
+    SmallBitVector allBits(bits.size());
+    for (auto range : *iter) {
+      range.setBits(allBits);
+    }
+    return (bits & allBits) == bits;
   }
 
   bool isDef(SILValue value, SmallBitVector const &bits) const {
-    assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(value));
-    if (!iter)
-      return false;
-    SmallBitVector allBits(bits.size());
-    for (auto range : *iter) {
-      range.setBits(allBits);
-    }
-    return (bits & allBits) == bits;
+    return isDef(cast<SILNode>(value), bits);
   }
 
   bool isDef(SILInstruction *inst, SmallBitVector const &bits) const {
+    return isDef(cast<SILNode>(inst), bits);
+  }
+
+  bool isDef(SILNode *node, TypeTreeLeafTypeRange span) const {
     assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(inst));
+    auto iter = defs.find(node);
     if (!iter)
       return false;
-    SmallBitVector allBits(bits.size());
-    for (auto range : *iter) {
-      range.setBits(allBits);
-    }
-    return (bits & allBits) == bits;
+    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
+      return span.setIntersection(storedSpan).has_value();
+    });
   }
 
   bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
-    assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(inst));
-    if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).has_value();
-    });
+    return isDef(cast<SILNode>(inst), span);
   }
 
   bool isDef(SILValue value, TypeTreeLeafTypeRange span) const {
-    assert(isInitialized());
-    auto iter = defs.find(cast<SILNode>(value));
-    if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).has_value();
-    });
+    return isDef(cast<SILNode>(value), span);
   }
 
   void
