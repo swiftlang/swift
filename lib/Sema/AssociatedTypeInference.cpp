@@ -2582,6 +2582,15 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   llvm_unreachable("unhandled result");
 }
 
+static bool containsConcreteDependentMemberType(Type ty) {
+  return ty.findIf([](Type t) -> bool {
+    if (auto *dmt = t->getAs<DependentMemberType>())
+      return !dmt->isTypeParameter();
+
+    return false;
+  });
+}
+
 AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes, unsigned reqDepth) {
   if (unresolvedAssocTypes.empty()) {
@@ -2709,15 +2718,15 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
       llvm::SmallPtrSet<AssociatedTypeDecl *, 4> circularityCheck;
       circularityCheck.insert(assocType);
 
-      std::function<Type(Type)> substCurrentTypeWitnesses;
-      substCurrentTypeWitnesses = [&](Type ty) -> Type {
+      std::function<llvm::Optional<Type>(Type)> substCurrentTypeWitnesses;
+      substCurrentTypeWitnesses = [&](Type ty) -> llvm::Optional<Type> {
         auto *const dmt = ty->getAs<DependentMemberType>();
         if (!dmt) {
-          return ty;
+          return llvm::None;
         }
 
         const auto substBase =
-            dmt->getBase().transform(substCurrentTypeWitnesses);
+            dmt->getBase().transformRec(substCurrentTypeWitnesses);
         if (!substBase) {
           return nullptr;
         }
@@ -2726,9 +2735,16 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         // need to look up a tentative type witness. Otherwise, just substitute
         // the base.
         if (substBase->getAnyNominal() != dc->getSelfNominalTypeDecl()) {
-          return dmt->substBaseType(substBase,
-                                    LookUpConformanceInModule(dc->getParentModule()),
-                                    substOptions);
+          auto substTy = dmt->substBaseType(
+              substBase,
+              LookUpConformanceInModule(dc->getParentModule()),
+              substOptions);
+
+          // If any unresolved dependent member types remain, give up.
+          if (containsConcreteDependentMemberType(substTy))
+            return nullptr;
+
+          return substTy;
         }
 
         auto *assocTy = dmt->getAssocType();
@@ -2765,7 +2781,7 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
           // out so that we don't break any subst() invariants.
           if (tyWitness->hasTypeParameter() ||
               tyWitness->hasDependentMember()) {
-            tyWitness = tyWitness.transform(substCurrentTypeWitnesses);
+            tyWitness = tyWitness.transformRec(substCurrentTypeWitnesses);
           }
 
           if (tyWitness) {
@@ -2798,15 +2814,20 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
         return tyWitness;
       };
 
-      type = type.transform(substCurrentTypeWitnesses);
+      type = type.transformRec(substCurrentTypeWitnesses);
 
       // If substitution failed, give up.
-      if (!type || type->hasError())
+      if (!type || type->hasError()) {
+        LLVM_DEBUG(llvm::dbgs() << "-- Simplification failed\n");
         return assocType;
+      }
+
+      // If any unresolved dependent member types remain, give up.
+      assert(!containsConcreteDependentMemberType(type));
 
       type = dc->mapTypeIntoContext(type);
 
-      LLVM_DEBUG(llvm::dbgs() << "Substituted witness type is " << type << "\n";);
+      LLVM_DEBUG(llvm::dbgs() << "Simplified witness type is " << type << "\n";);
     }
 
     if (const auto failed =
@@ -4229,11 +4250,11 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
           conformance, requirement);
 
       if (better == conformance) {
-        LLVM_DEBUG(llvm::dbgs() << "Conformance to " << conformance->getProtocol()
+        LLVM_DEBUG(llvm::dbgs() << "Conformance to " << conformance->getProtocol()->getName()
                                 << " is best\n";);
       } else {
-        LLVM_DEBUG(llvm::dbgs() << "Conformance to " << better->getProtocol()
-                                << " is better than " << conformance->getProtocol()
+        LLVM_DEBUG(llvm::dbgs() << "Conformance to " << better->getProtocol()->getName()
+                                << " is better than " << conformance->getProtocol()->getName()
                                 << "\n";);
       }
       if (better != conformance &&
