@@ -802,7 +802,7 @@ if(SWIFT_PATH_TO_CMARK_BUILD)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   message(STATUS "CMark Version: ${_CMARK_VERSION}")
 elseif(SWIFT_INCLUDE_TOOLS)
-  find_package(cmark-gfm CONFIG REQUIRED)
+  find_package(cmark-gfm REQUIRED)
 endif()
 message(STATUS "")
 
