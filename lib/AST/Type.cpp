@@ -5700,7 +5700,7 @@ llvm::Optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
     return getASTContext().getErrorExistentialType();
 
   // If the thrown interface type is "Never", this function does not throw.
-  if (thrownError->isEqual(getASTContext().getNeverType()))
+  if (thrownError->isNever())
     return llvm::None;
 
   // Otherwise, return the typed error.

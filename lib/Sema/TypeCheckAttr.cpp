@@ -2749,47 +2749,36 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                       ConstraintSystemFlags::IgnoreAsyncSyncMismatch);
   ConstraintLocator *locator =
       CS.getConstraintLocator({}, ConstraintLocator::Member);
+  auto throwsTypeVar = CS.createTypeVariable(locator, 0);
+
   // Allowed main function types
-  // `() -> Void`
-  // `() async -> Void`
-  // `() throws -> Void`
-  // `() async throws -> Void`
-  // `@MainActor () -> Void`
-  // `@MainActor () async -> Void`
-  // `@MainActor () throws -> Void`
-  // `@MainActor () async throws -> Void`
+  // `() throws(E) -> Void`
+  // `() async throws(E) -> Void`
+  // `@MainActor () throws(E) -> Void`
+  // `@MainActor () async throws(E) -> Void`
   {
-    llvm::SmallVector<Type, 8> mainTypes = {
-
+    llvm::SmallVector<Type, 4> mainTypes = {
         FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
-                          ASTExtInfo()),
-        FunctionType::get(
-            /*params*/ {}, context.TheEmptyTupleType,
-            ASTExtInfoBuilder().withAsync().build()),
-
-        FunctionType::get(/*params*/ {}, context.TheEmptyTupleType,
-                          ASTExtInfoBuilder().withThrows().build()),
+                          ASTExtInfoBuilder().withThrows(
+                            true, throwsTypeVar
+                          ).build()),
 
         FunctionType::get(
             /*params*/ {}, context.TheEmptyTupleType,
-            ASTExtInfoBuilder().withAsync().withThrows().build())};
+            ASTExtInfoBuilder().withAsync()
+                .withThrows(true, throwsTypeVar).build())};
 
     Type mainActor = context.getMainActorType();
     if (mainActor) {
       auto extInfo = ASTExtInfoBuilder().withIsolation(
-          FunctionTypeIsolation::forGlobalActor(mainActor));
+          FunctionTypeIsolation::forGlobalActor(mainActor))
+        .withThrows(true, throwsTypeVar);
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
           extInfo.build()));
       mainTypes.push_back(FunctionType::get(
           /*params*/ {}, context.TheEmptyTupleType,
           extInfo.withAsync().build()));
-      mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
-          extInfo.withThrows().build()));
-      mainTypes.push_back(FunctionType::get(
-          /*params*/ {}, context.TheEmptyTupleType,
-          extInfo.withAsync().withThrows().build()));
     }
     TypeVariableType *mainType =
         CS.createTypeVariable(locator, /*options=*/0);

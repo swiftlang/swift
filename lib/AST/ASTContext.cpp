@@ -965,6 +965,21 @@ FuncDecl *ASTContext::getAsyncIteratorNext() const {
   return nullptr;
 }
 
+namespace {
+
+template<typename DeclClass>
+DeclClass *synthesizeBuiltinDecl(const ASTContext &ctx, StringRef name) {
+  if (name == "Never") {
+    auto never = new (ctx) EnumDecl(SourceLoc(), ctx.getIdentifier(name),
+                                    SourceLoc(), { }, nullptr,
+                                    ctx.MainModule);
+    return (DeclClass *)never;
+  }
+  return nullptr;
+}
+
+}
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
 DECL_CLASS *ASTContext::get##NAME##Decl() const { \
   if (getImpl().NAME##Decl) \
@@ -980,7 +995,7 @@ DECL_CLASS *ASTContext::get##NAME##Decl() const { \
       } \
     } \
   } \
-  return nullptr; \
+  return synthesizeBuiltinDecl<DECL_CLASS>(*this, #NAME); \
 } \
 \
 Type ASTContext::get##NAME##Type() const { \

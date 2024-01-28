@@ -1208,7 +1208,6 @@ void SILGenFunction::ForceTryEmission::finish() {
             }, LookUpConformanceInModule(SGF.getModule().getSwiftModule()));
 
         // Generic errors are passed indirectly.
-        #if true
         if (!error.getType().isAddress()) {
           auto *tmp = SGF.B.createAllocStack(Loc,
                                              error.getType().getObjectType(),
@@ -1218,11 +1217,6 @@ void SILGenFunction::ForceTryEmission::finish() {
 
           tmpBuffer = tmp;
         }
-        #else
-        error = SGF.emitSubstToOrigValue(Loc, error,
-                                         AbstractionPattern::getOpaque(),
-                                         error.getType().getASTType());
-        #endif
       }
 
       SGF.emitApplyOfLibraryIntrinsic(

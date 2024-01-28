@@ -178,6 +178,140 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
   emitLazyConformancesForFunction(&toplevel);
 }
 
+/// Generate code for calling the given main function.
+void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
+  // This function is effectively emitting SIL for:
+  //   return try await TheType.$main();
+  auto loc = SILLocation(mainFunc);
+  auto *entryBlock = B.getInsertionBB();
+
+  SILDeclRef mainFunctionDeclRef(mainFunc, SILDeclRef::Kind::Func);
+  SILFunction *mainFunction =
+      SGM.getFunction(mainFunctionDeclRef, NotForDefinition);
+
+  NominalTypeDecl *mainType =
+      mainFunc->getDeclContext()->getSelfNominalTypeDecl();
+  auto metatype = B.createMetatype(mainType, getLoweredType(mainType->getInterfaceType()));
+
+  auto mainFunctionRef = B.createFunctionRef(loc, mainFunction);
+
+  auto builtinInt32Type = SILType::getBuiltinIntegerType(
+      32, getASTContext());
+
+  // Set up the exit block, which will either return the exit value
+  // (for synchronous main()) or call exit() with the return value (for
+  // asynchronous main()).
+  auto *exitBlock = createBasicBlock();
+  SILValue exitCode =
+      exitBlock->createPhiArgument(builtinInt32Type, OwnershipKind::None);
+  B.setInsertionPoint(exitBlock);
+
+  if (!mainFunc->hasAsync()) {
+    auto returnType = F.getConventions().getSingleSILResultType(
+        B.getTypeExpansionContext());
+    if (exitCode->getType() != returnType)
+      exitCode = B.createStruct(loc, returnType, exitCode);
+    B.createReturn(loc, exitCode);
+  } else {
+    FuncDecl *exitFuncDecl = SGM.getExit();
+    assert(exitFuncDecl && "Failed to find exit function declaration");
+    SILFunction *exitSILFunc = SGM.getFunction(
+        SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
+        NotForDefinition);
+
+    SILFunctionType &funcType =
+        *exitSILFunc->getLoweredType().getAs<SILFunctionType>();
+    SILType retType = SILType::getPrimitiveObjectType(
+        funcType.getParameters().front().getInterfaceType());
+    exitCode = B.createStruct(loc, retType, exitCode);
+    SILValue exitCall = B.createFunctionRef(loc, exitSILFunc);
+    B.createApply(loc, exitCall, {}, {exitCode});
+    B.createUnreachable(loc);
+  }
+
+  // Form a call to the main function.
+  CanSILFunctionType mainFnType = mainFunction->getConventions().funcTy;
+  ASTContext &ctx = getASTContext();
+  if (mainFnType->hasErrorResult()) {
+    auto *successBlock = createBasicBlock();
+    B.setInsertionPoint(successBlock);
+    successBlock->createPhiArgument(SGM.Types.getEmptyTupleType(),
+                                    OwnershipKind::None);
+    SILValue zeroReturnValue =
+        B.createIntegerLiteral(loc, builtinInt32Type, 0);
+    B.createBranch(loc, exitBlock, {zeroReturnValue});
+
+    SILResultInfo errorResult = mainFnType->getErrorResult();
+    SILType errorType = errorResult.getSILStorageInterfaceType();
+
+    auto *failureBlock = createBasicBlock();
+    B.setInsertionPoint(failureBlock);
+    SILValue error;
+    if (IndirectErrorResult) {
+      error = IndirectErrorResult;
+    } else {
+      error = failureBlock->createPhiArgument(
+          errorType, OwnershipKind::Owned);
+    }
+
+    // Log the error.
+    if (errorType.getASTType()->isErrorExistentialType()) {
+      // Load the indirect error, if needed.
+      if (IndirectErrorResult) {
+        const TypeLowering &errorExistentialTL = getTypeLowering(errorType);
+
+        error = emitLoad(
+           loc, IndirectErrorResult, errorExistentialTL, SGFContext(),
+          IsTake).forward(*this);
+      }
+
+      // Call the errorInMain entrypoint, which takes an existential
+      // error.
+      B.createBuiltin(loc, ctx.getIdentifier("errorInMain"),
+                      SGM.Types.getEmptyTupleType(), {}, {error});
+    } else {
+      // Call the _errorInMainTyped entrypoint, which handles
+      // arbitrary error types.
+      SILValue tmpBuffer;
+
+      FuncDecl *entrypoint = ctx.getErrorInMainTyped();
+      auto genericSig = entrypoint->getGenericSignature();
+      SubstitutionMap subMap = SubstitutionMap::get(
+          genericSig, [&](SubstitutableType *dependentType) {
+            return errorType.getASTType();
+          }, LookUpConformanceInModule(getModule().getSwiftModule()));
+
+      // Generic errors are passed indirectly.
+      if (!error->getType().isAddress()) {
+        auto *tmp = B.createAllocStack(loc,
+                                       error->getType().getObjectType(),
+                                       llvm::None);
+        emitSemanticStore(
+            loc, error, tmp,
+            getTypeLowering(tmp->getType()), IsInitialization);
+        tmpBuffer = tmp;
+        error = tmp;
+      }
+
+      emitApplyOfLibraryIntrinsic(
+          loc, entrypoint, subMap,
+          { ManagedValue::forForwardedRValue(*this, error) },
+          SGFContext());
+    }
+    B.createUnreachable(loc);
+
+    B.setInsertionPoint(entryBlock);
+    B.createTryApply(loc, mainFunctionRef, SubstitutionMap(),
+                     {metatype}, successBlock, failureBlock);
+  } else {
+    B.setInsertionPoint(entryBlock);
+    B.createApply(loc, mainFunctionRef, SubstitutionMap(), {metatype});
+    SILValue returnValue =
+        B.createIntegerLiteral(loc, builtinInt32Type, 0);
+    B.createBranch(loc, exitBlock, {returnValue});
+  }
+}
+
 void SILGenModule::emitEntryPoint(SourceFile *SF) {
   assert(!M.lookUpFunction(getASTContext().getEntryPointFunctionName()) &&
          "already emitted toplevel?!");
