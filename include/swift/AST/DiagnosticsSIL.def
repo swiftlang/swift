@@ -890,26 +890,29 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 
 // Warnings arising from the flow-sensitive checking of Sendability of
 // non-Sendable values
-WARNING(regionbasedisolation_selforargtransferred, none,
-        "call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller", ())
-WARNING(regionbasedisolation_transfer_yields_race_no_isolation, none,
-        "transferring value of non-Sendable type %0; later accesses could race",
-        (Type))
-WARNING(regionbasedisolation_transfer_yields_race_with_isolation, none,
-        "transferring value of non-Sendable type %0 from %1 context to %2 context; later accesses could race",
-        (Type, ActorIsolation, ActorIsolation))
-WARNING(regionbasedisolation_isolated_capture_yields_race, none,
-        "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
-        (Type, ActorIsolation, ActorIsolation))
-WARNING(regionbasedisolation_transfer_yields_race_transferring_parameter, none,
-        "transferring value of non-Sendable type %0 into transferring parameter; later accesses could race",
-        (Type))
-WARNING(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
-        "binding of non-Sendable type %0 accessed after being transferred; later accesses could race",
-        (Type))
-WARNING(regionbasedisolation_arg_transferred, none,
-        "task isolated value of type %0 transferred to %1 context; later accesses to value could race",
-        (Type, ActorIsolation))
+ERROR(regionbasedisolation_selforargtransferred, none,
+      "call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller", ())
+ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
+      "transferring value of non-Sendable type %0; later accesses could race",
+      (Type))
+ERROR(regionbasedisolation_transfer_yields_race_with_isolation, none,
+      "transferring value of non-Sendable type %0 from %1 context to %2 context; later accesses could race",
+      (Type, ActorIsolation, ActorIsolation))
+ERROR(regionbasedisolation_isolated_capture_yields_race, none,
+      "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
+      (Type, ActorIsolation, ActorIsolation))
+ERROR(regionbasedisolation_transfer_yields_race_transferring_parameter, none,
+      "transferring value of non-Sendable type %0 into transferring parameter; later accesses could race",
+      (Type))
+ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
+      "binding of non-Sendable type %0 accessed after being transferred; later accesses could race",
+      (Type))
+ERROR(regionbasedisolation_arg_transferred, none,
+      "task isolated value of type %0 transferred to %1 context; later accesses to value could race",
+      (Type, ActorIsolation))
+ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
+      "task isolated value of type %0 passed as a strongly transferred parameter; later accesses could race",
+      (Type))
 NOTE(regionbasedisolation_maybe_race, none,
      "access here could race", ())
 NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
