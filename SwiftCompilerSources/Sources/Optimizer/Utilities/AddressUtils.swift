@@ -34,12 +34,18 @@ protocol AddressUseVisitor {
   /// An access scope: begin_access, begin_apply, load_borrow.
   mutating func scopedAddressUse(of operand: Operand) -> WalkResult
 
+  /// end_access, end_apply, abort_apply, end_borrow.
+  mutating func scopeEndingAddressUse(of operand: Operand) -> WalkResult
+
   /// A address leaf use cannot propagate the address bits beyond the
   /// instruction.
   ///
-  /// An apply or builtin propagates an address into the callee, but
-  /// it is considered a leaf use as long as the argument does not escape.
+  /// StoringInstructions are leaf uses.
   mutating func leafAddressUse(of operand: Operand) -> WalkResult
+
+  /// An address used by an apply.
+  mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite)
+    -> WalkResult
 
   /// A loaded address use propagates the value at the address.
   mutating func loadedAddressUse(of operand: Operand, into value: Value)
@@ -67,9 +73,11 @@ extension AddressUseVisitor {
   /// protocol methods above.
   mutating func classifyAddress(operand: Operand) -> WalkResult {
     switch operand.instruction {
-    case is BeginAccessInst, is BeginApplyInst, is LoadBorrowInst,
-         is StoreBorrowInst:
+    case is BeginAccessInst, is LoadBorrowInst, is StoreBorrowInst:
       return scopedAddressUse(of: operand)
+
+    case is EndAccessInst, is EndApplyInst, is AbortApplyInst, is EndBorrowInst:
+      return scopeEndingAddressUse(of: operand)
 
     case let markDep as MarkDependenceInst:
       if markDep.valueOperand == operand {
@@ -81,7 +89,7 @@ extension AddressUseVisitor {
       if markDep.type.isAddress {
         return projectedAddressUse(of: operand, into: markDep)
       }
-      if LifetimeDependence(markDependence: markDep, context) != nil {
+      if LifetimeDependence(markDep, context) != nil {
         // This is unreachable from InteriorUseVisitor because the
         // base address of a `mark_dependence [nonescaping]` must be a
         // `begin_access`, and interior liveness does not check uses of
@@ -97,7 +105,7 @@ extension AddressUseVisitor {
     case let pai as PartialApplyInst where !pai.isOnStack:
       return escapingAddressUse(of: operand)
 
-    case is AddressToPointerInst:
+    case is ReturnInst, is ThrowInst, is YieldInst, is AddressToPointerInst:
       return escapingAddressUse(of: operand)
 
     case is StructElementAddrInst, is TupleElementAddrInst,
@@ -113,8 +121,10 @@ extension AddressUseVisitor {
       let svi = operand.instruction as! SingleValueInstruction
       return projectedAddressUse(of: operand, into: svi)
 
-    case is ReturnInst, is ThrowInst, is YieldInst, is TryApplyInst,
-         is SwitchEnumAddrInst, is CheckedCastAddrBranchInst,
+    case let apply as FullApplySite:
+      return appliedAddressUse(of: operand, by: apply)
+
+    case is SwitchEnumAddrInst, is CheckedCastAddrBranchInst,
          is SelectEnumAddrInst, is InjectEnumAddrInst,
          is StoreInst, is StoreUnownedInst, is StoreWeakInst,
          is AssignInst, is AssignByWrapperInst, is AssignOrInitInst,
@@ -122,7 +132,7 @@ extension AddressUseVisitor {
          is RetainValueAddrInst, is ReleaseValueAddrInst,
          is DestroyAddrInst, is DeallocStackInst, 
          is DeinitExistentialAddrInst,
-         is EndApplyInst, is IsUniqueInst, is MarkFunctionEscapeInst,
+         is IsUniqueInst, is MarkFunctionEscapeInst,
          is PackElementSetInst:
       return leafAddressUse(of: operand)
 

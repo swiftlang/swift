@@ -631,6 +631,14 @@ extension InteriorUseWalker: AddressUseVisitor {
     return walkDownAddressUses(of: value)
   }
 
+  mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite)
+    -> WalkResult {
+    if apply is BeginApplyInst {
+      return scopedAddressUse(of: operand)
+    }
+    return leafAddressUse(of: operand)
+  }
+
   mutating func scopedAddressUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case let ba as BeginAccessInst:
@@ -662,6 +670,10 @@ extension InteriorUseWalker: AddressUseVisitor {
     default:
       fatalError("Unrecognized scoped address use: \(operand.instruction)")
     }
+  }
+
+  mutating func scopeEndingAddressUse(of operand: Operand) -> WalkResult {
+    return .continueWalk
   }
 
   mutating func leafAddressUse(of operand: Operand) -> WalkResult {

@@ -575,6 +575,10 @@ extension Value {
 ///   %addr = struct_element_addr %base : $X, #X.e
 ///   store %v to [trivial] %addr : $*Int
 /// ```
+///
+/// Warning: This does not find the correct storage root of the
+/// lifetime of an object projection, such as .box or .class because
+/// ValueUseDefWalker ignores ownership and, for example, walks past copies.
 extension ValueUseDefWalker where Path == SmallProjectionPath {
   /// The main entry point.
   /// Given an `accessPath` where the access base is a reference (class, tail, box), call
