@@ -77,6 +77,10 @@ bool BridgedASTType::isOpenedExistentialWithError() const {
   return unbridged()->isOpenedExistentialWithError();
 }
 
+bool BridgedASTType::isEscapable() const {
+  return unbridged()->isEscapable();
+}
+
 BridgedResultInfoArray
 BridgedASTType::SILFunctionType_getResultsWithError() const {
   return unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError();

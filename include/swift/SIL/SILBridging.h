@@ -195,6 +195,8 @@ struct BridgedASTType {
 
   BRIDGED_INLINE bool isOpenedExistentialWithError() const;
 
+  BRIDGED_INLINE bool isEscapable() const;
+
   // =========================================================================//
   //                              SILFunctionType
   // =========================================================================//
