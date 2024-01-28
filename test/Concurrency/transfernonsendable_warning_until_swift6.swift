@@ -25,10 +25,35 @@ func testIsolationError() async {
   useValue(x) // expected-note {{access here could race}}
 }
 
-func testArgumentError(_ x: NonSendableType) async { // expected-note {{value is task isolated since it is in the same region as 'x'}}
+func testTransferArgumentError(_ x: NonSendableType) async { // expected-note {{value is task isolated since it is in the same region as 'x'}}
   await transferToMain(x) // expected-error {{task isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
 }
 
-func testTransferringArgument(_ x: NonSendableType) async {
+func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {
   transferValue(x) // expected-error {{task isolated value of type 'NonSendableType' passed as a strongly transferred parameter; later accesses could race}}
+}
+
+func testAssignmentIntoTransferringParameter(_ x: transferring NonSendableType) async {
+  let y = NonSendableType()
+  x = y // expected-error {{transferring value of non-Sendable type 'NonSendableType' into transferring parameter; later accesses could race}}
+  useValue(y) // expected-note {{access here could race}}
+}
+
+func testAssigningParameterIntoTransferringParameter(_ x: transferring NonSendableType, _ y: NonSendableType) async {
+  x = y // expected-error {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+}
+
+func testIsolationCrossingDueToCapture() async {
+  let x = NonSendableType()
+  let _ = { @MainActor in
+    print(x) // expected-error {{main actor-isolated closure captures value of non-Sendable type 'NonSendableType' from nonisolated context; later accesses to value could race}}
+  }
+  useValue(x) // expected-note {{access here could race}}
+}
+
+func testIsolationCrossingDueToCaptureParameter(_ x: NonSendableType) async {
+  let _ = { @MainActor in
+    print(x) // expected-error {{task isolated value of type 'NonSendableType' transferred to main actor-isolated context; later accesses to value could race}}
+  }
+  useValue(x)
 }
