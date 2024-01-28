@@ -1379,42 +1379,52 @@ public:
     return isDef(cast<SILNode>(value), bit);
   }
 
-  bool isDef(SILNode *node, SmallBitVector const &bits) const {
+  void isDef(SILNode *node, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
     assert(isInitialized());
+    assert(bitsOut.none());
     auto iter = defs.find(node);
     if (!iter)
-      return false;
-    SmallBitVector allBits(bits.size());
+      return;
     for (auto range : *iter) {
-      range.setBits(allBits);
+      range.setBits(bitsOut);
     }
-    return (bits & allBits) == bits;
+    bitsOut &= bits;
   }
 
-  bool isDef(SILValue value, SmallBitVector const &bits) const {
-    return isDef(cast<SILNode>(value), bits);
+  void isDef(SILValue value, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
+    isDef(cast<SILNode>(value), bits, bitsOut);
   }
 
-  bool isDef(SILInstruction *inst, SmallBitVector const &bits) const {
-    return isDef(cast<SILNode>(inst), bits);
+  void isDef(SILInstruction *inst, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
+    isDef(cast<SILNode>(inst), bits, bitsOut);
   }
 
-  bool isDef(SILNode *node, TypeTreeLeafTypeRange span) const {
+  void isDef(SILNode *node, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
     assert(isInitialized());
+    assert(bitsOut.none());
     auto iter = defs.find(node);
     if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).has_value();
-    });
+      return;
+    for (auto defSpan : *iter) {
+      auto intersection = span.setIntersection(defSpan);
+      if (!intersection.has_value())
+        continue;
+      span.setBits(bitsOut);
+    }
   }
 
-  bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
-    return isDef(cast<SILNode>(inst), span);
+  void isDef(SILInstruction *inst, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
+    return isDef(cast<SILNode>(inst), span, bitsOut);
   }
 
-  bool isDef(SILValue value, TypeTreeLeafTypeRange span) const {
-    return isDef(cast<SILNode>(value), span);
+  void isDef(SILValue value, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
+    return isDef(cast<SILNode>(value), span, bitsOut);
   }
 
   void
