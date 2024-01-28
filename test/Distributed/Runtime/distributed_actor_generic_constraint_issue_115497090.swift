@@ -13,9 +13,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // FIXME(distributed): Distributed has some issues on windows currently, see also: rdar://82593574
-// UNSUPPORTED: windows
-
-// UNSUPPORTED: windows
+// UNSUPPORTED: OS=windows-msvc
 
 import Distributed
 import FakeDistributedActorSystems
