@@ -2915,6 +2915,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD);
       AnyFunctionType::ExtInfoBuilder selfInfoBuilder;
       maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
+      if (lifetimeDependenceInfo.has_value())
+        selfInfoBuilder =
+            selfInfoBuilder.withLifetimeDependenceInfo(*lifetimeDependenceInfo);
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {

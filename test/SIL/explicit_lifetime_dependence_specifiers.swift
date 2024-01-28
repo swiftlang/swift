@@ -58,10 +58,12 @@ func use(_ x: borrowing BufferView) {}
 
 struct Wrapper : ~Escapable {
   let view: BufferView
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers7WrapperV8getView1AA10BufferViewVyF : $@convention(method) (@guaranteed Wrapper) -> _borrow(0) @owned BufferView {
   borrowing func getView1() -> _borrow(self) BufferView {
     return view
   }
 
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers7WrapperV8getView2AA10BufferViewVyF : $@convention(method) (@owned Wrapper) -> _inherit(0) @owned BufferView {
   consuming func getView2() -> _consume(self) BufferView {
     return view
   }
