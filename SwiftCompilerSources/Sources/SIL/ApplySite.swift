@@ -140,27 +140,14 @@ extension ApplySite {
   }
 
   public var calleeArgumentConventions: ArgumentConventions {
-    let originalConv = FunctionConvention(for: callee.type.bridged.getASTType(),
-                                          in: parentFunction)
-    let substConv = FunctionConvention(
-      for: bridged.ApplySite_getSubstitutedCalleeType(),
-      in: parentFunction)
-    return ArgumentConventions(originalFunctionConvention: originalConv,
-                               substitutedFunctionConvention: substConv)
+    ArgumentConventions(originalFunctionConvention: originalFunctionConvention,
+                        substitutedFunctionConvention: substitutedFunctionConvention)
   }
 
   public var operandConventions: ApplyOperandConventions {
     ApplyOperandConventions(
       calleeArgumentConventions: calleeArgumentConventions,
       unappliedArgumentCount: bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg())
-  }
-
-  /// Returns the argument index of an operand.
-  ///
-  /// Returns nil if 'operand' is not an argument operand. This is the case if
-  /// it's the callee function operand.
-  public func calleeArgumentIndex(of operand: Operand) -> Int? {
-    operandConventions.calleeArgumentIndex(of: operand)
   }
 
   /// Returns true if `operand` is the callee function operand and not am argument operand.
@@ -170,6 +157,17 @@ extension ApplySite {
 
   public func convention(of operand: Operand) -> ArgumentConvention? {
     operandConventions.convention(of: operand)
+  }
+  
+  public var yieldConventions: YieldConventions {
+    YieldConventions(originalFunctionConvention: originalFunctionConvention,
+                     substitutedFunctionConvention: substitutedFunctionConvention)
+  }
+
+  public func convention(of yield: MultipleValueInstructionResult)
+    -> ArgumentConvention {
+    assert(yield.definingInstruction == self)
+    return yieldConventions[yield.index]
   }
 
   /// Converts an argument index of a callee to the corresponding apply operand.
@@ -203,6 +201,29 @@ extension ApplySite {
       return callee.hasSemanticsAttribute(attr)
     }
     return false
+  }
+
+  /// Returns the argument index of an operand.
+  ///
+  /// Returns nil if 'operand' is not an argument operand. This is the case if
+  /// it's the callee function operand.
+  ///
+  /// Warning: the returned integer can be misused as an index into
+  /// the wrong collection. Replace uses of this API with safer APIs.
+  public func calleeArgumentIndex(of operand: Operand) -> Int? {
+    operandConventions.calleeArgumentIndex(of: operand)
+  }
+}
+
+extension ApplySite {
+  private var originalFunctionConvention: FunctionConvention {
+    FunctionConvention(for: callee.type.bridged.getASTType(),
+                       in: parentFunction)
+  }
+
+  private var substitutedFunctionConvention: FunctionConvention {
+    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(),
+                       in: parentFunction)
   }
 }
 

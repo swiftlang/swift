@@ -239,6 +239,41 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 }
 
+public struct YieldConventions : Collection, CustomStringConvertible {
+  public let originalFunctionConvention: FunctionConvention
+  public let substitutedFunctionConvention: FunctionConvention?
+
+  public var yields: FunctionConvention.Yields {
+    if let substitutedFunctionConvention {
+      return substitutedFunctionConvention.yields
+    }
+    return originalFunctionConvention.yields
+  }
+
+  public var startIndex: Int { 0 }
+
+  public var endIndex: Int { yields.count }
+
+  public func index(after index: Int) -> Int {
+    return index + 1
+  }
+
+  public subscript(_ index: Int) -> ArgumentConvention {
+    return yields[index].convention
+  }
+
+  public var description: String {
+    var str = String(taking: originalFunctionConvention.bridgedFunctionType.getDebugDescription())
+    if let substitutedFunctionConvention {
+      str += "\n" + String(taking: substitutedFunctionConvention.bridgedFunctionType.getDebugDescription())
+    }
+    yields.forEach {
+      str += "\n      yield: " + $0.description
+    }
+    return str
+  }
+}
+
 public enum ArgumentConvention : CustomStringConvertible {
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory.  The callee is responsible for destroying the

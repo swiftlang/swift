@@ -54,6 +54,18 @@ BridgedResultInfo BridgedResultInfoArray::at(SwiftInt resultIndex) const {
 }
 
 //===----------------------------------------------------------------------===//
+//                             BridgedYieldInfo
+//===----------------------------------------------------------------------===//
+
+SwiftInt BridgedYieldInfoArray::count() const {
+  return unbridged().size();
+}
+
+BridgedParameterInfo BridgedYieldInfoArray::at(SwiftInt resultIndex) const {
+  return BridgedParameterInfo(unbridged()[resultIndex]);
+}
+
+//===----------------------------------------------------------------------===//
 //                            BridgedParameterInfo
 //===----------------------------------------------------------------------===//
 
@@ -108,6 +120,10 @@ BridgedParameterInfoArray BridgedASTType::SILFunctionType_getParameters() const 
 
 bool BridgedASTType::SILFunctionType_hasSelfParam() const {
   return unbridged()->castTo<swift::SILFunctionType>()->hasSelfParam();
+}
+
+BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->getYields();
 }
 
 //===----------------------------------------------------------------------===//

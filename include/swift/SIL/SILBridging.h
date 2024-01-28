@@ -181,6 +181,24 @@ struct BridgedParameterInfoArray {
   BridgedParameterInfo at(SwiftInt parameterIndex) const;
 };
 
+struct BridgedYieldInfoArray {
+  BridgedArrayRef yieldInfoArray;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedYieldInfoArray(llvm::ArrayRef<swift::SILYieldInfo> yields)
+    : yieldInfoArray(yields) {}
+
+  llvm::ArrayRef<swift::SILYieldInfo> unbridged() const {
+    return yieldInfoArray.unbridged<swift::SILYieldInfo>();
+  }
+#endif
+
+  BRIDGED_INLINE SwiftInt count() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedParameterInfo at(SwiftInt resultIndex) const;
+};
+
 // Temporary access to the AST type within SIL until ASTBridging provides it.
 struct BridgedASTType {
   swift::TypeBase * _Nullable type;
@@ -215,6 +233,9 @@ struct BridgedASTType {
   BridgedParameterInfoArray SILFunctionType_getParameters() const;
 
   BRIDGED_INLINE bool SILFunctionType_hasSelfParam() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedYieldInfoArray SILFunctionType_getYields() const;
 };
 
 struct BridgedType {
