@@ -174,7 +174,7 @@ public:
         borrowLifetimeParamIndices(borrowLifetimeParamIndices),
         mutateLifetimeParamIndices(mutateLifetimeParamIndices) {}
 
-  operator bool() const { return empty(); }
+  operator bool() const { return !empty(); }
 
   bool empty() const {
     return inheritLifetimeParamIndices == nullptr &&
@@ -182,6 +182,8 @@ public:
            mutateLifetimeParamIndices == nullptr;
   }
   std::string getString() const;
+
+  void Profile(llvm::FoldingSetNodeID &ID) const;
 };
 
 // MARK: - UnexpectedClangTypeError
@@ -690,19 +692,20 @@ public:
              lifetimeDependenceInfo);
   }
 
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddInteger(bits);
+    ID.AddPointer(clangTypeInfo.getType());
+    ID.AddPointer(globalActor.getPointer());
+    ID.AddPointer(thrownError.getPointer());
+    lifetimeDependenceInfo.Profile(ID);
+  }
+
   bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes) const {
     return bits == other.bits &&
            (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
            globalActor.getPointer() == other.globalActor.getPointer() &&
            thrownError.getPointer() == other.thrownError.getPointer() &&
            lifetimeDependenceInfo == other.lifetimeDependenceInfo;
-  }
-
-  constexpr std::tuple<unsigned, const void *, const void *, const void *>
-  getFuncAttrKey() const {
-    return std::make_tuple(
-        bits, clangTypeInfo.getType(), globalActor.getPointer(),
-        thrownError.getPointer());
   }
 }; // end ASTExtInfoBuilder
 
@@ -850,13 +853,10 @@ public:
     return builder.withLifetimeDependenceInfo(lifetimeDependenceInfo).build();
   }
 
+  void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
+
   bool isEqualTo(ASTExtInfo other, bool useClangTypes) const {
     return builder.isEqualTo(other.builder, useClangTypes);
-  }
-
-  constexpr std::tuple<unsigned, const void *, const void *, const void *>
-  getFuncAttrKey() const {
-    return builder.getFuncAttrKey();
   }
 }; // end ASTExtInfo
 
@@ -1122,13 +1122,15 @@ public:
     return SILExtInfoBuilder(bits, clangTypeInfo, lifetimeDependenceInfo);
   }
 
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddInteger(bits);
+    ID.AddPointer(clangTypeInfo.getType());
+    lifetimeDependenceInfo.Profile(ID);
+  }
+
   bool isEqualTo(SILExtInfoBuilder other, bool useClangTypes) const {
     return bits == other.bits &&
            (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true);
-  }
-
-  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
-    return std::make_pair(bits, clangTypeInfo.getType());
   }
 }; // end SILExtInfoBuilder
 
@@ -1243,12 +1245,10 @@ public:
     return builder.withUnimplementable(isUnimplementable).build();
   }
 
+  void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
+
   bool isEqualTo(SILExtInfo other, bool useClangTypes) const {
     return builder.isEqualTo(other.builder, useClangTypes);
-  }
-
-  constexpr std::pair<unsigned, const void *> getFuncAttrKey() const {
-    return builder.getFuncAttrKey();
   }
 
   llvm::Optional<UnexpectedClangTypeError> checkClangType() const;

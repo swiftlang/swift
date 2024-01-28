@@ -89,6 +89,18 @@ std::string LifetimeDependenceInfo::getString() const {
   return lifetimeDependenceString;
 }
 
+void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
+  if (inheritLifetimeParamIndices) {
+    inheritLifetimeParamIndices->Profile(ID);
+  }
+  if (borrowLifetimeParamIndices) {
+    borrowLifetimeParamIndices->Profile(ID);
+  }
+  if (mutateLifetimeParamIndices) {
+    mutateLifetimeParamIndices->Profile(ID);
+  }
+}
+
 // MARK: - UnexpectedClangTypeError
 
 llvm::Optional<UnexpectedClangTypeError>

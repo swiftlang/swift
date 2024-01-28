@@ -93,6 +93,7 @@ public:
     assert(specifierKind == SpecifierKind::Ordered);
     return value.Ordered.index;
   }
+
   std::string getParamString() const {
     switch (specifierKind) {
     case SpecifierKind::Named:

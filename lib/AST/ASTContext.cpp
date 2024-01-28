@@ -4177,11 +4177,7 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
   if (info.has_value()) {
-    auto infoKey = info.value().getFuncAttrKey();
-    ID.AddInteger(std::get<0>(infoKey));
-    ID.AddPointer(std::get<1>(infoKey));
-    ID.AddPointer(std::get<2>(infoKey));
-    ID.AddPointer(std::get<3>(infoKey));
+    info->Profile(ID);
   }
 }
 
@@ -4306,11 +4302,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
   if (info.has_value()) {
-    auto infoKey = info.value().getFuncAttrKey();
-    ID.AddInteger(std::get<0>(infoKey));
-    ID.AddPointer(std::get<1>(infoKey));
-    ID.AddPointer(std::get<2>(infoKey));
-    ID.AddPointer(std::get<3>(infoKey));
+    info->Profile(ID);
   }
 }
 
@@ -4446,9 +4438,7 @@ void SILFunctionType::Profile(
     ProtocolConformanceRef conformance, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs) {
   id.AddPointer(genericParams.getPointer());
-  auto infoKey = info.getFuncAttrKey();
-  id.AddInteger(infoKey.first);
-  id.AddPointer(infoKey.second);
+  info.Profile(id);
   id.AddInteger(unsigned(coroutineKind));
   id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
