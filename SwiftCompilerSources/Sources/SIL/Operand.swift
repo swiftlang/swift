@@ -163,6 +163,25 @@ extension Sequence where Element == Operand {
   }
 }
 
+extension Operand {
+  /// Return true if this operation will store a full value into this
+  /// operand's address.
+  public var isAddressInitialization: Bool {
+    if !value.type.isAddress {
+      return false
+    }
+    switch instruction {
+    case is StoringInstruction:
+      return true
+    case let srcDestInst as SourceDestAddrInstruction
+           where srcDestInst.destinationOperand == self:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
 extension OptionalBridgedOperand {
   init(bridged: BridgedOperand?) {
     self = OptionalBridgedOperand(op: bridged?.op)

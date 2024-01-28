@@ -1092,6 +1092,14 @@ bool BridgedInstruction::CopyAddrInst_isInitializationOfDest() const {
   return getAs<swift::CopyAddrInst>()->isInitializationOfDest();
 }
 
+bool BridgedInstruction::ExplicitCopyAddrInst_isTakeOfSrc() const {
+  return getAs<swift::ExplicitCopyAddrInst>()->isTakeOfSrc();
+}
+
+bool BridgedInstruction::ExplicitCopyAddrInst_isInitializationOfDest() const {
+  return getAs<swift::ExplicitCopyAddrInst>()->isInitializationOfDest();
+}
+
 SwiftInt BridgedInstruction::MarkUninitializedInst_getKind() const {
   return (SwiftInt)getAs<swift::MarkUninitializedInst>()->getMarkUninitializedKind();
 }

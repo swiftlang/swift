@@ -826,6 +826,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool CopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
+  BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
+  BRIDGED_INLINE bool ExplicitCopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE SwiftInt MarkUninitializedInst_getKind() const;
   BRIDGED_INLINE void RefCountingInst_setIsAtomic(bool isAtomic) const;
   BRIDGED_INLINE bool RefCountingInst_getIsAtomic() const;
