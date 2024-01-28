@@ -221,7 +221,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   // A generic parameter that represents instance of invocation decoder.
   auto *decoderType =
       GenericTypeParamType::get(/*isParameterPack=*/false,
-                                /*depth=*/1, /*index=*/0, Context);
+                                /*depth=*/0, /*index=*/0, Context);
 
   // decoder
   parameters.push_back(GenericFunctionType::Param(
@@ -249,13 +249,15 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   parameters.push_back(GenericFunctionType::Param(Context.getUIntType()));
 
   // actor
-  {
-    auto targetTy = Target->getLoweredFunctionType();
-    auto actorLoc = targetTy->getParameters().back();
 
+  auto actorTypeParam =
+      GenericTypeParamType::get(/*isParameterPack=*/false,
+                                /*depth=*/0, /*index=*/1, Context);
     parameters.push_back(
-        GenericFunctionType::Param(actorLoc.getInterfaceType()));
-  }
+        GenericFunctionType::Param(actorTypeParam));
+  auto distributedActorTy =
+        Context.getDistributedActorDecl()
+        ->getDeclaredInterfaceType();
 
   auto decoderProtocolTy =
       Context
@@ -268,11 +270,8 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
     SmallVector<GenericTypeParamType *, 4> genericParams;
     SmallVector<Requirement, 4> genericRequirements;
 
-    auto *actor = getDistributedActorOf(Target);
-    assert(actor);
-
-    for (auto *genericParam : actor->getInnermostGenericParamTypes())
-      genericParams.push_back(genericParam);
+    assert(getDistributedActorOf(Target) &&
+           "target must be declared inside distributed actor");
 
     // Add a generic parameter `D` which stands for decoder type in the
     // accessor signature - `inout D`.
@@ -281,7 +280,14 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
     genericRequirements.push_back(
         {RequirementKind::Conformance, decoderType, decoderProtocolTy});
 
-    signature = GenericSignature::get(genericParams, genericRequirements);
+    genericRequirements.push_back(
+        {RequirementKind::Conformance, actorTypeParam, distributedActorTy});
+
+    genericParams.push_back(actorTypeParam);
+
+    signature = buildGenericSignature(Context, GenericSignature(),
+                          std::move(genericParams),
+                          std::move(genericRequirements));
   }
 
   auto accessorTy = GenericFunctionType::get(
@@ -650,14 +656,13 @@ void DistributedAccessor::emit() {
   // Metadata that represents passed in the invocation decoder.
   auto *decoderType = params.claimNext();
 
-  // If the distributed thunk is declared in a protocol that conforms
-  // to `DistributedActor` protocol, there is an extract parameter that
-  // represents a type of protocol witness.
-  if (isa<ProtocolDecl>(actor))
-    (void)params.claimNext();
+  // Metadata that represents the actor the invocation is on.
+  auto *actorType = params.claimNext();
+  (void)actorType;
 
   // Witness table for decoder conformance to DistributedTargetInvocationDecoder
   auto *decoderProtocolWitness = params.claimNext();
+  auto *distributedActorWitness = params.claimNext();
 
   // Preliminary: Setup async context for this accessor.
   {

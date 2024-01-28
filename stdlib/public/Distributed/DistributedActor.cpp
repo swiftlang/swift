@@ -61,7 +61,10 @@ using TargetExecutorSignature =
                         /*witnessTables=*/void **,
                         /*numWitnessTables=*/size_t,
                         /*decoderType=*/Metadata *,
-                        /*decoderWitnessTable=*/void **),
+                        /*actorType=*/Metadata *,
+                        /*decoderWitnessTable=*/void **,
+                        /*distributedActorWitnessTable=*/void **
+                        ),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -88,7 +91,9 @@ using DistributedAccessorSignature =
                         /*numWitnessTables=*/size_t,
                         /*actor=*/HeapObject *,
                         /*decoderType=*/Metadata *,
-                        /*decoderWitnessTable=*/void **),
+                        /*actorType=*/Metadata *,
+                        /*decoderWitnessTable=*/void **,
+                        /*actorWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -124,7 +129,9 @@ void swift_distributed_execute_target(
     void **witnessTables,
     size_t numWitnessTables,
     Metadata *decoderType,
-    void **decoderWitnessTable) {
+    Metadata *actorType,
+    void **decoderWitnessTable,
+    void **actorWitnessTable) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     SwiftError *error =
@@ -159,5 +166,7 @@ void swift_distributed_execute_target(
                 numWitnessTables,
                 actor,
                 decoderType,
-                decoderWitnessTable);
+                actorType,
+                decoderWitnessTable,
+                actorWitnessTable);
 }
