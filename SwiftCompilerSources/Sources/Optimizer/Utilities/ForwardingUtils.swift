@@ -202,7 +202,7 @@ enum ForwardingUseResult: CustomStringConvertible {
 ///
 /// Minimal requirements:
 ///   needWalk(for value: Value) -> Bool
-///   nonForwardingUse(_ operand: Operand) -> WalkResult
+///   nonForwardingUse(of operand: Operand) -> WalkResult
 ///   deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 ///
 /// Start walking:
@@ -217,7 +217,7 @@ protocol ForwardingDefUseWalker {
   /// A nonForwarding use does not forward ownership, but may
   /// propagate the lifetime in other ways, such as an interior
   /// pointer.
-  mutating func nonForwardingUse(_ operand: Operand) -> WalkResult
+  mutating func nonForwardingUse(of operand: Operand) -> WalkResult
 
   /// Report any initial or forwarded value with no uses. Only relevant for
   /// guaranteed values or incomplete OSSA. This could be a dead
@@ -249,8 +249,9 @@ extension ForwardingDefUseWalker {
   mutating func walkDownUsesDefault(forwarding value: Value,
     using operand: Operand?)
   -> WalkResult {
-    if !needWalk(for: value) { return .continueWalk }
-
+    if !needWalk(for: value) {
+      return .continueWalk
+    }
     var hasUse = false
     for use in value.uses where !use.isTypeDependent {
       if walkDown(operand: use) == .abortWalk {
@@ -280,7 +281,7 @@ extension ForwardingDefUseWalker {
     if let phi = Phi(using: operand) {
       return walkDownUses(of: phi.value, using: operand)
     }
-    return nonForwardingUse(operand)
+    return nonForwardingUse(of: operand)
   }
 }
 
@@ -313,7 +314,7 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
     visitedValues.insert(value)
   }
   
-  mutating func nonForwardingUse(_ operand: Operand) -> WalkResult {
+  mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
     return visitor(.operand(operand))
   }
 
