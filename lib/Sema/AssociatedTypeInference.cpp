@@ -1423,6 +1423,15 @@ static InferenceCandidateKind checkInferenceCandidate(
   return InferenceCandidateKind::Good;
 }
 
+static bool containsConcreteDependentMemberType(Type ty) {
+  return ty.findIf([](Type t) -> bool {
+    if (auto *dmt = t->getAs<DependentMemberType>())
+      return !dmt->isTypeParameter();
+
+    return false;
+  });
+}
+
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                     const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
@@ -1546,6 +1555,11 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       if (!canInferFromOtherAssociatedType) {
         // Check that the type witness meets the
         // requirements on the associated type.
+        if (containsConcreteDependentMemberType(result.second)) {
+          LLVM_DEBUG(llvm::dbgs() << "-- too abstract\n");
+          goto next_witness;
+        }
+
         if (auto failed =
                 checkTypeWitness(result.second, result.first, conformance,
                                  llvm::None)) {
@@ -2486,15 +2500,6 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
     return true;
   }
   llvm_unreachable("unhandled result");
-}
-
-static bool containsConcreteDependentMemberType(Type ty) {
-  return ty.findIf([](Type t) -> bool {
-    if (auto *dmt = t->getAs<DependentMemberType>())
-      return !dmt->isTypeParameter();
-
-    return false;
-  });
 }
 
 AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
