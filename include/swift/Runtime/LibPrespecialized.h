@@ -45,7 +45,7 @@ struct LibPrespecializedData {
   }
 };
 
-LibPrespecializedData<InProcess> *getLibPrespecializedData();
+const LibPrespecializedData<InProcess> *getLibPrespecializedData();
 Metadata *getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                        const void *const *arguments);
 
