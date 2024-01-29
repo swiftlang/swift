@@ -460,17 +460,17 @@ extension String {
   ///
   /// - Parameters:
   ///   - nullTerminatedCodeUnits: A pointer to a null-terminated sequence of
-  ///     code units encoded in `sourceEncoding`.
-  ///   - sourceEncoding: The encoding in which the code units should be
+  ///     code units encoded in `encoding`.
+  ///   - encoding: The encoding in which the code units should be
   ///     interpreted.
   @_specialize(where Encoding == Unicode.UTF8)
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    as sourceEncoding: Encoding.Type
+    as encoding: Encoding.Type
   ) {
-    self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
+    self = String.decodeCString(nullTerminatedCodeUnits, as: encoding)!.0
   }
 
   /// Creates a new string by copying the null-terminated sequence of code units
@@ -486,17 +486,17 @@ extension String {
   ///
   /// - Parameters:
   ///   - nullTerminatedCodeUnits: An array containing a null-terminated
-  ///     sequence of code units encoded in `sourceEncoding`.
-  ///   - sourceEncoding: The encoding in which the code units should be
+  ///     sequence of code units encoded in `encoding`.
+  ///   - encoding: The encoding in which the code units should be
   ///     interpreted.
   @inlinable
   @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, message: "Use String(decoding: array, as: Encoding.self) instead")
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: [Encoding.CodeUnit],
-    as sourceEncoding: Encoding.Type
+    as encoding: Encoding.Type
   ) {
-    self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
+    self = String.decodeCString(nullTerminatedCodeUnits, as: encoding)!.0
   }
 
   @inlinable
@@ -504,10 +504,10 @@ extension String {
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init<Encoding: _UnicodeEncoding>(
     decodingCString nullTerminatedCodeUnits: String,
-    as sourceEncoding: Encoding.Type
+    as encoding: Encoding.Type
   ) {
-    self = nullTerminatedCodeUnits.withCString(encodedAs: sourceEncoding) {
-      String(decodingCString: $0, as: sourceEncoding.self)
+    self = nullTerminatedCodeUnits.withCString(encodedAs: encoding) {
+      String(decodingCString: $0, as: encoding.self)
     }
   }
 
@@ -516,7 +516,7 @@ extension String {
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: inout Encoding.CodeUnit,
-    as sourceEncoding: Encoding.Type
+    as encoding: Encoding.Type
   ) {
     guard nullTerminatedCodeUnits == 0 else {
       _preconditionFailure(
