@@ -28,11 +28,11 @@ public struct ObservationTracking: Sendable {
       self.properties = properties
     }
     
-    func addWillSetObserver(_ changed: @Sendable @escaping () -> Void) -> Int {
+    func addWillSetObserver(_ changed: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       return context.registerTracking(for: properties, willSet: changed)
     }
 
-    func addDidSetObserver(_ changed: @Sendable @escaping () -> Void) -> Int {
+    func addDidSetObserver(_ changed: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       return context.registerTracking(for: properties, didSet: changed)
     }
     
@@ -78,17 +78,21 @@ public struct ObservationTracking: Sendable {
     let values = tracking.list.entries.mapValues { 
       switch (willSet, didSet) {
       case (.some(let willSetObserver), .some(let didSetObserver)):
-        return Id.full($0.addWillSetObserver {
+        return Id.full($0.addWillSetObserver { keyPath in
+          tracking.state.withCriticalRegion { $0.changed = keyPath }
           willSetObserver(tracking)
-        }, $0.addDidSetObserver {
+        }, $0.addDidSetObserver { keyPath in
+          tracking.state.withCriticalRegion { $0.changed = keyPath }
           didSetObserver(tracking)
         })
       case (.some(let willSetObserver), .none):
-        return Id.willSet($0.addWillSetObserver {
+        return Id.willSet($0.addWillSetObserver { keyPath in
+          tracking.state.withCriticalRegion { $0.changed = keyPath }
           willSetObserver(tracking)
         })
       case (.none, .some(let didSetObserver)):
-        return Id.didSet($0.addDidSetObserver {
+        return Id.didSet($0.addDidSetObserver { keyPath in
+          tracking.state.withCriticalRegion { $0.changed = keyPath }
           didSetObserver(tracking)
         })
       case (.none, .none):
@@ -114,6 +118,7 @@ public struct ObservationTracking: Sendable {
   struct State {
     var values = [ObjectIdentifier: ObservationTracking.Id]()
     var cancelled = false
+    var changed: AnyKeyPath?
   }
   
   private let state = _ManagedCriticalState(State())
@@ -150,6 +155,11 @@ public struct ObservationTracking: Sendable {
           list.entries[id]?.removeObserver(didSetToken)
         }
       }
+  }
+
+  @available(SwiftStdlib 5.11, *)
+  public var changed: AnyKeyPath? {
+      state.withCriticalRegion { $0.changed }
   }
 }
 

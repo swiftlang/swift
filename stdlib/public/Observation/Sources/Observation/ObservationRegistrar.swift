@@ -38,8 +38,8 @@ public struct ObservationRegistrar: Sendable {
   
   private struct State: @unchecked Sendable {
     private enum ObservationKind {
-      case willSetTracking(@Sendable () -> Void)
-      case didSetTracking(@Sendable () -> Void)
+      case willSetTracking(@Sendable (AnyKeyPath) -> Void)
+      case didSetTracking(@Sendable (AnyKeyPath) -> Void)
       case computed(@Sendable (Any) -> Void)
       case values(ValuesObserver)
     }
@@ -53,7 +53,7 @@ public struct ObservationRegistrar: Sendable {
         self.properties = properties
       }
       
-      var willSetTracker: (@Sendable () -> Void)? {
+      var willSetTracker: (@Sendable (AnyKeyPath) -> Void)? {
         switch kind {
         case .willSetTracking(let tracker):
           return tracker
@@ -62,7 +62,7 @@ public struct ObservationRegistrar: Sendable {
         }
       }
 
-      var didSetTracker: (@Sendable () -> Void)? {
+      var didSetTracker: (@Sendable (AnyKeyPath) -> Void)? {
         switch kind {
         case .didSetTracking(let tracker):
           return tracker
@@ -117,7 +117,7 @@ public struct ObservationRegistrar: Sendable {
       return id
     }
     
-    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping () -> Void) -> Int {
+    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .willSetTracking(observer), properties: properties)
       for keyPath in properties {
@@ -126,7 +126,7 @@ public struct ObservationRegistrar: Sendable {
       return id
     }
 
-    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping () -> Void) -> Int {
+    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .didSetTracking(observer), properties: properties)
       for keyPath in properties {
@@ -184,8 +184,8 @@ public struct ObservationRegistrar: Sendable {
       lookups.removeAll()
     }
     
-    internal mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable () -> Void] {
-      var trackers = [@Sendable () -> Void]()
+    internal mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable (AnyKeyPath) -> Void] {
+      var trackers = [@Sendable (AnyKeyPath) -> Void]()
       if let ids = lookups[keyPath] {
         for id in ids {
           if let tracker = observations[id]?.willSetTracker {
@@ -196,9 +196,9 @@ public struct ObservationRegistrar: Sendable {
       return trackers
     }
     
-    internal mutating func didSet<Subject: Observable, Member>(keyPath: KeyPath<Subject, Member>) -> ([@Sendable (Any) -> Void], [@Sendable () -> Void]) {
+    internal mutating func didSet<Subject: Observable, Member>(keyPath: KeyPath<Subject, Member>) -> ([@Sendable (Any) -> Void], [@Sendable (AnyKeyPath) -> Void]) {
       var observers = [@Sendable (Any) -> Void]()
-      var trackers = [@Sendable () -> Void]()
+      var trackers = [@Sendable (AnyKeyPath) -> Void]()
       if let ids = lookups[keyPath] {
         for id in ids {
           if let observer = observations[id]?.observer {
@@ -227,11 +227,11 @@ public struct ObservationRegistrar: Sendable {
     
     internal var id: ObjectIdentifier { state.id }
     
-    internal func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping () -> Void) -> Int {
+    internal func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, willSet: observer) }
     }
 
-    internal func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping () -> Void) -> Int {
+    internal func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, didSet: observer) }
     }
     
@@ -257,7 +257,7 @@ public struct ObservationRegistrar: Sendable {
     ) {
       let tracking = state.withCriticalRegion { $0.willSet(keyPath: keyPath) }
       for action in tracking {
-        action()
+        action(keyPath)
       }
     }
     
@@ -271,7 +271,7 @@ public struct ObservationRegistrar: Sendable {
         state.withCriticalRegion { $0.emit(value, ids: ids) }
       }
       for action in tracking {
-        action()
+        action(keyPath)
       }
       for action in actions {
         action(subject)
