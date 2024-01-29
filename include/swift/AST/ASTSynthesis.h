@@ -50,7 +50,7 @@ enum SingletonTypeSynthesizer {
   _void,
   _word,
   _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
-  _taskExecutor,   // the '_Concurrency._TaskExecutor' protocol
+  _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -71,7 +71,7 @@ inline Type synthesizeType(SynthesisContext &SC,
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
       ->getDeclaredInterfaceType();
   case _taskExecutor:
-    return SC.Context.getProtocol(KnownProtocolKind::_TaskExecutor)
+    return SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)
       ->getDeclaredInterfaceType();
   }
 }

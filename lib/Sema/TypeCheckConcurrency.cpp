@@ -1389,7 +1389,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
                                            ProtocolDecl *proto) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Executor) ||
          proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor) ||
-         proto->isSpecificProtocol(KnownProtocolKind::_TaskExecutor));
+         proto->isSpecificProtocol(KnownProtocolKind::TaskExecutor));
 
   auto &diags = C.Diags;
   auto module = nominal->getParentModule();
