@@ -19,4 +19,4 @@ module CxxModule {
 
 import CxxModule
 
-// CHECK: std-{{.*}}.pcm
+// CHECK: {{std|std_string_view}}-{{.*}}.pcm

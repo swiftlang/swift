@@ -2,5 +2,5 @@
 
 // REQUIRES: OS=macosx
 
-// CHECK: import CxxStdlib.vector
+// CHECK: import {{CxxStdlib.vector|std_vector}}
 // CHECK: extension std.basic_string<CChar, char_traits<CChar>, allocator<CChar>> {
