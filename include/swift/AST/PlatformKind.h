@@ -51,6 +51,12 @@ llvm::Optional<StringRef> closestCorrectedPlatformString(StringRef candidate);
 /// for emission in diagnostics (e.g., "macOS").
 StringRef prettyPlatformString(PlatformKind platform);
 
+/// Returns the base platform for an application-extension platform. For example
+/// `iOS` would be returned for `iOSApplicationExtension`. Returns `None` for
+/// platforms which are not application extension platforms.
+llvm::Optional<PlatformKind>
+basePlatformForExtensionPlatform(PlatformKind Platform);
+
 /// Returns whether the passed-in platform is active, given the language
 /// options. A platform is active if either it is the target platform or its
 /// AppExtension variant is the target platform. For example, OS X is
