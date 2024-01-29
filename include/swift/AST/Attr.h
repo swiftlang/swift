@@ -30,6 +30,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/EnumTraits.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -39,6 +40,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
@@ -77,6 +79,8 @@ public:
 
   /// The location of the attribute.
   SourceLoc getLocation() const { return Range.Start; }
+  SourceLoc getStartLoc() const { return Range.Start; }
+  SourceLoc getEndLoc() const { return Range.End; }
 
   /// Return the source range of the attribute.
   SourceRange getRange() const { return Range; }
@@ -100,7 +104,6 @@ enum class DeclKind : uint8_t;
   /// Represents one declaration attribute.
 class DeclAttribute : public AttributeBase {
   friend class DeclAttributes;
-  friend class TypeAttributes;
 
 protected:
   // clang-format off
@@ -2911,180 +2914,251 @@ public:
   }
 };
 
-/// TypeAttributes - These are attributes that may be applied to types.
-class TypeAttributes {
-  // Get a SourceLoc for every possible attribute that can be parsed in source.
-  // the presence of the attribute is indicated by its location being set.
-  SourceLoc AttrLocs[TAK_Count];
+class alignas(1 << AttrAlignInBits) TypeAttribute
+    : public ASTAllocated<TypeAttribute> {
+protected:
+  // clang-format off
+  union {
+    uint64_t OpaqueBits;
 
-  /// The custom attributes, in a linked list.
-  CustomAttr *CustomAttrs = nullptr;
+    SWIFT_INLINE_BITFIELD_BASE(TypeAttribute, bitmax(NumTypeAttrKindBits,8)+1+1,
+      Kind : bitmax(NumTypeAttrKindBits,8),
+      Implicit : 1,
+      Invalid : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(DifferentiableTypeAttr, TypeAttribute, 8,
+      Differentiability : 8
+    );
+
+    SWIFT_INLINE_BITFIELD_FULL(OpaqueReturnTypeOfTypeAttr, TypeAttribute, 32,
+      : NumPadBits,
+      Index : 32
+    );
+  } Bits;
+  // clang-format on
+
+  SourceLoc AttrLoc;
+
+  TypeAttribute(TypeAttrKind kind, SourceLoc attrLoc) : AttrLoc(attrLoc) {
+    Bits.TypeAttribute.Kind = unsigned(kind);
+    Bits.TypeAttribute.Implicit = false;
+    Bits.TypeAttribute.Invalid = false;
+  }
 
 public:
-  /// AtLoc - This is the location of the first '@' in the attribute specifier.
-  /// If this is an empty attribute specifier, then this will be an invalid loc.
-  SourceLoc AtLoc;
-
-  struct Convention {
-    StringRef Name = {};
-    DeclNameRef WitnessMethodProtocol = {};
-    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
-    /// Convenience factory function to create a Swift convention.
-    ///
-    /// Don't use this function if you are creating a C convention as you
-    /// probably need a ClangType field as well.
-    static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclNameRef(), Located<StringRef>("", {})};
-    }
-  };
-
-  llvm::Optional<Convention> ConventionArguments;
-
-  DifferentiabilityKind differentiabilityKind =
-      DifferentiabilityKind::NonDifferentiable;
-
-  // For an opened existential type, the known ID.
-  llvm::Optional<UUID> OpenedID;
-
-  // For an opened existential type, the constraint type.
-  llvm::Optional<TypeRepr *> ConstraintType;
-
-  // For a reference to an opaque return type, the mangled name and argument
-  // index into the generic signature.
-  struct OpaqueReturnTypeRef {
-    StringRef mangledName;
-    unsigned index;
-  };
-  llvm::Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
-
-  TypeAttributes() {}
-
-  bool isValid() const { return AtLoc.isValid(); }
-
-  void clearAttribute(TypeAttrKind A) {
-    AttrLocs[A] = SourceLoc();
+  TypeAttrKind getKind() const {
+    return TypeAttrKind(Bits.TypeAttribute.Kind);
+  }
+  const char *getAttrName() const {
+    return getAttrName(getKind());
   }
 
-  bool has(TypeAttrKind A) const {
-    return getLoc(A).isValid();
+  bool isInvalid() const {
+    return Bits.TypeAttribute.Invalid;
   }
 
-  SourceLoc getLoc(TypeAttrKind A) const {
-    return AttrLocs[A];
+  bool isImplicit() const {
+    return Bits.TypeAttribute.Implicit;
   }
 
-  void setOpaqueReturnTypeOf(StringRef mangling, unsigned index) {
-    OpaqueReturnTypeOf = OpaqueReturnTypeRef{mangling, index};
+  void setInvalid() {
+    Bits.TypeAttribute.Invalid = true;
   }
 
-  void setAttr(TypeAttrKind A, SourceLoc L) {
-    assert(!L.isInvalid() && "Cannot clear attribute with this method");
-    AttrLocs[A] = L;
+  void setImplicit() {
+    Bits.TypeAttribute.Implicit = true;
   }
 
-  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
-    for (auto Loc : AttrLocs) {
-      if (Loc.isValid())
-        Locs.push_back(Loc);
-    }
+  /// Return the location of the attribute identifier / keyword.
+  SourceLoc getAttrLoc() const {
+    return AttrLoc;
   }
 
-  // This attribute list is empty if no attributes are specified.  Note that
-  // the presence of the leading @ is not enough to tell, because we want
-  // clients to be able to remove attributes they process until they get to
-  // an empty list.
-  bool empty() const {
-    if (CustomAttrs)
-      return false;
-
-    for (SourceLoc elt : AttrLocs)
-      if (elt.isValid())
-        return false;
-
-    return true;
-  }
-
-  bool hasConvention() const { return ConventionArguments.has_value(); }
-
-  /// Returns the primary calling convention string.
-  ///
-  /// Note: For C conventions, this may not represent the full convention.
-  StringRef getConventionName() const {
-    return ConventionArguments.value().Name;
-  }
-
-  /// Show the string enclosed between @convention(..)'s parentheses.
-  ///
-  /// For example, @convention(foo, bar) will give the string "foo, bar".
-  void getConventionArguments(SmallVectorImpl<char> &buffer) const;
-
-  bool hasOwnership() const {
-    return getOwnership() != ReferenceOwnership::Strong;
-  }
-  ReferenceOwnership getOwnership() const {
-#define REF_STORAGE(Name, name, ...) \
-    if (has(TAK_sil_##name)) return ReferenceOwnership::Name;
-#include "swift/AST/ReferenceStorage.def"
-    return ReferenceOwnership::Strong;
-  }
-
-  void clearOwnership() {
-#define REF_STORAGE(Name, name, ...) \
-    clearAttribute(TAK_sil_##name);
-#include "swift/AST/ReferenceStorage.def"
-  }
-
-  bool hasOpenedID() const { return OpenedID.has_value(); }
-  UUID getOpenedID() const { return *OpenedID; }
-
-  bool hasConstraintType() const { return ConstraintType.has_value(); }
-  TypeRepr *getConstraintType() const { return *ConstraintType; }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const;
 
   /// Given a name like "autoclosure", return the type attribute ID that
-  /// corresponds to it.  This returns TAK_Count on failure.
-  ///
-  static TypeAttrKind getAttrKindFromString(StringRef Str);
+  /// corresponds to it.
+  static llvm::Optional<TypeAttrKind> getAttrKindFromString(StringRef Str);
 
   /// Return the name (like "autoclosure") for an attribute ID.
   static const char *getAttrName(TypeAttrKind kind);
 
-  void addCustomAttr(CustomAttr *attr) {
-    attr->Next = CustomAttrs;
-    CustomAttrs = attr;
-  }
+  static TypeAttribute *createSimple(const ASTContext &context,
+                                     TypeAttrKind kind,
+                                     SourceLoc atLoc,
+                                     SourceLoc attrLoc);
 
-  // Iterator for the custom type attributes.
-  class iterator {
-    CustomAttr *attr;
+  SWIFT_DEBUG_DUMPER(dump());
+  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+};
 
-  public:
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = CustomAttr*;
-    using difference_type = std::ptrdiff_t;
-    using pointer = value_type*;
-    using reference = value_type&;    
+class AtTypeAttrBase : public TypeAttribute {
+  SourceLoc AtLoc;
+public:
+  AtTypeAttrBase(TypeAttrKind kind, SourceLoc atLoc, SourceLoc attrLoc)
+    : TypeAttribute(kind, attrLoc), AtLoc(atLoc) {}
 
-    iterator() : attr(nullptr) { }
-    explicit iterator(CustomAttr *attr) : attr(attr) { }
+  SourceLoc getAtLoc() const { return AtLoc; }
 
-    iterator &operator++() {
-      attr = static_cast<CustomAttr *>(attr->Next);
-      return *this;
-    }
+  SourceLoc getStartLocImpl() const { return AtLoc; }
+  SourceLoc getEndLocImpl() const { return getAttrLoc(); }
+};
 
-#ifndef __swift__
-    bool operator==(iterator x) const { return x.attr == attr; }
-    bool operator!=(iterator x) const { return x.attr != attr; }
-#endif // __swift__
+class AtTypeAttrWithArgsBase : public AtTypeAttrBase {
+  SourceRange Parens;
+public:
+  AtTypeAttrWithArgsBase(TypeAttrKind kind, SourceLoc atLoc, SourceLoc idLoc,
+                         SourceRange parens)
+    : AtTypeAttrBase(kind, atLoc, idLoc), Parens(parens) {}
 
-    CustomAttr *operator*() const { return attr; }
-    CustomAttr &operator->() const { return *attr; }
-  };
+  SourceRange getParensRange() const { return Parens; }
 
-  llvm::iterator_range<iterator> getCustomAttrs() const {
-    return llvm::make_range(iterator(CustomAttrs), iterator());
+  SourceLoc getEndLocImpl() const { return Parens.End; }
+};
+
+template <TypeAttrKind Kind, class Base = AtTypeAttrBase>
+class SimpleTypeAttr : public Base {
+public:
+  template <class... Args>
+  SimpleTypeAttr(Args ...args) : Base(Kind, args...) {}
+
+  static constexpr TypeAttrKind StaticKind = Kind;
+
+  static bool classof(const TypeAttribute *attr) {
+    return attr->getKind() == Kind;
   }
 };
+
+template <TypeAttrKind Kind>
+using SimpleTypeAttrWithArgs = SimpleTypeAttr<Kind, AtTypeAttrWithArgsBase>;
+
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                \
+using CLASS##TypeAttr = SimpleTypeAttr<TAK_##SPELLING>;
+#include "swift/AST/Attr.def"
+
+class ConventionTypeAttr : public SimpleTypeAttrWithArgs<TAK_convention> {
+  Located<StringRef> Name;
+  DeclNameRef WitnessMethodProtocol;
+  Located<StringRef> ClangType;
+
+public:
+  ConventionTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
+                     SourceRange parens,
+                     Located<StringRef> name,
+                     DeclNameRef witnessMethodProtocol,
+                     Located<StringRef> clangType)
+    : SimpleTypeAttr(atLoc, kwLoc, parens),
+      Name(name),
+      WitnessMethodProtocol(witnessMethodProtocol),
+      ClangType(clangType) {}
+
+  StringRef getConventionName() const { return Name.Item; }
+  SourceLoc getConventionLoc() const { return Name.Loc; }
+  llvm::Optional<StringRef> getClangType() const {
+    if (!ClangType.Item.empty()) return ClangType.Item;
+    return {};
+  }
+  SourceLoc getClangTypeLoc() const { return ClangType.Loc; }
+  DeclNameRef getWitnessMethodProtocol() const {
+    return WitnessMethodProtocol;
+  }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class DifferentiableTypeAttr : public SimpleTypeAttrWithArgs<TAK_differentiable> {
+  SourceLoc DifferentiabilityLoc;
+public:
+  DifferentiableTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
+                         SourceRange parensRange,
+                         Located<DifferentiabilityKind> differentiability)
+    : SimpleTypeAttr(atLoc, kwLoc, parensRange),
+      DifferentiabilityLoc(differentiability.Loc) {
+    Bits.DifferentiableTypeAttr.Differentiability =
+      unsigned(differentiability.Item);
+  }
+
+  SourceLoc getEndLocImpl() const {
+    // "Override" this method to handle that @differentiable doesn't
+    // always take an argument.
+    if (getParensRange().isValid()) return getParensRange().End;
+    return getAttrLoc();
+  }
+
+  DifferentiabilityKind getDifferentiability() const {
+    return DifferentiabilityKind(Bits.DifferentiableTypeAttr.Differentiability);
+  }
+  SourceLoc getDifferentiabilityLoc() const {
+    return DifferentiabilityLoc;
+  }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class OpaqueReturnTypeOfTypeAttr
+    : public SimpleTypeAttrWithArgs<TAK__opaqueReturnTypeOf> {
+  Located<StringRef> MangledName;
+  SourceLoc IndexLoc;
+public:
+  OpaqueReturnTypeOfTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                             Located<StringRef> mangledName,
+                             Located<unsigned> index)
+    : SimpleTypeAttr(atLoc, kwLoc, parens), MangledName(mangledName) {
+    Bits.OpaqueReturnTypeOfTypeAttr.Index = index.Item;
+  }
+
+  StringRef getMangledName() const { return MangledName.Item; }
+  SourceLoc getMangledNameLoc() const { return MangledName.Loc; }
+  unsigned getIndex() const { return Bits.OpaqueReturnTypeOfTypeAttr.Index; }
+  SourceLoc getIndexLoc() const { return IndexLoc; }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class OpenedTypeAttr : public SimpleTypeAttrWithArgs<TAK_opened> {
+  Located<UUID> ID;
+  TypeRepr *ConstraintType;
+public:
+  OpenedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                 Located<UUID> id, TypeRepr *constraintType)
+    : SimpleTypeAttr(atLoc, kwLoc, parensRange),
+      ID(id), ConstraintType(constraintType) {}
+
+  UUID getUUID() const {
+    return ID.Item;
+  }
+  SourceLoc getUUIDLoc() const {
+    return ID.Loc;
+  }
+  TypeRepr *getConstraintType() const {
+    return ConstraintType;
+  }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+class PackElementTypeAttr : public SimpleTypeAttrWithArgs<TAK_pack_element> {
+  Located<UUID> ID;
+public:
+  PackElementTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                      Located<UUID> id)
+    : SimpleTypeAttr(atLoc, kwLoc, parensRange), ID(id) {}
+
+  UUID getUUID() const {
+    return ID.Item;
+  }
+  SourceLoc getUUIDLoc() const {
+    return ID.Loc;
+  }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+using TypeOrCustomAttr =
+  llvm::PointerUnion<CustomAttr*, TypeAttribute*>;
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 
@@ -3095,6 +3169,11 @@ inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
 /// Determine whether the given attribute is available, looking up the
 /// attribute by name.
 bool hasAttribute(const LangOptions &langOpts, llvm::StringRef attributeName);
+
+template <>
+struct EnumTraits<TypeAttrKind> {
+  static constexpr size_t NumValues = NumTypeAttrKinds;
+};
 
 } // end namespace swift
 

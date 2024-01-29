@@ -650,7 +650,7 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
 
       if (SILMod.getASTContext().LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
         if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(Req.getSubjectRepr())) {
-          if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+          if (attributedTy->has(TAK__noMetadata)) {
             typeErasedParams.push_back(Subject);
           }
         }
@@ -1126,11 +1126,17 @@ bool SILParser::parseSILType(SILType &Result,
   parsedAttrs.parse(P);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
-  if (IsFuncDecl && !parsedAttrs.Attributes.has(TAK_convention)) {
+  if (IsFuncDecl && !llvm::any_of(parsedAttrs.Attributes,
+                                  [](TypeOrCustomAttr attr) {
+        if (auto typeAttr = attr.dyn_cast<TypeAttribute*>())
+          return isa<ConventionTypeAttr>(typeAttr);
+        return false;
+      })) {
     // Use a random location.
-    parsedAttrs.Attributes.setAttr(TAK_convention, P.PreviousLoc);
-    parsedAttrs.Attributes.ConventionArguments =
-        TypeAttributes::Convention::makeSwiftConvention("thin");
+    auto loc = P.PreviousLoc;
+    parsedAttrs.Attributes.push_back(
+      new (P.Context) ConventionTypeAttr(loc, loc, {loc, loc},
+                                         {"thin", loc}, DeclNameRef(), {}));
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);

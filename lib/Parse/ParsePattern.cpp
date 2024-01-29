@@ -130,6 +130,8 @@ bool Parser::startsParameterName(bool isClosure) {
   if (nextTok.is(tok::colon))
     return true;
 
+
+
   // If the next token can be an argument label, we might have a name.
   if (nextTok.canBeArgumentLabel()) {
     // If the first name wasn't a contextual keyword, we're done.
@@ -229,18 +231,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     {
       // ('inout' | '__shared' | '__owned' | isolated)?
       bool hasSpecifier = false;
-      while (Tok.is(tok::kw_inout) ||
-             (canHaveParameterSpecifierContextualKeyword() &&
-              (Tok.isContextualKeyword("__shared") ||
-               Tok.isContextualKeyword("__owned") ||
-               Tok.isContextualKeyword("borrowing") ||
-               Tok.isContextualKeyword("consuming") ||
-               Tok.isContextualKeyword("isolated") ||
-               Tok.isContextualKeyword("_const") ||
-               (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-                Tok.isContextualKeyword("_resultDependsOn")) ||
-               (Context.LangOpts.hasFeature(
-                   Feature::TransferringArgsAndResults))))) {
+      while (isParameterSpecifier()) {
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
@@ -592,12 +583,12 @@ mapParsedParameters(Parser &parser,
         auto unwrappedType = type;
         while (true) {
           if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
-            auto &attrs = ATR->getAttrs();
             // At this point we actually don't know if that's valid to mark
             // this parameter declaration as `autoclosure` because type has
             // not been resolved yet - it should either be a function type
             // or typealias with underlying function type.
-            param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+            if (ATR->has(TAK_autoclosure))
+              param->setAutoClosure(true);
 
             unwrappedType = ATR->getTypeRepr();
             continue;

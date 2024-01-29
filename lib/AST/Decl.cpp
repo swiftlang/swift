@@ -2310,7 +2310,9 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
   // Look through most attributes.
   if (const auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
     // Ownership kinds have optionalness requirements.
-    if (optionalityOf(attributed->getAttrs().getOwnership()) ==
+    // FIXME: this is checking for *SIL* ownership; normal weak/unowned/etc.
+    // are decl attributes.  Is this actually an important check to do?
+    if (optionalityOf(attributed->getSILOwnership()) ==
         ReferenceOwnershipOptionality::Required)
       return true;
 

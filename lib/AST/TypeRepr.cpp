@@ -122,8 +122,10 @@ TypeRepr *TypeRepr::getWithoutParens() const {
 SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-    if (attrTypeRepr->getAttrs().has(kind)) {
-      return attrTypeRepr->getAttrs().getLoc(kind);
+    for (auto attr : attrTypeRepr->getAttrs()) {
+      if (auto typeAttr = attr.dyn_cast<TypeAttribute*>())
+        if (typeAttr->getKind() == kind)
+          return typeAttr->getAttrLoc();
     }
 
     typeRepr = attrTypeRepr->getTypeRepr();
@@ -198,6 +200,37 @@ void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << "<<error type>>";
 }
 
+AttributedTypeRepr *AttributedTypeRepr::create(const ASTContext &C,
+                                               ArrayRef<TypeOrCustomAttr> attrs,
+                                               TypeRepr *ty) {
+  size_t size = totalSizeToAlloc<TypeOrCustomAttr>(attrs.size());
+  void *mem = C.Allocate(size, alignof(AttributedTypeRepr));
+  return new (mem) AttributedTypeRepr(attrs, ty);
+}
+
+TypeAttribute *AttributedTypeRepr::get(TypeAttrKind kind) const {
+  for (auto attr : getAttrs()) {
+    auto typeAttr = attr.dyn_cast<TypeAttribute*>();
+    if (typeAttr && typeAttr->getKind() == kind)
+      return typeAttr;
+  }
+  return nullptr;
+}
+
+ReferenceOwnership AttributedTypeRepr::getSILOwnership() const {
+  for (auto attr : getAttrs()) {
+    auto typeAttr = attr.dyn_cast<TypeAttribute*>();
+    if (!typeAttr) continue;
+    switch (typeAttr->getKind()) {
+#define REF_STORAGE(Name, name, ...) \
+    case TAK_sil_##name: return ReferenceOwnership::Name;
+#include "swift/AST/ReferenceStorage.def"
+    default: continue;
+    }
+  }
+  return ReferenceOwnership::Strong;
+}
+
 void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
                                    const PrintOptions &Opts) const {
   printAttrs(Printer, Opts);
@@ -211,78 +244,20 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
                                     const PrintOptions &Options) const {
-  const TypeAttributes &Attrs = getAttrs();
-
-  auto hasAttr = [&](TypeAttrKind K) -> bool {
-    if (Options.excludeAttrKind(K))
-      return false;
-    return Attrs.has(K);
-  };
-
-  if (hasAttr(TAK_autoclosure))
-    Printer.printSimpleAttr("@autoclosure") << " ";
-  if (hasAttr(TAK_escaping))
-    Printer.printSimpleAttr("@escaping") << " ";
-
-  for (auto customAttr : Attrs.getCustomAttrs()) {
-    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-    Printer << "@";
-    customAttr->getTypeRepr()->print(Printer, Options);
-    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-    Printer << " ";
-  }
-
-  if (hasAttr(TAK_Sendable))
-    Printer.printSimpleAttr("@Sendable") << " ";
-  if (hasAttr(TAK_noDerivative))
-    Printer.printSimpleAttr("@noDerivative") << " ";
-  if (hasAttr(TAK_isolated))
-    Printer.printSimpleAttr("@isolated") << " ";
-
-  if (hasAttr(TAK_differentiable)) {
-    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-    Printer.printAttrName("@differentiable");
-    switch (Attrs.differentiabilityKind) {
-    case DifferentiabilityKind::Normal:
-      break;
-    case DifferentiabilityKind::Forward:
-      Printer << "(_forward)";
-      break;
-    case DifferentiabilityKind::Reverse:
-      Printer << "(reverse)";
-      break;
-    case DifferentiabilityKind::Linear:
-      Printer << "(_linear)";
-      break;
-    case DifferentiabilityKind::NonDifferentiable:
-      llvm_unreachable("Unexpected case 'NonDifferentiable'");
+  for (auto attr : getAttrs()) {
+    if (auto customAttr = attr.dyn_cast<CustomAttr*>()) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer << "@";
+      customAttr->getTypeRepr()->print(Printer, Options);
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+    } else {
+      auto typeAttr = attr.get<TypeAttribute*>();
+      if (Options.excludeAttrKind(typeAttr->getKind()))
+        continue;
+      typeAttr->print(Printer, Options);
     }
-    Printer << ' ';
-    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
-  }
-
-  if (hasAttr(TAK_thin))
-    Printer.printSimpleAttr("@thin") << " ";
-  if (hasAttr(TAK_thick))
-    Printer.printSimpleAttr("@thick") << " ";
-
-  if (hasAttr(TAK_convention) && Attrs.hasConvention()) {
-    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-    Printer.printAttrName("@convention");
-    SmallString<32> convention;
-    Attrs.getConventionArguments(convention);
-    Printer << "(" << convention << ")";
-    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }
-
-  if (hasAttr(TAK_async))
-    Printer.printSimpleAttr("@async") << " ";
-  if (hasAttr(TAK_opened))
-    Printer.printSimpleAttr("@opened") << " ";
-
-  if (hasAttr(TAK__noMetadata))
-    Printer.printSimpleAttr("@_noMetadata") << " ";
 }
 
 static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
