@@ -232,6 +232,16 @@ public func _errorInMain(_ error: Error) {
   #endif
 }
 
+/// Invoked by the compiler when code at top level throws an uncaught, typed error.
+@_alwaysEmitIntoClient
+public func _errorInMainTyped<Failure: Error>(_ error: Failure) -> Never {
+  #if !$Embedded
+  fatalError("Error raised at top level: \(String(reflecting: error))")
+  #else
+  Builtin.int_trap()
+  #endif
+}
+
 /// Runtime function to determine the default code for an Error-conforming type.
 /// Called by the Foundation overlay.
 @_silgen_name("_swift_stdlib_getDefaultErrorCode")

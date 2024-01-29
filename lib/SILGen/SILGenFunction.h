@@ -773,6 +773,9 @@ public:
   /// application based on a main type and optionally a main type.
   void emitArtificialTopLevel(Decl *mainDecl);
 
+  /// Generate code for calling the given main function.
+  void emitCallToMain(FuncDecl *mainDecl);
+
   /// Generate code into @main for starting the async main on the main thread.
   void emitAsyncMainThreadStart(SILDeclRef entryPoint);
 
