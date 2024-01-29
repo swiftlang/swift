@@ -819,6 +819,7 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
     case 7: return getSwift57Availability();
     case 8: return getSwift58Availability();
     case 9: return getSwift59Availability();
+    case 11: return getSwift511Availability();
     default: break;
     }
   }

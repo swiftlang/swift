@@ -2802,8 +2802,9 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
 
 RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     SILFunction *fn, PostOrderFunctionInfo *pofi)
-    : allocator(), fn(fn), translator(), ptrSetFactory(allocator),
-      blockStates(), pofi(pofi), solved(false), supportedFunction(true) {
+    : allocator(), fn(fn), valueMap(fn), translator(),
+      ptrSetFactory(allocator), blockStates(), pofi(pofi), solved(false),
+      supportedFunction(true) {
   // Before we do anything, make sure that we support processing this function.
   //
   // NOTE: See documentation on supportedFunction for criteria.
@@ -3005,7 +3006,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   }
 
   // Otherwise refer to the oracle.
-  if (!isNonSendableType(value->getType(), value->getFunction()))
+  if (!isNonSendableType(value->getType(), fn))
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
 
   // Check if our base is a ref_element_addr from an actor. In such a case,

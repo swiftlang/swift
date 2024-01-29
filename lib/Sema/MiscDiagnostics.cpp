@@ -6239,17 +6239,14 @@ llvm::Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
 
 bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
                                                   ForEachStmt *forEach) {
-  if (!forEach->getAwaitLoc().isValid())
-    return false;
-
-  auto conformanceRef = forEach->getSequenceConformance();
-  if (conformanceRef.hasEffect(EffectKind::Throws) &&
-      forEach->getTryLoc().isInvalid()) {
-    auto &ctx = dc->getASTContext();
-    ctx.Diags
-        .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
-        .fixItInsert(forEach->getAwaitLoc(), "try");
-    return true;
+  auto &ctx = dc->getASTContext();
+  if (auto thrownError = TypeChecker::canThrow(ctx, forEach)) {
+    if (forEach->getTryLoc().isInvalid()) {
+      ctx.Diags
+          .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
+          .fixItInsert(forEach->getAwaitLoc(), "try");
+      return true;
+    }
   }
 
   return false;

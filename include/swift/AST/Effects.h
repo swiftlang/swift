@@ -87,6 +87,11 @@ enum class PolymorphicEffectKind : uint8_t {
   /// This is the conformance-based 'rethrows' /'reasync' case.
   ByConformance,
 
+  /// The function is only permitted to be `rethrows` because it depends
+  /// on a conformance to `AsyncSequence` or `AsyncIteratorProtocol`,
+  /// which historically were "@rethrows" protocols.
+  AsyncSequenceRethrows,
+
   /// The function has this effect unconditionally.
   ///
   /// This is a plain old 'throws' / 'async' function.

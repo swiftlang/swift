@@ -2014,6 +2014,25 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
                              Where.withReason(reason), flags);
   }
 
+  /// Identify the AsyncSequence.flatMap set of functions from the
+  /// _Concurrency module.
+  static bool isAsyncSequenceFlatMap(const GenericContext *gc) {
+    auto func = dyn_cast<FuncDecl>(gc);
+    if (!func)
+      return false;
+
+    auto proto = func->getDeclContext()->getSelfProtocolDecl();
+    if (!proto ||
+        !proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))
+      return false;
+
+    ASTContext &ctx = proto->getASTContext();
+    if (func->getModuleContext()->getName() != ctx.Id_Concurrency)
+      return false;
+
+    return !func->getName().isSimpleName("flatMap");
+  }
+
   void checkGenericParams(const GenericContext *ownerCtx,
                           const ValueDecl *ownerDecl) {
     if (!ownerCtx->isGenericContext())
@@ -2031,6 +2050,13 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     }
 
     if (ownerCtx->getTrailingWhereClause()) {
+      // Ignore the where clause for AsyncSequence.flatMap from the
+      // _Concurrency module. This is an egregious hack to allow us to
+      // use overloading tricks to retain the behavior previously
+      // afforded by rethrowing conformances.
+      if (isAsyncSequenceFlatMap(ownerCtx))
+        return;
+
       forAllRequirementTypes(WhereClauseOwner(
                                const_cast<GenericContext *>(ownerCtx)),
                              [&](Type type, TypeRepr *typeRepr) {

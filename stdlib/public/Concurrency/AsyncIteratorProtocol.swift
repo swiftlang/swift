@@ -86,13 +86,40 @@ import Swift
 /// checking for cancellation as described above, or in `deinit` if it's
 /// a reference type.
 @available(SwiftStdlib 5.1, *)
-@rethrows
-public protocol AsyncIteratorProtocol {
+public protocol AsyncIteratorProtocol<Element, Failure> {
   associatedtype Element
+
+  /// The type of failure produced by iteration.
+  @available(SwiftStdlib 5.11, *)
+  associatedtype Failure: Error = any Error
+
   /// Asynchronously advances to the next element and returns it, or ends the
   /// sequence if there is no next element.
-  /// 
+  ///
   /// - Returns: The next element, if it exists, or `nil` to signal the end of
   ///   the sequence.
   mutating func next() async throws -> Element?
+
+  /// Asynchronously advances to the next element and returns it, or ends the
+  /// sequence if there is no next element.
+  ///
+  /// - Returns: The next element, if it exists, or `nil` to signal the end of
+  ///   the sequence.
+  @available(SwiftStdlib 5.11, *)
+  mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Element?
+}
+
+@available(SwiftStdlib 5.1, *)
+extension AsyncIteratorProtocol {
+  /// Default implementation of `next()` in terms of `next()`, which is
+  /// required to maintain backward compatibility with existing async iterators.
+  @available(SwiftStdlib 5.11, *)
+  @inlinable
+  public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Element? {
+    do {
+      return try await next()
+    } catch {
+      throw error as! Failure
+    }
+  }
 }

@@ -1141,6 +1141,36 @@ extension ThrowingTaskGroup: AsyncSequence {
       }
     }
 
+    /// Advances to and returns the result of the next child task.
+    ///
+    /// The elements returned from this method
+    /// appear in the order that the tasks *completed*,
+    /// not in the order that those tasks were added to the task group.
+    /// After this method returns `nil`,
+    /// this iterator is guaranteed to never produce more values.
+    ///
+    /// For more information about the iteration order and semantics,
+    /// see `ThrowingTaskGroup.next()`
+    ///
+    /// - Throws: The error thrown by the next child task that completes.
+    ///
+    /// - Returns: The value returned by the next child task that completes,
+    ///   or `nil` if there are no remaining child tasks,
+    @available(SwiftStdlib 5.11, *)
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Element? {
+      guard !finished else { return nil }
+      do {
+        guard let element = try await group.next() else {
+          finished = true
+          return nil
+        }
+        return element
+      } catch {
+        finished = true
+        throw error as! Failure
+      }
+    }
+    
     public mutating func cancel() {
       finished = true
       group.cancelAll()

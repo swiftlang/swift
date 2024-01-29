@@ -114,8 +114,23 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
 
   for (auto req : decl->getGenericSignature().getRequirements()) {
     if (req.getKind() == RequirementKind::Conformance) {
-      if (req.getProtocolDecl()->hasPolymorphicEffect(kind)) {
+      auto proto = req.getProtocolDecl();
+
+      if (proto->hasPolymorphicEffect(kind)) {
         return PolymorphicEffectKind::ByConformance;
+      }
+
+      // Specifically recognize functions that are rethrows and would
+      // have been ByConformance polymorphic when AsyncIteratorProtocol
+      // and AsyncSequence were rethrowing protocols.
+      if (kind == EffectKind::Throws &&
+          (proto->isSpecificProtocol(
+              KnownProtocolKind::AsyncIteratorProtocol) ||
+           proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence))) {
+        // FIXME: We should diagnose that this function should use typed
+        // throws instead.
+
+        return PolymorphicEffectKind::AsyncSequenceRethrows;
       }
     }
   }
@@ -152,6 +167,14 @@ static bool classifyWitness(ModuleDecl *module,
       // Witness doesn't have this effect at all, so it contributes nothing.
       return false;
 
+    case PolymorphicEffectKind::AsyncSequenceRethrows: {
+      // Witnesses that can only be polymorphic due to an
+      // AsyncSequence/AsyncIteratorProtocol conformance don't contribute
+      // anything; the thrown error result is captured by the Failure
+      // type.
+      return false;
+    }
+
     case PolymorphicEffectKind::ByConformance: {
       // Witness has the effect if the concrete type's conformances
       // recursively have the effect.
@@ -171,6 +194,17 @@ static bool classifyWitness(ModuleDecl *module,
 
     case PolymorphicEffectKind::Always:
       // Witness always has the effect.
+
+      // If the witness's thrown type is explicitly specified as a type
+      // parameter, then check whether the substituted type is `Never`.
+      if (kind == EffectKind::Throws) {
+        if (Type thrownError = witnessDecl->getThrownInterfaceType()) {
+          if (thrownError->hasTypeParameter())
+            thrownError = thrownError.subst(declRef.getSubstitutions());
+          if (thrownError->isNever())
+            return false;
+        }
+      }
       return true;
 
     case PolymorphicEffectKind::Invalid:
@@ -728,6 +762,21 @@ static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
   return true;
 }
 
+/// Determine whether the given rethrows context is only allowed to be
+/// rethrowing because of the historically-rethrowing behavior of
+/// AsyncSequence and AsyncIteratorProtocol.
+static bool isRethrowingDueToAsyncSequence(DeclContext *rethrowsDC) {
+  auto rethrowsFunc = dyn_cast<AbstractFunctionDecl>(rethrowsDC);
+  if (!rethrowsFunc)
+    return false;
+
+  if (rethrowsFunc->getPolymorphicEffectKind(EffectKind::Throws) !=
+        PolymorphicEffectKind::AsyncSequenceRethrows)
+    return false;
+
+  return true;
+}
+
 /// A type expressing the result of classifying whether a call or function
 /// throws or is async.
 class Classification {
@@ -1053,10 +1102,35 @@ public:
     }
   }
 
-  Classification classifyConformance(ProtocolConformanceRef conformanceRef,
+  Classification classifyConformance(Type type,
+                                     ProtocolConformanceRef conformanceRef,
                                      EffectKind kind) {
     if (conformanceRef.isInvalid())
       return Classification::forInvalidCode();
+
+    auto proto = conformanceRef.getRequirement();
+    if (kind == EffectKind::Throws &&
+        (proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence) ||
+         proto->isSpecificProtocol(
+             KnownProtocolKind::AsyncIteratorProtocol))) {
+      auto failureAssocType = proto->getAssociatedType(Ctx.Id_Failure);
+      if (failureAssocType) {
+        // Determine whether the async 'for' loop's thrown error is
+        // conditional.
+        ConditionalEffectKind conditional;
+        if (RethrowsDC && isRethrowingDueToAsyncSequence(RethrowsDC))
+          conditional = ConditionalEffectKind::Conditional;
+        else
+          conditional = ConditionalEffectKind::Always;
+
+        // Use the Failure type witness, when present.
+        Type thrownError = conformanceRef.getAssociatedType(
+            type, failureAssocType->getDeclaredInterfaceType());
+        return Classification::forThrows(
+            thrownError, conditional,
+            /*FIXME*/PotentialEffectReason::forConformance());
+        }
+    }
 
     if (conformanceRef.hasEffect(kind)) {
       assert(kind == EffectKind::Throws); // there is no async
@@ -1233,10 +1307,23 @@ public:
 
       // Handle rethrowing and reasync functions.
       switch (auto polyKind = fnRef.getPolymorphicEffectKind(kind)) {
+      case PolymorphicEffectKind::AsyncSequenceRethrows:
       case PolymorphicEffectKind::ByConformance: {
         auto substitutions = fnRef.getSubstitutions();
-        for (auto conformanceRef : substitutions.getConformances())
-          result.merge(classifyConformance(conformanceRef, kind));
+        auto requirements =
+            substitutions.getGenericSignature().getRequirements();
+        auto conformances = substitutions.getConformances();
+        for (const auto &req : requirements) {
+          if (req.getKind() != RequirementKind::Conformance)
+            continue;
+
+          auto conformanceRef = conformances.front();
+          conformances = conformances.drop_front();
+
+          Type type = req.getFirstType().subst(substitutions);
+          result.merge(classifyConformance(type, conformanceRef, kind));
+        }
+        assert(conformances.empty());
 
         // 'ByConformance' is a superset of 'ByClosure', so check for
         // closure arguments too.
@@ -1244,14 +1331,16 @@ public:
       }
 
       case PolymorphicEffectKind::Always:
-        if (polyKind == PolymorphicEffectKind::ByConformance) {
+        if (polyKind == PolymorphicEffectKind::ByConformance ||
+            polyKind == PolymorphicEffectKind::AsyncSequenceRethrows) {
           LLVM_FALLTHROUGH;
         } else if (RethrowsDC &&
             fnRef.getKind() == AbstractFunction::Function &&
             isRethrowLikeTypedThrows(fnRef.getFunction())) {
           // If we are in a rethrowing context and the function we're referring
-          // to is a rethrow-like function using typed throws, then look at all
-          // of the closure arguments.
+          // to is a rethrow-like function using typed throws or we are
+          // calling the next() or next(_:) of an async iterator,
+          // then look at all of the closure arguments.
           LLVM_FALLTHROUGH;
         } else {
           break;
@@ -1371,6 +1460,27 @@ public:
     }
   }
 
+  /// Check to see if the given for-each statement to determine if it
+  /// throws or is async.
+  Classification classifyForEach(ForEachStmt *stmt) {
+    // Only async for-each loops have effects.
+    if (!stmt->getAwaitLoc().isValid())
+      return Classification();
+
+    // For-each loops with effects are always async.
+    Classification result = Classification::forAsync(
+        ConditionalEffectKind::Always,
+        PotentialEffectReason::forApply());
+
+    if (!stmt->getNextCall())
+      return Classification::forInvalidCode();
+
+    // Merge the thrown result from the next/nextElement call.
+    result.merge(classifyExpr(stmt->getNextCall(), EffectKind::Throws));
+
+    return result;
+  }
+
 private:
   /// Classify a throwing or async function according to our local
   /// knowledge of its implementation.
@@ -1448,8 +1558,10 @@ private:
       auto conditional = ConditionalEffectKind::Always;
 
       // If we are within a rethrows context prior, treat some typed-throws
-      // functions as conditionally throwing.
-      if (RethrowsDC && isRethrowLikeTypedThrows(fn))
+      // functions and async iterator functions as conditionally throwing.
+      if (kind == EffectKind::Throws && RethrowsDC &&
+          (isRethrowLikeTypedThrows(fn) ||
+           isRethrowingDueToAsyncSequence(RethrowsDC)))
         conditional = ConditionalEffectKind::Conditional;
 
       return Classification::forDeclRef(
@@ -1553,11 +1665,7 @@ private:
     }
 
     ShouldRecurse_t checkForEach(ForEachStmt *S) {
-      if (S->getTryLoc().isValid()) {
-        classification.merge(Self.classifyConformance(
-            S->getSequenceConformance(), EffectKind::Throws).onlyThrowing());
-      }
-
+      classification.merge(Self.classifyForEach(S));
       return ShouldRecurse;
     }
 
@@ -1880,8 +1988,10 @@ private:
 
       case EffectKind::Throws:
         if (auto thrownError = fnType->getEffectiveThrownErrorType()) {
-          return Classification::forThrows(
-              thrownError->subst(subs), conditional, reason);
+          Type thrown = *thrownError;
+          if (subs)
+            thrown = thrown.subst(subs);
+          return Classification::forThrows(thrown, conditional, reason);
         }
 
         return Classification();
@@ -2014,6 +2124,7 @@ public:
     switch (fn->getPolymorphicEffectKind(kind)) {
     case PolymorphicEffectKind::ByClosure:
     case PolymorphicEffectKind::ByConformance:
+    case PolymorphicEffectKind::AsyncSequenceRethrows:
       return true;
 
     case PolymorphicEffectKind::None:
@@ -3383,18 +3494,19 @@ private:
     if (!CurContext.handlesAsync(ConditionalEffectKind::Always))
       CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, llvm::None);
 
-    // A 'for try await' might be effect polymorphic via the conformance
-    // in a 'rethrows' function body.
-    if (S->getTryLoc().isValid()) {
-      auto classification = getApplyClassifier().classifyConformance(
-          S->getSequenceConformance(), EffectKind::Throws);
+    // A 'for try await' has a thrown error type that depends on the
+    // AsyncSequence conformance.
+    auto classification =
+        getApplyClassifier().classifyForEach(S).onlyThrowing();
+    if (classification) {
       auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
 
       if (throwsKind != ConditionalEffectKind::None)
         Flags.set(ContextFlags::HasAnyThrowSite);
 
-      if (!CurContext.handlesThrows(throwsKind))
-        CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
+      // Note: we don't need to check whether the throw error is handled,
+      // because we will also be checking the generated next/nextElement
+      // call.
     }
 
     return ShouldRecurse;
@@ -3611,6 +3723,16 @@ void TypeChecker::checkPropertyWrapperEffects(
 llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   ApplyClassifier classifier(ctx);
   auto classification = classifier.classifyExpr(expr, EffectKind::Throws);
+  if (classification.getConditionalKind(EffectKind::Throws) ==
+        ConditionalEffectKind::None)
+    return llvm::None;
+
+  return classification.getThrownError();
+}
+
+llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, ForEachStmt *forEach) {
+  ApplyClassifier classifier(ctx);
+  auto classification = classifier.classifyForEach(forEach).onlyThrowing();
   if (classification.getConditionalKind(EffectKind::Throws) ==
         ConditionalEffectKind::None)
     return llvm::None;

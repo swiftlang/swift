@@ -81,6 +81,11 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
   /// The filter sequence produces whatever type of element its base
   /// sequence produces.
   public typealias Element = Base.Element
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The filter sequence produces errors from either the base
+  /// sequence or the filtering closure.
+  public typealias Failure = any Error
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
@@ -116,6 +121,35 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     public mutating func next() async throws -> Base.Element? {
       while !finished {
         guard let element = try await baseIterator.next() else {
+          return nil
+        }
+        do {
+          if try await isIncluded(element) {
+            return element
+          }
+        } catch {
+          finished = true
+          throw error
+        }
+      }
+
+      return nil
+    }
+
+    /// Produces the next element in the filter sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator; if this call
+    /// returns `nil`, `next()` returns nil. Otherwise, `next()`
+    /// evaluates the result with the `predicate` closure. If the closure
+    /// returns `true`, `next()` returns the received element; otherwise
+    /// it awaits the next element from the base iterator. If calling the
+    /// closure throws an error, the sequence ends and `next()` rethrows
+    /// the error.
+    @available(SwiftStdlib 5.11, *)
+    @inlinable
+    public mutating func next(_ actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
+      while !finished {
+        guard let element = try await baseIterator.next(actor) else {
           return nil
         }
         do {

@@ -556,7 +556,8 @@ bool isThrowsDecl(ConcreteDeclRef declRef);
 /// for the given expression.
 VarDecl *getReferencedParamOrCapture(
     Expr *expr,
-    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue);
+    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue,
+    llvm::function_ref<VarDecl *()> getCurrentIsolatedVar);
 
 /// Determine whether the given value can be accessed across actors
 /// without from normal synchronous code.

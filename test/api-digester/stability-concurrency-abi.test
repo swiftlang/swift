@@ -52,6 +52,7 @@
 // UNSUPPORTED: swift_evolve
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+Func AsyncSequence.flatMap(_:) has mangled name changing from '(extension in _Concurrency):Swift.AsyncSequence.flatMap<A where A1: Swift.AsyncSequence>((A.Element) async -> A1) -> _Concurrency.AsyncFlatMapSequence<A, A1>' to '(extension in _Concurrency):Swift.AsyncSequence.flatMap<A where A1: Swift.AsyncSequence>(@Sendable (A.Element) async -> A1) -> _Concurrency.AsyncFlatMapSequence<A, A1>'
 Func MainActor.run(resultType:body:) has generic signature change from <T where T : Swift.Sendable> to <T>
 Func MainActor.run(resultType:body:) has mangled name changing from 'static Swift.MainActor.run<A where A: Swift.Sendable>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A' to 'static Swift.MainActor.run<A>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A'
 Func _asyncLet_get(_:_:) has mangled name changing from '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> Builtin.RawPointer' to '_Concurrency._asyncLet_get(Builtin.RawPointer, Builtin.RawPointer) async -> ()'
@@ -60,7 +61,11 @@ Func _asyncLet_get_throwing(_:_:) has mangled name changing from '_Concurrency._
 Func _asyncLet_get_throwing(_:_:) has return type change from Builtin.RawPointer to ()
 Protocol Actor has added inherited protocol AnyActor
 Protocol Actor has generic signature change from <Self : AnyObject, Self : Swift.Sendable> to <Self : _Concurrency.AnyActor>
+Protocol AsyncIteratorProtocol has generic signature change from to <Self.Failure : Swift.Error>
+Protocol AsyncSequence has generic signature change from <Self.AsyncIterator : _Concurrency.AsyncIteratorProtocol, Self.Element == Self.AsyncIterator.Element> to <Self.AsyncIterator : _Concurrency.AsyncIteratorProtocol, Self.Element == Self.AsyncIterator.Element, Self.Failure == Self.AsyncIterator.Failure>
 Struct CheckedContinuation has removed conformance to UnsafeSendable
+Protocol AsyncIteratorProtocol is now without @rethrows
+Protocol AsyncSequence is now without @rethrows
 
 // SerialExecutor gained `enqueue(_: __owned Job)`, protocol requirements got default implementations
 Func SerialExecutor.enqueue(_:) has been added as a protocol requirement

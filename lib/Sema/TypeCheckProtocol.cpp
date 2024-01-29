@@ -584,6 +584,7 @@ RequirementMatch swift::matchWitness(
       case PolymorphicEffectKind::None:
       case PolymorphicEffectKind::Invalid:
       case PolymorphicEffectKind::ByClosure:
+      case PolymorphicEffectKind::AsyncSequenceRethrows:
         break;
 
       case PolymorphicEffectKind::ByConformance: {

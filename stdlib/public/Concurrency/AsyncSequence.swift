@@ -72,13 +72,18 @@ import Swift
 ///     // Prints "Odd Even Odd Even Odd Even Odd Even Odd Even "
 ///
 @available(SwiftStdlib 5.1, *)
-@rethrows
-public protocol AsyncSequence {
+public protocol AsyncSequence<Element, Failure> {
   /// The type of asynchronous iterator that produces elements of this
   /// asynchronous sequence.
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
   /// The type of element produced by this asynchronous sequence.
   associatedtype Element
+
+  /// The type of errors produced when iteration over the sequence fails.
+  @available(SwiftStdlib 5.11, *)
+  associatedtype Failure: Error = AsyncIterator.Failure
+      where AsyncIterator.Failure == Failure
+
   /// Creates the asynchronous iterator that produces elements of this
   /// asynchronous sequence.
   ///
