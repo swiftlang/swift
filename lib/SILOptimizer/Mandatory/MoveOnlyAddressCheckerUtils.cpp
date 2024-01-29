@@ -986,7 +986,7 @@ void UseState::initializeLiveness(
                "init!\n");
         // We cheat here slightly and use our address's operand.
         recordInitUse(address, address, liveness.getTopLevelSpan());
-        liveness.initializeDef(address, liveness.getTopLevelSpan());
+        liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
         break;
       case swift::SILArgumentConvention::Indirect_Out:
         llvm_unreachable("Should never have out addresses here");
@@ -1018,7 +1018,7 @@ void UseState::initializeLiveness(
                    << "Found move only arg closure box use... "
                       "adding mark_unresolved_non_copyable_value as init!\n");
         recordInitUse(address, address, liveness.getTopLevelSpan());
-        liveness.initializeDef(address, liveness.getTopLevelSpan());
+        liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
       }
     } else if (auto *box = dyn_cast<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
@@ -1026,7 +1026,7 @@ void UseState::initializeLiveness(
                  << "Found move only var allocbox use... "
                     "adding mark_unresolved_non_copyable_value as init!\n");
       recordInitUse(address, address, liveness.getTopLevelSpan());
-      liveness.initializeDef(address, liveness.getTopLevelSpan());
+      liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
     }
   }
 
@@ -1038,7 +1038,7 @@ void UseState::initializeLiveness(
                << "Found ref_element_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
 
   // Check if our address is from a global_addr. In such a case, we treat the
@@ -1049,7 +1049,7 @@ void UseState::initializeLiveness(
                << "Found global_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
 
   if (auto *ptai = dyn_cast<PointerToAddressInst>(
@@ -1059,13 +1059,13 @@ void UseState::initializeLiveness(
                << "Found pointer to address use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
   
   if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
         stripAccessMarkers(address->getOperand())->getDefiningInstruction())) {
     recordInitUse(address, address, liveness.getTopLevelSpan());
-    liveness.initializeDef(address, liveness.getTopLevelSpan());
+    liveness.initializeDef(SILValue(address), liveness.getTopLevelSpan());
   }
 
   // Now that we have finished initialization of defs, change our multi-maps

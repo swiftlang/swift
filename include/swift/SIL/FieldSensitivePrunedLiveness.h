@@ -1294,20 +1294,16 @@ public:
         bits, [&](auto range) { initializeDef(def, range); });
   }
 
-  void initializeDef(SILValue def, TypeTreeLeafTypeRange span) {
+  void initializeDef(SILNode *node, TypeTreeLeafTypeRange span) {
     assert(Super::isInitialized());
-    defs.insert(def, span);
-    auto *block = def->getParentBlock();
+    defs.insert(node, span);
+    auto *block = node->getParentBlock();
     defBlocks.insert(block, span);
     initializeDefBlock(block, span);
   }
 
   void initializeDef(SILInstruction *def, TypeTreeLeafTypeRange span) {
-    assert(Super::isInitialized());
-    defs.insert(cast<SILNode>(def), span);
-    auto *block = def->getParent();
-    defBlocks.insert(block, span);
-    initializeDefBlock(block, span);
+    initializeDef(cast<SILNode>(def), span);
   }
 
   bool isInitialized() const { return Super::isInitialized() && !defs.empty(); }
