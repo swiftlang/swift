@@ -332,9 +332,7 @@ extension String {
       codeUnits, encoding: encoding, repair: isRepairing)
   }
 
-  @_specialize(where Encoding == Unicode.UTF8)
-  @_specialize(where Encoding == Unicode.UTF16)
-  @inlinable // Fold away specializations
+  @inlinable
   @_alwaysEmitIntoClient
   public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: [Encoding.CodeUnit],
@@ -368,8 +366,6 @@ extension String {
     }
   }
 
-  @_specialize(where Encoding == Unicode.UTF8)
-  @_specialize(where Encoding == Unicode.UTF16)
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use a copy of the String argument")
@@ -385,8 +381,6 @@ extension String {
     }
   }
 
-  @_specialize(where Encoding == Unicode.UTF8)
-  @_specialize(where Encoding == Unicode.UTF16)
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
@@ -422,9 +416,7 @@ extension String {
     self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
   }
 
-  @_specialize(where Encoding == Unicode.UTF8)
-  @_specialize(where Encoding == Unicode.UTF16)
-  @inlinable // Fold away specializations
+  @inlinable
   @_alwaysEmitIntoClient
   @available(swift, deprecated: 6, message: "Use String(decoding: array, as: Encoding.self) instead")
   public init<Encoding: Unicode.Encoding>(
@@ -434,8 +426,6 @@ extension String {
     self = String.decodeCString(nullTerminatedCodeUnits, as: sourceEncoding)!.0
   }
 
-  @_specialize(where Encoding == Unicode.UTF8)
-  @_specialize(where Encoding == Unicode.UTF16)
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use a copy of the String argument")
@@ -448,9 +438,7 @@ extension String {
     }
   }
 
-  @_specialize(where Encoding == Unicode.UTF8)
-  @_specialize(where Encoding == Unicode.UTF16)
-  @inlinable // Fold away specializations
+  @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init<Encoding: Unicode.Encoding>(
