@@ -7983,12 +7983,20 @@ private:
                                     SILType elementType);
 
 public:
-  SILValue getIndex() const {
-    return getAllOperands()[IndexOperand].get();
+  SILValue getIndex() const { return getIndexOperand()->get(); }
+
+  Operand *getIndexOperand() { return &getAllOperands()[IndexOperand]; }
+
+  const Operand *getIndexOperand() const {
+    return &getAllOperands()[IndexOperand];
   }
 
-  SILValue getPack() const {
-    return getAllOperands()[PackOperand].get();
+  SILValue getPack() const { return getPackOperand()->get(); }
+
+  Operand *getPackOperand() { return &getAllOperands()[PackOperand]; }
+
+  const Operand *getPackOperand() const {
+    return &getAllOperands()[PackOperand];
   }
 
   CanSILPackType getPackType() const {
@@ -8028,17 +8036,28 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
-  SILValue getValue() const {
-    return getAllOperands()[ValueOperand].get();
+  SILValue getValue() const { return getValueOperand()->get(); }
+
+  const Operand *getValueOperand() const {
+    return &getAllOperands()[ValueOperand];
   }
 
-  SILValue getIndex() const {
-    return getAllOperands()[IndexOperand].get();
+  Operand *getValueOperand() { return &getAllOperands()[ValueOperand]; }
+
+  SILValue getIndex() const { return getIndexOperand()->get(); }
+
+  const Operand *getIndexOperand() const {
+    return &getAllOperands()[IndexOperand];
+  }
+  Operand *getIndexOperand() { return &getAllOperands()[IndexOperand]; }
+
+  SILValue getPack() const { return getPackOperand()->get(); }
+
+  const Operand *getPackOperand() const {
+    return &getAllOperands()[PackOperand];
   }
 
-  SILValue getPack() const {
-    return getAllOperands()[PackOperand].get();
-  }
+  Operand *getPackOperand() { return &getAllOperands()[PackOperand]; }
 
   CanSILPackType getPackType() const {
     return getPack()->getType().castTo<SILPackType>();
@@ -8079,12 +8098,20 @@ private:
                                           SILType elementType);
 
 public:
-  SILValue getIndex() const {
-    return getAllOperands()[IndexOperand].get();
+  SILValue getIndex() const { return getIndexOperand()->get(); }
+
+  Operand *getIndexOperand() { return &getAllOperands()[IndexOperand]; }
+
+  const Operand *getIndexOperand() const {
+    return &getAllOperands()[IndexOperand];
   }
 
-  SILValue getTuple() const {
-    return getAllOperands()[TupleOperand].get();
+  SILValue getTuple() const { return getTupleOperand()->get(); }
+
+  Operand *getTupleOperand() { return &getAllOperands()[TupleOperand]; }
+
+  const Operand *getTupleOperand() const {
+    return &getAllOperands()[TupleOperand];
   }
 
   CanTupleType getTupleType() const {
@@ -8124,9 +8151,21 @@ private:
          ValueOwnershipKind forwardingOwnershipKind);
 
 public:
-  SILValue getIndex() const { return getAllOperands()[IndexOperand].get(); }
+  SILValue getIndex() const { return getIndexOperand()->get(); }
 
-  SILValue getTuple() const { return getAllOperands()[TupleOperand].get(); }
+  Operand *getIndexOperand() { return &getAllOperands()[IndexOperand]; }
+
+  const Operand *getIndexOperand() const {
+    return &getAllOperands()[IndexOperand];
+  }
+
+  SILValue getTuple() const { return getTupleOperand()->get(); }
+
+  Operand *getTupleOperand() { return &getAllOperands()[TupleOperand]; }
+
+  const Operand *getTupleOperand() const {
+    return &getAllOperands()[TupleOperand];
+  }
 
   CanTupleType getTupleType() const {
     return getTuple()->getType().castTo<TupleType>();
