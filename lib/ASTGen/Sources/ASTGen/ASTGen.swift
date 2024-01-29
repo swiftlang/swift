@@ -76,7 +76,7 @@ struct ASTGenVisitor {
 
   let ctx: BridgedASTContext
 
-  fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(slabSize: 256)
+  fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(initialSlabSize: 256)
 
   /// Fallback legacy parser used when ASTGen doesn't have the generate(_:)
   /// implementation for the AST node kind.
