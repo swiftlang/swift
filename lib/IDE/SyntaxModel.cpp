@@ -134,7 +134,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     if (AttrLoc.isValid()) {
       // This token is following @, see if it's a known attribute name.
       // Type attribute, decl attribute, or '@unknown' for swift case statement.
-      if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count ||
+      if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value() ||
           DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count ||
           Tok.getText() == "unknown")  {
         // It's a known attribute, so treat it as a syntactic attribute node for
@@ -410,7 +410,7 @@ private:
                                  std::regex& Regex);
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const ParsedDeclAttributes &Attrs);
-  bool handleAttrs(const TypeAttributes &Attrs);
+  bool handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs);
 
   using DeclAttributeAndRange = std::pair<const DeclAttribute *, SourceRange>;
 
@@ -1249,12 +1249,16 @@ bool ModelASTWalker::handleAttrs(const ParsedDeclAttributes &Attrs) {
   return handleAttrRanges(DeclRanges);
 }
 
-bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
-  SmallVector<SourceLoc, 4> AttrLocs;
-  Attrs.getAttrLocs(AttrLocs);
+bool ModelASTWalker::handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs) {
   SmallVector<DeclAttributeAndRange, 4> DeclRanges;
-  for (auto AttrLoc : AttrLocs) {
-    DeclRanges.push_back(std::make_pair(nullptr, SourceRange(AttrLoc)));
+  for (auto Attr : Attrs) {
+    if (auto CA = Attr.dyn_cast<CustomAttr*>()) {
+      DeclRanges.push_back(std::make_pair(CA, CA->getRangeWithAt()));
+    } else {
+      auto TA = Attr.get<TypeAttribute*>();
+      // TODO: Use the structure in the TypeAttribute
+      DeclRanges.push_back(std::make_pair(nullptr, SourceRange(TA->getStartLoc())));
+    }
   }
   return handleAttrRanges(DeclRanges);
 }

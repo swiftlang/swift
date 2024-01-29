@@ -141,9 +141,16 @@ enum : unsigned { NumDeclAttrKindBits =
 
 // Define enumerators for each type attribute, e.g. TAK_weak.
 enum TypeAttrKind {
-#define TYPE_ATTR(X) TAK_##X,
+#define TYPE_ATTR(X, C) TAK_##X,
 #include "swift/AST/Attr.def"
-  TAK_Count
+};
+
+enum : unsigned {
+#define TYPE_ATTR(X, C) _counting_TAK_##X,
+#include "swift/AST/Attr.def"
+  NumTypeAttrKinds,
+
+  NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1)
 };
 
 } // end namespace swift

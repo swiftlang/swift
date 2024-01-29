@@ -1177,16 +1177,16 @@ bool AttributedFuncToTypeConversionFailure::
                                mismatchPosition);
   auto argsRepr = declFnRepr->getArgsTypeRepr();
   auto argRepr = argsRepr->getElement(mismatchPosition).Type;
-  if (!param.isAutoClosure()) {
-    note.fixItInsert(argRepr->getStartLoc(), "@escaping ");
+
+  TypeAttribute *autoclosureAttr = nullptr;
+  if (auto attrRepr = dyn_cast<AttributedTypeRepr>(argRepr)) {
+    autoclosureAttr = attrRepr->get(TAK_autoclosure);
+  }
+
+  if (autoclosureAttr) {
+    note.fixItInsertAfter(autoclosureAttr->getEndLoc(), " @escaping");
   } else {
-    auto attrRepr = dyn_cast<AttributedTypeRepr>(argRepr);
-    if (attrRepr) {
-      auto autoclosureEndLoc = Lexer::getLocForEndOfToken(
-          getASTContext().SourceMgr,
-          attrRepr->getAttrs().getLoc(TAK_autoclosure));
-      note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
-    }
+    note.fixItInsert(argRepr->getStartLoc(), "@escaping ");
   }
   return true;
 }
@@ -1267,23 +1267,22 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
   auto note = emitDiagnosticAt(
       PD, diag::noescape_parameter, attributeKind, PD->getName());
 
-  SourceLoc reprLoc;
-  SourceLoc autoclosureEndLoc;
-  if (auto *repr = PD->getTypeRepr()) {
-    reprLoc = repr->getStartLoc();
-    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
-      autoclosureEndLoc = Lexer::getLocForEndOfToken(
-          getASTContext().SourceMgr,
-          attrRepr->getAttrs().getLoc(TAK_autoclosure));
-    }
-  }
-  if (attributeKind == AttributeKind::Concurrent) {
-    note.fixItInsert(reprLoc, "@Sendable ");
-  }
-  else if (!PD->isAutoClosure()) {
-    note.fixItInsert(reprLoc, "@escaping ");
+  auto repr = PD->getTypeRepr();
+  if (!repr) {
+    // Don't add any fix-its if we don't have source locations.
+  } else if (attributeKind == AttributeKind::Concurrent) {
+    note.fixItInsert(repr->getStartLoc(), "@Sendable ");
   } else {
-    note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
+    SourceLoc autoclosureEndLoc;
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
+      if (auto *attr = attrRepr->get(TAK_autoclosure))
+        autoclosureEndLoc = attr->getEndLoc();
+    }
+    if (autoclosureEndLoc.isValid()) {
+      note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
+    } else {
+      note.fixItInsert(repr->getStartLoc(), "@escaping ");
+    }
   }
 
   return true;

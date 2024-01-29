@@ -58,8 +58,8 @@ func callFn() async {
 // CHECK: // swift-module-flags:{{.*}} -enable-experimental-concurrency
 // CHECK: public func fn() async
 // CHECK: public func reasyncFn(_: () async -> ()) reasync
-// CHECK: public func takesSendable(_ block: @escaping @Sendable () async throws ->
-// CHECK: public func takesMainActor(_ block: @escaping @{{_Concurrency.MainActor|MainActor}} () ->
+// CHECK: public func takesSendable(_ block: {{@escaping @Sendable|@Sendable @escaping}} () async throws ->
+// CHECK: public func takesMainActor(_ block: {{@escaping @_Concurrency.MainActor|@MainActor @escaping}} () ->
 
 // CHECK:      @_Concurrency.MainActor @preconcurrency public protocol UnsafeMainProtocol {
 // CHECK-NEXT:   @_Concurrency.MainActor @preconcurrency func requirement()

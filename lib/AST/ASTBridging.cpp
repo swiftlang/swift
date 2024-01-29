@@ -37,14 +37,14 @@
 
 using namespace swift;
 
-static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
+static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
   switch (kind) {
-#define TYPE_ATTR(X)                                                           \
+#define TYPE_ATTR(X, C)                                                        \
   case BridgedTypeAttrKind_##X:                                                \
     return TAK_##X;
 #include "swift/AST/Attr.def"
   case BridgedTypeAttrKind_Count:
-    return TAK_Count;
+    return {};
   }
 }
 
@@ -432,12 +432,17 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     auto unwrappedType = type;
     while (true) {
       if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
-        auto &attrs = ATR->getAttrs();
+        auto attrs = ATR->getAttrs();
         // At this point we actually don't know if that's valid to mark
         // this parameter declaration as `autoclosure` because type has
         // not been resolved yet - it should either be a function type
         // or typealias with underlying function type.
-        paramDecl->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+        bool autoclosure = llvm::any_of(attrs, [](TypeOrCustomAttr attr) {
+          if (auto typeAttr = attr.dyn_cast<TypeAttribute*>())
+            return isa<AutoclosureTypeAttr>(typeAttr);
+          return false;
+        });
+        paramDecl->setAutoClosure(autoclosure);
 
         unwrappedType = ATR->getTypeRepr();
         continue;
@@ -1522,20 +1527,29 @@ BridgedYieldStmt BridgedYieldStmt_createParsed(BridgedASTContext cContext,
 // MARK: TypeAttributes
 //===----------------------------------------------------------------------===//
 
+namespace swift {
+  class TypeAttributes {
+  public:
+    ASTContext &ctx;
+    SmallVector<TypeOrCustomAttr> attrs;
+
+    TypeAttributes(ASTContext &ctx) : ctx(ctx) {}
+  };
+}
+
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
-  TypeAttrKind kind = TypeAttributes::getAttrKindFromString(cStr.unbridged());
-  switch (kind) {
-#define TYPE_ATTR(X)                                                           \
+  auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
+  if (!optKind) return BridgedTypeAttrKind_Count;
+  switch (*optKind) {
+#define TYPE_ATTR(X, C)                                                        \
   case TAK_##X:                                                                \
     return BridgedTypeAttrKind_##X;
 #include "swift/AST/Attr.def"
-  case TAK_Count:
-    return BridgedTypeAttrKind_Count;
   }
 }
 
-BridgedTypeAttributes BridgedTypeAttributes_create() {
-  return {new TypeAttributes()};
+BridgedTypeAttributes BridgedTypeAttributes_create(BridgedASTContext cContext) {
+  return {new TypeAttributes(cContext.unbridged())};
 }
 
 void BridgedTypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
@@ -1543,13 +1557,21 @@ void BridgedTypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
                                          BridgedSourceLoc cAtLoc,
                                          BridgedSourceLoc cAttrLoc) {
   TypeAttributes *typeAttributes = cAttributes.unbridged();
-  typeAttributes->setAttr(unbridged(cKind), cAttrLoc.unbridged());
-  if (typeAttributes->AtLoc.isInvalid())
-    typeAttributes->AtLoc = cAtLoc.unbridged();
+
+  auto atLoc = cAtLoc.unbridged();
+  auto attrLoc = cAttrLoc.unbridged();
+
+  auto optKind = unbridged(cKind);
+  assert(optKind && "creating attribute of invalid kind?");
+
+  auto attr = TypeAttribute::createSimple(typeAttributes->ctx,
+                                          *optKind, atLoc, attrLoc);
+  typeAttributes->attrs.push_back(attr);
 }
 
 bool BridgedTypeAttributes_isEmpty(BridgedTypeAttributes cAttributes) {
-  return cAttributes.unbridged()->empty();
+  TypeAttributes *typeAttributes = cAttributes.unbridged();
+  return typeAttributes->attrs.empty();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1664,15 +1686,14 @@ BridgedPackExpansionTypeRepr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedAttributedTypeRepr
-BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
-                                       BridgedTypeRepr base,
+BridgedAttributedTypeRepr_createParsed(BridgedTypeRepr base,
                                        BridgedTypeAttributes cAttributes) {
   TypeAttributes *typeAttributes = cAttributes.unbridged();
-  assert(!typeAttributes->empty());
+  assert(!typeAttributes->attrs.empty());
 
-  ASTContext &context = cContext.unbridged();
+  ASTContext &ctx = typeAttributes->ctx;
   auto attributedType =
-      new (context) AttributedTypeRepr(*typeAttributes, base.unbridged());
+      AttributedTypeRepr::create(ctx, typeAttributes->attrs, base.unbridged());
   delete typeAttributes;
   return attributedType;
 }

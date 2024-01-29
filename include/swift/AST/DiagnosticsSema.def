@@ -6078,8 +6078,8 @@ ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
 ERROR(sil_non_coro_yields,PointsToFirstBadToken,
       "non-coroutine SIL function types cannot have @yield results", ())
-ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
-      "repeated %select{parameter|result|callee}0 convention attribute",
+ERROR(sil_function_invalid_convention,PointsToFirstBadToken,
+      "convention attribute isn't valid on a %select{parameter|result|callee}0",
       (unsigned))
 ERROR(ast_subst_function_type,none,
       "substitutions cannot be provided on a formal function type", ())
@@ -6100,6 +6100,9 @@ ERROR(sil_metatype_without_repr,none,
       ())
 ERROR(sil_metatype_multiple_reprs,none,
       "metatypes in SIL can only be one of @thin, @thick, or @objc_metatype",
+      ())
+ERROR(sil_metatype_not_metatype,none,
+      "@thin, @thick, or @objc_metatype can only apply to metatype types in SIL",
       ())
 
 //------------------------------------------------------------------------------

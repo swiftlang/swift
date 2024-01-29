@@ -75,7 +75,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
+#define TYPE_ATTR(X, C) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
 #include "swift/AST/Attr.def"
 
   // Allow the following type attributes:
@@ -131,7 +131,7 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
 
   #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
     Options.ExcludeAttrList.push_back(DAK_##CLASS);
-  #define TYPE_ATTR(X) \
+  #define TYPE_ATTR(X, C) \
     Options.ExcludeAttrList.push_back(TAK_##X);
   #include "swift/AST/Attr.def"
 

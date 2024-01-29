@@ -389,7 +389,7 @@ extension ASTGenVisitor {
 
     // Handle type attributes.
     if !node.attributes.isEmpty {
-      let typeAttributes = BridgedTypeAttributes()
+      let typeAttributes = BridgedTypeAttributes(context: self.ctx)
       for attributeElt in node.attributes {
         // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
         // but we don't have that ability right now.
@@ -436,7 +436,6 @@ extension ASTGenVisitor {
       if (!typeAttributes.isEmpty) {
         type =
           BridgedAttributedTypeRepr.createParsed(
-            self.ctx,
             base: type,
             consumingAttributes: typeAttributes
           ).asTypeRepr

@@ -1213,8 +1213,8 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
 SWIFT_NAME("BridgedTypeAttrKind.init(from:)")
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr);
 
-SWIFT_NAME("BridgedTypeAttributes.init()")
-BridgedTypeAttributes BridgedTypeAttributes_create(void);
+SWIFT_NAME("BridgedTypeAttributes.init(context:)")
+BridgedTypeAttributes BridgedTypeAttributes_create(BridgedASTContext cContext);
 
 SWIFT_NAME("BridgedTypeAttributes.addSimpleAttr(self:kind:atLoc:attrLoc:)")
 void BridgedTypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
@@ -1259,10 +1259,9 @@ BridgedArrayTypeRepr BridgedArrayTypeRepr_createParsed(
     BridgedSourceLoc cLSquareLoc, BridgedSourceLoc cRSquareLoc);
 
 SWIFT_NAME(
-    "BridgedAttributedTypeRepr.createParsed(_:base:consumingAttributes:)")
+    "BridgedAttributedTypeRepr.createParsed(base:consumingAttributes:)")
 BridgedAttributedTypeRepr
-BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
-                                       BridgedTypeRepr base,
+BridgedAttributedTypeRepr_createParsed(BridgedTypeRepr base,
                                        BridgedTypeAttributes cAttributes);
 
 SWIFT_NAME("BridgedCompositionTypeRepr.createEmpty(_:anyKeywordLoc:)")

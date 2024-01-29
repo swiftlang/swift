@@ -43,8 +43,6 @@ using namespace swift;
 #include "swift/AST/Attr.def"
 static_assert(IsTriviallyDestructible<DeclAttributes>::value,
               "DeclAttributes are BumpPtrAllocated; the d'tor is never called");
-static_assert(IsTriviallyDestructible<TypeAttributes>::value,
-              "TypeAttributes are BumpPtrAllocated; the d'tor is never called");
 
 #define DECL_ATTR(Name, Id, ...)                                                                     \
 static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToAdd) != \
@@ -83,38 +81,168 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 
-void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
-  llvm::raw_svector_ostream stream(buf);
-  auto &convention = ConventionArguments.value();
-  stream << convention.Name;
-  if (convention.WitnessMethodProtocol) {
-    stream << ": " << convention.WitnessMethodProtocol;
-    return;
+SourceLoc TypeAttribute::getStartLoc() const {
+  switch (getKind()) {
+#define TYPE_ATTR(SPELLING, CLASS)                                        \
+  case TAK_ ## SPELLING:                                                  \
+    return static_cast<const CLASS##TypeAttr *>(this)->getStartLocImpl();
+#include "swift/AST/Attr.def"
   }
-  if (!convention.ClangType.Item.empty())
-    stream << ", cType: " << QuotedString(convention.ClangType.Item);
+  llvm_unreachable("bad kind");
+}
+
+SourceLoc TypeAttribute::getEndLoc() const {
+  switch (getKind()) {
+#define TYPE_ATTR(SPELLING, CLASS)                                        \
+  case TAK_ ## SPELLING:                                                  \
+    return static_cast<const CLASS##TypeAttr *>(this)->getEndLocImpl();
+#include "swift/AST/Attr.def"
+  }
+  llvm_unreachable("bad kind");
+}
+
+SourceRange TypeAttribute::getSourceRange() const {
+  switch (getKind()) {
+#define TYPE_ATTR(SPELLING, CLASS)                                        \
+  case TAK_ ## SPELLING: {                                                \
+    auto attr = static_cast<const CLASS##TypeAttr *>(this);               \
+    return SourceRange(attr->getStartLocImpl(), attr->getEndLocImpl());   \
+  }
+#include "swift/AST/Attr.def"
+  }
+  llvm_unreachable("bad kind");
 }
 
 /// Given a name like "autoclosure", return the type attribute ID that
-/// corresponds to it.  This returns TAK_Count on failure.
+/// corresponds to it.
 ///
-TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
-  return llvm::StringSwitch<TypeAttrKind>(Str)
-#define TYPE_ATTR(X) .Case(#X, TAK_##X)
+llvm::Optional<TypeAttrKind>
+TypeAttribute::getAttrKindFromString(StringRef Str) {
+  return llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(Str)
+#define TYPE_ATTR(X, C) .Case(#X, TAK_##X)
 #include "swift/AST/Attr.def"
-  .Default(TAK_Count);
+  .Default(llvm::Optional<TypeAttrKind>());
 }
 
 /// Return the name (like "autoclosure") for an attribute ID.
-const char *TypeAttributes::getAttrName(TypeAttrKind kind) {
+const char *TypeAttribute::getAttrName(TypeAttrKind kind) {
   switch (kind) {
-  default: llvm_unreachable("Invalid attribute ID");
-#define TYPE_ATTR(X) case TAK_##X: return #X;
+#define TYPE_ATTR(X, C) case TAK_##X: return #X;
 #include "swift/AST/Attr.def"
   }
+  llvm_unreachable("unknown type attribute kind");
 }
 
+TypeAttribute *TypeAttribute::createSimple(const ASTContext &context,
+                                           TypeAttrKind kind,
+                                           SourceLoc atLoc,
+                                           SourceLoc attrLoc) {
 
+  switch (kind) {
+  // The simple cases should all be doing the exact same thing, and we
+  // can reasonably hope that the optimizer will unify them so that this
+  // function doesn't actually need a switch.
+#define TYPE_ATTR(SPELLING, CLASS) \
+  case TAK_##SPELLING: \
+    llvm_unreachable("not a simple attribute");
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) \
+  case TAK_##SPELLING: \
+    return new (context) CLASS##TypeAttr(atLoc, attrLoc);
+#include "swift/AST/Attr.def"
+  }
+  llvm_unreachable("bad type attribute kind");
+}
+
+void TypeAttribute::dump() const {
+  StreamPrinter P(llvm::errs());
+  PrintOptions PO = PrintOptions::printDeclarations();
+  print(P, PO);
+}
+
+void TypeAttribute::print(ASTPrinter &printer,
+                          const PrintOptions &options) const {
+  switch (getKind()) {
+#define TYPE_ATTR(SPELLING, CLASS)
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) \
+  case TAK_ ## SPELLING:
+#include "swift/AST/Attr.def"
+    printer.printSimpleAttr(getAttrName(getKind()), /*needAt*/ true);
+    return;
+
+#define TYPE_ATTR(SPELLING, CLASS)                                \
+  case TAK_ ## SPELLING:                                          \
+    return cast<CLASS##TypeAttr>(this)->printImpl(printer, options);
+#define SIMPLE_TYPE_ATTR(SPELLING, C)
+#include "swift/AST/Attr.def"
+  }
+  llvm_unreachable("bad kind");
+}
+
+void DifferentiableTypeAttr::printImpl(ASTPrinter &printer,
+                                       const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@differentiable");
+  switch (getDifferentiability()) {
+  case DifferentiabilityKind::Normal:
+    break;
+  case DifferentiabilityKind::Forward:
+    printer << "(_forward)";
+    break;
+  case DifferentiabilityKind::Reverse:
+    printer << "(reverse)";
+    break;
+  case DifferentiabilityKind::Linear:
+    printer << "(_linear)";
+    break;
+  case DifferentiabilityKind::NonDifferentiable:
+    llvm_unreachable("Unexpected case 'NonDifferentiable'");
+  }
+  printer << ' ';
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void ConventionTypeAttr::printImpl(ASTPrinter &printer,
+                                   const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@convention");
+  printer << "(" << getConventionName();
+  if (auto protocol = getWitnessMethodProtocol()) {
+    printer << ": " << protocol;
+  } else if (auto clangType = getClangType()) {
+    printer << ", cType: " << QuotedString(*clangType);
+  }
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void OpaqueReturnTypeOfTypeAttr::printImpl(ASTPrinter &printer,
+                                           const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_opaqueReturnTypeOf");
+  printer << "(" << QuotedString(getMangledName()) << ", " << getIndex() << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void OpenedTypeAttr::printImpl(ASTPrinter &printer,
+                               const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@opened");
+  printer << "(\"" << getUUID() << "\"";
+  if (auto constraintType = getConstraintType()) {
+    printer << ", ";
+    getConstraintType()->print(printer, options);
+  }
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void PackElementTypeAttr::printImpl(ASTPrinter &printer,
+                                    const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@pack_element");
+  printer << "(\"" << getUUID() << "\")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
 
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier

@@ -105,6 +105,11 @@ protected:
     NumFields : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(AttributedTypeRepr, TypeRepr, 32,
+    : NumPadBits,
+    NumAttributes : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(PackTypeRepr, TypeRepr, 32,
     /// The number of elements contained.
     NumElements : 32
@@ -247,19 +252,47 @@ private:
 /// \code
 ///   @convention(thin) Foo
 /// \endcode
-class AttributedTypeRepr : public TypeRepr {
-  // FIXME: TypeAttributes isn't a great use of space.
-  TypeAttributes Attrs;
+class AttributedTypeRepr final
+    : public TypeRepr,
+      private llvm::TrailingObjects<AttributedTypeRepr, TypeOrCustomAttr> {
   TypeRepr *Ty;
 
-public:
-  AttributedTypeRepr(const TypeAttributes &Attrs, TypeRepr *Ty)
-    : TypeRepr(TypeReprKind::Attributed), Attrs(Attrs), Ty(Ty) {
+  AttributedTypeRepr(ArrayRef<TypeOrCustomAttr> attrs, TypeRepr *Ty)
+      : TypeRepr(TypeReprKind::Attributed), Ty(Ty) {
+    assert(!attrs.empty());
+    Bits.AttributedTypeRepr.NumAttributes = attrs.size();
+    std::uninitialized_copy(attrs.begin(), attrs.end(),
+                            getTrailingObjects<TypeOrCustomAttr>());
+
   }
 
-  const TypeAttributes &getAttrs() const { return Attrs; }
-  void setAttrs(const TypeAttributes &attrs) { Attrs = attrs; }
+  friend TrailingObjects;
+
+public:
+  static AttributedTypeRepr *create(const ASTContext &C,
+                                    ArrayRef<TypeOrCustomAttr> attrs,
+                                    TypeRepr *ty);
+
+  ArrayRef<TypeOrCustomAttr> getAttrs() const {
+    return llvm::makeArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
+                              Bits.AttributedTypeRepr.NumAttributes);
+  }
+
+  TypeAttribute *get(TypeAttrKind kind) const;
+  bool has(TypeAttrKind kind) const {
+    return get(kind) != nullptr;
+  }
+  SourceLoc getAttrLoc(TypeAttrKind kind) const {
+    auto attr = get(kind);
+    return attr ? attr->getAttrLoc() : SourceLoc();
+  }
+
   TypeRepr *getTypeRepr() const { return Ty; }
+
+  /// Return the value of the first SIL ownership attribute (such as
+  /// `sil_weak`) in these attributes, or ReferenceOwnership::Strong if
+  /// there is no such attribute.
+  ReferenceOwnership getSILOwnership() const;
 
   void printAttrs(llvm::raw_ostream &OS) const;
   void printAttrs(ASTPrinter &Printer, const PrintOptions &Options) const;
@@ -270,7 +303,14 @@ public:
   static bool classof(const AttributedTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Attrs.AtLoc; }
+  SourceLoc getStartLocImpl() const {
+    auto attr = getAttrs().front();
+    if (auto customAttr = attr.dyn_cast<CustomAttr*>()) {
+      return customAttr->getStartLoc();
+    } else {
+      return attr.get<TypeAttribute*>()->getStartLoc();
+    }
+  }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   SourceLoc getLocImpl() const { return Ty->getLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;

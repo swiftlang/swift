@@ -36,7 +36,7 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
                                                        TypeRepr *ty) const {
   // Apply those attributes that do apply.
   if (!Attributes.empty()) {
-    ty = new (p.Context) AttributedTypeRepr(Attributes, ty);
+    ty = AttributedTypeRepr::create(p.Context, Attributes, ty);
   }
 
   // Apply 'inout', 'consuming', or 'borrowing' modifiers.
@@ -160,20 +160,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (Tok.is(tok::kw_inout) ||
-      (canHaveParameterSpecifierContextualKeyword() &&
-       (Tok.getRawText().equals("__shared") ||
-        Tok.getRawText().equals("__owned") ||
-        Tok.getRawText().equals("consuming") ||
-        Tok.getRawText().equals("borrowing") ||
-        (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
-         Tok.getRawText().equals("resultDependsOn")) ||
-        (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
-         Tok.getRawText().equals("transferring"))))) {
+  if (isParameterSpecifier()) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
-    consumeToken();
+    skipParameterSpecifier();
   }
 
   // Eat any '~' preceding the type.
@@ -334,7 +325,7 @@ ParserResult<TypeRepr> Parser::parseType() {
 }
 
 ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
-                                               const TypeAttributes &attrs) {
+                                               ParsedTypeAttributeList &attrs) {
   auto LBraceLoc = consumeToken(tok::l_brace);
   
   SmallVector<SILBoxTypeRepr::Field, 4> Fields;
@@ -391,11 +382,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   auto repr = SILBoxTypeRepr::create(Context, generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
-  ParsedTypeAttributeList parsedAttributeList;
-  parsedAttributeList.Specifier = ParamDecl::Specifier::LegacyOwned;
-  parsedAttributeList.Attributes = attrs;
-  return makeParserResult(
-      parsedAttributeList.applyAttributesToType(*this, repr));
+  attrs.Specifier = ParamDecl::Specifier::LegacyOwned;
+  return makeParserResult(attrs.applyAttributesToType(*this, repr));
 }
 
 
@@ -438,7 +426,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     if (patternGenerics) {
       diagnose(Tok.getLoc(), diag::sil_function_subst_expected_function);
     }
-    return parseSILBoxType(generics, parsedAttributeList.Attributes);
+    return parseSILBoxType(generics, parsedAttributeList);
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID, reason);
@@ -1750,8 +1738,7 @@ bool Parser::canParseTypeTupleBody() {
       // tuple type.
       (Tok.is(tok::kw_inout) || !isStartOfSwiftDecl())) {
     do {
-      // The contextual inout marker is part of argument lists.
-      consumeIf(tok::kw_inout);
+      bool hadParameterName = false;
 
       // If the tuple element starts with "ident :", then it is followed
       // by a type annotation.
@@ -1762,28 +1749,26 @@ bool Parser::canParseTypeTupleBody() {
           if (!Tok.is(tok::colon)) return false;
         }
         consumeToken(tok::colon);
-
-        // Parse a type.
-        if (!canParseType())
-          return false;
-
-        // Parse default values. This aren't actually allowed, but we recover
-        // better if we skip over them.
-        if (consumeIf(tok::equal)) {
-          while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
-                 Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
-                 Tok.isNot(tok::comma) && !isStartOfSwiftDecl()) {
-            skipSingle();
-          }
-        }
-
-        continue;
+        hadParameterName = true;
       }
-      
-      // Otherwise, this has to be a type.
+
+      // Consume various parameter specifiers.
+      while (isParameterSpecifier())
+        skipParameterSpecifier();
+
+      // Parse a type.
       if (!canParseType())
         return false;
 
+      // Parse default values. This aren't actually allowed, but we recover
+      // better if we skip over them.
+      if (hadParameterName && consumeIf(tok::equal)) {
+        while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
+               Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
+               Tok.isNot(tok::comma) && !isStartOfSwiftDecl()) {
+          skipSingle();
+        }
+      }
     } while (consumeIf(tok::comma));
   }
   

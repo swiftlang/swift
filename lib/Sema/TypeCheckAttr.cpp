@@ -3100,7 +3100,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
          attr->getTrailingWhereClause()->getRequirements()) {
       if (reqRepr.getKind() == RequirementReprKind::LayoutConstraint) {
         if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
-          if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+          if (attributedTy->has(TAK__noMetadata)) {
             const auto resolution = TypeResolution::forInterface(
                 FD->getDeclContext(), genericSig, llvm::None,
                 /*unboundTyOpener*/ nullptr,

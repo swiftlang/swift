@@ -1053,7 +1053,7 @@ public:
   /// Parse a string literal whose contents can be interpreted as a UUID.
   ///
   /// \returns false on success, true on error.
-  bool parseUUIDString(UUID &uuid, Diag<> diag);
+  bool parseUUIDString(UUID &uuid, Diag<> diag, bool justChecking = false);
 
   /// Parse the Objective-C selector inside @objc
   void parseObjCSelector(SmallVector<Identifier, 4> &Names,
@@ -1173,6 +1173,36 @@ public:
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
+  bool isParameterSpecifier() {
+    if (Tok.is(tok::kw_inout)) return true;
+    if (!canHaveParameterSpecifierContextualKeyword()) return false;
+    if (Tok.isContextualKeyword("__shared") ||
+        Tok.isContextualKeyword("__owned") ||
+        Tok.isContextualKeyword("borrowing") ||
+        Tok.isContextualKeyword("consuming") ||
+        Tok.isContextualKeyword("isolated") ||
+        Tok.isContextualKeyword("_const"))
+      return true;
+    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+        Tok.isContextualKeyword("_resultDependsOn"))
+      return true;
+    if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
+        Tok.isContextualKeyword("transferring"))
+      return true;
+    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+        (Tok.isContextualKeyword("_resultDependsOn") ||
+         Tok.isLifetimeDependenceToken()))
+      return true;
+    return false;
+  }
+
+  /// Given that we just returned true from isParameterSpecifier(), skip
+  /// over the specifier.
+  void skipParameterSpecifier() {
+    // These are all currently single tokens.
+    consumeToken();
+  }
+
   bool canHaveParameterSpecifierContextualKeyword() {
     // The parameter specifiers like `isolated`, `consuming`, `borrowing` are
     // also valid identifiers and could be the name of a type. Check whether
@@ -1198,7 +1228,7 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc ResultDependsOnLoc;
-    TypeAttributes Attributes;
+    SmallVector<TypeOrCustomAttr> Attributes;
     SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
 
     /// Main entry point for parsing.
@@ -1208,17 +1238,7 @@ public:
     /// code!
     ParserStatus parse(Parser &P) {
       auto &Tok = P.Tok;
-      if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
-          (P.canHaveParameterSpecifierContextualKeyword() &&
-           (Tok.getRawText().equals("__shared") ||
-            Tok.getRawText().equals("__owned") ||
-            Tok.getRawText().equals("consuming") ||
-            Tok.getRawText().equals("borrowing") ||
-            Tok.getRawText().equals("transferring") ||
-            Tok.isContextualKeyword("isolated") ||
-            Tok.isContextualKeyword("_const") ||
-            Tok.getRawText().equals("_resultDependsOn") ||
-            Tok.isLifetimeDependenceToken())))
+      if (Tok.is(tok::at_sign) || P.isParameterSpecifier())
         return slowParse(P);
       return makeParserSuccess();
     }
@@ -1231,10 +1251,11 @@ public:
     ParserStatus slowParse(Parser &P);
   };
 
-  bool parseConventionAttributeInternal(bool justChecking,
-                                        TypeAttributes::Convention &convention);
+  bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
+                                        ConventionTypeAttr *&result,
+                                        bool justChecking);
 
-  ParserStatus parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+  ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
                                   PatternBindingInitializer *&initContext,
                                   bool justChecking = false);
 
@@ -1438,7 +1459,7 @@ public:
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
-                                         const TypeAttributes &attrs);
+                                         ParsedTypeAttributeList &attrs);
   
   ParserResult<TypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(ParserResult<TypeRepr> Base);
