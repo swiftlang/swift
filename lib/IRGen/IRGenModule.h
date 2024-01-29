@@ -661,6 +661,7 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
+  llvm::Type *PtrTy;                   /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
@@ -1194,6 +1195,11 @@ public:
   llvm::Constant *getOrCreateOutlinedDestroyFunction(
                               SILType objectType, const TypeInfo &objectTI,
                               const OutliningMetadataCollector &collector);
+
+  llvm::Constant *getOrCreateOutlinedEnumTagStoreFunction(
+    SILType T, const TypeInfo &ti, EnumElementDecl *theCase, unsigned caseIdx);
+  llvm::Constant *getOrCreateOutlinedDestructiveProjectDataForLoad(
+    SILType T, const TypeInfo &ti, EnumElementDecl *theCase, unsigned caseIdx);
 
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);

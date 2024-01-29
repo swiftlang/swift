@@ -597,6 +597,38 @@ public:
     return finalize();
   }
 
+  std::string mangleOutlinedEnumTagStoreFunction(CanType t,
+                                                 CanGenericSignature sig,
+                                                 unsigned enumCaseNum) {
+    beginMangling();
+    appendType(t, sig);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperatorParam("WOi", Index(enumCaseNum));
+    return finalize();
+  }
+
+  std::string mangleOutlinedEnumProjectDataForLoadFunction(CanType t,
+                                                 CanGenericSignature sig,
+                                                 unsigned enumCaseNum) {
+    beginMangling();
+    appendType(t, sig);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperatorParam("WOj", Index(enumCaseNum));
+    return finalize();
+  }
+
+  std::string mangleOutlinedEnumGetTag(CanType t, CanGenericSignature sig) {
+    beginMangling();
+    appendType(t, sig);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOg");
+    return finalize();
+
+  }
+
   std::string manglePartialApplyForwarder(StringRef FuncName);
   
   std::string mangleTypeForForeignMetadataUniquing(Type type) {
