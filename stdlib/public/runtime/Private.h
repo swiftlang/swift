@@ -280,6 +280,13 @@ public:
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                           Demangle::Demangler &Dem);
 
+  /// Build the demangling for the generic type that's created by specializing
+  /// the given type context descriptor with the given arguments.
+  Demangle::NodePointer
+  _buildDemanglingForGenericType(const TypeContextDescriptor *description,
+                                 const void *const *arguments,
+                                 Demangle::Demangler &Dem);
+
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
   ///

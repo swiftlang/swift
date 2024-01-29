@@ -266,8 +266,8 @@ _buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
   return node;
 }
 
-/// Build an array of demangling trees for each generic argument of the given
-/// type metadata.
+/// Build an array of demangling trees for each generic argument to the given
+/// generic type context descriptor.
 ///
 /// Note:
 /// - The input array has an entry for those generic parameter descriptors which
@@ -286,15 +286,14 @@ _buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
 /// The output array is flat; the generic parameters of each depth are
 /// concatenated together.
 static bool _buildDemanglingForGenericArgs(
-    const Metadata *type,
     const TypeContextDescriptor *description,
+    const Metadata *const *genericArgs,
     llvm::SmallVectorImpl<NodePointer> &demangledGenerics,
     Demangle::Demangler &Dem) {
   auto generics = description->getGenericContext();
   if (!generics)
     return true;
 
-  auto genericArgs = description->getGenericArguments(type);
   auto packHeader = generics->getGenericPackShapeHeader();
   auto packDescriptors = generics->getGenericPackShapeDescriptors();
 
@@ -420,12 +419,16 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
     return nullptr;
   }
 
-  // Gather the complete set of generic arguments that must be written to
-  // form this type.
   llvm::SmallVector<NodePointer, 8> demangledGenerics;
-  if (!_buildDemanglingForGenericArgs(type, description, demangledGenerics, Dem))
-    return nullptr;
-  
+  if (description->isGeneric()) {
+    auto genericArgs = description->getGenericArguments(type);
+    // Gather the complete set of generic arguments that must be written to
+    // form this type.
+    if (!_buildDemanglingForGenericArgs(description, genericArgs,
+                                        demangledGenerics, Dem))
+      return nullptr;
+  }
+
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
@@ -817,6 +820,25 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   }
   // Not a type.
   return nullptr;
+}
+
+Demangle::NodePointer
+swift::_buildDemanglingForGenericType(const TypeContextDescriptor *description,
+                                      const void *const *arguments,
+                                      Demangle::Demangler &Dem) {
+  auto kind = description->getKind();
+  if (kind != ContextDescriptorKind::Class &&
+      kind != ContextDescriptorKind::Enum &&
+      kind != ContextDescriptorKind::Struct)
+    return nullptr;
+
+  llvm::SmallVector<NodePointer, 8> demangledGenerics;
+  if (!_buildDemanglingForGenericArgs(description,
+                                      (const Metadata *const *)arguments,
+                                      demangledGenerics, Dem))
+    return nullptr;
+
+  return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
 // NB: This function is not used directly in the Swift codebase, but is

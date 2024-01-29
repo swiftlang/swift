@@ -57,7 +57,7 @@ struct PrebuiltStringMap {
   PrebuiltStringMap(uint64_t arraySize) : arraySize(arraySize) {}
 
   // Based on MurmurHash2
-  uint64_t hash(const void *data, size_t len) {
+  uint64_t hash(const void *data, size_t len) const {
     uint64_t magic = 0xc6a4a7935bd1e995ULL;
     uint64_t salt = 47;
 
@@ -148,8 +148,12 @@ struct PrebuiltStringMap {
 
   /// Look up the given string in the table. Requires that StringTy be
   /// `const char *`.
-  ArrayElement *find(const char *toFind) {
+  const ArrayElement *find(const char *toFind) const {
     size_t len = strlen(toFind);
+    return find(toFind, len);
+  }
+
+  const ArrayElement *find(const char *toFind, size_t len) const {
     uint64_t hashValue = hash(toFind, len);
 
     size_t index = hashValue % arraySize;
