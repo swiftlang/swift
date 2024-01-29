@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -transfer-non-sendable -enable-sil-opaque-values -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
+// RUN: %target-sil-opt -transfer-non-sendable -enable-sil-opaque-values -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -verify -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -43,6 +43,7 @@ sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlas
 
 sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil @initIndirect : $@convention(thin) <τ_0_0> () -> @out τ_0_0
 
 sil @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
 
@@ -66,6 +67,28 @@ bb0(%owned_value : @owned $T):
   //destroy_value %value : $T
   destroy_value %owned_value : $T
 
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Make sure that tuple_pack_extract is look through.
+sil [ossa] @tuple_pack_extract_test : $@async @convention(thin) <each T> () -> () {
+bb0:
+  %initIndirect = function_ref @initIndirect : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %0 = apply %initIndirect<(repeat each T)>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %1 = begin_borrow %0 : $(repeat each T)
+  %zero = integer_literal $Builtin.Word, 0
+  %index = dynamic_pack_index %zero of $Pack{repeat each T}
+  open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
+  %elt = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{transferring value of non-Sendable type 'τ_1_0' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1 // expected-note {{access here could race}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+  end_borrow %1 : $(repeat each T)
+  destroy_value %0 : $(repeat each T)
   %9999 = tuple ()
   return %9999 : $()
 }

@@ -2190,8 +2190,11 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
     assert(trackableValue);
     llvm::dbgs() << "State: %%" << opArg << ". ";
     trackableValue->getValueState().print(llvm::dbgs());
-    llvm::dbgs() << "\n             Value: "
+    llvm::dbgs() << "\n             Rep Value: "
                  << trackableValue->getRepresentative();
+    if (auto value = trackableValue->getRepresentative().maybeGetValue()) {
+      llvm::dbgs() << "             Type: " << value->getType() << '\n';
+    }
   }
 #endif
 }
@@ -2473,16 +2476,12 @@ CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 // Packs
 //
 
-CONSTANT_TRANSLATION(DeallocPackInst, Unhandled)
-CONSTANT_TRANSLATION(DynamicPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(OpenPackElementInst, Unhandled)
-CONSTANT_TRANSLATION(PackElementGetInst, Unhandled)
-CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
-CONSTANT_TRANSLATION(PackLengthInst, Unhandled)
-CONSTANT_TRANSLATION(PackPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(ScalarPackIndexInst, Unhandled)
-CONSTANT_TRANSLATION(TuplePackElementAddrInst, Unhandled)
-CONSTANT_TRANSLATION(TuplePackExtractInst, Unhandled)
+CONSTANT_TRANSLATION(DeallocPackInst, Ignored)
+CONSTANT_TRANSLATION(DynamicPackIndexInst, Ignored)
+CONSTANT_TRANSLATION(OpenPackElementInst, Ignored)
+CONSTANT_TRANSLATION(PackLengthInst, Ignored)
+CONSTANT_TRANSLATION(PackPackIndexInst, Ignored)
+CONSTANT_TRANSLATION(ScalarPackIndexInst, Ignored)
 
 //===---
 // Apply
@@ -2604,6 +2603,46 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
+  if (!isNonSendableType(r->getType()))
+    return TranslationSemantics::Require;
+  translateSILAssign(SILValue(r), r->getPack());
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics PartitionOpTranslator::visitTuplePackElementAddrInst(
+    TuplePackElementAddrInst *r) {
+  if (!isNonSendableType(r->getType())) {
+    translateSILRequire(r->getTuple());
+  } else {
+    translateSILAssign(SILValue(r), r->getTuple());
+  }
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitTuplePackExtractInst(TuplePackExtractInst *r) {
+  if (!isNonSendableType(r->getType())) {
+    translateSILRequire(r->getTuple());
+  } else {
+    translateSILAssign(SILValue(r), r->getTuple());
+  }
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitPackElementSetInst(PackElementSetInst *r) {
+  // If the value we are storing is sendable, treat this as a require.
+  if (!isNonSendableType(r->getValue()->getType())) {
+    return TranslationSemantics::Require;
+  }
+
+  // Otherwise, this is a store.
+  translateSILStore(r->getPackOperand(), r->getValueOperand());
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
