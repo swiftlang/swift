@@ -19,6 +19,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
@@ -133,8 +134,15 @@ class LifetimeDependenceInfo {
   IndexSubset *borrowLifetimeParamIndices;
   IndexSubset *mutateLifetimeParamIndices;
 
+  static LifetimeDependenceInfo getForParamIndex(AbstractFunctionDecl *afd,
+                                                 unsigned index,
+                                                 ValueOwnership ownership);
+
   static llvm::Optional<LifetimeDependenceInfo>
   fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
+
+  static llvm::Optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
+                                                      Type resultType);
 
 public:
   LifetimeDependenceInfo()

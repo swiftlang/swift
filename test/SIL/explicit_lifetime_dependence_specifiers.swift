@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil  -enable-builtin-module -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-swift-frontend %s -emit-sil  -enable-builtin-module -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
 // REQUIRES: asserts
 
 import Builtin

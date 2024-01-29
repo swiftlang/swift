@@ -298,7 +298,7 @@ func conflict4(_ t: some NeedsCopyable & ~Copyable) {}
 // expected-error@-1 {{'some NeedsCopyable & ~Copyable' required to be 'Copyable' but is marked with '~Copyable'}}
 
 protocol Conflict5: ~Copyable {
-  func whatever() -> AlwaysCopyable<Self> // expected-error {{type 'Self' does not conform to protocol 'Copyable'}}
+  borrowing func whatever() -> AlwaysCopyable<Self> // expected-error {{type 'Self' does not conform to protocol 'Copyable'}}
 }
 
 // expected-warning@+1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
