@@ -2688,12 +2688,19 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
           // This can happen for instance along an exit block of a loop where
           // the error use is within the loop.
           continue;
-        case IsLive::LiveOut:
+        case IsLive::LiveOut: {
           LLVM_DEBUG(llvm::dbgs() << "    Live out block!\n");
           // If we see a live out block that is also a def block, we need to fa
-          assert(!liveness.isDefBlock(block, errorSpan) &&
+#ifndef NDEBUG
+          SmallBitVector defBits(addressUseState.getNumSubelements());
+          liveness.isDefBlock(block, errorSpan, defBits);
+          SmallBitVector errorSpanBits(addressUseState.getNumSubelements());
+          errorSpan.setBits(errorSpanBits);
+          assert((defBits & errorSpanBits).none() &&
                  "If in def block... we are in liveness block");
+#endif
           [[clang::fallthrough]];
+        }
         case IsLive::LiveWithin:
           if (isLive == IsLive::LiveWithin)
             LLVM_DEBUG(llvm::dbgs() << "    Live within block!\n");

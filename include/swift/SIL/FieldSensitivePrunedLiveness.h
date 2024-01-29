@@ -1325,24 +1325,32 @@ public:
         *iter, [&](TypeTreeLeafTypeRange span) { return span.contains(bit); });
   }
 
-  bool isDefBlock(SILBasicBlock *block, TypeTreeLeafTypeRange span) const {
+  void isDefBlock(SILBasicBlock *block, TypeTreeLeafTypeRange span,
+                  SmallBitVector &bitsOut) const {
     assert(isInitialized());
+    assert(bitsOut.none());
     auto iter = defBlocks.find(block);
     if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return span.setIntersection(storedSpan).has_value();
-    });
+      return;
+    for (auto defSpan : *iter) {
+      auto intersection = span.setIntersection(defSpan);
+      if (!intersection.has_value())
+        continue;
+      intersection.value().setBits(bitsOut);
+    }
   }
 
-  bool isDefBlock(SILBasicBlock *block, SmallBitVector const &bits) const {
+  void isDefBlock(SILBasicBlock *block, SmallBitVector const &bits,
+                  SmallBitVector &bitsOut) const {
     assert(isInitialized());
+    assert(bitsOut.none());
     auto iter = defBlocks.find(block);
     if (!iter)
-      return false;
-    return llvm::any_of(*iter, [&](TypeTreeLeafTypeRange storedSpan) {
-      return storedSpan.intersects(bits);
-    });
+      return;
+    for (auto defSpan : *iter) {
+      defSpan.setBits(bitsOut);
+    }
+    bitsOut &= bits;
   }
 
   /// Return true if \p user occurs before the first def in the same basic
