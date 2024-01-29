@@ -2080,8 +2080,6 @@ void ExternalGenericMetadataBuilderContext<Runtime>::writeAtomContentsJSON(
     J.object([&] {
       if (auto *fileTarget =
               std::get_if<FileTarget>(&targetsCursor->fileOrAtom)) {
-        J.attribute("target", fileTarget->file->path);
-
         std::string foundSymbolName = "";
         uint64_t foundSymbolAddress = 0;
 
