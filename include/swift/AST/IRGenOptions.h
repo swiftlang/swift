@@ -239,6 +239,9 @@ public:
   /// The DWARF version of debug info.
   uint8_t DWARFVersion = 4;
 
+  /// Enables DWARF Fission and sets the file path for .dwo output.
+  std::string DWOPath;
+
   /// The command line string that is to be stored in the debug info.
   std::string DebugFlags;
 

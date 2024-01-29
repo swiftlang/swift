@@ -340,12 +340,14 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_semantic_info_path);
   auto optRecordOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_save_optimization_record_path);
+  auto optDwarfFissionPath = getSupplementaryFilenamesFromArguments(
+      options::OPT_dwarf_fission_path);
   if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput || !packageModuleInterfaceOutput ||
       !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
-      !moduleSemanticInfoOutput || !optRecordOutput) {
+      !moduleSemanticInfoOutput || !optRecordOutput || !optDwarfFissionPath) {
     return llvm::None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -374,6 +376,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[i];
     sop.YAMLOptRecordPath = (*optRecordOutput)[i];
     sop.BitstreamOptRecordPath = (*optRecordOutput)[i];
+    sop.SplitDwarfObjectPath = (*optDwarfFissionPath)[i];
     result.push_back(sop);
   }
   return result;
@@ -443,6 +446,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
 
   // There is no non-path form of -emit-fixits-path
   auto fixItsOutputPath = pathsFromArguments.FixItsOutputPath;
+
+  // There is no non-path form of -dwarf-fission-path
+  auto splitDwarfObjectPath = pathsFromArguments.SplitDwarfObjectPath;
 
   auto clangHeaderOutputPath = determineSupplementaryOutputFilename(
       OPT_emit_objc_header, pathsFromArguments.ClangHeaderOutputPath,
@@ -531,6 +537,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
   sop.YAMLOptRecordPath = YAMLOptRecordPath;
   sop.BitstreamOptRecordPath = bitstreamOptRecordPath;
+  sop.SplitDwarfObjectPath = splitDwarfObjectPath;
   return sop;
 }
 
@@ -624,6 +631,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                                options::OPT_emit_private_module_interface_path,
                                options::OPT_emit_package_module_interface_path,
                                options::OPT_emit_module_source_info_path,
+                               options::OPT_dwarf_fission_path,
                                options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,

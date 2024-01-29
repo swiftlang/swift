@@ -121,6 +121,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
+    if (!Opts.DWOPath.empty())
+      CGO.SplitDwarfOutput = Opts.DWOPath;
     CGO.DwarfDebugFlags =
         Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop);
     break;

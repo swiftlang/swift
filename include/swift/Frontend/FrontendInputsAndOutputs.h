@@ -234,6 +234,8 @@ public:
   /// output files. If multiple are specified, the last one is returned.
   std::string getSingleIndexUnitOutputFilename() const;
 
+  std::string getSingleSplitDwarfObjectPath() const;
+
   bool isOutputFilenameStdout() const;
   bool isOutputFileDirectory() const;
   bool hasNamedOutputFile() const;
@@ -277,6 +279,7 @@ public:
   bool hasTBDPath() const;
   bool hasYAMLOptRecordPath() const;
   bool hasBitstreamOptRecordPath() const;
+  bool hasSplitDwarfObjectPath() const;
 
   bool hasDependencyTrackerPath() const;
 };
