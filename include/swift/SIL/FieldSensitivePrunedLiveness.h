@@ -1221,17 +1221,24 @@ public:
     return inst == defInst.first && defInst.second->contains(bit);
   }
 
-  bool isDef(SILInstruction *inst, SmallBitVector const &bits) const {
+  void isDef(SILInstruction *inst, SmallBitVector const &bits,
+             SmallBitVector &bitsOut) const {
+    assert(bitsOut.none());
     if (inst != defInst.first)
-      return false;
-    SmallBitVector defBits(bits.size());
-    defInst.second->setBits(defBits);
-    return (defBits & bits) == bits;
+      return;
+    defInst.second->setBits(bitsOut);
+    bitsOut &= bits;
   }
 
-  bool isDef(SILInstruction *inst, TypeTreeLeafTypeRange span) const {
-    return inst == defInst.first &&
-           defInst.second->setIntersection(span).has_value();
+  void isDef(SILInstruction *inst, TypeTreeLeafTypeRange span,
+             SmallBitVector &bitsOut) const {
+    assert(bitsOut.none());
+    if (inst != defInst.first)
+      return;
+    auto intersection = defInst.second->setIntersection(span);
+    if (!intersection.has_value())
+      return;
+    intersection.value().setBits(bitsOut);
   }
 
   bool isDefBlock(SILBasicBlock *block, unsigned bit) const {
