@@ -1181,3 +1181,10 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @increment_profiler_counter_test : $@convention(thin) @async () -> () {
+bb0:
+  increment_profiler_counter 1, "$foo", num_counters 3, hash 0
+  %9999 = tuple ()
+  return %9999 : $()
+}

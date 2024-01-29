@@ -2346,6 +2346,7 @@ CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
+CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
 
 //===---
 // Require
@@ -2451,7 +2452,6 @@ CONSTANT_TRANSLATION(DeinitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
-CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Unhandled)
 CONSTANT_TRANSLATION(BeginCOWMutationInst, Unhandled)
 
 //===---
