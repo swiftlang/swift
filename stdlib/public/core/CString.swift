@@ -42,7 +42,8 @@ extension String {
   ///     }
   ///     // Prints "Caf�"
   ///
-  /// - Parameter nullTerminatedUTF8: A pointer to a null-terminated UTF-8 code sequence.
+  /// - Parameter nullTerminatedUTF8:
+  ///     A pointer to a null-terminated sequence of UTF-8 code units.
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     let buffer = UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)
@@ -92,6 +93,9 @@ extension String {
   ///
   /// This is identical to `init(cString: UnsafePointer<CChar>)` but operates on
   /// an unsigned sequence of bytes.
+  ///
+  /// - Parameter nullTerminatedUTF8:
+  ///     A pointer to a null-terminated sequence of UTF-8 code units.
   public init(cString nullTerminatedUTF8: UnsafePointer<UInt8>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
     self = String._fromUTF8Repairing(
@@ -152,7 +156,7 @@ extension String {
   ///     // Prints "nil"
   ///
   /// - Parameter nullTerminatedUTF8:
-  ///       A pointer to a null-terminated UTF-8 code sequence.
+  ///     A pointer to a null-terminated sequence of UTF-8 code units.
   @inlinable
   @_alwaysEmitIntoClient
   public init?(validatingCString nullTerminatedUTF8: UnsafePointer<CChar>) {
@@ -185,10 +189,11 @@ extension String {
   ///     }
   ///     // Prints "nil"
   ///
-  /// Note: This initializer is deprecated. Use
+  /// Note: This initializer has been renamed. Use
   ///       `String.init?(validatingCString:)` instead.
   ///
-  /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
+  /// - Parameter cString:
+  ///     A pointer to a null-terminated sequence of UTF-8 code units.
   @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: cString)
@@ -287,8 +292,8 @@ extension String {
   ///     // Prints "Optional((result: "Caf�", repairsMade: true))"
   ///
   /// - Parameters:
-  ///   - cString: A pointer to a null-terminated code sequence encoded in
-  ///     `encoding`.
+  ///   - cString: A pointer to a null-terminated sequence of
+  ///     code units encoded in `encoding`.
   ///   - encoding: The Unicode encoding of the data referenced by `cString`.
   ///   - isRepairing: Pass `true` to create a new string, even when the data
   ///     referenced by `cString` contains ill-formed sequences. Ill-formed
@@ -397,13 +402,16 @@ extension String {
     return ("", false)
   }
 
-  /// Creates a string from the null-terminated sequence of bytes at the given
-  /// pointer.
+  /// Creates a new string by copying the null-terminated sequence of code units
+  /// referenced by the given pointer.
+  ///
+  /// If `nullTerminatedCodeUnits` contains ill-formed code unit sequences, this
+  /// initializer replaces them with the Unicode replacement character
+  /// (`"\u{FFFD}"`).
   ///
   /// - Parameters:
-  ///   - nullTerminatedCodeUnits: A pointer to a sequence of contiguous code
-  ///     units in the encoding specified in `sourceEncoding`, ending just
-  ///     before the first zero code unit.
+  ///   - nullTerminatedCodeUnits: A pointer to a null-terminated sequence of
+  ///     code units encoded in `sourceEncoding`.
   ///   - sourceEncoding: The encoding in which the code units should be
   ///     interpreted.
   @_specialize(where Encoding == Unicode.UTF8)
