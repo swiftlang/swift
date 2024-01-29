@@ -58,49 +58,6 @@ void ClangTypeInfo::dump(llvm::raw_ostream &os,
   }
 }
 
-std::string LifetimeDependenceInfo::getString() const {
-  std::string lifetimeDependenceString;
-  auto getOnIndices = [](IndexSubset *bitvector) {
-    std::string result;
-    bool isFirstSetBit = true;
-    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
-      if (bitvector->contains(i)) {
-        if (!isFirstSetBit) {
-          result += ", ";
-        }
-        result += std::to_string(i);
-        isFirstSetBit = false;
-      }
-    }
-    return result;
-  };
-  if (!inheritLifetimeParamIndices->isEmpty()) {
-    lifetimeDependenceString =
-        "_inherit(" + getOnIndices(inheritLifetimeParamIndices) + ")";
-  }
-  if (!borrowLifetimeParamIndices->isEmpty()) {
-    lifetimeDependenceString +=
-        "_borrow(" + getOnIndices(borrowLifetimeParamIndices) + ")";
-  }
-  if (!mutateLifetimeParamIndices->isEmpty()) {
-    lifetimeDependenceString +=
-        "_mutate(" + getOnIndices(mutateLifetimeParamIndices) + ")";
-  }
-  return lifetimeDependenceString;
-}
-
-void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
-  if (inheritLifetimeParamIndices) {
-    inheritLifetimeParamIndices->Profile(ID);
-  }
-  if (borrowLifetimeParamIndices) {
-    borrowLifetimeParamIndices->Profile(ID);
-  }
-  if (mutateLifetimeParamIndices) {
-    mutateLifetimeParamIndices->Profile(ID);
-  }
-}
-
 // MARK: - UnexpectedClangTypeError
 
 llvm::Optional<UnexpectedClangTypeError>

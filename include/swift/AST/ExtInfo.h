@@ -21,6 +21,7 @@
 #define SWIFT_EXTINFO_H
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/LifetimeDependence.h"
 
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
@@ -155,35 +156,6 @@ public:
   void printType(ClangModuleLoader *cml, llvm::raw_ostream &os) const;
 
   void dump(llvm::raw_ostream &os, const clang::ASTContext &ctx) const;
-};
-
-class LifetimeDependenceInfo {
-  IndexSubset *inheritLifetimeParamIndices;
-  IndexSubset *borrowLifetimeParamIndices;
-  IndexSubset *mutateLifetimeParamIndices;
-
-public:
-  LifetimeDependenceInfo()
-      : inheritLifetimeParamIndices(nullptr),
-        borrowLifetimeParamIndices(nullptr),
-        mutateLifetimeParamIndices(nullptr) {}
-  LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
-                         IndexSubset *borrowLifetimeParamIndices,
-                         IndexSubset *mutateLifetimeParamIndices)
-      : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
-        borrowLifetimeParamIndices(borrowLifetimeParamIndices),
-        mutateLifetimeParamIndices(mutateLifetimeParamIndices) {}
-
-  operator bool() const { return !empty(); }
-
-  bool empty() const {
-    return inheritLifetimeParamIndices == nullptr &&
-           borrowLifetimeParamIndices == nullptr &&
-           mutateLifetimeParamIndices == nullptr;
-  }
-  std::string getString() const;
-
-  void Profile(llvm::FoldingSetNodeID &ID) const;
 };
 
 // MARK: - UnexpectedClangTypeError
