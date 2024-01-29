@@ -859,3 +859,15 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @f : $@convention(thin) (@inout NonTrivialStruct, @owned NonTrivialStruct) -> () {
+entry(%out : $*NonTrivialStruct, %s : @owned $NonTrivialStruct):
+  %munc = mark_unresolved_non_copyable_value [consumable_and_assignable] %out : $*NonTrivialStruct
+  br body
+body:
+  store %s to [assign] %munc : $*NonTrivialStruct
+  br exit
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}

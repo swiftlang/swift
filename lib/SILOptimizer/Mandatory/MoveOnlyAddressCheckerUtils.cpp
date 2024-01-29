@@ -3436,8 +3436,11 @@ bool ExtendUnconsumedLiveness::hasDefAfter(SILInstruction *start,
 
 void ExtendUnconsumedLiveness::addPreviousInstructionToLiveness(
     SILInstruction *inst, unsigned element) {
-  auto range = TypeTreeLeafTypeRange(element, element + 1);
   inst->visitPriorInstructions([&](auto *prior) {
+    if (liveness.isDef(prior, element)) {
+      return true;
+    }
+    auto range = TypeTreeLeafTypeRange(element, element + 1);
     liveness.extendToNonUse(prior, range);
     return true;
   });
