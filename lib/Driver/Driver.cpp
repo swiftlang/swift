@@ -1290,6 +1290,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
+  OI.SplitDWARF = Args.hasArg(options::OPT_split_dwarf);
+
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as
     // top-level output.
@@ -1681,6 +1683,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftFixIt:
       case file_types::TY_ModuleSemanticInfo:
       case file_types::TY_CachedDiagnostics:
+      case file_types::TY_SplitDwarfObjectFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2506,6 +2509,12 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     }
   }
 
+  if (isa<CompileJobAction>(JA)) {
+    if (C.getArgs().hasArg(options::OPT_split_dwarf))
+      chooseModuleSplitDWARFOutputPath(C, OutputMap, workingDirectory,
+                                       Output.get());
+  }
+
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path))
     chooseModuleInterfacePath(C, JA, workingDirectory, Buf,
@@ -2817,6 +2826,17 @@ void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,
                                             CommandOutput *Output) const {
   chooseModuleAuxiliaryOutputFilePath(C, OutputMap, workingDirectory, Output,
                                       file_types::TY_SwiftModuleDocFile);
+}
+
+void Driver::chooseModuleSplitDWARFOutputPath(Compilation &C,
+                                              const TypeToPathMap *OutputMap,
+                                              StringRef workingDirectory,
+                                              CommandOutput *Output) const {
+  SmallString<128> Path(Output->getPrimaryOutputFilename());
+  StringRef ext = file_types::getExtension(file_types::TY_SplitDwarfObjectFile);
+  llvm::sys::path::replace_extension(Path, ext);
+  assert(!C.isTemporaryFile(Path) && "Target dwo file must not be temporary");
+  Output->setAdditionalOutputForType(file_types::TY_SplitDwarfObjectFile, Path);
 }
 
 void Driver::chooseRemappingOutputPath(Compilation &C,

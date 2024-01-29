@@ -98,6 +98,8 @@ TYPE("pcm",                 ClangModuleFile,           "pcm",             "")
 TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
 
+TYPE("dwo",                 SplitDwarfObjectFile,      "dwo",             "")
+
 TYPE("abi-baseline-json",   SwiftABIDescriptor,        "abi.json",        "")
 TYPE("api-descriptor-json", SwiftAPIDescriptor,        "",                "")
 TYPE("fixit",               SwiftFixIt,                "",                "")

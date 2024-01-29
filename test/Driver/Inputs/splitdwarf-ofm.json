@@ -1,0 +1,8 @@
+{
+  "Inputs/main.swift": {
+    "object": "main.o"
+  },
+  "Inputs/lib.swift": {
+    "object": "lib.o"
+  }
+}

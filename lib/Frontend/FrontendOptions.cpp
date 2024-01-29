@@ -270,11 +270,14 @@ void FrontendOptions::forAllOutputPaths(
   }
   const SupplementaryOutputPaths &outs =
       input.getPrimarySpecificPaths().SupplementaryOutputs;
-  const std::string *outputs[] = {
-      &outs.ModuleOutputPath,          &outs.ModuleDocOutputPath,
-      &outs.ModuleInterfaceOutputPath, &outs.PrivateModuleInterfaceOutputPath,
-      &outs.PackageModuleInterfaceOutputPath, &outs.ClangHeaderOutputPath,
-      &outs.ModuleSourceInfoOutputPath};
+  const std::string *outputs[] = {&outs.ModuleOutputPath,
+                                  &outs.ModuleDocOutputPath,
+                                  &outs.ModuleInterfaceOutputPath,
+                                  &outs.PrivateModuleInterfaceOutputPath,
+                                  &outs.PackageModuleInterfaceOutputPath,
+                                  &outs.ClangHeaderOutputPath,
+                                  &outs.ModuleSourceInfoOutputPath,
+                                  &outs.SplitDwarfObjectPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);

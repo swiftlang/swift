@@ -135,6 +135,13 @@
 // RUN: %swift_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 // RUN: %swiftc_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 
+// RUN: %swiftc_driver -### -g -split-dwarf -o split-dwarf.o %s 2>&1 | %FileCheck -check-prefix SPLIT_DWARF %s
+// SPLIT_DWARF: -split-dwarf-path {{.*}}options{{.*}}.dwo
+
+// RUN: %swiftc_driver -### -g -split-dwarf -emit-object -module-name test -output-file-map %S/Inputs/splitdwarf-ofm.json %S/Inputs/main.swift %S/Inputs/lib.swift %s 2>&1 | %FileCheck -check-prefix SPLIT_DWARF_MULTI %s
+// SPLIT_DWARF_MULTI: -primary-file {{.*}}main.swift {{.*}} -split-dwarf-path {{.*}}main{{.*}}.dwo {{.*}}
+// SPLIT_DWARF_MULTI: -primary-file {{.*}}lib.swift {{.*}} -split-dwarf-path {{.*}}lib{{.*}}.dwo {{.*}}
+
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s

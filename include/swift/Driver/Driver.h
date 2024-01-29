@@ -128,6 +128,9 @@ public:
   /// DWARF output format version number.
   std::optional<uint8_t> DWARFVersion;
 
+  /// Emit debug info as split-DWARF in separate .dwo files.
+  bool SplitDWARF = false;
+
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
 
@@ -393,6 +396,11 @@ private:
                                       const TypeToPathMap *OutputMap,
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
+
+  void chooseModuleSplitDWARFOutputPath(Compilation &C,
+                                        const TypeToPathMap *OutputMap,
+                                        StringRef workingDirectory,
+                                        CommandOutput *Output) const;
 
   void chooseSwiftSourceInfoOutputPath(Compilation &C,
                                        const TypeToPathMap *OutputMap,

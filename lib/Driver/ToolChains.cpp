@@ -767,6 +767,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
   case file_types::TY_CachedDiagnostics:
+  case file_types::TY_SplitDwarfObjectFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -912,6 +913,9 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SwiftModuleSummaryFile,
                    "-emit-module-summary-path");
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::TY_SplitDwarfObjectFile,
+                   "-split-dwarf-path");
 }
 
 ToolChain::InvocationInfo
@@ -1037,6 +1041,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftFixIt:
     case file_types::TY_ModuleSemanticInfo:
     case file_types::TY_CachedDiagnostics:
+    case file_types::TY_SplitDwarfObjectFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
