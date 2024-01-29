@@ -14,6 +14,9 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:B > %t/B.cmd
 // RUN: %swift_frontend_plain @%t/B.cmd
 
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json C > %t/C.cmd
+// RUN: %swift_frontend_plain @%t/C.cmd
+
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 
@@ -38,9 +41,18 @@ import A.Missing
 func b() {}
 #endif
 
+#if canImport(C, _version: 1.0)
+import C
+#endif
+
+#if canImport(C, _version: 2.0)
+import Missing
+#endif
+
 func useA() {
   a()
   b()
+  c()
 }
 
 //--- include/module.modulemap
@@ -61,3 +73,8 @@ void notused(void);
 
 //--- include/B.h
 void notused2(void);
+
+//--- include/C.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name C -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
+public func c() { }
