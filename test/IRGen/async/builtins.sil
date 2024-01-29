@@ -66,6 +66,34 @@ bb0(%0 : $Builtin.RawPointer, %1 : $@async @callee_guaranteed () -> (Int, @error
   return %12 : $()
 }
 
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_discarding_future_in_group
+sil hidden @launch_discarding_future_in_group : $@convention(thin) (Builtin.RawPointer, @guaranteed @async @callee_guaranteed () -> @error Error, Int) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $@async @callee_guaranteed () -> @error Error, %3: $Int):
+  %6 = metatype $@thick ().Type
+  %7 = init_existential_metatype %6 : $@thick ().Type, $@thick Any.Type
+  strong_retain %1 : $@async @callee_guaranteed () -> @error Error
+  // CHECK: call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create(
+  %9 = builtin "createAsyncDiscardingTaskInGroup"(%3 : $Int, %0 : $Builtin.RawPointer, %7 : $@thick Any.Type, %1 : $@async @callee_guaranteed () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %10 = tuple_extract %9 : $(Builtin.NativeObject, Builtin.RawPointer), 0
+  strong_release %10 : $Builtin.NativeObject
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_discarding_future_in_group_with_executor
+sil hidden @launch_discarding_future_in_group_with_executor : $@convention(thin) (Builtin.RawPointer, Builtin.Executor, @guaranteed @async @callee_guaranteed () -> @error Error, Int) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Executor, %2 : $@async @callee_guaranteed () -> @error Error, %3: $Int):
+  %6 = metatype $@thick ().Type
+  %7 = init_existential_metatype %6 : $@thick ().Type, $@thick Any.Type
+  strong_retain %2 : $@async @callee_guaranteed () -> @error Error
+  // CHECK: call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create(
+  %9 = builtin "createAsyncDiscardingTaskInGroupWithExecutor"(%3 : $Int, %0 : $Builtin.RawPointer, %1: $Builtin.Executor, %7 : $@thick Any.Type, %2 : $@async @callee_guaranteed () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %10 = tuple_extract %9 : $(Builtin.NativeObject, Builtin.RawPointer), 0
+  strong_release %10 : $Builtin.NativeObject
+  %12 = tuple ()
+  return %12 : $()
+}
+
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_void_future
 sil hidden [ossa] @launch_void_future : $@convention(method) (Int, Optional<Builtin.RawPointer>, @guaranteed @async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
 bb0(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %2: @guaranteed $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):

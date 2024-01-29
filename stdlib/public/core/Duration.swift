@@ -35,15 +35,13 @@
 @frozen
 public struct Duration: Sendable {
   /// The low 64 bits of a 128-bit signed integer value counting attoseconds.
-  @usableFromInline
-  internal var _low: UInt64
+  public var _low: UInt64
 
   /// The high 64 bits of a 128-bit signed integer value counting attoseconds.
-  @usableFromInline
-  internal var _high: Int64
+  public var _high: Int64
 
   @inlinable
-  internal init(_high: Int64, low: UInt64) {
+  public init(_high: Int64, low: UInt64) {
     self._low = low
     self._high = _high
   }

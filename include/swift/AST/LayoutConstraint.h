@@ -157,6 +157,11 @@ class LayoutConstraintInfo
     return 8*8;
   }
 
+  unsigned getTrivialStride() const {
+    assert(isTrivialStride());
+    return (SizeInBits + 7) / 8;
+  }
+
   unsigned getTrivialStrideInBits() const {
     assert(isTrivialStride());
     return SizeInBits;

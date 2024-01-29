@@ -53,6 +53,7 @@ static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   case StringLiteralInst::Encoding::Bytes: return SIL_BYTES;
   case StringLiteralInst::Encoding::UTF8: return SIL_UTF8;
   case StringLiteralInst::Encoding::ObjCSelector: return SIL_OBJC_SELECTOR;
+  case StringLiteralInst::Encoding::UTF8_OSLOG: return SIL_UTF8_OSLOG;
   }
   llvm_unreachable("bad string encoding");
 }
@@ -1281,21 +1282,31 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addUniquedStringRef(G->getName()));
     break;
   }
-  case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::GlobalValueInst: {
     // Format: Name and type. Use SILOneOperandLayout.
-    const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
-    auto *G = GI->getReferencedGlobal();
+    auto *gv = cast<GlobalValueInst>(&SI);
+    auto *G = gv->getReferencedGlobal();
     addReferencedGlobalVariable(G);
-    bool isBare = false;
-    if (auto *gv = dyn_cast<GlobalValueInst>(&SI))
-      isBare = gv->isBare();
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
-        (unsigned)SI.getKind(), isBare ? 1 : 0,
-        S.addTypeRef(GI->getType().getRawASTType()),
-        (unsigned)GI->getType().getCategory(),
+        (unsigned)SI.getKind(), gv->isBare() ? 1 : 0,
+        S.addTypeRef(gv->getType().getRawASTType()),
+        (unsigned)gv->getType().getCategory(),
         S.addUniquedStringRef(G->getName()));
+    break;
+  }
+  case SILInstructionKind::GlobalAddrInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    auto *ga = cast<GlobalAddrInst>(&SI);
+    auto *G = ga->getReferencedGlobal();
+    addReferencedGlobalVariable(G);
+    SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord,
+      SILAbbrCodes[SILOneValueOneOperandLayout::Code],
+      (unsigned)SI.getKind(), 0,
+      S.addUniquedStringRef(G->getName()),
+      S.addTypeRef(ga->getType().getRawASTType()),
+      (unsigned)ga->getType().getCategory(),
+      addValueRef(ga->getDependencyToken()));
     break;
   }
   case SILInstructionKind::BaseAddrForOffsetInst: {
@@ -1680,6 +1691,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const MarkDependenceInst *MDI = cast<MarkDependenceInst>(&SI);
       operand = MDI->getValue();
       operand2 = MDI->getBase();
+      Attr = (MDI->isNonEscaping() ? 1 : 0);
     } else {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();
@@ -2869,7 +2881,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
   // Do not emit vtables for non-public classes unless everything has to be
   // serialized.
   if (!ShouldSerializeAll &&
-      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
+      vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Package)
     return;
 
   if (vt.isSpecialized())
@@ -2913,7 +2925,7 @@ void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
   // Do not emit deinit for non-public nominal types unless everything has to be
   // serialized.
   if (!ShouldSerializeAll && deinit.getNominalDecl()->getEffectiveAccess() <
-                                 swift::AccessLevel::Public)
+                                 swift::AccessLevel::Package)
     return;
 
   SILFunction *impl = deinit.getImplementation();

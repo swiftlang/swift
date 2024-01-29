@@ -1038,10 +1038,15 @@ AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc,
 
 GlobalAddrInst::GlobalAddrInst(SILDebugLocation DebugLoc,
                                SILGlobalVariable *Global,
+                               SILValue dependencyToken,
                                TypeExpansionContext context)
     : InstructionBase(DebugLoc,
                       Global->getLoweredTypeInContext(context).getAddressType(),
-                      Global) {}
+                      Global) {
+  if (dependencyToken) {
+    this->dependencyToken.emplace(this, dependencyToken);
+  }
+}
 
 GlobalValueInst::GlobalValueInst(SILDebugLocation DebugLoc,
                                  SILGlobalVariable *Global,

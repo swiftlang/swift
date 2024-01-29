@@ -459,20 +459,7 @@ getProtocolRefsList(llvm::Constant *protocol) {
     return std::make_pair(0, nullptr);
   }
 
-  if (!protocol->getContext().supportsTypedPointers()) {
-    auto protocolRefsVar = cast<llvm::GlobalVariable>(objCProtocolList);
-    auto sizeListPair =
-        cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
-    auto size =
-        cast<llvm::ConstantInt>(sizeListPair->getOperand(0))->getZExtValue();
-    auto protocolRefsList =
-        cast<llvm::ConstantArray>(sizeListPair->getOperand(1));
-    return std::make_pair(size, protocolRefsList);
-  }
-
-  auto bitcast = cast<llvm::ConstantExpr>(objCProtocolList);
-  assert(bitcast->getOpcode() == llvm::Instruction::BitCast);
-  auto protocolRefsVar = cast<llvm::GlobalVariable>(bitcast->getOperand(0));
+  auto protocolRefsVar = cast<llvm::GlobalVariable>(objCProtocolList);
   auto sizeListPair =
       cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
   auto size =

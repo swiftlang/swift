@@ -241,12 +241,25 @@ public:
 class ReturnStmt : public Stmt {
   SourceLoc ReturnLoc;
   Expr *Result;
-  
+
+  ReturnStmt(SourceLoc returnLoc, Expr *result, bool isImplicit)
+      : Stmt(StmtKind::Return, isImplicit), ReturnLoc(returnLoc),
+        Result(result) {}
+
 public:
-  ReturnStmt(SourceLoc ReturnLoc, Expr *Result,
-             llvm::Optional<bool> implicit = llvm::None)
-      : Stmt(StmtKind::Return, getDefaultImplicitFlag(implicit, ReturnLoc)),
-        ReturnLoc(ReturnLoc), Result(Result) {}
+  static ReturnStmt *createParsed(ASTContext &ctx, SourceLoc returnLoc,
+                                  Expr *result) {
+    return new (ctx) ReturnStmt(returnLoc, result, /*isImplicit*/ false);
+  }
+
+  static ReturnStmt *createImplicit(ASTContext &ctx, SourceLoc returnLoc,
+                                    Expr *result) {
+    return new (ctx) ReturnStmt(returnLoc, result, /*isImplicit*/ true);
+  }
+
+  static ReturnStmt *createImplicit(ASTContext &ctx, Expr *result) {
+    return createImplicit(ctx, SourceLoc(), result);
+  }
 
   SourceLoc getReturnLoc() const { return ReturnLoc; }
 
@@ -363,14 +376,19 @@ class DeferStmt : public Stmt {
   /// This is the invocation of the closure, which is to be emitted on any error
   /// paths.
   Expr *callExpr;
-  
-public:
+
   DeferStmt(SourceLoc DeferLoc,
             FuncDecl *tempDecl, Expr *callExpr)
     : Stmt(StmtKind::Defer, /*implicit*/false),
       DeferLoc(DeferLoc), tempDecl(tempDecl),
       callExpr(callExpr) {}
-  
+
+public:
+  /// Create a 'defer' statement. This automatically creates the "temp decl" and
+  /// the call expression. It's the caller's responsibility to populate the
+  /// body of the func decl.
+  static DeferStmt *create(DeclContext *dc, SourceLoc deferLoc);
+
   SourceLoc getDeferLoc() const { return DeferLoc; }
   
   SourceLoc getStartLoc() const { return DeferLoc; }
@@ -390,7 +408,6 @@ public:
 /// conditional statements (i.e. `if`, `guard`, `while`).
 class alignas(8) ConditionalPatternBindingInfo
     : public ASTAllocated<ConditionalPatternBindingInfo> {
-public:
   /// Location of the var/let/case keyword.
   SourceLoc IntroducerLoc;
 
@@ -1186,6 +1203,18 @@ class CaseStmt final
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
+  /// Create a parsed 'case'/'default' for 'switch' statement.
+  static CaseStmt *
+  createParsedSwitchCase(ASTContext &C, SourceLoc ItemIntroducerLoc,
+                         ArrayRef<CaseLabelItem> CaseLabelItems,
+                         SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
+                         BraceStmt *Body);
+
+  /// Create a parsed 'catch' for 'do' statement.
+  static CaseStmt *createParsedDoCatch(ASTContext &C, SourceLoc CatchLoc,
+                                       ArrayRef<CaseLabelItem> CaseLabelItems,
+                                       BraceStmt *Body);
+
   static CaseStmt *
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
@@ -1605,10 +1634,10 @@ public:
       : Stmt(StmtKind::Fail, getDefaultImplicitFlag(implicit, returnLoc)),
         ReturnLoc(returnLoc), NilLoc(nilLoc) {}
 
-  SourceLoc getLoc() const { return ReturnLoc; }
-  
-  SourceRange getSourceRange() const { return SourceRange(ReturnLoc, NilLoc); }
-  
+  SourceRange getSourceRange() const {
+    return SourceRange::combine(ReturnLoc, NilLoc);
+  }
+
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Fail;
   }

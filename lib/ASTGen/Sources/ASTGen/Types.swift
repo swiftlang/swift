@@ -389,7 +389,7 @@ extension ASTGenVisitor {
 
     // Handle type attributes.
     if !node.attributes.isEmpty {
-      let typeAttributes = BridgedTypeAttributes()
+      let typeAttributes = BridgedTypeAttributes(context: self.ctx)
       for attributeElt in node.attributes {
         // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
         // but we don't have that ability right now.
@@ -415,12 +415,13 @@ extension ASTGenVisitor {
           .sil_weak, .sil_unowned, .inout, .block_storage, .box,
           .dynamic_self, .sil_unmanaged, .error, .error_indirect,
           .error_unowned, .direct, .inout_aliasable,
-          .in_guaranteed, .in_constant, .captures_generics, .moveOnly:
+          .in_guaranteed, .in_constant, .captures_generics, .moveOnly,
+          .isolated:
           fallthrough
 
         case .autoclosure, .escaping, .noescape, .noDerivative, .async,
-          .sendable, .retroactive, .unchecked, ._local, ._noMetadata,
-          .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
+          .sendable, .retroactive, .unchecked, .preconcurrency, ._local,
+          ._noMetadata, .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
           .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
           .count, .unimplementable:
           typeAttributes.addSimpleAttr(kind: typeAttrKind, atLoc: atLoc, attrLoc: attrLoc)
@@ -435,7 +436,6 @@ extension ASTGenVisitor {
       if (!typeAttributes.isEmpty) {
         type =
           BridgedAttributedTypeRepr.createParsed(
-            self.ctx,
             base: type,
             consumingAttributes: typeAttributes
           ).asTypeRepr

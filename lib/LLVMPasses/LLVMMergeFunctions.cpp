@@ -1261,29 +1261,6 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   ++NumSwiftThunksWritten;
 }
 
-static llvm::AttributeList
-fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
-                                        llvm::AttributeList attrList) {
-  auto &context = fnType->getContext();
-  if (!context.supportsTypedPointers())
-    return attrList;
-
-  for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
-    auto paramTy = fnType->getParamType(i);
-    auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
-    if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamStructRetType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::StructRet,
-          paramTy->getNonOpaquePointerElementType());
-    if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamByValType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::ByVal,
-          paramTy->getNonOpaquePointerElementType());
-  }
-  return attrList;
-}
 /// Replace direct callers of Old with New. Also add parameters to the call to
 /// \p New, which are defined by the FuncIdx's value in \p Params.
 bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
@@ -1356,7 +1333,6 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     auto newAttrList = AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
                                             NewPAL.getRetAttrs(),
                                             NewArgAttrs);
-    newAttrList = fixUpTypesInByValAndStructRetAttributes(FType, newAttrList);
     NewCI->setAttributes(newAttrList);
     Value *retVal = createCast(Builder, NewCI, CI->getType());
     CI->replaceAllUsesWith(retVal);

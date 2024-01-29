@@ -1606,7 +1606,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
     ProtocolConformanceRef conformances[1] = {
-      getModule().getSwiftModule()->conformsToProtocol(
+      getModule().getSwiftModule()->checkConformance(
         exn->getType().getASTType(), getASTContext().getErrorDecl())
     };
 

@@ -530,9 +530,12 @@ static ManagedValue createInputFunctionArgument(
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
-    if (!arg->getType().getASTType()->isNoncopyable()) {
+    if (!arg->getType().isMoveOnly()) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
+    }
+    if (pd->hasResultDependsOn()) {
+      arg->setHasResultDependsOn();
     }
   }
   if (isNoImplicitCopy)
@@ -1021,10 +1024,12 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
 
 ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
                                                  ManagedValue value,
-                                                 ManagedValue base) {
+                                                 ManagedValue base,
+                                                 bool isNonEscaping) {
   CleanupCloner cloner(*this, value);
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
-                                   base.forward(getSILGenFunction()));
+                                   base.forward(getSILGenFunction()),
+                                   isNonEscaping);
   return cloner.clone(mdi);
 }
 

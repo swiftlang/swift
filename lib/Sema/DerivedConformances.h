@@ -387,7 +387,6 @@ public:
   static CallExpr *createBuiltinCall(ASTContext &ctx,
                                      BuiltinValueKind builtin,
                                      ArrayRef<Type> typeArgs,
-                              ArrayRef<ProtocolConformanceRef> conformances,
                                      ArrayRef<Expr *> args);
 
   /// Build a call to the stdlib function that should be called when unavailable

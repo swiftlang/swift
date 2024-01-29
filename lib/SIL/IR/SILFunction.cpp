@@ -209,6 +209,7 @@ void SILFunction::init(
   this->ForceEnableLexicalLifetimes = DoNotForceEnableLexicalLifetimes;
   this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->HasUnsafeNonEscapableResult = false;
+  this->HasResultDependsOnSelf = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;

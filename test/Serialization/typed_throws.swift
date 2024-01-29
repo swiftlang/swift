@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -module-name def_typed_throws -o %t %S/Inputs/def_typed_throws.swift -enable-experimental-feature TypedThrows
+// RUN: %target-swift-frontend -emit-module -module-name def_typed_throws -o %t %S/Inputs/def_typed_throws.swift
 // RUN: llvm-bcanalyzer %t/def_typed_throws.swiftmodule | %FileCheck %s
 // RUN: %target-typecheck-verify-swift -I %t
 

@@ -13,7 +13,6 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
-import _StringProcessing // for String.contains(_:)
 
 public enum DebugDescriptionMacro {}
 public enum _DebugDescriptionPropertyMacro {}
@@ -47,19 +46,7 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
       return []
     }
 
-    guard propertyName == "debugDescription" || propertyName == "description" else {
-      return []
-    }
-
-    // Expansion is performed multiple times. Exit early to avoid emitting duplicate macros,
-    // which leads to duplicate symbol errors. To distinguish been invocations, inspect the
-    // current mangled name. This ignores the invocation that adds a "__vg" suffix to the member
-    // name, ex "description__vg". See https://github.com/apple/swift/pull/65559.
-    let mangledName = context.makeUniqueName("").text
-    let substring = "\(propertyName)__vg"
-    // Ex: "15description__vg"
-    let runlengthSubstring = "\(substring.count)\(substring)"
-    guard !mangledName.hasSubstring(runlengthSubstring) else {
+    guard DESCRIPTION_PROPERTIES.contains(propertyName) else {
       return []
     }
 
@@ -72,8 +59,8 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
       }
     }
 
-    // `debugDescription` takes priority: skip `description` if `debugDescription` also exists.
-    if propertyName == "description" && properties["debugDescription"] != nil {
+    // Skip if this description property is not prioritized.
+    guard propertyName == designatedProperty(properties) else {
       return []
     }
 
@@ -237,6 +224,23 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
     return [decl]
   }
+}
+
+/// The names of properties that can be converted to LLDB type summaries, in priority order.
+fileprivate let DESCRIPTION_PROPERTIES = [
+  "_debugDescription",
+  "debugDescription",
+  "description",
+]
+
+/// Identifies the prioritized description property, of available properties.
+fileprivate func designatedProperty(_ properties: [String: PatternBindingSyntax]) -> String? {
+  for name in DESCRIPTION_PROPERTIES {
+    if properties[name] != nil {
+      return name
+    }
+  }
+  return nil
 }
 
 // MARK: - Encoding
@@ -482,20 +486,5 @@ extension Collection {
   /// multiple elements, nil is returned.
   fileprivate var only: Element? {
     count == 1 ? first : nil
-  }
-}
-
-extension String {
-  fileprivate func hasSubstring(_ substring: String) -> Bool {
-    if #available(macOS 13, *) {
-      return self.contains(substring)
-    }
-
-    for index in self.indices {
-      if self.suffix(from: index).hasPrefix(substring) {
-        return true
-      }
-    }
-    return false
   }
 }

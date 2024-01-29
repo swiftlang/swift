@@ -278,10 +278,18 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     }
   }
 
+  bool IncludeSignature = false;
+  if (ParentCall->getArgs()->getUnlabeledUnaryExpr() == CompletionExpr) {
+    // If the code completion expression is the only expression in the call
+    // and the code completion token doesn’t have a label, we have a case like
+    // `Point(|)`. Suggest the entire function signature.
+    IncludeSignature = true;
+  }
+
   Results.push_back(
-      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall),
+      {ExpectedTy,  ExpectedCallType, isa<SubscriptExpr>(ParentCall),
        Info.getValue(), FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
-       IsNoninitialVariadic, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
+       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
        IsAsync, DeclParamIsOptional, SolutionSpecificVarTypes});
 }
 
@@ -316,7 +324,7 @@ void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
 }
 
 void ArgumentTypeCheckCompletionCallback::collectResults(
-    bool IncludeSignature, bool IsLabeledTrailingClosure, SourceLoc Loc,
+    bool IsLabeledTrailingClosure, SourceLoc Loc,
     DeclContext *DC, ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
@@ -333,13 +341,14 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
   }
 
   SmallVector<Type, 8> ExpectedTypes;
+  SmallVector<PossibleParamInfo, 8> Params;
 
-  if (IncludeSignature && !Results.empty()) {
-    Lookup.setHaveLParen(true);
-    Lookup.setExpectedTypes(ExpectedCallTypes,
-                            /*isImplicitSingleExpressionReturn=*/false);
+  for (auto &Result : Results) {
+    if (Result.IncludeSignature) {
+      Lookup.setHaveLParen(true);
+      Lookup.setExpectedTypes(ExpectedCallTypes,
+                              /*isImplicitSingleExpressionReturn=*/false);
 
-    for (auto &Result : Results) {
       auto SemanticContext = SemanticContextKind::None;
       NominalTypeDecl *BaseNominal = nullptr;
       if (Result.BaseType) {
@@ -383,19 +392,16 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
           }
         }
       }
-    }
-    Lookup.setHaveLParen(false);
-
-    shouldPerformGlobalCompletion |=
-        !Lookup.FoundFunctionCalls || Lookup.FoundFunctionsWithoutFirstKeyword;
-  } else if (!Results.empty()) {
-    SmallVector<PossibleParamInfo, 8> Params;
-    for (auto &Ret : Results) {
+      Lookup.setHaveLParen(false);
+      // We didn't find any function signatures. Perform global completion as a fallback.
       shouldPerformGlobalCompletion |=
-          addPossibleParams(Ret, Params, ExpectedTypes);
+          !Lookup.FoundFunctionCalls || Lookup.FoundFunctionsWithoutFirstKeyword;
+    } else {
+      shouldPerformGlobalCompletion |=
+          addPossibleParams(Result, Params, ExpectedTypes);
     }
-    Lookup.addCallArgumentCompletionResults(Params, IsLabeledTrailingClosure);
   }
+  Lookup.addCallArgumentCompletionResults(Params, IsLabeledTrailingClosure);
 
   if (shouldPerformGlobalCompletion) {
     llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;

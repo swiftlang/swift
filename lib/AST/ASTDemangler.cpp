@@ -389,11 +389,13 @@ void ASTBuilder::endPackExpansion() {
 
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
-    Type output, FunctionTypeFlags flags,
+    Type output, FunctionTypeFlags flags, ExtendedFunctionTypeFlags extFlags,
     FunctionMetadataDifferentiabilityKind diffKind, Type globalActor,
     Type thrownError) {
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
+
+  bool hasIsolatedParameter = false;
 
   llvm::SmallVector<AnyFunctionType::Param, 8> funcParams;
   for (const auto &param : params) {
@@ -411,8 +413,10 @@ Type ASTBuilder::createFunctionType(
                               .withOwnershipSpecifier(ownership)
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure())
-                              .withNoDerivative(flags.isNoDerivative());
+                              .withNoDerivative(flags.isNoDerivative())
+                              .withIsolated(flags.isIsolated());
 
+    hasIsolatedParameter |= flags.isIsolated();
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
 
@@ -445,6 +449,13 @@ Type ASTBuilder::createFunctionType(
   #undef SIMPLE_CASE
   }
 
+  FunctionTypeIsolation isolation = FunctionTypeIsolation::forNonIsolated();
+  if (hasIsolatedParameter) {
+    isolation = FunctionTypeIsolation::forParameter();
+  } else if (globalActor) {
+    isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
+  }
+
   auto noescape =
     (representation == FunctionTypeRepresentation::Swift
      || representation == FunctionTypeRepresentation::Block)
@@ -455,10 +466,12 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
+  // TODO: Handle LifetimeDependenceInfo here.
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
                                    thrownError, resultDiffKind,
-                                   clangFunctionType, globalActor)
+                                   clangFunctionType, isolation,
+                                   LifetimeDependenceInfo())
           .withAsync(flags.isAsync())
           .withConcurrent(flags.isSendable())
           .build();
@@ -494,15 +507,21 @@ getParameterConvention(ImplParameterConvention conv) {
   llvm_unreachable("covered switch");
 }
 
-static SILParameterDifferentiability
-getParameterDifferentiability(ImplParameterDifferentiability diffKind) {
-  switch (diffKind) {
-  case ImplParameterDifferentiability::DifferentiableOrNotApplicable:
-    return SILParameterDifferentiability::DifferentiableOrNotApplicable;
-  case ImplParameterDifferentiability::NotDifferentiable:
-    return SILParameterDifferentiability::NotDifferentiable;
+static std::optional<SILParameterInfo::Options>
+getParameterOptions(ImplParameterInfoOptions implOptions) {
+  SILParameterInfo::Options result;
+
+  if (implOptions.contains(ImplParameterInfoFlags::NotDifferentiable)) {
+    implOptions -= ImplParameterInfoFlags::NotDifferentiable;
+    result |= SILParameterInfo::NotDifferentiable;
   }
-  llvm_unreachable("unknown differentiability kind");
+
+  // If we did not handle all flags in implOptions, this code was not updated
+  // appropriately. Return None to signal error.
+  if (bool(implOptions))
+    return {};
+
+  return result;
 }
 
 static ResultConvention getResultConvention(ImplResultConvention conv) {
@@ -523,15 +542,21 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
   llvm_unreachable("covered switch");
 }
 
-static SILResultDifferentiability
-getResultDifferentiability(ImplResultDifferentiability diffKind) {
-  switch (diffKind) {
-  case ImplResultDifferentiability::DifferentiableOrNotApplicable:
-    return SILResultDifferentiability::DifferentiableOrNotApplicable;
-  case ImplResultDifferentiability::NotDifferentiable:
-    return SILResultDifferentiability::NotDifferentiable;
+static std::optional<SILResultInfo::Options>
+getResultOptions(ImplResultInfoOptions implOptions) {
+  SILResultInfo::Options result;
+
+  if (implOptions.contains(ImplResultInfoFlags::NotDifferentiable)) {
+    implOptions -= ImplResultInfoFlags::NotDifferentiable;
+    result |= SILResultInfo::NotDifferentiable;
   }
-  llvm_unreachable("unknown differentiability kind");
+
+  // If we did not remove all of the options from implOptions, someone forgot to
+  // update this code for a new type of flag. Return none to signal error!
+  if (bool(implOptions))
+    return {};
+
+  return result;
 }
 
 Type ASTBuilder::createImplFunctionType(
@@ -599,15 +624,15 @@ Type ASTBuilder::createImplFunctionType(
   for (const auto &param : params) {
     auto type = param.getType()->getCanonicalType();
     auto conv = getParameterConvention(param.getConvention());
-    auto diffKind = getParameterDifferentiability(param.getDifferentiability());
-    funcParams.emplace_back(type, conv, diffKind);
+    auto options = *getParameterOptions(param.getOptions());
+    funcParams.emplace_back(type, conv, options);
   }
 
   for (const auto &result : results) {
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
-    auto diffKind = getResultDifferentiability(result.getDifferentiability());
-    funcResults.emplace_back(type, conv, diffKind);
+    auto options = *getResultOptions(result.getOptions());
+    funcResults.emplace_back(type, conv, options);
   }
 
   if (errorResult) {

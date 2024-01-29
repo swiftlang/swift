@@ -68,3 +68,15 @@ public typealias SomeAlias<G> = Hello<G>
 public typealias AliasWithInverse<G> = Hello<G> where G: ~Copyable, G: ~Escapable
 
 public struct RudePointer<T: ~Copyable>: Copyable {}
+
+public class C {}
+
+public func noInversesSTART() {}
+public func checkAny<Result>(_ t: Result) where Result: Any {}
+public func usingClassConstraint<Result>(arg: Result) -> Result? where Result: C { return arg }
+public func withAnyObject<Result>(_ t: Result) where Result: AnyObject {}
+public func noInversesEND() {}
+
+public func checkAnyInv1<Result>(_ t: borrowing Result) where Result: Any & ~Copyable {}
+public func checkAnyInv2<Result: Any>(_ t: borrowing Result) where Result: ~Copyable & ~Escapable {}
+public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {}

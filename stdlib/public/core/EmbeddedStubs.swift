@@ -149,76 +149,31 @@ extension String {
   public init<T: BinaryInteger>(_ value: T, radix: Int = 10, uppercase: Bool = false) { fatalError() }
 }
 
-/// Unicode.Scalar
+/// Unicode
 
 public enum Unicode {}
 
-extension Unicode {
-  public struct Scalar: Sendable {
-    internal var _value: UInt32
-    internal init(_value: UInt32) {
-      self._value = _value
-    }
-  }
-}
-
-extension Unicode.Scalar : _ExpressibleByBuiltinUnicodeScalarLiteral, ExpressibleByUnicodeScalarLiteral {
-  public var value: UInt32 { return _value }
-  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self._value = UInt32(value)
-  }
-  public init(unicodeScalarLiteral value: Unicode.Scalar) {
-    self = value
-  }
-  public init?(_ v: UInt32) {
-    if (v < 0xD800 || v > 0xDFFF) && v <= 0x10FFFF {
-      self._value = v
-      return
-    }
-    return nil
-  }
-  public init?(_ v: UInt16) {
-    self.init(UInt32(v))
-  }
-  public init(_ v: UInt8) {
-    self._value = UInt32(v)
-  }
-  public init(_ v: Unicode.Scalar) {
-    self = v
-  }
-  @_unavailableInEmbedded
-  public func escaped(asASCII forceASCII: Bool) -> String { fatalError() }
-  @_unavailableInEmbedded
-  internal func _escaped(asASCII forceASCII: Bool) -> String? { fatalError() }
-  public var isASCII: Bool {
-    return value <= 127
-  }
-  internal var _isPrintableASCII: Bool {
-    return (self >= Unicode.Scalar(0o040) && self <= Unicode.Scalar(0o176))
-  }
-}
-
-extension Unicode.Scalar: Equatable {
-  public static func == (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
-    return lhs.value == rhs.value
-  }
-}
-
-extension Unicode.Scalar: Comparable {
-  public static func < (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
-    return lhs.value < rhs.value
-  }
-}
-
 public typealias UTF8 = Unicode.UTF8
+public typealias UTF16 = Unicode.UTF16
 
 extension Unicode {
   public enum UTF8 {
+  }
+  public enum UTF16 {
   }
 }
 
 extension Unicode.UTF8 {
   public typealias CodeUnit = UInt8
+}
+
+extension Unicode.UTF16 {
+  public typealias CodeUnit = UInt16
+}
+
+@_unavailableInEmbedded
+extension String {
+  public init(_ value: Unicode.Scalar) { fatalError() }
 }
 
 /// Codable

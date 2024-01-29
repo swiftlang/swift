@@ -137,15 +137,19 @@ void ConformanceLookupTable::destroy() {
 
 namespace {
   struct ConformanceConstructionInfo : public Located<ProtocolDecl *> {
-    /// The location of the "unchecked" attribute, if this
+    /// The location of the "unchecked" attribute, if present.
     const SourceLoc uncheckedLoc;
+
+    /// The location of the "preconcurrency" attribute if present.
+    const SourceLoc preconcurrencyLoc;
 
     ConformanceConstructionInfo() { }
 
-    ConformanceConstructionInfo(
-      ProtocolDecl *item, SourceLoc loc,
-      SourceLoc uncheckedLoc
-    ) : Located(item, loc), uncheckedLoc(uncheckedLoc) { }
+    ConformanceConstructionInfo(ProtocolDecl *item, SourceLoc loc,
+                                SourceLoc uncheckedLoc,
+                                SourceLoc preconcurrencyLoc)
+        : Located(item, loc), uncheckedLoc(uncheckedLoc),
+          preconcurrencyLoc(preconcurrencyLoc) {}
   };
 }
 
@@ -200,7 +204,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       loader.first->loadAllConformances(next, loader.second, conformances);
       loadAllConformances(next, conformances);
       for (auto conf : conformances) {
-        protocols.push_back({conf->getProtocol(), SourceLoc(), SourceLoc()});
+        protocols.push_back(
+            {conf->getProtocol(), SourceLoc(), SourceLoc(), SourceLoc()});
       }
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
@@ -208,7 +213,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
-          protocols.push_back({proto, found.Loc, found.uncheckedLoc});
+          protocols.push_back(
+              {proto, found.Loc, found.uncheckedLoc, found.preconcurrencyLoc});
       }
     }
 
@@ -294,15 +300,15 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           addMacroGeneratedProtocols(
               nominal, ConformanceSource::forUnexpandedMacro(nominal));
         },
-        [&](ExtensionDecl *ext,
-            ArrayRef<ConformanceConstructionInfo> protos) {
+        [&](ExtensionDecl *ext, ArrayRef<ConformanceConstructionInfo> protos) {
           // The extension decl may not be validated, so we can't use
           // its inherited protocols directly.
           auto source = ConformanceSource::forExplicit(ext);
           for (auto locAndProto : protos)
             addProtocol(
-              locAndProto.Item, locAndProto.Loc,
-              source.withUncheckedLoc(locAndProto.uncheckedLoc));
+                locAndProto.Item, locAndProto.Loc,
+                source.withUncheckedLoc(locAndProto.uncheckedLoc)
+                      .withPreconcurrencyLoc(locAndProto.preconcurrencyLoc));
         });
     break;
 
@@ -495,8 +501,9 @@ void ConformanceLookupTable::addInheritedProtocols(
   for (const auto &found :
           getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      addProtocol(
-        proto, found.Loc, source.withUncheckedLoc(found.uncheckedLoc));
+      addProtocol(proto, found.Loc,
+                  source.withUncheckedLoc(found.uncheckedLoc)
+                        .withPreconcurrencyLoc(found.preconcurrencyLoc));
     }
   }
 }
@@ -953,10 +960,11 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     }
 
     // Create or find the normal conformance.
-    auto normalConf =
-        ctx.getNormalConformance(conformingType, protocol, conformanceLoc,
-                                 conformingDC, ProtocolConformanceState::Incomplete,
-                                 entry->Source.getUncheckedLoc().isValid());
+    auto normalConf = ctx.getNormalConformance(
+        conformingType, protocol, conformanceLoc, conformingDC,
+        ProtocolConformanceState::Incomplete,
+        entry->Source.getUncheckedLoc().isValid(),
+        entry->Source.getPreconcurrencyLoc().isValid());
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the
     // early return at the start of this function.

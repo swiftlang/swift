@@ -462,4 +462,9 @@ struct DerivedFromLoadableIntWrapperWithUsingDecl : private LoadableIntWrapper {
   }
 };
 
+struct HasOperatorCallWithDefaultArg {
+  int value;
+  int operator()(int x = 0) const { return value + x; }
+};
+
 #endif

@@ -87,6 +87,17 @@ public protocol CollectionLikeSequence : FormattedLikeArray {
 
 public extension CollectionLikeSequence {
   var isEmpty: Bool { !contains(where: { _ in true }) }
+
+  var singleElement: Element? {
+    var singleElement: Element? = nil
+    for e in self {
+      if singleElement != nil {
+        return nil
+      }
+      singleElement = e
+    }
+    return singleElement
+  }
 }
 
 // Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.

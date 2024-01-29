@@ -237,7 +237,7 @@ void SILGenTopLevel::visitSourceFile(SourceFile *SF) {
     visit(D);
   }
 
-  for (TypeDecl *TD : SF->LocalTypeDecls) {
+  for (TypeDecl *TD : SF->getLocalTypeDecls()) {
     if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
       continue;
     visit(TD);

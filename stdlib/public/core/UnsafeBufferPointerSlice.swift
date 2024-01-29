@@ -785,9 +785,9 @@ extension Slice {
   ///    initialized by this function.
   @inlinable
   @_alwaysEmitIntoClient
-  public func initialize<C: Collection>(
-    fromContentsOf source: C
-  ) -> Index where Base == UnsafeMutableBufferPointer<C.Element> {
+  public func initialize<Element>(
+    fromContentsOf source: some Collection<Element>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.initialize(fromContentsOf: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -855,9 +855,9 @@ extension Slice {
   /// - Returns: An index one past the index of the last element updated.
   @inlinable
   @_alwaysEmitIntoClient
-  public func update<C: Collection>(
-    fromContentsOf source: C
-  ) -> Index where Base == UnsafeMutableBufferPointer<C.Element> {
+  public func update<Element>(
+    fromContentsOf source: some Collection<Element>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.update(fromContentsOf: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)

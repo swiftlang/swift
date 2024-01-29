@@ -20,7 +20,7 @@ func protocolExtCollection1a<C : Collection>(_ a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_2A?check=PRIVATE_NOMINAL_MEMBERS_2A;check=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2A;check=NO_STDLIB_PRIVATE^#
 }
 
-// PRIVATE_NOMINAL_MEMBERS_2A-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(transform): (C.Element) throws -> T##(C.Element) throws -> T#})[' rethrows'][#[T]#];
+// PRIVATE_NOMINAL_MEMBERS_2A-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(transform): (C.Element) throws(Error) -> T##(C.Element) throws(Error) -> T#})[' throws'][#[T]#];
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2A-NOT: Decl{{.*}}: index({#before: any Comparable#})
 
 func protocolExtCollection1b(_ a: Collection) {
@@ -28,14 +28,14 @@ func protocolExtCollection1b(_ a: Collection) {
 }
 
 // FIXME(https://github.com/apple/swift/issues/65696): We should not be showing this because (1) it cannot be accessed on the existential (2) we don't have the syntax and features to represent the projected type sig anyway.
-// PRIVATE_NOMINAL_MEMBERS_2B-DAG: map({#(transform): (any Collection.Element) throws -> T##(any Collection.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_2B-DAG: map({#(transform): (any Collection.Element) throws(Error) -> T##(any Collection.Element) throws(Error) -> T#})[' throws'][#[T]#]{{; name=.+}}
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2B-NOT: Decl{{.*}}: index({#before: any Comparable#})
 
 func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_ a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_3?check=PRIVATE_NOMINAL_MEMBERS_3;check=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3;check=NO_STDLIB_PRIVATE^#
 }
 
-// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (C.Element) throws -> T##(C.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (C.Element) throws(Error) -> T##(C.Element) throws(Error) -> T#})[' throws'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceVar]/Super/IsSystem:            lazy[#LazySequence<Collection>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: firstIndex({#where: (C.Element) throws -> Bool##(C.Element) throws -> Bool#})[' rethrows'][#Comparable?#]{{; name=.+}}
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3-NOT: Decl{{.*}}:         firstIndex({#({{.*}}): Self.Iterator.Element
@@ -43,7 +43,7 @@ func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_
 func protocolExtArray<T : Equatable>(_ a: [T]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_4?check=PRIVATE_NOMINAL_MEMBERS_4;check=NO_STDLIB_PRIVATE^#
 }
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (Equatable) throws -> T##(Equatable) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (Equatable) throws(Error) -> T##(Equatable) throws(Error) -> T#})[' throws'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceVar]/Super/IsSystem:            last[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super/IsSystem:         firstIndex({#of: Equatable#})[#Int?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super/IsSystem:         firstIndex({#where: (Equatable) throws -> Bool##(Equatable) throws -> Bool#})[' rethrows'][#Int?#]{{; name=.+}}
@@ -85,7 +85,7 @@ func testArchetypeReplacement3 (_ a : [Int]) {
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem:   append({#(newElement): Int#})[#Void#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         removeLast()[#Int#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceVar]/Super/IsSystem:            first[#Int?#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (Int) throws -> T##(Int) throws -> T#})[' rethrows'][#[T]#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (Int) throws(Error) -> T##(Int) throws(Error) -> T#})[' throws'][#[T]#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         dropLast({#(k): Int#})[#ArraySlice<Int>#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         elementsEqual({#(other): Sequence#}, {#by: (Int, Sequence.Element) throws -> Bool##(Int, Sequence.Element) throws -> Bool#})[' rethrows'][#Bool#]; name=elementsEqual(:by:)
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super/IsSystem:         elementsEqual({#(other): Sequence#})[#Bool#]; name=elementsEqual(:)

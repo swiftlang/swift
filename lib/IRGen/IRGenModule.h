@@ -305,6 +305,10 @@ private:
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
   /// The queue of opaque type descriptors to emit.
   llvm::SmallVector<OpaqueTypeDecl*, 4> LazyOpaqueTypeDescriptors;
+  /// The set of extension contenxts enqueued for lazy emission.
+  llvm::DenseMap<ExtensionDecl*, LazyOpaqueInfo> LazyExtensions;
+  /// The queue of opaque type descriptors to emit.
+  llvm::TinyPtrVector<ExtensionDecl*> LazyExtensionDescriptors;
 public:
   /// The set of eagerly emitted opaque types.
   llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
@@ -504,7 +508,7 @@ public:
   }
   
   void noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque);
-
+  void noteUseOfExtensionDescriptor(ExtensionDecl *ext);
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
 
   void noteUseOfFieldDescriptors(CanType type) {
@@ -657,6 +661,7 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
+  llvm::Type *PtrTy;                   /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
@@ -925,7 +930,9 @@ public:
 
   bool shouldPrespecializeGenericMetadata();
   
-  bool canMakeStaticObjectsReadOnly();
+  bool canMakeStaticObjectReadOnly(SILType objectType);
+
+  ClassDecl *getStaticArrayStorageDecl();
 
   bool canUseObjCSymbolicReferences();
 
@@ -1102,7 +1109,8 @@ public:
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false);
+                                        bool willBeRelativelyAddressed = false,
+                                        bool useOSLogSection = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
@@ -1188,6 +1196,11 @@ public:
                               SILType objectType, const TypeInfo &objectTI,
                               const OutliningMetadataCollector &collector);
 
+  llvm::Constant *getOrCreateOutlinedEnumTagStoreFunction(
+    SILType T, const TypeInfo &ti, EnumElementDecl *theCase, unsigned caseIdx);
+  llvm::Constant *getOrCreateOutlinedDestructiveProjectDataForLoad(
+    SILType T, const TypeInfo &ti, EnumElementDecl *theCase, unsigned caseIdx);
+
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
@@ -1212,6 +1225,8 @@ private:
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     GlobalStrings;
+  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
+    GlobalOSLogStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
@@ -1607,6 +1622,9 @@ public:
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
       SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+
+  TypeEntityReference
+  getContextDescriptorEntityReference(const LinkEntity &entity);
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 

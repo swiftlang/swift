@@ -4,7 +4,7 @@
 // RUN: %target-run-simple-swift(-Xllvm -enable-deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Check if it works in embedded mode.
-// RUN: %target-run-simple-swift(%S/../embedded/Inputs/print.swift -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Run without the deinit-devirtualizer to verify that our CHECK-OUTPUT lines are correct.
 // TODO: currently disabled because of rdar://118449507

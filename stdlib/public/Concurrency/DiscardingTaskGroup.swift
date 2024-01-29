@@ -190,7 +190,20 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
+    #if $BuiltinCreateAsyncDiscardingTaskInGroup
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
+    #else
+    // This builtin happens to work, but the signature of the operation is
+    // incorrect, as the discarding group uses Void, and therefore has less
+    // generic parameters than the operation expected to be passed to
+    // createAsyncTaskInGroup. While this happened to work on some platforms,
+    // on others this causes issues, e.g. on wasm;
+    //
+    // Keep this branch for compatibility with old compilers, but use the
+    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
+    // enough compiler is used).
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -231,7 +244,20 @@ public struct DiscardingTaskGroup {
 #endif
 
     // Create the task in this group.
+#if $BuiltinCreateAsyncDiscardingTaskInGroup
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
+#else
+    // This builtin happens to work, but the signature of the operation is
+    // incorrect, as the discarding group uses Void, and therefore has less
+    // generic parameters than the operation expected to be passed to
+    // createAsyncTaskInGroup. While this happened to work on some platforms,
+    // on others this causes issues, e.g. on wasm;
+    //
+    // Keep this branch for compatibility with old compilers, but use the
+    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
+    // enough compiler is used).
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+#endif
 
     return true
   }
@@ -247,7 +273,20 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
+    #if $BuiltinCreateAsyncDiscardingTaskInGroup
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
+    #else
+    // This builtin happens to work, but the signature of the operation is
+    // incorrect, as the discarding group uses Void, and therefore has less
+    // generic parameters than the operation expected to be passed to
+    // createAsyncTaskInGroup. While this happened to work on some platforms,
+    // on others this causes issues, e.g. on wasm;
+    //
+    // Keep this branch for compatibility with old compilers, but use the
+    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
+    // enough compiler is used).
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    #endif
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -278,7 +317,20 @@ public struct DiscardingTaskGroup {
     )
 
     // Create the task in this group.
+    #if $BuiltinCreateAsyncDiscardingTaskInGroup
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
+    #else
+    // This builtin happens to work, but the signature of the operation is
+    // incorrect, as the discarding group uses Void, and therefore has less
+    // generic parameters than the operation expected to be passed to
+    // createAsyncTaskInGroup. While this happened to work on some platforms,
+    // on others this causes issues, e.g. on wasm;
+    //
+    // Keep this branch for compatibility with old compilers, but use the
+    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
+    // enough compiler is used).
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    #endif
 
     return true
 #else
@@ -564,7 +616,20 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
+    #if $BuiltinCreateAsyncDiscardingTaskInGroup
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
+    #else
+    // This builtin happens to work, but the signature of the operation is
+    // incorrect, as the discarding group uses Void, and therefore has less
+    // generic parameters than the operation expected to be passed to
+    // createAsyncTaskInGroup. While this happened to work on some platforms,
+    // on others this causes issues, e.g. on wasm;
+    //
+    // Keep this branch for compatibility with old compilers, but use the
+    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
+    // enough compiler is used).
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    #endif
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -593,7 +658,20 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     )
 
     // Create the task in this group.
+    #if $BuiltinCreateAsyncDiscardingTaskInGroup
+    _ = Builtin.createAsyncDiscardingTaskInGroup(flags, _group, operation)
+    #else
+    // This builtin happens to work, but the signature of the operation is
+    // incorrect, as the discarding group uses Void, and therefore has less
+    // generic parameters than the operation expected to be passed to
+    // createAsyncTaskInGroup. While this happened to work on some platforms,
+    // on others this causes issues, e.g. on wasm;
+    //
+    // Keep this branch for compatibility with old compilers, but use the
+    // correct 'createAsyncDiscardingTaskInGroup' when available (and a recent
+    // enough compiler is used).
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    #endif
 
     return true
 #else

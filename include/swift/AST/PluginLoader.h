@@ -88,8 +88,9 @@ public:
   llvm::Expected<LoadedExecutablePlugin *>
   loadExecutablePlugin(llvm::StringRef path);
 
-  /// Add the specified path to the dependency tracker if needed.
-  void recordDependency(StringRef path);
+  /// Add the specified plugin associated with the module name to the dependency
+  /// tracker if needed.
+  void recordDependency(const PluginEntry &plugin, Identifier moduleName);
 };
 
 } // namespace swift

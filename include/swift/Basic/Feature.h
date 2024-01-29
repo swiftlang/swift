@@ -22,15 +22,13 @@ class LangOptions;
 
 /// Enumeration describing all of the named features.
 enum class Feature {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-FeatureName,
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) FeatureName,
 #include "swift/Basic/Features.def"
 };
 
 constexpr unsigned numFeatures() {
   enum Features {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-FeatureName,
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) FeatureName,
 #include "swift/Basic/Features.def"
     NumFeatures
   };

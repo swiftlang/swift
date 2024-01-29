@@ -235,49 +235,6 @@ extension ASTGenVisitor {
   }
 }
 
-// Misc visits.
-// TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
-extension ASTGenVisitor {
-  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl {
-    generate(decl: node.decl)
-  }
-
-  func generate(conditionElement node: ConditionElementSyntax) -> ASTNode {
-    // FIXME: returning ASTNode is wrong, non-expression conditions are not ASTNode.
-    switch node.condition {
-    case .availability(_):
-      break
-    case .expression(let node):
-      return .expr(self.generate(expr: node))
-    case .matchingPattern(_):
-      break
-    case .optionalBinding(_):
-      break
-    }
-    fatalError("unimplemented")
-  }
-
-  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
-    switch node.item {
-    case .decl(let node):
-      return .decl(self.generate(decl: node))
-    case .stmt(let node):
-      return .stmt(self.generate(stmt: node))
-    case .expr(let node):
-      return .expr(self.generate(expr: node))
-    }
-  }
-
-  func generate(arrayElement node: ArrayElementSyntax) -> BridgedExpr {
-    generate(expr: node.expression)
-  }
-
-  @inline(__always)
-  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate(codeBlockItem: $0).bridged }.bridgedArray(in: self)
-  }
-}
-
 // Forwarding overloads that take optional syntax nodes. These are defined on demand to achieve a consistent
 // 'self.generate(foo: FooSyntax)' recursion pattern between optional and non-optional inputs.
 extension ASTGenVisitor {
@@ -289,6 +246,11 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(expr node: ExprSyntax?) -> BridgedNullableExpr {
     node.map(generate(expr:)).asNullable
+  }
+
+  @inline(__always)
+  func generate(pattern node: PatternSyntax?) -> BridgedNullablePattern {
+    node.map(generate(pattern:)).asNullable
   }
 
   @inline(__always)

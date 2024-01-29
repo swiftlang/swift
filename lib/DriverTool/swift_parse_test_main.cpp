@@ -153,7 +153,7 @@ struct ASTGenExecutor {
     symbolgraphgen::SymbolGraphOptions symbolOpts;
 
     // Enable ASTGen.
-    langOpts.Features.insert(Feature::ParserASTGen);
+    langOpts.enableFeature(Feature::ParserASTGen);
 
     std::unique_ptr<ASTContext> ctx(
         ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,

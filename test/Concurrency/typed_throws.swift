@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TypedThrows
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: concurrency
 

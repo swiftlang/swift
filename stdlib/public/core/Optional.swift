@@ -782,3 +782,5 @@ extension Optional: _ObjectiveCBridgeable {
 #endif
 
 extension Optional: Sendable where Wrapped: Sendable { }
+
+extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }

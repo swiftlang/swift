@@ -42,9 +42,9 @@ func funcdecl5(_ a: Int, _ y: Int) {
   func6({($0) + $0})    // // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 
-  var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
+  var testfunc : ((), Int) -> Int  // expected-note 2 {{'testfunc' declared here}}
   testfunc({$0+1})  // expected-error {{missing argument for parameter #2 in call}}
-  // expected-error@-1 {{cannot convert value of type '(Int) -> Int' to expected argument type '()'}}
+  // expected-error@-1 {{closure passed to parameter of type '()' that does not accept a closure}}
 
   funcdecl5(1, 2) // recursion.
 

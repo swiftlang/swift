@@ -87,6 +87,15 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
   return Type();
 }
 
+bool swift::isInterfaceTypeNoncopyable(Type type, GenericEnvironment *env) {
+  assert(!type->hasTypeParameter() || env && "must have a generic environment");
+
+  if (env)
+    type = env->mapTypeIntoContext(type);
+
+  return type->isNoncopyable();
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -264,7 +273,7 @@ static void checkInheritanceClause(
       // Noncopyable types cannot have a raw type until there is support for
       // generics, since the raw type here is only useful if we'll generate
       // a conformance to RawRepresentable, which is currently disabled.
-      if (enumDecl->canBeNoncopyable()) {
+      if (!enumDecl->canBeCopyable()) {
         // TODO: getRemovalRange is not yet aware of ~Copyable entries so it
         // will accidentally delete commas or colons that are needed.
         diags.diagnose(inherited.getSourceRange().Start,
@@ -1396,8 +1405,8 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    auto ref = TypeChecker::conformsToProtocol(
-        superclassType, decodableProto, classDecl->getParentModule());
+    auto ref = classDecl->getParentModule()->lookupConformance(
+        superclassType, decodableProto);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1425,8 +1434,8 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      auto ref = TypeChecker::conformsToProtocol(
-          superclassType, encodableProto, classDecl->getParentModule());
+      auto ref = classDecl->getParentModule()->lookupConformance(
+          superclassType, encodableProto);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
@@ -1653,8 +1662,8 @@ static void diagnoseRetroactiveConformances(
     proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
 
       // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = TypeChecker::conformsToProtocol(
-          extendedType, decl, ext->getParentModule());
+      auto conformanceRef = ext->getParentModule()->lookupConformance(
+          extendedType, decl);
       if (!conformanceRef.isConcrete()) {
 
         return TypeWalker::Action::Continue;
@@ -1673,7 +1682,7 @@ static void diagnoseRetroactiveConformances(
         // However, if this is the protocol in the inherited type entry,
         // check to make sure it's not erroneously marked @retroactive when it's
         // not actually retroactive.
-        if (decl == proto && entry.isRetroactive) {
+        if (decl == proto && entry.isRetroactive()) {
           auto loc = entry.getTypeRepr()->findAttrLoc(TAK_retroactive);
           bool typeIsSameModule =
               extTypeModule->isSameModuleLookingThroughOverlays(module);
@@ -1688,7 +1697,7 @@ static void diagnoseRetroactiveConformances(
       }
 
       // If it's marked @retroactive, no need to warn.
-      if (entry.isRetroactive) {
+      if (entry.isRetroactive()) {
         return TypeWalker::Action::Continue;
       }
 
@@ -2443,26 +2452,6 @@ public:
     
     checkForEmptyOptionSet(VD);
 
-    // Under the Swift 3 inference rules, if we have @IBInspectable or
-    // @GKInspectable but did not infer @objc, warn that the attribute is
-    auto &DE = getASTContext().Diags;
-    if (!VD->isObjC() &&
-        VD->getASTContext().LangOpts.EnableSwift3ObjCInference) {
-      if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
-        DE.diagnose(attr->getLocation(),
-                    diag::attribute_meaningless_when_nonobjc,
-                    attr->getAttrName())
-            .fixItRemove(attr->getRange());
-      }
-
-      if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
-        DE.diagnose(attr->getLocation(),
-                    diag::attribute_meaningless_when_nonobjc,
-                    attr->getAttrName())
-            .fixItRemove(attr->getRange());
-      }
-    }
-
     // Now check all the accessors.
     VD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
@@ -2473,9 +2462,10 @@ public:
     //
     // NOTE: We do this here instead of TypeCheckAttr since types are not
     // completely type checked at that point.
+    auto &DE = getASTContext().Diags;
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
-        if (nom->canBeNoncopyable()) {
+        if (!nom->canBeCopyable()) {
           DE.diagnose(attr->getLocation(),
                       diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
@@ -2699,7 +2689,8 @@ public:
       // accessors since this means that we cannot call mutating methods without
       // copying. We do not want to support types that one cannot define a
       // modify operation via a get/set or a modify.
-      if (var->getInterfaceType()->isNoncopyable(DC)) {
+      if (isInterfaceTypeNoncopyable(var->getInterfaceType(),
+                                     DC->getGenericEnvironmentOfContext())) {
         if (auto *read = var->getAccessor(AccessorKind::Read)) {
           if (!read->isImplicit()) {
             if (auto *set = var->getAccessor(AccessorKind::Set)) {
@@ -2789,7 +2780,8 @@ public:
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (SD->getElementInterfaceType()->isNoncopyable(DC)) {
+    if (isInterfaceTypeNoncopyable(SD->getElementInterfaceType(),
+                                   SD->getGenericEnvironment())) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {
@@ -2865,6 +2857,16 @@ public:
                     diag::recursive_decl_reference, AT);
         AT->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
       }
+    }
+
+    // An associated type that was introduced after the protocol
+    auto module = AT->getDeclContext()->getParentModule();
+    if (!defaultType &&
+        module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+        AvailabilityInference::availableRange(proto, Ctx)
+          .isSupersetOf(AvailabilityInference::availableRange(AT, Ctx))) {
+      AT->diagnose(
+          diag::resilient_associated_type_less_available_requires_default, AT);
     }
   }
 
@@ -2979,7 +2981,7 @@ public:
     // NonCopyableChecks
     //
 
-    if (ED->isObjC() && ED->canBeNoncopyable()) {
+    if (ED->isObjC() && !ED->canBeCopyable()) {
       ED->diagnose(diag::noncopyable_objc_enum);
     }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
@@ -2994,7 +2996,7 @@ public:
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
-    if (ED->canBeNoncopyable()) {
+    if (!ED->canBeCopyable()) {
       if (ED->isIndirect())
         ED->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                      ED->getBaseIdentifier());
@@ -3151,7 +3153,7 @@ public:
                                                    NominalTypeDecl *moveonlyType,
                                                    Type type) {
     assert(type && "got an empty type?");
-    assert(moveonlyType->canBeNoncopyable());
+    assert(!moveonlyType->canBeCopyable());
 
     // no need to emit a diagnostic if the type itself is already problematic.
     if (type->hasError())
@@ -3177,7 +3179,7 @@ public:
       return; // taken care of elsewhere.
 
     if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl)) {
-      if (!nomDecl->canBeNoncopyable())
+      if (nomDecl->canBeCopyable())
         return;
 
       // go over the all protocols directly conformed-to by this nominal
@@ -3187,7 +3189,7 @@ public:
 
     } else if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       if (auto *nomDecl = extension->getExtendedNominal()) {
-        if (!nomDecl->canBeNoncopyable())
+        if (nomDecl->canBeCopyable())
           return;
 
         // go over the all types directly conformed-to by the extension
@@ -4013,7 +4015,7 @@ public:
     // that would require the ability to wrap one inside an optional
     if (CD->isFailable()) {
       if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
-        if (nom->canBeNoncopyable()) {
+        if (!nom->canBeCopyable()) {
           CD->diagnose(diag::noncopyable_failable_init);
         }
       }
@@ -4040,7 +4042,7 @@ public:
 
       } else if (!haveFeature(Feature::NoncopyableGenerics)
                   && !isa<ClassDecl>(nom)
-                  && !nom->canBeNoncopyable()) {
+                  && nom->canBeCopyable()) {
         // When we have NoncopyableGenerics, deinits get validated as part of
         // Copyable-conformance checking.
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
@@ -4050,7 +4052,7 @@ public:
       // feature flag is set.
       if (!haveFeature(Feature::MoveOnlyEnumDeinits)
           && isa<EnumDecl>(nom)
-          && nom->canBeNoncopyable()) {
+          && !nom->canBeCopyable()) {
         DD->diagnose(diag::destructor_decl_on_noncopyable_enum);
       }
     }
@@ -4175,7 +4177,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // is not move only. It is redundant.
     if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
-        if (nom->canBeNoncopyable()) {
+        if (!nom->canBeCopyable()) {
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
         }

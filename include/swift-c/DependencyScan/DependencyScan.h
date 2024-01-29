@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 0
-#define SWIFTSCAN_VERSION_MINOR 6
+#define SWIFTSCAN_VERSION_MINOR 7
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -505,9 +505,25 @@ SWIFTSCAN_PUBLIC void swiftscan_cas_dispose(swiftscan_cas_t cas);
 /// swift input on the command-line by convention. Return \c CacheKey as string.
 /// If error happens, the error message is returned via `error` parameter, and
 /// caller needs to free the error message via `swiftscan_string_dispose`.
+/// This API is DEPRECATED and in favor of using
+/// `swiftscan_cache_compute_key_from_input_index`.
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_cache_compute_key(swiftscan_cas_t cas, int argc, const char **argv,
                             const char *input, swiftscan_string_ref_t *error);
+
+/// Compute \c CacheKey for the outputs of a primary input file from a compiler
+/// invocation with command-line \c argc and \c argv and the index for the
+/// input. The index of the input is computed from the position of the input
+/// file from all input files. When primary input file is not available for
+/// compilation, e.g., using WMO, primary file is the first swift input on the
+/// command-line by convention. Return \c CacheKey as string. If error happens,
+/// the error message is returned via `error` parameter, and caller needs to
+/// free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_cache_compute_key_from_input_index(swiftscan_cas_t cas, int argc,
+                                             const char **argv,
+                                             unsigned input_index,
+                                             swiftscan_string_ref_t *error);
 
 /// Query the result of the compilation using the output cache key. \c globally
 /// suggests if the lookup should check remote cache if such operation exists.

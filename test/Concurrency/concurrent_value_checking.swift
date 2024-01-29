@@ -86,7 +86,9 @@ extension A1 {
     _ = await self.asynchronous(nil)
 
     // Across to a different actor, so Sendable restriction is enforced.
-    _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' in asynchronous access to actor-isolated property 'localLet' cannot cross actor boundary}}
+    _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' in implicitly asynchronous access to actor-isolated property 'localLet' cannot cross actor boundary}}
+    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-2 {{property access is 'async'}}
     _ = await other.synchronous() // expected-warning{{non-sendable type 'NotConcurrent?' returned by call to actor-isolated function cannot cross actor boundary}}
     _ = await other.asynchronous(nil) // expected-complete-warning{{passing argument of non-sendable type 'NotConcurrent?' into actor-isolated context may introduce data races}}
   }
@@ -188,7 +190,7 @@ func testConcurrency() {
   acceptConcurrent {
     print(x) // expected-warning{{capture of 'x' with non-sendable type 'NotConcurrent' in a `@Sendable` closure}}
     print(y) // expected-warning{{capture of 'y' with non-sendable type 'NotConcurrent' in a `@Sendable` closure}}
-    // expected-error@-1{{reference to captured var 'y' in concurrently-executing code}}
+    // expected-warning@-1{{reference to captured var 'y' in concurrently-executing code}}
   }
 }
 
@@ -230,7 +232,7 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
 // Sendable restriction on nonisolated declarations.
 // ----------------------------------------------------------------------
 actor ANI {
-  nonisolated let nc = NC()
+  nonisolated let nc = NC() // expected-warning {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NC'; this is an error in Swift 6}}
   nonisolated func f() -> NC? { nil }
 }
 
@@ -271,7 +273,8 @@ typealias CF = @Sendable () -> NotConcurrent?
 typealias BadGenericCF<T> = @Sendable () -> T?
 typealias GoodGenericCF<T: Sendable> = @Sendable () -> T? // okay
 
-var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil
+var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil // expected-warning{{var 'concurrentFuncVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+// expected-note@-1 {{isolate 'concurrentFuncVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on @Sendable closures.
@@ -340,6 +343,26 @@ class C6: C5 {
 final class C7<T>: Sendable { }
 
 class C9: Sendable { } // expected-warning{{non-final class 'C9' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+
+@globalActor
+struct SomeActor {
+  static let shared = A1()
+}
+
+class NotSendable {}
+
+// actor-isolated mutable properties are valid
+final class C10: Sendable { // expected-warning{{default initializer for 'C10' cannot be both nonisolated and main actor-isolated}}
+  @MainActor var x = 0
+  @MainActor var ns1 : NotSendable? // expected-note{{initializer for property 'ns1' is main actor-isolated}}
+  @MainActor let ns : NotSendable? = nil
+}
+
+final class C14: Sendable { // expected-warning{{default initializer for 'C14' cannot be both nonisolated and global actor 'SomeActor'-isolated}}
+  @SomeActor var y = 1
+  @SomeActor var nc = NotConcurrent() // expected-note{{initializer for property 'nc' is global actor 'SomeActor'-isolated}}
+  @SomeActor let nc1 = NotConcurrent()
+}
 
 extension NotConcurrent {
   func f() { }

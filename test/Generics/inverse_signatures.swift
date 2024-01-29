@@ -70,6 +70,15 @@ func withSomeProto(_ t: some NoCopyP) {}
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Escapable>
 func withInverseSome(_ t: borrowing some ~Copyable) {}
 
+// CHECK-LABEL: .checkAnyObject@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : AnyObject, τ_0_0 : Copyable, τ_0_0 : Escapable>
+func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {}
+
+// CHECK-LABEL: .checkSoup@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Soup>
+class Soup {}
+func checkSoup<T>(_ t: T) where T: Soup {}
+
 // CHECK-LABEL: .S1@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>
 struct S1<T> {}

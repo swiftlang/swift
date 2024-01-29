@@ -283,6 +283,8 @@ public:
 
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
+  virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
   virtual llvm::Optional<Type>
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) = 0;

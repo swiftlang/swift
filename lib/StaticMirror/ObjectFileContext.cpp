@@ -90,7 +90,7 @@ void Image::scanMachO(const llvm::object::MachOObjectFile *O) {
     }
 
     // The offset from the symbol is stored at the target address.
-    uint64_t Offset;
+    uint64_t Offset = 0;
     auto OffsetContent =
         getContentsAtAddress(bind.address(), O->getBytesInAddress());
     if (OffsetContent.empty())

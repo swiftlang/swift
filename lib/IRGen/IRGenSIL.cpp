@@ -2712,9 +2712,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         llvm::errs()
             << "Instruction missing on-stack pack metadata cleanups!\n";
         I.print(llvm::errs());
-        llvm::errs() << "\n In function";
+        llvm::errs() << "\n In function:\n";
         CurSILFn->print(llvm::errs());
-        llvm::errs() << "Allocated the following on-stack pack metadata:";
+        llvm::errs() << "Allocated the following on-stack pack metadata:\n";
         for (auto pair : OutstandingStackPackAllocs) {
           StackAddress addr;
           llvm::Value *shape;
@@ -2722,10 +2722,10 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           std::tie(addr, shape, kind) = pair;
           switch ((GenericRequirement::Kind)kind) {
           case GenericRequirement::Kind::MetadataPack:
-            llvm::errs() << "Metadata Pack: ";
+            llvm::errs() << "- Metadata Pack: ";
             break;
           case GenericRequirement::Kind::WitnessTablePack:
-            llvm::errs() << "Witness Table Pack: ";
+            llvm::errs() << "- Witness Table Pack: ";
             break;
           default:
             llvm_unreachable("bad requirement in stack pack alloc");
@@ -3097,7 +3097,7 @@ void IRGenSILFunction::visitGlobalValueInst(GlobalValueInst *i) {
                                                 NotForDefinition).getAddress();
   // We don't need to initialize the global object if it's never used for
   // something which can access the object header.
-  if (!i->isBare() && !IGM.canMakeStaticObjectsReadOnly()) {
+  if (!i->isBare() && !IGM.canMakeStaticObjectReadOnly(var->getLoweredType())) {
     auto ClassType = loweredTy.getASTType();
     llvm::Value *Metadata =
       emitClassHeapMetadataRef(*this, ClassType, MetadataValueType::TypeMetadata,
@@ -4832,9 +4832,13 @@ void IRGenSILFunction::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
     auto &EIS = getEnumImplStrategy(IGM, inst->getEnumOperand()->getType());
     // If this is testing for one case, do simpler codegen.  This is
     // particularly common when testing optionals.
+    const auto &TI = IGM.getTypeInfo(inst->getEnumOperand()->getType());
     auto isTrue = EIS.emitIndirectCaseTest(*this,
                                            inst->getEnumOperand()->getType(),
-                                           value, inst->getCase(0).first);
+                                           value, inst->getCase(0).first,
+                                           shouldOutlineEnumValueOperation(TI,
+                                                                           IGM)
+                                           /*noLoad*/);
     emitSingleEnumMemberSelectResult(*this, SelectEnumOperation(inst), isTrue,
                                      result);
   } else {

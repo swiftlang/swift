@@ -41,6 +41,8 @@
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
 
+#include <fstream>
+
 using namespace swift;
 
 llvm::cl::opt<bool> SILPrintAll(
@@ -66,6 +68,20 @@ llvm::cl::opt<bool> SILPrintLast(
 llvm::cl::opt<std::string> SILNumOptPassesToRun(
     "sil-opt-pass-count", llvm::cl::init(""),
     llvm::cl::desc("Stop optimizing after <N> passes or <N>.<M> passes/sub-passes"));
+
+// Read pass counts for each module from a config file.
+// Config file format:
+//   <module-name>:<pass-count>(.<sub-pass-count>)?
+//
+// This is useful for bisecting passes in large projects:
+//   1. create a config file from a full build log. E.g. with
+//        grep -e '-module-name' build.log  | sed -e 's/.*-module-name \([^ ]*\) .*/\1:10000000/' | sort | uniq > config.txt
+//   2. add the `-Xllvm -sil-pass-count-config-file config.txt` option to the project settings
+//   3. bisect by modifying the counts in the config file
+//   4. clean-rebuild after each bisecting step
+llvm::cl::opt<std::string> SILPassCountConfigFile(
+    "sil-pass-count-config-file", llvm::cl::init(""),
+    llvm::cl::desc("Read optimization counts from file"));
 
 llvm::cl::opt<unsigned> SILOptProfileRepeat(
     "sil-opt-profile-repeat", llvm::cl::init(1),
@@ -382,19 +398,25 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
   if (!SILNumOptPassesToRun.empty()) {
-    StringRef countsStr = SILNumOptPassesToRun;
-    bool validFormat = true;
-    if (countsStr.consumeInteger(10, maxNumPassesToRun))
-      validFormat = false;
-    if (countsStr.startswith(".")) {
-      countsStr = countsStr.drop_front(1);
-      if (countsStr.consumeInteger(10, maxNumSubpassesToRun))
-        validFormat = false;
-    }
-    if (!validFormat || !countsStr.empty()) {
-      llvm::errs() << "error: wrong format of -sil-opt-pass-count option\n";
+    parsePassCount(SILNumOptPassesToRun);
+  } else if (!SILPassCountConfigFile.empty()) {
+    StringRef moduleName = M->getSwiftModule()->getName().str();
+    std::fstream fs(SILPassCountConfigFile);
+    if (!fs) {
+      llvm::errs() << "cannot open pass count config file\n";
       exit(1);
     }
+    std::string line;
+    while (std::getline(fs, line)) {
+      auto pair = StringRef(line).split(":");
+      StringRef modName = pair.first;
+      StringRef countsStr = pair.second;
+      if (modName == moduleName) {
+        parsePassCount(countsStr);
+        break;
+      }
+    }
+    fs.close();
   }
 
   for (SILAnalysis *A : Analyses) {
@@ -405,6 +427,21 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
       new PassManagerDeserializationNotificationHandler(this));
   deserializationNotificationHandler = handler.get();
   M->registerDeserializationNotificationHandler(std::move(handler));
+}
+
+void SILPassManager::parsePassCount(StringRef countsStr) {
+  bool validFormat = true;
+  if (countsStr.consumeInteger(10, maxNumPassesToRun))
+    validFormat = false;
+  if (countsStr.startswith(".")) {
+    countsStr = countsStr.drop_front(1);
+    if (countsStr.consumeInteger(10, maxNumSubpassesToRun))
+      validFormat = false;
+  }
+  if (!validFormat || !countsStr.empty()) {
+    llvm::errs() << "error: wrong format of -sil-opt-pass-count option\n";
+    exit(1);
+  }
 }
 
 bool SILPassManager::continueTransforming() {

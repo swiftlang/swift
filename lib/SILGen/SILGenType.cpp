@@ -307,7 +307,7 @@ public:
     IsSerialized_t serialized = IsNotSerialized;
     auto classIsPublic = theClass->getEffectiveAccess() >= AccessLevel::Public;
     // Only public, fixed-layout classes should have serialized vtables.
-    if (classIsPublic && !theClass->hasPackageAccess() && !isResilient)
+    if (classIsPublic && !isResilient)
       serialized = IsSerialized;
 
     // Finally, create the vtable.
@@ -834,9 +834,21 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // archetypes of the witness thunk generic environment.
   auto witnessSubs = witness.getSubstitutions();
 
+  // If the conformance is marked as `@preconcurrency` instead of
+  // emitting a hop to the executor (when needed) emit a dynamic check
+  // to make sure that witness has been unsed in the expected context.
+  bool isPreconcurrency = false;
+  if (conformance.isConcrete()) {
+    if (auto *C =
+            dyn_cast<NormalProtocolConformance>(conformance.getConcrete()))
+      isPreconcurrency = C->isPreconcurrency();
+  }
+
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree, /*isSelfConformance*/ false,
+                          witnessSubs, isFree,
+                          /*isSelfConformance*/ false,
+                          isPreconcurrency,
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
@@ -910,7 +922,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement, witnessSubs,
-                          isFree, /*isSelfConformance*/ true, llvm::None);
+                          isFree, /*isSelfConformance*/ true,
+                          /*isPreconcurrency*/ false, llvm::None);
 
   SGM.emitLazyConformancesForFunction(f);
 
@@ -1080,7 +1093,7 @@ void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
   auto serialized = IsSerialized_t::IsNotSerialized;
   bool nomIsPublic = nom->getEffectiveAccess() >= AccessLevel::Public;
   // We only serialize the deinit if the type is public and not resilient.
-  if (nomIsPublic && !nom->hasPackageAccess() && !nom->isResilient())
+  if (nomIsPublic && !nom->isResilient())
     serialized = IsSerialized;
   SILMoveOnlyDeinit::create(f->getModule(), nom, serialized, f);
 }
@@ -1113,7 +1126,7 @@ public:
 
     // If this is a nominal type that is move only, emit a deinit table for it.
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->canBeNoncopyable()) {
+      if (!nom->canBeCopyable()) {
         SGM.emitNonCopyableTypeDeinitTable(nom);
       }
     }
@@ -1178,7 +1191,7 @@ public:
     if (auto *cd = dyn_cast<ClassDecl>(theType))
       return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->canBeNoncopyable()) {
+      if (!nom->canBeCopyable()) {
         return SGM.emitMoveOnlyDestructor(nom, dd);
       }
     }

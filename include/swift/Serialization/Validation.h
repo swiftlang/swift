@@ -82,7 +82,11 @@ enum class Status {
 
   /// The module file was built with a different SDK than the one in use
   /// to build the client.
-  SDKMismatch
+  SDKMismatch,
+
+  /// The module file was not built with support for NoncopyableGenerics,
+  /// yet that is required to by this compiler.
+  NotUsingNoncopyableGenerics,
 };
 
 /// Returns the string for the Status enum.
@@ -249,6 +253,8 @@ struct SearchPath {
 /// refers directly into this buffer.
 /// \param requiresOSSAModules If true, necessitates the module to be
 /// compiled with -enable-ossa-modules.
+/// \param requiresNoncopyableGenerics requires the module to have been built
+/// with the feature \c NoncopyableGenerics enabled.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
 /// \param[out] extendedInfo If present, will be populated with additional
@@ -257,7 +263,8 @@ struct SearchPath {
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
+    StringRef data, bool requiresOSSAModules, bool requiresNoncopyableGenerics,
+    StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,

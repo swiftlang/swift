@@ -13,7 +13,7 @@
 #if (os(macOS) || os(Linux)) && (arch(x86_64) || arch(arm64))
 
 #if canImport(Darwin)
-import Darwin.C
+import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(CRT)
@@ -510,6 +510,22 @@ Generate a backtrace for the parent process.
 
     writeln("Backtrace took \(formattedDuration)s")
     writeln("")
+
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    // On Darwin, if Developer Mode is turned off, or we can't tell if it's
+    // on or not, disable interactivity
+    var developerMode: Int32 = 0
+    var developerModeSize: Int = MemoryLayout<Int32>.size
+    if args.interactive
+         && (sysctlbyname("security.mac.amfi.developer_mode_status",
+                         &developerMode,
+                         &developerModeSize,
+                         nil,
+                         0) == -1
+               || developerMode == 0) {
+      args.interactive = false
+    }
+    #endif
 
     if args.interactive {
       // Make sure we're line buffered

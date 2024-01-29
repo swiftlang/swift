@@ -6,7 +6,6 @@ set(LLVM_ENABLE_PROJECTS
     CACHE STRING "")
 
 set(LLVM_EXTERNAL_PROJECTS
-      cmark
       swift
     CACHE STRING "")
 
@@ -124,8 +123,10 @@ set(LLVM_TOOLCHAIN_TOOLS
 set(CLANG_TOOLS
       clang
       clangd
+      clang-deps-launcher
       clang-format
       clang-resource-headers
+      clang-scan-deps
       clang-tidy
     CACHE STRING "")
 
@@ -139,7 +140,7 @@ set(LLDB_TOOLS
       lldb-argdumper
       lldb-python-scripts
       lldb-server
-      lldb-vscode
+      lldb-dap
       repl_swift
     CACHE STRING "")
 
@@ -150,6 +151,7 @@ set(SWIFT_INSTALL_COMPONENTS
       editor-integration
       tools
       sourcekit-inproc
+      static-mirror-lib
       swift-remote-mirror
       swift-remote-mirror-headers
       swift-syntax-lib

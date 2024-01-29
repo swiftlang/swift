@@ -159,6 +159,8 @@ public:
 
   const InputFile &getFirstOutputProducingInput() const;
 
+  unsigned getIndexOfFirstOutputProducingInput() const;
+
   bool isInputPrimary(StringRef file) const;
 
   unsigned numberOfPrimaryInputsEndingWith(StringRef extension) const;

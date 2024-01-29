@@ -97,7 +97,7 @@ LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
   LinkEntity entity;
   entity.Pointer = G;
   entity.SecondaryPointer = nullptr;
-  auto kind = (G->isInitializedObject() && IGM.canMakeStaticObjectsReadOnly() ?
+  auto kind = (G->isInitializedObject() && IGM.canMakeStaticObjectReadOnly(G->getLoweredType()) ?
                 Kind::ReadOnlyGlobalObject : Kind::SILGlobalVariable);
   entity.Data = unsigned(kind) << KindShift;
   return entity;

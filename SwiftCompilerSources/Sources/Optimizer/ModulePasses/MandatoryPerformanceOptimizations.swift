@@ -167,11 +167,6 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return true
   }
 
-  if apply.parentFunction.hasOwnership && !callee.hasOwnership {
-    // Cannot inline a non-ossa function into an ossa function
-    return false
-  }
-
   if apply is BeginApplyInst {
     // Avoid co-routines because they might allocate (their context).
     return true

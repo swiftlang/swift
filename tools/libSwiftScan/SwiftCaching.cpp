@@ -38,7 +38,9 @@
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/VirtualOutputBackend.h"
@@ -73,19 +75,19 @@ struct SwiftCachedCompilationHandle {
   SwiftCachedCompilationHandle(llvm::cas::ObjectRef Key,
                                llvm::cas::ObjectRef Output,
                                clang::cas::CompileJobCacheResult &&Result,
-                               llvm::StringRef Input, SwiftScanCAS &CAS)
-      : Key(Key), Output(Output), CorrespondingInput(Input), Result(Result),
+                               unsigned InputIndex, SwiftScanCAS &CAS)
+      : Key(Key), Output(Output), InputIndex(InputIndex), Result(Result),
         DB(CAS) {}
   SwiftCachedCompilationHandle(llvm::cas::ObjectRef Key,
                                llvm::cas::ObjectRef Output,
                                swift::cas::CompileJobCacheResult &&Result,
-                               llvm::StringRef Input, SwiftScanCAS &CAS)
-      : Key(Key), Output(Output), CorrespondingInput(Input), Result(Result),
+                               unsigned InputIndex, SwiftScanCAS &CAS)
+      : Key(Key), Output(Output), InputIndex(InputIndex), Result(Result),
         DB(CAS) {}
 
   llvm::cas::ObjectRef Key;
   llvm::cas::ObjectRef Output;
-  std::string CorrespondingInput;
+  unsigned InputIndex;
   std::variant<swift::cas::CompileJobCacheResult,
                clang::cas::CompileJobCacheResult>
       Result;
@@ -201,10 +203,67 @@ computeCacheKey(llvm::cas::ObjectStore &CAS, llvm::ArrayRef<const char *> Args,
   if (!BaseKey)
     return BaseKey.takeError();
 
-  auto Key = swift::createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputPath);
+  // Parse the arguments to figure out the index for the input.
+  swift::CompilerInvocation Invocation;
+  swift::SourceManager SourceMgr;
+  swift::DiagnosticEngine Diags(SourceMgr);
+  llvm::SmallString<128> workingDirectory;
+  llvm::sys::fs::current_path(workingDirectory);
+  llvm::SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4>
+      configurationFileBuffers;
+
+  std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(
+      "swift-frontend", (void *)swiftscan_cache_replay_compilation);
+
+  // Drop the `-frontend` option if it is passed.
+  if (llvm::StringRef(Args.front()) == "-frontend")
+    Args = Args.drop_front();
+
+  if (Invocation.parseArgs(Args, Diags, &configurationFileBuffers,
+                           workingDirectory, MainExecutablePath))
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "Argument parsing failed");
+
+  auto computeKey = [&](unsigned Index) -> llvm::Expected<std::string> {
+    auto Key = swift::createCompileJobCacheKeyForOutput(CAS, *BaseKey, Index);
+    if (!Key)
+      return Key.takeError();
+    return CAS.getID(*Key).toString();
+  };
+  auto AllInputs =
+      Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs();
+  // First pass, check for path equal.
+  for (unsigned Idx = 0; Idx < AllInputs.size(); ++Idx) {
+    if (AllInputs[Idx].getFileName() == InputPath)
+      return computeKey(Idx);
+  }
+
+  // If not found, slow second iteration with real_path.
+  llvm::SmallString<256> InputRealPath;
+  llvm::sys::fs::real_path(InputPath, InputRealPath, true);
+  for (unsigned Idx = 0; Idx < AllInputs.size(); ++Idx) {
+    llvm::SmallString<256> TestRealPath;
+    llvm::sys::fs::real_path(AllInputs[Idx].getFileName(), TestRealPath, true);
+    if (InputRealPath == TestRealPath)
+      return computeKey(Idx);
+  }
+
+  return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                 "requested input not found from invocation");
+}
+
+static llvm::Expected<std::string>
+computeCacheKeyFromIndex(llvm::cas::ObjectStore &CAS,
+                         llvm::ArrayRef<const char *> Args,
+                         unsigned InputIndex) {
+  auto BaseKey = swift::createCompileJobBaseCacheKey(CAS, Args);
+  if (!BaseKey)
+    return BaseKey.takeError();
+
+  auto Key =
+      swift::createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputIndex);
   if (!Key)
     return Key.takeError();
-
   return CAS.getID(*Key).toString();
 }
 
@@ -216,6 +275,26 @@ swiftscan_cache_compute_key(swiftscan_cas_t cas, int argc, const char **argv,
     Compilation.push_back(argv[i]);
 
   auto ID = computeCacheKey(unwrap(cas)->getCAS(), Compilation, input);
+  if (!ID) {
+    *error =
+        swift::c_string_utils::create_clone(toString(ID.takeError()).c_str());
+    return swift::c_string_utils::create_null();
+  }
+  *error = swift::c_string_utils::create_null();
+  return swift::c_string_utils::create_clone(ID->c_str());
+}
+
+swiftscan_string_ref_t
+swiftscan_cache_compute_key_from_input_index(swiftscan_cas_t cas, int argc,
+                                             const char **argv,
+                                             unsigned input_index,
+                                             swiftscan_string_ref_t *error) {
+  std::vector<const char *> Compilation;
+  for (int i = 0; i < argc; ++i)
+    Compilation.push_back(argv[i]);
+
+  auto ID =
+      computeCacheKeyFromIndex(unwrap(cas)->getCAS(), Compilation, input_index);
   if (!ID) {
     *error =
         swift::c_string_utils::create_clone(toString(ID.takeError()).c_str());
@@ -259,6 +338,9 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
     return KeyProxy.takeError();
   auto Input = KeyProxy->getData();
 
+  unsigned Index =
+      llvm::support::endian::read<uint32_t, llvm::support::little,
+                                  llvm::support::unaligned>(Input.data());
   {
     swift::cas::CompileJobResultSchema Schema(CAS.getCAS());
     if (Schema.isRootNode(*Proxy)) {
@@ -266,7 +348,7 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
       if (!Result)
         return Result.takeError();
       return new SwiftCachedCompilationHandle(KeyProxy->getRef(), *Ref,
-                                              std::move(*Result), Input, CAS);
+                                              std::move(*Result), Index, CAS);
     }
   }
   {
@@ -276,7 +358,7 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
       if (!Result)
         return Result.takeError();
       return new SwiftCachedCompilationHandle(KeyProxy->getRef(), *Ref,
-                                              std::move(*Result), Input, CAS);
+                                              std::move(*Result), Index, CAS);
     }
   }
   return createUnsupportedSchemaError();
@@ -696,6 +778,12 @@ swiftscan_cache_replay_instance_create(int argc, const char **argv,
     return nullptr;
   }
 
+  // Clear the LLVMArgs as `llvm::cl::ParseCommandLineOptions` is not
+  // thread-safe to be called in libSwiftScan. The replay instance should not be
+  // used to do compilation so clearing `-Xllvm` should not affect replay
+  // result.
+  Instance->Invocation.getFrontendOptions().LLVMArgs.clear();
+
   return wrap(Instance);
 }
 
@@ -759,13 +847,10 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   auto &InputsAndOutputs =
       Instance.Invocation.getFrontendOptions().InputsAndOutputs;
   auto AllInputs = InputsAndOutputs.getAllInputs();
-  auto Input = llvm::find_if(AllInputs, [&](const InputFile &Input) {
-    return Input.getFileName() == Comp.CorrespondingInput;
-  });
-  if (Input == AllInputs.end())
+  if (Comp.InputIndex >= AllInputs.size())
     return createStringError(inconvertibleErrorCode(),
-                             "InputFile \"" + Comp.CorrespondingInput +
-                                 "\" is not part of the compilation");
+                             "InputFile index too large for compilation");
+  const auto &Input = AllInputs[Comp.InputIndex];
 
   // Setup DiagnosticsConsumers.
   // FIXME: Reduce code duplication against `performFrontend()` and add support
@@ -793,10 +878,10 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
 
   // Collect the file that needs to write.
   DenseMap<file_types::ID, std::string> Outputs;
-  if (!Input->outputFilename().empty())
+  if (!Input.outputFilename().empty())
     Outputs.try_emplace(InputsAndOutputs.getPrincipalOutputType(),
-                        Input->outputFilename());
-  Input->getPrimarySpecificPaths().SupplementaryOutputs.forEachSetOutputAndType(
+                        Input.outputFilename());
+  Input.getPrimarySpecificPaths().SupplementaryOutputs.forEachSetOutputAndType(
       [&](const std::string &File, file_types::ID ID) {
         if (file_types::isProducedFromDiagnostics(ID))
           return;

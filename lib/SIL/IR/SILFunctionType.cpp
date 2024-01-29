@@ -222,8 +222,7 @@ SILFunctionType::getDifferentiabilityParameterIndices() {
   assert(isDifferentiable() && "Must be a differentiable function");
   SmallVector<unsigned, 8> paramIndices;
   for (auto paramAndIndex : enumerate(getParameters()))
-    if (paramAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable)
+    if (!paramAndIndex.value().hasOption(SILParameterInfo::NotDifferentiable))
       paramIndices.push_back(paramAndIndex.index());
   return IndexSubset::get(getASTContext(), getNumParameters(), paramIndices);
 }
@@ -234,8 +233,7 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
 
   // Check formal results.
   for (auto resultAndIndex : enumerate(getResults()))
-    if (resultAndIndex.value().getDifferentiability() !=
-        SILResultDifferentiability::NotDifferentiable)
+    if (!resultAndIndex.value().hasOption(SILResultInfo::NotDifferentiable))
       resultIndices.push_back(resultAndIndex.index());
 
   auto numSemanticResults = getNumResults();
@@ -254,8 +252,8 @@ IndexSubset *SILFunctionType::getDifferentiabilityResultIndices() {
     //
     // See TF-1305 for solution ideas. For now, `@noDerivative` `inout`
     // parameters are not treated as differentiability results.
-    if (resultParamAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable)
+    if (!resultParamAndIndex.value().hasOption(
+            SILParameterInfo::NotDifferentiable))
       resultIndices.push_back(getNumResults() + resultParamAndIndex.index());
 
   numSemanticResults += getNumAutoDiffSemanticResultsParameters();
@@ -300,22 +298,21 @@ SILFunctionType::getWithDifferentiability(DifferentiabilityKind kind,
          "Differentiability kind must be normal or linear");
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
-    auto &param = paramAndIndex.value();
+    auto param = paramAndIndex.value();
     unsigned index = paramAndIndex.index();
-    newParameters.push_back(param.getWithDifferentiability(
-        index < parameterIndices->getCapacity() &&
-                parameterIndices->contains(index)
-            ? SILParameterDifferentiability::DifferentiableOrNotApplicable
-            : SILParameterDifferentiability::NotDifferentiable));
+    newParameters.push_back(index < parameterIndices->getCapacity() &&
+                                    parameterIndices->contains(index)
+                                ? param - SILParameterInfo::NotDifferentiable
+                                : param | SILParameterInfo::NotDifferentiable);
   }
   SmallVector<SILResultInfo, 8> newResults;
   for (auto resultAndIndex : enumerate(getResults())) {
-    auto &result = resultAndIndex.value();
+    auto result = resultAndIndex.value();
     unsigned index = resultAndIndex.index();
-    newResults.push_back(result.getWithDifferentiability(
-        index < resultIndices->getCapacity() && resultIndices->contains(index)
-            ? SILResultDifferentiability::DifferentiableOrNotApplicable
-            : SILResultDifferentiability::NotDifferentiable));
+    newResults.push_back(index < resultIndices->getCapacity() &&
+                                 resultIndices->contains(index)
+                             ? result - SILResultInfo::NotDifferentiable
+                             : result | SILResultInfo::NotDifferentiable);
   }
   auto newExtInfo =
       getExtInfo().intoBuilder().withDifferentiabilityKind(kind).build();
@@ -335,13 +332,11 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
           .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable)
           .build();
   SmallVector<SILParameterInfo, 8> newParams;
-  for (auto &param : getParameters())
-    newParams.push_back(param.getWithDifferentiability(
-        SILParameterDifferentiability::DifferentiableOrNotApplicable));
+  for (SILParameterInfo param : getParameters())
+    newParams.push_back(param - SILParameterInfo::NotDifferentiable);
   SmallVector<SILResultInfo, 8> newResults;
-  for (auto &result : getResults())
-    newResults.push_back(result.getWithDifferentiability(
-        SILResultDifferentiability::DifferentiableOrNotApplicable));
+  for (SILResultInfo result : getResults())
+    newResults.push_back(result - SILResultInfo::NotDifferentiable);
   return SILFunctionType::get(
       getInvocationGenericSignature(), nondiffExtInfo, getCoroutineKind(),
       getCalleeConvention(), newParams, getYields(), newResults,
@@ -1589,8 +1584,7 @@ private:
         auto packTy = SILPackType::get(TC.Context, extInfo, {loweredParamTy});
 
         auto origFlags = param.getOrigFlags();
-        addPackParameter(packTy, origFlags.getValueOwnership(),
-                         origFlags.isNoDerivative());
+        addPackParameter(packTy, origFlags.getValueOwnership(), origFlags);
         return;
       }
 
@@ -1620,8 +1614,7 @@ private:
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
       auto origFlags = param.getOrigFlags();
-      addPackParameter(packTy, origFlags.getValueOwnership(),
-                       origFlags.isNoDerivative());
+      addPackParameter(packTy, origFlags.getValueOwnership(), origFlags);
     });
 
     // Process the self parameter.  But if we have a formal foreign self
@@ -1654,23 +1647,20 @@ private:
       bool indirect = true;
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, {substType});
-      return addPackParameter(packTy, flags.getValueOwnership(),
-                              flags.isNoDerivative());
+      return addPackParameter(packTy, flags.getValueOwnership(), flags);
     }
 
-    visit(flags.getValueOwnership(), forSelf, origType, substType,
-          flags.isNoDerivative());
+    visit(flags.getValueOwnership(), forSelf, origType, substType, flags);
   }
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             bool isNonDifferentiable) {
+             ParameterTypeFlags origFlags) {
     assert(!isa<InOutType>(substType));
 
     // Tuples get expanded unless they're inout.
     if (origType.isTuple() && ownership != ValueOwnership::InOut) {
-      expandTuple(ownership, forSelf, origType, substType,
-                  isNonDifferentiable);
+      expandTuple(ownership, forSelf, origType, substType, origFlags);
       return;
     }
 
@@ -1701,20 +1691,20 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
-    addParameter(loweredType, convention, isNonDifferentiable);
+    addParameter(loweredType, convention, origFlags);
   }
 
   /// Recursively expand a tuple type into separate parameters.
   void expandTuple(ValueOwnership ownership, bool forSelf,
                    AbstractionPattern origType, CanType substType,
-                   bool isNonDifferentiable) {
+                   ParameterTypeFlags oldFlags) {
     assert(ownership != ValueOwnership::InOut);
     assert(origType.isTuple());
 
     origType.forEachTupleElement(substType, [&](TupleElementGenerator &elt) {
       if (!elt.isOrigPackExpansion()) {
         visit(ownership, forSelf, elt.getOrigType(), elt.getSubstTypes()[0],
-              isNonDifferentiable);
+              oldFlags);
         return;
       }
 
@@ -1733,28 +1723,32 @@ private:
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
-      addPackParameter(packTy, ownership, isNonDifferentiable);
+      addPackParameter(packTy, ownership, oldFlags);
     });
   }
 
   /// Add a parameter that we derived from deconstructing the
   /// formal type.
   void addParameter(CanType loweredType, ParameterConvention convention,
-                    bool isNonDifferentiable) {
+                    ParameterTypeFlags origFlags) {
     SILParameterInfo param(loweredType, convention);
-    if (isNonDifferentiable)
-      param = param.getWithDifferentiability(
-          SILParameterDifferentiability::NotDifferentiable);
-    Inputs.push_back(param);
 
+    if (origFlags.isNoDerivative())
+      param = param.addingOption(SILParameterInfo::NotDifferentiable);
+    if (origFlags.isTransferring())
+      param = param.addingOption(SILParameterInfo::Transferring);
+    if (origFlags.isIsolated())
+      param = param.addingOption(SILParameterInfo::Isolated);
+
+    Inputs.push_back(param);
     maybeAddForeignParameters();
   }
 
   void addPackParameter(CanSILPackType packTy, ValueOwnership ownership,
-                        bool isNonDifferentiable) {
+                        ParameterTypeFlags origFlags) {
     unsigned origParamIndex = NextOrigParamIndex++;
     auto convention = Convs.getPack(ownership, origParamIndex);
-    addParameter(packTy, convention, isNonDifferentiable);
+    addParameter(packTy, convention, origFlags);
   }
 
   /// Given that we've just reached an argument index for the
@@ -1809,7 +1803,7 @@ private:
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
             /*forSelf=*/false, ForeignSelf->OrigSelfParam,
-            ForeignSelf->SubstSelfParam.getParameterType(), false);
+            ForeignSelf->SubstSelfParam.getParameterType(), {});
     }
     return true;
   }
@@ -2439,6 +2433,16 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     inputs.push_back(SILParameterInfo(getLoweredTypeOfProperty(property),
                                       ParameterConvention::Indirect_Inout));
   }
+
+  // Make a new 'self' parameter.
+  auto selfInterfaceType = MetatypeType::get(
+      accessor->getDeclContext()->getSelfInterfaceType());
+  AbstractionPattern origSelfType(genericSig,
+                                  selfInterfaceType->getCanonicalType());
+  auto loweredSelfType = TC.getLoweredType(
+      origSelfType, selfInterfaceType->getCanonicalType(), context);
+  inputs.push_back(SILParameterInfo(loweredSelfType.getASTType(),
+                                    ParameterConvention::Direct_Unowned));
 
   SmallVector<SILResultInfo, 8> results;
 
@@ -4122,8 +4126,7 @@ getLoweredResultIndices(const SILFunctionType *functionType,
 
   // Check formal results.
   for (auto resultAndIndex : enumerate(functionType->getResults()))
-    if (resultAndIndex.value().getDifferentiability() !=
-        SILResultDifferentiability::NotDifferentiable)
+    if (!resultAndIndex.value().hasOption(SILResultInfo::NotDifferentiable))
       resultIndices.push_back(resultAndIndex.index());
 
   auto numResults = functionType->getNumResults();
@@ -4135,9 +4138,9 @@ getLoweredResultIndices(const SILFunctionType *functionType,
     if (!resultParamAndIndex.value().isAutoDiffSemanticResult())
       continue;
 
-    if (resultParamAndIndex.value().getDifferentiability() !=
-        SILParameterDifferentiability::NotDifferentiable &&
-       parameterIndices->contains(resultParamAndIndex.index()))
+    if (!resultParamAndIndex.value().hasOption(
+            SILParameterInfo::NotDifferentiable) &&
+        parameterIndices->contains(resultParamAndIndex.index()))
       resultIndices.push_back(numResults + semResultParamIdx);
     semResultParamIdx += 1;
   }
@@ -4656,6 +4659,10 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (constant.isDistributedThunk()) {
     extInfo = extInfo.withAsync(true).withThrows(true, Type());
   }
+
+  // The uncurried function is parameter-isolated if the inner type is.
+  if (innerExtInfo.getIsolation().isParameter())
+    extInfo = extInfo.withIsolation(innerExtInfo.getIsolation());
 
   // If this is a C++ constructor, don't add the metatype "self" parameter
   // because we'll never use it and it will cause problems in IRGen.

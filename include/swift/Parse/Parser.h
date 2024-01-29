@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
@@ -1015,8 +1016,6 @@ public:
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
 
-  void recordLocalType(TypeDecl *TD);
-
   /// Skip an `#if` configuration block containing only attributes.
   ///
   /// \returns true if the skipping was successful, false otherwise.
@@ -1054,7 +1053,7 @@ public:
   /// Parse a string literal whose contents can be interpreted as a UUID.
   ///
   /// \returns false on success, true on error.
-  bool parseUUIDString(UUID &uuid, Diag<> diag);
+  bool parseUUIDString(UUID &uuid, Diag<> diag, bool justChecking = false);
 
   /// Parse the Objective-C selector inside @objc
   void parseObjCSelector(SmallVector<Identifier, 4> &Names,
@@ -1174,6 +1173,36 @@ public:
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
+  bool isParameterSpecifier() {
+    if (Tok.is(tok::kw_inout)) return true;
+    if (!canHaveParameterSpecifierContextualKeyword()) return false;
+    if (Tok.isContextualKeyword("__shared") ||
+        Tok.isContextualKeyword("__owned") ||
+        Tok.isContextualKeyword("borrowing") ||
+        Tok.isContextualKeyword("consuming") ||
+        Tok.isContextualKeyword("isolated") ||
+        Tok.isContextualKeyword("_const"))
+      return true;
+    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+        Tok.isContextualKeyword("_resultDependsOn"))
+      return true;
+    if (Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) &&
+        Tok.isContextualKeyword("transferring"))
+      return true;
+    if (Context.LangOpts.hasFeature(Feature::NonescapableTypes) &&
+        (Tok.isContextualKeyword("_resultDependsOn") ||
+         Tok.isLifetimeDependenceToken()))
+      return true;
+    return false;
+  }
+
+  /// Given that we just returned true from isParameterSpecifier(), skip
+  /// over the specifier.
+  void skipParameterSpecifier() {
+    // These are all currently single tokens.
+    consumeToken();
+  }
+
   bool canHaveParameterSpecifierContextualKeyword() {
     // The parameter specifiers like `isolated`, `consuming`, `borrowing` are
     // also valid identifiers and could be the name of a type. Check whether
@@ -1193,40 +1222,45 @@ public:
                            tok::kw_let);
   }
 
-  ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
-                                      SourceLoc &SpecifierLoc,
-                                      SourceLoc &IsolatedLoc,
-                                      SourceLoc &ConstLoc,
-                                      SourceLoc &ResultDependsOnLoc,
-                                      TypeAttributes &Attributes) {
-    if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
-        (canHaveParameterSpecifierContextualKeyword() &&
-         (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned") ||
-          Tok.getRawText().equals("consuming") ||
-          Tok.getRawText().equals("borrowing") ||
-          Tok.isContextualKeyword("isolated") ||
-          Tok.isContextualKeyword("_const") ||
-          Tok.getRawText().equals("_resultDependsOn"))))
-      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, IsolatedLoc,
-                                           ConstLoc, ResultDependsOnLoc,
-                                           Attributes);
-    return makeParserSuccess();
-  }
+  struct ParsedTypeAttributeList {
+    ParamDecl::Specifier Specifier = ParamDecl::Specifier::Default;
+    SourceLoc SpecifierLoc;
+    SourceLoc IsolatedLoc;
+    SourceLoc ConstLoc;
+    SourceLoc ResultDependsOnLoc;
+    SmallVector<TypeOrCustomAttr> Attributes;
+    SmallVector<LifetimeDependenceSpecifier> lifetimeDependenceSpecifiers;
 
-  ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                             SourceLoc &SpecifierLoc,
-                                             SourceLoc &IsolatedLoc,
-                                             SourceLoc &ConstLoc,
-                                             SourceLoc &ResultDependsOnLoc,
-                                             TypeAttributes &Attributes);
+    /// Main entry point for parsing.
+    ///
+    /// Inline we just have the fast path of failing to match. We call slowParse
+    /// that contains the outline of more complex implementation. This is HOT
+    /// code!
+    ParserStatus parse(Parser &P) {
+      auto &Tok = P.Tok;
+      if (Tok.is(tok::at_sign) || P.isParameterSpecifier())
+        return slowParse(P);
+      return makeParserSuccess();
+    }
 
-  bool parseConventionAttributeInternal(bool justChecking,
-                                        TypeAttributes::Convention &convention);
+    TypeRepr *applyAttributesToType(Parser &P, TypeRepr *Type) const;
 
-  ParserStatus parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+  private:
+    /// An out of line implementation of the more complicated cases. This
+    /// ensures on the inlined fast path we handle the case of not matching.
+    ParserStatus slowParse(Parser &P);
+  };
+
+  bool parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc,
+                                        ConventionTypeAttr *&result,
+                                        bool justChecking);
+
+  ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
                                   PatternBindingInitializer *&initContext,
                                   bool justChecking = false);
+
+  ParserStatus parseLifetimeDependenceSpecifiers(
+      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList);
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
@@ -1425,7 +1459,7 @@ public:
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
-                                         const TypeAttributes &attrs);
+                                         ParsedTypeAttributeList &attrs);
   
   ParserResult<TypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(ParserResult<TypeRepr> Base);
@@ -1446,12 +1480,6 @@ public:
   
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
-
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
-                                 ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc,
-                                 SourceLoc IsolatedLoc,
-                                 SourceLoc ConstLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1798,7 +1826,7 @@ public:
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
       const Diagnostic &diag);
 
-  ParserResult<Expr> parseExprIdentifier();
+  ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
@@ -1867,6 +1895,8 @@ public:
   ParserResult<ArgumentList>
   parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
                     bool allowTrailingClosure = true);
+
+  ParserStatus parseExprListElement(tok rightTok, bool isArgumentList, SourceLoc leftLoc, SmallVectorImpl<ExprListElt> &elts);
 
   /// Parse one or more trailing closures after an argument list.
   ParserStatus parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,

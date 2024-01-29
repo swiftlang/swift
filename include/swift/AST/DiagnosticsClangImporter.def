@@ -117,6 +117,7 @@ WARNING(nonmutating_without_mutable_fields,none,
         "attribute 'nonmutating' has no effect without any mutable fields", ())
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
+WARNING(module_map_ignored, none, "module map file '%0' will be ignored", (StringRef))
 
 WARNING(libc_not_found, none,
         "libc not found for '%0'; C stdlib may be unavailable",

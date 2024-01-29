@@ -323,6 +323,30 @@ public:
   void cacheResult(bool value) const;
 };
 
+class CollectExistentialConformancesRequest
+    : public SimpleRequest<CollectExistentialConformancesRequest,
+                           ArrayRef<ProtocolConformanceRef>(ModuleDecl*,
+                                                            CanType,
+                                                            CanType,
+                                                            bool,
+                                                            bool),
+                           RequestFlags::Uncached> { // TODO: maybe cache this?
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolConformanceRef>
+      evaluate(Evaluator &evaluator,
+               ModuleDecl *module,
+               CanType fromType,
+               CanType existential,
+               bool skipConditionalRequirements,
+               bool allowMissing) const;
+};
+
 /// Determine whether an existential type conforming to this protocol
 /// requires the \c any syntax.
 class HasSelfOrAssociatedTypeRequirementsRequest :
@@ -2782,6 +2806,28 @@ public:
   bool isCached() const { return true; }
 };
 
+using ConformanceAccessScope =
+    std::pair<AccessScope, /*witnessesMustBeUsableFromInline=*/bool>;
+
+class ConformanceAccessScopeRequest
+    : public SimpleRequest<ConformanceAccessScopeRequest,
+                           ConformanceAccessScope(DeclContext *, ProtocolDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ConformanceAccessScope
+  evaluate(Evaluator &evaluator, DeclContext *dc, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class TypeWitnessRequest
     : public SimpleRequest<TypeWitnessRequest,
                            TypeWitnessAndDecl(NormalProtocolConformance *,
@@ -2803,6 +2849,43 @@ public:
   bool isCached() const { return true; }
   llvm::Optional<TypeWitnessAndDecl> getCachedResult() const;
   void cacheResult(TypeWitnessAndDecl value) const;
+};
+
+class ReferencedAssociatedTypesRequest
+    : public SimpleRequest<ReferencedAssociatedTypesRequest,
+                           TinyPtrVector<AssociatedTypeDecl *>(ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  TinyPtrVector<AssociatedTypeDecl *>
+  evaluate(Evaluator &evaluator, ValueDecl *req) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class ResolveTypeWitnessesRequest
+    : public SimpleRequest<ResolveTypeWitnessesRequest,
+                           evaluator::SideEffect(NormalProtocolConformance *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 class ValueWitnessRequest
@@ -3693,6 +3776,25 @@ public:
 /// same file are consistently using \c @_spiOnly.
 class CheckInconsistentSPIOnlyImportsRequest
     : public SimpleRequest<CheckInconsistentSPIOnlyImportsRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+// Check that imports of the same module from the same file have the same
+// access-level.
+class CheckInconsistentAccessLevelOnImportSameFileRequest
+    : public SimpleRequest<CheckInconsistentAccessLevelOnImportSameFileRequest,
                            evaluator::SideEffect(SourceFile *),
                            RequestFlags::Cached> {
 public:
@@ -4711,6 +4813,23 @@ public:
   bool isCached() const { return true; }
   llvm::Optional<llvm::Optional<SubstitutionMap>> getCachedResult() const;
   void cacheResult(llvm::Optional<SubstitutionMap>) const;
+};
+
+/// Collect all local type declarations in the SourceFile.
+class LocalTypeDeclsRequest
+    : public SimpleRequest<LocalTypeDeclsRequest,
+                           ArrayRef<TypeDecl *>(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<TypeDecl *> evaluate(Evaluator &evaluator, SourceFile *sf) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

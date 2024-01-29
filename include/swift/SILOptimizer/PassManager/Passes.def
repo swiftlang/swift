@@ -128,6 +128,8 @@ PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",
      "Print SIL Instruction MemBehavior and ReleaseBehavior Information")
 PASS(BasicCalleePrinter, "basic-callee-printer",
      "Print Basic Callee Analysis for Testing")
+SWIFT_FUNCTION_PASS(BooleanLiteralFolding, "boolean-literal-folding",
+     "Constant folds initializers of boolean literals")
 PASS(CFGPrinter, "view-cfg",
      "View Function CFGs")
 PASS(COWArrayOpts, "cowarray-opt",

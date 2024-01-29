@@ -707,18 +707,19 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
 
       case KeyKind::KK_typeAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-        std::transform(Seq->begin(), Seq->end(),
-                       std::back_inserter(Info.TypeAttrs),
-          [&](llvm::yaml::Node &N) {
-            auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
-  #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
+        for (auto &N : *Seq) {
+          auto Result =
+            llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(GetScalarString(&N))
+  #define TYPE_ATTR(X, C) .Case(#X, TAK_##X)
   #include "swift/AST/Attr.def"
-            .Default(TypeAttrKind::TAK_Count);
-            if (Result == TAK_Count)
-              Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
-                           GetScalarString(&N));
-            return Result;
-          });
+          .Default(llvm::Optional<TypeAttrKind>());
+
+          if (!Result)
+            Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
+                         GetScalarString(&N));
+          else
+            Info.TypeAttrs.push_back(*Result);
+        }
         break;
       }
       case KeyKind::KK_declAttributes: {
@@ -2225,7 +2226,7 @@ namespace json {
 template<>
 struct ScalarEnumerationTraits<TypeAttrKind> {
   static void enumeration(Output &out, TypeAttrKind &value) {
-#define TYPE_ATTR(X) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
+#define TYPE_ATTR(X, C) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
 #include "swift/AST/Attr.def"
   }
 };

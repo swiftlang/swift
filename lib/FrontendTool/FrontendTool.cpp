@@ -280,7 +280,7 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
   C.NumDecls += SF->getTopLevelDecls().size();
-  C.NumLocalTypeDecls += SF->LocalTypeDecls.size();
+  C.NumLocalTypeDecls += SF->getLocalTypeDecls().size();
   C.NumObjCMethods += SF->ObjCMethods.size();
 
   SmallVector<OperatorDecl *, 2> operators;
@@ -311,6 +311,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
     C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
+    C.NumMacroPluginDependencies = D->getMacroPluginDependencies().size();
   }
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
@@ -417,7 +418,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
         Instance, Invocation.getClangModuleCachePath(),
         FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
         Invocation.getOutputFilename(),
-        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        /* shouldSerializeDeps */ true,
         Invocation.getSearchPathOptions().CandidateCompiledModules);
   else
     return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
@@ -430,6 +431,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
       RequireOSSAModules_t(Invocation.getSILOptions()),
+      RequireNoncopyableGenerics_t(Invocation.getLangOptions()),
       IgnoreAdjacentModules);
 }
 
@@ -1607,7 +1609,8 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
     }
 
     // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive) {
+    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive ||
+        Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Everything) {
       return false;
     }
 

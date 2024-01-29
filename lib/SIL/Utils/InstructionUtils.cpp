@@ -24,6 +24,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 
+#include "clang/AST/DeclObjC.h"
+
 using namespace swift;
 
 SILValue swift::lookThroughOwnershipInsts(SILValue v) {
@@ -916,6 +918,16 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
     switch (as.getSubstCalleeType()->getRepresentation()) {
     case SILFunctionTypeRepresentation::ObjCMethod:
+      if (auto *callee = as.getCalleeFunction()) {
+        if (auto *clangDecl = callee->getClangDecl()) {
+          if (auto clangMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+            if (clangMethodDecl->isDirectMethod()) {
+              break;
+            }
+          }
+        }
+      }
+      LLVM_FALLTHROUGH;
     case SILFunctionTypeRepresentation::Block:
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
@@ -996,8 +1008,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
       return RuntimeEffect::RefCounting | RuntimeEffect::Deallocating;
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
-      return RuntimeEffect::ObjectiveC | RuntimeEffect::Allocating;
     case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:

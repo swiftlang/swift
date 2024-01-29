@@ -369,11 +369,6 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(MacroExpansionExpr, Expr, (16-NumExprBits)+16,
-    : 16 - NumExprBits, // Align and leave room for subclasses
-    Discriminator : 16
-  );
-
   } Bits;
   // clang-format on
 
@@ -447,6 +442,10 @@ public:
   const Expr *getValueProvidingExpr() const {
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
+
+  /// Find the original expression value, looking through various
+  /// implicit conversions.
+  const Expr *findOriginalValue() const;
 
   /// Find the original type of a value, looking through various implicit
   /// conversions.
@@ -3389,6 +3388,10 @@ class ErasureExpr final : public ImplicitConversionExpr,
     Bits.ErasureExpr.NumArgumentConversions = argConversions.size();
     std::uninitialized_copy(argConversions.begin(), argConversions.end(),
                             getTrailingObjects<ConversionPair>());
+
+    assert(llvm::all_of(conformances, [](ProtocolConformanceRef ref) {
+      return !ref.isInvalid();
+    }));
   }
 
 public:
@@ -3843,6 +3846,20 @@ public:
     Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
+  /// If we find that a capture x of this AbstractClosureExpr belongs to a
+  /// different isolation domain than the closure, add an ApplyIsolationCrossing
+  /// to foundIsolationCrossing.
+  ///
+  /// \p foundIsolationCrossings an out parameter that contains the
+  /// ApplyIsolationCrossing if any of the captures are isolation crossing and
+  /// the index of the capture in the capture array. We return the index since
+  /// all captures may not cross isolation boundaries and we may need to be able
+  /// to look up the corresponding capture at the SIL level by index.
+  void getIsolationCrossing(
+      SmallVectorImpl<
+          std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>>
+          &foundIsolationCrossings);
+
   CaptureInfo getCaptureInfo() const { return Captures; }
   void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
@@ -3944,7 +3961,7 @@ public:
 /// SerializedAbstractClosureExpr - This represents what was originally an
 /// AbstractClosureExpr during serialization. It is preserved only to maintain
 /// the correct AST structure and remangling after deserialization.
-class SerializedAbstractClosureExpr : public SerializedLocalDeclContext {
+class SerializedAbstractClosureExpr : public DeclContext {
   const Type Ty;
   llvm::PointerIntPair<Type, 1> TypeAndImplicit;
   const unsigned Discriminator;
@@ -3952,8 +3969,7 @@ class SerializedAbstractClosureExpr : public SerializedLocalDeclContext {
 public:
   SerializedAbstractClosureExpr(Type Ty, bool Implicit, unsigned Discriminator,
                                 DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::AbstractClosure,
-                                 Parent),
+    : DeclContext(DeclContextKind::SerializedAbstractClosure, Parent),
       TypeAndImplicit(llvm::PointerIntPair<Type, 1>(Ty, Implicit)),
       Discriminator(Discriminator) {}
 
@@ -3970,10 +3986,7 @@ public:
   }
 
   static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::AbstractClosure;
-    return false;
+    return DC->getContextKind() == DeclContextKind::SerializedAbstractClosure;
   }
 };
 
@@ -6086,6 +6099,39 @@ public:
   }
 };
 
+/// Provides a value of type `(any Actor)?` that represents the actor
+/// isolation of the current context, or `nil` if this is non-isolated
+/// code.
+///
+/// This expression node is implicitly created by the type checker, and
+/// has no in-source spelling.
+class CurrentContextIsolationExpr : public Expr {
+  Expr *actorExpr = nullptr;
+  SourceLoc implicitLoc;
+
+public:
+  CurrentContextIsolationExpr(SourceLoc implicitLoc, Type type)
+      : Expr(ExprKind::CurrentContextIsolation, /*isImplicit=*/true, type),
+        implicitLoc(implicitLoc) {}
+
+  /// The expression that produces the actor isolation value.
+  Expr *getActor() const { return actorExpr; }
+
+  void setActor(Expr *expr) {
+    actorExpr = expr;
+  }
+
+  SourceLoc getLoc() const { return implicitLoc; }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(implicitLoc, implicitLoc);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CurrentContextIsolation;
+  }
+};
+
 /// Represents the unusual behavior of a . in a \ keypath expression, such as
 /// \.[0] and \Foo.?.
 class KeyPathDotExpr : public Expr {
@@ -6301,7 +6347,6 @@ public:
       : Expr(ExprKind::MacroExpansion, isImplicit, ty),
         FreestandingMacroExpansion(FreestandingMacroKind::Expr, info), DC(dc),
         Rewritten(nullptr), Roles(roles), SubstituteDecl(nullptr) {
-    Bits.MacroExpansionExpr.Discriminator = InvalidDiscriminator;
   }
 
   static MacroExpansionExpr *
@@ -6324,24 +6369,6 @@ public:
 
   DeclContext *getDeclContext() const { return DC; }
   void setDeclContext(DeclContext *dc) { DC = dc; }
-
-  /// Returns a discriminator which determines this macro expansion's index
-  /// in the sequence of macro expansions within the current function.
-  unsigned getDiscriminator() const;
-
-  /// Retrieve the raw discriminator, which may not have been computed yet.
-  ///
-  /// Only use this for queries that are checking for (e.g.) reentrancy or
-  /// intentionally do not want to initiate verification.
-  unsigned getRawDiscriminator() const {
-    return Bits.MacroExpansionExpr.Discriminator;
-  }
-
-  void setDiscriminator(unsigned discriminator) {
-    assert(getRawDiscriminator() == InvalidDiscriminator);
-    assert(discriminator != InvalidDiscriminator);
-    Bits.MacroExpansionExpr.Discriminator = discriminator;
-  }
 
   SourceRange getSourceRange() const {
     return getExpansionInfo()->getSourceRange();
@@ -6386,6 +6413,8 @@ void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
 SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
+SourceLoc extractNearestSourceLoc(const MacroExpansionExpr *expr);
+SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
 
 } // end namespace swift
 

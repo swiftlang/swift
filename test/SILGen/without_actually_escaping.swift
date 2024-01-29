@@ -51,9 +51,31 @@ func letEscapeThrow(f: () throws -> () -> ()) throws -> () -> () {
   return try withoutActuallyEscaping(f) { return try $0() }
 }
 
-// thunk for @callee_guaranteed () -> (@owned @escaping @callee_guaranteed () -> (), @error @owned Error)
+enum HomeworkError: Error {
+case forgot
+case dogAteIt
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping19letEscapeThrowTyped1fyycyycyAA13HomeworkErrorOYKXE_tKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error HomeworkError)) -> (@owned @callee_guaranteed () -> (), @error any Error)
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error HomeworkError)):
+// CHECK: function_ref @$sIeg_25without_actually_escaping13HomeworkErrorOIgozo_Ieg_ACIegozo_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error HomeworkError)) -> (@owned @callee_guaranteed () -> (), @error HomeworkError)
+// CHECK: bb2([[ERR:%.*]] : @owned $any Error):
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_value [[MD]]
+// CHECK:   throw [[ERR]] : $any Error
+// CHECK: }
+
+func letEscapeThrowTyped(f: () throws(HomeworkError) -> () -> ()) throws -> () -> () {
+  return try withoutActuallyEscaping(f) { return try $0() }
+}
+
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error any Error)) -> (@owned @callee_guaranteed () -> (), @error any Error) {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_25without_actually_escaping13HomeworkErrorOIgozo_Ieg_ACIegozo_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error HomeworkError)) -> (@owned @callee_guaranteed () -> (), @error HomeworkError)
+
+func letEscapeThrowTyped2(f: () throws(HomeworkError) -> () -> ()) throws(HomeworkError) -> () -> () {
+  return try withoutActuallyEscaping(f) { (g) throws(HomeworkError) in return try g() }
+}
+
 
 // We used to crash on this example because we would use the wrong substitution
 // map.

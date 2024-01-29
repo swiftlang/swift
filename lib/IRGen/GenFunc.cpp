@@ -225,13 +225,6 @@ namespace {
                     bool isOutlined) const override {
       auto *fn = src.claimNext();
 
-      // We might be presented with a value of the more precise pointer to
-      // function type "void(*)*" rather than the generic "i8*". Downcast to the
-      // more general expected type.
-      if (fn->getContext().supportsTypedPointers() &&
-          fn->getType()->getNonOpaquePointerElementType()->isFunctionTy())
-        fn = IGF.Builder.CreateBitCast(fn, getStorageType());
-
       Explosion tmp;
       tmp.add(fn);
       PODSingleScalarTypeInfo<ThinFuncTypeInfo,LoadableTypeInfo>::initialize(IGF, tmp, addr, isOutlined);

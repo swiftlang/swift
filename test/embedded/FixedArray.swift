@@ -1,11 +1,11 @@
 
-// RUN: %target-run-simple-swift(%S/Inputs/ExperimentalFixedArray.swift %S/Inputs/print.swift -enable-experimental-feature Embedded -enable-experimental-feature FixedArrays -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O %S/Inputs/ExperimentalFixedArray.swift %S/Inputs/print.swift -enable-experimental-feature Embedded -enable-experimental-feature FixedArrays -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(%S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature Embedded -enable-experimental-feature FixedArrays -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature Embedded -enable-experimental-feature FixedArrays -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
 
 // Also test in non-embedded mode
 
-// RUN: %target-run-simple-swift(%S/Inputs/ExperimentalFixedArray.swift %S/Inputs/print.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O %S/Inputs/ExperimentalFixedArray.swift %S/Inputs/print.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(%S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O %S/Inputs/ExperimentalFixedArray.swift -enable-experimental-feature FixedArrays -parse-as-library -wmo) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
@@ -37,18 +37,18 @@ struct IntByte: Printable {
   let b: Int8
 
   func print() {
-    main.print(i, terminator: "")
-    main.print(",", terminator: "")
-    main.print(b, terminator: "")
+    Swift.print(i, terminator: "")
+    Swift.print(",", terminator: "")
+    Swift.print(b, terminator: "")
   }
 }
 
 extension Optional: Printable where Wrapped == Int64 {
   func print() {
     if let x = self {
-      main.print(x, terminator: "")
+      Swift.print(x, terminator: "")
     } else {
-      main.print("nil", terminator: "")
+      Swift.print("nil", terminator: "")
     }
   }
 }
@@ -151,13 +151,13 @@ struct Matrix<T: Printable>: ~Copyable {
 
   func print() {
     for r in 0..<rows {
-      main.print("(", terminator: "")
+      Swift.print("(", terminator: "")
       for c in 0..<columns {
         self[r, c].print()
         if c < columns - 1 {
-          main.print(",", terminator: "")
+          Swift.print(",", terminator: "")
         } else {
-          main.print(")")
+          Swift.print(")")
         }
       }
     }
@@ -271,7 +271,7 @@ protocol Printable {
 
 extension Int: Printable {
   func print() {
-    main.print(self, terminator: "")
+    Swift.print(self, terminator: "")
   }
 }
 
@@ -290,13 +290,13 @@ final class CheckLifetime: Printable {
   }
 
   deinit {
-    main.print("deinit ", terminator: "")
-    main.print(x)
+    Swift.print("deinit ", terminator: "")
+    Swift.print(x)
   }
 
   func print() {
-    main.print("CheckLifetime(", terminator: "")
-    main.print(x, terminator: ")")
+    Swift.print("CheckLifetime(", terminator: "")
+    Swift.print(x, terminator: ")")
   }
 }
 

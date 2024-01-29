@@ -16,6 +16,19 @@ import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 extension ASTGenVisitor {
+  func generate(pattern node: PatternSyntax, typeAnnotation annotationNode: TypeAnnotationSyntax?) -> BridgedPattern {
+    let pat = self.generate(pattern: node)
+    if let annotationNode {
+      return BridgedTypedPattern.createParsed(
+        self.ctx,
+        pattern: pat,
+        type: self.generate(type: annotationNode.type)
+      ).asPattern
+    } else {
+      return pat
+    }
+  }
+
   func generate(pattern node: PatternSyntax) -> BridgedPattern {
     switch node.as(PatternSyntaxEnum.self) {
     case .expressionPattern(let node):

@@ -715,8 +715,7 @@ private:
 
       // Reset binding to point to the resolved pattern. This is required
       // before calling `forPatternBindingDecl`.
-      patternBinding->setPattern(index, pattern,
-                                 patternBinding->getInitContext(index));
+      patternBinding->setPattern(index, pattern);
 
       patterns.push_back(makeElement(
           patternBinding,
@@ -751,8 +750,7 @@ private:
     // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SyntacticElementTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
+          init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
 
       if (ConstraintSystem::preCheckTarget(
@@ -764,8 +762,7 @@ private:
 
     if (init) {
       return SyntacticElementTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
+          init, patternType, patternBinding, index,
           /*bindPatternVarsOneWay=*/false);
     }
 
@@ -2090,8 +2087,7 @@ private:
     auto *resultExpr = getVoidExpr(ctx);
     cs.cacheExprTypes(resultExpr);
 
-    auto *returnStmt = new (ctx) ReturnStmt(SourceLoc(), resultExpr,
-                                            /*implicit=*/true);
+    auto *returnStmt = ReturnStmt::createImplicit(ctx, resultExpr);
 
     // For a target for newly created result and apply a solution
     // to it, to make sure that optional injection happens required
@@ -2203,9 +2199,8 @@ private:
         return resultExpr;
 
       auto &ctx = solution.getConstraintSystem().getASTContext();
-      auto newReturnStmt =
-          new (ctx) ReturnStmt(
-            returnStmt->getStartLoc(), nullptr, /*implicit=*/true);
+      auto *newReturnStmt = ReturnStmt::createImplicit(
+          ctx, returnStmt->getStartLoc(), /*result*/ nullptr);
       ASTNode elements[2] = { resultExpr, newReturnStmt };
       return BraceStmt::create(ctx, returnStmt->getStartLoc(),
                                elements, returnStmt->getEndLoc(),
@@ -2652,21 +2647,6 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution, TapExpr *tapExpr,
 
   tapExpr->setBody(castToStmt<BraceStmt>(body));
   return false;
-}
-
-bool ConjunctionElement::mightContainCodeCompletionToken(
-  const ConstraintSystem &cs) const {
-  if (Element->getKind() == ConstraintKind::SyntacticElement) {
-    if (Element->getSyntacticElement().getSourceRange().isInvalid()) {
-      return true;
-    } else {
-      return cs.containsIDEInspectionTarget(Element->getSyntacticElement());
-    }
-  } else {
-    // All other constraint kinds are not handled yet. Assume that they might
-    // contain the code completion token.
-    return true;
-  }
 }
 
 bool ConstraintSystem::applySolutionToSingleValueStmt(

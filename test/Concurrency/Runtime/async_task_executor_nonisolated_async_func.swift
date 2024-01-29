@@ -39,7 +39,7 @@ nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
       let queue = DispatchQueue(label: "example-queue")
       let executor = NaiveQueueExecutor(queue)
 
-      await Task(_on: executor) {
+      await Task(_executorPreference: executor) {
         await nonisolatedFunc(expectedExecutor: executor)
       }.value
     }

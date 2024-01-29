@@ -11,6 +11,9 @@
 import OtherActors // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
 
 let immutableGlobal: String = "hello"
+
+// expected-warning@+2 {{var 'mutableGlobal' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+// expected-note@+1 {{isolate 'mutableGlobal' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
 @available(SwiftStdlib 5.1, *)
@@ -111,7 +114,9 @@ func checkAsyncPropertyAccess() async {
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
 
-  _ = act.point  // expected-warning{{non-sendable type 'Point' in asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
+  _ = act.point  // expected-warning{{non-sendable type 'Point' in implicitly asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
+  // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-2 {{property access is 'async'}}
 }
 
 /// ------------------------------------------------------------------
@@ -136,7 +141,8 @@ struct InferredFromContext {
     get { [] }
   }
 
-  nonisolated var status: Bool = true // expected-error {{'nonisolated' can not be applied to stored properties}}{{3-15=}}
+  nonisolated var status: Bool = true // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}{{3-15=}}{{3-15=}}{{14-14=(unsafe)}}
+  // expected-note@-1{{convert 'status' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
 
   nonisolated let flag: Bool = false // expected-warning {{'nonisolated' is redundant on struct's stored properties; this is an error in Swift 6}}{{3-15=}}
 
@@ -165,9 +171,12 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 }
 
 // check for instance members that do not need global-actor protection
+
+// expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in Swift 6}}
 // expected-note@+1 2 {{consider making struct 'NoGlobalActorValueType' conform to the 'Sendable' protocol}}
 struct NoGlobalActorValueType {
   @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in Swift 6}}
+  // expected-note@-1 {{initializer for property 'point' is global actor 'SomeGlobalActor'-isolated}}
 
   @MainActor let counter: Int // expected-warning {{stored property 'counter' within struct cannot have a global actor; this is an error in Swift 6}}
 
@@ -318,8 +327,8 @@ extension MyActor {
       acceptInout(&self.mutable) // expected-error{{actor-isolated property 'mutable' can not be used 'inout' from a Sendable closure}}
       _ = self.immutable
       _ = self.synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
-      _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
-      localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
+      _ = localVar // expected-warning{{reference to captured var 'localVar' in concurrently-executing code}}
+      localVar = 25 // expected-warning{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
 
       _ = otherLocalVar
@@ -350,8 +359,8 @@ extension MyActor {
     @Sendable func localFn1() {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a Sendable function}}
       _ = self.synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
-      _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
-      localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
+      _ = localVar // expected-warning{{reference to captured var 'localVar' in concurrently-executing code}}
+      localVar = 25 // expected-warning{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
     }
 
@@ -359,8 +368,8 @@ extension MyActor {
       acceptClosure {
         _ = text[0]  // expected-error{{actor-isolated property 'text' can not be referenced from a non-isolated context}}
         _ = self.synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
-        _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
-        localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
+        _ = localVar // expected-warning{{reference to captured var 'localVar' in concurrently-executing code}}
+        localVar = 25 // expected-warning{{mutation of captured var 'localVar' in concurrently-executing code}}
         _ = localConstant
       }
     }
@@ -633,8 +642,8 @@ func testGlobalRestrictions(actor: MyActor) async {
   // code.
   var i = 17
   acceptConcurrentClosure {
-    _ = i // expected-error{{reference to captured var 'i' in concurrently-executing code}}
-    i = 42 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
+    _ = i // expected-warning{{reference to captured var 'i' in concurrently-executing code}}
+    i = 42 // expected-warning{{mutation of captured var 'i' in concurrently-executing code}}
   }
   print(i)
 
@@ -731,7 +740,7 @@ func checkLocalFunctions() async {
   }
 
   func local3() { // expected-warning{{concurrently-executed local function 'local3()' must be marked as '@Sendable'}}
-    k = 25 // expected-error{{mutation of captured var 'k' in concurrently-executing code}}
+    k = 25 // expected-warning{{mutation of captured var 'k' in concurrently-executing code}}
   }
 
   print(k)
@@ -765,7 +774,6 @@ actor LocalFunctionIsolatedActor {
 @available(SwiftStdlib 5.1, *)
 actor LazyActor {
     var v: Int = 0
-    // expected-note@-1 6 {{property declared here}}
 
     let l: Int = 0
 
@@ -773,7 +781,7 @@ actor LazyActor {
     lazy var l12: Int = v
     lazy var l13: Int = { self.v }()
     lazy var l14: Int = self.v
-    lazy var l15: Int = { [unowned self] in self.v }() // expected-error{{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    lazy var l15: Int = { [unowned self] in self.v }()
 
     lazy var l21: Int = { l }()
     lazy var l22: Int = l
@@ -782,15 +790,15 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l32: Int = v
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l34: Int = self.v
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in Swift 6}}
 
     nonisolated lazy var l41: Int = { l }()
     nonisolated lazy var l42: Int = l
@@ -1152,12 +1160,12 @@ extension MyActor {
       _ = synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}
       // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
 
-      counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
+      counter += 1 // expected-warning{{mutation of captured var 'counter' in concurrently-executing code}}
     }
 
     acceptAsyncSendableClosure {
       _ = await synchronous() // ok
-      counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
+      counter += 1 // expected-warning{{mutation of captured var 'counter' in concurrently-executing code}}
     }
 
     acceptAsyncSendableClosureInheriting {
@@ -1178,7 +1186,7 @@ func testGlobalActorInheritance() {
   var counter = 0
 
   acceptAsyncSendableClosure {
-    counter += 1 // expected-error{{mutation of captured var 'counter' in concurrently-executing code}}
+    counter += 1 // expected-warning{{mutation of captured var 'counter' in concurrently-executing code}}
   }
 
   acceptAsyncSendableClosure { @SomeGlobalActor in
@@ -1532,11 +1540,11 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
   }
 }
 
-// expected-note@+1 2 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+// expected-note@+1 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
 class NonSendable {}
 
 actor ProtectNonSendable {
-  // expected-note@+1 {{property declared here}}
+  // expected-note@+1 2 {{property declared here}}
   let ns = NonSendable()
 
   init() {}
@@ -1554,7 +1562,9 @@ class ReferenceActor {
   init() async {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    // expected-warning@+3 {{non-sendable type 'NonSendable' in implicitly asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
+    // expected-note@+1 {{property access is 'async'}}
     _ = a.ns
   }
 }
@@ -1565,7 +1575,7 @@ actor AnotherActor {
   init() {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from a non-isolated context}}
     _ = a.ns
   }
 }

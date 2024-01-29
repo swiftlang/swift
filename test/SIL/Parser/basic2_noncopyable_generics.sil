@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt                                      \
+// RUN:     %s                                               \
+// RUN:     -enable-experimental-feature NoncopyableGenerics \
+// RUN:     -enable-experimental-feature NonescapableTypes   \
+// RUN: |                                                    \
+// RUN: %target-sil-opt                                      \
+// RUN:     -enable-experimental-feature NoncopyableGenerics \
+// RUN:     -enable-experimental-feature NonescapableTypes   \
+// RUN: |                                                    \
+// RUN: %FileCheck %s
+
+// For -enable-experimental-feature NoncopyableGenerics/NonescapableTypes
+// REQUIRES: asserts
+// TODO: Once NoncopyableGenerics/NonescapableTypes is no longer behind a feature flag, merge this into basic2.
+
+sil_stage raw
+
+import Swift
+
+// CHECK-LABEL: struct NCG<T> : ~Copyable {
+// CHECK-NEXT:    var t: T
+// CHECK-NEXT:    deinit
+struct NCG<T> : ~Copyable {
+  var t: T
+  deinit
+}
+
+// CHECK-LABEL: struct NEG<T> : ~Escapable {
+// CHECK-NEXT:    var t: T
+struct NEG<T> : ~Escapable {
+  var t: T
+}
+

@@ -142,6 +142,22 @@ static void addLTOArgs(const OutputInfo &OI, ArgStringList &arguments) {
   }
 }
 
+namespace {
+
+template<typename Container>
+bool containsValue(
+    const Container &container,
+    typename Container::value_type const &element
+) {
+  for (const auto &value : container) {
+    if (value == element)
+      return true;
+  }
+
+  return false;
+}
+
+}
 
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
@@ -177,7 +193,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   // Enable or disable ObjC interop appropriately for the platform
-  if (Triple.isOSDarwin()) {
+  if (Triple.isOSDarwin() &&
+      !containsValue(
+          inputArgs
+            .getAllArgValues(options::OPT_enable_experimental_feature),
+          "Embedded")) {
     arguments.push_back("-enable-objc-interop");
   } else {
     arguments.push_back("-disable-objc-interop");
@@ -314,8 +334,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_diagnostic_style);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_verify_incremental_dependencies);
   inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
   inputArgs.AddLastArg(arguments, options::OPT_library_level);
   inputArgs.AddLastArg(arguments, options::OPT_enable_bare_slash_regex);
@@ -376,6 +394,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   addPlatformSpecificPluginFrontendArgs(OI, output, inputArgs, arguments);
 
   addPluginArguments(inputArgs, arguments);
+
+  // Pass along -no-verify-emitted-module-interface only if it's effective.
+  // Assume verification by default as we want to know only when the user skips
+  // the verification.
+  if (!inputArgs.hasFlag(options::OPT_verify_emitted_module_interface,
+                         options::OPT_no_verify_emitted_module_interface,
+                         true))
+    arguments.push_back("-no-verify-emitted-module-interface");
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
@@ -1173,8 +1199,6 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
-
-  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));

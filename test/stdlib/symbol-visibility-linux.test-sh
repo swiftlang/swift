@@ -250,6 +250,7 @@
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_EOS6_PKS3_ \
 // RUN:             -e _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_EPKS3_OS6_ \
 // RUN:             -e _ZNSt6vectorIjSaIjEE17_M_realloc_insertIJRKjEEEvN9__gnu_cxx17__normal_iteratorIPjS1_EEDpOT_ \
+// RUN:             -e _ZNSsC2EPKcRKSaIcE \
 // RUN:   > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
 // RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt

@@ -82,6 +82,13 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether this is a resolution based on a pack reference.
   FromPackReference = 1 << 12,
+
+  /// Whether to suppress warnings about conversions from and bindings of type
+  /// Never
+  SilenceNeverWarnings = 1 << 13,
+
+  /// Whether the immediate context has an @escaping attribute.
+  DirectEscaping = 1 << 14,
 };
 
 /// Type resolution contexts that require special handling.
@@ -247,7 +254,8 @@ public:
   /// Set the current type resolution context.
   void setContext(Context newContext) {
     context = newContext;
-    flags &= ~unsigned(TypeResolutionFlags::Direct);
+    flags &= ~(unsigned(TypeResolutionFlags::Direct) |
+               unsigned(TypeResolutionFlags::DirectEscaping));
   }
   void setContext(llvm::NoneType) { setContext(Context::None); }
 

@@ -86,7 +86,7 @@ static void addSearchPathInvocationArguments(
 static std::vector<std::string> getClangDepScanningInvocationArguments(
     ASTContext &ctx, llvm::Optional<StringRef> sourceFileName = llvm::None) {
   std::vector<std::string> commandLineArgs =
-      ClangImporter::getClangArguments(ctx);
+      ClangImporter::getClangDriverArguments(ctx);
   addSearchPathInvocationArguments(commandLineArgs, ctx);
 
   auto sourceFilePos = std::find(
@@ -166,10 +166,6 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
-
-    // We pass the entire argument list via -Xcc, so the invocation should
-    // use extra clang options alone.
-    swiftArgs.push_back("-only-use-extra-clang-opts");
 
     auto pcmPath = moduleCacheRelativeLookupModuleOutput(
         clangModuleDep.ID, ModuleOutputKind::ModuleFile, moduleOutputPath);
@@ -306,10 +302,6 @@ void ClangImporter::recordBridgingHeaderOptions(
 
   // Swift frontend action: -emit-pcm
   swiftArgs.push_back("-emit-pch");
-
-  // We pass the entire argument list via -Xcc, so the invocation should
-  // use extra clang options alone.
-  swiftArgs.push_back("-only-use-extra-clang-opts");
 
   // Ensure that the resulting PCM build invocation uses Clang frontend
   // directly

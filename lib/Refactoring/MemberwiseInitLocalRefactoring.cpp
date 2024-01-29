@@ -38,7 +38,7 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
       // Unconditionally print '@escaping' if we print out a function type -
       // the assignments we generate below will escape this parameter.
       if (isa<AnyFunctionType>(memberData.MemberType->getCanonicalType())) {
-        OS << "@" << TypeAttributes::getAttrName(TAK_escaping) << " ";
+        OS << "@" << TypeAttribute::getAttrName(TAK_escaping) << " ";
       }
       OS << memberData.MemberType.getString();
     }

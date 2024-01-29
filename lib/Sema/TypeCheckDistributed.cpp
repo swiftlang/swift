@@ -188,6 +188,9 @@ bool IsDistributedActorRequest::evaluate(
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
     auto *distributedActorProtocol = ctx.getDistributedActorDecl();
+    if (!distributedActorProtocol)
+      return false;
+
     return (protocol == distributedActorProtocol ||
             protocol->inheritsFrom(distributedActorProtocol));
   }
@@ -424,7 +427,7 @@ static bool checkDistributedTargetResultType(
 
   for (auto serializationReq: serializationRequirements) {
     auto conformance =
-        TypeChecker::conformsToProtocol(resultType, serializationReq, module);
+        module->checkConformance(resultType, serializationReq);
     if (conformance.isInvalid()) {
       if (diagnose) {
         llvm::StringRef conformanceToSuggest = isCodableRequirement ?
@@ -535,7 +538,7 @@ bool CheckDistributedFunctionRequest::evaluate(
 
       auto srl = serializationReqType->getExistentialLayout();
       for (auto req: srl.getProtocols()) {
-        if (TypeChecker::conformsToProtocol(paramTy, req, module).isInvalid()) {
+        if (module->checkConformance(paramTy, req).isInvalid()) {
           auto diag = func->diagnose(
               diag::distributed_actor_func_param_not_codable,
               param->getArgumentName().str(), param->getInterfaceType(),

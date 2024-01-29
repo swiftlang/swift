@@ -4,20 +4,20 @@
 // RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -Xfrontend -cas-path -Xfrontend %t/cas -module-cache-path %t/clang-module-cache -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/SwiftShims.pcm
 // RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -Xfrontend -cas-path -Xfrontend %t/cas -module-cache-path %t/clang-module-cache -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/SwiftShims.pcm -### > %t/Shims.cmd
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- @%t/Shims.cmd > %t/Shims.key.json
-// RUN: %S/Inputs/ExtractOutputKey.py %t/Shims.key.json %t/SwiftShims.pcm | tr -d '\n' > %t/Shims.key
+// RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/Shims.key.json %t/SwiftShims.pcm | tr -d '\n' > %t/Shims.key
 
 // RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -module-cache-path %t/clang-module-cache -Xfrontend -cas-path -Xfrontend %t/cas -module-name _SwiftConcurrencyShims %swift-lib-dir/swift/shims/module.modulemap -o %t/_SwiftConcurrencyShims.pcm
 // RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -module-cache-path %t/clang-module-cache -Xfrontend -cas-path -Xfrontend %t/cas -module-name _SwiftConcurrencyShims %swift-lib-dir/swift/shims/module.modulemap -o %t/_SwiftConcurrencyShims.pcm -### > %t/ConcurrencyShims.cmd
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- @%t/ConcurrencyShims.cmd > %t/ConcurrencyShims.key.json
-// RUN: %S/Inputs/ExtractOutputKey.py %t/ConcurrencyShims.key.json %t/_SwiftConcurrencyShims.pcm | tr -d '\n' > %t/ConcurrencyShims.key
+// RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/ConcurrencyShims.key.json %t/_SwiftConcurrencyShims.pcm | tr -d '\n' > %t/ConcurrencyShims.key
 
 // RUN: %target-swift-frontend -emit-module -module-cache-path %t/clang-module-cache %t/A.swift -o %t/A.swiftmodule -swift-version 5
 // RUN: %target-swift-frontend -emit-module -module-cache-path %t/clang-module-cache %t/B.swift -o %t/B.swiftmodule -I %t -swift-version 5
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %t/Test.swift -o %t/deps.json -I %t -swift-version 5 -cache-compile-job -cas-path %t/cas
 // RUN: %validate-json %t/deps.json &>/dev/null
 
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json swiftPrebuiltExternal:A moduleCacheKey | tr -d '\n' > %t/A.key
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json swiftPrebuiltExternal:B moduleCacheKey | tr -d '\n' > %t/B.key
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json swiftPrebuiltExternal:A moduleCacheKey | tr -d '\n' > %t/A.key
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json swiftPrebuiltExternal:B moduleCacheKey | tr -d '\n' > %t/B.key
 
 /// Prepare the cas objects that can be used to construct CompileJobResultSchema object.
 // RUN: llvm-cas --cas %t/cas --get-cache-result @%t/A.key > %t/A.result
@@ -116,7 +116,7 @@
 // RUN:   -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid %s -cache-compile-job \
 // RUN:   -cas-path %t/cas -allow-unstable-cache-key-for-testing  -swift-version 5 -enable-library-evolution > %t/keys.json
 
-// RUN: %S/Inputs/ExtractOutputKey.py %t/keys.json %t/Foo.swiftinterface > %t/interface.casid
+// RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json %t/Foo.swiftinterface > %t/interface.casid
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/Foo.swiftinterface -disable-implicit-swift-modules \
 // RUN:   -module-cache-path %t.module-cache -explicit-swift-module-map-file @%t/map.casid  \
 // RUN:   -cache-compile-job -cas-path %t/cas -allow-unstable-cache-key-for-testing -swift-version 5 -enable-library-evolution \

@@ -531,6 +531,8 @@ public:
   Demangle::NodePointer visit(const TypeRef *typeRef) {
     auto node = TypeRefVisitor<DemanglingForTypeRef,
                                 Demangle::NodePointer>::visit(typeRef);
+    if (!node)
+      return nullptr;
 
     // Wrap all nodes in a Type node, as consumers generally expect.
     auto typeNode = Dem.createNode(Node::Kind::Type);

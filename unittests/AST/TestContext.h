@@ -18,7 +18,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 
 namespace swift {
 namespace unittest {

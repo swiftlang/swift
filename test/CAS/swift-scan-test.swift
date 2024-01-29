@@ -4,6 +4,12 @@
 // RUN:   -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies -module-name Test -o %t/test.o -cas-path %t/cas \
 // RUN:   -allow-unstable-cache-key-for-testing > %t/key.casid
 
+// RUN: %swift-scan-test -action compute_cache_key_from_index -cas-path %t/cas -input 0 -- %target-swift-frontend -cache-compile-job -Rcache-compile-job %s \
+// RUN:   -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies -module-name Test -o %t/test.o -cas-path %t/cas \
+// RUN:   -allow-unstable-cache-key-for-testing > %t/key1.casid
+
+// RUN: diff %t/key.casid %t/key1.casid
+
 // RUN: not %swift-scan-test -action cache_query -id @%t/key.casid -cas-path %t/cas 2>&1 | %FileCheck %s --check-prefix=CHECK-QUERY-NOT-FOUND
 
 // RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job %s -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies \

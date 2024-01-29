@@ -413,8 +413,6 @@ ERROR(subscript_without_get,none,
       "subscript declarations must have a getter", ())
 
 // initializer
-ERROR(invalid_nested_init,none,
-      "missing '%select{super.|self.}0' at initializer invocation", (bool))
 ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
@@ -1366,6 +1364,8 @@ ERROR(expected_rparen_expr_list,none,
 ERROR(expected_rsquare_expr_list,none,
       "expected ']' in expression list", ())
 
+ERROR(expected_label_before_colon,none, "expected argument label before colon", ())
+
 // Array literal expressions
 ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
@@ -1501,6 +1501,9 @@ WARNING(warning_in_effects_attribute,none,
 
 ERROR(expected_in_attribute_list,none,
       "expected ']' or ',' in attribute list", ())
+
+ERROR(expected_depends_on,none,
+      "expected 'depends_on'", ())
 
 ERROR(type_attribute_applied_to_decl,none,
       "attribute can only be applied to types, not declarations", ())
@@ -2160,10 +2163,24 @@ ERROR(duplicate_storage_restrictions_attr_label,none,
 ERROR(storage_restrictions_attr_expected_name,none,
       "expected property name in @storageRestrictions list", ())
 
-ERROR(requires_non_escapable_types, none,
-      "'%0' %select{attribute|parameter specifier}1 is only valid when experimental "
-      "NonescapableTypes is enabled",
-      (StringRef, bool))
+ERROR(requires_experimental_feature, none,
+      "'%0' %select{attribute|parameter specifier}1 is only valid when experimental feature "
+      "%2 is enabled",
+      (StringRef, bool, StringRef))
+
+ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected '(' after lifetime dependence specifier", ())
+
+ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
+      PointsToFirstBadToken,
+      "expected identifier, index or self in lifetime dependence specifier",
+      ())
+
+ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected ')' after parameter list in lifetime dependence specifier", ())
+
+ERROR(expected_param_index_lifetime_dependence, PointsToFirstBadToken,
+      "expected unsigned parameter index in lifetime dependence specifier", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

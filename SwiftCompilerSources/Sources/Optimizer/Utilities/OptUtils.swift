@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
 import SIL
 import OptimizerBridging
 
@@ -483,6 +484,18 @@ extension Function {
     }
     return nil
   }
+
+  var initializedGlobal: GlobalVariable? {
+    if !isGlobalInitOnceFunction {
+      return nil
+    }
+    for inst in entryBlock.instructions {
+      if let allocGlobal = inst as? AllocGlobalInst {
+        return allocGlobal.global
+      }
+    }
+    return nil
+  }
 }
 
 extension FullApplySite {
@@ -497,6 +510,14 @@ extension FullApplySite {
        !calleeFunction.isSerialized {
       return false
     }
+
+    // Cannot inline a non-ossa function into an ossa function
+    if parentFunction.hasOwnership,
+      let calleeFunction = referencedFunction,
+      !calleeFunction.hasOwnership {
+      return false
+    }
+
     return true
   }
 
@@ -568,4 +589,69 @@ extension InstructionRange {
       }
     }
   }
+}
+
+/// Analyses the global initializer function and returns the `alloc_global` and `store`
+/// instructions which initialize the global.
+/// Returns nil if `function` has any side-effects beside initializing the global.
+///
+/// The function's single basic block must contain following code pattern:
+/// ```
+///   alloc_global @the_global
+///   %a = global_addr @the_global
+///   %i = some_const_initializer_insts
+///   store %i to %a
+/// ```
+func getGlobalInitialization(
+  of function: Function,
+  allowGlobalValue: Bool
+) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
+  guard let block = function.blocks.singleElement else {
+    return nil
+  }
+
+  var allocInst: AllocGlobalInst? = nil
+  var globalAddr: GlobalAddrInst? = nil
+  var store: StoreInst? = nil
+
+  for inst in block.instructions {
+    switch inst {
+    case is ReturnInst,
+         is DebugValueInst,
+         is DebugStepInst,
+         is BeginAccessInst,
+         is EndAccessInst:
+      break
+    case let agi as AllocGlobalInst:
+      if allocInst != nil {
+        return nil
+      }
+      allocInst = agi
+    case let ga as GlobalAddrInst:
+      if let agi = allocInst, agi.global == ga.global {
+        globalAddr = ga
+      }
+    case let si as StoreInst:
+      if store != nil {
+        return nil
+      }
+      guard let ga = globalAddr else {
+        return nil
+      }
+      if si.destination != ga {
+        return nil
+      }
+      store = si
+    case is GlobalValueInst where allowGlobalValue:
+      break
+    default:
+      if !inst.isValidInStaticInitializerOfGlobal {
+        return nil
+      }
+    }
+  }
+  if let store = store {
+    return (allocInst: allocInst!, storeToGlobal: store)
+  }
+  return nil
 }

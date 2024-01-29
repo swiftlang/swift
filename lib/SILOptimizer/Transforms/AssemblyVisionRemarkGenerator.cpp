@@ -156,6 +156,9 @@ void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
 
     // WARNING: This must be kept insync with isSupportedProjection!
     switch (proj.getKind()) {
+    case ProjectionKind::BlockStorageCast:
+      stream << "project_block_storage<" << proj.getCastType(baseType) << ">";
+      continue;
     case ProjectionKind::Upcast:
       stream << "upcast<" << proj.getCastType(baseType) << ">";
       continue;
@@ -204,6 +207,7 @@ static SingleValueInstruction *isSupportedProjection(Projection p, SILValue v) {
   switch (p.getKind()) {
   case ProjectionKind::Upcast:
   case ProjectionKind::RefCast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::Struct:
   case ProjectionKind::Tuple:

@@ -1,6 +1,3 @@
-// FIXME: Disabled due to https://github.com/apple/swift/issues/69485
-// REQUIRES: issue_69485
-
 // REQUIRES: VENDOR=apple
 // REQUIRES: executable_test
 

@@ -1141,6 +1141,15 @@ void ASTMangler::appendExistentialLayout(
   bool DroppedRequiresClass = false;
   bool SawRequiresClass = false;
   for (auto proto : layout.getProtocols()) {
+    // Skip invertible protocols
+    //
+    // TODO: reconsituteInverses so the absence of such protocols gets mangled.
+    // I think here we need to see if any protocols inheritsFrom
+    // Copyable/Escapable, and if not, and none of those are found in the layout
+    // then it must have had an inverse.
+    if (proto->getInvertibleProtocolKind())
+      continue;
+
     // If we aren't allowed to emit marker protocols, suppress them here.
     if (!AllowMarkerProtocols && proto->isMarkerProtocol()) {
       if (proto->requiresClass())
@@ -1787,8 +1796,9 @@ static bool conformanceHasIdentity(const RootProtocolConformance *root) {
     return true;
   }
 
-  // Synthesized non-unique conformances all get collapsed together at run time.
-  if (conformance->isSynthesizedNonUnique())
+  // Synthesized conformances can have multiple copies, so they don't
+  // provide identity.
+  if (conformance->isSynthesized())
     return false;
 
   // Objective-C protocol conformances are checked by the ObjC runtime.
@@ -1933,14 +1943,10 @@ void ASTMangler::appendSymbolicExtendedExistentialType(
 }
 
 static llvm::Optional<char>
-getParamDifferentiability(SILParameterDifferentiability diffKind) {
-  switch (diffKind) {
-  case swift::SILParameterDifferentiability::DifferentiableOrNotApplicable:
-    return llvm::None;
-  case swift::SILParameterDifferentiability::NotDifferentiable:
+getParamDifferentiability(SILParameterInfo::Options options) {
+  if (options.contains(SILParameterInfo::NotDifferentiable))
     return 'w';
-  }
-  llvm_unreachable("bad parameter differentiability");
+  return {};
 }
 
 static char getResultConvention(ResultConvention conv) {
@@ -1956,14 +1962,10 @@ static char getResultConvention(ResultConvention conv) {
 }
 
 static llvm::Optional<char>
-getResultDifferentiability(SILResultDifferentiability diffKind) {
-  switch (diffKind) {
-  case swift::SILResultDifferentiability::DifferentiableOrNotApplicable:
-    return llvm::None;
-  case swift::SILResultDifferentiability::NotDifferentiable:
+getResultDifferentiability(SILResultInfo::Options options) {
+  if (options.contains(SILResultInfo::NotDifferentiable))
     return 'w';
-  }
-  llvm_unreachable("bad result differentiability");
+  return {};
 }
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
@@ -2077,7 +2079,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
-    if (auto diffKind = getParamDifferentiability(param.getDifferentiability()))
+    if (auto diffKind = getParamDifferentiability(param.getOptions()))
       OpArgs.push_back(*diffKind);
     appendType(param.getInterfaceType(), sig, forDecl);
   }
@@ -2085,8 +2087,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
   // Mangle the results.
   for (auto result : fn->getResults()) {
     OpArgs.push_back(getResultConvention(result.getConvention()));
-    if (auto diffKind =
-            getResultDifferentiability(result.getDifferentiability()))
+    if (auto diffKind = getResultDifferentiability(result.getOptions()))
       OpArgs.push_back(*diffKind);
     appendType(result.getInterfaceType(), sig, forDecl);
   }
@@ -2326,33 +2327,6 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     appendContext(ctx->getParent(), useModuleName);
     return;
 
-  case DeclContextKind::SerializedLocal: {
-    auto local = cast<SerializedLocalDeclContext>(ctx);
-    switch (local->getLocalDeclContextKind()) {
-    case LocalDeclContextKind::AbstractClosure:
-      appendClosureEntity(cast<SerializedAbstractClosureExpr>(local));
-      return;
-    case LocalDeclContextKind::DefaultArgumentInitializer: {
-      auto argInit = cast<SerializedDefaultArgumentInitializer>(local);
-      appendDefaultArgumentEntity(ctx->getParent(), argInit->getIndex());
-      return;
-    }
-    case LocalDeclContextKind::PatternBindingInitializer: {
-      auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      if (auto var = findFirstVariable(patternInit->getBinding())) {
-        appendInitializerEntity(var.value());
-      } else {
-        // This is incorrect in that it does not produce a /unique/ mangling,
-        // but it will at least produce a /valid/ mangling.
-        appendContext(ctx->getParent(), useModuleName);
-      }
-      return;
-    }
-    case LocalDeclContextKind::TopLevelCodeDecl:
-      return appendContext(local->getParent(), useModuleName);
-    }
-  }
-
   case DeclContextKind::GenericTypeDecl:
     appendAnyGenericType(cast<GenericTypeDecl>(ctx));
     return;
@@ -2392,6 +2366,9 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
 
   case DeclContextKind::AbstractClosureExpr:
     return appendClosureEntity(cast<AbstractClosureExpr>(ctx));
+
+  case DeclContextKind::SerializedAbstractClosure:
+    return appendClosureEntity(cast<SerializedAbstractClosureExpr>(ctx));
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto fn = cast<AbstractFunctionDecl>(ctx);
@@ -2453,6 +2430,7 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
     llvm_unreachable("bad initializer kind");
 
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     // Mangle the containing module context.
     return appendContext(ctx->getParent(), useModuleName);
 
@@ -2900,7 +2878,8 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
   // `inout` should already be specified in the flags.
   case ParamSpecifier::InOut:
     return flags;
-  
+
+  case ParamSpecifier::Transferring:
   case ParamSpecifier::Consuming:
   case ParamSpecifier::Borrowing:
     // Only mangle the ownership if it diverges from the default.
@@ -3026,14 +3005,28 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
     appendOperator("d");
 }
 
+/// Filters out requirements stating that a type conforms to one of the
+/// invertible protocols.
+/// TODO: reconsituteInverses so the absence of conformances gets mangled
+static void withoutInvertibleRequirements(ArrayRef<Requirement> requirements,
+                                          SmallVector<Requirement, 4> &output) {
+  for (auto req : requirements) {
+    // Skip conformance requirements for invertible protocols.
+    if (req.getKind() == RequirementKind::Conformance
+        && req.getProtocolDecl()->getInvertibleProtocolKind())
+      continue;
+
+    output.push_back(req);
+  }
+}
+
 bool ASTMangler::appendGenericSignature(GenericSignature sig,
                                         GenericSignature contextSig) {
   auto canSig = sig.getCanonicalSignature();
 
   unsigned initialParamDepth;
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> genericParams;
-  ArrayRef<Requirement> requirements;
-  SmallVector<Requirement, 4> requirementsBuffer;
+  SmallVector<Requirement, 4> requirements;
   if (contextSig) {
     // If the signature is the same as the context signature, there's nothing
     // to do.
@@ -3063,16 +3056,16 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
         contextSig.getRequirements().empty()) {
       initialParamDepth = 0;
       genericParams = canSig.getGenericParams();
-      requirements = canSig.getRequirements();
+      withoutInvertibleRequirements(canSig.getRequirements(), requirements);
     } else {
-      requirementsBuffer = canSig.requirementsNotSatisfiedBy(contextSig);
-      requirements = requirementsBuffer;
+      withoutInvertibleRequirements(
+          canSig.requirementsNotSatisfiedBy(contextSig), requirements);
     }
   } else {
     // Use the complete canonical signature.
     initialParamDepth = 0;
     genericParams = canSig.getGenericParams();
-    requirements = canSig.getRequirements();
+    withoutInvertibleRequirements(canSig.getRequirements(), requirements);
   }
 
   if (genericParams.empty() && requirements.empty())

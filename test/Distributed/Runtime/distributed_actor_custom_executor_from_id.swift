@@ -28,7 +28,7 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 distributed actor Worker {
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("get unowned 'local' executor via ID")
-    return self.id.executorPreference ?? buildDefaultDistributedRemoteActorExecutor(self)
+    return self.id.preferredTaskExecutor ?? buildDefaultDistributedRemoteActorExecutor(self)
   }
 
   distributed func test(x: Int) {
@@ -46,7 +46,7 @@ distributed actor Worker {
 
 @available(SwiftStdlib 5.7, *)
 extension DefaultDistributedActorSystem.ActorID {
-  var executorPreference: UnownedSerialExecutor? {
+  var preferredTaskExecutor: UnownedSerialExecutor? {
     MainActor.sharedUnownedExecutor
   }
 }

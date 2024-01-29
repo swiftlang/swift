@@ -101,6 +101,8 @@ private extension BuiltinInst {
     guard let callee = calleeOfOnce, callee.isDefinition else {
       return
     }
+    context.notifyDependency(onBodyOf: callee)
+
     // If the callee is side effect-free we can remove the whole builtin "once".
     // We don't use the callee's memory effects but instead look at all callee instructions
     // because memory effects are not computed in the Onone pipeline, yet.
@@ -108,6 +110,10 @@ private extension BuiltinInst {
     // or contains the side-effect instruction `alloc_global` right at the beginning.
     if callee.instructions.contains(where: hasSideEffectForBuiltinOnce) {
       return
+    }
+    for use in uses {
+      let ga = use.instruction as! GlobalAddrInst
+      ga.clearToken(context)
     }
     context.erase(instruction: self)
   }
@@ -271,8 +277,13 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsTy = lhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsExistential.metatype.type.instanceTypeOfMetatype(in: function)
+  let lhsMetatype = lhsExistential.metatype.type
+  let rhsMetatype = rhsExistential.metatype.type
+  if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
+    return nil
+  }
+  let lhsTy = lhsMetatype.instanceTypeOfMetatype(in: function)
+  let rhsTy = rhsMetatype.instanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.

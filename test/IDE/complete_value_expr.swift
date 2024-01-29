@@ -588,8 +588,8 @@ func testInsideFunctionCall11(_ x: inout FooStruct) {
 // INSIDE_FUNCTION_CALL_11B: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#Int#}, {#b: &Double#}[')'][#Void#];
 }
 func testInsideFunctionCall12(_ x: inout FooStruct) {
-  x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12?check=INSIDE_FUNCTION_CALL_4^#<#placeholder#>
-// INSIDE_FUNCTION_CALL_12-NOT: Decl[InstanceMethod]/{{.*}}:{{.*}}({{.*}}{#Int#}
+  x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12^#<#placeholder#>
+// INSIDE_FUNCTION_CALL_12: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#]; name=0
 }
 
 func testInsideVarargFunctionCall1() {

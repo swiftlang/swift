@@ -34,20 +34,20 @@ func check(_ t: RudeEnum<Int>) {}
 // CHECK: sil hidden [ossa] @$s4main5checkyyAA8RudeEnumOyAA2NCVGF : $@convention(thin) (RudeEnum<NC>) -> () {
 func check(_ t: RudeEnum<NC>) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA18CondCopyableStructVySiGF : $@convention(thin) (CondCopyableStruct<Int>) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA18CondCopyableStructVySiGF : $@convention(thin) (@guaranteed CondCopyableStruct<Int>) -> () {
 func check(_ t: CondCopyableStruct<Int>) {}
 
 // CHECK: sil hidden [ossa] @$s4main5checkyyAA18CondCopyableStructVyAA2NCVGF : $@convention(thin) (@guaranteed CondCopyableStruct<NC>) -> () {
 func check(_ t: borrowing CondCopyableStruct<NC>) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOySiGF : $@convention(thin) (CondCopyableEnum<Int>) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOySiGF : $@convention(thin) (@guaranteed CondCopyableEnum<Int>) -> () {
 func check(_ t: CondCopyableEnum<Int>) {}
 
 // CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyAA2NCVGF : $@convention(thin) (@guaranteed CondCopyableEnum<NC>) -> () {
 func check(_ t: borrowing CondCopyableEnum<NC>) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGs0D0Rzs9EscapableRzlF : $@convention(thin) <T where T : Copyable, T : Escapable> (@in_guaranteed CondCopyableEnum<T>) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGlF : $@convention(thin) <T where T : Copyable, T : Escapable> (@in_guaranteed CondCopyableEnum<T>) -> () {
 func check<T>(_ t: CondCopyableEnum<T>) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGs9EscapableRzlF : $@convention(thin) <U where U : Escapable> (@in_guaranteed CondCopyableEnum<U>) -> () {
-func check<U: ~Copyable>(_ t: borrowing CondCopyableEnum<U>) {}
+// CHECK: sil hidden [ossa] @$s4main13check_noClashyyAA16CondCopyableEnumOyxGlF : $@convention(thin) <U where U : Escapable> (@in_guaranteed CondCopyableEnum<U>) -> () {
+func check_noClash<U: ~Copyable>(_ t: borrowing CondCopyableEnum<U>) {}

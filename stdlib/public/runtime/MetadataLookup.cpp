@@ -221,7 +221,7 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
   switch (kind) {
   case SymbolicReferenceKind::Context:
     return _buildDemanglingForContext(
-      (const ContextDescriptor *)resolvedReference, {}, Dem);
+        (const ContextDescriptor *)resolvedReference, {}, Dem);
 
   case SymbolicReferenceKind::AccessorFunctionReference:
 #if SWIFT_PTRAUTH
@@ -1957,6 +1957,7 @@ public:
   createFunctionType(
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
+      ExtendedFunctionTypeFlags extFlags,
       FunctionMetadataDifferentiabilityKind diffKind,
       BuiltType globalActorType, BuiltType thrownError) const {
     assert(
@@ -1991,12 +1992,6 @@ public:
                                      "the global actor type is a pack");
       }
       flags = flags.withGlobalActor(true);
-    }
-
-    ExtendedFunctionTypeFlags extFlags;
-    if (thrownError) {
-      flags = flags.withExtendedFlags(true);
-      extFlags = extFlags.withTypedThrows(true);
     }
 
     return BuiltType(
@@ -2264,7 +2259,7 @@ swift_getTypeByMangledNodeImpl(MetadataRequest request, Demangler &demangler,
     return TypeInfo{MetadataResponse{type, MetadataState::Complete},
                     TypeReferenceOwnership()};
   }
-  
+    
   // TODO: propagate the request down to the builder instead of calling
   // swift_checkMetadataState after the fact.
   DecodedMetadataBuilder builder(demangler, substGenericParam,

@@ -395,6 +395,9 @@ public:
   /// Whether the type contains any flavor of pack.
   bool hasAnyPack() const { return getASTType()->hasAnyPack(); }
 
+  /// Whether the type's layout is known to include some flavor of pack.
+  bool isOrContainsPack(const SILFunction &F) const;
+
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;
@@ -760,9 +763,13 @@ public:
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
 
-  /// Returns true if this type is a first class move only type or a move only
-  /// wrapped type.
-  bool isMoveOnly() const;
+  /// Returns true if this type is a noncopyable type. Otherwise, if the type
+  /// satisfies \c isMoveOnlyWrapped(), then it returns true iff \c orWrapped
+  /// is true. That is,
+  ///
+  /// orWrapped == false -->  isNoncopyable
+  /// orWrapped == true  -->  isNoncopyable || isMoveOnlyWrapped
+  bool isMoveOnly(bool orWrapped=true) const;
 
   /// Return true if this is a value type (struct/enum) that requires
   /// deinitialization beyond destruction of its members.
@@ -887,9 +894,6 @@ public:
 
   /// Returns true if this function conforms to the Sendable protocol.
   bool isSendable(SILFunction *fn) const;
-
-  ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
-                                            ProtocolDecl *protocol) const;
 
   /// False if SILValues of this type cannot be used outside the scope of their
   /// lifetime dependence.

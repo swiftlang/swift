@@ -1016,6 +1016,7 @@ static Type substOpaqueTypesWithUnderlyingTypesRec(
 /// opaque substitutions are or are not allowed.
 static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
                                   OpaqueSubstitutionKind kind,
+                                  ResilienceExpansion contextExpansion,
                                   bool isContextWholeModule) {
   TypeDecl *typeDecl = ty->getAnyNominal();
   if (!typeDecl) {
@@ -1056,7 +1057,8 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
 
   case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
-    if (dc->getParentModule() == typeDecl->getDeclContext()->getParentModule())
+    if (dc->getParentModule() == typeDecl->getDeclContext()->getParentModule() &&
+        contextExpansion != ResilienceExpansion::Minimal)
       return typeDecl->getEffectiveAccess() > AccessLevel::FilePrivate;
 
     return typeDecl->getEffectiveAccess() > AccessLevel::Internal;
@@ -1100,10 +1102,13 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // context.
   auto inContext = this->getContext();
   auto isContextWholeModule = this->isWholeModule();
+  auto contextExpansion = this->contextExpansion;
   if (inContext &&
       partialSubstTy.findIf(
-          [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
+          [inContext, substitutionKind, isContextWholeModule,
+           contextExpansion](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
+                                       contextExpansion,
                                        isContextWholeModule))
               return true;
             return false;
@@ -1211,9 +1216,12 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // context.
   auto inContext = this->getContext();
   auto isContextWholeModule = this->isWholeModule();
+  auto contextExpansion = this->contextExpansion;
   if (partialSubstTy.findIf(
-          [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
+          [inContext, substitutionKind, isContextWholeModule,
+          contextExpansion](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
+                                       contextExpansion,
                                        isContextWholeModule))
               return true;
             return false;

@@ -19,7 +19,7 @@ using namespace swift::refactoring::asyncrefactorings;
 static bool isErrorType(Type Ty, ModuleDecl *MD) {
   if (!Ty)
     return false;
-  return !MD->conformsToProtocol(Ty, Ty->getASTContext().getErrorDecl())
+  return !MD->checkConformance(Ty, Ty->getASTContext().getErrorDecl())
               .isInvalid();
 }
 

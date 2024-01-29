@@ -600,7 +600,7 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
   return keyPathTy;
 }
 
-void BindingSet::finalize(
+bool BindingSet::finalize(
     llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings) {
   inferTransitiveBindings(inferredBindings);
 
@@ -654,9 +654,10 @@ void BindingSet::finalize(
 
       std::tie(isValid, capability) = CS.inferKeyPathLiteralCapability(TypeVar);
 
-      // Key path literal is not yet sufficiently resolved.
+      // Key path literal is not yet sufficiently resolved, this binding
+      // set is not viable.
       if (isValid && !capability)
-        return;
+        return false;
 
       // If the key path is sufficiently resolved we can add inferred binding
       // to the set.
@@ -728,7 +729,7 @@ void BindingSet::finalize(
       Bindings = std::move(updatedBindings);
       Defaults.clear();
 
-      return;
+      return true;
     }
 
     if (CS.shouldAttemptFixes() &&
@@ -753,6 +754,8 @@ void BindingSet::finalize(
       }
     }
   }
+
+  return true;
 }
 
 void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
@@ -1030,7 +1033,8 @@ llvm::Optional<BindingSet> ConstraintSystem::determineBestBindings(
     // produce a default type.
     bool isViable = isViableForRanking(bindings);
 
-    bindings.finalize(cache);
+    if (!bindings.finalize(cache))
+      continue;
 
     if (!bindings || !isViable)
       continue;
@@ -2172,10 +2176,43 @@ static Type getOptionalSuperclass(Type type) {
     type = underlying;
   }
 
-  if (!type->mayHaveSuperclass())
-    return Type();
+  Type superclass;
+  if (auto *existential = type->getAs<ExistentialType>()) {
+    auto constraintTy = existential->getConstraintType();
+    if (auto *compositionTy = constraintTy->getAs<ProtocolCompositionType>()) {
+      SmallVector<Type, 2> members;
+      bool found = false;
+      // Preserve all of the protocol requirements of the type i.e.
+      // if the type was `any B & P` where `B : A` the supertype is
+      // going to be `any A & P`.
+      //
+      // This is especially important for Sendable key paths because
+      // to reserve sendability of the original type.
+      for (auto member : compositionTy->getMembers()) {
+        if (member->getClassOrBoundGenericClass()) {
+          member = member->getSuperclass();
+          if (!member)
+            return Type();
+          found = true;
+        }
+        members.push_back(member);
+      }
 
-  auto superclass = type->getSuperclass();
+      if (!found)
+        return Type();
+
+      superclass = ExistentialType::get(
+          ProtocolCompositionType::get(type->getASTContext(), members,
+                                       compositionTy->hasExplicitAnyObject()));
+    } else {
+      // Avoid producing superclass for situations like `any P` where `P` is
+      // `protocol P : C`.
+      return Type();
+    }
+  } else {
+    superclass = type->getSuperclass();
+  }
+
   if (!superclass)
     return Type();
 
@@ -2326,7 +2363,7 @@ bool TypeVarBindingProducer::computeNext() {
           auto supertype = *simplifiedSuper;
           // A key path type cannot be bound to type-erased key path variants.
           if (TypeVar->getImpl().isKeyPathType() &&
-              (supertype->isPartialKeyPath() || supertype->isAnyKeyPath()))
+              isTypeErasedKeyPathType(supertype))
             continue;
 
           addNewBinding(binding.withType(supertype));

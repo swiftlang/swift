@@ -134,13 +134,13 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
                               ArrayRef<StringRef>());
 
   auto F1 = Builder.createFunctionType(
-      Parameters1, Result, FunctionTypeFlags(),
+      Parameters1, Result, FunctionTypeFlags(), ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F2 = Builder.createFunctionType(
-      Parameters1, Result, FunctionTypeFlags(),
+      Parameters1, Result, FunctionTypeFlags(), ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F3 = Builder.createFunctionType(
-      Parameters2, Result, FunctionTypeFlags(),
+      Parameters2, Result, FunctionTypeFlags(), ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
 
   EXPECT_EQ(F1, F2);
@@ -148,9 +148,11 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   auto F4 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withThrows(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F5 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withThrows(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
 
   EXPECT_EQ(F4, F5);
@@ -165,41 +167,51 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   auto F6 = Builder.createFunctionType(
       {Param1.withFlags(inoutFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F6_1 = Builder.createFunctionType(
       {Param1.withFlags(inoutFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_EQ(F6, F6_1);
 
   auto F7 = Builder.createFunctionType(
       {Param1.withFlags(variadicFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F7_1 = Builder.createFunctionType(
       {Param1.withFlags(variadicFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_EQ(F7, F7_1);
 
   auto F8 = Builder.createFunctionType(
       {Param1.withFlags(sharedFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F8_1 = Builder.createFunctionType(
       {Param1.withFlags(sharedFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_EQ(F8, F8_1);
 
   auto F9 = Builder.createFunctionType(
       {Param1.withFlags(ownedFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F9_1 = Builder.createFunctionType(
       {Param1.withFlags(ownedFlags)}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_EQ(F9, F9_1);
 
   auto F10 = Builder.createFunctionType(
       {Param1}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F10_1 = Builder.createFunctionType(
       {Param1.withLabel("foo")}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_NE(F10, F10_1);
 
@@ -216,9 +228,11 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   auto VoidVoid1 =
       Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto VoidVoid2 =
       Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
 
   EXPECT_EQ(VoidVoid1, VoidVoid2);
@@ -227,12 +241,15 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   // Test escaping.
   auto F11 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withEscaping(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F12 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withEscaping(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F13 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withEscaping(false),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_EQ(F11, F12);
   EXPECT_NE(F11, F13);
@@ -240,12 +257,15 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   // Test sendable.
   auto F14 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withConcurrent(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F15 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withConcurrent(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   auto F16 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withConcurrent(false),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
   EXPECT_EQ(F14, F15);
   EXPECT_NE(F14, F16);
@@ -253,12 +273,15 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   // Test differentiable.
   auto F17 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withDifferentiable(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::Reverse, nullptr, nullptr);
   auto F18 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withDifferentiable(true),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::Reverse, nullptr, nullptr);
   auto F19 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withDifferentiable(false),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::Reverse, nullptr, nullptr);
   EXPECT_EQ(F17, F18);
   EXPECT_NE(F17, F19);
@@ -269,12 +292,15 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
     parameters[1].setNoDerivative();
     auto f1 = Builder.createFunctionType(
         parameters, Result, FunctionTypeFlags().withDifferentiable(true),
+        ExtendedFunctionTypeFlags(),
         FunctionMetadataDifferentiabilityKind::Reverse, nullptr, nullptr);
     auto f2 = Builder.createFunctionType(
         parameters, Result, FunctionTypeFlags().withDifferentiable(true),
+        ExtendedFunctionTypeFlags(),
         FunctionMetadataDifferentiabilityKind::Reverse, nullptr, nullptr);
     auto f3 = Builder.createFunctionType(
         Parameters1, Result, FunctionTypeFlags().withDifferentiable(true),
+        ExtendedFunctionTypeFlags(),
         FunctionMetadataDifferentiabilityKind::Reverse, nullptr, nullptr);
     EXPECT_EQ(f1, f2);
     EXPECT_NE(f1, f3);
@@ -522,6 +548,7 @@ TEST(TypeRefTest, DeriveSubstitutions) {
                                         ArrayRef<StringRef>());
   auto Func = Builder.createFunctionType(
       {Nominal}, Result, FunctionTypeFlags(),
+      ExtendedFunctionTypeFlags(),
       FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr, nullptr);
 
   TypeRefDecl SubstOneName("subst1");

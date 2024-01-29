@@ -123,6 +123,8 @@
 /lib/SILGen/*Distributed*                           @ktoso
 # TODO: /lib/SILOptimizer/
 /lib/SILOptimizer/Mandatory/FlowIsolation.cpp       @kavon
+/lib/SILOptimizer/Mandatory/ConsumeOperator*        @kavon
+/lib/SILOptimizer/Mandatory/MoveOnly*               @kavon
 /lib/SILOptimizer/Utils/Distributed*                @ktoso
 /lib/Sema/                                          @hborla @slavapestov @xedin
 /lib/Sema/*Availability*                            @tshortli
@@ -144,7 +146,7 @@
 # stdlib
 /stdlib/                                  @apple/standard-librarians
 /stdlib/public/Backtracing/               @al45tair
-/stdlib/public/Concurrency/               @ktoso @kavon
+/stdlib/public/Concurrency/               @ktoso
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
 /stdlib/public/Distributed/               @ktoso
 /stdlib/public/Observation/               @phausler
@@ -155,13 +157,14 @@
 
 # test
 /test/ASTGen/                                       @ahoppen @bnbarham @CodaFi @hamishknight @rintaro
-/test/Concurrency/                                  @ktoso @kavon
+/test/Concurrency/                                  @ktoso
 /test/Constraints/                                  @hborla @xedin
 /test/DebugInfo/                                    @adrian-prantl
 /test/Distributed/                                  @ktoso
 /test/Driver/                                       @artemcm
 /test/Driver/static*                                @MaxDesiatov @etcwilde
 /test/Generics/                                     @hborla @slavapestov
+/test/Generics/inverse*                             @kavon
 # TODO: /test/IRGen/
 /test/IDE/                                          @ahoppen @bnbarham @hamishknight @rintaro
 /test/Index/                                        @ahoppen @bnbarham @hamishknight @rintaro
@@ -171,8 +174,11 @@
 # TODO: /test/SIL/
 # TODO: /test/SILGen/
 # TODO: /test/SILOptimizer/
+/test/SILOptimizer/moveonly*                        @kavon
+/test/SILOptimizer/noimplicitcopy*                  @kavon
 /test/ScanDependencies/                             @artemcm
 /test/Sema/                                         @hborla @slavapestov @xedin
+/test/Sema/moveonly*                                @kavon
 /test/SourceKit/                                    @ahoppen @bnbarham @hamishknight @rintaro
 /test/SymbolGraph/                                  @QuietMisdreavus
 /test/abi/                                          @apple/standard-librarians

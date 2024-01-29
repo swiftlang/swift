@@ -931,6 +931,24 @@ public:
   bool isCached() const { return true; }
 };
 
+class LookupIntrinsicRequest
+    : public SimpleRequest<LookupIntrinsicRequest,
+                           FuncDecl *(ModuleDecl *, Identifier),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  FuncDecl *evaluate(Evaluator &evaluator, ModuleDecl *module,
+                     Identifier funcName) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

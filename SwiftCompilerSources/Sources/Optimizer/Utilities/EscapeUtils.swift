@@ -555,7 +555,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   /// Handle an apply (full or partial) during the walk-down.
   private mutating
   func walkDownCallee(argOp: Operand, apply: ApplySite, path: Path) -> WalkResult {
-    guard let argIdx = apply.argumentIndex(of: argOp) else {
+    guard let calleeArgIdx = apply.calleeArgumentIndex(of: argOp) else {
       // The callee or a type dependent operand of the apply does not let escape anything.
       return .continueWalk
     }
@@ -591,8 +591,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return isEscaping
     }
 
-    let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: argIdx)
-
     for callee in callees {
       let effects = callee.effects
       if !effects.escapeEffects.canEscape(argumentIndex: calleeArgIdx,
@@ -617,12 +615,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       case .escapingToArgument(let toArgIdx, let toPath):
         // Note: exclusive argument -> argument effects cannot appear, so we don't need to handle them here.
         if effect.matches(calleeArgIdx, argPath.projectionPath) {
-          guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {
+          guard let argOp = apply.operand(forCalleeArgumentIndex: toArgIdx) else {
             return isEscaping
           }
 
           // Continue at the destination of an arg-to-arg escape.
-          let arg = apply.arguments[callerToIdx]
+          let arg = argOp.value
           
           let p = Path(projectionPath: toPath, followStores: false, knownType: nil)
           if walkUp(addressOrValue: arg, path: p) == .abortWalk {
@@ -778,10 +776,10 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         switch effect.kind {
         case .escapingToReturn(let toPath, let exclusive):
           if exclusive && path.projectionPath.matches(pattern: toPath) {
-            guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.argumentIndex) else {
+            guard let argOp = apply.operand(forCalleeArgumentIndex: effect.argumentIndex) else {
               return .abortWalk
             }
-            let arg = apply.arguments[callerArgIdx]
+            let arg = argOp.value
             
             let p = Path(projectionPath: effect.pathPattern, followStores: path.followStores, knownType: nil)
             if walkUp(addressOrValue: arg, path: p) == .abortWalk {

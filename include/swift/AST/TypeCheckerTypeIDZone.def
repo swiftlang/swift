@@ -37,6 +37,8 @@ SWIFT_REQUEST(TypeChecker, CheckInconsistentSPIOnlyImportsRequest,
               evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentAccessLevelOnImport,
               evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInconsistentAccessLevelOnImportSameFileRequest,
+              evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentWeakLinkedImportsRequest,
               evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
@@ -98,6 +100,13 @@ SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExistentialConformsToSelfRequest,
               bool(ProtocolDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CollectExistentialConformancesRequest,
+            ArrayRef<ProtocolConformanceRef>(ModuleDecl*,
+                                             CanType,
+                                             CanType,
+                                             bool,
+                                             bool),
+            Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasSelfOrAssociatedTypeRequirementsRequest,
               bool(ProtocolDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExtendedTypeRequest, Type(ExtensionDecl *), Cached,
@@ -409,6 +418,9 @@ SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckSourceFileRequest,
               bool(SouceFile *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ConformanceAccessScopeRequest,
+              ConformanceAccessScope(DeclContext *, ProtocolDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
               TypeWitnessAndDecl(NormalProtocolConformance *,
                                  AssociatedTypeDecl *),
@@ -417,6 +429,12 @@ SWIFT_REQUEST(TypeChecker, AssociatedConformanceRequest,
               ProtocolConformanceRef(NormalProtocolConformance *,
                                      Type, ProtocolDecl *, unsigned),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ReferencedAssociatedTypesRequest,
+              TinyPtrVector<AssociatedTypeDecl *>(ValueDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveTypeWitnessesRequest,
+              evaluator::SideEffect(NormalProtocolConformance *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
               Witness(NormalProtocolConformance *, ValueDecl *),
               SeparatelyCached, NoLocationInfo)
@@ -540,3 +558,6 @@ SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
               llvm::Optional<SubstitutionMap>(const Decl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LocalTypeDeclsRequest,
+              ArrayRef<TypeDecl *>(SourceFile *),
+              Cached, NoLocationInfo)

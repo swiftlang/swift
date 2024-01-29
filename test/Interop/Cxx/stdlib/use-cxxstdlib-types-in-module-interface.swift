@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-ide-test -swift-version 5 -print-module -module-to-print=IncludesCxxStdlib -I %t/Inputs -source-filename=test.swift -enable-experimental-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t/cache | %FileCheck %s
+// RUN: %target-swift-ide-test -swift-version 5 -print-module -module-to-print=IncludesCxxStdlib -I %t/Inputs -source-filename=test.swift -enable-experimental-cxx-interop -module-cache-path %t/cache | %FileCheck %s
 
 //--- Inputs/module.modulemap
 module IncludesCxxStdlib {

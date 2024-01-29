@@ -202,7 +202,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     for (auto idx : range(PBD->getNumPatternEntries())) {
       if (Pattern *Pat = doIt(PBD->getPattern(idx)))
-        PBD->setPattern(idx, Pat, PBD->getInitContext(idx));
+        PBD->setPattern(idx, Pat);
       else
         return true;
 
@@ -1315,6 +1315,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E) {
+    if (auto actor = E->getActor()) {
+      if (auto newActor = doIt(actor))
+        E->setActor(newActor);
+      else
+        return nullptr;
+    }
+
+    return E;
+  }
+
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
@@ -2253,6 +2264,11 @@ bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
       return true;
   }
   return false;
+}
+
+bool Traversal::visitLifetimeDependentReturnTypeRepr(
+    LifetimeDependentReturnTypeRepr *T) {
+  return doIt(T->getBase());
 }
 
 Expr *Expr::walk(ASTWalker &walker) {

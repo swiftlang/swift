@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature TypedThrows
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 enum MyError: Error {
 case failed

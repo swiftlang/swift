@@ -324,6 +324,14 @@ void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
 /// Warn about deprecated `Executor.enqueue` implementations.
 void tryDiagnoseExecutorConformance(ASTContext &C, const NominalTypeDecl *nominal, ProtocolDecl *proto);
 
+/// Whether to suppress deprecation diagnostics for \p decl in \p declContext
+/// because \p decl is a deprecated decl from the `_Concurrency` module and is
+/// being referenced from the implementation of the `_Concurrency` module. This
+/// prevents unaddressable warnings in the standard library build. Ideally, a
+/// language feature would obviate the need for this.
+bool shouldIgnoreDeprecationOfConcurrencyDecl(const Decl *decl,
+                                              DeclContext *declContext);
+
 // Get a concrete reference to a declaration
 ConcreteDeclRef getDeclRefInContext(ValueDecl *value);
 
@@ -393,7 +401,8 @@ struct SendableCheckContext {
 /// \returns \c true if any errors were produced, \c false if no diagnostics or
 /// only warnings and notes were produced.
 bool diagnoseNonSendableTypes(
-    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    Type type, SendableCheckContext fromContext,
+    Type inDerivedConformance, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
 
 namespace detail {
@@ -416,14 +425,15 @@ namespace detail {
 template<typename ...DiagArgs>
 bool diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext,
+    Type derivedConformance,
     SourceLoc typeLoc, SourceLoc diagnoseLoc,
     Diag<Type, DiagArgs...> diag,
     typename detail::Identity<DiagArgs>::type ...diagArgs) {
 
     ASTContext &ctx = fromContext.fromDC->getASTContext();
     return diagnoseNonSendableTypes(
-        type, fromContext, typeLoc, [&](Type specificType,
-                                        DiagnosticBehavior behavior) {
+        type, fromContext, derivedConformance, typeLoc,
+        [&](Type specificType, DiagnosticBehavior behavior) {
 
           if (behavior != DiagnosticBehavior::Ignore) {
             ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
@@ -441,12 +451,14 @@ bool diagnoseNonSendableTypes(
 /// only warnings and notes were produced.
 template<typename ...DiagArgs>
 bool diagnoseNonSendableTypes(
-    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    Type type, SendableCheckContext fromContext,
+    Type derivedConformance, SourceLoc loc,
     Diag<Type, DiagArgs...> diag,
     typename detail::Identity<DiagArgs>::type ...diagArgs) {
 
-    return diagnoseNonSendableTypes(type, fromContext, loc, loc, diag,
-                             std::forward<decltype(diagArgs)>(diagArgs)...);
+    return diagnoseNonSendableTypes(
+        type, fromContext, derivedConformance, loc, loc, diag,
+        std::forward<decltype(diagArgs)>(diagArgs)...);
 }
 
 /// Diagnose this sendability error with behavior based on the import of
@@ -627,7 +639,7 @@ struct DenseMapInfo<swift::ReferencedActor::Kind> {
     }
 
     static unsigned getHashValue(RefActor Val) {
-     return static_cast<unsigned>(Val.getKind());
+     return hash_value(Val);
     }
 
     static bool isEqual(const RefActor &LHS, const RefActor &RHS) {

@@ -1466,9 +1466,10 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 }
 
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
-                                     bool inGroup, bool withTaskExecutor) {
-  BuiltinFunctionBuilder builder(ctx);
-  auto genericParam = makeGenericParam().build(builder); // <T>
+                                     bool inGroup, bool withTaskExecutor,
+                                     bool isDiscarding) {
+  unsigned numGenericParams = isDiscarding ? 0 : 1;
+  BuiltinFunctionBuilder builder(ctx, numGenericParams);
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
   if (inGroup) {
     builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // group
@@ -1477,8 +1478,14 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
     builder.addParameter(makeConcrete(ctx.TheExecutorType)); // executor
   }
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  builder.addParameter(
-      makeConcrete(FunctionType::get({}, genericParam, extInfo))); // operation
+  Type operationResultType;
+  if (isDiscarding) {
+    operationResultType = TupleType::getEmpty(ctx); // ()
+  } else {
+    operationResultType = makeGenericParam().build(builder); // <T>
+  }
+  builder.addParameter(makeConcrete(
+      FunctionType::get({}, operationResultType, extInfo))); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
   return builder.build(id);
 }
@@ -1918,9 +1925,11 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
           .build();
   auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
   SmallVector<swift::Type, 3> ArgTypes = {HandleTy, BlockTy};
-  if (withContext)
+  if (withContext) {
     ArgTypes.push_back(ContextTy);
-  return getBuiltinFunction(Id, ArgTypes, VoidTy);
+    return getBuiltinFunction(Id, ArgTypes, VoidTy);
+  }
+  return getBuiltinFunction(Id, ArgTypes, Context.TheSILTokenType);
 }
 
 static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,
@@ -1963,6 +1972,19 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   builder.addParameter(actorParam);
   builder.addConformanceRequirement(actorParam, actorProto);
   builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
+  return builder.build(id);
+}
+
+static ValueDecl *getDistributedActorAsAnyActor(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto *distributedActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+  auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+
+  // Create type parameters and add conformance constraints.
+  auto actorParam = makeGenericParam();
+  builder.addParameter(actorParam);
+  builder.addConformanceRequirement(actorParam, distributedActorProto);
+  builder.setResult(makeConcrete(actorProto->getDeclaredExistentialType()));
   return builder.build(id);
 }
 
@@ -2928,16 +2950,22 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTask:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
-                              /*withExecutor=*/false);
+                              /*withExecutor=*/false, /*isDiscarding=*/false);
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
-                              /*withExecutor=*/false);
+                              /*withExecutor=*/false, /*isDiscarding=*/false);
+  case BuiltinValueKind::CreateAsyncDiscardingTaskInGroup:
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/false, /*isDiscarding=*/true);
   case BuiltinValueKind::CreateAsyncTaskWithExecutor:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
-                              /*withExecutor=*/true);
+                              /*withExecutor=*/true, /*isDiscarding=*/false);
   case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
-                              /*withExecutor=*/true);
+                              /*withExecutor=*/true, /*isDiscarding=*/false);
+  case BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor:
+    return getCreateAsyncTask(Context, Id, /*inGroup=*/true,
+                              /*withExecutor=*/true, /*isDiscarding=*/true);
 
   case BuiltinValueKind::TaskRunInline:
     return getTaskRunInline(Context, Id);
@@ -2967,11 +2995,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TSanInoutAccess:
     return getTSanInoutAccess(Context, Id);
-
-  case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
-    return getBuiltinFunction(Id,
-                              {},
-                              TupleType::getEmpty(Context));
 
   case BuiltinValueKind::TypePtrAuthDiscriminator:
     return getTypePtrAuthDiscriminator(Context, Id);
@@ -3045,6 +3068,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::InjectEnumTag:
     return getInjectEnumTag(Context, Id);
+
+  case BuiltinValueKind::DistributedActorAsAnyActor:
+    return getDistributedActorAsAnyActor(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");
@@ -3080,6 +3106,27 @@ bool swift::isPolymorphicBuiltin(BuiltinValueKind id) {
 BuiltinTypeKind BuiltinType::getBuiltinTypeKind() const {
   // If we do not have a vector or an integer our job is easy.
   return BuiltinTypeKind(std::underlying_type<TypeKind>::type(getKind()));
+}
+
+bool BuiltinType::isBitwiseCopyable() const {
+  switch (getBuiltinTypeKind()) {
+  case BuiltinTypeKind::BuiltinInteger:
+  case BuiltinTypeKind::BuiltinIntegerLiteral:
+  case BuiltinTypeKind::BuiltinFloat:
+  case BuiltinTypeKind::BuiltinPackIndex:
+  case BuiltinTypeKind::BuiltinRawPointer:
+  case BuiltinTypeKind::BuiltinVector:
+  case BuiltinTypeKind::BuiltinExecutor:
+  case BuiltinTypeKind::BuiltinJob:
+  case BuiltinTypeKind::BuiltinRawUnsafeContinuation:
+    return true;
+  case BuiltinTypeKind::BuiltinNativeObject:
+  case BuiltinTypeKind::BuiltinBridgeObject:
+  case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
+  case BuiltinTypeKind::BuiltinDefaultActorStorage:
+  case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
+    return false;
+  }
 }
 
 StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,

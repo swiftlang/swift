@@ -35,12 +35,12 @@ public class Test {
   // CHECK-NEXT: [[DEFAULT_VALUE:%.*]] = load [take] [[DEFAULT_VALUE_SLOT]] : $*Test.State
   // CHECK: [[NEW_VALUE:%.*]] = alloc_stack $Test.State
   // CHECK-NEXT: store [[DEFAULT_VALUE]] to [init] [[NEW_VALUE]] : $*Test.State
-  // CHECK: assign_or_init [init] #Test.state, self [[MU]] : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@convention(thin) (@in Test.State) -> @out Test.State, set {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> ()
+  // CHECK: assign_or_init [init] #Test.state, self [[MU]] : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> @out Test.State, set {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> ()
   //
   // CHECK: [[START_STATE:%.*]] = enum $Test.State, #Test.State.start!enumelt
   // CHECK-NEXT: [[NEW_VALUE:%.*]] = alloc_stack $Test.State
   // CHECK-NEXT: store [[START_STATE]] to [trivial] [[NEW_VALUE]] : $*Test.State
-  // CHECK: assign_or_init [set] #Test.state, self [[MU]] : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@convention(thin) (@in Test.State) -> @out Test.State, set {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> ()
+  // CHECK: assign_or_init [set] #Test.state, self [[MU]] : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> @out Test.State, set {{.*}} : $@noescape @callee_guaranteed (@in Test.State) -> ()
   public init() {
     state = .start
   }

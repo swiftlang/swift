@@ -777,8 +777,7 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
     auto Err = Instance.getCASOutputBackend().storeCachedDiagnostics(
         Instance.getInvocation()
             .getFrontendOptions()
-            .InputsAndOutputs.getFirstOutputProducingInput()
-            .getFileName(),
+            .InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
         Content);
 
     if (Err) {

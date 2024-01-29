@@ -526,6 +526,8 @@ ManglingError Remangler::mangleAnyNominalType(Node *node, unsigned depth) {
     return mangleAnyGenericType(node, "XY", depth);
   case Node::Kind::TypeAlias:
     return mangleAnyGenericType(node, "a", depth);
+  case Node::Kind::TypeSymbolicReference:
+    return mangleTypeSymbolicReference(node, depth);
   default:
     return MANGLING_ERROR(ManglingError::BadNominalTypeKind, node);
   }
@@ -598,6 +600,10 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
       NodePointer unboundType = node->getChild(0);
       DEMANGLER_ASSERT(unboundType->getKind() == Node::Kind::Type, node);
       NodePointer nominalType = unboundType->getChild(0);
+      if (nominalType->getKind() == Node::Kind::TypeSymbolicReference) {
+          NodePointer resolvedUnboundType = Resolver(SymbolicReferenceKind::Context, (const void *)nominalType->getIndex());
+          nominalType = resolvedUnboundType->getChild(0);
+      }
       NodePointer parentOrModule = nominalType->getChild(0);
       RETURN_IF_ERROR(mangleGenericArgs(parentOrModule, Separator, depth + 1,
                                         fullSubstitutionMap));
@@ -3309,7 +3315,45 @@ ManglingError Remangler::mangleOutlinedDestroy(Node *node, unsigned depth) {
   Buffer << "WOh";
   return ManglingError::Success;
 }
-
+ManglingError Remangler::mangleOutlinedEnumGetTag(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOg";
+  return ManglingError::Success;
+}
+ManglingError Remangler::mangleOutlinedEnumProjectDataForLoad(Node *node, unsigned depth) {
+  if (node->getNumChildren() == 2) {
+    auto ty = node->getChild(0);
+    RETURN_IF_ERROR(mangle(ty, depth + 1));
+    Buffer << "WOj";
+    mangleIndex(node->getChild(1)->getIndex());
+    return ManglingError::Success;
+  } else {
+    auto ty = node->getChild(0);
+    RETURN_IF_ERROR(mangle(ty, depth + 1));
+    auto sig = node->getChild(1);
+    RETURN_IF_ERROR(mangle(sig, depth + 1));
+    Buffer << "WOj";
+    mangleIndex(node->getChild(2)->getIndex());
+    return ManglingError::Success;
+  }
+}
+ManglingError Remangler::mangleOutlinedEnumTagStore(Node *node, unsigned depth) {
+  if (node->getNumChildren() == 2) {
+    auto ty = node->getChild(0);
+    RETURN_IF_ERROR(mangle(ty, depth + 1));
+    Buffer << "WOi";
+    mangleIndex(node->getChild(1)->getIndex());
+    return ManglingError::Success;
+  } else {
+    auto ty = node->getChild(0);
+    RETURN_IF_ERROR(mangle(ty, depth + 1));
+    auto sig = node->getChild(1);
+    RETURN_IF_ERROR(mangle(sig, depth + 1));
+    Buffer << "WOi";
+    mangleIndex(node->getChild(2)->getIndex());
+    return ManglingError::Success;
+  }
+}
 ManglingError Remangler::mangleOutlinedVariable(Node *node, unsigned depth) {
   Buffer << "Tv";
   mangleIndex(node->getIndex());

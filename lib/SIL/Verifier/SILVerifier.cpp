@@ -251,7 +251,7 @@ void verifyKeyPathComponent(SILModule &M,
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = component.getStoredPropertyDecl();
     if (expansion == ResilienceExpansion::Minimal) {
-      require(property->getEffectiveAccess() >= AccessLevel::Public,
+      require(property->getEffectiveAccess() >= AccessLevel::Package,
               "Key path in serialized function cannot reference non-public "
               "property");
     }
@@ -689,9 +689,7 @@ struct ImmutableAddressUseVerifier {
         }
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        auto type =
-            cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand()->getType();
-        if (type.getOptionalObjectType()) {
+        if (!cast<UncheckedTakeEnumDataAddrInst>(inst)->isDestructive()) {
           for (auto result : inst->getResults()) {
             llvm::copy(result->getUses(), std::back_inserter(worklist));
           }
@@ -1515,6 +1513,11 @@ public:
     if (isa<OpenPackElementInst>(value))
       return true;
 
+    if (auto *bi = dyn_cast<BuiltinInst>(value)) {
+      if (bi->getBuiltinInfo().ID == BuiltinValueKind::Once)
+        return true;
+    }
+
     // Add more token cases here as they arise.
 
     return false;
@@ -1964,6 +1967,14 @@ public:
     }
   }
 
+  void checkMarkDependencInst(MarkDependenceInst *MDI) {
+    if (MDI->isNonEscaping()) {
+      require(F.hasOwnership(), "mark_dependence [nonescaping] requires OSSA");
+      require(MDI->getOwnershipKind() == OwnershipKind::Owned,
+              "mark_dependence [nonescaping] must be an owned value");
+    }
+  }
+  
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
@@ -2297,6 +2308,10 @@ public:
             "global_addr cannot refer to a statically initialized object");
     checkGlobalAccessInst(GAI);
     checkAddressWalkerCanVisitAllTransitiveUses(GAI);
+    if (SILValue token = GAI->getDependencyToken()) {
+      require(token->getType().is<SILTokenType>(),
+              "depends_on operand of global_addr must be a token");
+    }
   }
 
   void checkGlobalValueInst(GlobalValueInst *GVI) {
@@ -3338,6 +3353,8 @@ public:
   }
 
   void checkTupleAddrConstructorInst(TupleAddrConstructorInst *taci) {
+    require(F.getModule().useLoweredAddresses(),
+            "tuple_addr_constructor is invalid in opaque values");
     require(taci->getNumElements() > 0,
             "Cannot be applied to tuples that do not contain any real "
             "elements. E.x.: ((), ())");
@@ -6206,7 +6223,7 @@ public:
     auto type = ddi->getType();
     require(type == ddi->getOperand()->getType(),
             "Result and operand must have the same type.");
-    require(type.getASTType()->isNoncopyable(),
+    require(type.isMoveOnly(/*orWrapped=*/false),
             "drop_deinit only allowed for move-only types");
     require(type.getNominalOrBoundGenericNominal()
             ->getValueTypeDestructor(), "drop_deinit only allowed for "
@@ -6270,9 +6287,11 @@ public:
   }
 
   void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
-    require(apmi->getIntroducer()->mayRequirePackMetadata(),
+    require(apmi->getIntroducer()->mayRequirePackMetadata(*apmi->getFunction()),
             "Introduces instruction of kind which cannot emit on-stack pack "
             "metadata");
+    require(F.getModule().getStage() == SILStage::Lowered,
+            "Only supported in lowered SIL");
   }
 
   void checkDeallocPackMetadataInst(DeallocPackMetadataInst *dpmi) {
@@ -6280,6 +6299,8 @@ public:
     require(apmi, "Must have instruction operand.");
     require(isa<AllocPackMetadataInst>(apmi),
             "Must have alloc_pack_metadata operand");
+    require(F.getModule().getStage() == SILStage::Lowered,
+            "Only supported in lowered SIL");
   }
 
   void checkMoveOnlyWrapperToCopyableAddrInst(

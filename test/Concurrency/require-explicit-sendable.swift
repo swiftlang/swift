@@ -112,7 +112,7 @@ open class TestThing {}
 open class TestSubThing : TestThing {}
 
 @available(SwiftStdlib 5.1, *)
-@MainActor(unsafe)
+@MainActor(unsafe) // expected-warning {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
 open class TestThing2 {}
 
 @available(SwiftStdlib 5.1, *)

@@ -200,3 +200,20 @@ func testReferencesToDifferentGlobalActorIsolatedMembers() {
     // expected-warning@-1 {{cannot form key path to main actor-isolated property 'name'; this is an error in Swift 6}}
   }
 }
+
+do {
+  struct S {
+    var a: Int
+    var b: String?
+  }
+
+  func test<T: Sendable>(_: T) {}
+
+  let kp = [\S.a, \S.b]
+
+  test(kp) // Ok
+  test([\S.a, \S.b]) // Ok
+
+  let _: [PartialKeyPath<S>] = [\.a, \.b] // Ok
+  let _: [any PartialKeyPath<S> & Sendable] = [\.a, \.b] // Ok
+}

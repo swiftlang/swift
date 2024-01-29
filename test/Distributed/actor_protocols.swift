@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift -enable-experimental-associated-type-inference
+// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t -enable-experimental-associated-type-inference 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -48,6 +48,8 @@ actor A2: DistributedActor {
 // FIXME(distributed): error reporting is a bit whacky here; needs cleanup
 // expected-error@-2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
 // expected-error@-3{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
+// expected-error@-4{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
+// expected-note@-5{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = A2]}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -67,6 +69,8 @@ actor A2: DistributedActor {
 final class DA2: DistributedActor {
 // expected-error@-1{{non-actor type 'DA2' cannot conform to the 'AnyActor' protocol}}
 // expected-error@-2{{non-distributed actor type 'DA2' cannot conform to the 'DistributedActor' protocol}}
+// expected-error@-3{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
+// expected-note@-4{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = DA2]}}
   nonisolated var id: ID {
     fatalError()
   }

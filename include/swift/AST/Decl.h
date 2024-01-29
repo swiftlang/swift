@@ -31,6 +31,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -790,10 +791,6 @@ protected:
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
     NumberOfFieldOffsetVectorEntries : 1,
     NumberOfVTableEntries : 2
-  );
-
-  SWIFT_INLINE_BITFIELD(MacroExpansionDecl, Decl, 16,
-    Discriminator : 16
   );
 
   } Bits;
@@ -1602,17 +1599,27 @@ public:
 
 /// An entry in the "inherited" list of a type or extension.
 struct InheritedEntry : public TypeLoc {
+private:
   /// Whether there was an @unchecked attribute.
-  bool isUnchecked = false;
+  bool IsUnchecked : 1;
 
   /// Whether there was an @retroactive attribute.
-  bool isRetroactive = false;
+  bool IsRetroactive : 1;
 
+  /// Whether there was an @preconcurrency attribute.
+  bool IsPreconcurrency : 1;
+
+public:
   InheritedEntry(const TypeLoc &typeLoc);
 
-  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive)
-    : TypeLoc(typeLoc), isUnchecked(isUnchecked), isRetroactive(isRetroactive) {
-    }
+  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
+                 bool isPreconcurrency)
+      : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
+        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency) {}
+
+  bool isUnchecked() const { return IsUnchecked; }
+  bool isRetroactive() const { return IsRetroactive; }
+  bool isPreconcurrency() const { return IsPreconcurrency; }
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -1966,7 +1973,7 @@ class PatternBindingEntry {
     IsFromDebugger = 1 << 2,
   };
   /// The initializer context used for this pattern binding entry.
-  llvm::PointerIntPair<DeclContext *, 3, OptionSet<PatternFlags>>
+  llvm::PointerIntPair<PatternBindingInitializer *, 3, OptionSet<PatternFlags>>
       InitContextAndFlags;
 
   /// Values captured by this initializer.
@@ -2007,7 +2014,7 @@ private:
 public:
   /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
-                      DeclContext *InitContext)
+                      PatternBindingInitializer *InitContext)
       : PatternAndFlags(P, {}),
         InitExpr({E, {E, InitializerStatus::NotChecked}, EqualLoc}),
         InitContextAndFlags({InitContext, llvm::None}) {}
@@ -2111,12 +2118,14 @@ private:
   VarDecl *getAnchoringVarDecl() const;
 
   // Retrieve the declaration context for the initializer.
-  DeclContext *getInitContext() const {
+  PatternBindingInitializer *getInitContext() const {
     return InitContextAndFlags.getPointer();
   }
 
   /// Override the initializer context.
-  void setInitContext(DeclContext *dc) { InitContextAndFlags.setPointer(dc); }
+  void setInitContext(PatternBindingInitializer *init) {
+    InitContextAndFlags.setPointer(init);
+  }
 
   SourceLoc getStartLoc() const;
 
@@ -2314,16 +2323,22 @@ public:
   Pattern *getPattern(unsigned i) const {
     return getPatternList()[i].getPattern();
   }
-  
-  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext,
-                  bool isFullyValidated = false);
+
+  void setPattern(unsigned i, Pattern *P, bool isFullyValidated = false);
 
   bool isFullyValidated(unsigned i) const {
     return getPatternList()[i].isFullyValidated();
   }
 
-  DeclContext *getInitContext(unsigned i) const {
+  PatternBindingInitializer *getInitContext(unsigned i) const {
     return getPatternList()[i].getInitContext();
+  }
+
+  void setInitContext(unsigned i, PatternBindingInitializer *init) {
+    if (init) {
+      init->setBinding(this, i);
+    }
+    getMutablePatternList()[i].setInitContext(init);
   }
 
   CaptureInfo getCaptureInfo(unsigned i) const {
@@ -2479,16 +2494,13 @@ public:
 /// SerializedTopLevelCodeDeclContext - This represents what was originally a
 /// TopLevelCodeDecl during serialization. It is preserved only to maintain the
 /// correct AST structure and remangling after deserialization.
-class SerializedTopLevelCodeDeclContext : public SerializedLocalDeclContext {
+class SerializedTopLevelCodeDeclContext : public DeclContext {
 public:
   SerializedTopLevelCodeDeclContext(DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::TopLevelCodeDecl,
-                                 Parent) {}
+    : DeclContext(DeclContextKind::SerializedTopLevelCodeDecl, Parent) {}
+
   static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::TopLevelCodeDecl;
-    return false;
+    return DC->getContextKind() == DeclContextKind::SerializedTopLevelCodeDecl;
   }
 };
 
@@ -3179,13 +3191,35 @@ public:
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
-  /// Is it possible for this type to lack a Copyable constraint?
-  /// If you need a more precise answer, ask this Decl's corresponding
-  /// Type if it `isNoncopyable` instead of using this.
-  bool canBeNoncopyable() const;
+  struct CanBeInvertible {
+    /// Indicates how "strongly" a TypeDecl will conform to an invertible
+    /// protocol. Supports inequality comparisons and casts to bool.
+    enum Result : unsigned {
+      Never = 0,            // Never conforms.
+      Conditionally = 1,    // Conditionally conforms.
+      Always = 2,           // Always conforms.
+    };
+  };
 
-  /// Is this declaration escapable?
-  bool isEscapable() const;
+  /// "Does a conformance for Copyable exist for this type declaration?"
+  ///
+  /// This doesn't mean that all instance of this type are Copyable, because
+  /// if a conditional conformance to Copyable exists, this method will return
+  /// true.
+  ///
+  /// If you need a more precise answer, ask this Decl's corresponding
+  /// Type if it `isCopyable` instead of using this.
+  CanBeInvertible::Result canBeCopyable() const;
+
+  /// "Does a conformance for Escapable exist for this type declaration?"
+  ///
+  /// This doesn't mean that all instance of this type are Escapable, because
+  /// if a conditional conformance to Escapable exists, this method will return
+  /// true.
+  ///
+  /// If you need a more precise answer, ask this Decl's corresponding
+  /// Type if it `isEscapable` instead of using this.
+  CanBeInvertible::Result canBeEscapable() const;
 
   /// Determine how the given invertible protocol was written on this TypeDecl,
   /// if at all.
@@ -5171,6 +5205,10 @@ public:
   /// Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
+
+  /// Determine whether this protocol requires conformance to `IP`, without
+  /// querying a generic signature.
+  bool requiresInvertible(InvertibleProtocolKind ip) const;
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceRange getSourceRange() const {
@@ -5216,9 +5254,9 @@ public:
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
 
-  /// Determine whether this is an invertible protocol,
-  /// i.e., for a protocol P, the inverse constraint ~P exists.
-  bool isInvertibleProtocol() const;
+  /// Determine if this is an invertible protocol and return its kind,
+  /// i.e., for a protocol P, returns the kind if inverse constraint ~P exists.
+  llvm::Optional<InvertibleProtocolKind> getInvertibleProtocolKind() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -6396,9 +6434,11 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeConst = 1 << 1,
+
+    HasResultDependsOn = 1 << 2,
   };
 
-  llvm::PointerIntPair<Identifier, 2, OptionSet<ArgumentNameFlags>>
+  llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
       ArgumentNameAndFlags;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
@@ -6650,13 +6690,15 @@ public:
   }
 
   bool hasResultDependsOn() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsResultDependsOn);
+    return ArgumentNameAndFlags.getInt().contains(
+        ArgumentNameFlags::HasResultDependsOn);
   }
 
   void setResultDependsOn(bool value = true) {
-    auto flags = DefaultValueAndFlags.getInt();
-    DefaultValueAndFlags.setInt(value ? flags | Flags::IsResultDependsOn
-                                      : flags - Flags::IsResultDependsOn);
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = value ? flags | ArgumentNameFlags::HasResultDependsOn
+                  : flags - ArgumentNameFlags::HasResultDependsOn;
+    ArgumentNameAndFlags.setInt(flags);
   }
 
   /// Does this parameter reject temporary pointer conversions?
@@ -6710,6 +6752,7 @@ public:
       return true;
     case Specifier::Consuming:
     case Specifier::InOut:
+    case Specifier::Transferring:
       return false;
     }
     llvm_unreachable("unhandled specifier");
@@ -6727,6 +6770,7 @@ public:
     case ParamSpecifier::LegacyShared:
       return ValueOwnership::Shared;
     case ParamSpecifier::Consuming:
+    case ParamSpecifier::Transferring:
     case ParamSpecifier::LegacyOwned:
       return ValueOwnership::Owned;
     case ParamSpecifier::Default:
@@ -9000,8 +9044,6 @@ public:
 class MacroExpansionDecl : public Decl, public FreestandingMacroExpansion {
 
 public:
-  enum : unsigned { InvalidDiscriminator = 0xFFFF };
-
   MacroExpansionDecl(DeclContext *dc, MacroExpansionInfo *info);
 
   static MacroExpansionDecl *create(DeclContext *dc, SourceLoc poundLoc,
@@ -9020,24 +9062,6 @@ public:
 
   /// Enumerate the nodes produced by expanding this macro expansion.
   void forEachExpandedNode(llvm::function_ref<void(ASTNode)> callback) const;
-
-  /// Returns a discriminator which determines this macro expansion's index
-  /// in the sequence of macro expansions within the current function.
-  unsigned getDiscriminator() const;
-
-  /// Retrieve the raw discriminator, which may not have been computed yet.
-  ///
-  /// Only use this for queries that are checking for (e.g.) reentrancy or
-  /// intentionally do not want to initiate verification.
-  unsigned getRawDiscriminator() const {
-    return Bits.MacroExpansionDecl.Discriminator;
-  }
-
-  void setDiscriminator(unsigned discriminator) {
-    assert(getRawDiscriminator() == InvalidDiscriminator);
-    assert(discriminator != InvalidDiscriminator);
-    Bits.MacroExpansionDecl.Discriminator = discriminator;
-  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MacroExpansion;

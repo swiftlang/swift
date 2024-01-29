@@ -441,7 +441,7 @@ bool SILBasicBlock::hasPhi() const {
 
 const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
   for (auto &Inst : *this)
-    if (Inst.isMetaInstruction())
+    if (!Inst.isMetaInstruction())
       return Inst.getDebugScope();
   return begin()->getDebugScope();
 }

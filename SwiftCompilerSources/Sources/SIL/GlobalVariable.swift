@@ -126,7 +126,7 @@ extension Instruction {
       return false
     case let sli as StringLiteralInst:
       switch sli.encoding {
-      case .Bytes, .UTF8:
+      case .Bytes, .UTF8, .UTF8_OSLOG:
         return true
       case .ObjCSelector:
         // Objective-C selector string literals cannot be used in static

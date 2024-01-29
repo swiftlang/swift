@@ -533,6 +533,23 @@ bool SourceManager::isOwning(SourceLoc Loc) const {
   return findBufferContainingLocInternal(Loc).has_value();
 }
 
+SourceRange SourceRange::combine(ArrayRef<SourceRange> ranges) {
+  if (ranges.empty())
+    return SourceRange();
+
+  SourceRange result = ranges.front();
+  for (auto other : ranges.drop_front()) {
+    if (!other)
+      continue;
+    if (!result) {
+      result = other;
+      continue;
+    }
+    result.widen(other);
+  }
+  return result;
+}
+
 void SourceRange::widen(SourceRange Other) {
   if (Other.Start.Value.getPointer() < Start.Value.getPointer())
     Start = Other.Start;
@@ -797,11 +814,11 @@ static bool isBeforeInSource(
   SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
       ? firstLoc
       : sourceMgr.getGeneratedSourceInfo(*firstMismatch)
-          ->originalSourceRange.getStart();
+          ->originalSourceRange.getEnd();
   SourceLoc secondLocInLCA = secondMismatch == secondAncestors.end()
       ? secondLoc
       : sourceMgr.getGeneratedSourceInfo(*secondMismatch)
-          ->originalSourceRange.getStart();
+          ->originalSourceRange.getEnd();
   return sourceMgr.isBeforeInBuffer(firstLocInLCA, secondLocInLCA) ||
     (allowEqual && firstLocInLCA == secondLocInLCA);
 }

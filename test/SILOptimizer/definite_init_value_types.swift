@@ -115,6 +115,16 @@ struct ValueStruct {
       self = ValueStruct()
     }
   }
+
+  // Test control statements with boolean literals, like while-true loops
+  init(es: EmptyStruct) {
+    while true {
+      if cond() {
+        ivar = es
+        break
+      }
+    }
+  }
 }
 
 struct AddressStruct {
@@ -131,3 +141,8 @@ struct AddressStruct {
     }
   }
 }
+
+func cond() -> Bool {
+  return true
+}
+

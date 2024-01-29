@@ -229,6 +229,11 @@ public:
   /// diagnostics through the given diagnostics engine.
   Evaluator(DiagnosticEngine &diags, const LangOptions &opts);
 
+  /// For last-ditch diagnostics, get a good approximate source location for
+  /// the thing we're currently type checking by searching for a request whose
+  /// source location matches the predicate.
+  SourceLoc getInnermostSourceLoc(llvm::function_ref<bool(SourceLoc)> fn);
+
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
 

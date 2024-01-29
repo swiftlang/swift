@@ -3,6 +3,8 @@
 import Swift
 import Builtin
 
+// REQUIRES: swift_in_compiler
+
 // CHECK-LABEL: sil @test_enum_with_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
@@ -247,5 +249,22 @@ bb0(%0 : $*T, %1 : $*T):
   dealloc_stack %2 : $*T
   %78 = tuple ()
   return %78 : $()
+}
+
+
+// CHECK-LABEL: sil @optimize_builtin_zeroInitialize : {{.*}} {
+// CHECK:       bb0([[RET_ADDR:%[^,]+]] :
+// CHECK:         builtin "zeroInitializer"<T>([[RET_ADDR]] : $*T) : $()
+// CHECK:         apply undef<T>([[RET_ADDR]])
+// CHECK-LABEL: } // end sil function 'optimize_builtin_zeroInitialize'
+sil @optimize_builtin_zeroInitialize : $@convention(thin) <T> () -> @out T {
+bb0(%ret_addr : $*T):
+  %temporary = alloc_stack [lexical] $T
+  builtin "zeroInitializer"<T>(%temporary : $*T) : $()
+  apply undef<T>(%temporary) : $@convention(thin) <T> () -> @out T
+  copy_addr [take] %temporary to [init] %ret_addr : $*T
+  dealloc_stack %temporary : $*T
+  %15 = tuple ()
+  return %15 : $()
 }
 

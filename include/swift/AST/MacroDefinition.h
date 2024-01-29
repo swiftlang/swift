@@ -58,6 +58,8 @@ struct ExternalMacroReference {
 enum class BuiltinMacroKind: uint8_t {
   /// #externalMacro, which references an external macro.
   ExternalMacro,
+  /// #isolation, which produces the isolation of the current context
+  IsolationMacro,
 };
 
 /// A single replacement

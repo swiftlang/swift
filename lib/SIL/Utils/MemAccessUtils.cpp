@@ -437,8 +437,14 @@ bool swift::isLetAddress(SILValue address) {
 //===----------------------------------------------------------------------===//
 
 bool swift::mayAccessPointer(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
   if (!instruction->mayReadOrWriteMemory())
     return false;
+  if (isa<BuiltinInst>(instruction)) {
+    // Consider all builtins that read/write memory to access pointers.
+    return true;
+  }
   bool retval = false;
   visitAccessedAddress(instruction, [&retval](Operand *operand) {
     auto accessStorage = AccessStorage::compute(operand->get());
@@ -451,6 +457,11 @@ bool swift::mayAccessPointer(SILInstruction *instruction) {
 }
 
 bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
+  if (isa<BuiltinInst>(instruction)) {
+    return instruction->mayReadOrWriteMemory();
+  }
   return isa<LoadWeakInst>(instruction) 
       || isa<LoadUnownedInst>(instruction) 
       || isa<StrongCopyUnownedValueInst>(instruction)
@@ -459,17 +470,23 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
 
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
-bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction) {
-  return FullApplySite::isa(instruction) 
-      || isa<EndApplyInst>(instruction)
-      || isa<AbortApplyInst>(instruction)
-      || isa<HopToExecutorInst>(instruction);
+bool swift::maySynchronize(SILInstruction *instruction) {
+  assert(!FullApplySite::isa(instruction) && !isa<EndApplyInst>(instruction) &&
+         !isa<AbortApplyInst>(instruction));
+  if (isa<BuiltinInst>(instruction)) {
+    return instruction->mayReadOrWriteMemory();
+  }
+  return isa<HopToExecutorInst>(instruction);
 }
 
 bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
+  if (FullApplySite::isa(instruction) || isa<EndApplyInst>(instruction) ||
+      isa<AbortApplyInst>(instruction)) {
+    return true;
+  }
   bool retval = mayAccessPointer(instruction)
              || mayLoadWeakOrUnowned(instruction)
-             || maySynchronizeNotConsideringSideEffects(instruction);
+             || maySynchronize(instruction);
   assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
   return retval;
 }
@@ -1419,10 +1436,12 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
 }
 
 void swift::visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+    AccessPath rootPath, SILValue address, TypeExpansionContext tec,
+    SILModule &module,
     std::function<void(AccessPath::PathNode, SILType)> visitor) {
+  assert(rootPath.isValid());
+  assert(AccessPath::compute(address) == rootPath);
   SmallVector<std::pair<SILType, IndexTrieNode *>, 32> worklist;
-  auto rootPath = AccessPath::compute(address);
   auto *node = rootPath.getPathNode().node;
   worklist.push_back({address->getType(), node});
   while (!worklist.empty()) {
@@ -2606,14 +2625,15 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::Unreachable:
     case BuiltinValueKind::CondUnreachable:
     case BuiltinValueKind::DestroyArray:
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroup:
     case BuiltinValueKind::CreateAsyncTaskWithExecutor:
     case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
+    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::InitializeDefaultActor:

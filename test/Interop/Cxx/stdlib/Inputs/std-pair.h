@@ -35,7 +35,7 @@ struct __attribute__((swift_attr("import_iterator"))) Iterator {};
 using PairUnsafeStructInt = std::pair<UnsafeStruct, int>;
 using PairIteratorInt = std::pair<Iterator, int>;
 
-struct HasMethodThatReturnsUnsafePair {
+struct __attribute__((swift_attr("import_owned"))) HasMethodThatReturnsUnsafePair {
     PairUnsafeStructInt getUnsafePair() const { return {}; }
     PairIteratorInt getIteratorPair() const { return {}; }
 };

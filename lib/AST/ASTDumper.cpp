@@ -445,6 +445,21 @@ static unsigned getDumpString(unsigned value) {
 static size_t getDumpString(size_t value) {
   return value;
 }
+static void *getDumpString(void *value) { return value; }
+
+static StringRef getDumpString(LifetimeDependenceKind kind) {
+  switch (kind) {
+  case LifetimeDependenceKind::Copy:
+    return "copy";
+  case LifetimeDependenceKind::Consume:
+    return "consume";
+  case LifetimeDependenceKind::Borrow:
+    return "borrow";
+  case LifetimeDependenceKind::Mutate:
+    return "mutate";
+  }
+  llvm_unreachable("Invalid lifetime dependence kind\n");
+}
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -928,7 +943,7 @@ namespace {
     using PrintBase::PrintBase;
 
     void printCommon(Pattern *P, const char *Name, StringRef Label) {
-     printHead(Name, PatternColor, Label);
+      printHead(Name, PatternColor, Label);
 
       printFlag(P->isImplicit(), "implicit", ExprModifierColor);
 
@@ -990,6 +1005,22 @@ namespace {
     }
     void visitExprPattern(ExprPattern *P, StringRef label) {
       printCommon(P, "pattern_expr", label);
+      switch (P->getCachedMatchOperandOwnership()) {
+      case ValueOwnership::Default:
+        break;
+      case ValueOwnership::Shared:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
+                      "ownership");
+        break;
+      case ValueOwnership::InOut:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
+                      "ownership");
+        break;
+      case ValueOwnership::Owned:
+        printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
+                      "ownership");
+        break;
+      }
       if (auto m = P->getCachedMatchExpr())
         printRec(m);
       else
@@ -1715,8 +1746,8 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     os << "(file)";
     break;
 
-  case DeclContextKind::SerializedLocal:
-    os << "local context";
+  case DeclContextKind::SerializedAbstractClosure:
+    os << "serialized abstract closure";
     break;
 
   case DeclContextKind::AbstractClosureExpr: {
@@ -1765,6 +1796,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     break;
 
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     os << "top-level code";
     break;
 
@@ -2011,6 +2043,22 @@ public:
         printFlag(LabelItem.isDefault(), "default");
         
         if (auto *CasePattern = LabelItem.getPattern()) {
+          switch (CasePattern->getOwnership()) {
+          case ValueOwnership::Default:
+            break;
+          case ValueOwnership::Shared:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
+                          "ownership");
+            break;
+          case ValueOwnership::InOut:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
+                          "ownership");
+            break;
+          case ValueOwnership::Owned:
+            printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
+                          "ownership");
+            break;
+          }
           printRec(CasePattern);
         }
         if (auto *Guard = LabelItem.getGuardExpr()) {
@@ -2756,7 +2804,6 @@ public:
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       printFieldQuoted(isolation.getGlobalActor().getString(),
                        "global_actor_isolated", CapturesColor);
       break;
@@ -3115,6 +3162,15 @@ public:
     printFoot();
   }
 
+  void visitCurrentContextIsolationExpr(
+      CurrentContextIsolationExpr *E, StringRef label) {
+    printCommon(E, "current_context_isolation_expr", label);
+    if (auto actor = E->getActor())
+      printRec(actor);
+
+    printFoot();
+  }
+
   void visitKeyPathDotExpr(KeyPathDotExpr *E, StringRef label) {
     printCommon(E, "key_path_dot_expr", label);
     printFoot();
@@ -3470,6 +3526,21 @@ public:
     for (auto arg : T->getGenericArguments())
       printRec(arg);
 
+    printFoot();
+  }
+
+  void visitLifetimeDependentReturnTypeRepr(LifetimeDependentReturnTypeRepr *T,
+                                            StringRef label) {
+    printCommon("type_lifetime_dependent_return", label);
+    for (auto &dep : T->getLifetimeDependencies()) {
+      printFieldRaw(
+          [&](raw_ostream &out) {
+            out << getDumpString(dep.getLifetimeDependenceKind()) << "(";
+            out << dep.getParamString() << ")";
+          },
+          "");
+    }
+    printRec(T->getBase());
     printFoot();
   }
 };

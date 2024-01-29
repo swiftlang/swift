@@ -321,8 +321,9 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
       return cast<Id##Expr>(this)->Getter()
   #define PASS_THROUGH_REFERENCE(Id, GetSubExpr)                      \
     case ExprKind::Id:                                                \
-      return cast<Id##Expr>(this)                                     \
-                 ->GetSubExpr()->getReferencedDecl(stopAtParenExpr)
+      if (auto sub = cast<Id##Expr>(this)->GetSubExpr())              \
+        return sub->getReferencedDecl(stopAtParenExpr);               \
+      return ConcreteDeclRef();
 
   NO_REFERENCE(Error);
   SIMPLE_REFERENCE(NilLiteral, getInitializer);
@@ -469,6 +470,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
+  PASS_THROUGH_REFERENCE(CurrentContextIsolation, getActor);
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
@@ -842,6 +844,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::MacroExpansion:
+  case ExprKind::CurrentContextIsolation:
     return true;
   }
 
@@ -1022,6 +1025,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::SingleValueStmt:
   case ExprKind::TypeJoin:
   case ExprKind::MacroExpansion:
+  case ExprKind::CurrentContextIsolation:
     return false;
   }
 
@@ -2068,7 +2072,7 @@ FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {
   auto &Context = getASTContext();
-  auto *RS = new (Context) ReturnStmt(SourceLoc(), E);
+  auto *RS = ReturnStmt::createImplicit(Context, E);
   Body = BraceStmt::create(Context, E->getStartLoc(), { RS }, E->getEndLoc());
 }
 
@@ -2531,9 +2535,14 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
           if (!IS->isSyntacticallyExhaustive())
             continue;
         } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+            continue;
           if (!DCS->isSyntacticallyExhaustive())
             continue;
-        } else if (!isa<SwitchStmt>(S) && !isa<DoStmt>(S)) {
+        } else if (isa<DoStmt>(S)) {
+          if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+            continue;
+        } else if (!isa<SwitchStmt>(S)) {
           continue;
         }
       } else {
@@ -2706,19 +2715,8 @@ SourceRange TapExpr::getSourceRange() const {
   if (!SubExpr)
     return Body->getSourceRange();
 
-  SourceLoc start = SubExpr->getStartLoc();
-  if (!start.isValid())
-    start = Body->getStartLoc();
-  if (!start.isValid())
-    return SourceRange();
-
-  SourceLoc end = Body->getEndLoc();
-  if (!end.isValid())
-    end = SubExpr->getEndLoc();
-  if (!end.isValid())
-    return SourceRange();
-
-  return SourceRange(start, end);
+  return SourceRange::combine(SubExpr->getSourceRange(),
+                              Body->getSourceRange());
 }
 
 RegexLiteralExpr *
@@ -2786,23 +2784,6 @@ MacroExpansionExpr *MacroExpansionExpr::create(
   return new (ctx) MacroExpansionExpr(dc, info, roles, isImplicit, ty);
 }
 
-unsigned MacroExpansionExpr::getDiscriminator() const {
-  if (getRawDiscriminator() != InvalidDiscriminator)
-    return getRawDiscriminator();
-
-  auto mutableThis = const_cast<MacroExpansionExpr *>(this);
-  auto dc = getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  auto discriminatorContext =
-      MacroDiscriminatorContext::getParentOf(mutableThis);
-  mutableThis->setDiscriminator(
-      ctx.getNextMacroDiscriminator(
-          discriminatorContext, getMacroName().getBaseName()));
-
-  assert(getRawDiscriminator() != InvalidDiscriminator);
-  return getRawDiscriminator();
-}
-
 MacroExpansionDecl *MacroExpansionExpr::createSubstituteDecl() {
   auto dc = DC;
   if (auto *tlcd = dyn_cast_or_null<TopLevelCodeDecl>(dc->getAsDecl()))
@@ -2843,7 +2824,15 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "expression";
 }
 
+SourceLoc swift::extractNearestSourceLoc(const ClosureExpr *expr) {
+  return expr->getLoc();
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
+  return expr->getLoc();
+}
+
+SourceLoc swift::extractNearestSourceLoc(const MacroExpansionExpr *expr) {
   return expr->getLoc();
 }
 
@@ -2875,7 +2864,7 @@ FrontendStatsTracer::getTraceFormatter<const Expr *>() {
   return &TF;
 }
 
-Type Expr::findOriginalType() const {
+const Expr *Expr::findOriginalValue() const {
   auto *expr = this;
   do {
     expr = expr->getSemanticsProvidingExpr();
@@ -2898,6 +2887,11 @@ Type Expr::findOriginalType() const {
     break;
   } while (true);
 
+  return expr;
+}
+
+Type Expr::findOriginalType() const {
+  auto *expr = findOriginalValue();
   return expr->getType()->getRValueType();
 }
 
@@ -2932,4 +2926,56 @@ Type ThrownErrorDestination::getContextErrorType() const {
 
   auto conversion = storage.get<Conversion *>();
   return conversion->conversion->getType();
+}
+
+void AbstractClosureExpr::getIsolationCrossing(
+    SmallVectorImpl<std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>>
+        &foundIsolationCrossings) {
+  /// For each capture...
+  for (auto pair : llvm::enumerate(getCaptureInfo().getCaptures())) {
+    auto capture = pair.value();
+
+    // First check quickly if we have dynamic self metadata. This is Sendable
+    // data so we don't care about it.
+    if (capture.isDynamicSelfMetadata())
+      continue;
+
+    auto declIsolation = swift::getActorIsolation(capture.getDecl());
+
+    // Assert that we do not have an opaque value capture. These only appear in
+    // TypeLowering and should never appear in the AST itself.
+    assert(!capture.getOpaqueValue() &&
+           "This should only be created in TypeLowering");
+
+    // If our decl is actor isolated...
+    if (declIsolation.isActorIsolated()) {
+      // And our closure is also actor isolated, then add the apply isolation
+      // crossing if the actors are different.
+      if (actorIsolation.isActorIsolated()) {
+        if (declIsolation.getActor() == actorIsolation.getActor()) {
+          continue;
+        }
+
+        foundIsolationCrossings.emplace_back(
+            capture, pair.index(),
+            ApplyIsolationCrossing(declIsolation, actorIsolation));
+        continue;
+      }
+
+      // Otherwise, our closure is not actor isolated but our decl is actor
+      // isolated. Add it.
+      foundIsolationCrossings.emplace_back(
+          capture, pair.index(),
+          ApplyIsolationCrossing(declIsolation, actorIsolation));
+      continue;
+    }
+
+    if (!actorIsolation.isActorIsolated()) {
+      continue;
+    }
+
+    foundIsolationCrossings.emplace_back(
+        capture, pair.index(),
+        ApplyIsolationCrossing(declIsolation, actorIsolation));
+  }
 }

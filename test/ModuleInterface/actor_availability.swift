@@ -110,3 +110,43 @@ public struct SPIAvailableStruct {
     // CHECK-PRIVATE-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor
   }
 }
+
+// CHECK: @_hasMissingDesignatedInitializers @available(macCatalyst 13.1, *)
+// CHECK-NEXT: public class MacCatalystAvailableClass
+@available(macCatalyst 13.1, *)
+public class MacCatalystAvailableClass {
+  // CHECK: #if compiler(>=5.3) && $Actors
+  // CHECK-NEXT: @_hasMissingDesignatedInitializers public actor NestedActor
+  public actor NestedActor {
+    // CHECK: @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, macCatalyst 13.1, *)
+    // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor
+  }
+
+  // CHECK: #if compiler(>=5.3) && $Actors
+  // CHECK-NEXT: @_hasMissingDesignatedInitializers @available(macCatalyst 14, *)
+  // CHECK-NEXT: public actor LessAvailableMacCatalystActor
+  @available(macCatalyst 14, *)
+  public actor LessAvailableMacCatalystActor {
+    // CHECK: @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, macCatalyst 14, *)
+    // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor
+  }
+
+  // CHECK: #if compiler(>=5.3) && $Actors
+  // CHECK-NEXT: @_hasMissingDesignatedInitializers @available(iOS 15.0, macOS 12.0, *)
+  // CHECK-NEXT: public actor AvailableiOSAndMacOSNestedActor {
+  @available(iOS 15.0, macOS 12.0, *)
+  public actor AvailableiOSAndMacOSNestedActor {
+    // CHECK: @available(iOS 15.0, tvOS 13.0, watchOS 6.0, macOS 12.0, *)
+    // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor
+  }
+
+  // CHECK: #if compiler(>=5.3) && $Actors
+  // CHECK-NEXT: @_hasMissingDesignatedInitializers @available(iOS, unavailable)
+  // CHECK-NEXT: public actor UnavailableiOSNestedActor
+  @available(iOS, unavailable)
+  public actor UnavailableiOSNestedActor {
+    // CHECK: @available(tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+    // CHECK-NEXT: @available(iOS, unavailable, introduced: 13.0)
+    // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor
+  }
+}

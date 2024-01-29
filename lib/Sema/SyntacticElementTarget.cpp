@@ -165,9 +165,12 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
 }
 
 SyntacticElementTarget SyntacticElementTarget::forInitialization(
-    Expr *initializer, DeclContext *dc, Type patternType,
-    PatternBindingDecl *patternBinding, unsigned patternBindingIndex,
-    bool bindPatternVarsOneWay) {
+    Expr *initializer, Type patternType, PatternBindingDecl *patternBinding,
+    unsigned patternBindingIndex, bool bindPatternVarsOneWay) {
+  auto *dc = patternBinding->getDeclContext();
+  if (auto *initContext = patternBinding->getInitContext(patternBindingIndex))
+    dc = initContext;
+
   auto result = forInitialization(
       initializer, dc, patternType,
       patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
@@ -178,8 +181,9 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 
 SyntacticElementTarget
 SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
-                                       bool ignoreWhereClause) {
-  SyntacticElementTarget target(stmt, dc, ignoreWhereClause);
+                                       bool ignoreWhereClause,
+                                       GenericEnvironment *packElementEnv) {
+  SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
   return target;
 }
 

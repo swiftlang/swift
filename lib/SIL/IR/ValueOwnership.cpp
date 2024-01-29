@@ -71,6 +71,7 @@ CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
+CONSTANT_OWNERSHIP_INST(None, GlobalValue)
 CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocRef)
@@ -85,7 +86,6 @@ CONSTANT_OWNERSHIP_INST(Owned, EndInitLetRef)
 CONSTANT_OWNERSHIP_INST(Owned, BeginDeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
-CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -581,7 +581,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AtomicStore)
 CONSTANT_OWNERSHIP_BUILTIN(None, Once)
 CONSTANT_OWNERSHIP_BUILTIN(None, OnceWithContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, TSanInoutAccess)
-CONSTANT_OWNERSHIP_BUILTIN(None, Swift3ImplicitObjCEntrypoint)
 CONSTANT_OWNERSHIP_BUILTIN(None, PoundAssert)
 CONSTANT_OWNERSHIP_BUILTIN(None, TypePtrAuthDiscriminator)
 CONSTANT_OWNERSHIP_BUILTIN(None, TargetOSVersionAtLeast)
@@ -590,8 +589,10 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroup)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroup)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskWithExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskInGroupWithExecutor)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncDiscardingTaskInGroupWithExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
@@ -620,6 +621,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, TaskRunInline)
 CONSTANT_OWNERSHIP_BUILTIN(None, Copy)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(None, InjectEnumTag)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

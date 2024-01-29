@@ -453,8 +453,11 @@ PackType::getExpandedGenericArgs(ArrayRef<GenericTypeParamType *> params,
 }
 
 PackType *PackType::getSingletonPackExpansion(Type param) {
-  assert(param->isParameterPack() || param->is<PackArchetypeType>());
-  return get(param->getASTContext(), {PackExpansionType::get(param, param)});
+  SmallVector<Type, 2> rootParameterPacks;
+  param->getTypeParameterPacks(rootParameterPacks);
+  assert(rootParameterPacks.size() >= 1);
+  auto count = rootParameterPacks[0];
+  return get(param->getASTContext(), {PackExpansionType::get(param, count)});
 }
 
 CanPackType CanPackType::getSingletonPackExpansion(CanType param) {

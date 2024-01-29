@@ -1810,7 +1810,14 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         }
 
         auto *argPack = PackType::get(cs.getASTContext(), argTypes);
-        auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
+        auto argPackExpansion = [&]() {
+          if (argPack->getNumElements() == 1 &&
+              argPack->getElementType(0)->is<PackExpansionType>()) {
+            return argPack->getElementType(0)->castTo<PackExpansionType>();
+          }
+
+          return PackExpansionType::get(argPack, argPack);
+        }();
 
         auto firstArgIdx =
             argTypes.empty() ? paramIdx : parameterBindings[paramIdx].front();
@@ -2748,7 +2755,12 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     if (!cs.findSelectedOverloadFor(calleeLoc))
       return 10;
   }
-  
+
+  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+    if (isResultBuilderMethodReference(cs.getASTContext(), UDE))
+      return 12;
+  }
+
   auto resolvedTy = cs.simplifyType(requirementType);
 
   // Increase the impact of a conformance fix for generic parameters on
@@ -3877,7 +3889,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   // move-only types (and their metatypes) cannot match with existential types.
-  if (type1->getMetatypeInstanceType()->isNoncopyable(DC)) {
+  if (type1->getMetatypeInstanceType()->isNoncopyable()) {
     // tailor error message
     if (shouldAttemptFixes()) {
       auto *fix = MustBeCopyable::create(*this,
@@ -8407,8 +8419,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       increaseScore(SK_Unavailable, locator);
 
     unsigned numMissing = 0;
-    conformance.forEachMissingConformance(DC->getParentModule(),
-                                          [&numMissing](auto *missing) {
+    conformance.forEachMissingConformance([&numMissing](auto *missing) {
                                             ++numMissing;
                                             return false;
                                           });
@@ -8851,8 +8862,7 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
 static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
                                             Type toType) {
   auto &ctx = cs.getASTContext();
-  auto *nilLiteral = TypeChecker::getProtocol(
-      ctx, SourceLoc(), KnownProtocolKind::ExpressibleByNilLiteral);
+  auto *nilLiteral = ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral);
   if (!nilLiteral)
     return false;
 
@@ -10094,8 +10104,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // the same name, so you could write "foo.init" to look up a
   // method or property named `init`.
   if (!ctx.isSwiftVersionAtLeast(5) &&
-      memberName.getBaseName() == DeclBaseName::createConstructor() &&
-      !isImplicitInit) {
+      memberName.getBaseName().isConstructor() && !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
                                       DeclNameRef(ctx.getIdentifier("init")),
                                       memberLoc);
@@ -10682,9 +10691,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         auto *sequenceProto = cast<ProtocolDecl>(
             getContextualType(baseExpr, /*forConstraint=*/false)
                 ->getAnyNominal());
-        bool isAsync = sequenceProto ==
-                       TypeChecker::getProtocol(
-                           ctx, SourceLoc(), KnownProtocolKind::AsyncSequence);
+        bool isAsync = sequenceProto->getKnownProtocolKind() ==
+                       KnownProtocolKind::AsyncSequence;
 
         auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
                                      : ctx.getSequenceMakeIterator();
@@ -10700,10 +10708,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         auto *iteratorProto = cast<ProtocolDecl>(
             getContextualType(baseExpr, /*forConstraint=*/false)
                 ->getAnyNominal());
-        bool isAsync =
-            iteratorProto ==
-            TypeChecker::getProtocol(ctx, SourceLoc(),
-                                     KnownProtocolKind::AsyncIteratorProtocol);
+        bool isAsync = iteratorProto->getKnownProtocolKind() ==
+                       KnownProtocolKind::AsyncIteratorProtocol;
 
         auto *next =
             isAsync ? ctx.getAsyncIteratorNext() : ctx.getIteratorNext();
@@ -11547,6 +11553,28 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     return true;
   };
 
+  // If contextual type is not a function type or `Any` and this
+  // closure is used as an argument, let's skip resolution.
+  //
+  // Doing so improves performance if closure is passed as an argument
+  // to a (heavily) overloaded declaration, avoid unrelated errors,
+  // propagate holes, and record a more impactful fix.
+  if (!contextualType->isTypeVariableOrMember() &&
+      !(contextualType->is<FunctionType>() || contextualType->isAny()) &&
+      locator.endsWith<LocatorPathElt::ApplyArgToParam>()) {
+    if (!shouldAttemptFixes())
+      return false;
+
+    assignFixedType(typeVar, PlaceholderType::get(getASTContext(), typeVar),
+                    closureLocator);
+    recordTypeVariablesAsHoles(inferredClosureType);
+
+    return !recordFix(
+        AllowArgumentMismatch::create(*this, typeVar, contextualType,
+                                      getConstraintLocator(locator)),
+        /*impact=*/15);
+  }
+
   // Determine whether a result builder will be applied.
   auto resultBuilderType = getOpenedResultBuilderTypeFor(*this, locator);
 
@@ -11558,6 +11586,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   auto *paramList = closure->getParameters();
   SmallVector<AnyFunctionType::Param, 4> parameters;
+  bool hasIsolatedParam = false;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
     auto param = inferredClosureType->getParams()[i];
     auto *paramDecl = paramList->get(i);
@@ -11691,6 +11720,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
+    hasIsolatedParam |= param.isIsolated();
+
     setType(paramDecl, internalType);
     parameters.push_back(param);
   }
@@ -11700,6 +11731,12 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (contextualFnType->isSendable())
       closureExtInfo = closureExtInfo.withConcurrent();
+  }
+
+  // Isolated parameters override any other kind of isolation we might infer.
+  if (hasIsolatedParam) {
+    closureExtInfo = closureExtInfo.withIsolation(
+      FunctionTypeIsolation::forParameter());
   }
 
   auto closureType =
@@ -11858,7 +11895,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 
   // Noncopyable types can't be involved in bridging conversions since a bridged
   // type assumes the ability to copy.
-  if (type1->isNoncopyable(DC)) {
+  if (type1->isNoncopyable()) {
     return SolutionKind::Error;
   }
 
@@ -12206,13 +12243,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
       contextualTy = contextualTy->getExistentialLayout().explicitSuperclass;
       assert(contextualTy);
     }
-
-    // If there are no other options the solver might end up picking
-    // `AnyKeyPath` or `PartialKeyPath` based on a contextual conversion.
-    // This is an error during normal type-checking but okay in
-    // diagnostic mode because root and value are allowed to be holes.
-    if (contextualTy->isAnyKeyPath() || contextualTy->isPartialKeyPath())
-      return shouldAttemptFixes();
 
     if (auto bgt = contextualTy->getAs<BoundGenericType>()) {
       // We can get root and value from a concrete key path type.
@@ -13543,32 +13573,33 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
         auto argLoc =
             loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
 
-        if (type1->getAs<PackArchetypeType>() &&
-            type2->getAs<PackArchetypeType>())
+        if (type1->is<PackArchetypeType>() &&
+            type2->is<PackArchetypeType>())
           return recordShapeMismatchFix();
 
-        auto argPack = type1->getAs<PackType>();
-        auto paramPack = type2->getAs<PackType>();
-
-        if (!(argPack && paramPack))
-          return SolutionKind::Error;
+        auto numArgs = (shape1->is<PackType>()
+                        ? shape1->castTo<PackType>()->getNumElements()
+                        : 1);
+        auto numParams = (shape2->is<PackType>()
+                          ? shape2->castTo<PackType>()->getNumElements()
+                          : 1);
 
         // Tailed diagnostic to explode tuples.
         // FIXME: This is very similar to
         // 'cannot_convert_single_tuple_into_multiple_arguments'; can we emit
         // both of these in the same place?
-        if (argPack->getNumElements() == 1) {
-          if (argPack->getElementType(0)->is<TupleType>() &&
-              paramPack->getNumElements() >= 1) {
+        if (numArgs == 1) {
+          if (type1->is<TupleType>() &&
+              numParams >= 1) {
             return recordShapeFix(
                 DestructureTupleToMatchPackExpansionParameter::create(
-                    *this, paramPack, loc),
-                /*impact=*/2 * paramPack->getNumElements());
+                    *this,
+                    (type2->is<PackType>()
+                     ? type2->castTo<PackType>()
+                     : PackType::getSingletonPackExpansion(type2)), loc),
+                /*impact=*/2 * numParams);
           }
         }
-
-        auto numArgs = shape1->castTo<PackType>()->getNumElements();
-        auto numParams = shape2->castTo<PackType>()->getNumElements();
 
         // Drops `ApplyArgToParam` and left with `ApplyArgument`.
         path.pop_back();
@@ -13916,7 +13947,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // before matching base types if other side is an optional, so
     // score needs to account for number of such promotions.
     int optionalWraps = baseType2.getInt() - baseType1.getInt();
-    return recordFix(fix, baseImpact + abs(optionalWraps))
+    return recordFix(fix, baseImpact + std::abs(optionalWraps))
                ? SolutionKind::Error
                : SolutionKind::Solved;
   };

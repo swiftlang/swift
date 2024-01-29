@@ -72,6 +72,11 @@ extension ASTGenVisitor {
     return self.generateWithLegacy(node)
   }
 
+  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl {
+    // TODO: Set semicolon loc.
+    generate(decl: node.decl)
+  }
+
   func generate(typeAliasDecl node: TypeAliasDeclSyntax) -> BridgedTypeAliasDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 

@@ -114,7 +114,7 @@ static TestActor *createActor() {
     // swift_getTypeName will tolerate it. Otherwise we crash when trying to
     // signpost actor creation.
     descriptor =
-        reinterpret_cast<ClassDescriptor *>(calloc(sizeof(*descriptor), 1));
+        reinterpret_cast<ClassDescriptor *>(calloc(1, sizeof(*descriptor)));
     TestActorMetadata.setDescription(descriptor);
   }
   return new TestActor();

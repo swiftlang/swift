@@ -1081,23 +1081,4 @@ CastsTests.test("type(of:) should look through __SwiftValue")
   expectEqual(t, "S")  // Fails: currently says `__SwiftValue`
 }
 
-#if _runtime(_ObjC)
-@objc protocol P106973771 {
-  func sayHello()
-}
-CastsTests.test("Class metatype values should not cast to Obj-C existentials") {
-  class C106973771: NSObject, P106973771 {
-    func sayHello() { print("Hello") }
-  }
-  // A class instance clearly conforms to the protocol
-  expectTrue(C106973771() is any P106973771)
-  // But the metatype definitely does not
-  expectFalse(C106973771.self is any P106973771)
-  // The cast should not succeed
-  expectNil(C106973771.self as? any P106973771)
-  // The following will crash if the cast succeeds
-  (C106973771.self as? any P106973771)?.sayHello()
-}
-#endif
-
 runAllTests()

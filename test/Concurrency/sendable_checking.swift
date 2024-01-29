@@ -251,11 +251,11 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to main actor-isolated context; later accesses to value could race}}
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to main actor-isolated context; later accesses to value could race}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -273,7 +273,7 @@ func testNonSendableBaseArg() async {
   let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-  // expected-tns-warning@-2 {{passing argument of non-sendable type 'NonSendable' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-tns-warning@-2 {{transferring value of non-Sendable type 'NonSendable' from nonisolated context to main actor-isolated context; later accesses could race}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -287,18 +287,18 @@ func globalSendable(_ ns: NonSendable) async {}
 @available(SwiftStdlib 5.1, *)
 @MainActor
 func callNonisolatedAsyncClosure(
-  ns: NonSendable,
+  ns: NonSendable, // expected-tns-note {{value is task isolated since it is in the same region as 'ns'}}
   g: (NonSendable) async -> Void
 ) async {
   await g(ns)
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-  // expected-tns-warning @-3 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to nonisolated context; later accesses to value could race}}
+  // expected-tns-warning @-3 {{task isolated value of type '@noescape @async @callee_guaranteed (@guaranteed NonSendable) -> ()' transferred to nonisolated context; later accesses to value could race}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
-  // expected-tns-warning @-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // expected-tns-warning @-2 {{task isolated value of type 'NonSendable' transferred to nonisolated context; later accesses to value could race}}
 
 }
 
@@ -342,5 +342,19 @@ func testPointersAreNotSendable() {
     testSendable(rawBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
     testSendable(rawMutableBuffer) // expected-warning {{conformance of 'UnsafeMutableRawBufferPointer' to 'Sendable' is unavailable}}
     testSendable(rawMutableBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
+  }
+}
+
+@available(*, unavailable)
+extension SynthesizedConformances.NotSendable: Sendable {}
+
+enum SynthesizedConformances {
+  // expected-note@+1 2 {{consider making struct 'NotSendable' conform to the 'Sendable' protocol}}
+  struct NotSendable: Equatable {}
+
+  // expected-warning@+2 2{{non-sendable type 'SynthesizedConformances.NotSendable' in asynchronous access to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-note@+1 2 {{in derived conformance to 'Equatable'}}
+  @MainActor struct Isolated: Equatable {
+    let x: NotSendable
   }
 }

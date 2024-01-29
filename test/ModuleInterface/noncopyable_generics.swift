@@ -96,6 +96,14 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public struct RudePointer<T> : Swift.Copyable where T : ~Copyable {
 
+// CHECK-MISC: noInversesSTART
+// CHECK-MISC-NOT: ~
+// CHECK-MISC: noInversesEND
+
+// CHECK-MISC: public func checkAnyInv1<Result>(_ t: borrowing Result) where Result : ~Copyable
+// CHECK-MISC: public func checkAnyInv2<Result>(_ t: borrowing Result) where Result : ~Copyable, Result : ~Escapable
+// CHECK-MISC: public func checkAnyObject<Result>(_ t: Result) where Result : AnyObject
+
 ///////////////////////////////////////////////////////////////////////
 // Synthesized conditional conformances are next
 

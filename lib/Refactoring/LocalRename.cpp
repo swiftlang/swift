@@ -297,8 +297,9 @@ DeclContext *getRenameScope(const ValueDecl *VD) {
     Scope = Scope->getParent();
     break;
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
   case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
   case DeclContextKind::Package:
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:

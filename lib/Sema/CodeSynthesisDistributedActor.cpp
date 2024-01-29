@@ -263,7 +263,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
           TryExpr::createImplicit(C, sloc, localPropertyAccess);
     }
 
-    auto returnLocalPropertyAccess = new (C) ReturnStmt(sloc, localPropertyAccess, implicit);
+    auto returnLocalPropertyAccess =
+        ReturnStmt::createImplicit(C, sloc, localPropertyAccess);
     localBranchStmt =
         BraceStmt::create(C, sloc, {returnLocalPropertyAccess}, sloc, implicit);
   } else {
@@ -283,7 +284,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     if (func->hasThrows()) {
       localFuncCall = TryExpr::createImplicit(C, sloc, localFuncCall);
     }
-    auto returnLocalFuncCall = new (C) ReturnStmt(sloc, localFuncCall, implicit);
+    auto returnLocalFuncCall =
+        ReturnStmt::createImplicit(C, sloc, localFuncCall);
 
     localBranchStmt =
         BraceStmt::create(C, sloc, {returnLocalFuncCall}, sloc, implicit);
@@ -643,8 +645,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         CallExpr::createImplicit(C, systemRemoteCallRef, remoteCallArgs);
     remoteCallExpr = AwaitExpr::createImplicit(C, sloc, remoteCallExpr);
     remoteCallExpr = TryExpr::createImplicit(C, sloc, remoteCallExpr);
-    auto returnRemoteCall =
-                new (C) ReturnStmt(sloc, remoteCallExpr, implicit);
+    auto returnRemoteCall = ReturnStmt::createImplicit(C, sloc, remoteCallExpr);
     remoteBranchStmts.push_back(returnRemoteCall);
   }
 
@@ -811,7 +812,8 @@ addDistributedActorCodableConformance(
       actor->getDeclaredInterfaceType(), proto,
       actor->getLoc(), /*dc=*/actor,
       ProtocolConformanceState::Incomplete,
-      /*isUnchecked=*/false);
+      /*isUnchecked=*/false,
+      /*isPreconcurrency=*/false);
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
@@ -928,7 +930,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     auto DistributedActorProto = C.getDistributedActorDecl();
     for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
       if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = module->conformsToProtocol(
+        auto conformance = module->checkConformance(
             proto->mapTypeIntoContext(var->getInterfaceType()),
             DAS);
 

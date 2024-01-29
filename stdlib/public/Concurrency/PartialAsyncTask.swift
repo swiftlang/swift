@@ -121,7 +121,7 @@ public struct UnownedJob: Sendable {
   @available(SwiftStdlib 9999, *)
   @_alwaysEmitIntoClient
   @inlinable
-  public func runSynchronously(isolated serialExecutor: UnownedSerialExecutor,
+  public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
                                taskExecutor: UnownedTaskExecutor) {
     _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
   }

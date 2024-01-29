@@ -215,6 +215,38 @@ class RecursiveOuter {
 class GuardedAvailability {
 }
 
+@Observable class TestASTScopeLCA {
+  // Make sure ASTScope unqualified lookup can find local variables
+  // inside initial values with closures when accessor macros are
+  // involved.
+  var state : Bool = {
+    let value = true
+    return value
+  }()
+}
+
+struct CowContainer {
+  final class Contents { }
+  
+  var contents = Contents()
+  
+  mutating func mutate() {
+    if !isKnownUniquelyReferenced(&contents) {
+      contents = Contents()
+    }
+  }
+  
+  var id: ObjectIdentifier {
+    ObjectIdentifier(contents)
+  }
+}
+
+
+@Observable
+final class CowTest {
+  var container = CowContainer()
+}
+
 @main
 struct Validator {
   @MainActor
@@ -429,6 +461,14 @@ struct Validator {
       obj.inner.value = "test"
       expectEqual(obj.innerEventCount, 2)
       expectEqual(obj.outerEventCount, 2)
+    }
+    
+    suite.test("validate copy on write semantics") {
+      let subject = CowTest()
+      let startId = subject.container.id
+      expectEqual(subject.container.id, startId)
+      subject.container.mutate()
+      expectEqual(subject.container.id, startId)
     }
 
     runAllTests()

@@ -79,13 +79,6 @@ public:
     return CurrentResults.addInitsToTopLevel;
   }
 
-  void setCallPatternHeuristics(bool flag) {
-    CurrentResults.enableCallPatternHeuristics = flag;
-  }
-  bool getCallPatternHeuristics() const {
-    return CurrentResults.enableCallPatternHeuristics;
-  }
-
   void setAddCallWithNoDefaultArgs(bool flag) {
     CurrentResults.addCallWithNoDefaultArgs = flag;
   }

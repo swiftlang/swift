@@ -111,25 +111,6 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
   }
 }
 
-// Gather the conformances needed for an existential value based on an opened
-// archetype. This adds any conformances inherited from superclass constraints.
-static ArrayRef<ProtocolConformanceRef>
-collectExistentialConformances(ModuleDecl *M, CanType openedType,
-                               CanType existentialType) {
-  assert(!openedType.isAnyExistentialType());
-
-  auto layout = existentialType.getExistentialLayout();
-  auto protocols = layout.getProtocols();
-
-  SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (auto proto : protocols) {
-    auto conformance = M->lookupConformance(openedType, proto);
-    assert(conformance);
-    conformances.push_back(conformance);
-  }
-  return M->getASTContext().AllocateCopy(conformances);
-}
-
 // Create the entry basic block with the function arguments.
 void ExistentialSpecializerCloner::cloneArguments(
     SmallVectorImpl<SILValue> &entryArgs) {
@@ -180,11 +161,17 @@ void ExistentialSpecializerCloner::cloneArguments(
         ValueOwnershipKind(NewF, GenericSILType,
                            ArgDesc.Arg->getArgumentConvention()));
     NewArg->copyFlags(ArgDesc.Arg);
-    // Determine the Conformances.
+
+    // Gather the conformances needed for an existential value based on an
+    // opened archetype. This adds any conformances inherited from superclass
+    // constraints.
     SILType ExistentialType = ArgDesc.Arg->getType().getObjectType();
     CanType OpenedType = NewArg->getType().getASTType();
-    auto Conformances = collectExistentialConformances(
-        M.getSwiftModule(), OpenedType, ExistentialType.getASTType());
+    assert(!OpenedType.isAnyExistentialType());
+    auto Conformances = M.getSwiftModule()->collectExistentialConformances(
+        OpenedType,
+        ExistentialType.getASTType());
+
     auto ExistentialRepr =
         ArgDesc.Arg->getType().getPreferredExistentialRepresentation();
     auto &EAD = ExistentialArgDescriptor[ArgDesc.Index];

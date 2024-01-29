@@ -40,6 +40,7 @@
 #ifndef SWIFT_RUNTIME_METADATAIMPL_H
 #define SWIFT_RUNTIME_METADATAIMPL_H
 
+#include "swift/Basic/MathUtils.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
@@ -468,10 +469,6 @@ struct FunctionPointerBox : NativeBox<void*> {
     return swift_getFunctionPointerExtraInhabitantIndex(src) + 1;
   }
 };
-
-constexpr size_t roundUpToAlignment(size_t offset, size_t alignment) {
-  return ((offset + alignment - 1) & ~(alignment - 1));
-}
 
 // A helper template for building an AggregateBox.  The more natural
 // way to do this would be to left-recurse, but we have to

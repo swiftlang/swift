@@ -84,12 +84,12 @@ func mutationOfLocal() {
     }()
 
     // Mutations of captured variables executing concurrently are bad.
-    localInt = 17 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
-    localInt += 1 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
-    localInt.makeNegative() // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt = 17 // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt += 1 // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt.makeNegative() // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
 
     _ = {
-      localInt = localInt + 12 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+      localInt = localInt + 12 // expected-warning{{mutation of captured var 'localInt' in concurrently-executing code}}
     }()
 
     return i + localInt
@@ -114,8 +114,8 @@ func testCaseNonTrivialValue() {
     print(i.optArray?[j] ?? 0)
     print(i.optArray![j])
 
-    i.int = 5 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
-    i.array[0] = 5 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
+    i.int = 5 // expected-warning{{mutation of captured var 'i' in concurrently-executing code}}
+    i.array[0] = 5 // expected-warning{{mutation of captured var 'i' in concurrently-executing code}}
 
     return value
   }

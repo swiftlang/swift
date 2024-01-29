@@ -142,10 +142,14 @@ open class SwiftSubclass: ImplClass {
 @_objcImplementation @_cdecl("implFunc")
 public func implFunc(_ param: Int32) {}
 
+@_objcImplementation @_cdecl("implFuncCName")
+public func implFuncCName(_ param: Int32) {}
+
 public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
   impl.mainMethod(0)
   swiftSub.mainMethod(1)
   implFunc(2)
+  implFuncCName(3)
 }
 
 // Swift calling convention -[ImplClass init]
@@ -247,6 +251,11 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // CHECK-LABEL: define void @implFunc
 // FIXME: We'd like this to be internal or hidden, not public.
 // CHECK: define swiftcc void @"$s19objc_implementation8implFuncyys5Int32VF"
+
+// inplFuncCName(_:)
+// CHECK-LABEL: define void @"\01_implFuncAsmName"
+// FIXME: We'd like this to be internal or hidden, not public.
+// CHECK: define swiftcc void @"$s19objc_implementation13implFuncCNameyys5Int32VF"
 
 // fn(impl:swiftSub:)
 // CHECK-LABEL: define swiftcc void @"$s19objc_implementation2fn4impl8swiftSubySo9ImplClassC_AA13SwiftSubclassCtF"

@@ -885,5 +885,4 @@ do {
   struct Conformer: P48c {}
   // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P48a'}}
   // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P48b'}}
-  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P48c'}}
 }

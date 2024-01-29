@@ -494,7 +494,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 void TestOptions::printHelp(bool ShowHidden) const {
 
   // Based off of swift/lib/Driver/Driver.cpp, at Driver::printHelp
-  //FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
+  // FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
   // Maybe not for modes such as Interactive, Batch, AutolinkExtract, etc,
   // as in Driver.cpp. But could be useful for extra info, like HelpHidden.
 

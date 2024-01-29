@@ -78,7 +78,7 @@ endif()
 add_subdirectory(Threading)
 
 # This static library is shared across swiftCore and swiftRemoteInspection
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
+if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR OR SWIFT_BUILD_EXTERNAL_GENERIC_METADATA_BUILDER)
   # TODO: due to the use of `add_swift_target_library` rather than `add_library`
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
@@ -190,6 +190,23 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
     )
   endif()
+  if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "i686    i686-unknown-none-elf       i686-unknown-none-elf"
+      "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+      # Without specifying the `windows` component LLVM refuses to
+      # generate valid COFF object files.
+      "i686    i686-unknown-windows-coff   i686-unknown-windows-coff"
+      "x86_64  x86_64-unknown-windows-coff x86_64-unknown-windows-coff"
+    )
+  endif()
+
+  if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
+    )
+  endif()
 
   if (SWIFT_HOST_VARIANT STREQUAL "linux")
     set(EMBEDDED_STDLIB_TARGET_TRIPLES ${EMBEDDED_STDLIB_TARGET_TRIPLES}
@@ -244,6 +261,10 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
 
   if(SWIFT_ENABLE_BACKTRACING)
     add_subdirectory(Backtracing)
+  endif()
+
+  if(SWIFT_ENABLE_SYNCHRONIZATION)
+    add_subdirectory(Synchronization)
   endif()
 endif()
 

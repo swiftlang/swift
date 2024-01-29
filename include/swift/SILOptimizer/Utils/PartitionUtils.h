@@ -577,7 +577,9 @@ public:
             fstReduced.elementToRegionMap.find(Element(sndRegionNumber));
         if (iter != fstReduced.elementToRegionMap.end()) {
           fstReduced.elementToRegionMap.insert({sndEltNumber, iter->second});
-          if (fstReduced.fresh_label < Region(sndEltNumber))
+          // We want fresh_label to always be one element larger than our
+          // maximum element.
+          if (fstReduced.fresh_label <= Region(sndEltNumber))
             fstReduced.fresh_label = Region(sndEltNumber + 1);
           continue;
         }
@@ -597,14 +599,9 @@ public:
           fstIter.first->getSecond() =
               fstIter.first->second->merge(sndIter->second);
       }
-      if (fstReduced.fresh_label < sndRegionNumber)
+      if (fstReduced.fresh_label <= sndRegionNumber)
         fstReduced.fresh_label = Region(sndEltNumber + 1);
     }
-
-    LLVM_DEBUG(llvm::dbgs() << "JOIN PEFORMED: \nFST: ";
-               fst.print(llvm::dbgs()); llvm::dbgs() << "SND: ";
-               snd.print(llvm::dbgs()); llvm::dbgs() << "RESULT: ";
-               fstReduced.print(llvm::dbgs()););
 
     assert(fstReduced.is_canonical_correct());
 

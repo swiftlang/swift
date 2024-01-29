@@ -322,20 +322,25 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor) {
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor) {
 
     auto flags = args.claimNext();
     auto taskGroup =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroup ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
             ? args.claimNext()
             : nullptr;
 
     // ExecutorRef is two pointers: {Identity, Implementation}
     std::pair<llvm::Value *, llvm::Value *> executorRef =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
-         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
+         Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor ||
+         Builtin.ID == BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor)
             ? std::pair(args.claimNext(), args.claimNext())
             : std::pair(nullptr, nullptr);
 
@@ -343,6 +348,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // actual value.
     llvm::Value *futureResultType =
         llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    // FIXME: We pass a metatype of result type even if it's statically known to
+    // be discarded (`Void`) just to keep the existing behavior.
     if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       futureResultType = args.claimNext();
     }
@@ -1390,46 +1397,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto patch = args.claimNext();
     auto result = IGF.emitTargetOSVersionAtLeastCall(major, minor, patch);
     out.add(result);
-    return;
-  }
-
-  if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
-    llvm::Value *entrypointArgs[7];
-    auto argIter = IGF.CurFn->arg_begin();
-
-    // self
-    entrypointArgs[0] = &*argIter++;
-    if (entrypointArgs[0]->getType() != IGF.IGM.ObjCPtrTy)
-      entrypointArgs[0] = IGF.Builder.CreateBitCast(entrypointArgs[0], IGF.IGM.ObjCPtrTy);
-
-    // _cmd
-    entrypointArgs[1] = &*argIter;
-    if (entrypointArgs[1]->getType() != IGF.IGM.ObjCSELTy)
-      entrypointArgs[1] = IGF.Builder.CreateBitCast(entrypointArgs[1], IGF.IGM.ObjCSELTy);
-    
-    // Filename pointer
-    entrypointArgs[2] = args.claimNext();
-    // Filename length
-    entrypointArgs[3] = args.claimNext();
-    // Line
-    entrypointArgs[4] = args.claimNext();
-    // Column
-    entrypointArgs[5] = args.claimNext();
-    
-    // Create a flag variable so that this invocation logs only once.
-    auto flagStorageTy = llvm::ArrayType::get(IGF.IGM.Int8Ty,
-                                        IGF.IGM.getAtomicBoolSize().getValue());
-    auto flag = new llvm::GlobalVariable(IGF.IGM.Module, flagStorageTy,
-                               /*constant*/ false,
-                               llvm::GlobalValue::PrivateLinkage,
-                               llvm::ConstantAggregateZero::get(flagStorageTy));
-    flag->setAlignment(
-        llvm::MaybeAlign(IGF.IGM.getAtomicBoolAlignment().getValue()));
-    entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
-
-    IGF.Builder.CreateCall(
-        IGF.IGM.getSwift3ImplicitObjCEntrypointFunctionPointer(),
-        entrypointArgs);
     return;
   }
   

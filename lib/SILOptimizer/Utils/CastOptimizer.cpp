@@ -522,6 +522,12 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)
     return llvm::None;
+  // The bridging function must have the correct parent module set. This ensures
+  // that IRGen sets correct linkage when this function comes from the same
+  // module as being compiled.
+  if (!bridgedFunc->getDeclContext())
+    bridgedFunc->setParentModule(
+        resultDecl->getDeclContext()->getParentModule());
 
   if (dynamicCast.getFunction()->isSerialized() &&
       !bridgedFunc->hasValidLinkageForFragileRef())
@@ -1455,14 +1461,14 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // SourceType is a non-existential type with a non-conditional
     // conformance to a protocol represented by the TargetType.
     //
-    // TypeChecker::conformsToProtocol checks any conditional conformances. If
+    // ModuleDecl::checkConformance() checks any conditional conformances. If
     // they depend on information not known until runtime, the conformance
     // will not be returned. For instance, if `X: P` where `T == Int` in `func
     // foo<T>(_: T) { ... X<T>() as? P ... }`, the cast will succeed for
     // `foo(0)` but not for `foo("string")`. There are many cases where
     // everything is completely static (`X<Int>() as? P`), in which case a
     // valid conformance will be returned.
-    auto Conformance = SM->conformsToProtocol(SourceType, Proto);
+    auto Conformance = SM->checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
       return false;
 

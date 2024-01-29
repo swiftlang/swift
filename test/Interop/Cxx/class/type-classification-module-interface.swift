@@ -44,3 +44,5 @@
 // CHECK:   func __getIteratorBoxUnsafe() -> IteratorBox
 // CHECK-SKIP-UNSAFE-NOT: func __getIteratorBoxUnsafe() -> IteratorBox
 // CHECK: }
+
+// CHECK: struct StructCopyableMovableAnnotatedNonCopyable

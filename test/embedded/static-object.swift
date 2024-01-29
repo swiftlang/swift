@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-irgen %s %S/Inputs/print.swift -module-name main -parse-as-library -enable-experimental-feature Embedded | %FileCheck %s --check-prefix CHECK-IR
-// RUN: %target-run-simple-swift(-O %S/Inputs/print.swift -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-irgen %s -module-name main -parse-as-library -enable-experimental-feature Embedded | %FileCheck %s --check-prefix CHECK-IR
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test

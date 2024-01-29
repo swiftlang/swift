@@ -77,6 +77,9 @@ def backup_module_interface_path_EQ :
   Joined<["-"], "backup-module-interface-path=">,
   Alias<backup_module_interface_path>;
 
+def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
+  HelpText<"Emit textual output in a parseable format">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 
 def primary_file : Separate<["-"], "primary-file">,
@@ -86,9 +89,6 @@ def primary_file : Separate<["-"], "primary-file">,
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
-
-def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
-  HelpText<"Emit textual output in a parseable format">;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
@@ -664,14 +664,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_conformance_availability_errors : Flag<["-"],
-  "enable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as errors">;
-
-def disable_conformance_availability_errors : Flag<["-"],
-  "disable-conformance-availability-errors">,
-  HelpText<"Diagnose conformance availability violations as warnings">;
-
 def warn_on_potentially_unavailable_enum_case : Flag<["-"],
   "warn-on-potentially-unavailable-enum-case">,
   HelpText<"Deprecated, will be removed in future versions">;
@@ -685,12 +677,12 @@ def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
 
 def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Enable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 3 behavior)">;
+  HelpText<"Deprecated, has no effect">;
 
 def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -1115,9 +1107,6 @@ def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
 def target_sdk_name : Separate<["-"], "target-sdk-name">,
   HelpText<"Canonical name of the target SDK used for compilation">;
 
-def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
-  HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;
-
 def candidate_module_file
   : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
     HelpText<"Specify Swift module may be ready to use for an interface">;
@@ -1176,6 +1165,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
+
+def disable_sil_opaque_values : Flag<["-"], "disable-sil-opaque-values">,
+  HelpText<"Disable SIL Opaque Values">;
 
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,

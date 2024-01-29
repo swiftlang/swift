@@ -405,18 +405,17 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
     if (param.getConvention() == ParameterConvention::Direct_Owned) {
       return SILParameterInfo(storageType.getASTType(),
                               ParameterConvention::Indirect_In,
-                              param.getDifferentiability());
+                              param.getOptions());
     }
     assert(param.getConvention() == ParameterConvention::Direct_Guaranteed
            || param.getConvention() == ParameterConvention::Direct_Unowned);
     return SILParameterInfo(storageType.getASTType(),
                             ParameterConvention::Indirect_In_Guaranteed,
-                            param.getDifferentiability());
+                            param.getOptions());
   } else {
     auto newType = getNewSILType(env, storageType, IGM);
-    return SILParameterInfo(newType.getASTType(),
-                            param.getConvention(),
-                            param.getDifferentiability());
+    return SILParameterInfo(newType.getASTType(), param.getConvention(),
+                            param.getOptions());
   }
 }
 
@@ -2841,7 +2840,8 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   case SILInstructionKind::MarkDependenceInst: {
     auto instr = cast<MarkDependenceInst>(convInstr);
     newInstr = convBuilder.createMarkDependence(
-        instr->getLoc(), instr->getValue(), instr->getBase());
+      instr->getLoc(), instr->getValue(), instr->getBase(),
+      instr->isNonEscaping());
     break;
   }
   case SILInstructionKind::DifferentiableFunctionInst: {
@@ -3051,6 +3051,7 @@ void LoadableByAddress::run() {
                 builtinInstrs.insert(instr);
                 break;
               }
+              case SILInstructionKind::StructInst:
               case SILInstructionKind::DebugValueInst:
                 break;
               default:
@@ -3164,7 +3165,8 @@ void LoadableByAddress::run() {
     } else if (auto *globalAddr = dyn_cast<GlobalAddrInst>(inst)) {
       SILBuilderWithScope builder(inst);
       auto *newInst = builder.createGlobalAddr(
-          globalAddr->getLoc(), globalAddr->getReferencedGlobal());
+          globalAddr->getLoc(), globalAddr->getReferencedGlobal(),
+          globalAddr->getDependencyToken());
       globalAddr->replaceAllUsesWith(newInst);
       globalAddr->eraseFromParent();
     } else if (auto *globalVal = dyn_cast<GlobalValueInst>(inst)) {

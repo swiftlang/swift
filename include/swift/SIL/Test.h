@@ -120,6 +120,9 @@ class TestRunner;
 /// Tests are instantiated once at program launch.  At that time, they are
 /// stored in a registry name -> test.  When an specify_test instruction
 /// naming a particular test is processed, that test is run.
+///
+/// This is a value type because we have no persistent location in which to
+/// store SwiftCompilerSources tests.
 class FunctionTest final {
 public:
   /// Wraps a test lambda.
@@ -190,7 +193,7 @@ private:
            SILFunctionTransform &pass, Dependencies &dependencies);
 
   /// Retrieve the test with named \p name from the global registry.
-  static FunctionTest *get(StringRef name);
+  static FunctionTest get(StringRef name);
 
   /// The instance of the TestRunner pass currently running this test.  Only
   /// non-null when FunctionTest::run is executing.

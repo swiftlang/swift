@@ -83,8 +83,12 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   case CodeCompletionLiteralKind::StringLiteral:
     return Ctx.getStringType();
   case CodeCompletionLiteralKind::ArrayLiteral:
+    if (!Ctx.getArrayDecl())
+      return Type();
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
+    if (!Ctx.getDictionaryDecl())
+      return Type();
     return Ctx.getDictionaryDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::NilLiteral:
   case CodeCompletionLiteralKind::ColorLiteral:
@@ -633,6 +637,8 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
     //     τ_1_0(U) => U }
     auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
 
+    // FIXME: The below should use substitution map substitution.
+
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
     auto keyPathResultTy =
@@ -761,15 +767,15 @@ void CompletionLookup::analyzeActorIsolation(
     }
     break;
   }
-  case ActorIsolation::GlobalActorUnsafe:
-    // For "unsafe" global actor isolation, automatic 'async' only happens
+  case ActorIsolation::GlobalActor: {
+    // For "preconcurrency" global actor isolation, automatic 'async' only happens
     // if the context has adopted concurrency.
-    if (!CanCurrDeclContextHandleAsync &&
+    if (isolation.preconcurrency() &&
+        !CanCurrDeclContextHandleAsync &&
         !completionContextUsesConcurrencyFeatures(CurrDeclContext)) {
       return;
     }
-    LLVM_FALLTHROUGH;
-  case ActorIsolation::GlobalActor: {
+
     auto getClosureActorIsolation = [this](AbstractClosureExpr *CE) {
       // Prefer solution-specific actor-isolations and fall back to the one
       // recorded in the AST.
@@ -796,21 +802,20 @@ void CompletionLookup::analyzeActorIsolation(
   // If the reference is 'async', all types must be 'Sendable'.
   if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete &&
       implicitlyAsync && T) {
-    auto *M = CurrDeclContext->getParentModule();
     if (isa<VarDecl>(VD)) {
-      if (!isSendableType(M, T)) {
+      if (!T->isSendableType()) {
         NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
       }
     } else {
       assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
       // Check if the result and the param types are all 'Sendable'.
       auto *AFT = T->castTo<AnyFunctionType>();
-      if (!isSendableType(M, AFT->getResult())) {
+      if (!AFT->getResult()->isSendableType()) {
         NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
       } else {
         for (auto &param : AFT->getParams()) {
           Type paramType = param.getPlainType();
-          if (!isSendableType(M, paramType)) {
+          if (!paramType->isSendableType()) {
             NotRecommended =
                 ContextualNotRecommendedReason::CrossActorReference;
             break;
@@ -1228,6 +1233,10 @@ void CompletionLookup::addFunctionCallPattern(
             : CodeCompletionResultKind::Pattern,
         SemanticContext ? *SemanticContext : getSemanticContextKind(AFD));
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
+    if (DotLoc) {
+      Builder.setNumBytesToErase(Ctx.SourceMgr.getByteDistance(
+          DotLoc, Ctx.SourceMgr.getIDEInspectionTargetLoc()));
+    }
     if (AFD)
       Builder.setAssociatedDecl(AFD);
 
@@ -3435,8 +3444,8 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
                      /*IncludeTopLevel=*/false, Loc);
 }
 
-void CompletionLookup::getWithoutConstraintTypes() {
-  // FIXME: Once we have a typealias declaration for copyable, we should be
-  // returning that instead of a keyword (rdar://109107817).
-  addKeyword("Copyable");
+void CompletionLookup::addWithoutConstraintTypes() {
+  auto *CopyableDecl = Ctx.getProtocol(KnownProtocolKind::Copyable);
+  addNominalTypeRef(CopyableDecl, DeclVisibilityKind::VisibleAtTopLevel,
+                    DynamicLookupInfo());
 }

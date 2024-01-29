@@ -17,15 +17,18 @@
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/ThreadPool.h"
 
 using namespace llvm;
 
 namespace {
 enum Actions {
   compute_cache_key,
+  compute_cache_key_from_index,
   cache_query,
   replay_result,
 };
@@ -35,11 +38,16 @@ llvm::cl::opt<std::string> CASPath("cas-path", llvm::cl::desc("<path>"),
                                    llvm::cl::cat(Category));
 llvm::cl::opt<std::string> CASID("id", llvm::cl::desc("<casid>"),
                                  llvm::cl::cat(Category));
-llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file>"),
+llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file|index>"),
                                  llvm::cl::cat(Category));
+llvm::cl::opt<unsigned> Threads("threads",
+                                llvm::cl::desc("<number of threads>"),
+                                llvm::cl::cat(Category), cl::init(1));
 llvm::cl::opt<Actions>
     Action("action", llvm::cl::desc("<action>"),
            llvm::cl::values(clEnumVal(compute_cache_key, "compute cache key"),
+                            clEnumVal(compute_cache_key_from_index,
+                                      "compute cache key from index"),
                             clEnumVal(cache_query, "cache query"),
                             clEnumVal(replay_result, "replay result")),
            llvm::cl::cat(Category));
@@ -69,6 +77,27 @@ static int action_compute_cache_key(swiftscan_cas_t cas, StringRef input,
   swiftscan_string_ref_t err_msg;
   auto key = swiftscan_cache_compute_key(cas, Args.size(), Args.data(),
                                          input.str().c_str(), &err_msg);
+  if (key.length == 0)
+    return printError(err_msg);
+
+  llvm::outs() << toString(key) << "\n";
+  swiftscan_string_dispose(key);
+
+  return EXIT_SUCCESS;
+}
+
+static int
+action_compute_cache_key_from_index(swiftscan_cas_t cas, StringRef index,
+                                    std::vector<const char *> &Args) {
+  unsigned inputIndex = 0;
+  if (!to_integer(index, inputIndex)) {
+    llvm::errs() << "-input is not a number for compute_cache_key_from_index\n";
+    return EXIT_FAILURE;
+  }
+
+  swiftscan_string_ref_t err_msg;
+  auto key = swiftscan_cache_compute_key_from_input_index(
+      cas, Args.size(), Args.data(), inputIndex, &err_msg);
   if (key.length == 0)
     return printError(err_msg);
 
@@ -191,14 +220,27 @@ int main(int argc, char *argv[]) {
   llvm::StringSaver Saver(Alloc);
   auto Args = createArgs(SwiftCommands, Saver);
 
-  switch (Action) {
-  case compute_cache_key:
-    return action_compute_cache_key(cas, Input, Args);
-  case cache_query:
-    return action_cache_query(cas, CASID.c_str());
-  case replay_result:
-    return action_replay_result(cas, CASID.c_str(), Args);
+  std::atomic<int> Ret = 0;
+  llvm::ThreadPool Pool(llvm::hardware_concurrency(Threads));
+  for (unsigned i = 0; i < Threads; ++i) {
+    Pool.async([&]() {
+      switch (Action) {
+      case compute_cache_key:
+        Ret += action_compute_cache_key(cas, Input, Args);
+        break;
+      case compute_cache_key_from_index:
+        Ret += action_compute_cache_key_from_index(cas, Input, Args);
+        break;
+      case cache_query:
+        Ret += action_cache_query(cas, CASID.c_str());
+        break;
+      case replay_result:
+        Ret += action_replay_result(cas, CASID.c_str(), Args);
+        break;
+      }
+    });
   }
+  Pool.wait();
 
-  return EXIT_SUCCESS;
+  return Ret;
 }

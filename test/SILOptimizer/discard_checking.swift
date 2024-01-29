@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-sil -sil-verify-all -verify %s -disable-availability-checking
 
 // REQUIRES: concurrency
+// REQUIRES: swift_in_compiler
 
 enum Color {
   case red, green, blue, none
@@ -476,10 +477,17 @@ struct Basics: ~Copyable {
     repeat {
       self = Basics() // expected-error {{cannot reinitialize 'self' after 'discard self'}}
       discard self // expected-note 2{{discarded self here}}
-    } while false
+    } while 1 == 0
   } // expected-error {{must consume 'self' before exiting method that discards self}}
 
-  consuming func reinitAfterDiscard3_ok(_ c: Color) throws {
+  consuming func reinitAfterDiscard3_ok1(_ c: Color) throws {
+    repeat {
+      self = Basics()
+      discard self
+    } while false
+  }
+
+  consuming func reinitAfterDiscard3_ok2(_ c: Color) throws {
     self = Basics()
     discard self
   }

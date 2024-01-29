@@ -764,9 +764,6 @@ BUILTIN_MISC_OPERATION(COWBufferForReading, "COWBufferForReading", "n", Special)
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
-// Swift3ImplicitObjCEntrypoint has type () -> ()
-BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
-
 /// willThrow: Error -> ()
 BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
@@ -986,6 +983,17 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
     "createAsyncTaskInGroup", "", Special)
 
+/// createAsyncDiscardingTaskInGroup(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous discarding task, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroup,
+    "createAsyncDiscardingTaskInGroup", "", Special)
+
 /// createAsyncTaskWithExecutor(): (
 ///     Int,                            // flags
 ///     Builtin.Executor,               // executor
@@ -997,7 +1005,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
     "createAsyncTaskWithExecutor", "", Special)
 
-/// createAsyncTaskWithExecutor(): (
+/// createAsyncTaskInGroupWithExecutor(): (
 ///     Int,                            // flags
 ///     Builtin.RawPointer,             // group
 ///     Builtin.Executor,               // executor
@@ -1008,6 +1016,18 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
 /// task group and a function to execute.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
     "createAsyncTaskInGroupWithExecutor", "", Special)
+
+/// createAsyncDiscardingTaskInGroupWithExecutor(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     Builtin.Executor,                  // executor
+///     @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous discarding task, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncDiscardingTaskInGroupWithExecutor,
+    "createAsyncDiscardingTaskInGroupWithExecutor", "", Special)
 
 /// Build a Builtin.Executor value from an "ordinary" task executor
 /// reference.
@@ -1062,6 +1082,12 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetEnumTag, "getEnumTag", "", Special)
 /// Note: This assume that either 1. the given tag has no payload or 2. the
 /// tag's payload is already initialized with the given source.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(InjectEnumTag, "injectEnumTag", "", Special)
+
+/// distributedActorAsAnyActor: <DA: DistributedActor>(_: DA) -> any Actor
+///
+/// For a given distributed actor that is known to be local, extract an
+/// `any Actor` existential that refers to the local actor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActorAsAnyActor", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

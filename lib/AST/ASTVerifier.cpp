@@ -622,7 +622,7 @@ public:
         if (!(countType->is<PackType>() ||
               countType->is<PackArchetypeType>() ||
               countType->isRootParameterPack())) {
-          Out << "non-pack shape type" << countType->getString() << "\n";
+          Out << "non-pack shape type: " << countType->getString() << "\n";
           abort();
         }
       }
@@ -2472,6 +2472,10 @@ public:
     }
 
     void verifyChecked(MacroExpansionExpr *expansion) {
+      // If there is a substitute decl, we'll end up checking that instead.
+      if (expansion->getSubstituteDecl())
+        return;
+
       MacroExpansionDiscriminatorKey key{
         MacroDiscriminatorContext::getParentOf(expansion).getOpaqueValue(),
         expansion->getMacroName().getBaseName().getIdentifier()
@@ -2799,7 +2803,6 @@ public:
         // Ignore incomplete conformances; we didn't need them.
         return;
 
-      case ProtocolConformanceState::CheckingTypeWitnesses:
       case ProtocolConformanceState::Checking:
         dumpRef(decl);
         Out << " has a protocol conformance that is still being checked "
@@ -3284,7 +3287,7 @@ public:
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       auto *ND = DD->getDeclContext()->getSelfNominalTypeDecl();
-      if (!isa<ClassDecl>(ND) && !ND->canBeNoncopyable() && !DD->isInvalid()) {
+      if (!isa<ClassDecl>(ND) && ND->canBeCopyable() && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes/move only types should be "
                "marked invalid\n";
         abort();
@@ -3816,8 +3819,9 @@ public:
         if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
           auto *expansionBuffer =
               D->getModuleContext()->getSourceFileContainingLocation(Current.Start);
-          if (auto expansion = expansionBuffer->getMacroExpansion()) {
-            Current = expansion.getSourceRange();
+
+          if (auto expansionRange = expansionBuffer->getMacroInsertionRange()) {
+            Current = expansionRange;
           }
         }
 

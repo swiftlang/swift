@@ -15,6 +15,9 @@ public struct Sample5 {}
 public struct Sample6 {}
 
 public struct SampleAlreadyConforms: SampleProtocol1 {}
+
+public struct GenericSample1<T> {}
+
 #else
 
 import Library
@@ -80,5 +83,10 @@ public struct OriginallyDefinedInLibrary {}
 extension OriginallyDefinedInLibrary: SampleProtocol1 {} // ok, @_originallyDefinedIn attribute makes this authoritative
 
 #endif
+
+// conditional conformances
+extension GenericSample1: SampleProtocol1 where T: SampleProtocol1 {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'GenericSample1' to imported protocol 'SampleProtocol1'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-2 {{add '@retroactive' to silence this warning}}
 
 #endif

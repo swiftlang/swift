@@ -39,7 +39,7 @@ function(add_swift_compiler_module module)
   get_property(modules GLOBAL PROPERTY swift_compiler_modules)
   set_property(GLOBAL PROPERTY swift_compiler_modules ${modules} ${module})
 endfunction()
- 
+
 # Add source files to a swift compiler module.
 #
 function(swift_compiler_sources module)
@@ -264,41 +264,6 @@ else()
 
   add_subdirectory(Sources)
 
-  # TODO: generate this dynamically through the modulemap; this cannot use `sed`
-  # as that is not available on all platforms (e.g. Windows).
-  #
-  # step 1: generate a dummy source file, which just includes all headers
-  # defined in include/swift/module.modulemap
-  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
-       "
-#define COMPILED_WITH_SWIFT
-
-#include \"Basic/BasicBridging.h\"
-#include \"SIL/SILBridging.h\"
-#include \"SILOptimizer/OptimizerBridging.h\"
-")
-  add_custom_command(
-    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
-      "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
-  )
-
-  # step 2: build a library containing that source file. This library depends on all the included header files.
-  #         The swift modules can now depend on that target.
-  #         Note that this library is unused, i.e. not linked to anything.   
-  add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
-  target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
-
-  # When building unified, we need to make sure all the Clang headers are
-  # generated before we try to use them.
-  # When building Swift against an already compiled LLVM/Clang, like
-  # build-script does, this target does not exist, but the headers
-  # are already completely generated at that point.
-  if(TARGET clang-tablegen-targets)
-    add_dependencies(importedHeaderDependencies clang-tablegen-targets)
-  endif()
 
   if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
 

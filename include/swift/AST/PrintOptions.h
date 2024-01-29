@@ -90,16 +90,17 @@ class AnyAttrKind {
 
 public:
   AnyAttrKind(TypeAttrKind K) : kind(static_cast<unsigned>(K)), isType(1) {
-    static_assert(TAK_Count < UINT_MAX, "TypeAttrKind is > 31 bits");
+    static_assert(NumTypeAttrKinds < UINT_MAX, "TypeAttrKind is > 31 bits");
   }
   AnyAttrKind(DeclAttrKind K) : kind(static_cast<unsigned>(K)), isType(0) {
     static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
-  AnyAttrKind() : kind(TAK_Count), isType(1) {}
+  AnyAttrKind() : kind(NumTypeAttrKinds), isType(1) {}
 
-  /// Returns the TypeAttrKind, or TAK_Count if this is not a type attribute.
-  TypeAttrKind type() const {
-    return isType ? static_cast<TypeAttrKind>(kind) : TAK_Count;
+  /// Returns the TypeAttrKind.
+  llvm::Optional<TypeAttrKind> type() const {
+    if (!isType || kind == NumTypeAttrKinds) return {};
+    return static_cast<TypeAttrKind>(kind);
   }
   /// Returns the DeclAttrKind, or DAK_Count if this is not a decl attribute.
   DeclAttrKind decl() const {

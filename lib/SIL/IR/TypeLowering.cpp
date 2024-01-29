@@ -31,6 +31,7 @@
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -116,15 +117,16 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   assert(var->hasStorage() &&
          "should not have attempted to directly capture this variable");
 
+  auto contextTy = var->getTypeInContext();
   auto &lowering = getTypeLowering(
-      var->getTypeInContext(), TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+      contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                           expansion.getResilienceExpansion()));
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in
   // its boxed form so we can obey Swift's capture reference semantics.
   if (!var->supportsMutation()
-      && lowering.getLoweredType().getASTType()->isNoncopyable()
+      && contextTy->isNoncopyable()
       && !capture.isNoEscape()) {
       auto *param = dyn_cast<ParamDecl>(var);
       if (!param || (param->getValueOwnership() != ValueOwnership::Shared &&
@@ -260,6 +262,13 @@ namespace {
       return props;
     }
 
+    RecursiveProperties mergeHasPack(HasPack_t hasPack,
+                                     RecursiveProperties props) {
+      if (hasPack == HasPack)
+        props.setHasPack();
+      return props;
+    }
+
     RecursiveProperties applyLifetimeAnnotation(LifetimeAnnotation annotation,
                                                 RecursiveProperties props) {
       switch (annotation) {
@@ -332,7 +341,8 @@ namespace {
                                                IsAddressOnly, IsNotResilient,
                                                isSensitive,
                                                DoesNotHaveRawPointer,
-                                               IsLexical});
+                                               IsLexical,
+                                               HasPack});
     }
 
     RetTy visitSILPackType(CanSILPackType type,
@@ -342,7 +352,8 @@ namespace {
                                                IsAddressOnly, IsNotResilient,
                                                isSensitive,
                                                DoesNotHaveRawPointer,
-                                               IsLexical});
+                                               IsLexical,
+                                               HasPack});
     }
 
     RetTy visitPackExpansionType(CanPackExpansionType type,
@@ -354,6 +365,7 @@ namespace {
                                       type.getPatternType(),
                                       TC, Expansion));
       props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      props.setHasPack();
       return asImpl().handleAddressOnly(type, props);
     }
 
@@ -2251,6 +2263,7 @@ namespace {
                                    IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      properties.setHasPack();
       for (auto i : indices(packType.getElementTypes())) {
         auto &eltLowering =
           TC.getTypeLowering(packType->getSILElementType(i),
@@ -2267,6 +2280,7 @@ namespace {
                                          IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties;
       properties.setAddressOnly();
+      properties.setHasPack();
       auto &patternLowering =
         TC.getTypeLowering(origType.getPackExpansionPatternType(),
                            packExpansionType.getPatternType(),
@@ -2361,7 +2375,19 @@ namespace {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
       }
-      
+
+      // [is_or_contains_pack_unsubstituted] Visit the fields of the
+      // unsubstituted type to find pack types which would be substituted away.
+      for (auto field : D->getStoredProperties()) {
+        auto fieldInterfaceTy = field->getInterfaceType()->getCanonicalType();
+        auto origFieldType = AbstractionPattern(
+            D->getGenericSignature().getCanonicalSignature(), fieldInterfaceTy);
+        auto fieldProperties =
+            classifyType(origFieldType, fieldInterfaceTy, TC, Expansion);
+        properties =
+            mergeHasPack(fieldProperties.isOrContainsPack(), properties);
+      }
+
       // If the type has raw storage, it is move-only and address-only.
       if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
         properties.setAddressOnly();
@@ -2403,11 +2429,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      GenericEnvironment *env = nullptr;
-      if (auto sig = origType.getGenericSignatureOrNull())
-        env = sig.getGenericEnvironment();
-
-      if (structType->isNoncopyable(env)) {
+      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2415,7 +2437,7 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-      if (!structType->isEscapable(env)) {
+      if (D->canBeEscapable() != TypeDecl::CanBeInvertible::Always) {
         properties.setNonTrivial();
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2440,6 +2462,19 @@ namespace {
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
+
+      // [is_or_contains_pack_unsubstituted] Visit the elements of the
+      // unsubstituted type to find pack types which would be substituted away.
+      for (auto elt : D->getAllElements()) {
+        if (!elt->hasAssociatedValues())
+          continue;
+        auto eltInterfaceTy = elt->getInterfaceType()->getCanonicalType();
+        auto origEltType = AbstractionPattern(
+            D->getGenericSignature().getCanonicalSignature(), eltInterfaceTy);
+        auto eltProperties =
+            classifyType(origEltType, eltInterfaceTy, TC, Expansion);
+        properties = mergeHasPack(eltProperties.isOrContainsPack(), properties);
+      }
 
       // If the whole enum is indirect, we lower it as if all payload
       // cases were indirect. This means a fixed-layout indirect enum
@@ -2491,11 +2526,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      GenericEnvironment *env = nullptr;
-      if (auto sig = origType.getGenericSignatureOrNull())
-        env = sig.getGenericEnvironment();
-
-      if (enumType->isNoncopyable(env)) {
+      if (D->canBeCopyable() != TypeDecl::CanBeInvertible::Always) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2504,7 +2535,8 @@ namespace {
             MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
 
-      assert(enumType->isEscapable(env) && "missing typelowering case here!");
+      assert(D->canBeEscapable() == TypeDecl::CanBeInvertible::Always
+             && "missing typelowering case here!");
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
@@ -2902,6 +2934,14 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
+  verifyLexicalLowering(lowering, origType, substType, forExpansion);
+  verifyTrivialLowering(lowering, origType, substType, forExpansion);
+}
+
+void TypeConverter::verifyLexicalLowering(const TypeLowering &lowering,
+                                          AbstractionPattern origType,
+                                          CanType substType,
+                                          TypeExpansionContext forExpansion) {
   // Non-trivial lowerings should always be lexical unless all non-trivial
   // fields are eager move.
   if (!lowering.isTrivial() && !lowering.isLexical()) {
@@ -2966,6 +3006,150 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
         });
     assert(hasNoNontrivialLexicalLeaf &&
            "Found non-trivial lexical leaf in non-trivial non-lexical type?!");
+  }
+}
+
+void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
+                                          AbstractionPattern origType,
+                                          CanType substType,
+                                          TypeExpansionContext forExpansion) {
+  if (!Context.LangOpts.hasFeature(Feature::BitwiseCopyable))
+    return;
+  auto *bitwiseCopyableProtocol =
+      Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
+  if (!bitwiseCopyableProtocol)
+    return;
+
+  // We can't check conditional requirements in this case. Why are we seeing
+  // interface types here at all?
+  if (substType->hasTypeParameter())
+    return;
+
+  auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
+
+  if (lowering.isTrivial() && !conformance) {
+    // A trivial type can only lack a conformance if one of its leaves is a
+    // public type that doesn't conform.
+    bool hasNoNonconformingNode = visitAggregateLeaves(
+        origType, substType, forExpansion,
+        /*isLeaf=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // The field's type is an aggregate.  Treat it as a leaf if it is
+          // public.
+          auto *nominal = ty.getAnyNominal();
+          // Non-nominal types are public iff their components are; visit the
+          // components.
+          if (!nominal)
+            return false;
+
+          // Nominals with generic parameters must be explicitly conformed to
+          // BitwiseCopyable.
+          auto *generic = ty.getAnyGeneric();
+          if (generic && generic->isGenericContext()) {
+            return true;
+          }
+
+          return nominal
+              ->getFormalAccessScope(/*useDC=*/nullptr,
+                                     /*treatUsableFromInlineAsPublic=*/true)
+              .isPublic();
+        },
+        /*visit=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // Return false to indicate seeing a leaf which justifies the type
+          // being trivial but not conforming to BitwiseCopyable.
+
+          // A BitwiseCopyable conformer appearing within its layout doesn't
+          // explain why substType doesn't itself conform.
+          if (M.checkConformance(ty, bitwiseCopyableProtocol))
+            return true;
+
+          // ModuleTypes are trivial but don't warrant being given a conformance
+          // to BitwiseCopyable.
+          if (auto mt = dyn_cast<ModuleType>(ty)) {
+            // If one were to appear within a type, its lack of conformance
+            // wouldn't result in the type's failure to conform.  Conversely, if
+            // substType itself is the ModuleType, it is trivial and
+            // non-conformant; return false to indicate its the leaf which
+            // justifies substType being non-conformant.
+            return field;
+          }
+
+          // Given a non-bitwise-copyable C, unowned(unsafe) C is still
+          // BitwiseCopyable.
+          auto rst = dyn_cast<ReferenceStorageType>(ty);
+          if (rst && rst->getOwnership() == ReferenceOwnership::Unmanaged) {
+            // If a ReferenceStorageType appears as a component of an aggregate,
+            // that shouldn't stop the aggregate from being BitwiseCopyable.  If
+            // the whole type is the ReferenceStorageType, however, it does not
+            // conform.
+            return field;
+          }
+
+          auto *nominal = ty.getAnyNominal();
+
+          // Non-nominal types are trivial iff conforming.
+          if (!nominal) {
+            llvm::errs()
+                << "Non-nominal type without conformance to _BitwiseCopyable:\n"
+                << ty << "\n"
+                << "within " << substType << "\n"
+                << "of " << origType << "\n";
+            assert(false);
+            return true;
+          }
+
+          /// A non-conforming generic nominal type justifies substType not
+          /// conforming.
+          auto *generic = ty.getAnyGeneric();
+          if (generic && generic->isGenericContext()) {
+            return false;
+          }
+
+          // The field is trivial and the whole type is nonconforming.  That's
+          // legal iff the type is public.
+          return !nominal
+                      ->getFormalAccessScope(
+                          /*useDC=*/nullptr,
+                          /*treatUsableFromInlineAsPublic=*/true)
+                      .isPublic();
+        });
+    if (hasNoNonconformingNode) {
+      llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
+                   << substType << "\n"
+                   << "of " << origType << "\n";
+      assert(false);
+    }
+  }
+
+  if (!lowering.isTrivial() && conformance) {
+    // A non-trivial type can only conform if at least one of its leaves is a
+    // type parameter that conforms.
+    bool hasNoConformingArchetypeNode = visitAggregateLeaves(
+        origType, substType, forExpansion,
+        /*isLeaf=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // Walk into every aggregate.
+          return false;
+        },
+        /*visit=*/
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
+          // Return false to indicate visiting a type parameter.
+          assert(M.checkConformance(ty, bitwiseCopyableProtocol) &&
+                 "leaf of non-trivial BitwiseCopyable type that doesn't "
+                 "conform to BitwiseCopyable!?");
+
+          if (origTy.isTypeParameter())
+            return false;
+
+          return true;
+        });
+    if (hasNoConformingArchetypeNode) {
+      llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
+                   << substType << "\n";
+      conformance.print(llvm::errs());
+      assert(false);
+    }
   }
 }
 #endif
@@ -3497,6 +3681,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
                                       funcType->getThrownError())
           .withConcurrent(funcType->isSendable())
           .withAsync(funcType->isAsync())
+          .withIsolation(funcType->getIsolation())
           .build();
 
   return CanAnyFunctionType::get(
@@ -4645,6 +4830,7 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << "isOrContainsRawPointer: " << BOOL(Properties.isOrContainsRawPointer())
      << ".\n"
      << "isLexical: " << BOOL(Properties.isLexical()) << ".\n"
+     << "isOrContainsPack: " << BOOL(Properties.isOrContainsPack()) << ".\n"
      << "\n";
 }
 

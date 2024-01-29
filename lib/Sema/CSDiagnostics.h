@@ -449,7 +449,9 @@ class SameShapeExpansionFailure final : public FailureDiagnostic {
 public:
   SameShapeExpansionFailure(const Solution &solution, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), lhs(lhs), rhs(rhs) {}
+      : FailureDiagnostic(solution, locator),
+        lhs(resolveType(lhs)),
+        rhs(resolveType(rhs)) {}
 
   bool diagnoseAsError() override;
 };
@@ -2118,9 +2120,9 @@ public:
   /// or now deprecated `init(initialValue:)`.
   bool diagnosePropertyWrapperMismatch() const;
 
-  /// Tailored diagnostics for argument mismatches associated with trailing
+  /// Tailored diagnostics for argument mismatches associated with (trailing)
   /// closures being passed to non-closure parameters.
-  bool diagnoseTrailingClosureMismatch() const;
+  bool diagnoseClosureMismatch() const;
 
   /// Tailored key path as function diagnostics for argument mismatches where
   /// argument is a keypath expression that has a root type that matches a

@@ -32,6 +32,11 @@ public struct ExportedSourceFile {
   /// The syntax tree for the complete source file.
   public let syntax: SourceFileSyntax
 
+  /// A source location converter to convert `AbsolutePosition`s in `syntax` to line/column locations.
+  /// 
+  /// Cached so we don't need to re-build the line table every time we need to convert a position.
+  let sourceLocationConverter: SourceLocationConverter
+
   public func position(of location: BridgedSourceLoc) -> AbsolutePosition? {
     let sourceFileBaseAddress = UnsafeRawPointer(buffer.baseAddress!)
     guard let opaqueValue = location.getOpaquePointerValue() else {
@@ -52,9 +57,9 @@ extension Parser.ExperimentalFeatures {
       }
     }
     mapFeature(.ThenStatements, to: .thenStatements)
-    mapFeature(.TypedThrows, to: .typedThrows)
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
+    mapFeature(.TransferringArgsAndResults, to: .transferringArgsAndResults)
   }
 }
 
@@ -74,12 +79,15 @@ public func parseSourceFile(
   let sourceFile = Parser.parse(source: buffer, experimentalFeatures: .init(from: ctx))
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
+  let moduleName = String(cString: moduleName)
+  let fileName = String(cString: filename)
   exportedPtr.initialize(
     to: .init(
       buffer: buffer,
-      moduleName: String(cString: moduleName),
-      fileName: String(cString: filename),
-      syntax: sourceFile
+      moduleName: moduleName,
+      fileName: fileName,
+      syntax: sourceFile,
+      sourceLocationConverter: SourceLocationConverter(fileName: fileName, tree: sourceFile)
     )
   )
 

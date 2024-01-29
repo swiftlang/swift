@@ -1543,6 +1543,10 @@ public:
   llvm::MapVector<PackElementExpr *, PackExpansionExpr *>
       PackEnvironments;
 
+  /// The outer pack element generic environment to use when dealing with nested
+  /// pack iteration (see \c getPackElementEnvironment).
+  llvm::SmallVector<GenericEnvironment *> PackElementGenericEnvironments;
+
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
 
@@ -2344,6 +2348,8 @@ private:
   llvm::SmallMapVector<PackElementExpr *, PackExpansionExpr *, 2>
       PackEnvironments;
 
+  llvm::SmallVector<GenericEnvironment *, 4> PackElementGenericEnvironments;
+
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
@@ -2832,6 +2838,9 @@ public:
 
     /// The length of \c PackEnvironments.
     unsigned numPackEnvironments;
+
+    /// The length of \c PackElementGenericEnvironments.
+    unsigned numPackElementGenericEnvironments;
 
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;
@@ -3823,14 +3832,17 @@ public:
   /// Given a tuple with a single unlabeled element that represents a pack
   /// expansion (either directly via \c PackExpansionType or through a type
   /// variable constrained to a pack expansion), materialize the pack expansion
-  /// and return its pattern type as a result. The result is a type variable
-  /// because element of the tuple is not required to be resolved at the time of
-  /// the call and operation is delayed until the element is sufficiently
-  /// resolved (see \c simplifyMaterializePackExpansionConstraint)
+  /// and return its pattern type as a result. The result is a type
+  /// variable because element of the tuple is not required to be resolved at
+  /// the time of the call and operation is delayed until the element is
+  /// sufficiently resolved (see \c simplifyMaterializePackExpansionConstraint)
   ///
   /// \param tupleType A tuple with a single unlabeled element that represents a
-  /// pack expansion. 
+  /// pack expansion.
   /// \param locator The locator.
+  ///
+  /// \returns A type variable type that represents the pattern type of the pack
+  /// expansion.
   TypeVariableType *
   addMaterializePackExpansionConstraint(Type tupleType,
                                         ConstraintLocatorBuilder locator);
@@ -6054,10 +6066,6 @@ public:
     Element->print(Out, SM, indent);
   }
 
-  /// Returns \c false if this conjunction element is known not to contain the
-  /// code compleiton token.
-  bool mightContainCodeCompletionToken(const ConstraintSystem &cs) const;
-
 private:
   /// Find type variables referenced by this conjunction element.
   /// If this is a closure body element, it would look inside \c ASTNode.
@@ -6389,6 +6397,11 @@ public:
 /// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathType(Type type);
 
+/// Determine whether the given type is a PartialKeyPath and
+/// AnyKeyPath or existential type thererof, for example,
+/// `PartialKeyPath<...> & Sendable`.
+bool isTypeErasedKeyPathType(Type type);
+
 /// Determine whether given declaration is one for a key path
 /// `{Writable, ReferenceWritable}KeyPath`.
 bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
@@ -6440,6 +6453,9 @@ bool containsPackExpansionType(TupleType *tuple);
 /// \returns null if \c type is not a single unlabeled pack expansion tuple.
 Type getPatternTypeOfSingleUnlabeledPackExpansionTuple(Type type);
 
+/// Check whether this is a reference to one of the special result builder
+/// methods prefixed with `build*` i.e. `buildBlock`, `buildExpression` etc.
+bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 } // end namespace constraints
 
 template<typename ...Args>

@@ -469,9 +469,6 @@ public:
   /*implicit*/ ConsumableManagedValue(ManagedValue value,
                                       CastConsumptionKind finalConsumption)
       : Value(value), FinalConsumption(finalConsumption) {
-    assert((value.getType().isObject() ||
-            finalConsumption != CastConsumptionKind::BorrowAlways) &&
-           "Can not borrow always a value");
     assert((value.getType().isAddress() ||
             finalConsumption != CastConsumptionKind::CopyOnSuccess) &&
            "Can not copy on success a value.");

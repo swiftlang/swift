@@ -305,8 +305,8 @@ public struct Builder {
     return notifyNew(vectorInst.getAs(VectorInst.self))
   }
 
-  public func createGlobalAddr(global: GlobalVariable) -> GlobalAddrInst {
-    return notifyNew(bridged.createGlobalAddr(global.bridged).getAs(GlobalAddrInst.self))
+  public func createGlobalAddr(global: GlobalVariable, dependencyToken: Value?) -> GlobalAddrInst {
+    return notifyNew(bridged.createGlobalAddr(global.bridged, dependencyToken.bridged).getAs(GlobalAddrInst.self))
   }
 
   public func createGlobalValue(global: GlobalVariable, isBare: Bool) -> GlobalValueInst {
@@ -374,5 +374,10 @@ public struct Builder {
   public func createEndCOWMutation(instance: Value, keepUnique: Bool) -> EndCOWMutationInst {
     let endMutation = bridged.createEndCOWMutation(instance.bridged, keepUnique)
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
+  }
+
+  public func createMarkDependence(value: Value, base: Value, isNonEscaping: Bool) -> MarkDependenceInst {
+    let markDependence = bridged.createMarkDependence(value.bridged, base.bridged, isNonEscaping)
+    return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
 }

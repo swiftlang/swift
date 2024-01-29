@@ -1,0 +1,71 @@
+// RUN: %target-sil-opt -transfer-non-sendable -enable-sil-opaque-values -enable-experimental-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+// REQUIRES: objc_interop
+
+// PLEASE READ THIS!
+//
+// This test is specifically to test out individual instruction interactions,
+// not for crashers. The idea is to make it so that we have one test for every
+// SIL instruction, so please add a test here when you add a new instruction.
+//
+// For assign/lookthrough, just add a test that triggers an ownership error. If it is
+// a more complex instruction, talk with @gottesmm.
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+class NonSendableKlass {}
+
+final class SendableKlass : Sendable {}
+
+@_moveOnly
+struct NonSendableMoveOnlyStruct {
+  var ns: NonSendableKlass
+}
+
+struct NonSendableStruct {
+  var ns: NonSendableKlass
+}
+
+sil @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
+sil @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+
+sil @transferSendableKlass : $@convention(thin) @async (@guaranteed SendableKlass) -> ()
+sil @constructSendableKlass : $@convention(thin) () -> @owned SendableKlass
+
+sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+
+sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+sil @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+sil [ossa] @test_unowned_copy_value : $@convention(thin) @async <T where T : AnyObject> (@owned T) -> () {
+bb0(%owned_value : @owned $T):
+  %unowned_value = unowned_copy_value %owned_value : $T
+
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<@sil_unowned T>(%unowned_value) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+
+  destroy_value %unowned_value : $@sil_unowned T
+  //destroy_value %value : $T
+  destroy_value %owned_value : $T
+
+  %9999 = tuple ()
+  return %9999 : $()
+}

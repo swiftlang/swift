@@ -51,19 +51,6 @@ namespace swift {
 #include "swift/AST/PlatformConditionKinds.def"
   };
 
-  /// Describes which Swift 3 Objective-C inference warnings should be
-  /// emitted.
-  enum class Swift3ObjCInferenceWarnings {
-    /// No warnings; this is the default.
-    None,
-    /// "Minimal" warnings driven by uses of declarations that make use of
-    /// the Objective-C entry point directly.
-    Minimal,
-    /// "Complete" warnings that add "@objc" for every entry point that
-    /// Swift 3 would have inferred as "@objc" but Swift 4 will not.
-    Complete,
-  };
-
   /// Describes how strict concurrency checking should be.
   enum class StrictConcurrency {
     /// Enforce Sendable constraints where it has been explicitly adopted and
@@ -197,15 +184,11 @@ namespace swift {
     bool DisableAvailabilityChecking = false;
 
     /// Optimization mode for unavailable declarations.
-    UnavailableDeclOptimization UnavailableDeclOptimizationMode =
-        UnavailableDeclOptimization::None;
+    llvm::Optional<UnavailableDeclOptimization> UnavailableDeclOptimizationMode;
 
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.
     bool WeakLinkAtTarget = false;
-
-    /// Should conformance availability violations be diagnosed as errors?
-    bool EnableConformanceAvailabilityErrors = false;
 
     /// Should the editor placeholder error be downgraded to a warning?
     bool WarnOnEditorPlaceholder = false;
@@ -432,12 +415,6 @@ namespace swift {
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
 
-    /// The set of features that have been enabled.
-    FixedBitSet<numFeatures(), Feature> Features;
-
-    /// Temporary flag to support LLDB's transition to using \c Features.
-    bool EnableBareSlashRegexLiterals = false;
-
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
     /// but will not be used for checking type equality.
@@ -448,20 +425,11 @@ namespace swift {
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
 
-    /// Whether to enable Swift 3 @objc inference, e.g., for members of
-    /// Objective-C-derived classes and 'dynamic' members.
-    bool EnableSwift3ObjCInference = false;
-
     /// Access or distribution level of the whole module being parsed.
     LibraryLevel LibraryLevel = LibraryLevel::Other;
 
     /// The name of the package this module belongs to.
     std::string PackageName;
-
-    /// Warn about cases where Swift 3 would infer @objc but later versions
-    /// of Swift do not.
-    Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
-      Swift3ObjCInferenceWarnings::None;
 
     /// Diagnose implicit 'override'.
     bool WarnImplicitOverrides = false;
@@ -693,6 +661,12 @@ namespace swift {
     /// by name.
     bool hasFeature(llvm::StringRef featureName) const;
 
+    /// Enable the given feature.
+    void enableFeature(Feature feature) { Features.insert(feature); }
+
+    /// Disable the given feature.
+    void disableFeature(Feature feature) { Features.remove(feature); }
+
     /// Sets the "_hasAtomicBitWidth" conditional.
     void setHasAtomicBitWidth(llvm::Triple triple);
 
@@ -765,6 +739,11 @@ namespace swift {
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 10>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
+
+    /// The set of features that have been enabled. Doesn't include upcoming
+    /// features, which are checked against the language version in
+    /// `hasFeature`.
+    FixedBitSet<numFeatures(), Feature> Features;
   };
 
   class TypeCheckerOptions final {
@@ -960,10 +939,6 @@ namespace swift {
     /// DWARFImporter delegate.
     bool DisableSourceImport = false;
 
-    /// When set, use ExtraArgs alone to configure clang instance because ExtraArgs
-    /// contains the full option set.
-    bool ExtraArgsOnly = false;
-
     /// When building a PCM, rely on the Swift frontend's command-line -Xcc flags
     /// to build the Clang module via Clang frontend directly,
     /// and completely bypass the Clang driver.
@@ -973,8 +948,11 @@ namespace swift {
     /// built and provided to the compiler invocation.
     bool DisableImplicitClangModules = false;
 
-    /// Enable ClangIncludeTree for explicit module builds.
+    /// Enable ClangIncludeTree for explicit module builds scanning.
     bool UseClangIncludeTree = false;
+
+    /// Using ClangIncludeTreeRoot for compilation.
+    bool HasClangIncludeTreeRoot = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

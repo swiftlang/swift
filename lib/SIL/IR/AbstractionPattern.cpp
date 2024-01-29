@@ -1280,12 +1280,10 @@ AbstractionPattern::getFunctionThrownErrorType(
   }
 
   if (!substErrorType) {
-    Type origErrorSubstType;
-    if (auto errorSubs = optOrigErrorType->getGenericSubstitutions()) {
-      substErrorType = optOrigErrorType->getType().subst(errorSubs);
-    } else {
+    if (optOrigErrorType->getType()->hasTypeParameter())
+      substErrorType = ctx.getNeverType();
+    else
       substErrorType = optOrigErrorType->getType();
-    }
   }
 
   return std::make_pair(*optOrigErrorType,

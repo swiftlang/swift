@@ -284,10 +284,10 @@ int SwiftCacheToolInvocation::printOutputKeys() {
 
   std::vector<OutputEntry> OutputKeys;
   bool hasError = false;
-  auto addFromInputFile = [&](const InputFile &Input) {
+  auto addFromInputFile = [&](const InputFile &Input, unsigned InputIndex) {
     auto InputPath = Input.getFileName();
     auto OutputKey =
-        createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputPath);
+        createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputIndex);
     if (!OutputKey) {
       llvm::errs() << "cannot create cache key for " << InputPath << ": "
                    << toString(OutputKey.takeError()) << "\n";
@@ -310,9 +310,10 @@ int SwiftCacheToolInvocation::printOutputKeys() {
               Outputs.emplace_back(file_types::getTypeName(ID), File);
             });
   };
-  llvm::for_each(
-      Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs(),
-      addFromInputFile);
+  auto AllInputs =
+      Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs();
+  for (unsigned Index = 0; Index < AllInputs.size(); ++Index)
+    addFromInputFile(AllInputs[Index], Index);
 
   // Add diagnostics file.
   if (!OutputKeys.empty())

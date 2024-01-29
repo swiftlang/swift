@@ -48,7 +48,7 @@ extension ASTGenVisitor {
   }
 
   func generate(arrayExpr node: ArrayExprSyntax) -> BridgedArrayExpr {
-    let expressions = node.elements.lazy.map(self.generate)
+    let expressions = node.elements.lazy.map({ self.generate(expr: $0.expression) })
 
     let commaLocations = node.elements.compactMap(in: self) {
       self.generateSourceLoc($0.trailingComma)

@@ -853,7 +853,7 @@ public:
 
   /// Whether IRGen lowering of this instruction may result in emitting packs of
   /// metadata or witness tables.
-  bool mayRequirePackMetadata() const;
+  bool mayRequirePackMetadata(SILFunction const &F) const;
 
   /// Create a new copy of this instruction, which retains all of the operands
   /// and other information of this one.  If an insertion point is specified,
@@ -3009,6 +3009,10 @@ public:
     return getArguments().slice(getNumIndirectResults());
   }
 
+  MutableArrayRef<Operand> getOperandsWithoutIndirectResults() const {
+    return getArgumentOperands().slice(getNumIndirectResults());
+  }
+
   /// Returns all `@inout` and `@inout_aliasable` arguments passed to the
   /// instruction.
   InoutArgumentRange getInoutArguments() const {
@@ -4176,7 +4180,10 @@ class GlobalAddrInst
   friend SILBuilder;
 
   GlobalAddrInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global,
+                 SILValue dependencyToken,
                  TypeExpansionContext context);
+
+  llvm::Optional<FixedOperandList<1>> dependencyToken;
 
 public:
   // FIXME: This constructor should be private but is currently used
@@ -4185,6 +4192,31 @@ public:
   /// Create a placeholder instruction with an unset global reference.
   GlobalAddrInst(SILDebugLocation DebugLoc, SILType Ty)
       : InstructionBase(DebugLoc, Ty, nullptr) {}
+
+  SILValue getDependencyToken() const {
+    if (hasOperand())
+      return getOperand();
+    return SILValue();
+  }
+
+  void clearToken() {
+    dependencyToken = llvm::None;
+  }
+
+  bool hasOperand() const { return dependencyToken.has_value(); }
+  SILValue getOperand() const { return dependencyToken->asValueArray()[0]; }
+
+  Operand &getOperandRef() { return dependencyToken->asArray()[0]; }
+  const Operand &getOperandRef() const { return dependencyToken->asArray()[0]; }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return dependencyToken ? dependencyToken->asArray() : ArrayRef<Operand>{};
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return dependencyToken
+      ? dependencyToken->asArray() : MutableArrayRef<Operand>{};
+  }
 };
 
 /// Creates a base address for offset calculations.
@@ -4296,6 +4328,7 @@ public:
     UTF8 = 1,
     /// UTF-8 encoding of an Objective-C selector.
     ObjCSelector = 2,
+    UTF8_OSLOG = 3,
   };
 
 private:
@@ -6704,8 +6737,14 @@ public:
   }
 };
 
-/// Invalidate an enum value and take ownership of its payload data
-/// without moving it in memory.
+/// Project an enum's payload data without checking the case of the enum or
+/// moving it in memory.
+///
+/// For some classes of enum, this is a destructive operation that invalidates
+/// the enum, particularly in cases where the layout algorithm can potentially
+/// use the common spare bits out of the payloads of a multi-payload enum
+/// to store the tag without allocating additional space. The `isDestructive`
+/// static method returns true for enums where this is potentially the case.
 class UncheckedTakeEnumDataAddrInst
   : public UnaryInstructionBase<SILInstructionKind::UncheckedTakeEnumDataAddrInst,
                                 SingleValueInstruction>
@@ -6723,6 +6762,15 @@ class UncheckedTakeEnumDataAddrInst
   }
 
 public:
+  // Returns true if the projection operation is possibly destructive for
+  // instances of the given enum declaration.
+  static bool isDestructive(EnumDecl *forEnum, SILModule &M);
+
+  // Returns true if this projection operation is possibly destructive.
+  bool isDestructive() const {
+    return isDestructive(Element->getParentEnum(), getModule());
+  }
+
   EnumElementDecl *getElement() const { return Element; }
 
   unsigned getCaseIndex() {
@@ -6993,6 +7041,7 @@ class TupleExtractInst
                    ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
                              forwardingOwnershipKind) {
+    assert(Operand->getType().castTo<TupleType>());
     sharedUInt32().TupleExtractInst.fieldNo = FieldNo;
   }
 
@@ -8290,6 +8339,15 @@ public:
 /// result) have a dependence on "base" being alive. Do not allow for things
 /// that /may/ destroy base to be moved earlier than any of these uses of
 /// "value"'.
+///
+/// The dependent 'value' may be marked 'nonescaping', which guarantees that the
+/// lifetime dependence is statically enforceable. In this case, the compiler
+/// must be able to follow all values forwarded from the dependent 'value', and
+/// recognize all final (non-forwarded, non-escaping) use points. This implies
+/// that `findPointerEscape` is false. A diagnostic pass checks that the
+/// incoming SIL to verify that these use points are all initially within the
+/// 'base' lifetime. Regular 'mark_dependence' semantics ensure that
+/// optimizations cannot violate the lifetime dependence after diagnostics.
 class MarkDependenceInst
     : public InstructionBase<SILInstructionKind::MarkDependenceInst,
                              OwnershipForwardingSingleValueInstruction> {
@@ -8297,10 +8355,17 @@ class MarkDependenceInst
 
   FixedOperandList<2> Operands;
 
+  USE_SHARED_UINT8;
+
   MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
-                     ValueOwnershipKind forwardingOwnershipKind)
+                     ValueOwnershipKind forwardingOwnershipKind,
+                     bool isNonEscaping)
       : InstructionBase(DebugLoc, value->getType(), forwardingOwnershipKind),
-        Operands{this, value, base} {}
+        Operands{this, value, base} {
+    if (isNonEscaping) {
+      sharedUInt8().MarkDependenceInst.nonEscaping = true;
+    }
+  }
 
 public:
   enum { Value, Base };
@@ -8318,6 +8383,14 @@ public:
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  bool isNonEscaping() const {
+    return sharedUInt8().MarkDependenceInst.nonEscaping;
+  }
+
+  /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
+  bool visitNonEscapingLifetimeEnds(llvm::function_ref<bool (Operand*)> func)
+    const;
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply

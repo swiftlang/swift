@@ -6,15 +6,21 @@
 
 // CHECK:      #if compiler(>=5.3) && $Extern
 // CHECK-NEXT:   @_extern(c) public func externalCFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT:   public func externalCFunc()
 // CHECK-NEXT: #endif
 @_extern(c) public func externalCFunc()
 
 // CHECK:      #if compiler(>=5.3) && $Extern
 // CHECK-NEXT:   @_extern(c, "renamedCFunc") public func externalRenamedCFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT:   public func externalRenamedCFunc()
 // CHECK-NEXT: #endif
 @_extern(c, "renamedCFunc") public func externalRenamedCFunc()
 
 // CHECK:      #if compiler(>=5.3) && $Extern
 // CHECK-NEXT:   @_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
+// CHECK-NEXT: #else
+// CHECK-NEXT:  public func wasmImportedFunc()
 // CHECK-NEXT: #endif
 @_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()

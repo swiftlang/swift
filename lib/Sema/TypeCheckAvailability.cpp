@@ -139,8 +139,9 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
   for (; !DC->isModuleScopeContext(); DC = DC->getParent()) {
     switch (DC->getContextKind()) {
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedAbstractClosure:
     case DeclContextKind::TopLevelCodeDecl:
-    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::SerializedTopLevelCodeDecl:
     case DeclContextKind::Package:
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit:
@@ -358,6 +359,27 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
   return (*referencedPlatform == platform ||
           inheritsAvailabilityFromPlatform(platform, *referencedPlatform));
+}
+
+static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
+    const Decl *D, const ExportContext &where) {
+  auto *DC = where.getDeclContext();
+  auto *SF = DC->getParentSourceFile();
+
+  // Unavailable-in-Swift declarations shouldn't be referenced directly in
+  // source. However, they can be referenced in implicit declarations that are
+  // printed in .swiftinterfaces.
+  if (!SF || SF->Kind != SourceFileKind::Interface)
+    return false;
+
+  if (auto constructor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl())) {
+    // Designated initializers inherited from an Obj-C superclass may have
+    // parameters that are unavailable-in-Swift.
+    if (constructor->isObjC())
+      return true;
+  }
+
+  return false;
 }
 
 namespace {
@@ -2161,17 +2183,13 @@ void TypeChecker::diagnosePotentialUnavailability(
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+    auto err = ctx.Diags.diagnose(
+        loc, diag::conformance_availability_only_version_newer, type, proto,
+        prettyPlatformString(targetPlatform(ctx.LangOpts)),
+        reason.getRequiredOSVersionRange().getLowerEndpoint());
 
-    auto diagID = (ctx.LangOpts.EnableConformanceAvailabilityErrors
-                   ? diag::conformance_availability_only_version_newer
-                   : diag::conformance_availability_only_version_newer_warn);
-    auto behavior = behaviorLimitForExplicitUnavailability(rootConf, dc);
-    auto err =
-      ctx.Diags.diagnose(
-               loc, diagID,
-               type, proto, prettyPlatformString(targetPlatform(ctx.LangOpts)),
-               reason.getRequiredOSVersionRange().getLowerEndpoint());
-    err.limitBehavior(behavior);
+    err.warnUntilSwiftVersion(6);
+    err.limitBehavior(behaviorLimitForExplicitUnavailability(rootConf, dc));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc,
@@ -2629,6 +2647,9 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     }
   }
 
+  if (shouldIgnoreDeprecationOfConcurrencyDecl(DeprecatedDecl, ReferenceDC))
+    return;
+
   StringRef Platform = Attr->prettyPlatformString();
   llvm::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
@@ -2795,7 +2816,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
                                            const RootProtocolConformance *rootConf,
                                            const ExtensionDecl *ext,
                                            const ExportContext &where,
-                                           bool useConformanceAvailabilityErrorsOption) {
+                                           bool warnIfConformanceUnavailablePreSwift6) {
   auto *attr = AvailableAttr::isUnavailable(ext);
   if (!attr)
     return false;
@@ -2805,6 +2826,10 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   // enclosing code in the same situations it wouldn't be able to
   // call this code.
   if (isInsideCompatibleUnavailableDeclaration(ext, where, attr))
+    return false;
+
+  // Invertible protocols are never unavailable.
+  if (rootConf->getProtocol()->getInvertibleProtocolKind())
     return false;
 
   ASTContext &ctx = ext->getASTContext();
@@ -2853,9 +2878,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
                  type, proto,
                  platform.empty(), platform, EncodedMessage.Message)
       .limitBehavior(behavior)
-      .warnUntilSwiftVersionIf(useConformanceAvailabilityErrorsOption &&
-                               !ctx.LangOpts.EnableConformanceAvailabilityErrors,
-                               6);
+      .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
@@ -3038,7 +3061,9 @@ bool swift::diagnoseExplicitUnavailability(
     break;
 
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-    // This API is explicitly unavailable in Swift.
+    if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
+      return true;
+
     platform = "Swift";
     break;
   }
@@ -3857,10 +3882,16 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   DeclAvailabilityFlags flags;
 
   bool checkIdentTypeRepr(IdentTypeRepr *ITR) {
+    ArrayRef<AssociatedTypeDecl *> primaryAssociatedTypes;
+
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
       if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
         return true;
+
+      if (auto protocol = dyn_cast<ProtocolDecl>(typeDecl)) {
+        primaryAssociatedTypes = protocol->getPrimaryAssociatedTypes();
+      }
     }
 
     bool foundAnyIssues = false;
@@ -3872,6 +3903,17 @@ class TypeReprAvailabilityWalker : public ASTWalker {
       for (auto *genericArg : GTR->getGenericArgs()) {
         if (diagnoseTypeReprAvailability(genericArg, where, genericFlags))
           foundAnyIssues = true;
+
+        // The associated type that is being specified must be available as
+        // well.
+        if (!primaryAssociatedTypes.empty()) {
+          auto primaryAssociatedType = primaryAssociatedTypes.front();
+          primaryAssociatedTypes = primaryAssociatedTypes.drop_front();
+          if (diagnoseDeclAvailability(
+                  primaryAssociatedType, genericArg->getSourceRange(),
+                  nullptr, where, genericFlags))
+            foundAnyIssues = true;
+        }
       }
     }
 
@@ -3983,7 +4025,7 @@ public:
         Loc, subs, Where,
         /*depTy=*/Type(),
         /*replacementTy=*/Type(),
-        /*useConformanceAvailabilityErrorsOption=*/false,
+        /*warnIfConformanceUnavailablePreSwift6=*/false,
         /*suppressParameterizationCheckForOptional=*/ty->isOptional());
     return Action::Continue;
   }
@@ -4062,7 +4104,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
                                        ProtocolConformanceRef conformance,
                                        const ExportContext &where,
                                        Type depTy, Type replacementTy,
-                                       bool useConformanceAvailabilityErrorsOption) {
+                                       bool warnIfConformanceUnavailablePreSwift6) {
   assert(!where.isImplicit());
 
   if (conformance.isPack()) {
@@ -4071,7 +4113,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     for (auto patternConf : pack->getPatternConformances()) {
       diagnosed |= diagnoseConformanceAvailability(
           loc, patternConf, where, depTy, replacementTy,
-          useConformanceAvailabilityErrorsOption);
+          warnIfConformanceUnavailablePreSwift6);
     }
     return diagnosed;
   }
@@ -4108,13 +4150,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   if (auto *ext = dyn_cast<ExtensionDecl>(rootConf->getDeclContext())) {
     if (TypeChecker::diagnoseConformanceExportability(loc, rootConf, ext, where,
-                                                      useConformanceAvailabilityErrorsOption)) {
+                                                      warnIfConformanceUnavailablePreSwift6)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
 
     if (diagnoseExplicitUnavailability(loc, rootConf, ext, where,
-                                       useConformanceAvailabilityErrorsOption)) {
+                                       warnIfConformanceUnavailablePreSwift6)) {
       maybeEmitAssociatedTypeNote();
       return true;
     }
@@ -4142,7 +4184,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   SubstitutionMap subConformanceSubs = concreteConf->getSubstitutionMap();
   if (diagnoseSubstitutionMapAvailability(loc, subConformanceSubs, where,
                                           depTy, replacementTy,
-                                          useConformanceAvailabilityErrorsOption))
+                                          warnIfConformanceUnavailablePreSwift6))
     return true;
 
   return false;
@@ -4153,13 +4195,13 @@ swift::diagnoseSubstitutionMapAvailability(SourceLoc loc,
                                            SubstitutionMap subs,
                                            const ExportContext &where,
                                            Type depTy, Type replacementTy,
-                                           bool useConformanceAvailabilityErrorsOption,
+                                           bool warnIfConformanceUnavailablePreSwift6,
                                            bool suppressParameterizationCheckForOptional) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
     if (diagnoseConformanceAvailability(loc, conformance, where,
                                         depTy, replacementTy,
-                                        useConformanceAvailabilityErrorsOption))
+                                        warnIfConformanceUnavailablePreSwift6))
       hadAnyIssues = true;
   }
 

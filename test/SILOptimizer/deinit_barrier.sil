@@ -139,3 +139,18 @@ entry:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin running test {{.*}} on rdar120656227: is-deinit-barrier
+// CHECK:       builtin "int_memmove_RawPointer_RawPointer_Int64"
+// CHECK:       true
+// CHECK-LABEL: end running test {{.*}} on rdar120656227: is-deinit-barrier
+sil [ossa] @rdar120656227 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> () {
+bb0(%42 : $Builtin.RawPointer, %9 : $Builtin.RawPointer):
+  %14 = integer_literal $Builtin.Int64, 27
+  %28 = integer_literal $Builtin.Int1, 1
+  specify_test "is-deinit-barrier @instruction"
+  %43 = builtin "int_memmove_RawPointer_RawPointer_Int64"(%42 : $Builtin.RawPointer, %9 : $Builtin.RawPointer, %14 : $Builtin.Int64, %28 : $Builtin.Int1) : $()
+  %68 = tuple ()
+  return %68 : $()
+}
+

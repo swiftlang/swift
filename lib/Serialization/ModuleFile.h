@@ -74,6 +74,11 @@ class ModuleFile
   /// The module that this module is an overlay of, if any.
   ModuleDecl *UnderlyingModule = nullptr;
 
+  /// Once this module file has been associated with the AST node representing
+  /// it, resolve the potentially-SDK-relative module-defining `.swiftinterface`
+  /// path to an absolute path.
+  llvm::Optional<std::string> ResolvedModuleDefiningFilename;
+
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
 
@@ -279,6 +284,10 @@ private:
   createLazyConformanceLoaderToken(ArrayRef<uint64_t> ids);
   ArrayRef<ProtocolConformanceID>
   claimLazyConformanceLoaderToken(uint64_t token);
+
+  /// If the module-defining `.swiftinterface` file is an SDK-relative path,
+  /// resolve it to be absolute to the context's SDK.
+  std::string resolveModuleDefiningFilename(const ASTContext &ctx);
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
@@ -849,6 +858,8 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false);
 
   StringRef getModuleFilename() const {
+    if (ResolvedModuleDefiningFilename)
+      return ResolvedModuleDefiningFilename.value();
     if (!Core->ModuleInterfacePath.empty())
       return Core->ModuleInterfacePath;
     return getModuleLoadedFilename();

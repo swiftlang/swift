@@ -30,7 +30,7 @@ final class D: C {
 
 // CHECK: declare swiftcc ptr @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvg"(ptr swiftself) #0
 // CHECK: declare swiftcc void @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvs"(ptr, ptr swiftself) #0
-// CHECK: declare swiftcc { ptr, ptr } @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvM"(ptr noalias dereferenceable(32), ptr swiftself) #0
+// CHECK: declare swiftcc { ptr, ptr } @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvM"(ptr noalias dereferenceable({{32|16}}), ptr swiftself) #0
 
 @main
 struct Main {

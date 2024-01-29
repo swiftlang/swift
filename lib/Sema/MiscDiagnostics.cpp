@@ -325,7 +325,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                 tupleExpr->getElementNames());
                                 
         // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isNoncopyable(DC)
+        if (E->getType()->isNoncopyable()
             && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
           auto noncopyableTy = E->getType();
           assert(noncopyableTy->is<TupleType>() && "will use poor wording");
@@ -388,7 +388,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!castType)
         return;
 
-      if (castType->isNoncopyable(DC)) {
+      if (castType->isNoncopyable()) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
@@ -398,7 +398,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // as of now there is no type it could be cast to except itself, so
       // there's no reason for it to happen at runtime.
       if (auto fromType = cast->getSubExpr()->getType()) {
-        if (fromType->isNoncopyable(DC)) {
+        if (fromType->isNoncopyable()) {
           // can't cast move-only to anything.
           Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
           return;
@@ -415,7 +415,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
-        if (proto->isMarkerProtocol() && !proto->isInvertibleProtocol()) {
+        if (proto->isMarkerProtocol() && !proto->getInvertibleProtocolKind()) {
           // can't conditionally cast to a marker protocol
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());
@@ -2940,9 +2940,10 @@ public:
                   .getRequirements(),
               [&exprType, this](auto requirement) {
                 if (requirement.getKind() == RequirementKind::Conformance) {
-                  auto conformance = TypeChecker::conformsToProtocol(
-                      exprType->getRValueType(), requirement.getProtocolDecl(),
-                      Implementation->getModuleContext(),
+                  auto conformance = Implementation->getModuleContext()
+                      ->checkConformance(
+                      exprType->getRValueType(),
+                      requirement.getProtocolDecl(),
                       /*allowMissing=*/false);
                   return !conformance.isInvalid();
                 }
@@ -3937,6 +3938,8 @@ private:
               continue;
             }
           }
+          // TODO: If 'then' statements are enabled by default, the wording of
+          // this diagnostic should be tweaked.
           Diags.diagnose(branch->getEndLoc(),
                          diag::single_value_stmt_branch_must_end_in_result,
                          S->getKind());
@@ -4100,7 +4103,7 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   auto subjectType = subjectExpr->getType();
   if (!subjectType
       || subjectType->hasError()
-      || !subjectType->isNoncopyable(DC)) {
+      || !subjectType->isNoncopyable()) {
     return;
   }
 
@@ -4109,7 +4112,8 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
     subjectExpr = load->getSubExpr()->getSemanticsProvidingExpr();
   }
-  if (isa<DeclRefExpr>(subjectExpr)) {
+  if (!C.LangOpts.hasFeature(Feature::BorrowingSwitch)
+      && isa<DeclRefExpr>(subjectExpr)) {
     C.Diags.diagnose(subjectExpr->getLoc(),
                            diag::move_only_pattern_match_not_consumed)
       .fixItInsert(subjectExpr->getStartLoc(), "consume ");
@@ -6263,7 +6267,7 @@ void swift::diagnoseCopyableTypeContainingMoveOnlyType(
 
   // If we already have a move only type, just bail, we have no further work to
   // do.
-  if (copyableNominalType->canBeNoncopyable())
+  if (!copyableNominalType->canBeCopyable())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "DiagnoseCopyableType for: "

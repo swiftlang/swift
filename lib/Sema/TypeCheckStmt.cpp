@@ -173,7 +173,7 @@ namespace {
 
       if (ctx.TypeCheckerOpts.DebugTimeFunctionBodies) {
         // Round up to the nearest 100th of a millisecond.
-        llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
+        llvm::errs() << llvm::format("%0.2f", std::ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
 
         if (AFD) {
@@ -1000,6 +1000,8 @@ public:
 
   StmtChecker(DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) { }
 
+  llvm::SmallVector<GenericEnvironment *, 4> genericSigStack;
+
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
@@ -1434,7 +1436,10 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    if (TypeChecker::typeCheckForEachBinding(DC, S))
+    GenericEnvironment *genericSignature =
+        genericSigStack.empty() ? nullptr : genericSigStack.back();
+
+    if (TypeChecker::typeCheckForEachBinding(DC, S, genericSignature))
       return nullptr;
 
     // Type-check the body of the loop.
@@ -1442,9 +1447,17 @@ public:
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
 
     BraceStmt *Body = S->getBody();
+
+    if (auto packExpansion =
+            dyn_cast<PackExpansionExpr>(S->getParsedSequence()))
+      genericSigStack.push_back(packExpansion->getGenericEnvironment());
+
     typeCheckStmt(Body);
     S->setBody(Body);
-    
+
+    if (isa<PackExpansionExpr>(S->getParsedSequence()))
+      genericSigStack.pop_back();
+
     return S;
   }
 
@@ -1468,6 +1481,7 @@ public:
   }
 
   void checkCaseLabelItemPattern(CaseStmt *caseBlock, CaseLabelItem &labelItem,
+                                 CaseParentKind parentKind,
                                  bool &limitExhaustivityChecks,
                                  Type subjectType) {
     Pattern *pattern = labelItem.getPattern();
@@ -1484,6 +1498,9 @@ public:
     if (subjectType) {
       auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
       TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      if (parentKind == CaseParentKind::DoCatch)
+        patternOptions |= TypeResolutionFlags::SilenceNeverWarnings;
+
       auto coercedPattern = TypeChecker::coercePatternToType(
           contextualPattern, subjectType, patternOptions);
       if (coercedPattern)
@@ -1584,8 +1601,8 @@ public:
       for (auto &labelItem : caseLabelItemArray) {
         // Resolve the pattern in our case label if it has not been resolved and
         // check that our var decls follow invariants.
-        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
-                                  subjectType);
+        checkCaseLabelItemPattern(caseBlock, labelItem, parentKind,
+                                  limitExhaustivityChecks, subjectType);
 
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
@@ -2226,7 +2243,17 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       fromCtor->diagnose(diag::availability_unavailable_implicit_init,
                          ctor, superclassDecl->getName());
     }
-
+    
+    // Only allowed to synthesize a throwing super.init() call if the init being
+    // checked is also throwing.
+    if (ctor->hasThrows()) {
+      // Diagnose on nonthrowing or rethrowing initializer.
+      if (!fromCtor->hasThrows() || fromCtor->hasPolymorphicEffect(EffectKind::Throws)) {
+        fromCtor->diagnose(diag::implicit_throws_super_init);
+        return true; // considered an error
+      }
+    }
+    
     // Not allowed to implicitly generate a super.init() call if the init
     // is async; that would hide the 'await' from the programmer.
     if (ctor->hasAsync()) {
@@ -2679,8 +2706,7 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
         if (S->mayProduceSingleValue(ctx)) {
           auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
               ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
-          auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
-          body->setLastElement(RS);
+          body->setLastElement(ReturnStmt::createImplicit(ctx, SVE));
           func->setHasSingleExpressionBody();
           func->setSingleExpressionBody(SVE);
         }
@@ -2695,9 +2721,8 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
       // This simplifies SILGen.
       SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
                                    body->getElements().end());
-      Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
-                                          /*value*/ nullptr,
-                                          /*implicit*/ true));
+      Elts.push_back(ReturnStmt::createImplicit(ctx, body->getRBraceLoc(),
+                                                /*value*/ nullptr));
       body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
                                body->getRBraceLoc(), body->isImplicit());
     }

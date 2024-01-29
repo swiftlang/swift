@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 828; // ~Copyable / ~Escapable
+const uint16_t SWIFTMODULE_VERSION_MINOR = 843; // add OSLog string encoding
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -359,6 +359,7 @@ enum class ParamDeclSpecifier : uint8_t {
   Consuming = 3,
   LegacyShared = 4,
   LegacyOwned = 5,
+  Transferring = 6,
 };
 using ParamDeclSpecifierField = BCFixed<3>;
 
@@ -395,6 +396,15 @@ enum class SILParameterDifferentiability : uint8_t {
   NotDifferentiable,
 };
 
+/// These IDs must \em not be renumbered or reordered without incrementing the
+/// module version.
+enum class SILParameterInfoFlags : uint8_t {
+  NotDifferentiable = 0x1,
+  Isolated = 0x2,
+};
+
+using SILParameterInfoOptions = OptionSet<SILParameterInfoFlags>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class ResultConvention : uint8_t {
@@ -407,12 +417,13 @@ enum class ResultConvention : uint8_t {
 };
 using ResultConventionField = BCFixed<3>;
 
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class SILResultDifferentiability : uint8_t {
-  DifferentiableOrNotApplicable = 0,
-  NotDifferentiable,
+/// These IDs must \em not be renumbered or reordered without incrementing the
+/// module version.
+enum class SILResultInfoFlags : uint8_t {
+  NotDifferentiable = 0x1,
 };
+
+using SILResultInfoOptions = OptionSet<SILResultInfoFlags>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -673,6 +684,14 @@ enum class PluginSearchOptionKind : uint8_t {
 };
 using PluginSearchOptionKindField = BCFixed<3>;
 
+enum class FunctionTypeIsolation : uint8_t {
+  NonIsolated,
+  Parameter,
+  Dynamic,
+  GlobalActorOffset, // Add this to the global actor type ID
+};
+using FunctionTypeIsolationField = TypeIDField;
+
 // Encodes a VersionTuple:
 //
 //  Major
@@ -838,7 +857,8 @@ namespace control_block {
     SDK_NAME,
     REVISION,
     IS_OSSA,
-    ALLOWABLE_CLIENT_NAME
+    ALLOWABLE_CLIENT_NAME,
+    HAS_NONCOPYABLE_GENERICS,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -882,6 +902,11 @@ namespace control_block {
   using AllowableClientLayout = BCRecordLayout<
     ALLOWABLE_CLIENT_NAME,
     BCBlob
+  >;
+
+  using HasNoncopyableGenerics = BCRecordLayout<
+      HAS_NONCOPYABLE_GENERICS,
+      BCFixed<1>
   >;
 }
 
@@ -1202,23 +1227,25 @@ namespace decls_block {
     BCFixed<1>,                      // throws?
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
-    TypeIDField                      // global actor
+    FunctionTypeIsolationField       // isolation
     // trailed by parameters
   );
 
-  using FunctionParamLayout = BCRecordLayout<
-    FUNCTION_PARAM,
-    IdentifierIDField,   // name
-    IdentifierIDField,   // internal label
-    TypeIDField,         // type
-    BCFixed<1>,          // vararg?
-    BCFixed<1>,          // autoclosure?
-    BCFixed<1>,          // non-ephemeral?
-    ParamDeclSpecifierField, // inout, shared or owned?
-    BCFixed<1>,          // isolated
-    BCFixed<1>,          // noDerivative?
-    BCFixed<1>           // compileTimeConst
-  >;
+  using FunctionParamLayout =
+      BCRecordLayout<FUNCTION_PARAM,
+                     IdentifierIDField,       // name
+                     IdentifierIDField,       // internal label
+                     TypeIDField,             // type
+                     BCFixed<1>,              // vararg?
+                     BCFixed<1>,              // autoclosure?
+                     BCFixed<1>,              // non-ephemeral?
+                     ParamDeclSpecifierField, // inout, shared or owned?
+                     BCFixed<1>,              // isolated
+                     BCFixed<1>,              // noDerivative?
+                     BCFixed<1>,              // compileTimeConst
+                     BCFixed<1>,              // _resultDependsOn
+                     BCFixed<1>               // transferring
+                     >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
     METATYPE_TYPE,
@@ -1298,7 +1325,7 @@ namespace decls_block {
     BCFixed<1>,                      // throws?
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
-    TypeIDField,                     // global actor
+    FunctionTypeIsolationField,      // isolation
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1950,6 +1977,7 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
     BCFixed<1>, // unchecked
+    BCFixed<1>, // preconcurrency
     BCArray<DeclIDField>
     // The array contains requirement signature conformances, then
     // type witnesses, then value witnesses.
@@ -2074,6 +2102,16 @@ namespace decls_block {
     BCBlob      // _silgen_name
   >;
 
+  using ImplementsDeclAttrLayout = BCRecordLayout<
+    Implements_DECL_ATTR,
+    BCFixed<1>,  // implicit flag
+    DeclContextIDField,// context decl
+    DeclIDField, // protocol
+    BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
+                  // components plus one
+    BCArray<IdentifierIDField> // name components
+  >;
+
   using SPIAccessControlDeclAttrLayout = BCRecordLayout<
     SPIAccessControl_DECL_ATTR,
     BCArray<IdentifierIDField>  // SPI names
@@ -2170,7 +2208,6 @@ namespace decls_block {
   using ObjCBridgedDeclAttrLayout = BCRecordLayout<ObjCBridged_DECL_ATTR>;
   using SynthesizedProtocolDeclAttrLayout
     = BCRecordLayout<SynthesizedProtocol_DECL_ATTR>;
-  using ImplementsDeclAttrLayout = BCRecordLayout<Implements_DECL_ATTR>;
   using ObjCRuntimeNameDeclAttrLayout
     = BCRecordLayout<ObjCRuntimeName_DECL_ATTR>;
   using RestatedObjCConformanceDeclAttrLayout
@@ -2233,7 +2270,6 @@ namespace decls_block {
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCFixed<1>, // Swift 3 inferred
     BCFixed<1>, // implicit name flag
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>

@@ -37,6 +37,7 @@ public func test() {
   let opaque = unmanaged.toOpaque()
   let unmanaged2 = Unmanaged<MyClass>.fromOpaque(opaque)
   let o = unmanaged2.takeUnretainedValue()
+  var s1: Set<Int> = [1, 2, 3]
 }
 
 test()

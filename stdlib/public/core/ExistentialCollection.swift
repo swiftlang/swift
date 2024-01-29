@@ -175,7 +175,7 @@ internal class _AnySequenceBox<Element> {
   @inlinable
   internal func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  ) throws -> [T] {
     _abstract()
   }
 
@@ -525,8 +525,8 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -618,8 +618,8 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -813,8 +813,8 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -1026,8 +1026,8 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -1308,10 +1308,26 @@ extension AnySequence {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @usableFromInline
+  @_silgen_name("$ss11AnySequenceV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable
@@ -1395,10 +1411,26 @@ extension AnyCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @usableFromInline
+  @_silgen_name("$ss13AnyCollectionV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable
@@ -1488,10 +1520,26 @@ extension AnyBidirectionalCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @usableFromInline
+  @_silgen_name("$ss26AnyBidirectionalCollectionV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable
@@ -1583,10 +1631,26 @@ extension AnyRandomAccessCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @usableFromInline
+  @_silgen_name("$ss25AnyRandomAccessCollectionV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable

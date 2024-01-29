@@ -79,6 +79,20 @@ inline bool operator&(RuntimeEffect lhs, RuntimeEffect rhs) {
 
 } // end swift namespace
 
+namespace RuntimeConstants {
+  const auto NoEffect = swift::RuntimeEffect::NoEffect;
+  const auto Locking = swift::RuntimeEffect::Locking;
+  const auto Allocating = swift::RuntimeEffect::Allocating;
+  const auto Deallocating = swift::RuntimeEffect::Deallocating;
+  const auto RefCounting = swift::RuntimeEffect::RefCounting;
+  const auto ObjectiveC = swift::RuntimeEffect::ObjectiveC;
+  const auto Concurrency = swift::RuntimeEffect::Concurrency;
+  const auto AutoDiff = swift::RuntimeEffect::AutoDiff;
+  const auto MetaData = swift::RuntimeEffect::MetaData;
+  const auto Casting = swift::RuntimeEffect::Casting;
+  const auto ExclusivityChecking = swift::RuntimeEffect::ExclusivityChecking;
+}
+
 // Enable the following macro to perform validation check on the runtime effects
 // of instructions in IRGen.
 // #define CHECK_RUNTIME_EFFECT_ANALYSIS

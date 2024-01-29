@@ -230,6 +230,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   EnableValueNames = opts.shouldProvideValueNames();
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
+  PtrTy = llvm::PointerType::getUnqual(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
@@ -786,20 +787,6 @@ namespace RuntimeConstants {
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
   const auto WillReturn = llvm::Attribute::WillReturn;
-
-#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
-  const auto NoEffect = RuntimeEffect::NoEffect;
-  const auto Locking = RuntimeEffect::Locking;
-  const auto Allocating = RuntimeEffect::Allocating;
-  const auto Deallocating = RuntimeEffect::Deallocating;
-  const auto RefCounting = RuntimeEffect::RefCounting;
-  const auto ObjectiveC = RuntimeEffect::ObjectiveC;
-  const auto Concurrency = RuntimeEffect::Concurrency;
-  const auto AutoDiff = RuntimeEffect::AutoDiff;
-  const auto MetaData = RuntimeEffect::MetaData;
-  const auto Casting = RuntimeEffect::Casting;
-  const auto ExclusivityChecking = RuntimeEffect::ExclusivityChecking;
-#endif
 
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
     return RuntimeAvailability::AlwaysAvailable;
@@ -2037,7 +2024,7 @@ bool IRGenModule::canUseObjCSymbolicReferences() {
       context.getObjCSymbolicReferencesAvailability());
 }
 
-bool IRGenModule::canMakeStaticObjectsReadOnly() {
+bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
@@ -2046,8 +2033,33 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
   if (!Triple.isOSDarwin())
     return false;
 
-  return getAvailabilityContext().isContainedIn(
-          Context.getStaticReadOnlyArraysAvailability());
+  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  if (!clDecl)
+    return false;
+
+  // Currently only arrays can be put into a read-only data section.
+  // "Regular" classes have dynamically initialized metadata, which needs to be
+  // stored into the isa field at runtime.
+  if (clDecl->getNameStr() != "_ContiguousArrayStorage")
+    return false;
+
+  if (!getAvailabilityContext().isContainedIn(Context.getStaticReadOnlyArraysAvailability()))
+    return false;
+
+  if (!getStaticArrayStorageDecl())
+    return false;
+
+  return true;
+}
+
+ClassDecl *IRGenModule::getStaticArrayStorageDecl() {
+  SmallVector<ValueDecl *, 1> results;
+  Context.lookupInSwiftModule("__StaticArrayStorage", results);
+
+  if (results.size() != 1)
+    return nullptr;
+
+  return dyn_cast<ClassDecl>(results[0]);
 }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {

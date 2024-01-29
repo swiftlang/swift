@@ -329,6 +329,17 @@ internal func _diagnoseUnexpectedEnumCase<SwitchedValue>(
 @_semantics("unavailable_code_reached")
 @usableFromInline // COMPILER_INTRINSIC
 internal func _diagnoseUnavailableCodeReached() -> Never {
+  _diagnoseUnavailableCodeReached_aeic()
+}
+
+// FIXME: Remove this with rdar://119892482
+/// An `@_alwaysEmitIntoClient` variant of `_diagnoseUnavailableCodeReached()`.
+/// This is temporarily needed by the compiler to reference from back deployed
+/// clients.
+@_alwaysEmitIntoClient
+@inline(never)
+@_semantics("unavailable_code_reached")
+internal func _diagnoseUnavailableCodeReached_aeic() -> Never {
   _assertionFailure(
     "Fatal error", "Unavailable code reached", flags: _fatalErrorFlags())
 }

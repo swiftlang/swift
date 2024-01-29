@@ -295,7 +295,7 @@ extension Unicode.Scalar: CustomStringConvertible, CustomDebugStringConvertible 
   }
 }
 
-@_unavailableInEmbedded
+#if !$Embedded
 extension Unicode.Scalar: LosslessStringConvertible {
   @inlinable
   public init?(_ description: String) {
@@ -306,6 +306,7 @@ extension Unicode.Scalar: LosslessStringConvertible {
     self = v
   }
 }
+#endif
 
 extension Unicode.Scalar: Hashable {
   /// Hashes the essential components of this value by feeding them into the
@@ -410,6 +411,8 @@ extension Unicode.Scalar {
     return UTF16View(value: self)
   }
 }
+
+#if !$Embedded
 
 extension Unicode.Scalar.UTF16View: RandomAccessCollection {
 
@@ -540,3 +543,4 @@ extension Unicode.Scalar {
   }
 }
 
+#endif

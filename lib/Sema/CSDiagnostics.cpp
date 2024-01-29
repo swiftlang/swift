@@ -114,7 +114,9 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
       }
 
       Type GP = typeVar->getImpl().getGenericParameter();
-      return resolvedType->is<UnresolvedType>() && GP ? GP : resolvedType;
+      return resolvedType->is<UnresolvedType>() && GP
+          ? ErrorType::get(GP)
+          : resolvedType;
     }
 
     if (type->hasElementArchetype()) {
@@ -1175,16 +1177,16 @@ bool AttributedFuncToTypeConversionFailure::
                                mismatchPosition);
   auto argsRepr = declFnRepr->getArgsTypeRepr();
   auto argRepr = argsRepr->getElement(mismatchPosition).Type;
-  if (!param.isAutoClosure()) {
-    note.fixItInsert(argRepr->getStartLoc(), "@escaping ");
+
+  TypeAttribute *autoclosureAttr = nullptr;
+  if (auto attrRepr = dyn_cast<AttributedTypeRepr>(argRepr)) {
+    autoclosureAttr = attrRepr->get(TAK_autoclosure);
+  }
+
+  if (autoclosureAttr) {
+    note.fixItInsertAfter(autoclosureAttr->getEndLoc(), " @escaping");
   } else {
-    auto attrRepr = dyn_cast<AttributedTypeRepr>(argRepr);
-    if (attrRepr) {
-      auto autoclosureEndLoc = Lexer::getLocForEndOfToken(
-          getASTContext().SourceMgr,
-          attrRepr->getAttrs().getLoc(TAK_autoclosure));
-      note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
-    }
+    note.fixItInsert(argRepr->getStartLoc(), "@escaping ");
   }
   return true;
 }
@@ -1265,23 +1267,22 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
   auto note = emitDiagnosticAt(
       PD, diag::noescape_parameter, attributeKind, PD->getName());
 
-  SourceLoc reprLoc;
-  SourceLoc autoclosureEndLoc;
-  if (auto *repr = PD->getTypeRepr()) {
-    reprLoc = repr->getStartLoc();
-    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
-      autoclosureEndLoc = Lexer::getLocForEndOfToken(
-          getASTContext().SourceMgr,
-          attrRepr->getAttrs().getLoc(TAK_autoclosure));
-    }
-  }
-  if (attributeKind == AttributeKind::Concurrent) {
-    note.fixItInsert(reprLoc, "@Sendable ");
-  }
-  else if (!PD->isAutoClosure()) {
-    note.fixItInsert(reprLoc, "@escaping ");
+  auto repr = PD->getTypeRepr();
+  if (!repr) {
+    // Don't add any fix-its if we don't have source locations.
+  } else if (attributeKind == AttributeKind::Concurrent) {
+    note.fixItInsert(repr->getStartLoc(), "@Sendable ");
   } else {
-    note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
+    SourceLoc autoclosureEndLoc;
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
+      if (auto *attr = attrRepr->get(TAK_autoclosure))
+        autoclosureEndLoc = attr->getEndLoc();
+    }
+    if (autoclosureEndLoc.isValid()) {
+      note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
+    } else {
+      note.fixItInsert(repr->getStartLoc(), "@escaping ");
+    }
   }
 
   return true;
@@ -3162,8 +3163,8 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
   if (auto errorCodeProtocol =
           Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
-    auto conformance = TypeChecker::conformsToProtocol(
-        errorCodeType, errorCodeProtocol, getParentModule());
+    auto conformance = getParentModule()->checkConformance(
+        errorCodeType, errorCodeProtocol);
     if (conformance && toErrorExistential) {
       Type errorType =
           conformance
@@ -3403,8 +3404,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   SmallVector<std::string, 8> missingProtoTypeStrings;
   SmallVector<ProtocolDecl *, 8> missingProtocols;
   for (auto protocol : layout.getProtocols()) {
-    if (!TypeChecker::conformsToProtocol(fromType, protocol,
-                                         getParentModule())) {
+    if (!getParentModule()->checkConformance(fromType, protocol)) {
       auto protoTy = protocol->getDeclaredInterfaceType();
       missingProtoTypeStrings.push_back(protoTy->getString());
       missingProtocols.push_back(protocol);
@@ -3452,21 +3452,27 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   {
     llvm::SmallString<128> Text;
     llvm::raw_svector_ostream SS(Text);
-    llvm::SetVector<MissingWitness> missingWitnesses;
+    llvm::SmallVector<NormalProtocolConformance *, 2> fakeConformances;
     for (auto protocol : missingProtocols) {
-      auto conformance = NormalProtocolConformance(
-          nominal->getDeclaredType(), protocol, SourceLoc(), nominal,
-          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false);
-      ConformanceChecker checker(getASTContext(), &conformance,
-                                 missingWitnesses);
+      auto conformance = getASTContext().getNormalConformance(
+          nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
+          ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
+          /*isPreconcurrency=*/false);
       // Type witnesses must be resolved first.
-      checker.resolveTypeWitnesses();
+      evaluateOrDefault(getASTContext().evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+      ConformanceChecker checker(getASTContext(), conformance);
       checker.resolveValueWitnesses();
+      fakeConformances.push_back(conformance);
     }
 
-    for (auto decl : missingWitnesses) {
-      swift::printRequirementStub(decl.requirement, nominal, nominal->getDeclaredType(),
-                                  nominal->getStartLoc(), SS);
+    for (auto conformance : fakeConformances) {
+      auto missingWitnesses = getASTContext().takeDelayedMissingWitnesses(conformance);
+      for (auto decl : missingWitnesses) {
+        swift::printRequirementStub(decl.requirement, nominal, nominal->getDeclaredType(),
+                                    nominal->getStartLoc(), SS);
+      }
     }
 
     if (!Text.empty()) {
@@ -4325,7 +4331,7 @@ bool MissingMemberFailure::diagnoseAsError() {
       correction->addFixits(diagnostic);
     } else if ((instanceTy->getAnyNominal() ||
                 instanceTy->is<ExistentialType>()) &&
-               getName().getBaseName() == DeclBaseName::createConstructor()) {
+               getName().getBaseName().isConstructor()) {
       auto &cs = getConstraintSystem();
 
       auto result = cs.performMemberLookup(
@@ -5579,6 +5585,12 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
 
   auto argType = solution.simplifyType(solution.getType(unaryArg));
   auto paramType = fnType->getParams()[1].getPlainType();
+
+  if (isExpr<ClosureExpr>(unaryArg) && argType->is<UnresolvedType>()) {
+    auto unwrappedParamTy = paramType->lookThroughAllOptionalTypes();
+    if (unwrappedParamTy->is<FunctionType>() || unwrappedParamTy->isAny())
+      return true;
+  }
 
   return TypeChecker::isConvertibleTo(argType, paramType, solution.getDC());
 }
@@ -7292,7 +7304,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseAttemptedRegexBuilder())
     return true;
 
-  if (diagnoseTrailingClosureMismatch())
+  if (diagnoseClosureMismatch())
     return true;
 
   if (diagnoseKeyPathAsFunctionResultMismatch())
@@ -7346,10 +7358,15 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 bool ArgumentMismatchFailure::diagnoseAsNote() {
   auto *locator = getLocator();
   if (auto *callee = getCallee()) {
-    emitDiagnosticAt(callee, diag::candidate_has_invalid_argument_at_position,
-                     getToType(), getParamPosition(),
-                     locator->isLastElement<LocatorPathElt::LValueConversion>(),
-                     getFromType());
+    if (isExpr<ClosureExpr>(getAnchor())) {
+      emitDiagnosticAt(callee, diag::candidate_has_invalid_closure_at_position,
+                       getToType());
+    } else {
+      emitDiagnosticAt(callee, diag::candidate_has_invalid_argument_at_position,
+                       getToType(), getParamPosition(),
+                       locator->isLastElement<LocatorPathElt::LValueConversion>(),
+                       getFromType());
+    }
     return true;
   }
 
@@ -7633,15 +7650,16 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
   return true;
 }
 
-bool ArgumentMismatchFailure::diagnoseTrailingClosureMismatch() const {
-  if (!Info.isTrailingClosure())
+bool ArgumentMismatchFailure::diagnoseClosureMismatch() const {
+  if (!isExpr<ClosureExpr>(getAnchor()))
     return false;
 
   auto paramType = getToType();
   if (paramType->lookThroughAllOptionalTypes()->is<AnyFunctionType>())
     return false;
 
-  emitDiagnostic(diag::trailing_closure_bad_param, paramType)
+  emitDiagnostic(diag::closure_bad_param, paramType,
+                 Info.isTrailingClosure())
       .highlight(getSourceRange());
 
   if (auto overload = getCalleeOverloadChoiceIfAvailable(getLocator())) {
@@ -9023,8 +9041,7 @@ bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
     auto *protocol = TypeChecker::getLiteralProtocol(ctx, sub);
     // Special handle for literals conditional checked cast when they can
     // be statically coerced to the cast type.
-    if (protocol && TypeChecker::conformsToProtocol(toType, protocol,
-                                                    dc->getParentModule())) {
+    if (protocol && dc->getParentModule()->checkConformance(toType, protocol)) {
       emitDiagnostic(diag::literal_conditional_downcast_to_coercion, fromType,
                      toType);
       return true;

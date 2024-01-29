@@ -110,10 +110,12 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
 
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     // Variables declared in a top-level 'guard' statement can be accessed in
     // later top-level code.
     return AccessLevel::FilePrivate;
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
     if (isa<ParamDecl>(D)) {
       // Closure parameters may need to be accessible to the enclosing
       // context, for single-expression closures.
@@ -121,7 +123,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     } else {
       return AccessLevel::Private;
     }
-  case DeclContextKind::SerializedLocal:
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:

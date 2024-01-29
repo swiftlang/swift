@@ -1076,3 +1076,25 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
   return %r : $()
 }
 
+// CHECK-LABEL: @test_builtin_zeroInitializer
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %0 = alloc_stack
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "zeroInitializer"<C>(%1 : $*C)
+// CHECK-NEXT:      %1 = alloc_stack
+// CHECK-NEXT:    r=0,w=1
+sil @test_builtin_zeroInitializer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = alloc_stack $C
+  %2 = builtin "zeroInitializer"<C>(%1 : $*C) : $()
+  %3 = apply undef<C>(%1) : $@convention(thin) <C> () -> @out C
+  copy_addr [take] %1 to [init] %0 : $*C
+  dealloc_stack %1 : $*C
+  destroy_addr %0 : $*C
+  dealloc_stack %0 : $*C
+  %4 = tuple ()
+  return %4 : $()
+}

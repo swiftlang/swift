@@ -117,15 +117,6 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
       return nil
     }
 
-    // Determine the filename to use in the resulting location.
-    let fileName: String
-    switch filePathMode {
-    case .fileID:
-      fileName = "\(exportedSourceFile.moduleName)/\(exportedSourceFile.fileName.basename)"
-
-    case .filePath:
-      fileName = exportedSourceFile.fileName
-    }
 
     // Find the node's offset relative to its root.
     let rawPosition: AbsolutePosition
@@ -146,8 +137,37 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
     let offsetWithinSyntaxNode =
       rawPosition.utf8Offset - node.position.utf8Offset
 
+    var location = exportedSourceFile.sourceLocationConverter.location(
+      for: rootPosition.advanced(by: offsetWithinSyntaxNode)
+    )
+
+    switch filePathMode {
+    case .fileID:
+      // The `SourceLocationConverter` in `exportedSourceFile` uses `filePath` as the file mode. When the `fileID` mode
+      // is requested, we need to adjust the file and presumed file to the `fileID`.
+      let fileID = "\(exportedSourceFile.moduleName)/\(exportedSourceFile.fileName.basename)"
+      var adjustedFile = location.file
+      if adjustedFile == exportedSourceFile.fileName {
+        adjustedFile = fileID
+      }
+      var adjustedPresumedFile = location.presumedFile
+      if adjustedPresumedFile == exportedSourceFile.fileName {
+        adjustedPresumedFile = fileID
+      }
+      location = SourceLocation(
+        line: location.line,
+        column: location.column,
+        offset: location.offset,
+        file: adjustedFile,
+        presumedLine: location.presumedLine,
+        presumedFile: adjustedPresumedFile
+      )
+
+    case .filePath:
+      break
+    }
+
     // Do the location lookup.
-    let converter = SourceLocationConverter(file: fileName, tree: sourceFile)
-    return AbstractSourceLocation(converter.location(for: rootPosition.advanced(by: offsetWithinSyntaxNode)))
+    return AbstractSourceLocation(location)
   }
 }

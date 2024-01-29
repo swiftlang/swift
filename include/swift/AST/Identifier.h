@@ -323,6 +323,8 @@ public:
 
   bool isSubscript() const { return getKind() == Kind::Subscript; }
 
+  bool isConstructor() const { return getKind() == Kind::Constructor; }
+
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
   Identifier getIdentifier() const {

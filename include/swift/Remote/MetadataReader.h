@@ -24,6 +24,7 @@
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ExternalUnion.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/TypeIdentity.h"
@@ -970,20 +971,18 @@ public:
       if (!Result)
         return BuiltType();
 
-      auto flags = FunctionTypeFlags()
-                       .withConvention(Function->getConvention())
-                       .withAsync(Function->isAsync())
-                       .withThrows(Function->isThrowing())
-                       .withParameterFlags(Function->hasParameterFlags())
-                       .withEscaping(Function->isEscaping())
-                       .withDifferentiable(Function->isDifferentiable());
+      auto flags = FunctionTypeFlags::fromIntValue(Function->Flags.getIntValue());
+      auto extFlags = ExtendedFunctionTypeFlags();
+      if (flags.hasExtendedFlags())
+        extFlags = ExtendedFunctionTypeFlags::fromIntValue(
+                      Function->getExtendedFlags().getIntValue());
 
       BuiltType globalActor = BuiltType();
       if (Function->hasGlobalActor()) {
         globalActor = readTypeFromMetadata(Function->getGlobalActor(), false,
                                            recursion_limit);
-        if (globalActor)
-          flags = flags.withGlobalActor(true);
+        if (!globalActor)
+          return BuiltType();
       }
 
       FunctionMetadataDifferentiabilityKind diffKind;
@@ -1005,10 +1004,12 @@ public:
       if (Function->hasThrownError()) {
         thrownError = readTypeFromMetadata(Function->getThrownError(), false,
                                            recursion_limit);
+        if (!thrownError)
+          return BuiltType();
       }
 
       auto BuiltFunction = Builder.createFunctionType(
-          Parameters, Result, flags, diffKind, globalActor, thrownError);
+          Parameters, Result, flags, extFlags, diffKind, globalActor, thrownError);
       TypeCache[TypeCacheKey] = BuiltFunction;
       return BuiltFunction;
     }
@@ -3418,11 +3419,6 @@ private:
 #   undef tryFindAndReadSymbolWithDefault
 
     return finish(TaggedPointerEncodingKind::Extended);
-  }
-
-  template <class T>
-  static constexpr T roundUpToAlignment(T offset, T alignment) {
-    return (offset + alignment - 1) & ~(alignment - 1);
   }
 };
 

@@ -239,8 +239,7 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
     return false;
   auto conformance = c.getConcrete()->getRootConformance();
   return M.Types.protocolRequiresWitnessTable(conformance->getProtocol())
-    && isa<ClangModuleUnit>(conformance->getDeclContext()
-                                       ->getModuleScopeContext());
+    && conformance->isSynthesized();
 }
 
 void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {

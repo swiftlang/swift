@@ -57,7 +57,7 @@ private:
   raw_ostream &os;
   raw_ostream &prologueOS;
   raw_ostream &outOfLineDefinitionsOS;
-  const DelayedMemberSet &delayedMembers;
+  const DelayedMemberSet &objcDelayedMembers;
   CxxDeclEmissionScope *cxxDeclEmissionScope;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
@@ -84,7 +84,8 @@ public:
                      llvm::StringSet<> &exposedModules,
                      OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS),
-        outOfLineDefinitionsOS(outOfLineDefinitionsOS), delayedMembers(delayed),
+        outOfLineDefinitionsOS(outOfLineDefinitionsOS),
+        objcDelayedMembers(delayed),
         cxxDeclEmissionScope(&topLevelEmissionScope), typeMapping(typeMapping),
         interopContext(interopContext), minRequiredAccess(access),
         requiresExposedAttribute(requiresExposedAttribute),

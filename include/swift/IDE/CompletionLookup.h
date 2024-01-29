@@ -628,7 +628,7 @@ public:
 
   void getOptionalBindingCompletions(SourceLoc Loc);
 
-  void getWithoutConstraintTypes();
+  void addWithoutConstraintTypes();
 };
 
 } // end namespace ide

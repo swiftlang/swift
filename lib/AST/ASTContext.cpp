@@ -46,6 +46,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/RequirementMatch.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -192,6 +193,35 @@ template <> struct DenseMapInfo<OverrideSignatureKey> {
 };
 } // namespace llvm
 
+namespace {
+
+/// If the conformance is in a primary file, we might diagnose some failures
+/// early via request evaluation, with all remaining failures diagnosed when
+/// we completely force the conformance from typeCheckDecl(). To emit the
+/// diagnostics together, we batch them up in the Diags vector.
+///
+/// If the conformance is in a secondary file, we instead just diagnose a
+/// generic "T does not conform to P" error the first time we hit an error
+/// via request evaluation. The detailed delayed conformance diagnostics
+/// are discarded, since we'll emit them again when we compile the file as
+/// a primary file.
+struct DelayedConformanceDiags {
+  /// The delayed conformance diagnostics that have not been emitted yet.
+  /// Never actually emitted for a secondary file.
+  std::vector<ASTContext::DelayedConformanceDiag> Diags;
+
+  /// Any missing witnesses that need to be diagnosed.
+  std::vector<ASTContext::MissingWitness> MissingWitnesses;
+
+  /// We set this if we've ever seen an error diagnostic here.
+  unsigned HadError : 1;
+
+  DelayedConformanceDiags() {
+    HadError = false;
+  }
+};
+
+}
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -354,16 +384,8 @@ struct ASTContext::Implementation {
 
   /// Map from normal protocol conformances to diagnostics that have
   /// been delayed until the conformance is fully checked.
-  llvm::DenseMap<NormalProtocolConformance *,
-                 std::vector<ASTContext::DelayedConformanceDiag>>
+  llvm::DenseMap<NormalProtocolConformance *, ::DelayedConformanceDiags>
     DelayedConformanceDiags;
-
-  /// Map from normal protocol conformances to missing witnesses that have
-  /// been delayed until the conformance is fully checked, so that we can
-  /// issue a fixit that fills the entire protocol stub.
-  llvm::DenseMap<
-      NormalProtocolConformance *, std::unique_ptr<MissingWitnessesBase>>
-    DelayedMissingWitnesses;
 
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
@@ -1144,6 +1166,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Differentiation);
     break;
   case KnownProtocolKind::Actor:
+  case KnownProtocolKind::AnyActor:
   case KnownProtocolKind::GlobalActor:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
@@ -1864,7 +1887,7 @@ void ASTContext::addCleanup(std::function<void(void)> cleanup) {
 }
 
 bool ASTContext::hadError() const {
-  return Diags.hadAnyError();
+  return Diags.hadAnyError() || hasDelayedConformanceErrors();
 }
 
 /// Retrieve the arena from which we should allocate storage for a type.
@@ -2317,6 +2340,10 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     return false;
 
   if (version.empty()) {
+    // If this module has already been checked successfully, it is importable.
+    if (SucceededModuleImportNames.count(ModuleNameStr))
+      return true;
+
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
@@ -2374,12 +2401,21 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
 bool ASTContext::canImportModule(ImportPath::Module ModuleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
-  return canImportModuleImpl(ModuleName, version, underlyingVersion, true);
+  if (!canImportModuleImpl(ModuleName, version, underlyingVersion, true))
+    return false;
+
+  // If checked successfully, add the top level name to success list as
+  // dependency to handle clang submodule correctly. Swift does not have
+  // submodule so the name should be the same.
+  SmallString<64> TopModuleName;
+  ModuleName.getTopLevelPath().getString(TopModuleName);
+  SucceededModuleImportNames.insert(TopModuleName.str());
+  return true;
 }
 
-bool ASTContext::canImportModule(ImportPath::Module ModuleName,
-                                 llvm::VersionTuple version,
-                                 bool underlyingVersion) const {
+bool ASTContext::testImportModule(ImportPath::Module ModuleName,
+                                  llvm::VersionTuple version,
+                                  bool underlyingVersion) const {
   return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
 }
 
@@ -2490,7 +2526,8 @@ ASTContext::getNormalConformance(Type conformingType,
                                  SourceLoc loc,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
-                                 bool isUnchecked) {
+                                 bool isUnchecked,
+                                 bool isPreconcurrency) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2504,10 +2541,9 @@ ASTContext::getNormalConformance(Type conformingType,
     return result;
 
   // Build a new normal protocol conformance.
-  auto result
-    = new (*this, AllocationArena::Permanent)
-        NormalProtocolConformance(
-          conformingType, protocol, loc, dc, state,isUnchecked);
+  auto result = new (*this, AllocationArena::Permanent)
+      NormalProtocolConformance(conformingType, protocol, loc, dc, state,
+                                isUnchecked, isPreconcurrency);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -2721,17 +2757,10 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
 bool ASTContext::hasDelayedConformanceErrors(
                           NormalProtocolConformance const* conformance) const {
 
-  auto hasDelayedErrors = [](std::vector<DelayedConformanceDiag> const& diags) {
-    return std::any_of(diags.begin(), diags.end(),
-                    [](ASTContext::DelayedConformanceDiag const& diag) {
-                      return diag.IsError;
-                    });
-  };
-
   if (conformance) {
     auto entry = getImpl().DelayedConformanceDiags.find(conformance);
     if (entry != getImpl().DelayedConformanceDiags.end())
-      return hasDelayedErrors(entry->second);
+      return entry->second.HadError;
 
     return false; // unknown conformance, so no delayed diags either.
   }
@@ -2739,35 +2768,92 @@ bool ASTContext::hasDelayedConformanceErrors(
   // check all conformances for any delayed errors
   for (const auto &entry : getImpl().DelayedConformanceDiags) {
     auto const& diagnostics = entry.getSecond();
-    if (hasDelayedErrors(diagnostics))
+    if (diagnostics.HadError)
       return true;
   }
 
   return false;
 }
 
-MissingWitnessesBase::~MissingWitnessesBase() { }
+ASTContext::MissingWitness::MissingWitness(ValueDecl *requirement,
+                                           ArrayRef<RequirementMatch> matches)
+  : requirement(requirement),
+    matches(matches.begin(), matches.end()) { }
+
+static void maybeEmitFallbackConformanceDiagnostic(
+    ASTContext &ctx,
+    NormalProtocolConformance *conformance,
+    DelayedConformanceDiags &diagnostics) {
+
+  if (diagnostics.HadError)
+    return;
+
+  diagnostics.HadError = true;
+
+  auto *proto = conformance->getProtocol();
+  auto *dc = conformance->getDeclContext();
+  auto *sf = dc->getParentSourceFile();
+  auto *mod = sf->getParentModule();
+  assert(mod->isMainModule());
+
+  // If we have at least one primary file and the conformance is declared in a
+  // non-primary file, emit a fallback diagnostic.
+  if ((!sf->isPrimary() && !mod->getPrimarySourceFiles().empty()) ||
+      ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    auto complainLoc = ctx.evaluator.getInnermostSourceLoc([&](SourceLoc loc) {
+      if (loc.isInvalid())
+        return false;
+
+      auto *otherSF = mod->getSourceFileContainingLocation(loc);
+      if (otherSF == nullptr)
+        return false;
+
+      return otherSF->isPrimary();
+    });
+
+    if (complainLoc.isInvalid()) {
+      complainLoc = conformance->getLoc();
+    }
+
+    ctx.Diags.diagnose(complainLoc,
+                       diag::type_does_not_conform,
+                       dc->getSelfInterfaceType(),
+                       proto->getDeclaredInterfaceType());
+  }
+}
 
 void ASTContext::addDelayedConformanceDiag(
-       NormalProtocolConformance *conformance,
-       DelayedConformanceDiag fn) {
-  getImpl().DelayedConformanceDiags[conformance].push_back(std::move(fn));
+       NormalProtocolConformance *conformance, bool isError,
+       std::function<void(NormalProtocolConformance *)> callback) {
+  if (isError)
+    conformance->setInvalid();
+
+  auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
+
+  if (isError)
+    maybeEmitFallbackConformanceDiagnostic(*this, conformance, diagnostics);
+
+  diagnostics.Diags.push_back({isError, callback});
 }
 
-void ASTContext::addDelayedMissingWitnesses(
+void ASTContext::addDelayedMissingWitness(
     NormalProtocolConformance *conformance,
-    std::unique_ptr<MissingWitnessesBase> missingWitnesses) {
-  getImpl().DelayedMissingWitnesses[conformance] = std::move(missingWitnesses);
+    ASTContext::MissingWitness missingWitness) {
+  conformance->setInvalid();
+
+  auto &diagnostics = getImpl().DelayedConformanceDiags[conformance];
+  maybeEmitFallbackConformanceDiagnostic(*this, conformance, diagnostics);
+  diagnostics.MissingWitnesses.push_back(missingWitness);
 }
 
-std::unique_ptr<MissingWitnessesBase>
+std::vector<ASTContext::MissingWitness>
 ASTContext::takeDelayedMissingWitnesses(
     NormalProtocolConformance *conformance) {
-  std::unique_ptr<MissingWitnessesBase> result;
-  auto known = getImpl().DelayedMissingWitnesses.find(conformance);
-  if (known != getImpl().DelayedMissingWitnesses.end()) {
-    result = std::move(known->second);
-    getImpl().DelayedMissingWitnesses.erase(known);
+  std::vector<ASTContext::MissingWitness> result;
+  auto known = getImpl().DelayedConformanceDiags.find(conformance);
+  if (known != getImpl().DelayedConformanceDiags.end()) {
+    auto &diagnostics = known->second;
+    std::swap(result, diagnostics.MissingWitnesses);
   }
   return result;
 }
@@ -2777,8 +2863,8 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance const* cnfrm){
   std::vector<ASTContext::DelayedConformanceDiag> result;
   auto known = getImpl().DelayedConformanceDiags.find(cnfrm);
   if (known != getImpl().DelayedConformanceDiags.end()) {
-    result = std::move(known->second);
-    getImpl().DelayedConformanceDiags.erase(known);
+    auto &diagnostics = known->second;
+    std::swap(result, diagnostics.Diags);
   }
   return result;
 }
@@ -4142,9 +4228,15 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
       info.has_value() && !info.value().getClangTypeInfo().empty();
 
   unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
-  size_t allocSize = totalSizeToAlloc<
-      AnyFunctionType::Param, ClangTypeInfo, Type
-    >(params.size(), hasClangInfo ? 1 : 0, numTypes);
+
+  bool hasLifetimeDependenceInfo =
+      info.has_value() && !info.value().getLifetimeDependenceInfo().empty();
+
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo,
+                                      Type, LifetimeDependenceInfo>(
+      params.size(), hasClangInfo ? 1 : 0, numTypes,
+      hasLifetimeDependenceInfo ? 1 : 0);
+
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isAnyFunctionTypeCanonical(params, result);
@@ -4171,6 +4263,14 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   return funcTy;
 }
 
+#ifndef NDEBUG
+static bool isConsistentAboutIsolation(const llvm::Optional<ASTExtInfo> &info,
+                                       ArrayRef<AnyFunctionType::Param> params) {
+  return (hasIsolatedParameter(params)
+            == (info && info->getIsolation().isParameter()));
+}
+#endif
+
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
                            llvm::Optional<ExtInfo> info, const ASTContext *ctx,
@@ -4179,6 +4279,7 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
                       params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  assert(isConsistentAboutIsolation(info, params));
   if (info.has_value()) {
     auto clangTypeInfo = info.value().getClangTypeInfo();
     if (!clangTypeInfo.empty())
@@ -4190,6 +4291,10 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
     }
     if (Type thrownError = info->getThrownError())
       getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
+    auto lifetimeDependenceInfo = info->getLifetimeDependenceInfo();
+    if (!lifetimeDependenceInfo.empty()) {
+      *getTrailingObjects<LifetimeDependenceInfo>() = lifetimeDependenceInfo;
+    }
   }
 }
 
@@ -4293,6 +4398,7 @@ GenericFunctionType::GenericFunctionType(
       Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  assert(isConsistentAboutIsolation(info, params));
   if (info) {
     unsigned thrownErrorIndex = 0;
     if (Type globalActor = info->getGlobalActor()) {
@@ -4532,14 +4638,12 @@ SILFunctionType::SILFunctionType(
   // `@differentiable` function types.
   if (!ext.isDifferentiable()) {
     for (auto param : getParameters()) {
-      assert(param.getDifferentiability() ==
-                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+      assert(!param.hasOption(SILParameterInfo::NotDifferentiable) &&
              "non-`@differentiable` function type should not have "
              "`@noDerivative` parameter");
     }
     for (auto result : getResults()) {
-      assert(result.getDifferentiability() ==
-                 SILResultDifferentiability::DifferentiableOrNotApplicable &&
+      assert(!result.hasOption(SILResultInfo::NotDifferentiable) &&
              "non-`@differentiable` function type should not have "
              "`@noDerivative` result");
     }
@@ -6297,6 +6401,9 @@ BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
   if (auto *proto = getProtocol(KnownProtocolKind::Escapable))
     buildFakeExtension(proto);
 
+  if (auto *proto = getProtocol(KnownProtocolKind::BitwiseCopyable))
+    buildFakeExtension(proto);
+
   return result;
 }
 
@@ -6310,6 +6417,14 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
 
   return result;
+}
+
+FuncDecl *ASTContext::getDiagnoseUnavailableCodeReachedDecl() {
+  // FIXME: Remove this with rdar://119892482
+  if (AvailabilityContext::forDeploymentTarget(*this).isContainedIn(
+      getSwift59Availability()))
+    return getDiagnoseUnavailableCodeReached();
+  return getDiagnoseUnavailableCodeReachedAEIC();
 }
 
 void ASTContext::setPluginLoader(std::unique_ptr<PluginLoader> loader) {

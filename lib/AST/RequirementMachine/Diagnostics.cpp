@@ -564,11 +564,23 @@ void RequirementMachine::computeRequirementDiagnostics(
                                                 getGenericParams());
 
   // Check that the generic parameters with inverses truly lack the conformance.
-  for (auto const& inverse : inverses)
-    if (requiresProtocol(inverse.subject, inverse.protocol))
+  for (auto const& inverse : inverses) {
+    // The Superclass and AnyObject checks here are based on the assumption that
+    // a class cannot have an inverse applied to it. As a result, the existence
+    // of a superclass bound always implies the existence of the conformance.
+    // Thus, an inverse being present is a conflict.
+    //
+    // While AnyObject doesn't imply the conformance in the signature, we don't
+    // want a generic parameter to be a class that can't be copied, since we
+    // don't allow that for concrete classes today. Thus, we artificially
+    // prevent AnyObject from being mixed with inverses.
+    if (requiresProtocol(inverse.subject, inverse.protocol) ||
+        getSuperclassBound(inverse.subject, getGenericParams()) ||
+        requiresClass(inverse.subject))
       errors.push_back(
           RequirementError::forConflictingInverseRequirement(inverse,
                                                              inverse.loc));
+  }
 }
 
 std::string RequirementMachine::getRuleAsStringForDiagnostics(

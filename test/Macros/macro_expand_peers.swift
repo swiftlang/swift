@@ -257,3 +257,35 @@ func fDeprecated(a: Int, for b: String, _ value: Double) async -> String {
 }
 
 #endif
+
+protocol MyType {
+  associatedtype Value
+  associatedtype Entity
+}
+
+@attached(peer, names: named(bar))
+macro Wrapper<Value>(
+    get: (Value.Entity) async throws -> Value.Value
+) = #externalMacro(module: "MacroDefinition", type: "WrapperMacro")
+where Value: MyType
+
+@attached(peer)
+macro _AddPeer() = #externalMacro(module: "MacroDefinition", type: "WrapperMacro")
+
+@attached(memberAttribute)
+public macro AddMemberPeers() = #externalMacro(module: "MacroDefinition", type: "AddMemberPeersMacro")
+
+struct Thing: MyType {
+  typealias Entity = [Int]
+  typealias Value = Int
+}
+
+@AddMemberPeers
+struct Test {
+    @Wrapper<Thing>(
+        get: { p1 in
+            p1.count // Error: Cannot find 'p1' in scope
+        }
+    )
+    var doesNotWork: Thing
+}

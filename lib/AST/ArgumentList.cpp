@@ -24,15 +24,7 @@ using namespace swift;
 Type swift::__Expr_getType(Expr *E) { return E->getType(); }
 
 SourceRange Argument::getSourceRange() const {
-  auto labelLoc = getLabelLoc();
-  if (labelLoc.isInvalid())
-    return getExpr()->getSourceRange();
-
-  auto exprEndLoc = getExpr()->getEndLoc();
-  if (exprEndLoc.isInvalid())
-    return labelLoc;
-
-  return SourceRange(labelLoc, exprEndLoc);
+  return SourceRange::combine(getLabelLoc(), getExpr()->getSourceRange());
 }
 
 Argument Argument::implicitInOut(ASTContext &ctx, Expr *expr) {

@@ -1635,6 +1635,8 @@ static void swift_task_asyncMainDrainQueueImpl() {
   swift_task_donateThreadToGlobalExecutorUntil([](void *context) {
     return *reinterpret_cast<bool*>(context);
   }, &Finished);
+  swift_unreachable(
+      "Returned from swift_task_donateThreadToGlobalExecutorUntil()");
 #elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   // FIXME: consider implementing a concurrent global main queue for
   // these environments?

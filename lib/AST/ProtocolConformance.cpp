@@ -23,6 +23,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
@@ -71,7 +72,8 @@ void Witness::dump() const { dump(llvm::errs()); }
 void Witness::dump(llvm::raw_ostream &out) const {
   out << "Witness: ";
   if (auto decl = this->getDecl()) {
-    decl->print(out);
+    decl->dumpRef(out);
+    out << "\n";
   } else {
     out << "<no decl>\n";
   }
@@ -289,6 +291,13 @@ bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(hasWitness, (requirement))
 }
 
+bool RootProtocolConformance::isSynthesized() const {
+  if (auto normal = dyn_cast<NormalProtocolConformance>(this))
+    return normal->isSynthesizedNonUnique() || normal->isConformanceOfProtocol();
+
+  return false;
+}
+
 bool NormalProtocolConformance::isRetroactive() const {
   auto module = getDeclContext()->getParentModule();
 
@@ -320,9 +329,15 @@ bool NormalProtocolConformance::isRetroactive() const {
 }
 
 bool NormalProtocolConformance::isSynthesizedNonUnique() const {
+  // Check if the conformance was synthesized by the ClangImporter.
   if (auto *file = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext()))
     return file->getKind() == FileUnitKind::ClangModule;
+
   return false;
+}
+
+bool NormalProtocolConformance::isConformanceOfProtocol() const {
+  return getDeclContext()->getSelfProtocolDecl() != nullptr;
 }
 
 bool NormalProtocolConformance::isResilient() const {
@@ -478,14 +493,13 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
   // If this conformance is in a state where it is inferring type witnesses but
   // we didn't find anything, fail.
-  if (getState() == ProtocolConformanceState::CheckingTypeWitnesses) {
+  //
+  // FIXME: This is unsound, because we may not have diagnosed anything but
+  // still end up with an ErrorType in the AST.
+  if (getDeclContext()->getASTContext().evaluator.hasActiveRequest(
+         ResolveTypeWitnessesRequest{
+             const_cast<NormalProtocolConformance *>(this)})) {
     return { Type(), nullptr };
-  }
-
-  // If the conditional requirements aren't known, we can't properly run
-  // inference.
-  if (!getConditionalRequirementsIfAvailable()) {
-    return TypeWitnessAndDecl();
   }
 
   return evaluateOrDefault(
@@ -1062,13 +1076,15 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
+  const bool haveNoncopyableGenerics =
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   auto addSynthesized = [&](ProtocolDecl *proto) {
     if (!proto)
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (canBeNoncopyable()) {
+    if (!haveNoncopyableGenerics && !canBeCopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;
@@ -1080,6 +1096,16 @@ void NominalTypeDecl::prepareConformanceTable() const {
       protocols.insert(proto);
     }
   };
+
+  // Synthesize the unconditional conformances to invertible protocols.
+  // For conditional ones, see findSynthesizedConformances .
+  if (haveNoncopyableGenerics) {
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto invertible = getMarking(ip);
+      if (!invertible.getInverse() || bool(invertible.getPositive()))
+        addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
+    }
+  }
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
@@ -1253,9 +1279,17 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
 
-    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-      trySynthesize(KnownProtocolKind::Copyable);
-      trySynthesize(KnownProtocolKind::Escapable);
+    // Triggers synthesis of a possibly conditional conformance.
+    // For the unconditional ones, see NominalTypeDecl::prepareConformanceTable
+    if (nominal->getASTContext().LangOpts.hasFeature(
+            Feature::NoncopyableGenerics)) {
+      for (auto ip : InvertibleProtocolSet::full())
+        trySynthesize(getKnownProtocolKind(ip));
+    }
+
+    if (nominal->getASTContext().LangOpts.hasFeature(
+            Feature::BitwiseCopyable)) {
+      trySynthesize(KnownProtocolKind::BitwiseCopyable);
     }
   }
 
@@ -1483,11 +1517,11 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 }
 
 BuiltinProtocolConformance::BuiltinProtocolConformance(
-    Type conformingType, ProtocolDecl *protocol,
-    BuiltinConformanceKind kind
-) : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
-    protocol(protocol), builtinConformanceKind(static_cast<unsigned>(kind))
-{}
+    Type conformingType, ProtocolDecl *protocol, BuiltinConformanceKind kind)
+    : RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
+      protocol(protocol) {
+  Bits.BuiltinProtocolConformance.Kind = unsigned(kind);
+}
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing
 // ProtocolConformances, is defined here to avoid too much layering violation /

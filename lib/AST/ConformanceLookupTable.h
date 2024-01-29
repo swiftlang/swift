@@ -91,6 +91,9 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the "unchecked" attribute, if there is one.
     SourceLoc uncheckedLoc;
 
+    /// The location of the "preconcurrency" attribute, if there is one.
+    SourceLoc preconcurrencyLoc;
+
     ConformanceSource(void *ptr, ConformanceEntryKind kind) 
       : Storage(ptr), Kind(kind) { }
 
@@ -141,6 +144,15 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return result;
     }
 
+    /// Return a new conformance source with the given location of
+    /// "@preconcurrency".
+    ConformanceSource withPreconcurrencyLoc(SourceLoc preconcurrencyLoc) {
+      ConformanceSource result(*this);
+      if (preconcurrencyLoc.isValid())
+        result.preconcurrencyLoc = preconcurrencyLoc;
+      return result;
+    }
+
     /// Retrieve the kind of conformance formed from this source.
     ConformanceEntryKind getKind() const { return Kind; }
 
@@ -182,6 +194,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the @unchecked attribute, if any.
     SourceLoc getUncheckedLoc() const {
       return uncheckedLoc;
+    }
+
+    SourceLoc getPreconcurrencyLoc() const {
+      return preconcurrencyLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration

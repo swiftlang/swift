@@ -136,13 +136,28 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // a per-platform basis.
   std::map<PlatformKind, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
+    llvm::SmallVector<const AvailableAttr *, 8> MergedAttrs;
+
     do {
+      llvm::SmallVector<const AvailableAttr *, 8> PendingAttrs;
+
       for (const DeclAttribute *Attr : D->getAttrs()) {
         auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
         if (!AvAttr || AvAttr->isInvalid())
           continue;
 
+        // Skip an attribute from an outer declaration if it is for a platform
+        // that was already handled implicitly by an attribute from an inner
+        // declaration.
+        if (llvm::any_of(MergedAttrs,
+                         [&AvAttr](const AvailableAttr *MergedAttr) {
+                           return inheritsAvailabilityFromPlatform(
+                               AvAttr->Platform, MergedAttr->Platform);
+                         }))
+          continue;
+
         mergeWithInferredAvailability(AvAttr, Inferred[AvAttr->Platform]);
+        PendingAttrs.push_back(AvAttr);
 
         if (Message.empty() && !AvAttr->Message.empty())
           Message = AvAttr->Message;
@@ -152,6 +167,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
           RenameDecl = AvAttr->RenameDecl;
         }
       }
+
+      MergedAttrs.append(PendingAttrs);
 
       // Walk up the enclosing declaration hierarchy to make sure we aren't
       // missing any inherited attributes.
@@ -306,10 +323,18 @@ static bool isUnconditionallyUnavailable(const Decl *D) {
   return false;
 }
 
+static UnavailableDeclOptimization
+getEffectiveUnavailableDeclOptimization(ASTContext &ctx) {
+  if (ctx.LangOpts.UnavailableDeclOptimizationMode.has_value())
+    return *ctx.LangOpts.UnavailableDeclOptimizationMode;
+
+  return UnavailableDeclOptimization::Stub;
+}
+
 bool Decl::isAvailableDuringLowering() const {
   // Unconditionally unavailable declarations should be skipped during lowering
   // when -unavailable-decl-optimization=complete is specified.
-  if (getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+  if (getEffectiveUnavailableDeclOptimization(getASTContext()) !=
       UnavailableDeclOptimization::Complete)
     return true;
 
@@ -322,7 +347,7 @@ bool Decl::isAvailableDuringLowering() const {
 bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
   // Code associated with unavailable declarations should trap at runtime if
   // -unavailable-decl-optimization=stub is specified.
-  if (getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
+  if (getEffectiveUnavailableDeclOptimization(getASTContext()) !=
       UnavailableDeclOptimization::Stub)
     return false;
 

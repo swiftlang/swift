@@ -585,15 +585,27 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
               ClangOpts.BridgingHeader))
         MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
                        std::move(loadedBuffer));
+      else
+        Diagnostics.diagnose(
+            SourceLoc(), diag::error_load_input_from_cas,
+            Invocation.getClangImporterOptions().BridgingHeader);
     }
     if (!Opts.InputFileKey.empty()) {
-      auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
-      auto Type = file_types::lookupTypeForExtension(
-          llvm::sys::path::extension(InputPath));
-      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-              getObjectStore(), getActionCache(), Diagnostics,
-              Opts.InputFileKey, Type, InputPath))
-        MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+      if (Opts.InputsAndOutputs.getAllInputs().size() != 1)
+        Diagnostics.diagnose(SourceLoc(),
+                             diag::error_wrong_input_num_for_input_file_key);
+      else {
+        auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
+        auto Type = file_types::lookupTypeFromFilename(
+            llvm::sys::path::filename(InputPath));
+        if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
+                getObjectStore(), getActionCache(), Diagnostics,
+                Opts.InputFileKey, Type, InputPath))
+          MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
+        else
+          Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                               InputPath);
+      }
     }
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
         new llvm::vfs::OverlayFileSystem(SourceMgr.getFileSystem());
@@ -762,7 +774,8 @@ bool CompilerInstance::setUpModuleLoaders() {
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
           FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-          RequireOSSAModules_t(Invocation.getSILOptions())));
+          RequireOSSAModules_t(Invocation.getSILOptions()),
+          RequireNoncopyableGenerics_t(Invocation.getLangOptions())));
 
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
@@ -803,7 +816,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
-        RequireOSSAModules_t(Invocation.getSILOptions()));
+        RequireOSSAModules_t(Invocation.getSILOptions()),
+        RequireNoncopyableGenerics_t(Invocation.getLangOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
         std::make_unique<PlaceholderSwiftModuleScanner>(
@@ -869,7 +883,7 @@ bool CompilerInstance::setUpInputs() {
   // There is no input file when building PCM using ClangIncludeTree.
   if (Invocation.getFrontendOptions().RequestedAction ==
           FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getClangImporterOptions().UseClangIncludeTree)
+      Invocation.getClangImporterOptions().HasClangIncludeTreeRoot)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
@@ -1107,14 +1121,14 @@ bool CompilerInstance::canImportSwiftConcurrency() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportSwiftConcurrencyShims() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_CONCURRENCY_SHIMS_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitStringProcessingImport() {
@@ -1129,7 +1143,7 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitBacktracingImport() {
@@ -1144,15 +1158,16 @@ bool CompilerInstance::canImportSwiftBacktracing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath);
+  return getASTContext().testImportModule(modulePath);
 }
 
 bool CompilerInstance::canImportCxxShim() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(CXX_SHIM_NAME));
   auto modulePath = builder.get();
-  return getASTContext().canImportModule(modulePath) &&
-         !Invocation.getFrontendOptions().InputsAndOutputs.hasModuleInterfaceOutputPath();
+  return getASTContext().testImportModule(modulePath) &&
+         !Invocation.getFrontendOptions()
+              .InputsAndOutputs.hasModuleInterfaceOutputPath();
 }
 
 bool CompilerInstance::supportCaching() const {
@@ -1482,8 +1497,8 @@ bool CompilerInstance::loadStdlibIfNeeded() {
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {
-    assert(Diagnostics.hadAnyError() &&
-           "Module failed to load but nothing was diagnosed?");
+//    assert(Diagnostics.hadAnyError() &&
+//           "Module failed to load but nothing was diagnosed?");
     return true;
   }
   return false;

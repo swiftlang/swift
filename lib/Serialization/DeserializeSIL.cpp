@@ -60,6 +60,7 @@ fromStableStringEncoding(unsigned value) {
   case SIL_BYTES: return StringLiteralInst::Encoding::Bytes;
   case SIL_UTF8: return StringLiteralInst::Encoding::UTF8;
   case SIL_OBJC_SELECTOR: return StringLiteralInst::Encoding::ObjCSelector;
+  case SIL_UTF8_OSLOG: return StringLiteralInst::Encoding::UTF8_OSLOG;
   default:
     return llvm::None;
   }
@@ -1877,7 +1878,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createAllocGlobal(Loc, g);
     break;
   }
-  case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::GlobalValueInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     auto Ty = MF->getType(TyID);
@@ -1886,20 +1886,31 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     // Find the global variable.
     SILGlobalVariable *g = getGlobalForReference(Name);
     assert(g && "Can't deserialize global variable");
-    SILType expectedType =
-        (OpCode == SILInstructionKind::GlobalAddrInst
-             ? g->getLoweredTypeInContext(TypeExpansionContext(*Fn))
-                   .getAddressType()
-             : g->getLoweredTypeInContext(TypeExpansionContext(*Fn)));
+    SILType expectedType = g->getLoweredTypeInContext(TypeExpansionContext(*Fn));
     assert(expectedType == getSILType(Ty, (SILValueCategory)TyCategory, Fn) &&
            "Type of a global variable does not match GlobalAddr.");
     (void)Ty;
     (void)expectedType;
-    if (OpCode == SILInstructionKind::GlobalAddrInst) {
-      ResultInst = Builder.createGlobalAddr(Loc, g);
-    } else {
-      ResultInst = Builder.createGlobalValue(Loc, g, /*isBare=*/ (Attr & 1) != 0);
-    }
+    ResultInst = Builder.createGlobalValue(Loc, g, /*isBare=*/ (Attr & 1) != 0);
+    break;
+  }
+  case SILInstructionKind::GlobalAddrInst: {
+    // Format: Name and type. Use SILOneOperandLayout.
+    auto Ty = MF->getType(TyID);
+    StringRef Name = MF->getIdentifierText(ValID);
+
+    // Find the global variable.
+    SILGlobalVariable *g = getGlobalForReference(Name);
+    assert(g && "Can't deserialize global variable");
+    SILType expectedType = g->getLoweredTypeInContext(TypeExpansionContext(*Fn))
+                            .getAddressType();
+    assert(expectedType == getSILType(Ty, (SILValueCategory)TyCategory, Fn) &&
+           "Type of a global variable does not match GlobalAddr.");
+    (void)Ty;
+    (void)expectedType;
+    SILValue token = ValID2 == 0 ? SILValue()
+          : getLocalValue(ValID2, SILType::getSILTokenType(MF->getContext()));
+    ResultInst = Builder.createGlobalAddr(Loc, g, token);
     break;
   }
   case SILInstructionKind::BaseAddrForOffsetInst:
@@ -1979,7 +1990,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
-                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
+        /*nonEscaping*/Attr);
     break;
   }
   case SILInstructionKind::BeginDeallocRefInst: {

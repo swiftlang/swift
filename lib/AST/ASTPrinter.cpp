@@ -1470,6 +1470,10 @@ static void reconstituteInverses(GenericSignature genericSig,
   for (auto tp : typeParams) {
     assert(tp);
 
+    // Any generic parameter with a superclass bound could not have an inverse.
+    if (genericSig->getSuperclassBound(tp))
+      continue;
+
     auto defaults = InverseRequirement::expandDefault(tp);
     for (auto ip : defaults) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
@@ -2723,11 +2727,13 @@ void PrintAST::printInherited(const Decl *decl) {
   Printer << ": ";
 
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
-    if (inherited.isUnchecked)
+    if (inherited.isUnchecked())
       Printer << "@unchecked ";
-    if (inherited.isRetroactive &&
+    if (inherited.isRetroactive() &&
         !llvm::is_contained(Options.ExcludeAttrList, TAK_retroactive))
       Printer << "@retroactive ";
+    if (inherited.isPreconcurrency())
+      Printer << "@preconcurrency ";
 
     printTypeLoc(inherited);
   }, [&]() {
@@ -3215,11 +3221,9 @@ static bool usesFeatureRetroactiveAttribute(Decl *decl) {
   if (!ext)
     return false;
 
-  ArrayRef<InheritedEntry> entries = ext->getInherited().getEntries();
-  return std::find_if(entries.begin(), entries.end(), 
-    [](const InheritedEntry &entry) {
-      return entry.isRetroactive;
-    }) != entries.end();
+  return llvm::any_of(
+      ext->getInherited().getEntries(),
+      [](const InheritedEntry &entry) { return entry.isRetroactive(); });
 }
 
 static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
@@ -3284,7 +3288,16 @@ static bool usesFeatureBuiltinCreateAsyncTaskInGroupWithExecutor(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinCreateAsyncDiscardingTaskInGroup(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinCreateAsyncTaskWithExecutor(Decl *decl) {
+  return false;
+}
+
+static bool
+usesFeatureBuiltinCreateAsyncDiscardingTaskInGroupWithExecutor(Decl *decl) {
   return false;
 }
 
@@ -3467,10 +3480,6 @@ static bool usesFeatureImplicitSome(Decl *decl) {
 }
 
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureCompleteConcurrency(Decl *decl) {
   return false;
 }
 
@@ -3827,6 +3836,25 @@ static bool usesFeatureInferSendableFromCaptures(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureOptionalIsolatedParameters(Decl *decl) {
+  auto *value = dyn_cast<ValueDecl>(decl);
+  if (!value)
+    return false;
+
+  auto *paramList = getParameterList(value);
+  if (!paramList)
+    return false;
+
+  for (auto param : *paramList) {
+    if (param->isIsolated()) {
+      auto paramType = param->getInterfaceType();
+      return !paramType->getOptionalObjectType().isNull();
+    }
+  }
+
+  return false;
+}
+
 static bool usesFeaturePlaygroundExtendedCallbacks(Decl *decl) {
   return false;
 }
@@ -3858,6 +3886,14 @@ static bool usesFeatureExtern(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExternAttr>();
 }
 
+static void suppressingFeatureExtern(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DAK_Extern);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
 static bool usesFeatureStaticExclusiveOnly(Decl *decl) {
   return decl->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>();
 }
@@ -3868,16 +3904,52 @@ static bool usesFeatureExtractConstantsFromMembers(Decl *decl) {
 
 static bool usesFeatureBitwiseCopyable(Decl *decl) { return false; }
 
+static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
+  if (auto *pd = dyn_cast<ParamDecl>(decl))
+    if (pd->getSpecifier() == ParamSpecifier::Transferring)
+      return true;
+
+  // TODO: Results.
+
+  return false;
+}
+
+static bool usesFeaturePreconcurrencyConformances(Decl *decl) {
+  auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
+    return llvm::any_of(
+        inherited.getEntries(),
+        [](const InheritedEntry &entry) { return entry.isPreconcurrency(); });
+  };
+
+  if (auto *T = dyn_cast<TypeDecl>(decl))
+    return usesPreconcurrencyConformance(T->getInherited());
+
+  if (auto *E = dyn_cast<ExtensionDecl>(decl)) {
+    // If type has `@preconcurrency` conformance(s) all of its
+    // extensions have to be guarded by the flag too.
+    if (auto *T = dyn_cast<TypeDecl>(E->getExtendedNominal())) {
+      if (usesPreconcurrencyConformance(T->getInherited()))
+        return true;
+    }
+
+    return usesPreconcurrencyConformance(E->getInherited());
+  }
+
+  return false;
+}
+
+static bool usesFeatureBorrowingSwitch(Decl *decl) { return false; }
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-  case Feature::FeatureName:                                          \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  case Feature::FeatureName:                                                   \
     llvm_unreachable("not a suppressible feature");
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName:                                          \
-    suppressingFeature##FeatureName(options, action);                 \
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  case Feature::FeatureName:                                                   \
+    suppressingFeature##FeatureName(options, action);                          \
     return;
 #include "swift/Basic/Features.def"
   }
@@ -3948,12 +4020,12 @@ public:
   void collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
     // Go through each of the features, checking whether the
     // declaration uses that feature.
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-    if (usesFeature##FeatureName(decl))                               \
-      collectRequiredFeature(Feature::FeatureName, operation);
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-    if (usesFeature##FeatureName(decl))                               \
-      collectSuppressibleFeature(Feature::FeatureName, operation);
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  if (usesFeature##FeatureName(decl))                                          \
+    collectRequiredFeature(Feature::FeatureName, operation);
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  if (usesFeature##FeatureName(decl))                                          \
+    collectSuppressibleFeature(Feature::FeatureName, operation);
 #include "swift/Basic/Features.def"
   }
 };
@@ -4503,6 +4575,8 @@ static void printParameterFlags(ASTPrinter &printer,
     printer.printAttrName("@autoclosure ");
   if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
+  if (flags.isTransferring())
+    printer.printAttrName("@transferring ");
 
   switch (flags.getOwnershipSpecifier()) {
   case ParamSpecifier::Default:
@@ -4523,13 +4597,16 @@ static void printParameterFlags(ASTPrinter &printer,
   case ParamSpecifier::LegacyOwned:
     printer.printKeyword("__owned", options, " ");
     break;
+  case ParamSpecifier::Transferring:
+    printer.printKeyword("transferring", options, " ");
+    break;
   }
   
   if (flags.isIsolated())
     printer.printKeyword("isolated", options, " ");
 
   if (flags.hasResultDependsOn())
-    printer.printKeyword("resultDependsOn", options, " ");
+    printer.printKeyword("_resultDependsOn", options, " ");
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
@@ -5346,6 +5423,9 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         case BuiltinMacroKind::ExternalMacro:
           Printer << "ExternalMacro";
           break;
+        case BuiltinMacroKind::IsolationMacro:
+          Printer << "IsolationMacro";
+          break;
         }
         break;
 
@@ -5613,6 +5693,12 @@ void PrintAST::visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
 }
 
 void PrintAST::visitForceValueExpr(ForceValueExpr *expr) {
+}
+
+void PrintAST::visitCurrentContextIsolationExpr(
+    CurrentContextIsolationExpr *expr) {
+  if (auto actor = expr->getActor())
+    visit(actor);
 }
 
 void PrintAST::visitKeyPathDotExpr(KeyPathDotExpr *expr) {
@@ -6244,7 +6330,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       if (param->isParameterPack())
         return false;
     } else if (auto archetype = dyn_cast<ArchetypeType>(T.getPointer())) {
-      if (archetype->isParameterPack())
+      if (isa<PackArchetypeType>(archetype))
         return false;
       if (Options.PrintForSIL && isa<LocalArchetypeType>(archetype))
         return false;
@@ -6560,7 +6646,10 @@ public:
 
     auto *typeAliasDecl = T->getDecl();
     if (typeAliasDecl->isGeneric()) {
-      printGenericArgs(T->getExpandedGenericArgs());
+      if (Options.PrintTypesForDebugging)
+        printGenericArgs(T->getDirectGenericArgs());
+      else
+        printGenericArgs(T->getExpandedGenericArgs());
     }
   }
 
@@ -6571,7 +6660,7 @@ public:
   }
 
   void visitPackType(PackType *T) {
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "Pack{";
 
     auto Fields = T->getElementTypes();
@@ -6582,7 +6671,7 @@ public:
       visit(EltType);
     }
 
-    if (Options.PrintExplicitPackTypes)
+    if (Options.PrintExplicitPackTypes || Options.PrintTypesForDebugging)
       Printer << "}";
   }
 
@@ -6607,7 +6696,8 @@ public:
 
     if (rootParameterPacks.empty() &&
         (T->getCountType()->isParameterPack() ||
-         T->getCountType()->is<PackArchetypeType>())) {
+         T->getCountType()->is<PackArchetypeType>() ||
+         Options.PrintTypesForDebugging)) {
       Printer << "/* shape: ";
       visit(T->getCountType());
       Printer << " */ ";
@@ -6682,7 +6772,10 @@ public:
     }
     printQualifiedType(T);
 
-    printGenericArgs(T->getExpandedGenericArgs());
+    if (Options.PrintTypesForDebugging)
+      printGenericArgs(T->getGenericArgs());
+    else
+      printGenericArgs(T->getExpandedGenericArgs());
   }
 
   void visitParentType(Type T) {
@@ -7749,10 +7842,20 @@ public:
       // canonical types to sugared types.
       if (Options.GenericSig)
         T = Options.GenericSig->getSugaredType(T);
+
+      decl = T->getDecl();
     }
 
     // Print opaque types as "some ..."
     if (decl && decl->isOpaqueType()) {
+      // For SIL, we print opaque parameter types as canonical types, and parse
+      // them that way too (because they're printed in this way in the SIL
+      // generic parameter list).
+      if (Options.PrintInSILBody) {
+        Printer.printName(cast<GenericTypeParamType>(T->getCanonicalType())->getName());
+        return;
+      }
+
       // If we have and should print based on the type representation, do so.
       if (auto opaqueRepr = decl->getOpaqueTypeRepr()) {
         if (willUseTypeReprPrinting(opaqueRepr, Type(), Options)) {
@@ -7971,13 +8074,27 @@ void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
 }
 void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
-  switch (getDifferentiability()) {
-  case SILParameterDifferentiability::NotDifferentiable:
+  auto options = getOptions();
+
+  if (options.contains(SILParameterInfo::NotDifferentiable)) {
+    options -= SILParameterInfo::NotDifferentiable;
     Printer << "@noDerivative ";
-    break;
-  default:
-    break;
   }
+
+  if (options.contains(SILParameterInfo::Transferring)) {
+    options -= SILParameterInfo::Transferring;
+    Printer << "@transferring ";
+  }
+
+  if (options.contains(SILParameterInfo::Isolated)) {
+    options -= SILParameterInfo::Isolated;
+    Printer << "@isolated ";
+  }
+
+  // If we did not handle a case in Options, this code was not updated
+  // appropriately.
+  assert(!bool(options) && "Code not updated for introduced option");
+
   Printer << getStringForParameterConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }
@@ -7998,14 +8115,17 @@ void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
+
 void SILResultInfo::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
-  switch (getDifferentiability()) {
-  case SILResultDifferentiability::NotDifferentiable:
+  auto options = getOptions();
+
+  if (options.contains(SILResultInfo::NotDifferentiable)) {
+    options -= SILResultInfo::NotDifferentiable;
     Printer << "@noDerivative ";
-    break;
-  default:
-    break;
   }
+
+  assert(!bool(options) && "ResultInfo has option that was not handled?!");
+
   Printer << getStringForResultConvention(getConvention());
   getInterfaceType().print(Printer, Opts);
 }
@@ -8246,7 +8366,8 @@ swift::getInheritedForPrinting(
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
                        isUnchecked,
-                       /*isRetroactive=*/false});
+                       /*isRetroactive=*/false,
+                       /*isPreconcurrency=*/false});
   }
 }
 

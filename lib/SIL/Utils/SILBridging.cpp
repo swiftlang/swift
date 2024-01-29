@@ -443,8 +443,8 @@ bool BridgedInstruction::mayLoadWeakOrUnowned() const {
   return ::mayLoadWeakOrUnowned(unbridged());
 }
 
-bool BridgedInstruction::maySynchronizeNotConsideringSideEffects() const {
-  return ::maySynchronizeNotConsideringSideEffects(unbridged());
+bool BridgedInstruction::maySynchronize() const {
+  return ::maySynchronize(unbridged());
 }
 
 bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {

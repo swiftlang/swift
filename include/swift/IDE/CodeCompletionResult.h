@@ -195,7 +195,6 @@ enum class CompletionKind : uint8_t {
   StmtOrExpr,
   PostfixExprBeginning,
   PostfixExpr,
-  PostfixExprParen,
   KeyPathExprObjC,
   KeyPathExprSwift,
   TypeDeclResultBeginning,

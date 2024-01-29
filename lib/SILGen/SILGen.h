@@ -83,6 +83,10 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
+  /// The conformance for any DistributedActor to the Actor protocol,
+  /// used only by the `distributedActorAsAnyActor` builtin.
+  RootProtocolConformance *distributedActorAsActorConformance = nullptr;
+
   size_t anonymousSymbolCounter = 0;
 
   llvm::Optional<SILDeclRef> StringToNSStringFn;
@@ -113,31 +117,6 @@ public:
   llvm::Optional<VarDecl *> NSErrorRequirement;
 
   llvm::Optional<ProtocolConformance *> NSErrorConformanceToError;
-
-  llvm::Optional<FuncDecl *> AsyncLetStart;
-  llvm::Optional<FuncDecl *> AsyncLetGet;
-  llvm::Optional<FuncDecl *> AsyncLetGetThrowing;
-  llvm::Optional<FuncDecl *> EndAsyncLet;
-
-  llvm::Optional<FuncDecl *> TaskFutureGet;
-  llvm::Optional<FuncDecl *> TaskFutureGetThrowing;
-
-  llvm::Optional<FuncDecl *> RunTaskForBridgedAsyncMethod;
-  llvm::Optional<FuncDecl *> ResumeUnsafeContinuation;
-  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuation;
-  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
-  llvm::Optional<FuncDecl *> CheckExpectedExecutor;
-
-  llvm::Optional<FuncDecl*> CreateCheckedContinuation;
-  llvm::Optional<FuncDecl*> CreateCheckedThrowingContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuationWithError;
-
-  llvm::Optional<FuncDecl *> AsyncMainDrainQueue;
-  llvm::Optional<FuncDecl *> GetMainExecutor;
-  llvm::Optional<FuncDecl *> SwiftJobRun;
-  llvm::Optional<FuncDecl *> ExitFunc;
 
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
@@ -629,6 +608,20 @@ public:
   /// Mark _ObjectiveCBridgeable conformances as used for any imported types
   /// mentioned by the given type.
   void useConformancesFromObjectiveCType(CanType type);
+
+  /// Retrieve a protocol conformance to the `Actor` protocol for a
+  /// distributed actor type that is described via a substitution map for
+  /// the generic signature `<T: DistributedActor>`.
+  ///
+  /// The protocol conformance is a special one that is currently
+  /// only used by the `distributedActorAsAnyActor` builtin.
+  ProtocolConformanceRef
+  getDistributedActorAsActorConformance(SubstitutionMap subs);
+
+  /// Make a note of a member reference expression, which allows us
+  /// to ensure that the conformance above is emitted wherever it
+  /// needs to be.
+  void noteMemberRefExpr(MemberRefExpr *e);
 
   /// Map the substitutions for the original declaration to substitutions for
   /// the overridden declaration.

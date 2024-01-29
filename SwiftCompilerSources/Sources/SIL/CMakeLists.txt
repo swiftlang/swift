@@ -17,6 +17,7 @@ add_swift_compiler_module(SIL
     Effects.swift
     ForwardingInstruction.swift
     Function.swift
+    FunctionConvention.swift
     GlobalVariable.swift
     Instruction.swift
     Location.swift

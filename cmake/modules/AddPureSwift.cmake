@@ -1,11 +1,8 @@
 include(macCatalystUtils)
 
 # Workaround a cmake bug, see the corresponding function in swift-syntax
-function(force_target_link_libraries TARGET)
-  target_link_libraries(${TARGET} ${ARGN})
-
-  cmake_parse_arguments(ARGS "PUBLIC;PRIVATE;INTERFACE" "" "" ${ARGN})
-  foreach(DEPENDENCY ${ARGS_UNPARSED_ARGUMENTS})
+function(force_add_dependencies TARGET)
+  foreach(DEPENDENCY ${ARGN})
     string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
       COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
@@ -15,6 +12,13 @@ function(force_target_link_libraries TARGET)
       ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
     )
   endforeach()
+endfunction()
+
+function(force_target_link_libraries TARGET)
+  target_link_libraries(${TARGET} ${ARGN})
+
+  cmake_parse_arguments(ARGS "PUBLIC;PRIVATE;INTERFACE" "" "" ${ARGN})
+  force_add_dependencies(${TARGET} ${ARGS_UNPARSED_ARGUMENTS})
 endfunction()
 
 # Add compile options shared between libraries and executables.
@@ -175,6 +179,9 @@ function(add_pure_swift_host_library name)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
   endif()
 
+  # Depends on all '*.h' files in 'include/module.modulemap'.
+  force_add_dependencies(${name} importedHeaderDependencies)
+
   # Workaround to touch the library and its objects so that we don't
   # continually rebuild (again, see corresponding change in swift-syntax).
   add_custom_command(
@@ -207,6 +214,7 @@ function(add_pure_swift_host_library name)
     set(module_base "${module_dir}/${name}.swiftmodule")
     set(module_file "${module_base}/${module_triple}.swiftmodule")
     set(module_interface_file "${module_base}/${module_triple}.swiftinterface")
+    set(module_private_interface_file "${module_base}/${module_triple}.private.swiftinterface")
     set(module_sourceinfo_file "${module_base}/${module_triple}.swiftsourceinfo")
 
     set_target_properties(${name} PROPERTIES
@@ -231,7 +239,8 @@ function(add_pure_swift_host_library name)
         -enable-library-evolution;
         -emit-module-path;${module_file};
         -emit-module-source-info-path;${module_sourceinfo_file};
-        -emit-module-interface-path;${module_interface_file}
+        -emit-module-interface-path;${module_interface_file};
+        -emit-private-module-interface-path;${module_private_interface_file}
         >)
   else()
     # Emit a swiftmodule in the current directory.
@@ -331,6 +340,9 @@ function(add_pure_swift_host_tool name)
   if (LLVM_COMMON_DEPENDS)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
   endif()
+
+  # Depends on all '*.h' files in 'include/module.modulemap'.
+  force_add_dependencies(${name} importedHeaderDependencies)
 
   # Link against dependencies.
   target_link_libraries(${name} PUBLIC

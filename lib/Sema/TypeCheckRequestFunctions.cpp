@@ -414,6 +414,31 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
   return type->mapTypeOutOfContext();
 }
 
+ArrayRef<ProtocolConformanceRef>
+CollectExistentialConformancesRequest::evaluate(Evaluator &evaluator,
+                                      ModuleDecl *module,
+                                      CanType fromType,
+                                      CanType existential,
+                                      bool skipConditionalRequirements,
+                                      bool allowMissing) const {
+  assert(existential.isAnyExistentialType());
+
+  auto layout = existential.getExistentialLayout();
+  auto protocols = layout.getProtocols();
+
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (auto *proto : protocols) {
+    auto conformance =
+        TypeChecker::containsProtocol(
+            fromType, proto, module,
+            skipConditionalRequirements, allowMissing);
+    assert(conformance);
+    conformances.push_back(conformance);
+  }
+
+  return module->getASTContext().AllocateCopy(conformances);
+}
+
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

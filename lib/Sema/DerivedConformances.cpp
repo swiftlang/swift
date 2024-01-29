@@ -184,8 +184,8 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC->getParentModule())) {
+    if (!DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
+                                                 protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -462,8 +462,6 @@ CallExpr *
 DerivedConformance::createBuiltinCall(ASTContext &ctx,
                                       BuiltinValueKind builtin,
                                       ArrayRef<Type> typeArgs,
-                                      ArrayRef<ProtocolConformanceRef>
-                                        conformances,
                                       ArrayRef<Expr *> args) {
   auto name = ctx.getIdentifier(getBuiltinName(builtin));
   auto decl = getBuiltinValueDecl(ctx, name);
@@ -472,8 +470,21 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   ConcreteDeclRef declRef = decl;
   auto fnType = decl->getInterfaceType();
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
+    auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
-    auto subs = SubstitutionMap::get(generics, typeArgs, conformances);
+
+    auto genericParams = generics.getGenericParams();
+    assert(genericParams.size() == typeArgs.size());
+
+    TypeSubstitutionMap map;
+    for (auto i : indices(genericParams))
+      map.insert({genericParams[i]->getCanonicalType()
+                                  ->getAs<SubstitutableType>(),
+                  typeArgs[i]});
+
+    auto subs = SubstitutionMap::get(generics,
+                                     QueryTypeSubstitutionMap{map},
+                                     LookUpConformanceInModule{builtinModule});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
   } else {
@@ -495,7 +506,8 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
 
 CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
     ASTContext &ctx) {
-  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReached();
+  FuncDecl *diagnoseDecl = ctx.getDiagnoseUnavailableCodeReachedDecl();
+  assert(diagnoseDecl);
   auto diagnoseDeclRefExpr =
       new (ctx) DeclRefExpr(diagnoseDecl, DeclNameLoc(), true);
   diagnoseDeclRefExpr->setType(diagnoseDecl->getInterfaceType());
@@ -654,8 +666,8 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
                                         Expr *guardReturnValue) {
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
-  
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), guardReturnValue);
+
+  auto *returnStmt = ReturnStmt::createImplicit(C, guardReturnValue);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
@@ -699,7 +711,7 @@ GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
 
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
+  auto *returnStmt = ReturnStmt::createImplicit(C, nilExpr);
   statements.push_back(returnStmt);
 
   // Next, generate the condition being checked.
@@ -838,9 +850,8 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC->getParentModule())
-              .isInvalid()) {
+      if (DC->getParentModule()->checkConformance(DC->mapTypeIntoContext(type),
+                                                  protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -937,6 +948,12 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
     return nullptr;
 
   if (!availableAttr->isUnconditionallyUnavailable())
+    return nullptr;
+
+  // If the stdlib isn't new enough to contain the helper function for
+  // diagnosing execution of unavailable code then just synthesize this case
+  // normally.
+  if (!C.getDiagnoseUnavailableCodeReachedDecl())
     return nullptr;
 
   auto createElementPattern = [&]() -> EnumElementPattern * {

@@ -540,9 +540,13 @@ public:
       assert(componentInit);
       assert(componentInit->canPerformPackExpansionInitialization());
 
-      auto opening = SGF.createOpenedElementValueEnvironment(packComponentTy);
-      auto openedEnv = opening.first;
-      auto eltTy = opening.second;
+      SILType eltTy;
+      CanType substEltType;
+      auto openedEnv =
+        SGF.createOpenedElementValueEnvironment({packComponentTy},
+                                                {&eltTy},
+                                                {substExpansionType},
+                                                {&substEltType});
 
       SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
                               openedEnv, [&](SILValue indexWithinComponent,
@@ -555,12 +559,6 @@ public:
           auto eltAddr =
             SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
           auto eltAddrMV = cloner.clone(eltAddr);
-
-          CanType substEltType = substExpansionType.getPatternType();
-          if (openedEnv) {
-            substEltType =
-              openedEnv->mapContextualPackTypeIntoElementContext(substEltType);
-          }
 
           auto result = handleScalar(eltAddrMV, origPatternType, substEltType,
                                      eltInit, /*inout*/ false);
@@ -705,7 +703,7 @@ private:
     // - @_eagerMove
     // - @_noEagerMove
     bool isNoImplicitCopy = pd->isNoImplicitCopy();
-    if (!argrv.getType().getASTType()->isNoncopyable()) {
+    if (!argrv.getType().isMoveOnly(/*orWrapped=*/false)) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
       if (pd->isSelfParameter()) {
@@ -862,6 +860,7 @@ private:
           argrv = ManagedValue::forBorrowedAddressRValue(
               SGF.B.createCopyableToMoveOnlyWrapperAddr(pd, argrv.getValue()));
           break;
+        case swift::ParamSpecifier::Transferring:
         case swift::ParamSpecifier::Consuming:
         case swift::ParamSpecifier::Default:
         case swift::ParamSpecifier::InOut:
@@ -1168,7 +1167,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // in SIL since it is illegal to capture an inout value in an escaping
     // closure. The later code knows how to handle that we have the
     // mark_unresolved_non_copyable_value here.
-    if (isInOut && ty.getASTType()->isNoncopyable()) {
+    if (isInOut && ty.isMoveOnly(/*orWrapped=*/false)) {
       arg = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           Loc, arg,
           MarkUnresolvedNonCopyableValueInst::CheckKind::
@@ -1275,7 +1274,6 @@ void SILGenFunction::emitProlog(
           return true;
 
         case ActorIsolation::GlobalActor:
-        case ActorIsolation::GlobalActorUnsafe:
           // Global-actor-isolated types should likely have deinits that
           // are not themselves actor-isolated, yet still have access to
           // the instance properties of the class.
@@ -1374,7 +1372,6 @@ void SILGenFunction::emitProlog(
     }
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       if (F.isAsync() || wantDataRaceChecks) {
         ExpectedExecutor =
           emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());
@@ -1398,7 +1395,6 @@ void SILGenFunction::emitProlog(
     }
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
       if (wantExecutor) {
         ExpectedExecutor =
           emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());
@@ -1509,15 +1505,6 @@ SILValue SILGenFunction::emitLoadActorExecutor(SILLocation loc,
   else
     actorV = actor.borrow(*this, loc).getValue();
 
-  // Open an existential actor type.
-  CanType actorType = actor.getType().getASTType();
-  if (actorType->isExistentialType()) {
-    actorType = OpenedArchetypeType::get(
-        actorType, F.getGenericSignature())->getCanonicalType();
-    SILType loweredActorType = getLoweredType(actorType);
-    actorV = B.createOpenExistentialRef(loc, actorV, loweredActorType);
-  }
-
   // For now, we just want to emit a hop_to_executor directly to the
   // actor; LowerHopToActor will add the emission logic necessary later.
   return actorV;
@@ -1563,7 +1550,6 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   }
 
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
     return emitLoadGlobalActorExecutor(isolation.getGlobalActor());
   }
   llvm_unreachable("covered switch");

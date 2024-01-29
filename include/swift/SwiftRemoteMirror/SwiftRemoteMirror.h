@@ -188,7 +188,9 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
 ///
 /// The returned string is heap allocated and the caller must free() it when
 /// done.
-[[deprecated("Please use swift_reflection_copyNameForTypeRef()")]]
+SWIFT_REMOTE_MIRROR_DEPRECATED(
+    "Please use swift_reflection_copyNameForTypeRef()",
+    "swift_reflection_copyNameForTypeRef")
 SWIFT_REMOTE_MIRROR_LINKAGE
 char *
 swift_reflection_copyDemangledNameForTypeRef(

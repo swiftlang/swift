@@ -594,7 +594,10 @@ struct TaskGroupStatus {
     write(STDERR_FILENO, message, strlen(message));
 #endif
 #if defined(SWIFT_STDLIB_HAS_ASL)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#pragma clang diagnostic pop
 #elif defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
@@ -1381,7 +1384,12 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
       return unlock();
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
+    // This _should_ be statically unreachable, but we leave it in as a
+    // safeguard in case the control flow above changes.
     swift_unreachable("expected to early return from when handling offer of last task in group");
+#pragma clang diagnostic pop
   }
 
   assert(!hadErrorResult && "only successfully completed tasks can reach here");
@@ -1779,14 +1787,14 @@ reevaluate_if_taskgroup_has_results:;
   // ==== 3) Add to wait queue -------------------------------------------------
   assert(assumed.readyTasks(this) == 0);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
+  if (!hasSuspended) {
+    waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
+    hasSuspended = true;
+  }
   while (true) {
-    if (!hasSuspended) {
-      hasSuspended = true;
-      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
-    }
     // Put the waiting task at the beginning of the wait queue.
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "WATCH OUT, SET WAITER ONTO waitQueue.head = %p", waitQueue.load(std::memory_order_relaxed));
-    if (waitQueue.compare_exchange_strong(
+    if (waitQueue.compare_exchange_weak(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
@@ -1941,13 +1949,13 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
 
   auto waitHead = waitQueue.load(std::memory_order_acquire);
   _swift_tsan_release(static_cast<Job *>(waitingTask));
+  if (!hasSuspended) {
+    waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
+    hasSuspended = true;
+  }
   while (true) {
-    if (!hasSuspended) {
-      hasSuspended = true;
-      waitingTask->flagAsSuspendedOnTaskGroup(asAbstract(this));
-    }
     // Put the waiting task at the beginning of the wait queue.
-    if (waitQueue.compare_exchange_strong(
+    if (waitQueue.compare_exchange_weak(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {

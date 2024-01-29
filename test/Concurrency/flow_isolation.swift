@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: asserts
+// REQUIRES: rdar120849093
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
@@ -139,6 +140,7 @@ actor ExampleFromProposal {
   let immutableSendable = SendableType()
   var mutableSendable = SendableType()
   let nonSendable = NonSendableType()
+  nonisolated(unsafe) let unsafeNonSendable = NonSendableType()
   var nsItems: [NonSendableType] = []
   var sItems: [SendableType] = []
 
@@ -146,12 +148,14 @@ actor ExampleFromProposal {
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // ok
     _ = self.nonSendable        // ok
+    _ = self.unsafeNonSendable
 
     f() // expected-note 2 {{after calling instance method 'f()', only non-isolated properties of 'self' can be accessed from this init}}
 
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // expected-warning {{cannot access property 'mutableSendable' here in non-isolated initializer; this is an error in Swift 6}}
     _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' here in non-isolated initializer; this is an error in Swift 6}}
+    _ = self.unsafeNonSendable // ok
   }
 
 
@@ -518,7 +522,9 @@ struct CardboardBox<T> {
 
 
 @available(SwiftStdlib 5.1, *)
-var globalVar: EscapeArtist? // expected-note 2 {{var declared here}}
+var globalVar: EscapeArtist? // expected-warning {{var 'globalVar' is not concurrency-safe because it is non-isolated global shared mutable state; this is an error in Swift 6}}
+// expected-note@-1 {{isolate 'globalVar' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
+// expected-note@-2 2 {{var declared here}}
 
 @available(SwiftStdlib 5.1, *)
 actor EscapeArtist {

@@ -102,7 +102,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto *argList = ArgumentList::forImplicitCallTo(functionRef->getName(),
                                                     {selfRef, typeExpr}, C);
     auto call = CallExpr::createImplicit(C, functionRef, argList);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
+    auto *returnStmt = ReturnStmt::createImplicit(C, call);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
     return { body, /*isTypeChecked=*/false };
@@ -121,7 +121,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto labelItem = CaseLabelItem(pat);
 
     auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
+    auto *returnStmt = ReturnStmt::createImplicit(C, returnExpr);
 
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
@@ -517,7 +517,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   if (requirement->getBaseName() == Context.Id_rawValue)
     return deriveRawRepresentable_raw(*this);
 
-  if (requirement->getBaseName() == DeclBaseName::createConstructor())
+  if (requirement->getBaseName().isConstructor())
     return deriveRawRepresentable_init(*this);
 
   Context.Diags.diagnose(requirement->getLoc(),

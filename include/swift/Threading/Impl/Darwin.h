@@ -108,9 +108,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 using lazy_mutex_handle = ::os_unfair_lock;
 
 // We don't need to be lazy here because Darwin has OS_UNFAIR_LOCK_INIT.
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return OS_UNFAIR_LOCK_INIT;
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER OS_UNFAIR_LOCK_INIT
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {

@@ -180,6 +180,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
     switch (SLI->getEncoding()) {
       case StringLiteralInst::Encoding::Bytes: ArgOpBuffer << 'B'; break;
       case StringLiteralInst::Encoding::UTF8: ArgOpBuffer << 'b'; break;
+      case StringLiteralInst::Encoding::UTF8_OSLOG: ArgOpBuffer << 'o'; break;
       case StringLiteralInst::Encoding::ObjCSelector: ArgOpBuffer << 'c'; break;
     }
     break;

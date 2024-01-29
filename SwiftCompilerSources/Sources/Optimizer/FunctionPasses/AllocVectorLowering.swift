@@ -246,7 +246,7 @@ private func createOutlinedGlobal(
   }
 
   let builder = Builder(before: allocVectorBuiltin, context)
-  let globalAddr = builder.createGlobalAddr(global: outlinedGlobal)
+  let globalAddr = builder.createGlobalAddr(global: outlinedGlobal, dependencyToken: nil)
   let rawVectorPointer = builder.createAddressToPointer(address: globalAddr, pointerType: allocVectorBuiltin.type,
                                                         needStackProtection: false)
   allocVectorBuiltin.uses.replaceAll(with: rawVectorPointer, context)
@@ -439,19 +439,5 @@ private extension StoreInst {
       return true
     }
     return false
-  }
-}
-
-private extension Function {
-  var initializedGlobal: GlobalVariable? {
-    if !isGlobalInitOnceFunction {
-      return nil
-    }
-    for inst in entryBlock.instructions {
-      if let allocGlobal = inst as? AllocGlobalInst {
-        return allocGlobal.global
-      }
-    }
-    return nil
   }
 }

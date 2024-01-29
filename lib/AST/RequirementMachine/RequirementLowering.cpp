@@ -820,6 +820,11 @@ void swift::rewriting::applyInverses(
     inverses[canSubject] = state;
   }
 
+  // Fast-path: if there are no valid inverses, then there are no requirements
+  // to be removed.
+  if (inverses.empty())
+    return;
+
   // Scan the structural requirements and cancel out any inferred requirements
   // based on the inverses we saw.
   result.erase(llvm::remove_if(result, [&](StructuralRequirement structReq) {

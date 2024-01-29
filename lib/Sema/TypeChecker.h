@@ -211,8 +211,6 @@ struct ParentConditionalConformance {
 
 class CheckGenericArgumentsResult {
 public:
-  enum Kind { Success, RequirementFailure, SubstitutionFailure };
-
   struct RequirementFailureInfo {
     /// The failed requirement.
     Requirement Req;
@@ -227,36 +225,40 @@ public:
   };
 
 private:
-  Kind Knd;
+  CheckRequirementsResult Kind;
   llvm::Optional<RequirementFailureInfo> ReqFailureInfo;
 
   CheckGenericArgumentsResult(
-      Kind Knd, llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
-      : Knd(Knd), ReqFailureInfo(ReqFailureInfo) {}
+      CheckRequirementsResult Kind,
+      llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
+      : Kind(Kind), ReqFailureInfo(ReqFailureInfo) {}
 
 public:
   static CheckGenericArgumentsResult createSuccess() {
-    return CheckGenericArgumentsResult(Success, llvm::None);
+    return CheckGenericArgumentsResult(CheckRequirementsResult::Success,
+                                       llvm::None);
   }
 
   static CheckGenericArgumentsResult createSubstitutionFailure() {
-    return CheckGenericArgumentsResult(SubstitutionFailure, llvm::None);
+    return CheckGenericArgumentsResult(CheckRequirementsResult::SubstitutionFailure,
+                                       llvm::None);
   }
 
   static CheckGenericArgumentsResult createRequirementFailure(
       Requirement Req, Requirement SubstReq,
       SmallVector<ParentConditionalConformance, 2> ReqPath) {
     return CheckGenericArgumentsResult(
-        RequirementFailure, RequirementFailureInfo{Req, SubstReq, ReqPath});
+        CheckRequirementsResult::RequirementFailure,
+        RequirementFailureInfo{Req, SubstReq, ReqPath});
   }
 
   const RequirementFailureInfo &getRequirementFailureInfo() const {
-    assert(Knd == RequirementFailure);
+    assert(Kind == CheckRequirementsResult::RequirementFailure);
 
     return ReqFailureInfo.value();
   }
 
-  operator Kind() const { return Knd; }
+  CheckRequirementsResult getKind() const { return Kind; }
 };
 
 /// Describes the kind of checked cast operation being performed.
@@ -520,19 +522,6 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
                                     ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
 
-/// Check the given generic parameter substitutions against the given
-/// requirements. Unlike \c checkGenericArgumentsForDiagnostics, this version
-/// reports just the result of the check and doesn't provide additional
-/// information on requirement failures that is warranted for diagnostics.
-CheckGenericArgumentsResult::Kind
-checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
-                      TypeSubstitutionFn substitutions,
-                      SubstOptions options = llvm::None);
-
-/// Check the given requirements without applying substitutions.
-CheckGenericArgumentsResult::Kind
-checkGenericArguments(ArrayRef<Requirement> requirements);
-
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
 /// that are needed to spell it as a member of the given parent type
@@ -759,7 +748,8 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 /// Type-check a for-each loop's pattern binding and sequence together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
+bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt,
+                             GenericEnvironment *packElementEnv);
 
 /// Compute the set of captures for the given function or closure.
 void computeCaptures(AnyFunctionRef AFR);
@@ -810,17 +800,6 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
                                         bool skipConditionalRequirements=false,
                                         bool allowMissing=false);
 
-/// Determine whether the given type conforms to the given protocol.
-///
-/// Unlike subTypeOfProtocol(), this will return false for existentials of
-/// non-self conforming protocols.
-///
-/// \returns The protocol conformance, if \c T conforms to the
-/// protocol \c Proto, or \c None.
-ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          ModuleDecl *M,
-                                          bool allowMissing = true);
-
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
                              ModuleDecl *module, bool allowMissing = true);
@@ -855,13 +834,6 @@ ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
 ValueDecl *deriveProtocolRequirement(DeclContext *DC,
                                      NominalTypeDecl *TypeDecl,
                                      ValueDecl *Requirement);
-
-/// Derive an implicit type witness for the given associated type in
-/// the conformance of the given nominal type to some known
-/// protocol.
-std::pair<Type, TypeDecl *>
-deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
-                  AssociatedTypeDecl *assocType);
 
 /// \name Name lookup
 ///
@@ -1421,6 +1393,10 @@ bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 /// protocol. If \p type is not null, check specifically whether \p decl
 /// could fulfill a protocol requirement for it.
 bool isMemberOperator(FuncDecl *decl, Type type);
+
+/// Given an interface type and possibly a generic environment,
+/// is the type ever noncopyable?
+bool isInterfaceTypeNoncopyable(Type interfaceTy, GenericEnvironment *env);
 
 /// Returns `true` iff `AdditiveArithmetic` derived conformances are enabled.
 bool isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF);

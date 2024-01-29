@@ -1239,7 +1239,9 @@ Pattern *TypeChecker::coercePatternToType(
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
       if (MTT->getInstanceType()->isAnyObject())
         shouldRequireType = true;
-    } else if (diagTy->isStructurallyUninhabited()) {
+    } else if (diagTy->isStructurallyUninhabited() &&
+               !(options.contains(TypeResolutionFlags::SilenceNeverWarnings) &&
+                 type->isNever())) {
       shouldRequireType = true;
       diag = isOptional ? diag::type_inferred_to_undesirable_type
                         : diag::type_inferred_to_uninhabited_type;
@@ -1428,11 +1430,15 @@ Pattern *TypeChecker::coercePatternToType(
       if (type->hasError()) {
         return nullptr;
       }
-      diags
-          .diagnose(IP->getLoc(), diag::downcast_to_unrelated, type,
-                    IP->getCastType())
-          .highlight(IP->getLoc())
-          .highlight(IP->getCastTypeRepr()->getSourceRange());
+
+      if (!(options.contains(TypeResolutionFlags::SilenceNeverWarnings) &&
+            type->isNever())) {
+        diags
+            .diagnose(IP->getLoc(), diag::downcast_to_unrelated, type,
+                      IP->getCastType())
+            .highlight(IP->getLoc())
+            .highlight(IP->getCastTypeRepr()->getSourceRange());
+      }
 
       IP->setCastKind(CheckedCastKind::ValueCast);
       break;

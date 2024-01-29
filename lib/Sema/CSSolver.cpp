@@ -247,6 +247,9 @@ Solution ConstraintSystem::finalize() {
   for (const auto &packEnv : PackEnvironments)
     solution.PackEnvironments.insert(packEnv);
 
+  for (const auto &packEltGenericEnv : PackElementGenericEnvironments)
+    solution.PackElementGenericEnvironments.push_back(packEltGenericEnv);
+
   return solution;
 }
 
@@ -314,6 +317,12 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the solutions's pack environments.
   for (auto &packEnvironment : solution.PackEnvironments) {
     PackEnvironments.insert(packEnvironment);
+  }
+
+  // Register the solutions's pack element generic environments.
+  for (auto &packElementGenericEnvironment :
+       solution.PackElementGenericEnvironments) {
+    PackElementGenericEnvironments.push_back(packElementGenericEnvironment);
   }
 
   // Register the defaulted type variables.
@@ -647,6 +656,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedPackExpansionTypes = cs.OpenedPackExpansionTypes.size();
   numPackExpansionEnvironments = cs.PackExpansionEnvironments.size();
   numPackEnvironments = cs.PackEnvironments.size();
+  numPackElementGenericEnvironments = cs.PackElementGenericEnvironments.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
   numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
@@ -735,6 +745,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any pack environments.
   truncate(cs.PackEnvironments, numPackEnvironments);
+
+  // Remove any pack element generic environments.
+  truncate(cs.PackElementGenericEnvironments,
+           numPackElementGenericEnvironments);
 
   // Remove any defaulted type variables.
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
@@ -2168,17 +2182,24 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
   SmallVector<unsigned, 4> simdOverloads;
   SmallVector<unsigned, 4> otherGenericOverloads;
 
-  auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, KnownProtocolKind kind) -> bool {
-    if (!nominal)
-      return false;
+  auto &ctx = CS.getASTContext();
 
-    auto *protocol =
-        TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
+  auto *additiveArithmeticProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+  auto *sequenceProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  auto *simdProto = ctx.getProtocol(KnownProtocolKind::SIMD);
+
+  auto conformsTo = [&](Type type, ProtocolDecl *protocol) -> bool {
+    return protocol && bool(CS.lookupConformance(type, protocol));
+  };
+
+  auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, ProtocolDecl *protocol) -> bool {
+    if (!nominal || !protocol)
+      return false;
 
     if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
       return refined->inheritsFrom(protocol);
 
-    return bool(CS.lookupConformance(nominal->getDeclaredType(), protocol));
+    return conformsTo(nominal->getDeclaredInterfaceType(), protocol);
   };
 
   // Gather Numeric and Sequence overloads into separate buckets.
@@ -2191,9 +2212,9 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
       simdOverloads.push_back(index);
     } else if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
       concreteOverloads.push_back(index);
-    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::AdditiveArithmetic)) {
+    } else if (refinesOrConformsTo(nominal, additiveArithmeticProto)) {
       numericOverloads.push_back(index);
-    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::Sequence)) {
+    } else if (refinesOrConformsTo(nominal, sequenceProto)) {
       sequenceOverloads.push_back(index);
     } else {
       otherGenericOverloads.push_back(index);
@@ -2229,27 +2250,21 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
     if (argType->isTypeVariableOrMember())
       continue;
 
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::AdditiveArithmetic,
-            CS.DC->getParentModule())) {
+    if (conformsTo(argType, additiveArithmeticProto)) {
       first =
           std::copy(numericOverloads.begin(), numericOverloads.end(), first);
       numericOverloads.clear();
       break;
     }
 
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::Sequence,
-            CS.DC->getParentModule())) {
+    if (conformsTo(argType, sequenceProto)) {
       first =
           std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
       sequenceOverloads.clear();
       break;
     }
 
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::SIMD,
-            CS.DC->getParentModule())) {
+    if (conformsTo(argType, simdProto)) {
       first = std::copy(simdOverloads.begin(), simdOverloads.end(), first);
       simdOverloads.clear();
       break;

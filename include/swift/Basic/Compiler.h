@@ -98,6 +98,12 @@
 #define SWIFT_ATTRIBUTE_NORETURN
 #endif
 
+#if __has_attribute(unused)
+#define SWIFT_ATTRIBUTE_UNUSED __attribute__((__unused__))
+#else
+#define SWIFT_ATTRIBUTE_UNUSED
+#endif
+
 #ifndef SWIFT_BUG_REPORT_URL
 #define SWIFT_BUG_REPORT_URL "https://swift.org/contributing/#reporting-bugs"
 #endif

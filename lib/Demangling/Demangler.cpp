@@ -451,6 +451,24 @@ void Node::removeChildAt(unsigned Pos) {
   }
 }
 
+void Node::replaceChild(unsigned Pos, NodePointer Child) {
+  switch (NodePayloadKind) {
+    case PayloadKind::OneChild:
+      assert(Pos == 0);
+      InlineChildren[0] = Child;
+      break;
+    case PayloadKind::TwoChildren:
+      assert(Pos < 2);
+      InlineChildren[Pos] = Child;
+      break;
+    case PayloadKind::ManyChildren:
+      Children.Nodes[Pos] = Child;
+      break;
+    default:
+      assert(false && "cannot remove child");
+  }
+}
+
 void Node::reverseChildren(size_t StartingAt) {
   assert(StartingAt <= getNumChildren());
   switch (NodePayloadKind) {
@@ -3472,6 +3490,33 @@ NodePointer Demangler::demangleWitness() {
         return createWithChild(Node::Kind::OutlinedDestroy,
                                popNode(Node::Kind::Type));
       }
+      case 'g': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedEnumGetTag,
+                                    popNode(Node::Kind::Type), sig);
+        return createWithChild(Node::Kind::OutlinedEnumGetTag,
+                               popNode(Node::Kind::Type));
+      }
+
+      case 'i': {
+        auto enumCaseIdx = demangleIndexAsNode();
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedEnumTagStore,
+                                    popNode(Node::Kind::Type), sig,
+                                    enumCaseIdx);
+        return createWithChildren(Node::Kind::OutlinedEnumTagStore,
+                                  popNode(Node::Kind::Type), enumCaseIdx);
+      }
+      case 'j': {
+        auto enumCaseIdx = demangleIndexAsNode();
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(Node::Kind::OutlinedEnumProjectDataForLoad,
+                                    popNode(Node::Kind::Type), sig,
+                                    enumCaseIdx);
+        return createWithChildren(Node::Kind::OutlinedEnumProjectDataForLoad,
+                                  popNode(Node::Kind::Type), enumCaseIdx);
+      }
+
       default:
         return nullptr;
       }

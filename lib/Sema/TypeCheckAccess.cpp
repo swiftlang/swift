@@ -2440,24 +2440,30 @@ void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
         import.accessLevel <= AccessLevel::Internal)
       continue;
 
-    AccessLevel levelUsed = SF.getMaxAccessLevelUsingImport(import);
-    if (import.accessLevel > levelUsed) {
-      auto diagId = import.accessLevel == AccessLevel::Public ?
-                                                  diag::remove_public_import :
-                                                  diag::remove_package_import;
+    // Ignore submodules as we associate decls with the top module.
+    // The top module will be reported if it's not used.
+    auto importedModule = import.module.importedModule;
+    if (importedModule->getTopLevelModule() != importedModule)
+      continue;
 
-      auto inFlight = ctx.Diags.diagnose(import.importLoc,
-                                         diagId,
-                                         import.module.importedModule);
+    AccessLevel levelUsed = SF.getMaxAccessLevelUsingImport(importedModule);
+    if (import.accessLevel <= levelUsed)
+      continue;
 
-      if (levelUsed == AccessLevel::Package) {
-        inFlight.fixItReplace(import.accessLevelRange, "package");
-      } else if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
-        // Let it default to internal.
-        inFlight.fixItRemove(import.accessLevelRange);
-      } else {
-        inFlight.fixItReplace(import.accessLevelRange, "internal");
-      }
+    auto diagId = import.accessLevel == AccessLevel::Public ?
+                                          diag::remove_public_import :
+                                          diag::remove_package_import;
+    auto inFlight = ctx.Diags.diagnose(import.importLoc,
+                                       diagId,
+                                       importedModule);
+
+    if (levelUsed == AccessLevel::Package) {
+      inFlight.fixItReplace(import.accessLevelRange, "package");
+    } else if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
+      // Let it default to internal.
+      inFlight.fixItRemove(import.accessLevelRange);
+    } else {
+      inFlight.fixItReplace(import.accessLevelRange, "internal");
     }
   }
 }

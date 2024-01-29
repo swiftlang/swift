@@ -196,7 +196,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
       }
       guard let ptr = _kvcKeyPathStringPtr else { return nil }
 
-      return String(validatingUTF8: ptr)
+      return String(validatingCString: ptr)
     }
   }
   

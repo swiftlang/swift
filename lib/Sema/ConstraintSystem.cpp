@@ -82,7 +82,7 @@ ExpressionTimer::~ExpressionTimer() {
 
   if (PrintDebugTiming) {
     // Round up to the nearest 100th of a millisecond.
-    llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
+    llvm::errs() << llvm::format("%0.2f", std::ceil(elapsed * 100000) / 100)
                  << "ms\t";
     if (auto *E = Anchor.dyn_cast<Expr *>()) {
       E->getLoc().print(llvm::errs(), Context.SourceMgr);
@@ -374,7 +374,7 @@ void ConstraintSystem::recordPotentialThrowSite(
   ASTContext &ctx = getASTContext();
 
   // Only record potential throw sites when typed throws is enabled.
-  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
+  if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
     return;
 
   // Catch node location is determined by the source location.
@@ -431,6 +431,9 @@ Type ConstraintSystem::getCaughtErrorType(CatchNode catchNode) {
   if (auto closure = catchNode.dyn_cast<ClosureExpr *>()) {
     return getClosureType(closure)->getEffectiveThrownErrorTypeOrNever();
   }
+
+  if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
+    return ctx.getErrorExistentialType();
 
   // Handle inference of caught error types.
 
@@ -789,9 +792,11 @@ ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
       shapeClass->mapTypeOutOfContext()->getCanonicalType());
 
   auto &ctx = getASTContext();
+  auto *contextEnv = PackElementGenericEnvironments.empty()
+                         ? DC->getGenericEnvironmentOfContext()
+                         : PackElementGenericEnvironments.back();
   auto elementSig = ctx.getOpenedElementSignature(
-      DC->getGenericSignatureOfContext().getCanonicalSignature(), shapeParam);
-  auto *contextEnv = DC->getGenericEnvironmentOfContext();
+      contextEnv->getGenericSignature().getCanonicalSignature(), shapeParam);
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
   return GenericEnvironment::forOpenedElement(elementSig, uuidAndShape.first,
                                               shapeParam, contextSubs);
@@ -966,25 +971,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
     result = DC->mapTypeIntoContext(result);
   }
 
-  return result.transform([&](Type type) -> Type {
-    // Although generic parameters are declared with just `each`
-    // their interface types introduce a pack expansion which
-    // means that the solver has to extact generic argument type
-    // variable from Pack{repeat ...} and drop that structure to
-    // make sure that generic argument gets inferred to a pack type.
-    if (auto *packTy = type->getAs<PackType>()) {
-      assert(packTy->getNumElements() == 1);
-      auto *expansion = packTy->getElementType(0)->castTo<PackExpansionType>();
-      auto *typeVar = expansion->getPatternType()->castTo<TypeVariableType>();
-      assert(typeVar->getImpl().getGenericParameter() &&
-             typeVar->getImpl().canBindToPack());
-      return typeVar;
-    }
-
-    if (auto *expansion = dyn_cast<PackExpansionType>(type.getPointer()))
-      return openPackExpansionType(expansion, replacements, locator);
-    return type;
-  });
+  return result;
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -1130,18 +1117,6 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements,
                     locator)},
                 tuple->getASTContext());
           }
-        }
-      }
-
-      // While opening variadic generic types that appear in other types
-      // we need to extract generic parameter from Pack{repeat ...} structure
-      // that gets introduced by the interface type, see
-      // \c openUnboundGenericType for more details.
-      if (auto *packTy = type->getAs<PackType>()) {
-        if (auto expansionTy = packTy->unwrapSingletonPackExpansion()) {
-          auto patternTy = expansionTy->getPatternType();
-          if (patternTy->isTypeParameter())
-            return openType(patternTy, replacements, locator);
         }
       }
 
@@ -1823,8 +1798,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
       // All global functions should be @Sendable
-      if (!funcDecl->getDeclContext()->isTypeContext() &&
-          !funcDecl->getDeclContext()->isLocalContext()) {
+      if (funcDecl->getDeclContext()->isModuleScopeContext()) {
         funcType =
             funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
       }
@@ -1849,7 +1823,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (isForCodeCompletion() && openedType->hasError()) {
       // In code completion, replace error types by placeholder types so we can
       // match the types we know instead of bailing out completely.
-      openedType = replaceParamErrorTypeByPlaceholder(openedType, value, /*hasAppliedSelf=*/true);
+      openedType = replaceParamErrorTypeByPlaceholder(
+          openedType, value, /*hasAppliedSelf=*/true);
     }
 
     // If we opened up any type variables, record the replacements.
@@ -2064,8 +2039,7 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   // been loaded because you've passed `-parse-stdlib` and are not building the
   // stdlib itself (which would have `-module-name Swift` too).
   if (!outerDC->getParentModule()->isBuiltinModule()) {
-    if (auto *copyable = TypeChecker::getProtocol(getASTContext(), SourceLoc(),
-                                                  KnownProtocolKind::Copyable)) {
+    if (auto *copyable = getASTContext().getProtocol(KnownProtocolKind::Copyable)) {
       addConstraint(
           ConstraintKind::ConformsTo, typeVar,
           copyable->getDeclaredInterfaceType(),
@@ -2297,7 +2271,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
             return parameterized->getBaseType();
         }
       }
-
+      /*
       if (auto lvalue = dyn_cast<LValueType>(t)) {
         auto objTy = lvalue->getObjectType();
         auto erasedTy =
@@ -2311,6 +2285,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
 
         return erasedTy;
       }
+      */
 
       if (!predicateFn(t)) {
         // Recurse.
@@ -2833,8 +2808,7 @@ ConstraintSystem::getTypeOfMemberReference(
     FunctionType::ExtInfo info;
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-      if (isPartialApplication(locator) &&
-          isSendableType(DC->getParentModule(), baseOpenedTy)) {
+      if (isPartialApplication(locator) && baseOpenedTy->isSendableType()) {
         // Add @Sendable to functions without conditional conformances
         functionType =
             functionType
@@ -2844,6 +2818,11 @@ ConstraintSystem::getTypeOfMemberReference(
       // Unapplied values should always be Sendable
       info = info.withConcurrent();
     }
+
+    // We'll do other adjustment later, but we need to handle parameter
+    // isolation to avoid assertions.
+    if (fullFunctionType->getIsolation().isParameter())
+      info = info.withIsolation(FunctionTypeIsolation::forParameter());
 
     openedType =
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
@@ -3135,12 +3114,15 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
+    auto thrownError = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
+        0);
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
                                              .withAsync(true)
-                                             .withThrows(true, /*FIXME:*/Type())
+                                             .withThrows(true, thrownError)
                                              .build());
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
@@ -3151,7 +3133,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
                                          .withAsync(true)
-                                         .withThrows(true, /*FIXME:*/Type())
+                                         .withThrows(true, thrownError)
                                          .build());
     return {refType, refType, refType, refType, Type()};
   }
@@ -3169,11 +3151,14 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape);
+    auto thrownError = CS.createTypeVariable(
+        CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
+        0);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
-                                             .withThrows(true, /*FIXME:*/Type())
+                                             .withThrows(true, thrownError)
                                              .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
@@ -3183,7 +3168,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto refType = FunctionType::get(args, result,
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
-                                         .withThrows(true, /*FIXME:*/Type())
+                                         .withThrows(true, thrownError)
                                          .withAsync(true)
                                          .build());
     return {refType, refType, refType, refType, Type()};
@@ -4140,6 +4125,14 @@ struct TypeSimplifier {
       auto countType = expansion->getCountType().transform(
           TypeSimplifier(CS, GetFixedTypeFn));
 
+      if (!countType->is<PackType>() &&
+          !countType->is<PackArchetypeType>()) {
+        SmallVector<Type, 2> rootParameterPacks;
+        countType->getTypeParameterPacks(rootParameterPacks);
+        if (!rootParameterPacks.empty())
+          countType = rootParameterPacks[0];
+      }
+
       // If both pattern and count are resolves, let's just return
       // the pattern type for `transformWithPosition` to take care
       // of the rest.
@@ -4422,6 +4415,7 @@ size_t Solution::getTotalMemory() const {
          OpenedPackExpansionTypes.getMemorySize() +
          PackExpansionEnvironments.getMemorySize() +
          size_in_bytes(PackEnvironments) +
+         PackElementGenericEnvironments.size() +
          (DefaultedConstraints.size() * sizeof(void *)) +
          ImplicitCallAsFunctionRoots.getMemorySize() +
          nodeTypes.getMemorySize() +
@@ -5509,21 +5503,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // Aggregate all requirement fixes that belong to the same callee
   // and attempt to diagnose possible ambiguities.
   {
-    auto isResultBuilderMethodRef = [&](ASTNode node) {
-      auto *UDE = getAsExpr<UnresolvedDotExpr>(node);
-      if (!(UDE && UDE->isImplicit()))
-        return false;
-
-      auto &ctx = getASTContext();
-      SmallVector<Identifier, 4> builderMethods(
-          {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
-           ctx.Id_buildFinalResult});
-
-      return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
-        return UDE->getName().compare(DeclNameRef(methodId)) == 0;
-      });
-    };
-
     // Aggregates fixes fixes attached to `buildExpression` and `buildBlock`
     // methods at the particular source location.
     llvm::MapVector<SourceLoc, SmallVector<FixInContext, 4>>
@@ -5539,7 +5518,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
       auto *calleeLoc = entry.first->getCalleeLocator(fix->getLocator());
 
-      if (isResultBuilderMethodRef(calleeLoc->getAnchor())) {
+      auto *UDE = getAsExpr<UnresolvedDotExpr>(calleeLoc->getAnchor());
+      if (UDE && isResultBuilderMethodReference(getASTContext(), UDE)) {
         auto *anchor = castToExpr<Expr>(calleeLoc->getAnchor());
         builderMethodRequirementFixes[anchor->getLoc()].push_back(entry);
       } else {
@@ -6676,6 +6656,19 @@ bool constraints::isKnownKeyPathType(Type type) {
          type->isAnyKeyPath();
 }
 
+bool constraints::isTypeErasedKeyPathType(Type type) {
+  assert(type);
+
+  if (type->isPartialKeyPath() || type->isAnyKeyPath())
+    return true;
+
+  if (!type->isExistentialType())
+    return false;
+
+  auto superclass = type->getSuperclass();
+  return superclass ? isTypeErasedKeyPathType(superclass) : false;
+}
+
 bool constraints::hasExplicitResult(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -7237,7 +7230,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
   // diagnostics already emitted or waiting to be emitted. Because they are
   // a better indication of the problem.
   ASTContext &ctx = getASTContext();
-  if (ctx.Diags.hadAnyError() || ctx.hasDelayedConformanceErrors())
+  if (ctx.hadError())
     return;
 
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
@@ -7635,6 +7628,13 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   if (keyPath->hasSingleInvalidComponent())
     return fail();
 
+  // If root is determined to be a hole it means that none of the components
+  // are resolvable and key path is not viable.
+  auto rootTy =
+      getFixedTypeRecursive(getKeyPathRootType(keyPath), /*wantRValue=*/false);
+  if (rootTy->isPlaceholder())
+    return fail();
+
   auto mutability = KeyPathMutability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
@@ -7671,7 +7671,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
             auto conformance = lookupConformance(argTy, sendable);
             isSendable &=
                 bool(conformance) &&
-                !conformance.hasMissingConformance(DC->getParentModule());
+                !conformance.hasMissingConformance();
           }
         }
       }
@@ -7722,7 +7722,6 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       // A reference to an actor isolated state make key path non-Sendable.
       case ActorIsolation::ActorInstance:
       case ActorIsolation::GlobalActor:
-      case ActorIsolation::GlobalActorUnsafe:
         isSendable = false;
         break;
       }
@@ -7963,4 +7962,18 @@ void constraints::dumpAnchor(ASTNode anchor, SourceManager *SM,
     }
   }
   // TODO(diagnostics): Implement the rest of the cases.
+}
+
+bool constraints::isResultBuilderMethodReference(ASTContext &ctx,
+                                                 UnresolvedDotExpr *UDE) {
+  if (!(UDE && UDE->isImplicit()))
+    return false;
+
+  SmallVector<Identifier, 5> builderMethods(
+      {ctx.Id_buildBlock, ctx.Id_buildExpression, ctx.Id_buildPartialBlock,
+       ctx.Id_buildFinalResult, ctx.Id_buildIf});
+
+  return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
+    return UDE->getName().compare(DeclNameRef(methodId)) == 0;
+  });
 }

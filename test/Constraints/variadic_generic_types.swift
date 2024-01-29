@@ -56,6 +56,7 @@ do {
     return Test<String, Int, repeat each T>("a", 42, repeat each v) // Ok
   }
 }
+
 // rdar://107479662 - variadic tuple of Sendable elements does not conform to Sendable
 do {
   struct Test<each T> : Sendable {
@@ -63,5 +64,16 @@ do {
   }
 
   struct TestProperty<T> : Sendable {
+  }
+}
+
+// https://github.com/apple/swift/issues/68160
+do {
+  struct G<each T, U> {
+    let f: (repeat Optional<each T>) -> U
+
+    init(f: @escaping (repeat Optional<each T>) -> U) {
+      self.f = f
+    }
   }
 }

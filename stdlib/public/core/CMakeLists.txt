@@ -43,10 +43,10 @@ split_embedded_sources(
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
   EMBEDDED BidirectionalCollection.swift
-    NORMAL Bitset.swift
+  EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
     NORMAL BridgeObjectiveC.swift
-    NORMAL BridgeStorage.swift
+  EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
@@ -65,12 +65,13 @@ split_embedded_sources(
     NORMAL CString.swift
   EMBEDDED CTypes.swift
     NORMAL DebuggerSupport.swift
-    NORMAL Dictionary.swift
-    NORMAL DictionaryBridging.swift
-    NORMAL DictionaryBuilder.swift
-    NORMAL DictionaryCasting.swift
-    NORMAL DictionaryStorage.swift
-    NORMAL DictionaryVariant.swift
+  EMBEDDED Dictionary.swift
+  EMBEDDED DictionaryBridging.swift
+  EMBEDDED DictionaryBuilder.swift
+  EMBEDDED DictionaryCasting.swift
+  EMBEDDED DictionaryStorage.swift
+  EMBEDDED DictionaryVariant.swift
+    NORMAL DiscontiguousSlice.swift
     NORMAL DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED EmptyCollection.swift
@@ -89,7 +90,7 @@ split_embedded_sources(
   # END WORKAROUND
   EMBEDDED Hasher.swift
     NORMAL Hashing.swift
-    NORMAL HashTable.swift
+  EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
     NORMAL InputStream.swift
@@ -98,20 +99,20 @@ split_embedded_sources(
     NORMAL Join.swift
     NORMAL KeyPath.swift
     NORMAL KeyValuePairs.swift
-    NORMAL LazyCollection.swift
-    NORMAL LazySequence.swift
+  EMBEDDED LazyCollection.swift
+  EMBEDDED LazySequence.swift
     NORMAL LegacyABI.swift
   EMBEDDED LifetimeManager.swift
     NORMAL Macros.swift
   EMBEDDED ManagedBuffer.swift
     NORMAL Map.swift
   EMBEDDED MemoryLayout.swift
-    NORMAL UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
-    NORMAL NativeDictionary.swift
-    NORMAL NativeSet.swift
+  EMBEDDED NativeDictionary.swift
+  EMBEDDED NativeSet.swift
     NORMAL NewtypeWrapper.swift
     NORMAL NFC.swift
     NORMAL NFD.swift
@@ -129,6 +130,8 @@ split_embedded_sources(
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
   EMBEDDED RangeReplaceableCollection.swift
+    NORMAL RangeSet.swift
+    NORMAL RangeSetRanges.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
     NORMAL REPL.swift
@@ -139,15 +142,15 @@ split_embedded_sources(
   EMBEDDED SipHash.swift
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
-    NORMAL Set.swift
+  EMBEDDED Set.swift
   EMBEDDED SetAlgebra.swift
     NORMAL SetAnyHashableExtensions.swift
     NORMAL SetBridging.swift
-    NORMAL SetBuilder.swift
-    NORMAL SetCasting.swift
-    NORMAL SetStorage.swift
-    NORMAL SetVariant.swift
-    NORMAL ShadowProtocols.swift
+  EMBEDDED SetBuilder.swift
+  EMBEDDED SetCasting.swift
+  EMBEDDED SetStorage.swift
+  EMBEDDED SetVariant.swift
+  EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
   EMBEDDED Slice.swift
     NORMAL SmallString.swift
@@ -252,11 +255,15 @@ split_embedded_sources(
 if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
   list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+
+  list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
+  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedRuntime.swift
   EmbeddedStubs.swift
+  EmbeddedPrint.swift
   )
 
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)

@@ -130,7 +130,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   bool AttrParamHasLabel;
   bool IsInSil = false;
   bool HasSpace = false;
-  bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
   llvm::Optional<DeclKind> AttTargetDK;
@@ -259,7 +258,6 @@ public:
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeForEachInKeyword() override;
   void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
-  void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
   void completeTypeDeclResultBeginning() override;
@@ -285,7 +283,7 @@ public:
   void completeImportDecl(ImportPath::Builder &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
 
   bool canPerformCompleteLabeledTrailingClosure() const override {
     return true;
@@ -419,32 +417,6 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(CodeCompletionExpr *E,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
-                                                           Expr *CodeCompletionE) {
-  assert(P.Tok.is(tok::code_complete));
-
-  // Don't produce any results in an enum element.
-  if (InEnumElementRawValue)
-    return;
-
-  Kind = CompletionKind::PostfixExprParen;
-  ParsedExpr = E;
-  CurDeclContext = P.CurDeclContext;
-  CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
-
-  ShouldCompleteCallPatternAfterParen = true;
-  if (CompletionContext.getCallPatternHeuristics()) {
-    // Lookahead one token to decide what kind of call completions to provide.
-    // When it appears that there is already code for the call present, just
-    // complete values and/or argument labels.  Otherwise give the entire call
-    // pattern.
-    Token next = P.peekToken();
-    if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
-      ShouldCompleteCallPatternAfterParen = false;
-    }
-  }
-}
-
 void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
                                                       SourceLoc DotLoc) {
   Kind = (!KPE || KPE->isObjC()) ? CompletionKind::KeyPathExprObjC
@@ -573,26 +545,10 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(CodeCompletionExpr *E
   this->DotLoc = DotLoc;
 }
 
-void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
-                                                  bool isFirst) {
+void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::CallArg;
-
-  ShouldCompleteCallPatternAfterParen = false;
-  if (isFirst) {
-    ShouldCompleteCallPatternAfterParen = true;
-    if (CompletionContext.getCallPatternHeuristics()) {
-      // Lookahead one token to decide what kind of call completions to provide.
-      // When it appears that there is already code for the call present, just
-      // complete values and/or argument labels.  Otherwise give the entire call
-      // pattern.
-      Token next = P.peekToken();
-      if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
-        ShouldCompleteCallPatternAfterParen = false;
-      }
-    }
-  }
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
@@ -1075,7 +1031,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
 
   case CompletionKind::CallArg:
-  case CompletionKind::PostfixExprParen:
     // Note that we don't add keywords here as the completion might be for
     // an argument list pattern. We instead add keywords later in
     // CodeCompletionCallbacksImpl::doneParsing when we know we're not
@@ -1314,7 +1269,8 @@ void swift::ide::postProcessCompletionResults(
         Kind != CompletionKind::TypeSimpleWithoutDot &&
         Kind != CompletionKind::TypeSimpleWithDot &&
         Kind != CompletionKind::TypeDeclResultBeginning &&
-        Kind != CompletionKind::GenericRequirement) {
+        Kind != CompletionKind::GenericRequirement &&
+        Kind != CompletionKind::WithoutConstraintType) {
       flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
       modified = true;
     }
@@ -1554,8 +1510,7 @@ void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,
           Context.CompletionCallback, &Lookup);
       typeCheckContextAt(TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
                          CompletionLoc);
-      Lookup.collectResults(/*IncludeSignature=*/false,
-                            /*IsLabeledTrailingClosure=*/true, CompletionLoc,
+      Lookup.collectResults(/*IsLabeledTrailingClosure=*/true, CompletionLoc,
                             CurDeclContext, CompletionContext);
     }
   }
@@ -1599,8 +1554,7 @@ void CodeCompletionCallbacksImpl::callCompletion(SourceLoc CompletionLoc,
                                              CurDeclContext);
   typeCheckWithLookup(Lookup, CompletionLoc);
 
-  Lookup.collectResults(ShouldCompleteCallPatternAfterParen,
-                        /*IsLabeledTrailingClosure=*/false, CompletionLoc,
+  Lookup.collectResults(/*IsLabeledTrailingClosure=*/false, CompletionLoc,
                         CurDeclContext, CompletionContext);
   Consumer.handleResults(CompletionContext);
 }
@@ -1725,7 +1679,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::KeyPathExprSwift:
     keyPathExprCompletion(CompletionLoc, MaybeFuncBody);
     return;
-  case CompletionKind::PostfixExprParen:
   case CompletionKind::CallArg:
     callCompletion(CompletionLoc, MaybeFuncBody);
     return;
@@ -1773,8 +1726,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
       ParsedExpr->setType(*ExprType);
     }
 
-    if (!ExprType && Kind != CompletionKind::PostfixExprParen &&
-        Kind != CompletionKind::CallArg &&
+    if (!ExprType && Kind != CompletionKind::CallArg &&
         Kind != CompletionKind::KeyPathExprObjC)
       return;
   }
@@ -1810,7 +1762,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AccessorBeginning:
   case CompletionKind::CaseStmtBeginning:
-  case CompletionKind::PostfixExprParen:
   case CompletionKind::PostfixExpr:
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::YieldStmtExpr:
@@ -2007,7 +1958,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   }
 
   case CompletionKind::WithoutConstraintType: {
-    Lookup.getWithoutConstraintTypes();
+    Lookup.addWithoutConstraintTypes();
     break;
   }
 

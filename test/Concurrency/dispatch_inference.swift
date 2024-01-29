@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 // RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
+// https://github.com/apple/swift/issues/69481
+// REQUIRES: GH69481
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: asserts
@@ -22,7 +24,7 @@ func testMe() {
 func testUnsafeSendableInMainAsync() async {
   var x = 5
   DispatchQueue.main.async {
-    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+    x = 17 // expected-warning{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
 }
@@ -30,7 +32,7 @@ func testUnsafeSendableInMainAsync() async {
 func testUnsafeSendableInAsync(queue: DispatchQueue) async {
   var x = 5
   queue.async {
-    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+    x = 17 // expected-warning{{mutation of captured var 'x' in concurrently-executing code}}
   }
 
   queue.sync {

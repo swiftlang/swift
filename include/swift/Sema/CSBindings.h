@@ -576,7 +576,10 @@ public:
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
-  void finalize(
+  ///
+  /// \returns true if finalization successful (which makes binding set viable),
+  /// and false otherwise.
+  bool finalize(
       llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
 
   static BindingScore formBindingScore(const BindingSet &b);

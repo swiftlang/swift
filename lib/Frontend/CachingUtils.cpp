@@ -145,10 +145,12 @@ bool replayCachedCompilerOutputs(
   Optional<OutputEntry> DiagnosticsOutput;
 
   auto replayOutputsForInputFile = [&](const std::string &InputPath,
+                                       unsigned InputIndex,
                                        const DenseMap<file_types::ID,
                                                       std::string> &Outputs) {
     auto lookupFailed = [&CanReplayAllOutput] { CanReplayAllOutput = false; };
-    auto OutputKey = createCompileJobCacheKeyForOutput(CAS, BaseKey, InputPath);
+    auto OutputKey =
+        createCompileJobCacheKeyForOutput(CAS, BaseKey, InputIndex);
 
     if (!OutputKey) {
       Diag.diagnose(SourceLoc(), diag::error_cas,
@@ -199,7 +201,8 @@ bool replayCachedCompilerOutputs(
     }
   };
 
-  auto replayOutputFromInput = [&](const InputFile &Input) {
+  auto replayOutputFromInput = [&](const InputFile &Input,
+                                   unsigned InputIndex) {
     auto InputPath = Input.getFileName();
     DenseMap<file_types::ID, std::string> Outputs;
     if (!Input.outputFilename().empty())
@@ -225,27 +228,33 @@ bool replayCachedCompilerOutputs(
     Outputs.try_emplace(file_types::ID::TY_CachedDiagnostics,
                         "<cached-diagnostics>");
 
-    return replayOutputsForInputFile(InputPath, Outputs);
+    return replayOutputsForInputFile(InputPath, InputIndex, Outputs);
   };
 
+  auto AllInputs = InputsAndOutputs.getAllInputs();
   // If there are primary inputs, look up only the primary input files.
   // Otherwise, prepare to do cache lookup for all inputs.
-  if (InputsAndOutputs.hasPrimaryInputs())
-    InputsAndOutputs.forEachPrimaryInput([&](const InputFile &File) {
-      replayOutputFromInput(File);
-      return false;
-    });
-  else
-    llvm::for_each(InputsAndOutputs.getAllInputs(), replayOutputFromInput);
+  for (unsigned Index = 0; Index < AllInputs.size(); ++Index) {
+    const auto &Input = AllInputs[Index];
+    if (InputsAndOutputs.hasPrimaryInputs() && !Input.isPrimary())
+      continue;
+
+    replayOutputFromInput(Input, Index);
+  }
+
+  if (!CanReplayAllOutput)
+    return false;
 
   // If there is not diagnostic output, this is a job that produces no output
   // and only diagnostics, like `typecheck-module-from-interface`, look up
   // diagnostics from first file.
   if (!DiagnosticsOutput)
     replayOutputsForInputFile(
-        InputsAndOutputs.getFirstOutputProducingInput().getFileName(),
+        "<cached-diagnostics>",
+        InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
         {{file_types::ID::TY_CachedDiagnostics, "<cached-diagnostics>"}});
 
+  // Check again to make sure diagnostics is fetched successfully.
   if (!CanReplayAllOutput)
     return false;
 

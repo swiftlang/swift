@@ -580,6 +580,7 @@ namespace {
     RValue visitConsumeExpr(ConsumeExpr *E, SGFContext C);
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
+    RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -2647,24 +2648,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
                captures);
 
-  // The default argument might require the callee's isolation. If so,
-  // make sure to emit an actor hop.
-  //
-  // FIXME: Instead of hopping back and forth for each individual isolated
-  // default argument, we should emit one hop for all default arguments if
-  // any of them are isolated, and immediately enter the function after.
-  llvm::Optional<ActorIsolation> implicitActorHopTarget = llvm::None;
-  if (implicitlyAsync) {
-    auto *param = getParameterAt(defaultArgsOwner.getDecl(), destIndex);
-    auto isolation = param->getInitializerIsolation();
-    if (isolation.isActorIsolated()) {
-      implicitActorHopTarget = isolation;
-    }
-  }
-
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   captures, calleeTypeInfo, ApplyOptions(), C,
-                   implicitActorHopTarget);
+                   captures, calleeTypeInfo, ApplyOptions(), C, llvm::None);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -4344,14 +4329,14 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
             SILGlobalVariable::create(M, SILLinkage::DefaultForDeclaration,
                                       IsNotSerialized, "__ImageBase",
                                       BuiltinRawPtrTy);
-      ModuleBase = B.createGlobalAddr(SILLoc, ImageBase);
+      ModuleBase = B.createGlobalAddr(SILLoc, ImageBase, /*dependencyToken=*/ SILValue());
     } else {
       auto DSOHandle = M.lookUpGlobalVariable("__dso_handle");
       if (!DSOHandle)
         DSOHandle = SILGlobalVariable::create(M, SILLinkage::PublicExternal,
                                               IsNotSerialized, "__dso_handle",
                                               BuiltinRawPtrTy);
-      ModuleBase = B.createGlobalAddr(SILLoc, DSOHandle);
+      ModuleBase = B.createGlobalAddr(SILLoc, DSOHandle, /*dependencyToken=*/ SILValue());
     }
 
     auto ModuleBasePointer =
@@ -5876,7 +5861,8 @@ public:
     // is important to ensure that the destroy of the assign is not hoisted
     // above the retain. We are doing unmanaged things here so we need to be
     // extra careful.
-    ownedMV = SGF.B.createMarkDependence(loc, ownedMV, base);
+    ownedMV = SGF.B.createMarkDependence(loc, ownedMV, base,
+                                         /*isNonEscaping*/false);
 
     // Then reassign the mark dependence into the +1 storage.
     ownedMV.assignInto(SGF, loc, base.getUnmanagedValue());
@@ -5964,7 +5950,7 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   auto *SM = SGF.getModule().getSwiftModule();
   if (auto *fixedWidthIntegerDecl = SM->getASTContext().getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
-    if (SM->conformsToProtocol(eltTy, fixedWidthIntegerDecl))
+    if (SM->checkConformance(eltTy, fixedWidthIntegerDecl))
       return;
   }
 
@@ -6191,7 +6177,8 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   // Mark the dependence of the pointer on the owner value.
   auto owner = resultScalars[0];
   auto pointer = resultScalars[1].forward(*this);
-  pointer = B.createMarkDependence(loc, pointer, owner.getValue());
+  pointer = B.createMarkDependence(loc, pointer, owner.getValue(),
+                                   /*isNonEscaping*/false);
 
   // The owner's already in its own cleanup.  Return the pointer.
   return {ManagedValue::forObjectRValueWithoutOwnership(pointer), owner};
@@ -6226,7 +6213,8 @@ SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
   // Mark the dependence of the pointer on the owner value.
   auto owner = results[0];
   auto pointer = results[1].forward(*this);
-  pointer = B.createMarkDependence(loc, pointer, owner.getValue());
+  pointer = B.createMarkDependence(loc, pointer, owner.getValue(),
+                                   /*isNonEscaping*/false);
 
   return {ManagedValue::forObjectRValueWithoutOwnership(pointer), owner};
 }
@@ -6547,6 +6535,11 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
     return RValue();
   }
   return RValue();
+}
+
+RValue RValueEmitter::visitCurrentContextIsolationExpr(
+    CurrentContextIsolationExpr *E, SGFContext C) {
+  return visit(E->getActor(), C);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

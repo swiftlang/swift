@@ -1219,7 +1219,7 @@ static bool isReadNoneFunction(const Expr *e) {
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     const DeclName name = dre->getDecl()->getName();
     return (name.getArgumentNames().size() == 1 &&
-            name.getBaseName() == DeclBaseName::createConstructor() &&
+            name.getBaseName().isConstructor() &&
             !name.getArgumentNames()[0].empty() &&
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
@@ -2320,8 +2320,9 @@ namespace {
 
       auto keyPathValue = KeyPath;
 
-      SmallVector<Type, 2> typeArgs;
-      typeArgs.push_back(BaseFormalType);
+      GenericSignature sig;
+      TypeSubstitutionMap map;
+
       if (TypeKind == KPTK_AnyKeyPath) {
         projectFn = SGF.getASTContext().getGetAtAnyKeyPath();
       } else if (TypeKind == KPTK_PartialKeyPath) {
@@ -2330,21 +2331,31 @@ namespace {
                  TypeKind == KPTK_WritableKeyPath ||
                  TypeKind == KPTK_ReferenceWritableKeyPath) {
         projectFn = SGF.getASTContext().getGetAtKeyPath();
+        sig = projectFn->getGenericSignature();
+        auto genericParams = sig.getGenericParams();
 
         auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
         assert(keyPathTy->getGenericArgs().size() == 2);
         assert(keyPathTy->getGenericArgs()[0]->getCanonicalType() ==
                BaseFormalType->getCanonicalType());
-        typeArgs.push_back(keyPathTy->getGenericArgs()[1]);
+        assert(genericParams.size() == 2);
+        auto secondGenParam = genericParams[1]->getCanonicalType()
+                                              ->castTo<SubstitutableType>();
+        map[secondGenParam] = keyPathTy->getGenericArgs()[1];
 
         keyPathValue = emitUpcastToKeyPath(SGF, loc, TypeKind, keyPathValue);
       } else {
         llvm_unreachable("bad key path kind for this component");
       }
 
-      auto subs = SubstitutionMap::get(projectFn->getGenericSignature(),
-                                       ArrayRef<Type>(typeArgs),
-                                       ArrayRef<ProtocolConformanceRef>());
+      sig = projectFn->getGenericSignature();
+      auto firstGenParam = sig.getGenericParams()[0]->getCanonicalType()
+                                                  ->castTo<SubstitutableType>();
+      map[firstGenParam] = BaseFormalType;
+
+      auto subs = SubstitutionMap::get(sig,
+                  QueryTypeSubstitutionMap{map},
+                  LookUpConformanceInModule{SGF.getModule().getSwiftModule()});
 
       base = makeBaseConsumableMaterializedRValue(SGF, loc, base);
 
@@ -3008,6 +3019,8 @@ public:
         case ParamSpecifier::InOut:
         case ParamSpecifier::LegacyShared:
         case ParamSpecifier::LegacyOwned:
+        // For now, transferring isn't implicitly copyable.
+        case ParamSpecifier::Transferring:
           return false;
         }
         if (pd->hasResultDependsOn()) {
@@ -3053,6 +3066,9 @@ public:
                              options, e->isSuper(), accessKind, strategy,
                              getSubstFormalRValueType(e),
                              false /*is on self parameter*/, actorIso);
+
+    SGF.SGM.noteMemberRefExpr(e);
+
     return lv;
   }
 
@@ -3862,6 +3878,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
                            options, e->isSuper(), accessKind, strategy,
                            substFormalRValueType, isOnSelfParameter, actorIso);
+
+  SGF.SGM.noteMemberRefExpr(e);
+
   return lv;
 }
 

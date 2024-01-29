@@ -1933,6 +1933,24 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
   return fn;
 }
 
+/// Produce a reference for the conforming entity of a protocol conformance
+/// descriptor, which is usually the conforming concrete type.
+static TypeEntityReference getConformingEntityReference(
+    IRGenModule &IGM, const RootProtocolConformance *conformance) {
+  // This is a conformance of a protocol to another protocol. Module it as
+  // an extension.
+  if (isa<NormalProtocolConformance>(conformance) &&
+      cast<NormalProtocolConformance>(conformance)->isConformanceOfProtocol()) {
+    auto ext = cast<ExtensionDecl>(conformance->getDeclContext());
+    auto linkEntity = LinkEntity::forExtensionDescriptor(ext);
+    IGM.IRGen.noteUseOfExtensionDescriptor(ext);
+    return IGM.getContextDescriptorEntityReference(linkEntity);
+  }
+
+  return IGM.getTypeEntityReference(
+             conformance->getDeclContext()->getSelfNominalTypeDecl());
+}
+
 namespace {
   /// Builds a protocol conformance descriptor.
   class ProtocolConformanceDescriptorBuilder {
@@ -1984,8 +2002,7 @@ namespace {
     void addConformingType() {
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
-      auto ref = IGM.getTypeEntityReference(
-                   Conformance->getDeclContext()->getSelfNominalTypeDecl());
+      auto ref = getConformingEntityReference(IGM, Conformance);
       B.addRelativeAddress(ref.getValue());
       Flags = Flags.withTypeReferenceKind(ref.getKind());
     }
@@ -2000,6 +2017,7 @@ namespace {
       if (auto conf = dyn_cast<NormalProtocolConformance>(Conformance)) {
         Flags = Flags.withIsRetroactive(conf->isRetroactive());
         Flags = Flags.withIsSynthesizedNonUnique(conf->isSynthesizedNonUnique());
+        Flags = Flags.withIsConformanceOfProtocol(conf->isConformanceOfProtocol());
       } else {
         Flags = Flags.withIsRetroactive(false)
                      .withIsSynthesizedNonUnique(false);
@@ -2027,9 +2045,22 @@ namespace {
       if (!normal)
         return;
 
+      llvm::Optional<Requirement> scratchRequirement;
       auto condReqs = normal->getConditionalRequirements();
-      if (condReqs.empty())
-        return;
+      if (condReqs.empty()) {
+        // For a protocol P that conforms to another protocol, introduce a
+        // conditional requirement for that P's Self: P. This aligns with
+        // SILWitnessTable::enumerateWitnessTableConditionalConformances().
+        if (auto selfProto = normal->getDeclContext()->getSelfProtocolDecl()) {
+          auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
+          scratchRequirement.emplace(RequirementKind::Conformance, selfType,
+                                     selfProto->getDeclaredInterfaceType());
+          condReqs = *scratchRequirement;
+        }
+
+        if (condReqs.empty())
+          return;
+      }
 
       Flags = Flags.withNumConditionalRequirements(condReqs.size());
 

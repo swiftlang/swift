@@ -407,17 +407,6 @@ static llvm::cl::opt<bool> CodeCompleteInitsInPostfixExpr(
     llvm::cl::desc(
         "Include initializers when completing a postfix expression"),
     llvm::cl::cat(Category));
-static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
-    "code-complete-call-pattern-heuristics",
-    llvm::cl::desc(
-        "Use heuristics to guess whether we want call pattern completions"),
-    llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-EnableSwift3ObjCInference("enable-swift3-objc-inference",
-    llvm::cl::desc("Enable Swift 3's @objc inference rules"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
@@ -1414,7 +1403,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
                  bool CodeCompletionComments,
                  bool CodeCompletionAnnotateResults,
                  bool CodeCompletionAddInitsToTopLevel,
-                 bool CodeCompletionCallPatternHeuristics,
                  bool CodeCompletionAddCallWithNoDefaultArgs,
                  bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
@@ -1426,7 +1414,6 @@ doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-  CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
   CompletionContext.setAddCallWithNoDefaultArgs(
       CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -1457,7 +1444,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
-                                 bool CodeCompletionCallPatternHeuristics,
                                  bool CodeCompletionAddCallWithNoDefaultArgs,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
@@ -1586,8 +1572,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     ide::CodeCompletionContext CompletionContext(CompletionCache);
     CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-    CompletionContext.setCallPatternHeuristics(
-        CodeCompletionCallPatternHeuristics);
     CompletionContext.setAddCallWithNoDefaultArgs(
         CodeCompletionAddCallWithNoDefaultArgs);
 
@@ -4359,6 +4343,20 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
+  for (const auto &featureArg : options::EnableExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureArg)) {
+      InitInvok.getLangOptions().enableFeature(*feature);
+    }
+  }
+
+  for (const auto &featureArg : options::EnableUpcomingFeatures) {
+    if (auto feature = getUpcomingFeature(featureArg)) {
+      InitInvok.getLangOptions().enableFeature(*feature);
+    }
+  }
+
+  // NOTE: 'setMainExecutablePath' must be after 'Features' because
+  // 'setRuntimeResourcePath()' called from here depends on 'Features'.
   InitInvok.setMainExecutablePath(mainExecutablePath);
   InitInvok.setModuleName(options::ModuleName);
 
@@ -4421,23 +4419,11 @@ int main(int argc, char *argv[]) {
   }
 
   if (options::EnableExperimentalNamedOpaqueTypes) {
-    InitInvok.getLangOptions().Features.insert(Feature::NamedOpaqueTypes);
+    InitInvok.getLangOptions().enableFeature(Feature::NamedOpaqueTypes);
   }
   if (options::EnableBareSlashRegexLiterals) {
-    InitInvok.getLangOptions().Features.insert(Feature::BareSlashRegexLiterals);
+    InitInvok.getLangOptions().enableFeature(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
-  }
-
-  for (const auto &featureArg : options::EnableExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
-    }
-  }
-
-  for (const auto &featureArg : options::EnableUpcomingFeatures) {
-    if (auto feature = getUpcomingFeature(featureArg)) {
-      InitInvok.getLangOptions().Features.insert(*feature);
-    }
   }
 
   if (!options::Triple.empty())
@@ -4492,8 +4478,6 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().EnableDeserializationSafety =
     options::EnableDeserializationSafety;
-  InitInvok.getLangOptions().EnableSwift3ObjCInference =
-    options::EnableSwift3ObjCInference;
   // The manner in which swift-ide-test constructs its CompilerInvocation does
   // not hit the codepath in arg parsing that would normally construct
   // ClangImporter options based on enabled language features etc. Explicitly
@@ -4646,7 +4630,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;
@@ -4662,7 +4645,6 @@ int main(int argc, char *argv[]) {
         options::CodeCompletionKeywords, options::CodeCompletionComments,
         options::CodeCompletionAnnotateResults,
         options::CodeCompleteInitsInPostfixExpr,
-        options::CodeCompleteCallPatternHeuristics,
         options::CodeCompletionAddCallWithNoDefaultArgs,
         options::CodeCompletionSourceText);
     break;

@@ -179,7 +179,9 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
   if (cache.getScanService().hasPathMapping())
     InputPath = cache.getScanService().remapPath(InputPath);
 
-  auto key = createCompileJobCacheKeyForOutput(CAS, *base, InputPath);
+  // Module compilation commands always have only one input and the input
+  // index is always 0.
+  auto key = createCompileJobCacheKeyForOutput(CAS, *base, /*InputIndex=*/0);
   if (!key)
     return key.takeError();
 
@@ -418,6 +420,8 @@ std::string quote(StringRef unquoted) {
   llvm::raw_svector_ostream os(buffer);
   for (const auto ch : unquoted) {
     if (ch == '\\')
+      os << '\\';
+    if (ch == '"')
       os << '\\';
     os << ch;
   }

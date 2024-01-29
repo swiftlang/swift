@@ -161,7 +161,7 @@ bool TypeBase::isMarkerExistential() {
 /// that does not rely on conformances.
 static bool alwaysNoncopyable(Type ty) {
   if (auto *nominal = ty->getNominalOrBoundGenericNominal())
-    return nominal->canBeNoncopyable();
+    return !nominal->canBeCopyable();
 
   if (auto *expansion = ty->getAs<PackExpansionType>()) {
     return alwaysNoncopyable(expansion->getPatternType());
@@ -177,13 +177,18 @@ static bool alwaysNoncopyable(Type ty) {
   return false; // otherwise, the conservative assumption is it's copyable.
 }
 
-static CanType preprocessType(GenericEnvironment *env, Type orig) {
+/// Preprocesses a type before querying whether it conforms to an invertible.
+static CanType preprocessTypeForInvertibleQuery(Type orig) {
   Type type = orig;
 
-  // Turn any type parameters into archetypes.
-  if (env)
-    if (!type->hasArchetype() || type->hasOpenedExistential())
-      type = GenericEnvironment::mapTypeIntoContext(env, type);
+  // Strip off any StorageType wrapper.
+  type = type->getReferenceStorageReferent();
+
+  // Pack expansions such as `repeat T` themselves do not have conformances,
+  // so check its pattern type for conformance.
+  if (auto *pet = type->getAs<PackExpansionType>()) {
+    type = pet->getPatternType()->getCanonicalType();
+  }
 
   // Strip @lvalue and canonicalize.
   auto canType = type->getRValueType()->getCanonicalType();
@@ -191,30 +196,34 @@ static CanType preprocessType(GenericEnvironment *env, Type orig) {
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
-bool TypeBase::isNoncopyable(GenericEnvironment *env) {
-  auto canType = preprocessType(env, this);
+bool TypeBase::isNoncopyable() {
+  auto canType = preprocessTypeForInvertibleQuery(this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return alwaysNoncopyable(canType);
 
+  assert(!hasTypeParameter()
+             && "requires a contextual type; use mapTypeIntoContext");
   IsNoncopyableRequest request{canType};
   return evaluateOrDefault(ctx.evaluator, request, /*default=*/true);
 }
 
-bool TypeBase::isEscapable(GenericEnvironment *env) {
-  auto canType = preprocessType(env, this);
+bool TypeBase::isEscapable() {
+  auto canType = preprocessTypeForInvertibleQuery(this);
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Escapable
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     if (auto nom = canType.getAnyNominal())
-      return nom->isEscapable();
+      return nom->canBeEscapable();
     else
       return true;
   }
 
+  assert(!hasTypeParameter()
+    && "requires a contextual type; use mapTypeIntoContext");
   IsEscapableRequest request{canType};
   return evaluateOrDefault(ctx.evaluator, request, /*default=*/false);
 }
@@ -341,8 +350,11 @@ bool TypeBase::allowsOwnership(const GenericSignatureImpl *sig) {
 }
 
 /// Adds the inferred default protocols for an ExistentialLayout with respect
-/// to that existential's inverses. For example, if an inverse ~P exists, then
-/// P will not be added to the protocols list.
+/// to that existential's inverses and existing protocols. For example, if an
+/// inverse ~P exists, then P will not be added to the protocols list.
+///
+/// Similarly, if the protocols list has a protocol Q that already implies
+/// Copyable, then we will not add `Copyable` to the protocols list.
 ///
 /// \param inverses the inverses '& ~P' that are in the existential's type.
 /// \param protocols the output vector of protocols for an ExistentialLayout
@@ -356,9 +368,23 @@ static void expandDefaultProtocols(
   if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics))
     return;
 
-  // Try to add all invertible protocols, unless an inverse was provided.
+  // Try to add all invertible protocols, unless:
+  //  - an inverse was provided
+  //  - an existing protocol already requires it
   for (auto ip : InvertibleProtocolSet::full()) {
     if (inverses.contains(ip))
+      continue;
+
+    // This matches with `lookupExistentialConformance`'s use of 'inheritsFrom'.
+    bool alreadyRequired = false;
+    for (auto proto : protocols) {
+      if (proto->requiresInvertible(ip)) {
+        alreadyRequired = true;
+        break;
+      }
+    }
+
+    if (alreadyRequired)
       continue;
 
     auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
@@ -523,6 +549,10 @@ NominalTypeDecl *TypeBase::getAnyActor() {
     return nullptr;
   }
 
+  if (auto self = getAs<DynamicSelfType>()) {
+    return self->getSelfType()->getAnyActor();
+  }
+
   // Existential types: check for Actor protocol.
   if (isExistentialType()) {
     auto layout = getExistentialLayout();
@@ -548,12 +578,34 @@ bool TypeBase::isActorType() {
   return false;
 }
 
-bool TypeBase::isSendableType(DeclContext *ctx) {
-  return isSendableType(ctx->getParentModule());
+bool TypeBase::isAnyActorType() {
+  if (auto actor = getAnyActor())
+    return actor->isAnyActor();
+  return false;
 }
 
-bool TypeBase::isSendableType(ModuleDecl *parentModule) {
-  return ::isSendableType(parentModule, Type(this));
+bool TypeBase::isSendableType() {
+  auto proto = getASTContext().getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return true;
+
+  // First check if we have a function type. If we do, check if it is
+  // Sendable. We do this since functions cannot conform to protocols.
+  if (auto *fas = getAs<SILFunctionType>())
+    return fas->isSendable();
+  if (auto *fas = getAs<AnyFunctionType>())
+    return fas->isSendable();
+
+  auto conformance = proto->getParentModule()->checkConformance(this, proto);
+  if (conformance.isInvalid())
+    return false;
+
+  // Look for missing Sendable conformances.
+  return !conformance.forEachMissingConformance(
+      [](BuiltinProtocolConformance *missing) {
+        return missing->getProtocol()->isSpecificProtocol(
+            KnownProtocolKind::Sendable);
+      });
 }
 
 bool TypeBase::isDistributedActor() {
@@ -982,7 +1034,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
         fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
     extInfo = extInfo.withConcurrent(false);
     if (dropGlobalActor)
-      extInfo = extInfo.withGlobalActor(Type());
+      extInfo = extInfo.withoutIsolation();
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
@@ -1108,6 +1160,61 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     }
 
     return Type(this);
+  }
+
+  if (auto *BGT = getAs<BoundGenericType>()) {
+    if (!recurse)
+      return Type(this);
+
+    bool anyChanged = false;
+    SmallVector<Type, 2> genericArgs;
+    llvm::transform(BGT->getGenericArgs(), std::back_inserter(genericArgs),
+                    [&](Type argTy) {
+                      auto newArgTy =
+                          argTy->stripConcurrency(recurse, dropGlobalActor);
+                      anyChanged |= !newArgTy->isEqual(argTy);
+                      return newArgTy;
+                    });
+
+    return anyChanged ? BoundGenericType::get(BGT->getDecl(), BGT->getParent(),
+                                              genericArgs)
+                      : Type(this);
+  }
+
+  if (auto *tuple = getAs<TupleType>()) {
+    if (!recurse)
+      return Type(this);
+
+    bool anyChanged = false;
+    SmallVector<TupleTypeElt, 2> elts;
+    llvm::transform(
+        tuple->getElements(), std::back_inserter(elts), [&](const auto &elt) {
+          auto eltTy = elt.getType();
+          auto strippedTy = eltTy->stripConcurrency(recurse, dropGlobalActor);
+          anyChanged |= !strippedTy->isEqual(eltTy);
+          return elt.getWithType(strippedTy);
+        });
+
+    return anyChanged ? TupleType::get(elts, getASTContext()) : Type(this);
+  }
+
+  if (auto *arrayTy = dyn_cast<ArraySliceType>(this)) {
+    auto newBaseTy =
+        arrayTy->getBaseType()->stripConcurrency(recurse, dropGlobalActor);
+    return newBaseTy->isEqual(arrayTy->getBaseType())
+               ? Type(this)
+               : ArraySliceType::get(newBaseTy);
+  }
+
+  if (auto *dictTy = dyn_cast<DictionaryType>(this)) {
+    auto keyTy = dictTy->getKeyType();
+    auto strippedKeyTy = keyTy->stripConcurrency(recurse, dropGlobalActor);
+    auto valueTy = dictTy->getValueType();
+    auto strippedValueTy = valueTy->stripConcurrency(recurse, dropGlobalActor);
+
+    return keyTy->isEqual(strippedKeyTy) && valueTy->isEqual(strippedValueTy)
+               ? Type(this)
+               : DictionaryType::get(strippedKeyTy, strippedValueTy);
   }
 
   return Type(this);
@@ -4105,6 +4212,19 @@ Type AnyFunctionType::getGlobalActor() const {
   }
 }
 
+LifetimeDependenceInfo AnyFunctionType::getLifetimeDependenceInfo() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getLifetimeDependenceInfo();
+  case TypeKind::GenericFunction:
+    // TODO: Handle GenericFunction
+    return LifetimeDependenceInfo();
+
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
 }
@@ -4144,7 +4264,7 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
-                 globalActor, thrownError);
+                 globalActor, thrownError, getLifetimeDependenceInfo());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4159,6 +4279,14 @@ bool AnyFunctionType::hasNonDerivableClangType() {
 
 bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
   return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
+}
+
+bool swift::hasIsolatedParameter(ArrayRef<AnyFunctionType::Param> params) {
+  for (auto &param : params) {
+    if (param.isIsolated())
+      return true;
+  }
+  return false;
 }
 
 ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
@@ -5028,48 +5156,49 @@ case TypeKind::Id:
     if (resultTy.getPointer() != function->getResult().getPointer())
       isUnchanged = false;
 
-    // Transform the thrown error.
-    Type thrownError;
-    if (Type origThrownError = function->getThrownError()) {
-      thrownError = origThrownError.transformWithPosition(pos, fn);
-      if (!thrownError)
-        return Type();
-
-      if (thrownError.getPointer() != origThrownError.getPointer())
-        isUnchanged = false;
-    }
-    
-    // Transform the global actor.
-    Type globalActorType;
-    if (Type origGlobalActorType = function->getGlobalActor()) {
-      globalActorType = origGlobalActorType.transformWithPosition(
-          TypePosition::Invariant, fn);
-      if (!globalActorType)
-        return Type();
-
-      if (globalActorType.getPointer() != origGlobalActorType.getPointer())
-        isUnchanged = false;
-    }
-
+    // Transform the extended info.
     llvm::Optional<ASTExtInfo> extInfo;
     if (function->hasExtInfo()) {
-      extInfo = function->getExtInfo()
-                    .withGlobalActor(globalActorType)
-                    .withThrows(function->isThrowing(), thrownError);
+      auto origExtInfo = function->getExtInfo();
+      extInfo = origExtInfo;
 
-      // If there was a generic thrown error and it substituted with
-      // 'any Error' or 'Never', map to 'throws' or non-throwing rather than
-      // maintaining the sugar.
-      if (auto origThrownError = function->getThrownError()) {
+      // Transform the thrown error.
+      if (Type origThrownError = origExtInfo.getThrownError()) {
+        Type thrownError = origThrownError.transformWithPosition(pos, fn);
+        if (!thrownError)
+          return Type();
+
+        if (thrownError.getPointer() != origThrownError.getPointer())
+          isUnchanged = false;
+
+        extInfo = extInfo->withThrows(true, thrownError);
+
+        // If there was a generic thrown error and it substituted with
+        // 'any Error' or 'Never', map to 'throws' or non-throwing rather than
+        // maintaining the sugar.
         if (origThrownError->isTypeParameter() ||
             origThrownError->isTypeVariableOrMember()) {
           // 'any Error'
           if (thrownError->isEqual(
-                  thrownError->getASTContext().getErrorExistentialType()))
+                  thrownError->getASTContext().getErrorExistentialType())) {
             extInfo = extInfo->withThrows(true, Type());
-          else if (thrownError->isNever())
+          } else if (thrownError->isNever()) {
             extInfo = extInfo->withThrows(false, Type());
+          }
         }
+      }
+
+      // Transform the global actor.
+      if (Type origGlobalActorType = origExtInfo.getGlobalActor()) {
+        Type globalActorType = origGlobalActorType.transformWithPosition(
+            TypePosition::Invariant, fn);
+        if (!globalActorType)
+          return Type();
+
+        if (globalActorType.getPointer() != origGlobalActorType.getPointer())
+          isUnchanged = false;
+
+        extInfo = extInfo->withGlobalActor(globalActorType);
       }
     }
 

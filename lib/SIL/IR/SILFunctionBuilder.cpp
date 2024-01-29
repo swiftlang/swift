@@ -209,6 +209,10 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setHasUnsafeNonEscapableResult(true);
   }
 
+  if (Attrs.hasAttribute<ResultDependsOnSelfAttr>()) {
+    F->setHasResultDependsOnSelf();
+  }
+
   // Validate `@differentiable` attributes by calling `getParameterIndices`.
   // This is important for:
   // - Skipping invalid `@differentiable` attributes in non-primary files.

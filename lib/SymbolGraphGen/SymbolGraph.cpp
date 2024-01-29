@@ -75,7 +75,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
+#define TYPE_ATTR(X, C) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
 #include "swift/AST/Attr.def"
 
   // Allow the following type attributes:
@@ -131,7 +131,7 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
 
   #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
     Options.ExcludeAttrList.push_back(DAK_##CLASS);
-  #define TYPE_ATTR(X) \
+  #define TYPE_ATTR(X, C) \
     Options.ExcludeAttrList.push_back(TAK_##X);
   #include "swift/AST/Attr.def"
 
@@ -261,11 +261,12 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
     case swift::DeclContextKind::AbstractClosureExpr:
+    case swift::DeclContextKind::SerializedAbstractClosure:
     case swift::DeclContextKind::Initializer:
     case swift::DeclContextKind::TopLevelCodeDecl:
+    case swift::DeclContextKind::SerializedTopLevelCodeDecl:
     case swift::DeclContextKind::SubscriptDecl:
     case swift::DeclContextKind::AbstractFunctionDecl:
-    case swift::DeclContextKind::SerializedLocal:
     case swift::DeclContextKind::Package:
     case swift::DeclContextKind::Module:
     case swift::DeclContextKind::FileUnit:

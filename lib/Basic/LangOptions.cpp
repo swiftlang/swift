@@ -32,6 +32,20 @@
 using namespace swift;
 
 LangOptions::LangOptions() {
+  // Add all promoted language features
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  Features.insert(Feature::FeatureName);
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#include "swift/Basic/Features.def"
+
+  // Special case: remove macro support if the compiler wasn't built with a
+  // host Swift.
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  Features.removeAll({Feature::Macros, Feature::FreestandingExpressionMacros,
+                      Feature::AttachedMacros, Feature::ExtensionMacros});
+#endif
+
   // Note: Introduce default-on language options here.
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
@@ -269,10 +283,6 @@ bool LangOptions::hasFeature(Feature feature) const {
   if (Features.contains(feature))
     return true;
 
-  if (feature == Feature::BareSlashRegexLiterals &&
-      EnableBareSlashRegexLiterals)
-    return true;
-
   if (auto version = getFeatureLanguageVersion(feature))
     return isSwiftVersionAtLeast(*version);
 
@@ -280,10 +290,12 @@ bool LangOptions::hasFeature(Feature feature) const {
 }
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
-  if (auto feature = getUpcomingFeature(featureName))
-    return hasFeature(*feature);
-
-  if (auto feature = getExperimentalFeature(featureName))
+  auto feature = llvm::StringSwitch<llvm::Optional<Feature>>(featureName)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  .Case(#FeatureName, Feature::FeatureName)
+#include "swift/Basic/Features.def"
+                     .Default(llvm::None);
+  if (feature)
     return hasFeature(*feature);
 
   return false;
@@ -571,8 +583,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
 llvm::StringRef swift::getFeatureName(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return #FeatureName;
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  case Feature::FeatureName:                                                   \
+    return #FeatureName;
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("covered switch");
@@ -580,10 +593,12 @@ llvm::StringRef swift::getFeatureName(Feature feature) {
 
 bool swift::isSuppressibleFeature(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return false;
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return true;
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  case Feature::FeatureName:                                                   \
+    return false;
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
+  case Feature::FeatureName:                                                   \
+    return true;
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("covered switch");
@@ -591,8 +606,9 @@ bool swift::isSuppressibleFeature(Feature feature) {
 
 bool swift::isFeatureAvailableInProduction(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-  case Feature::FeatureName: return true;
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  case Feature::FeatureName:                                                   \
+    return true;
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
   case Feature::FeatureName: return AvailableInProd;
 #include "swift/Basic/Features.def"
@@ -602,7 +618,7 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
 
 llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
   return llvm::StringSwitch<llvm::Optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
@@ -611,7 +627,7 @@ llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
 
 llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
   return llvm::StringSwitch<llvm::Optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
@@ -620,7 +636,7 @@ llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
 
 llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
 #include "swift/Basic/Features.def"
@@ -631,8 +647,9 @@ llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
 
 bool swift::includeInModuleInterface(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-  case Feature::FeatureName: return true;
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  case Feature::FeatureName:                                                   \
+    return true;
 #define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName, AvailableInProd) \
   case Feature::FeatureName: return false;
 #include "swift/Basic/Features.def"

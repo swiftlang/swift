@@ -136,7 +136,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::Once:
     case BuiltinValueKind::OnceWithContext:
     case BuiltinValueKind::GetObjCTypeEncoding:
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::WillThrow:
     case BuiltinValueKind::CondFailMessage:
     case BuiltinValueKind::PoundAssert:
@@ -187,8 +186,10 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroup:
     case BuiltinValueKind::CreateAsyncTaskWithExecutor:
     case BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor:
+    case BuiltinValueKind::CreateAsyncDiscardingTaskInGroupWithExecutor:
     case BuiltinValueKind::TaskRunInline:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     case BuiltinValueKind::ConvertTaskToJob:
@@ -208,6 +209,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     case BuiltinValueKind::AddressOfBorrowOpaque:
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
+    case BuiltinValueKind::DistributedActorAsAnyActor:
       return true;
     }
   }

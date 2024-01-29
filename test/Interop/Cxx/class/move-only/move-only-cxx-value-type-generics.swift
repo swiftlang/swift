@@ -4,6 +4,9 @@
 // REQUIRES: executable_test
 // REQUIRES: GH_ISSUE_70246
 
+// For -enable-experimental-feature NoncopyableGenerics
+// REQUIRES: asserts
+
 import MoveOnlyCxxValueType
 import StdlibUnittest
 

@@ -138,4 +138,4 @@ public func _RegexLiteralParsingFn(
 
 #warning("Regex parsing is disabled")
 
-#endif  // canImport(_CompilerRegexParser)
+#endif

@@ -1,4 +1,8 @@
 // RUN: %target-swift-emit-silgen -module-name test %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-silgen -enable-experimental-feature NoncopyableGenerics -module-name test %s | %FileCheck %s --enable-var-scope
+
+// For -enable-experimental-feature NoncopyableGenerics
+// REQUIRES: asserts
 
 class Retainable {}
 
@@ -27,3 +31,11 @@ func testHasStatic_1() {
 func testHasStatic_2() {
   _ = HasStatic.b.y
 }
+
+
+struct NormalType {}
+func expectWrapper(_ a : consuming NormalType) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test13expectWrapperyyAA10NormalTypeVnF : $@convention(thin) (NormalType) -> () {
+// CHECK:         bb0({{.*}} : @noImplicitCopy @_eagerMove $NormalType):
+// CHECK:           alloc_box ${ var @moveOnly NormalType }, var

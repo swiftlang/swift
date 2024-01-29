@@ -277,7 +277,9 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   // Create a borrow scope and a mark_dependence to prevent the enum being
   // optimized away.
   auto *borrow = lifetimeExtendBuilder.createBeginBorrow(loc, optionalSome);
-  auto *mdi = lifetimeExtendBuilder.createMarkDependence(loc, cvt, borrow);
+  auto *mdi =
+    lifetimeExtendBuilder.createMarkDependence(loc, cvt, borrow,
+                                               /*isNonEscaping*/false);
 
   // Replace all uses of the non escaping closure with mark_dependence
   SmallVector<Operand *, 4> convertUses;
@@ -402,7 +404,8 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
     if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(arg.get()))
       if (m->hasGuaranteedInitialKind())
         continue;
-    curr = b.createMarkDependence(pai->getLoc(), curr, arg.get());
+    curr = b.createMarkDependence(pai->getLoc(), curr, arg.get(),
+                                  /*isNonEscaping*/false);
   }
 
   return curr;

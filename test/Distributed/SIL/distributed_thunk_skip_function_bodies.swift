@@ -36,7 +36,7 @@ extension DA {
 
   // CHECK-SKIP-ALL-NOT: s38distributed_thunk_skip_function_bodies2DAC13inlinableFuncyyF
 
-  // CHECK-SKIP-NONINLINE-LABEL: sil [serialized] [distributed] [ossa] @$s38distributed_thunk_skip_function_bodies2DAC13inlinableFuncyyF : $@convention(method) (@guaranteed DA) -> () {
+  // CHECK-SKIP-NONINLINE-LABEL: sil [serialized] [distributed] [ossa] @$s38distributed_thunk_skip_function_bodies2DAC13inlinableFuncyyF : $@convention(method) (@isolated @guaranteed DA) -> () {
   // CHECK-SKIP-NONINLINE:         function_ref @$s38distributed_thunk_skip_function_bodies9blackHoleyyxlF
   // CHECK-SKIP-NONINLINE:       } // end sil function '$s38distributed_thunk_skip_function_bodies2DAC13inlinableFuncyyF'
   @inlinable public distributed func inlinableFunc() {

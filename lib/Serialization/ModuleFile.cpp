@@ -91,6 +91,19 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
   return ctxTarget.isOSVersionLT(moduleTarget);
 }
 
+std::string ModuleFile::resolveModuleDefiningFilename(const ASTContext &ctx) {
+  if (!Core->ModuleInterfacePath.empty()) {
+    std::string interfacePath = Core->ModuleInterfacePath.str();
+    if (llvm::sys::path::is_relative(interfacePath)) {
+      SmallString<128> absoluteInterfacePath(ctx.SearchPathOpts.getSDKPath());
+      llvm::sys::path::append(absoluteInterfacePath, interfacePath);
+      return absoluteInterfacePath.str().str();
+    } else
+      return interfacePath;
+  } else
+    return getModuleLoadedFilename().str();
+}
+
 namespace swift {
 namespace serialization {
 bool areCompatible(const llvm::Triple &moduleTarget,
@@ -257,6 +270,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   }
 
   ASTContext &ctx = getContext();
+  // Resolve potentially-SDK-relative module-defining .swiftinterface path
+  ResolvedModuleDefiningFilename = resolveModuleDefiningFilename(ctx);
 
   llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
   if (!areCompatible(moduleTarget, ctx.LangOpts.Target)) {
@@ -405,6 +420,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(newBuf), nullptr, nullptr,
       /*isFramework=*/isFramework, Ctx.SILOpts.EnableOSSAModules,
+      Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics),
       Ctx.LangOpts.SDKName, Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
   Name = loadedModuleFile->Name.str();
