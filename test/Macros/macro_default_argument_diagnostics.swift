@@ -50,10 +50,10 @@ func testObject(color: Stringified<MyLiteral> = #stringify(#colorLiteral(red: 0.
 
 let myString = "oops"
 
-// expected-error@+1{{argument to macro used as default argument must be literal}}
+// expected-error@+1{{only literals are permitted}}
 func testIdentifier(notOkay: Stringified<String> = #stringify(myString)) {}
 
-// expected-error@+1{{argument to macro used as default argument must be literal}}
+// expected-error@+1{{only literals are permitted}}
 func testString(interpolated: Stringified<String> = #stringify("Hello \(0b10001)")) {}
 
 // expected-error@+1{{macro 'stringify' is internal and cannot be referenced from a default argument value}}

@@ -54,6 +54,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -1033,18 +1034,16 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
     return false;
   }
 
-  auto macroExpansionExpr = cast<MacroExpansionExpr>(initExpr);
-  // only allow arguments that are literals
-  auto args = macroExpansionExpr->getArgs();
-  for (auto arg : *args)
-    if (!isa<LiteralExpr>(arg.getExpr()) ||
-        isa<InterpolatedStringLiteralExpr>(arg.getExpr())) {
-      ctx.Diags.diagnose(
-          arg.getExpr()->getLoc(),
-          diag::macro_as_default_argument_arguments_must_be_literal);
-      return false;
-    }
-  return true;
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  auto *DC = param->getInnermostDeclContext();
+  const SourceFile *SF = DC->getParentSourceFile();
+  return swift_ASTGen_checkDefaultArgumentMacroExpression(
+      &ctx.Diags, SF->getExportedSourceFile(),
+      initExpr->getLoc().getOpaquePointerValue());
+#else
+  ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_unsupported));
+  return false;
+#endif
 }
 
 void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,

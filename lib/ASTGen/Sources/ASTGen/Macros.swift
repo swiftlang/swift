@@ -179,6 +179,53 @@ fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
   return stringSegment.content.text
 }
 
+/// Checks if the macro expression used as an default argument has any issues.
+///
+/// - Returns: `true` if all restrictions are satisfied, `false` if diagnostics
+/// are emitted.
+@_cdecl("swift_ASTGen_checkDefaultArgumentMacroExpression")
+func checkDefaultArgumentMacroExpression(
+  diagEnginePtr: UnsafeMutableRawPointer,
+  sourceFilePtr: UnsafeRawPointer,
+  macroLocationPtr: UnsafePointer<UInt8>
+) -> Bool {
+  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+
+  // Find the macro expression.
+  guard
+    let macroExpr = findSyntaxNodeInSourceFile(
+      sourceFilePtr: sourceFilePtr,
+      sourceLocationPtr: macroLocationPtr,
+      type: MacroExpansionExprSyntax.self
+    )
+  else {
+    // FIXME: Produce an error
+    return false
+  }
+
+  do {
+    try macroExpr.checkDefaultArgumentMacroExpression()
+    return true
+  } catch let errDiags as DiagnosticsError {
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(sourceFilePtr)
+    for diag in errDiags.diagnostics {
+      srcMgr.diagnose(diagnostic: diag)
+    }
+    return false
+  } catch let error {
+    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    srcMgr.insert(sourceFilePtr)
+    srcMgr.diagnose(
+      diagnostic: .init(
+        node: macroExpr,
+        message: ASTGenMacroDiagnostic.thrownError(error)
+      )
+    )
+    return false
+  }
+}
+
 /// Check a macro definition, producing a description of that macro definition
 /// for use in macro expansion.
 ///

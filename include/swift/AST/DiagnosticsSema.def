@@ -7526,9 +7526,6 @@ ERROR(macro_attached_to_invalid_decl,none,
 ERROR(macro_as_default_argument, none,
       "non-built-in macro cannot be used as default argument",
       ())
-ERROR(macro_as_default_argument_arguments_must_be_literal, none,
-      "argument to macro used as default argument must be literal",
-      ())
 ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
