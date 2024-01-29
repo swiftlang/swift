@@ -431,6 +431,8 @@ bool ObjectMemoryReader::queryDataLayout(DataLayoutQueryType type,
     }
     return true;
   }
+  case DLQ_GetObjCInteropIsEnabled:
+    break;
   }
 
   return false;

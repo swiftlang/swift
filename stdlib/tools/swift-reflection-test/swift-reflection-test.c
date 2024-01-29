@@ -180,6 +180,8 @@ static int PipeMemoryReader_queryDataLayout(void *Context,
       }
       return 1;
     }
+    case DLQ_GetObjCInteropIsEnabled:
+      break;
   }
 
   return 0;

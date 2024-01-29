@@ -647,8 +647,11 @@ public:
 
       auto classMeta = cast<TargetClassMetadata>(meta);
       while (stripSignedPointer(classMeta->Superclass)) {
-        classMeta = cast<TargetClassMetadata>(
-            readMetadata(stripSignedPointer(classMeta->Superclass)));
+        meta = readMetadata(stripSignedPointer(classMeta->Superclass));
+        if (!meta || meta->getKind() != MetadataKind::Class)
+          return llvm::None;
+
+        classMeta = cast<TargetClassMetadata>(meta);
 
         // Subtract the size contribution of the isa and retain counts from
         // the super class.
