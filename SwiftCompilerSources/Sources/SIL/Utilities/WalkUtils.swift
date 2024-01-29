@@ -779,7 +779,10 @@ extension AddressUseDefWalker {
       }
     case let mdi as MarkDependenceInst:
       return walkUp(address: mdi.operands[0].value, path: path)
-    default:
+    case is MoveOnlyWrapperToCopyableAddrInst,
+         is CopyableToMoveOnlyWrapperAddrInst:
+      return walkUp(address: (def as! Instruction).operands[0].value, path: path)
+  default:
       return rootDef(address: def, path: path)
     }
   }

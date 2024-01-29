@@ -269,6 +269,14 @@ extension TupleExtractInst {
   public var canForwardOwnedValues: Bool { false }
 }
 
+extension CopyableToMoveOnlyWrapperValueInst {
+  public var preservesRepresentation: Bool { true }
+}
+
+extension MoveOnlyWrapperToCopyableValueInst {
+  public var preservesRepresentation: Bool { true }
+}
+
 extension TuplePackExtractInst {
   public var preservesRepresentation: Bool { true }
   public var canForwardOwnedValues: Bool { false }
