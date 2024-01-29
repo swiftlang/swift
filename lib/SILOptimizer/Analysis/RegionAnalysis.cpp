@@ -2627,12 +2627,20 @@ TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
 // ref_element_addr to be merged into.
 TranslationSemantics
 PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
-  // If we are accessing a let of a Sendable type, do not treat the
-  // ref_element_addr as an assign.
-  if (reai->getField()->isLet() && !isNonSendableType(reai->getType())) {
-    LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
-    return TranslationSemantics::Ignored;
+  // If our field is a NonSendableType...
+  if (!isNonSendableType(reai->getType())) {
+    // And the field is a let... then ignore it. We know that we cannot race on
+    // any writes to the field.
+    if (reai->getField()->isLet()) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
+      return TranslationSemantics::Ignored;
+    }
+
+    // Otherwise, we need to treat the access to the field as a require since we
+    // could have a race on assignment to the class.
+    return TranslationSemantics::Require;
   }
+
   return TranslationSemantics::Assign;
 }
 
