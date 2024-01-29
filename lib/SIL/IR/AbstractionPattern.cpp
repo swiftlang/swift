@@ -1270,11 +1270,6 @@ AbstractionPattern::getFunctionThrownErrorType(
     if (!substErrorType)
       return llvm::None;
 
-    if (!(*substErrorType)->isEqual(ctx.getErrorExistentialType())) {
-      llvm::errs() << "unsupported reabstraction\n";
-      abort();
-    }
-
     return std::make_pair(AbstractionPattern(*substErrorType),
                           (*substErrorType)->getCanonicalType());
   }
