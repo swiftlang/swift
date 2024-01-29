@@ -19,6 +19,19 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-sil-based-debuginfo")
 endif()
 
+option(SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE
+       "On Darwin platforms, link the standard library in a way that
+       allows inclusion in the dyld shared cache"
+       FALSE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
+   LLVM_LINKER_IS_APPLE AND
+   NOT SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE)
+  set(shared_cache_link_flags "LINKER:-not_for_dyld_shared_cache")
+  list(APPEND SWIFT_RUNTIME_LINK_FLAGS ${shared_cache_link_flags})
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
+endif()
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)

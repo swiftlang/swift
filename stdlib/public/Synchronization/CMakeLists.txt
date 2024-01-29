@@ -32,6 +32,9 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     "-enable-experimental-feature" "RawLayout"
     "-enable-experimental-feature" "StaticExclusiveOnly"
 
+  LINK_FLAGS
+    "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+
   INSTALL_IN_COMPONENT
     stdlib
 

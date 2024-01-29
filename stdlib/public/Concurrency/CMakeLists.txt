@@ -173,6 +173,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -diagnostic-style swift
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
   ${swift_concurrency_options}
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR zippered
 )
