@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -parse-stdlib -debug-constraints > %t.log 2>&1
+// RUN: %target-typecheck-verify-swift -enable-builtin-module -debug-constraints > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
-import Swift
+import Builtin
 
 
 func takeDoubleAndBool(_: Double, _: Bool) { }

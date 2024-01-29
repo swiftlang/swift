@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -parse-stdlib \
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -enable-builtin-module \
 // RUN: -debug-info-format=codeview -O -parse-as-library \
 // RUN: -module-name DoubleInlines -o - | %FileCheck %s
 
@@ -16,3 +16,5 @@ func callCondFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {
 // CHECK: ![[SCOPEONE]] = !DILocation(line: 0, scope: ![[SCOPETWO:.*]], inlinedAt: ![[SCOPETHREE:.*]])
 // CHECK: ![[SCOPETHREE]] = !DILocation(line: 6, scope: ![[FUNCSCOPE:.*]])
 // CHECK: ![[FUNCSCOPE:[0-9]+]] = distinct !DILexicalBlock(scope: ![[FUNC]],
+
+import Builtin
