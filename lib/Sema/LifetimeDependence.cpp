@@ -35,15 +35,15 @@ std::string LifetimeDependenceInfo::getString() const {
     }
     return result;
   };
-  if (!inheritLifetimeParamIndices->isEmpty()) {
+  if (inheritLifetimeParamIndices && !inheritLifetimeParamIndices->isEmpty()) {
     lifetimeDependenceString =
         "_inherit(" + getOnIndices(inheritLifetimeParamIndices) + ")";
   }
-  if (!borrowLifetimeParamIndices->isEmpty()) {
+  if (borrowLifetimeParamIndices && !borrowLifetimeParamIndices->isEmpty()) {
     lifetimeDependenceString +=
         "_borrow(" + getOnIndices(borrowLifetimeParamIndices) + ")";
   }
-  if (!mutateLifetimeParamIndices->isEmpty()) {
+  if (mutateLifetimeParamIndices && !mutateLifetimeParamIndices->isEmpty()) {
     lifetimeDependenceString +=
         "_mutate(" + getOnIndices(mutateLifetimeParamIndices) + ")";
   }
