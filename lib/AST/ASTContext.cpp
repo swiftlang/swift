@@ -995,7 +995,8 @@ DECL_CLASS *ASTContext::get##NAME##Decl() const { \
       } \
     } \
   } \
-  return synthesizeBuiltinDecl<DECL_CLASS>(*this, #NAME); \
+  getImpl().NAME##Decl = synthesizeBuiltinDecl<DECL_CLASS>(*this, #NAME); \
+  return getImpl().NAME##Decl; \
 } \
 \
 Type ASTContext::get##NAME##Type() const { \
