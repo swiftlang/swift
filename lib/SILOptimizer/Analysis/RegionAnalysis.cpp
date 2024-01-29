@@ -2410,7 +2410,6 @@ CONSTANT_TRANSLATION(VectorInst, Unhandled)
 CONSTANT_TRANSLATION(TuplePackElementAddrInst, Unhandled)
 CONSTANT_TRANSLATION(TuplePackExtractInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementGetInst, Unhandled)
-CONSTANT_TRANSLATION(RefTailAddrInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
@@ -2629,11 +2628,33 @@ TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
 TranslationSemantics
 PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
   // If we are accessing a let of a Sendable type, do not treat the
-  // ref_element_addr as a require use.
+  // ref_element_addr as an assign.
   if (reai->getField()->isLet() && !isNonSendableType(reai->getType())) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a let! Not tracking!\n");
     return TranslationSemantics::Ignored;
   }
+  return TranslationSemantics::Assign;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitRefTailAddrInst(RefTailAddrInst *reai) {
+  // If our trailing type is Sendable...
+  if (!isNonSendableType(reai->getType())) {
+    // And our ref_tail_addr is immutable... we can ignore the access since we
+    // cannot race against a write to any of these fields.
+    if (reai->isImmutable()) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "    Found an immutable Sendable ref_tail_addr! Not tracking!\n");
+      return TranslationSemantics::Ignored;
+    }
+
+    // Otherwise, we need a require since the value maybe alive.
+    return TranslationSemantics::Require;
+  }
+
+  // If we have a NonSendable type, treat the address as a separate Element from
+  // our base value.
   return TranslationSemantics::Assign;
 }
 
