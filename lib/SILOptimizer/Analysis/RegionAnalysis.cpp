@@ -2328,6 +2328,7 @@ CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
 CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Store)
+CONSTANT_TRANSLATION(StoreUnownedInst, Store)
 
 //===---
 // Ignored
@@ -2455,7 +2456,6 @@ CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
 CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
 CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
 CONSTANT_TRANSLATION(TestSpecificationInst, Unhandled)
-CONSTANT_TRANSLATION(StoreUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
 
 //===---
