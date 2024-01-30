@@ -7454,6 +7454,8 @@ scalar_pack_index
 
   sil-instruction ::= 'scalar_pack_index' int-literal 'of' sil-type
 
+  %index = scalar_pack_index 0 of $Pack{Int, repeat each T, Int}
+
 Produce the dynamic pack index of a scalar (non-pack-expansion)
 component of a pack.  The type operand is the indexed pack type.  The
 integer operand is an index into the components of this pack type; it
@@ -7573,6 +7575,8 @@ pack_element_get
 
   sil-instruction ::= 'pack_element_get' sil-value 'of' sil-operand 'as' sil-type
 
+  %addr = pack_element_get %index of %pack : $*Pack{Int, repeat each T} as $*Int
+
 Extracts the value previously stored in a pack at a particular index.
 If the pack element is uninitialized, this has undefined behavior.
 
@@ -7590,6 +7594,8 @@ pack_element_set
 ::
 
   sil-instruction ::= 'pack_element_set' sil-operand 'into' sil-value 'of' sil-operand
+
+  pack_element_set %addr : $*@pack_element("...") each U into %index of %pack : $*Pack{Int, repeat each T}
 
 Places a value in a pack at a particular index.
 
