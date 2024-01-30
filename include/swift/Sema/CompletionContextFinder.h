@@ -28,7 +28,8 @@ class CompletionContextFinder : public ASTWalker {
   enum class ContextKind {
     FallbackExpression,
     StringInterpolation,
-    Closure,
+    SingleStmtClosure,
+    MultiStmtClosure,
     ErrorExpression
   };
 
