@@ -381,6 +381,8 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
   if (!ip)
     llvm_unreachable("not an invertible protocol");
 
+  auto file = cast<FileUnit>(nominal->getModuleScopeContext());
+
   // Generates a conformance for the nominal to the protocol.
   // The conformanceDC specifies THE decl context to use for the conformance.
   auto generateConformance =
@@ -430,7 +432,6 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     nominal->addExtension(ext);
 
     // Make it accessible to getTopLevelDecls() so it gets type-checked.
-    auto file = cast<FileUnit>(nominal->getModuleScopeContext());
     file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
 
     // Then create the conformance using the extension as the conformance's
@@ -469,8 +470,10 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     //
     // I'm currently unsure what happens when rebuilding a module from its
     // interface, so this might not be unreachable code just yet.
-    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
+        file->getKind() != FileUnitKind::Synthesized) {
       llvm_unreachable("when can this actually happen??");
+    }
 
     // If there's no inverse, we infer a positive IP conformance.
     return generateConformance(nominal);
