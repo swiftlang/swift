@@ -50,6 +50,12 @@ extension Context {
   }
 
   func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
+
+  func lookupFunction(name: String) -> Function? {
+    name._withBridgedStringRef {
+      _bridged.lookupFunction($0).function
+    }
+  }
 }
 
 /// A context which allows mutation of a function's SIL.

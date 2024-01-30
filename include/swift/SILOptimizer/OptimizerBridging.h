@@ -215,6 +215,10 @@ struct BridgedPassContext {
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
+  SWIFT_IMPORT_UNSAFE BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
+                                                            SwiftInt numDeadArgs,
+                                                            BridgedFunction function) const;
+
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
                                                             bool isPrivate) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
@@ -274,6 +278,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDefaultWitnessTable getFirstDefaultWitnessTableInModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE static OptionalBridgedDefaultWitnessTable getNextDefaultWitnessTableInModule(
                                                                                   BridgedDefaultWitnessTable table);
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction loadFunction(BridgedStringRef name,
                                                                           bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
@@ -281,6 +286,12 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
+  SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunction(BridgedStringRef name,
+                                                                const BridgedParameterInfo * _Nullable bridgedParams,
+                                                                SwiftInt paramCount,
+                                                                bool hasSelfParam,
+                                                                BridgedFunction fromFunc) const;
+  void moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const;
 
   // Passmanager housekeeping
 

@@ -364,6 +364,11 @@ getNextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
   return {&*nextIter};
 }
 
+OptionalBridgedFunction BridgedPassContext::lookupFunction(BridgedStringRef name) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpFunction(name.unbridged())};
+}
+
 OptionalBridgedFunction BridgedPassContext::loadFunction(BridgedStringRef name, bool loadCalleesRecursively) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {mod->loadFunction(name.unbridged(),

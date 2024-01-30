@@ -1657,6 +1657,17 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   return Mangler.mangle();
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
+                                                          SwiftInt numDeadArgs,
+                                                          BridgedFunction function) const {
+  SILFunction *f = function.getFunction();
+  Mangle::FunctionSignatureSpecializationMangler Mangler(Demangle::SpecializationPass::FunctionSignatureOpts,                                                        f->isSerialized(), f);
+  for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
+    Mangler.setArgumentDead((unsigned)idx);
+  }
+  return Mangler.mangle();
+}
+
 BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, bool isPrivate) const {
   return {SILGlobalVariable::create(
       *invocation->getPassManager()->getModule(),
@@ -1717,6 +1728,54 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
       return true;
   }
   return false;
+}
+
+BridgedFunction BridgedPassContext::
+createSpecializedFunction(BridgedStringRef name,
+                          const BridgedParameterInfo * _Nullable bridgedParams,
+                          SwiftInt paramCount,
+                          bool hasSelfParam,
+                          BridgedFunction fromFunc) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  SILFunction *fromFn = fromFunc.getFunction();
+
+  llvm::SmallVector<SILParameterInfo> params;
+  for (unsigned idx = 0; idx < paramCount; ++idx) {
+    params.push_back(bridgedParams[idx].unbridged());
+  }
+
+  CanSILFunctionType fTy = fromFn->getLoweredFunctionType();
+  assert(fromFn->getGenericSignature().isNull() && "generic functions are not supported");
+
+  auto extInfo = fTy->getExtInfo();
+  if (fTy->hasSelfParam() && !hasSelfParam)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  CanSILFunctionType newTy = SILFunctionType::get(
+      /*GenericSignature=*/nullptr, extInfo, fTy->getCoroutineKind(),
+      fTy->getCalleeConvention(), params, fTy->getYields(),
+      fTy->getResults(), fTy->getOptionalErrorResult(),
+      SubstitutionMap(), SubstitutionMap(),
+      mod->getASTContext());
+
+  SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
+
+  SILFunction *newF = functionBuilder.createFunction(
+    SILLinkage::Shared, name.unbridged(), newTy, nullptr, fromFn->getLocation(), fromFn->isBare(),
+    fromFn->isTransparent(), fromFn->isSerialized(), IsNotDynamic, IsNotDistributed,
+    IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
+    fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(), fromFn->getEffectsKind(),
+    nullptr, fromFn->getDebugScope());
+
+  return {newF};
+}
+
+void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const {
+  SILFunction *sourceFn = sourceFunc.getFunction();
+  SILFunction *destFn = destFunc.getFunction();
+  destFn->moveAllBlocksFromOtherFunction(sourceFn);
+  invocation->getPassManager()->invalidateAnalysis(sourceFn, SILAnalysis::InvalidationKind::Everything);
+  invocation->getPassManager()->invalidateAnalysis(destFn, SILAnalysis::InvalidationKind::Everything);
 }
 
 bool FullApplySite_canInline(BridgedInstruction apply) {
