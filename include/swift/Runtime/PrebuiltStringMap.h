@@ -160,7 +160,10 @@ struct PrebuiltStringMap {
 
     size_t numSearched = 0;
     while (const char *key = array()[index].key) {
-      if (strcmp(key, toFind) == 0)
+      // key is NUL terminated but toFind may not be. Check that they have equal
+      // contents up to len, and check that key has a terminating NUL at the
+      // right point.
+      if (strncmp(key, toFind, len) == 0 && key[len] == 0)
         return &array()[index];
 
       index = index + 1;
