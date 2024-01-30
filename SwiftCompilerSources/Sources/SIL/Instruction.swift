@@ -41,6 +41,8 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.isDeleted()
   }
 
+  final public var isInStaticInitializer: Bool { bridged.isInStaticInitializer() }
+
   final public var operands: OperandArray {
     let operands = bridged.getOperands()
     return OperandArray(base: operands.base, count: operands.count)

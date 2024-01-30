@@ -175,6 +175,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE SILStage getSILStage() const;
   BRIDGED_INLINE bool hadError() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;
+  BRIDGED_INLINE bool isTransforming(BridgedFunction function) const;
 
   // Analysis
 

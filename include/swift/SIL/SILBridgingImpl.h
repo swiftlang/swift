@@ -774,6 +774,10 @@ bool BridgedInstruction::isDeleted() const {
   return unbridged()->isDeleted();
 }
 
+bool BridgedInstruction::isInStaticInitializer() const {
+  return unbridged()->isStaticInitializerInst();
+}
+
 BridgedOperandArray BridgedInstruction::getOperands() const {
   auto operands = unbridged()->getAllOperands();
   return {{operands.data()}, (SwiftInt)operands.size()};

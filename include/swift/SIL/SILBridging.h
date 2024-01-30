@@ -700,6 +700,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction getLastInstOfParent() const;
   BRIDGED_INLINE bool isDeleted() const;
+  BRIDGED_INLINE bool isInStaticInitializer() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandArray getOperands() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandArray getTypeDependentOperands() const;
   BRIDGED_INLINE void setOperand(SwiftInt index, BridgedValue value) const;

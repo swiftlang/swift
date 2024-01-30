@@ -155,6 +155,10 @@ bool BridgedPassContext::moduleIsSerialized() const {
   return invocation->getPassManager()->getModule()->isSerialized();
 }
 
+bool BridgedPassContext::isTransforming(BridgedFunction function) const {
+  return invocation->getFunction() == function.getFunction();
+}
+
 BridgedAliasAnalysis BridgedPassContext::getAliasAnalysis() const {
   return {invocation->getPassManager()->getAnalysis<swift::AliasAnalysis>(invocation->getFunction())};
 }
