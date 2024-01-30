@@ -576,6 +576,23 @@ SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
+SourceLoc Parser::consumeAttributeLParen() {
+  SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
+  if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
+    diagnose(LastTokenEndLoc, diag::attr_extra_whitespace_before_lparen)
+        .warnUntilSwiftVersion(6);
+  }
+  return consumeToken(tok::l_paren);
+}
+
+bool Parser::consumeIfAttributeLParen() {
+  if (!Tok.isFollowingLParen()) {
+    return false;
+  }
+  consumeAttributeLParen();
+  return true;
+}
+
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
   // Consumes prefix of token and returns its location.
   // (like '?', '<', '>' or '!' immediately followed by '<') 

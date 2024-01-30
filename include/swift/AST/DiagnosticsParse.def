@@ -1514,6 +1514,9 @@ ERROR(decl_attribute_applied_to_type,none,
 ERROR(attr_extra_whitespace_after_at,PointsToFirstBadToken,
       "extraneous whitespace between '@' and attribute name", ())
 
+ERROR(attr_extra_whitespace_before_lparen,PointsToFirstBadToken,
+      "extraneous whitespace between attribute name and '('", ())
+
 ERROR(attr_expected_lparen,none,
 "expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 

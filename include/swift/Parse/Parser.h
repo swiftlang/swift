@@ -602,6 +602,18 @@ public:
     return true;
   }
 
+  /// Consume a '('. If it is not directly following the previous token, emit an
+  /// error (Swift 6) or warning (Swift <6) that attribute name and parentheses
+  /// must not be separated by a space.
+  SourceLoc consumeAttributeLParen();
+
+  /// If the next token is a '(' that's not on a new line consume it, and error
+  /// (Swift 6) or warn (Swift <6) that the attribute must not be separted from
+  /// the '(' by a space.
+  ///
+  /// If the next token is not '(' or it's on a new line, return false.
+  bool consumeIfAttributeLParen();
+
   bool consumeIfNotAtStartOfLine(tok K) {
     if (Tok.isAtStartOfLine()) return false;
     return consumeIf(K);
