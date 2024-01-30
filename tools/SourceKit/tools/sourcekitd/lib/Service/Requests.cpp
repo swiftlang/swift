@@ -2903,7 +2903,9 @@ static void findRelatedIdents(StringRef PrimaryFilePath,
           Elem.set(KeyLength, R.Length);
           Elem.set(KeyNameType, renameLocUsageUID(R.Usage));
         }
-        RespBuilder.getDictionary().set(KeyName, Info.OldName);
+        if (Info.OldName) {
+          RespBuilder.getDictionary().set(KeyName, *Info.OldName);
+        }
 
         Rec(RespBuilder.createResponse());
       });

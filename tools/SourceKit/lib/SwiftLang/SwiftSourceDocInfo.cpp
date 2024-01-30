@@ -2550,7 +2550,10 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
 
       RenameLocs Locs = localRenameLocs(SrcFile, Info->VD);
 
-      std::string OldName = Locs.getLocations().front().OldName.str();
+      std::optional<std::string> OldName;
+      if (!Locs.getLocations().empty()) {
+        OldName = Locs.getLocations().front().OldName.str();
+      }
 #ifndef NDEBUG
       for (auto loc : Locs.getLocations()) {
         assert(loc.OldName == OldName &&

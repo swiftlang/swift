@@ -792,10 +792,10 @@ struct RelatedIdentInfo {
 /// Result of `findRelatedIdentifiersInFile`.
 struct RelatedIdentsResult {
   SmallVector<RelatedIdentInfo, 8> RelatedIdents;
-  std::string OldName;
+  std::optional<std::string> OldName;
 
   RelatedIdentsResult(SmallVector<RelatedIdentInfo, 8> RelatedIdents,
-                      std::string OldName)
+                      std::optional<std::string> OldName)
       : RelatedIdents(RelatedIdents), OldName(OldName) {}
 
   static RelatedIdentsResult empty() { return RelatedIdentsResult({}, ""); }
