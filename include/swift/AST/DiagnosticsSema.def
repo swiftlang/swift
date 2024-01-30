@@ -7807,10 +7807,22 @@ ERROR(pack_iteration_where_clause_not_supported, none,
        "functions, methods, initializers",
        ())
  ERROR(lifetime_dependence_invalid_return_type, none,
-       "lifetime dependence specifiers can only be specifier on ~Escapable "
-       "results", ())
+       "lifetime dependence can only be specified on ~Escapable results", ())
  ERROR(lifetime_dependence_missing_ownership_modifier, none,
        "lifetime dependence can only be specified on parameters with ownership "
        "modifiers (borrowing, consuming, inout)", ())
+ ERROR(lifetime_dependence_cannot_infer_wo_ownership_modifier_on_method, none,
+       "cannot infer lifetime dependence, specify ownership modifier for the "
+       "method",
+       ())
+ ERROR(lifetime_dependence_cannot_infer_wo_ambiguous_candidate, none,
+       "cannot infer lifetime dependence, multiple ~Escapable or ~Copyable "
+       "parameters with ownership modifiers, specify explicit lifetime "
+       "dependence",
+       ())
+ ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
+       "cannot infer lifetime dependence, no ~Escapable or ~Copyable "
+       "parameters with ownership modifiers present",
+       ())
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

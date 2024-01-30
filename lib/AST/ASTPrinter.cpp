@@ -7201,6 +7201,12 @@ public:
 
     Printer << " -> ";
 
+    if (T->hasLifetimeDependenceInfo()) {
+      auto lifetimeDependenceInfo = T->getExtInfo().getLifetimeDependenceInfo();
+      assert(!lifetimeDependenceInfo.empty());
+      Printer << lifetimeDependenceInfo.getString() << " ";
+    }
+
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
@@ -7359,6 +7365,11 @@ public:
         param.print(sub->Printer, subOptions);
       }
       sub->Printer << ") -> ";
+
+      auto lifetimeDependenceInfo = T->getLifetimeDependenceInfo();
+      if (!lifetimeDependenceInfo.empty()) {
+        sub->Printer << lifetimeDependenceInfo.getString() << " ";
+      }
 
       bool parenthesizeResults = mustParenthesizeResults(T);
       if (parenthesizeResults)

@@ -4186,9 +4186,10 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   bool async = claim<AsyncTypeAttr>(attrs);
   bool unimplementable = claim<UnimplementableTypeAttr>(attrs);
 
+  // TODO: Handle LifetimeDependenceInfo here.
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
-        representation, pseudogeneric, noescape, sendable, async,
-        unimplementable, diffKind, clangFnType);
+      representation, pseudogeneric, noescape, sendable, async, unimplementable,
+      diffKind, clangFnType, LifetimeDependenceInfo());
 
   // Resolve parameter and result types using the function's generic
   // environment.

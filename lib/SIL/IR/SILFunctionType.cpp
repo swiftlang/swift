@@ -2380,6 +2380,8 @@ static CanSILFunctionType getSILFunctionType(
                         .withConcurrent(isSendable)
                         .withAsync(isAsync)
                         .withUnimplementable(unimplementable)
+                        .withLifetimeDependenceInfo(
+                            extInfoBuilder.getLifetimeDependenceInfo())
                         .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,

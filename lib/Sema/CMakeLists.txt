@@ -35,6 +35,7 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformances.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
+  LifetimeDependence.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   PCMacro.cpp

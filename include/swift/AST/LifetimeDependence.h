@@ -17,12 +17,19 @@
 #ifndef SWIFT_AST_LIFETIMEDEPENDENCE_H
 #define SWIFT_AST_LIFETIMEDEPENDENCE_H
 
-#include "swift/AST/Decl.h"
+#include "swift/AST/Identifier.h"
+#include "swift/AST/IndexSubset.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
-#include "llvm/Support/TrailingObjects.h"
+#include "swift/Basic/SourceLoc.h"
+
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
+
+class AbstractFunctionDecl;
+class LifetimeDependentReturnTypeRepr;
 
 enum class LifetimeDependenceKind : uint8_t {
   Copy = 0,
@@ -93,6 +100,7 @@ public:
     assert(specifierKind == SpecifierKind::Ordered);
     return value.Ordered.index;
   }
+
   std::string getParamString() const {
     switch (specifierKind) {
     case SpecifierKind::Named:
@@ -104,7 +112,65 @@ public:
     }
     llvm_unreachable("Invalid LifetimeDependenceSpecifier::SpecifierKind");
   }
+
+  StringRef getLifetimeDependenceKindString() const {
+    switch (lifetimeDependenceKind) {
+    case LifetimeDependenceKind::Borrow:
+      return "_borrow";
+    case LifetimeDependenceKind::Consume:
+      return "_consume";
+    case LifetimeDependenceKind::Copy:
+      return "_copy";
+    case LifetimeDependenceKind::Mutate:
+      return "_mutate";
+    }
+    llvm_unreachable(
+        "Invalid LifetimeDependenceSpecifier::LifetimeDependenceKind");
+  }
 };
+
+class LifetimeDependenceInfo {
+  IndexSubset *inheritLifetimeParamIndices;
+  IndexSubset *borrowLifetimeParamIndices;
+  IndexSubset *mutateLifetimeParamIndices;
+
+  static LifetimeDependenceInfo getForParamIndex(AbstractFunctionDecl *afd,
+                                                 unsigned index,
+                                                 ValueOwnership ownership);
+
+  static llvm::Optional<LifetimeDependenceInfo>
+  fromTypeRepr(AbstractFunctionDecl *afd, Type resultType, bool allowIndex);
+
+  static llvm::Optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd,
+                                                      Type resultType);
+
+public:
+  LifetimeDependenceInfo()
+      : inheritLifetimeParamIndices(nullptr),
+        borrowLifetimeParamIndices(nullptr),
+        mutateLifetimeParamIndices(nullptr) {}
+  LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
+                         IndexSubset *borrowLifetimeParamIndices,
+                         IndexSubset *mutateLifetimeParamIndices)
+      : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
+        borrowLifetimeParamIndices(borrowLifetimeParamIndices),
+        mutateLifetimeParamIndices(mutateLifetimeParamIndices) {}
+
+  operator bool() const { return !empty(); }
+
+  bool empty() const {
+    return inheritLifetimeParamIndices == nullptr &&
+           borrowLifetimeParamIndices == nullptr &&
+           mutateLifetimeParamIndices == nullptr;
+  }
+
+  std::string getString() const;
+  void Profile(llvm::FoldingSetNodeID &ID) const;
+
+  static llvm::Optional<LifetimeDependenceInfo>
+  get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
+};
+
 } // namespace swift
 
 #endif

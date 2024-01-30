@@ -652,8 +652,8 @@ Type ASTBuilder::createImplFunctionType(
   }
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
-                   flags.isSendable(), flags.isAsync(),
-                   unimplementable, diffKind, clangFnType)
+                   flags.isSendable(), flags.isAsync(), unimplementable,
+                   diffKind, clangFnType, LifetimeDependenceInfo())
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
