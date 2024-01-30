@@ -30,6 +30,8 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
+// REQUIRES: rdar121923818
+
 @_silgen_name("putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
