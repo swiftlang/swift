@@ -1,12 +1,21 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
+
+// Also test this with a bridging header instead of the StdVector module.
+// RUN: %empty-directory(%t2)
+// RUN: cp %S/Inputs/std-vector.h %t2/std-vector-bridging-header.h
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-vector-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
+
 // FIXME: also run in C++20 mode when conformance works properly on UBI platform (rdar://109366764):
 // %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=gnu++20)
 //
 // REQUIRES: executable_test
 
 import StdlibUnittest
+#if !BRIDGING_HEADER
 import StdVector
+#endif
 import CxxStdlib
 
 var StdVectorTestSuite = TestSuite("StdVector")
@@ -130,6 +139,18 @@ StdVectorTestSuite.test("VectorOfInt subclass for loop") {
         count += 1
     }
     expectEqual(count, 2)
+}
+
+StdVectorTestSuite.test("VectorOfString subclass for loop") {
+    var v = VectorOfStringSubclass()
+    v.push_back(std.string("abc"))
+
+    var count: CInt = 0
+    for e in v {
+        expectEqual(std.string("abc"), e)
+        count += 1
+    }
+    expectEqual(count, 1)
 }
 
 runAllTests()
