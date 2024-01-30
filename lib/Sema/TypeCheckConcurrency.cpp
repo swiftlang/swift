@@ -882,7 +882,9 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     if (sourceFile)
       sourceFile->setImportUsedPreconcurrency(*import);
 
-    return nominal->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+    // `@preconcurrency` suppresses diagnostics until the imported
+    // module enables Swift 6.
+    return import->module.importedModule->isConcurrencyChecked()
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
   }
