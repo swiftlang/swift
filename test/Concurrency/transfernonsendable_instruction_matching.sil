@@ -1289,3 +1289,10 @@ bb0:
   return %9999 : $()
 }
 
+sil [ossa] @test_specification_test : $@async @convention(thin) () -> () {
+bb0:
+  specify_test "test_specification_parsing Vs @function[4].trace[0] howdy"
+  %9999 = tuple ()
+  return %9999 : $()
+}
+

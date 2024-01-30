@@ -2360,6 +2360,7 @@ CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
+CONSTANT_TRANSLATION(TestSpecificationInst, Ignored)
 
 //===---
 // Require
@@ -2455,7 +2456,6 @@ CONSTANT_TRANSLATION(AssignInst, Unhandled)
 CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
 CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
 CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
-CONSTANT_TRANSLATION(TestSpecificationInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
 
 //===---
