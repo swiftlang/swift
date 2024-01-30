@@ -142,11 +142,11 @@ public struct UTFTest {
   public let loc: SourceLoc
 
   public var utf32: [UInt32] {
-    return unicodeScalars.map(UInt32.init)
+    return unicodeScalars.map({ s in UInt32(s) })
   }
 
   public var utf32RepairedTail: [UInt32] {
-    return unicodeScalarsRepairedTail.map(UInt32.init)
+    return unicodeScalarsRepairedTail.map({ s in UInt32(s) })
   }
 
   public init(

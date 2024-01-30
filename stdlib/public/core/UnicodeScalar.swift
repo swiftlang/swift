@@ -380,6 +380,62 @@ extension UInt64 {
   }
 }
 
+/// Allows direct comparisons between UInt8 and double quoted literals.
+extension UInt8 {
+  /// Basic comparison operators
+  @_transparent @_alwaysEmitIntoClient
+  public static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    return i != UInt8(ascii: s)
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func <= (i: Self, s: Unicode.Scalar) -> Bool {
+    return i <= UInt8(ascii: s)
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func >= (i: Self, s: Unicode.Scalar) -> Bool {
+    return i >= UInt8(ascii: s)
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func < (i: Self, s: Unicode.Scalar) -> Bool {
+    return i < UInt8(ascii: s)
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func > (i: Self, s: Unicode.Scalar) -> Bool {
+    return i > UInt8(ascii: s)
+  }
+  /// Used in switch statements
+  @_transparent @_alwaysEmitIntoClient
+  public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+  /// Useful now and then
+  @_transparent @_alwaysEmitIntoClient
+  public static func - (i: Self, s: Unicode.Scalar) -> Self {
+    return i - UInt8(ascii: s)
+  }
+}
+
+extension UInt8? {
+  /// Basic equality operators
+  @_transparent @_alwaysEmitIntoClient
+  public static func == (i: Self, s: Unicode.Scalar) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+  @_transparent @_alwaysEmitIntoClient
+  public static func != (i: Self, s: Unicode.Scalar) -> Bool {
+    return i != UInt8(ascii: s)
+  }
+  /// Used in switch statements
+  @_transparent @_alwaysEmitIntoClient
+  public static func ~= (s: Unicode.Scalar, i: Self) -> Bool {
+    return i == UInt8(ascii: s)
+  }
+}
+
 extension Unicode.Scalar: Equatable {
   @inlinable
   public static func == (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {

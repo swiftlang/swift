@@ -1786,6 +1786,14 @@ ${operatorComment(x.operator, True)}
   }
 }
 
+extension ${Self} {
+  /// Construct with value `v.value`.
+  @inlinable @_alwaysEmitIntoClient
+  public init(unicode v: Unicode.Scalar) {
+    self = ${Self}(v.value)
+  }
+}
+
 
 extension ${Self}: Sendable { }
 
