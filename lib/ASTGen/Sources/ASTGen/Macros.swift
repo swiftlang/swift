@@ -17,7 +17,7 @@ import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxBuilder
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacroExpansion
+@_spi(ExperimentalLanguageFeature) @_spi(Compiler) import SwiftSyntaxMacroExpansion
 @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
 /// Describes a macro that has been "exported" to the C++ part of the
