@@ -146,6 +146,19 @@ braced2(x: {<#T##() -> Void#>}, y: Int)
 // CHECK-NEXT:  <#code#>
 // CHECK-NEXT:  }, y: Int)
 
+braced3({
+  #if true
+  <#T##() -> Int#>
+  #endif
+})
+// CHECK:      braced3({
+// CHECK-NEXT:   #if true
+// CHECK-NEXT:    {
+// CHECK-NEXT:      <#code#>
+// CHECK-NEXT:    }
+// CHECK-NEXT:    #endif
+// CHECK-NEXT:  })
+
 func returnTrailing() -> Int {
   return withtrail(<#T##() -> ()#>)
 // CHECK: return withtrail {

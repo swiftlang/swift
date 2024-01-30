@@ -8840,51 +8840,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   Fingerprint fp(std::move(currentHash));
 
   BraceStmt *BS = Body.get();
-  // Reset the single expression body status.
-  AFD->setHasSingleExpressionBody(false);
   AFD->setBodyParsed(BS, fp);
-
-  if (auto Element = BS->getSingleActiveElement()) {
-    if (auto *stmt = Element.dyn_cast<Stmt *>()) {
-      if (isa<FuncDecl>(AFD)) {
-        if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
-          if (!returnStmt->hasResult()) {
-            auto returnExpr = TupleExpr::createEmpty(Context,
-                                                     SourceLoc(),
-                                                     SourceLoc(),
-                                                     /*implicit*/true);
-            returnStmt->setResult(returnExpr);
-            AFD->setHasSingleExpressionBody();
-            AFD->setSingleExpressionBody(returnExpr);
-          }
-        }
-      }
-    } else if (auto *E = Element.dyn_cast<Expr *>()) {
-      if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
-        if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
-          // This is an assignment.  We don't want to implicitly return
-          // it.
-          return {BS, fp};
-        }
-      }
-      if (isa<FuncDecl>(AFD)) {
-        auto RS = ReturnStmt::createImplicit(Context, E);
-        BS->setLastElement(RS);
-        AFD->setHasSingleExpressionBody();
-        AFD->setSingleExpressionBody(E);
-      } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
-        if (F->isFailable() && isa<NilLiteralExpr>(E)) {
-          // If it's a nil literal, just insert return.  This is the only
-          // legal thing to return.
-          auto RS = ReturnStmt::createImplicit(Context, E);
-          BS->setLastElement(RS);
-          AFD->setHasSingleExpressionBody();
-          AFD->setSingleExpressionBody(E);
-        }
-      }
-    }
-  }
-
   return {BS, fp};
 }
 

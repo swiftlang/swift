@@ -1019,7 +1019,7 @@ BridgedClosureExpr_createParsed(BridgedASTContext cContext,
   auto *out = new (context) ClosureExpr(
       attributes, bracketRange, nullptr, nullptr, asyncLoc, throwsLoc,
       /*FIXME:thrownType=*/nullptr, arrowLoc, inLoc, nullptr, declContext);
-  out->setBody(body.unbridged(), true);
+  out->setBody(body.unbridged(), /*isSingleExpression*/ false);
   out->setParameterList(params);
   return out;
 }

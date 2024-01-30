@@ -1462,17 +1462,9 @@ namespace {
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
-  // If we have a single statement that can become an expression, turn it
-  // into an expression now.
-  auto *body = closure->getBody();
-  if (auto *S = body->getSingleActiveStatement()) {
-    if (S->mayProduceSingleValue(Ctx)) {
-      auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
-          Ctx, S, /*DC*/ closure, /*mustBeExpr*/ false);
-      body->setLastElement(ReturnStmt::createImplicit(Ctx, SVE));
-      closure->setBody(body, /*isSingleExpression*/ true);
-    }
-  }
+  // Pre-check the closure body.
+  (void)evaluateOrDefault(Ctx.evaluator, PreCheckClosureBodyRequest{closure},
+                          nullptr);
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
