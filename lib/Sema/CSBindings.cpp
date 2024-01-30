@@ -2522,6 +2522,17 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
                        FixKind::IgnoreCollectionElementContextualMismatch)) {
         return llvm::None;
       }
+      if (dstLocator->getAnchor().isExpr(ExprKind::CodeCompletion)) {
+        // Ignore the hole if it is because the right-hand-side of the pattern
+        // match is a code completion token. Assigning a high fix score to this
+        // mismatch won't help. In fact, it can harm because we might have a
+        // different exploration path in the constraint system that gives up
+        // earlier (eg. because code completion is in a closure that doesn't
+        // match the expected parameter of a function call) and might thus get a
+        // better score, despite not having any information about the code
+        // completion token at all.
+        return llvm::None;
+      }
       // Not being able to infer the type of a variable in a pattern binding
       // decl is more dramatic than anything that could happen inside the
       // expression because we want to preferrably point the diagnostic to a
