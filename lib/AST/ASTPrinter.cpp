@@ -3631,6 +3631,10 @@ static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMoveOnlyPartialReinitialization(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNoncopyableGenerics(Decl *decl) {
   auto checkMarking = [](auto &marking) -> bool {
     switch (marking.getInverse().getKind()) {

@@ -20,6 +20,7 @@
 #ifndef SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYTYPEUTILS_H
 #define SWIFT_SILOPTIMIZER_MANDATORY_MOVEONLYTYPEUTILS_H
 
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
@@ -127,6 +128,15 @@ public:
   }
 };
 
+inline Feature partialMutationFeature(PartialMutation::Kind kind) {
+  switch (kind) {
+  case PartialMutation::Kind::Consume:
+    return Feature::MoveOnlyPartialConsumption;
+  case PartialMutation::Kind::Reinit:
+    return Feature::MoveOnlyPartialReinitialization;
+  }
+}
+
 /// How a partial mutation (consume/reinit) is illegal for diagnostic emission.
 ///
 /// Emulates the following enum with associated value:
@@ -136,7 +146,9 @@ public:
 /// case hasDeinit(SILType, NominalTypeDecl)
 /// }
 class PartialMutationError {
-  struct FeatureDisabled {};
+  struct FeatureDisabled {
+    PartialMutation::Kind kind;
+  };
   struct HasDeinit {
     NominalTypeDecl &nominal;
   };
@@ -176,8 +188,9 @@ public:
     return Kind::HasDeinit;
   }
 
-  static PartialMutationError featureDisabled(SILType type) {
-    return PartialMutationError(type, FeatureDisabled{});
+  static PartialMutationError featureDisabled(SILType type,
+                                              PartialMutation::Kind kind) {
+    return PartialMutationError(type, FeatureDisabled{kind});
   }
 
   static PartialMutationError hasDeinit(SILType type,
@@ -186,6 +199,7 @@ public:
   }
 
   NominalTypeDecl &getNominal() { return kind.get<HasDeinit>().nominal; };
+  PartialMutation::Kind getKind() { return kind.get<FeatureDisabled>().kind; };
 };
 } // namespace siloptimizer
 } // namespace swift

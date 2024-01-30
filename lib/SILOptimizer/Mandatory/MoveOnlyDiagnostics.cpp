@@ -967,13 +967,11 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
   if (!pathString.empty())
     varName.append(pathString);
 
-  bool hasPartialConsumption =
-      astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
-  (void)hasPartialConsumption;
-
   switch (error) {
-  case PartialMutationError::Kind::FeatureDisabled:
-    assert(!hasPartialConsumption);
+  case PartialMutationError::Kind::FeatureDisabled: {
+    assert(!astContext.LangOpts.hasFeature(
+        partialMutationFeature(error.getKind())));
+
     switch (kind) {
     case PartialMutation::Kind::Consume:
       diagnose(astContext, user, diag::sil_movechecking_cannot_destructure,
@@ -988,8 +986,12 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     }
     registerDiagnosticEmitted(address);
     return;
+  }
   case PartialMutationError::Kind::HasDeinit: {
-    assert(hasPartialConsumption);
+    assert(
+        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
+        astContext.LangOpts.hasFeature(
+            Feature::MoveOnlyPartialReinitialization));
     switch (kind) {
     case PartialMutation::Kind::Consume:
       diagnose(astContext, user,
