@@ -13703,6 +13703,25 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   if (simplifiedBoundType->isTypeVariableOrMember())
     return formUnsolved();
 
+  std::function<GenericParamList *(ValueDecl *)> getGenericParams =
+      [&](ValueDecl *decl) -> GenericParamList * {
+    auto genericContext = decl->getAsGenericContext();
+    if (!genericContext)
+      return nullptr;
+
+    auto genericParams = genericContext->getGenericParams();
+    if (!genericParams) {
+      // If declaration is a non-generic typealias, let's point
+      // to the underlying generic declaration.
+      if (auto *TA = dyn_cast<TypeAliasDecl>(decl)) {
+        if (auto *UGT = TA->getUnderlyingType()->getAs<AnyGenericType>())
+          return getGenericParams(UGT->getDecl());
+      }
+    }
+
+    return genericParams;
+  };
+
   ValueDecl *decl;
   SmallVector<OpenedType, 2> openedTypes;
   if (auto *bound = dyn_cast<TypeAliasType>(type1.getPointer())) {
@@ -13759,27 +13778,19 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
     decl = overloadChoice.getDecl();
 
     auto openedOverloadTypes = getOpenedTypes(overloadLocator);
-    openedTypes.append(openedOverloadTypes.begin(), openedOverloadTypes.end());
-  }
 
-  std::function<GenericParamList *(ValueDecl *)> getGenericParams =
-      [&](ValueDecl *decl) -> GenericParamList * {
-    auto genericContext = decl->getAsGenericContext();
-    if (!genericContext)
-      return nullptr;
-
-    auto genericParams = genericContext->getGenericParams();
-    if (!genericParams) {
-      // If declaration is a non-generic typealias, let's point
-      // to the underlying generic declaration.
-      if (auto *TA = dyn_cast<TypeAliasDecl>(decl)) {
-        if (auto *UGT = TA->getUnderlyingType()->getAs<AnyGenericType>())
-          return getGenericParams(UGT->getDecl());
+    auto genericParams = getGenericParams(decl);
+    if (genericParams) {
+      for (auto gp : *genericParams) {
+        auto found = find_if(openedOverloadTypes, [&](auto entry) {
+          return entry.first->getDepth() == gp->getDepth() &&
+              entry.first->getIndex() == gp->getIndex();
+        });
+        assert(found != openedOverloadTypes.end());
+        openedTypes.push_back(*found);
       }
     }
-
-    return genericParams;
-  };
+  }
 
   if (!decl->getAsGenericContext())
     return SolutionKind::Error;
