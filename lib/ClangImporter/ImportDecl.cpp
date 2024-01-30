@@ -8055,11 +8055,14 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       parser.consumeTokenWithoutFeedingReceiver();
 
       bool hadError = false;
-      SourceLoc atLoc;
-      if (parser.consumeIf(tok::at_sign, atLoc)) {
-        hadError = parser.parseDeclAttribute(
-            MappedDecl->getAttrs(), atLoc, initContext,
-            /*isFromClangAttribute=*/true).isError();
+      if (parser.Tok.is(tok::at_sign)) {
+        SourceLoc atEndLoc = parser.Tok.getRange().getEnd();
+        SourceLoc atLoc = parser.consumeToken(tok::at_sign);
+        hadError = parser
+                       .parseDeclAttribute(MappedDecl->getAttrs(), atLoc,
+                                           atEndLoc, initContext,
+                                           /*isFromClangAttribute=*/true)
+                       .isError();
       } else {
         SourceLoc staticLoc;
         StaticSpellingKind staticSpelling;

@@ -1147,6 +1147,7 @@ public:
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
+                                  SourceLoc AtEndLoc,
                                   PatternBindingInitializer *&initContext,
                                   bool isFromClangAttribute = false);
 
@@ -1256,6 +1257,7 @@ public:
                                         bool justChecking);
 
   ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
+                                  SourceLoc AtEndLoc,
                                   PatternBindingInitializer *&initContext,
                                   bool justChecking = false);
 

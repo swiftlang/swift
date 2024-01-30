@@ -1510,6 +1510,10 @@ ERROR(type_attribute_applied_to_decl,none,
 ERROR(decl_attribute_applied_to_type,none,
       "attribute can only be applied to declarations, not types", ())
 
+
+ERROR(attr_extra_whitespace_after_at,PointsToFirstBadToken,
+      "extraneous whitespace between '@' and attribute name", ())
+
 ERROR(attr_expected_lparen,none,
 "expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
