@@ -183,10 +183,6 @@ struct UseDefChainVisitor
 /// values. We assert that all instructions that are CONSTANT_TRANSLATION
 /// LookThrough to make sure they stay in sync.
 static bool isStaticallyLookThroughInst(SILInstruction *inst) {
-  if (auto cast = SILDynamicCastInst::getAs(inst))
-    if (cast.isRCIdentityPreserving())
-      return true;
-
   switch (inst->getKind()) {
   default:
     return false;
@@ -225,6 +221,13 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
     return true;
+  case SILInstructionKind::UnconditionalCheckedCastInst: {
+    auto cast = SILDynamicCastInst::getAs(inst);
+    assert(cast);
+    if (cast.isRCIdentityPreserving())
+      return true;
+    return false;
+  }
   }
 }
 
@@ -2324,6 +2327,7 @@ CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
+CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Store)
 
 //===---
 // Ignored
@@ -2451,9 +2455,9 @@ CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
 CONSTANT_TRANSLATION(TestSpecificationInst, Unhandled)
 CONSTANT_TRANSLATION(StoreUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(DeinitExistentialAddrInst, Unhandled)
+CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
 CONSTANT_TRANSLATION(DeinitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Unhandled)
-CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
 
 //===---
 // Apply
