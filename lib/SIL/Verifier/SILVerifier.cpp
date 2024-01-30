@@ -1627,6 +1627,7 @@ public:
     requireAddressType(SILPackType, AI->getType(),
                        "result of alloc_pack must be an address of "
                        "lowered pack type");
+    checkAddressWalkerCanVisitAllTransitiveUses(AI);
   }
 
   void checkAllocRefBase(AllocRefInstBase *ARI) {
