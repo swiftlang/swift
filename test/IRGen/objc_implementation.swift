@@ -202,6 +202,9 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // Swift calling convention -[ImplClass copyWithZone:]
 // CHECK-LABEL: define hidden swiftcc void @"$sSo9ImplClassC19objc_implementationE4copy4withypSg10ObjectiveC6NSZoneVSg_tF"
 
+// FIXME: Do we actually want a public type metadata accessor? I'm guessing no.
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$sSo9ImplClassCMa"
+
 // ObjC calling convention -[ImplClass copyWithZone:]
 // CHECK-LABEL: define internal ptr @"$sSo9ImplClassC19objc_implementationE4copy4withypSg10ObjectiveC6NSZoneVSg_tFTo"
 
@@ -266,9 +269,6 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // CHECK:   call void @implFunc
 // CHECK:   ret void
 // CHECK: }
-
-// FIXME: Do we actually want a public type metadata accessor? I'm guessing no.
-// CHECK-LABEL: define swiftcc %swift.metadata_response @"$sSo9ImplClassCMa"
 
 //
 // Not implemented in Swift

@@ -208,3 +208,64 @@ bb3:
   return %1 : $Int32
 }
 
+// CHECK-LABEL: sil [no_locks] [ossa] @remove_metatype_arg :
+// CHECK:         [[F:%.*]] = function_ref @$s12metatype_argTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK:         [[A:%.*]] = apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK:         return [[A]]
+// CHECK:       } // end sil function 'remove_metatype_arg'
+sil [no_locks] [ossa] @remove_metatype_arg : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+  %3 = metatype $@thick Int.Type
+  %7 = function_ref @metatype_arg : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %8 = apply %7(%0, %3, %1) : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %8 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @metatype_arg :
+sil [ossa] @metatype_arg : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
+  fix_lifetime %1 : $@thick Int.Type
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [no_locks] [ossa] @remove_metatype_arg_throws :
+// CHECK:         [[F:%.*]] = function_ref @$s19metatype_arg_throwsTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error)
+// CHECK:         try_apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error), normal bb1, error bb2
+// CHECK:       bb1([[R:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:         return [[R]]
+// CHECK:       bb2([[E:%.*]] : @owned $any Error):
+// CHECK:         throw [[E]] : $any Error  
+// CHECK:       } // end sil function 'remove_metatype_arg_throws'
+sil [no_locks] [ossa] @remove_metatype_arg_throws : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error) {
+bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+  %3 = metatype $@thick Int.Type
+  %4 = function_ref @metatype_arg_throws : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error)
+  try_apply %4(%0, %3, %1) : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error), normal bb1, error bb2
+
+bb1(%10 : @owned $Builtin.NativeObject):
+  return %10 : $Builtin.NativeObject
+
+bb2(%13 : @owned $any Error):
+  throw %13 : $any Error
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @metatype_arg_throws :
+sil [ossa] @metatype_arg_throws : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error) {
+bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
+  fix_lifetime %1 : $@thick Int.Type
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s12metatype_argTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK:       bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+// CHECK:         %2 = metatype $@thick Int.Type
+// CHECK:         fix_lifetime %2 : $@thick Int.Type
+// CHECK:         return %1 : $Builtin.NativeObject
+// CHECK:       } // end sil function '$s12metatype_argTf4dnn_n'
+
+// CHECK-LABEL: sil shared [ossa] @$s19metatype_arg_throwsTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error) {
+// CHECK:       bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+// CHECK:         %2 = metatype $@thick Int.Type
+// CHECK:         fix_lifetime %2 : $@thick Int.Type
+// CHECK:         return %1 : $Builtin.NativeObject
+// CHECK:       } // end sil function '$s19metatype_arg_throwsTf4dnn_n'

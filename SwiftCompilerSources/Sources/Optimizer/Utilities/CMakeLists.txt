@@ -13,6 +13,7 @@ swift_compiler_sources(Optimizer
   Devirtualization.swift
   EscapeUtils.swift
   ForwardingUtils.swift
+  FunctionSignatureTransforms.swift
   LifetimeDependenceUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
