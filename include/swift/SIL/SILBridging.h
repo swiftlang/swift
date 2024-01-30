@@ -899,6 +899,7 @@ struct BridgedArgument {
   BRIDGED_INLINE bool isSelf() const;
   BRIDGED_INLINE bool isReborrow() const;
   BRIDGED_INLINE bool hasResultDependsOn() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl getVarDecl() const;
 };
 
 struct OptionalBridgedArgument {

@@ -30,7 +30,11 @@ public class Argument : Value, Hashable {
   }
 
   public var isReborrow: Bool { bridged.isReborrow() }
-  
+
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.getVarDecl())
+  }
+
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
   }

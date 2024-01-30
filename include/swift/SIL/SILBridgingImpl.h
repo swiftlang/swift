@@ -471,6 +471,12 @@ bool BridgedArgument::hasResultDependsOn() const {
 
 bool BridgedArgument::isReborrow() const { return getArgument()->isReborrow(); }
 
+BridgedNullableVarDecl BridgedArgument::getVarDecl() const {
+  // TODO: why does AST bridging force a non-const pointer?
+  return {llvm::dyn_cast_or_null<swift::VarDecl>(
+      const_cast<swift::ValueDecl*>(getArgument()->getDecl()))};
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedSubstitutionMap
 //===----------------------------------------------------------------------===//
