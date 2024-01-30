@@ -13,6 +13,11 @@
 import SILBridging
 
 /// An instruction that forwards ownership from operands to results.
+///
+/// Forwarding instructions are not allowed to store the value or
+/// propagate its bits in any way that isn't tracked by its
+/// results. Passes assume that a forwarding value is nonescaping as
+/// long as its results are nonescaping.
 public protocol ForwardingInstruction : Instruction {
   var singleForwardedOperand: Operand? { get }
 
@@ -267,6 +272,14 @@ extension StructExtractInst {
 extension TupleExtractInst {
   public var preservesRepresentation: Bool { true }
   public var canForwardOwnedValues: Bool { false }
+}
+
+extension CopyableToMoveOnlyWrapperValueInst {
+  public var preservesRepresentation: Bool { true }
+}
+
+extension MoveOnlyWrapperToCopyableValueInst {
+  public var preservesRepresentation: Bool { true }
 }
 
 extension TuplePackExtractInst {

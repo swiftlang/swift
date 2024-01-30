@@ -254,6 +254,7 @@ extension UnaryInstruction {
 final public class UnimplementedInstruction : Instruction {
 }
 
+/// Only one of the operands may have an address type.
 public protocol StoringInstruction : Instruction {
   var operands: OperandArray { get }
 }
@@ -303,14 +304,16 @@ final public class AssignInst : Instruction, StoringInstruction {
   }
 }
 
-final public class AssignByWrapperInst : Instruction {}
+final public class AssignByWrapperInst : Instruction, StoringInstruction {}
 
-final public class AssignOrInitInst : Instruction {}
+final public class AssignOrInitInst : Instruction, StoringInstruction {}
 
 /// Instruction that copy or move from a source to destination address.
 public protocol SourceDestAddrInstruction : Instruction {
   var sourceOperand: Operand { get }
   var destinationOperand: Operand { get }
+  var isTakeOfSrc: Bool { get }
+  var isInitializationOfDest: Bool { get }
 }
 
 extension SourceDestAddrInstruction {
@@ -333,6 +336,13 @@ final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
 final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction {
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
+
+  public var isTakeOfSrc: Bool {
+    bridged.ExplicitCopyAddrInst_isTakeOfSrc()
+  }
+  public var isInitializationOfDest: Bool {
+    bridged.ExplicitCopyAddrInst_isInitializationOfDest()
+  }
 }
 
 final public class EndAccessInst : Instruction, UnaryInstruction {
@@ -464,6 +474,10 @@ final public class RetainValueInst : RefCountingInst {
   public var value: Value { return operand.value }
 }
 
+final public class UnmanagedRetainValueInst : RefCountingInst {
+  public var value: Value { return operand.value }
+}
+
 final public class RetainValueAddrInst : RefCountingInst {
 }
 
@@ -479,6 +493,10 @@ final public class UnownedReleaseInst : RefCountingInst {
 }
 
 final public class ReleaseValueInst : RefCountingInst {
+  public var value: Value { return operand.value }
+}
+
+final public class UnmanagedReleaseValueInst : RefCountingInst {
   public var value: Value { return operand.value }
 }
 
@@ -590,7 +608,10 @@ class UncheckedRefCastInst : SingleValueInstruction, ConversionInstruction {
 }
 
 final public
-class UncheckedRefCastAddrInst : Instruction, SourceDestAddrInstruction {}
+class UncheckedRefCastAddrInst : Instruction, SourceDestAddrInstruction {
+  public var isTakeOfSrc: Bool { true }
+  public var isInitializationOfDest: Bool { true }
+}
 
 final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruction {
   public var fromAddress: Value { operand.value }
@@ -779,7 +800,9 @@ class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { bridged.TupleElementAddrInst_fieldIndex() }
 }
 
-final public class TupleAddrConstructorInst : Instruction {}
+final public class TupleAddrConstructorInst : Instruction {
+  public var destinationOperand: Operand { operands[0] }
+}
 
 final public class StructInst : SingleValueInstruction, ForwardingInstruction {
 }
@@ -965,7 +988,13 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { bridged.ProjectBoxInst_fieldIndex() }
 }
 
-final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {
+public protocol CopyingInstruction : SingleValueInstruction, UnaryInstruction {}
+
+final public class CopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
+  public var fromValue: Value { operand.value }
+}
+
+final public class ExplicitCopyValueInst : SingleValueInstruction, UnaryInstruction, CopyingInstruction {
   public var fromValue: Value { operand.value }
 }
 
@@ -1026,16 +1055,25 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
-final public
-class MarkUnresolvedNonCopyableValueInst : SingleValueInstruction, UnaryInstruction {}
+final public class MarkUnresolvedNonCopyableValueInst
+  : SingleValueInstruction, UnaryInstruction, ConversionInstruction {}
 
-final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstruction {}
+final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstruction {
+  public var isTakeOfSrc: Bool { true }
+  public var isInitializationOfDest: Bool { true }
+}
 
-final public
-class CopyableToMoveOnlyWrapperAddrInst : SingleValueInstruction, UnaryInstruction {}
+final public class CopyableToMoveOnlyWrapperValueInst
+  : SingleValueInstruction, UnaryInstruction, ConversionInstruction {}
 
-final public
-class MoveOnlyWrapperToCopyableAddrInst : SingleValueInstruction, UnaryInstruction {}
+final public class MoveOnlyWrapperToCopyableValueInst
+  : SingleValueInstruction, UnaryInstruction, ConversionInstruction {}
+
+final public class CopyableToMoveOnlyWrapperAddrInst
+  : SingleValueInstruction, UnaryInstruction {}
+
+final public class MoveOnlyWrapperToCopyableAddrInst
+  : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjectInst : SingleValueInstruction {
   public var baseOperands: OperandArray {

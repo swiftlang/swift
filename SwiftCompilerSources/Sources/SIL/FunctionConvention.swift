@@ -98,6 +98,29 @@ public struct FunctionConvention : CustomStringConvertible {
     bridgedFunctionType.SILFunctionType_hasSelfParam()
   }
 
+  public struct Yields : Collection {
+    let bridged: BridgedYieldInfoArray
+    let hasLoweredAddresses: Bool
+
+    public var startIndex: Int { 0 }
+
+    public var endIndex: Int { bridged.count() }
+
+    public func index(after index: Int) -> Int {
+      return index + 1
+    }
+
+    public subscript(_ index: Int) -> ParameterInfo {
+      return ParameterInfo(bridged: bridged.at(index),
+        hasLoweredAddresses: hasLoweredAddresses)
+    }
+  }
+
+  public var yields: Yields {
+    Yields(bridged: bridgedFunctionType.SILFunctionType_getYields(),
+      hasLoweredAddresses: hasLoweredAddresses)
+  }
+
   public var description: String {
     var str = String(taking: bridgedFunctionType.getDebugDescription())
     parameters.forEach { str += "\nparameter: " + $0.description }
@@ -145,8 +168,9 @@ public struct ParameterInfo : CustomStringConvertible {
   public let hasLoweredAddresses: Bool
 
   /// Is this parameter passed indirectly in SIL? Most formally
-  /// indirect results can be passed directly in SIL. This depends on
-  /// whether the calling function has lowered addresses.
+  /// indirect results can be passed directly in SIL (opaque values
+  /// mode). This depends on whether the calling function has lowered
+  /// addresses.
   public var isSILIndirect: Bool {
     switch convention {
     case .indirectIn, .indirectInGuaranteed:

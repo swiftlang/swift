@@ -1046,7 +1046,31 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
 }
 
 bool SILType::isEscapable() const {
-  return getASTType()->isEscapable();
+  CanType ty = getASTType();
+
+  // For storage with reference ownership, check the referent.
+  if (auto refStorage = ty->getAs<ReferenceStorageType>())
+    ty = refStorage->getReferentType()->getCanonicalType();
+
+  if (auto fnTy = getAs<SILFunctionType>()) {
+    return !fnTy->isNoEscape();
+  }
+  if (auto boxTy = getAs<SILBoxType>()) {
+    auto fields = boxTy->getLayout()->getFields();
+    assert(fields.size() == 1);
+    ty = fields[0].getLoweredType();
+  }
+
+  // TODO: Support ~Escapable in parameter packs.
+  //
+  // Treat all other SIL-specific types as Escapable.
+  if (isa<SILBlockStorageType,
+          SILBoxType,
+          SILPackType,
+          SILTokenType>(ty)) {
+    return true;
+  }
+  return ty->isEscapable();
 }
 
 bool SILType::isMoveOnly(bool orWrapped) const {

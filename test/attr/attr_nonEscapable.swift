@@ -2,15 +2,15 @@
 
 // REQUIRES: asserts
 
-@_nonEscapable public struct NES {
+@_nonescapable public struct NES {
   let x: Int
 
-  @_unsafeNonEscapableResult
+  @_unsafeNonescapableResult
   init() {
     x = 0
   }
 
-  @_unsafeNonEscapableResult
+  @_unsafeNonescapableResult
   static func makeS() -> NES {
     return NES()
   }

@@ -455,10 +455,10 @@ DECL_ATTR(_rawLayout, RawLayout,
 DECL_ATTR(_extern, Extern,
   OnFunc | AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   147)
-SIMPLE_DECL_ATTR(_nonEscapable, NonEscapable,
+SIMPLE_DECL_ATTR(_nonescapable, NonEscapable,
   OnNominalType | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   148)
-SIMPLE_DECL_ATTR(_unsafeNonEscapableResult, UnsafeNonEscapableResult,
+SIMPLE_DECL_ATTR(_unsafeNonescapableResult, UnsafeNonEscapableResult,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   149)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,

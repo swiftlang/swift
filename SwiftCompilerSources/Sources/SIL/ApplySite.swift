@@ -59,10 +59,31 @@ public struct ApplyOperandConventions : Collection {
   }
 
   public func convention(of operand: Operand) -> ArgumentConvention? {
-    guard let argIdx = calleeArgumentIndex(of: operand) else { return nil }
+    guard let argIdx = calleeArgumentIndex(of: operand) else {
+      return nil
+    }
     return calleeArgumentConventions[argIdx]
   }
 
+  public func originalParameter(of operand: Operand) -> ParameterInfo? {
+    guard let argIdx = calleeArgumentIndex(of: operand) else {
+      return nil
+    }
+    guard argIdx >= calleeArgumentConventions.firstParameterIndex else {
+      return nil
+    }
+    return calleeArgumentConventions.originalParameters[argIdx]
+  }
+
+  public var firstParameterOperandIndex: Int {
+    return ApplyOperandConventions.firstArgumentIndex +
+      calleeArgumentConventions.firstParameterIndex
+  }
+
+  // TODO: rewrite uses of this API to pass an Operand instead, and
+  // make this private. No client should have multiple integer
+  // indices, some of which are caller indices, and some of which are
+  // callee indices.
   public func calleeArgumentIndex(ofOperandIndex index: Int) -> Int? {
     let callerArgIdx = index - ApplyOperandConventions.firstArgumentIndex
     guard callerArgIdx >= 0 else { return nil }
@@ -108,36 +129,25 @@ extension ApplySite {
     argumentOperands.values
   }
 
+  /// Indirect results including the error result.
+  public var indirectResultOperands: OperandArray {
+    let offset = ApplyOperandConventions.firstArgumentIndex
+    return operands[offset..<operandConventions.firstParameterOperandIndex]
+  }
+
   public var substitutionMap: SubstitutionMap {
     SubstitutionMap(bridged.ApplySite_getSubstitutionMap())
   }
 
-  /// Get the conventions of the callee without the applied substitutions.
-  public var originalCalleeConvention: FunctionConvention {
-    FunctionConvention(for: callee.type.bridged.getASTType(), in: parentFunction)
-  }
-
-  /// Get the conventions of the callee with the applied substitutions.
-  public var substitutedCalleeConvention: FunctionConvention {
-    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(), in: parentFunction)
-  }
-
   public var calleeArgumentConventions: ArgumentConventions {
-    ArgumentConventions(functionConvention: substitutedCalleeConvention)
+    ArgumentConventions(originalFunctionConvention: originalFunctionConvention,
+                        substitutedFunctionConvention: substitutedFunctionConvention)
   }
 
   public var operandConventions: ApplyOperandConventions {
     ApplyOperandConventions(
       calleeArgumentConventions: calleeArgumentConventions,
       unappliedArgumentCount: bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg())
-  }
-
-  /// Returns the argument index of an operand.
-  ///
-  /// Returns nil if 'operand' is not an argument operand. This is the case if
-  /// it's the callee function operand.
-  public func calleeArgumentIndex(of operand: Operand) -> Int? {
-    operandConventions.calleeArgumentIndex(of: operand)
   }
 
   /// Returns true if `operand` is the callee function operand and not am argument operand.
@@ -147,6 +157,17 @@ extension ApplySite {
 
   public func convention(of operand: Operand) -> ArgumentConvention? {
     operandConventions.convention(of: operand)
+  }
+  
+  public var yieldConventions: YieldConventions {
+    YieldConventions(originalFunctionConvention: originalFunctionConvention,
+                     substitutedFunctionConvention: substitutedFunctionConvention)
+  }
+
+  public func convention(of yield: MultipleValueInstructionResult)
+    -> ArgumentConvention {
+    assert(yield.definingInstruction == self)
+    return yieldConventions[yield.index]
   }
 
   /// Converts an argument index of a callee to the corresponding apply operand.
@@ -180,6 +201,29 @@ extension ApplySite {
       return callee.hasSemanticsAttribute(attr)
     }
     return false
+  }
+
+  /// Returns the argument index of an operand.
+  ///
+  /// Returns nil if 'operand' is not an argument operand. This is the case if
+  /// it's the callee function operand.
+  ///
+  /// Warning: the returned integer can be misused as an index into
+  /// the wrong collection. Replace uses of this API with safer APIs.
+  public func calleeArgumentIndex(of operand: Operand) -> Int? {
+    operandConventions.calleeArgumentIndex(of: operand)
+  }
+}
+
+extension ApplySite {
+  private var originalFunctionConvention: FunctionConvention {
+    FunctionConvention(for: callee.type.bridged.getASTType(),
+                       in: parentFunction)
+  }
+
+  private var substitutedFunctionConvention: FunctionConvention {
+    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(),
+                       in: parentFunction)
   }
 }
 

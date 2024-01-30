@@ -54,6 +54,18 @@ BridgedResultInfo BridgedResultInfoArray::at(SwiftInt resultIndex) const {
 }
 
 //===----------------------------------------------------------------------===//
+//                             BridgedYieldInfo
+//===----------------------------------------------------------------------===//
+
+SwiftInt BridgedYieldInfoArray::count() const {
+  return unbridged().size();
+}
+
+BridgedParameterInfo BridgedYieldInfoArray::at(SwiftInt resultIndex) const {
+  return BridgedParameterInfo(unbridged()[resultIndex]);
+}
+
+//===----------------------------------------------------------------------===//
 //                            BridgedParameterInfo
 //===----------------------------------------------------------------------===//
 
@@ -75,6 +87,10 @@ BridgedOwnedString BridgedASTType::getDebugDescription() const {
 
 bool BridgedASTType::isOpenedExistentialWithError() const {
   return unbridged()->isOpenedExistentialWithError();
+}
+
+bool BridgedASTType::isEscapable() const {
+  return unbridged()->isEscapable();
 }
 
 BridgedResultInfoArray
@@ -104,6 +120,10 @@ BridgedParameterInfoArray BridgedASTType::SILFunctionType_getParameters() const 
 
 bool BridgedASTType::SILFunctionType_hasSelfParam() const {
   return unbridged()->castTo<swift::SILFunctionType>()->hasSelfParam();
+}
+
+BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
+  return unbridged()->castTo<swift::SILFunctionType>()->getYields();
 }
 
 //===----------------------------------------------------------------------===//
@@ -450,6 +470,12 @@ bool BridgedArgument::hasResultDependsOn() const {
 }
 
 bool BridgedArgument::isReborrow() const { return getArgument()->isReborrow(); }
+
+BridgedNullableVarDecl BridgedArgument::getVarDecl() const {
+  // TODO: why does AST bridging force a non-const pointer?
+  return {llvm::dyn_cast_or_null<swift::VarDecl>(
+      const_cast<swift::ValueDecl*>(getArgument()->getDecl()))};
+}
 
 //===----------------------------------------------------------------------===//
 //                            BridgedSubstitutionMap
@@ -1070,6 +1096,14 @@ bool BridgedInstruction::CopyAddrInst_isTakeOfSrc() const {
 
 bool BridgedInstruction::CopyAddrInst_isInitializationOfDest() const {
   return getAs<swift::CopyAddrInst>()->isInitializationOfDest();
+}
+
+bool BridgedInstruction::ExplicitCopyAddrInst_isTakeOfSrc() const {
+  return getAs<swift::ExplicitCopyAddrInst>()->isTakeOfSrc();
+}
+
+bool BridgedInstruction::ExplicitCopyAddrInst_isInitializationOfDest() const {
+  return getAs<swift::ExplicitCopyAddrInst>()->isInitializationOfDest();
 }
 
 SwiftInt BridgedInstruction::MarkUninitializedInst_getKind() const {

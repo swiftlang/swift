@@ -16,12 +16,12 @@
 // values that most closely associated with the variable declarations
 // that the given value holds an instance of.
 //
-// LifetimeDependence.init(base:) finds the OSSA lifetime for `base`
-// and categorizes the kind of dependence scope that the lifetime
-// represents.
+// LifetimeDependence.init models the lifetime dependence for a
+// FunctionArgument or a MarkDependenceInst, categorizing the kind of
+// dependence scope that the lifetime represents.
 //
 // LifetimeDependence.Scope.computeRange() computes the instruction
-// range covered by the dependence scope.
+// range covered by a dependence scope.
 //
 // LifetimeDependence.visitDependenceRoots(enclosing:) is a use-def
 // walk that walks up the chain of dependent values and visits the
@@ -99,10 +99,14 @@ struct LifetimeDependence : CustomStringConvertible {
     case yield(Value)
     /// An owned value whose OSSA lifetime encloses nonescapable values
     case owned(Value)
-    /// An singly-initialized address-only value, in which the entire
-    /// initialized region is a lifetime (as opposed to an individual
-    /// access). e.g. A value produced by @out.
+    /// Singly-initialized addressible storage (likely for an
+    /// immutable address-only value). The entire initialized region
+    /// is a lifetime (as opposed to an individual access for mutable
+    /// variables). e.g. A value produced by an @in FunctionArgument
+    /// or @out apply.
     case initialized(Value)
+    // TODO: make .unknown a SIL Verification error
+    case unknown(Value)
 
     var parentValue: Value {
       switch self {
@@ -111,6 +115,7 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .yield(value): return value
       case let .owned(value): return value
       case let .initialized(value): return value
+      case let .unknown(value): return value
       }
     }
 
@@ -120,7 +125,7 @@ struct LifetimeDependence : CustomStringConvertible {
         precondition(!argument.type.isEscapable
           || argument.ownership == .guaranteed,
           "only non-escapable or guaranteed arguments have a caller scope")
-      case .access:
+      case .access, .unknown:
         break        
       case let .yield(value):
         precondition(value.definingInstruction is BeginApplyInst)
@@ -138,6 +143,7 @@ struct LifetimeDependence : CustomStringConvertible {
         case .yield: return "Yield: "
         case .owned: return "Owned: "
         case .initialized: return "Initialized: "
+        case .unknown: return "Unknown: "
         }
       }() + "\(parentValue)"
     }
@@ -157,17 +163,55 @@ struct LifetimeDependence : CustomStringConvertible {
 }
 
 extension LifetimeDependence {
+  /// Construct LifetimeDependence from a function argument.
+  ///
+  /// Returns 'nil' for indirect results.
+  init?(_ arg: FunctionArgument, _ context: some Context) {
+    if arg.isIndirectResult {
+      return nil
+    }
+    self.scope = Scope(base: arg, context)!
+    self.dependentValue = arg
+  }
+
   /// Construct LifetimeDependence from mark_dependence [nonescaping]
   ///
   /// TODO: Add SIL verification that all mark_depedence [nonescaping]
   /// have a valid LifetimeDependence.
-  init?(markDependence: MarkDependenceInst, _ context: some Context) {
-    guard markDependence.isNonEscaping else { return nil }
-    guard let scope = Scope(base: markDependence.base, context) else {
+  init?(_ markDep: MarkDependenceInst, _ context: some Context) {
+    guard markDep.isNonEscaping else { return nil }
+    guard let scope = Scope(base: markDep.base, context) else {
       return nil
     }
     self.scope = scope
-    self.dependentValue = markDependence.value
+    self.dependentValue = markDep
+  }
+
+  /// Compute the range of the dependence scope.
+  ///
+  /// Returns nil if the dependence scope covers the entire function
+  /// or if 'dependentValue' is part of the parent's forwarded
+  /// lifetime.
+  ///
+  /// Note: The caller must deinitialize the returned range.
+  func computeRange(_ context: Context) -> InstructionRange? {
+    if dependentValue.isForwarded(from: parentValue) {
+      return nil
+    }
+    return scope.computeRange(context)
+  }
+}
+
+private extension Value {
+  func isForwarded(from: Value) -> Bool {
+    if self == from {
+      return true
+    }
+    if let forward = self.forwardingInstruction,
+       let singleOp = forward.singleForwardedOperand {
+      return singleOp.value.isForwarded(from: from)
+    }
+    return false
   }
 }
 
@@ -184,20 +228,11 @@ extension LifetimeDependence.Scope {
   /// forwarded (via struct/tuple) from multiple guaranteed values.
   init?(base: Value, _ context: some Context) {
     if base.type.isAddress {
-      switch base.enclosingAccessScope {
-      case let .scope(access):
-        self = .access(access)
+      if let scope = Self(address: base, context) {
+        self = scope
         return
-      case let .base(accessBase):
-        if case let .argument(arg) = accessBase {
-          self = .caller(arg)
-          return
-        }
-        // TODO: Handle singly initialize address-only values:
-        // if case let .stack(stackAddr) = accessBase:
-        // and create a LifetimeDependence.initialized
-        fatalError("a non-escaping scope's address must be in an access scope")
       }
+      return nil
     }
     switch base.ownership {
     case .owned:
@@ -213,7 +248,41 @@ extension LifetimeDependence.Scope {
       // lifetime dependence requires a nontrivial value"
       return nil
     case .unowned:
-      fatalError("Cannot create a dependence on an unowned value")
+      self = .unknown(base)
+    }
+  }
+
+  private init?(address: Value, _ context: some Context) {
+    switch address.enclosingAccessScope {
+    case let .scope(access):
+      self = .access(access)
+    case let .base(accessBase):
+      switch accessBase {
+      case let .box(projectBox):
+        self = .owned(projectBox.operand.value)
+      case let .stack(allocStack):
+        self = .initialized(allocStack)
+      case .global:
+        self = .unknown(address)
+      case .class, .tail:
+        let refElt = address as! UnaryInstruction
+        if let scope = Self(guaranteed: refElt.operand.value, context) {
+          self = scope
+        }
+        return nil
+      case let .argument(arg):
+        if arg.convention.isIndirectIn {
+          self = .initialized(arg)
+        } else if arg.convention.isInout {
+          self = .caller(arg)
+        } else {
+          self = .unknown(address)
+        }
+      case let .yield(result):
+        self = Self(yield: result)
+      case .pointer, .unidentified:
+        self = .unknown(address)
+      }
     }
   }
 
@@ -224,7 +293,7 @@ extension LifetimeDependence.Scope {
     // there is no dependence scope.
     //
     // TODO: Add a SIL verifier check that a mark_dependence [nonescaping]
-      // base is never a guaranteed phi.
+    // base is never a guaranteed phi.
     guard let introducer = introducers.pop() else { return nil }
     assert(introducers.isEmpty,
            "guaranteed phis not allowed when diagnosing lifetime dependence")
@@ -234,20 +303,28 @@ extension LifetimeDependence.Scope {
     switch beginBorrow {
     case .beginBorrow, .loadBorrow:
       let borrowOperand = beginBorrow.baseOperand!
-      if let scope = LifetimeDependence.Scope(base: borrowOperand.value,
-                                              context) {
-        self = scope
-        return
+      guard let scope = LifetimeDependence.Scope(base: borrowOperand.value,
+                                                 context) else {
+        return nil
       }
-      return nil
+      self = scope
     case let .beginApply(value):
       self = .yield(value)
     case .functionArgument:
       self = .caller(beginBorrow.value as! Argument)
-      return
     case .reborrow:
       fatalError("reborrows are not supported in diagnostics")
     }
+  }
+
+  private init(yield result: MultipleValueInstructionResult) {
+    // Consider an @in yield an .initialized scope. We must find the destroys.
+    let apply = result.parentInstruction as! FullApplySite
+    if apply.convention(of: result).isIndirectIn {
+      self = .initialized(result)
+      return
+    }
+    self = .yield(result)
   }
 }
 
@@ -266,6 +343,7 @@ extension LifetimeDependence.Scope {
       range.insert(contentsOf: beginAccess.endInstructions)
       return range
     case let .yield(value):
+      // This assumes @inout or @in_guaranteed convention.
       let def = value.definingInstruction!
       var range = InstructionRange(begin: def, context)
       _ = BorrowingInstruction(def)!.visitScopeEndingOperands(context) {
@@ -274,22 +352,59 @@ extension LifetimeDependence.Scope {
       }
       return range
     case let .owned(value):
+      // FIXME: This should compute forwarded liveness instead.
       return computeLinearLiveness(for: value, context)
     case let .initialized(value):
-      return LifetimeDependence.Scope.computeIndirectResultRange(value: value,
-        context)
+      return LifetimeDependence.Scope.computeInitializedRange(value: value,
+                                                              context)
+    case let .unknown(value):
+      // Return an empty range.
+      return InstructionRange(for: value, context)
     }
   }
   
-  private static func computeIndirectResultRange(
-    value: Value, _ context: Context
-  ) -> InstructionRange {
-    // TODO: add a utility for addressible lifetimes. This only
-    // happens for singly initialized address-only values, like
-    // indirect function results. It will be sufficient to visit all
-    // the destroy_addr, copy_addr [take], and load[take] address
-    // uses. This is unreachable with opaque SIL values.
-    fatalError("Unimplemented: addressible lifetime parent")
+  private static func computeInitializedRange(value: Value, _ context: Context)
+    -> InstructionRange {
+    assert(value.type.isAddress)
+
+    var range: InstructionRange
+    if value is FunctionArgument {
+      range = InstructionRange(for: value, context)
+    } else if let singleStore = findSingleStore(into: value, context) {
+      range = InstructionRange(begin: singleStore, context)
+    } else {
+      // return an empty range
+      return InstructionRange(for: value, context)
+    }
+    for use in value.uses {
+      let inst = use.instruction
+      switch inst {
+      case is DestroyAddrInst:
+        range.insert(inst)
+      case let sdai as SourceDestAddrInstruction
+             where sdai.sourceOperand == use && sdai.isTakeOfSrc:
+        range.insert(inst)
+      case let li as LoadInst where li.loadOwnership == .take:
+        range.insert(inst)
+      default:
+        break
+      }
+    }
+    return range
+  }
+
+  private static func findSingleStore(into address: Value, _ context: Context)
+    -> Instruction? {
+    var singleStore: Instruction?
+    for use in address.uses {
+      if use.isAddressInitialization {
+        if singleStore != nil {
+          return nil
+        }
+        singleStore = use.instruction
+      }
+    }
+    return singleStore
   }
 }
 
@@ -407,11 +522,12 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 ///
 /// This extends the ForwardingDefUseWalker, which finds the
 /// forward-extended lifetime introducers. Certain forward-extended
-/// lifetime introducers produce dependent values: namely copies,
-/// moves, and borrows. These introducers are considered part of their
-/// operand's dependence scope because non-escapable values can be
-/// copied, moved, and borrowed. Nonetheless, all of their uses must
-/// remain within original dependence scope.
+/// lifetime introducers can inherit a lifetime dependency from their
+/// operand: namely copies, moves, and borrows. These introducers are
+/// considered part of their operand's dependence scope because
+/// non-escapable values can be copied, moved, and
+/// borrowed. Nonetheless, all of their uses must remain within
+/// original dependence scope.
 ///
 ///   # owned lifetime dependence
 ///   %parent = apply               // begin dependence scope -+
@@ -480,8 +596,7 @@ extension LifetimeDependenceUseDefWalker {
     case let load as LoadInstruction:
       return walkUp(value: load.address)
     case let markDep as MarkDependenceInst:
-      if let dependence = LifetimeDependence(markDependence: markDep,
-        context) {
+      if let dependence = LifetimeDependence(markDep, context) {
         return walkUp(value: dependence.parentValue)
       }
     default:
@@ -513,7 +628,9 @@ extension LifetimeDependenceUseDefWalker {
 ///   needWalk(for value: Value) -> Bool
 ///   leafUse(of: Operand) -> WalkResult
 ///   deadValue(_ value: Value, using operand: Operand?) -> WalkResult
-///   pointerEscapingUse(of operand: Operand) -> WalkResult
+///   escapingDependence(on operand: Operand) -> WalkResult
+///   returnedDependence(result: Operand) -> WalkResult
+///   returnedDependence(address: FunctionArgument, using: Operand) -> WalkResult
 ///
 /// Start walking:
 ///   walkDown(root: Value)
@@ -523,50 +640,127 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
   var function: Function { get }
 
   mutating func leafUse(of operand: Operand) -> WalkResult
+
+  mutating func escapingDependence(on operand: Operand) -> WalkResult
+
+  mutating func returnedDependence(result: Operand) -> WalkResult
+
+  mutating func returnedDependence(address: FunctionArgument, using: Operand)
+    -> WalkResult
 }
 
-// ForwardingDefUseWalker
 extension LifetimeDependenceDefUseWalker {
-  // Callback from ForwardingDefUseWalker.
-  //
-  // This is not a ForwardingInstruction use, so consider it a leaf use.
-  mutating func nonForwardingUse(_ operand: Operand) -> WalkResult {
-    // OwnershipVisitor classified this as a forwarding use, but it is
-    // not a forwarding instruction.
-    leafUse(of: operand)
+  mutating func walkDown(root: Value) -> WalkResult {
+    if root.type.isAddress {
+      return walkDownAddressUses(of: root)
+    }
+    return walkDownUses(of: root, using: nil)
+  }
+}
+
+// Implement ForwardingDefUseWalker
+extension LifetimeDependenceDefUseWalker {
+  // Override ForwardingDefUseWalker.
+  mutating func walkDownUses(of value: Value, using operand: Operand?)
+    -> WalkResult {
+    // Only track ~Escapable types.
+    if value.type.isEscapable {
+      return .continueWalk
+    }
+    return walkDownUsesDefault(forwarding: value, using: operand)
   }
 
-  // Callback from ForwardingDefUseWalker.
+  // Override ForwardingDefUseWalker.
   mutating func walkDown(operand: Operand) -> WalkResult {
-    classify(operand: operand)
+    // Initially delegate all usess to OwnershipUseVisitor.
+    // walkDownDefault will be called for uses that forward ownership.
+    return classify(operand: operand)
+  }
+
+  // Callback from (a) ForwardingDefUseWalker or (b) ownershipLeafUse.
+  //
+  // (a) OwnershipUseVisitor classified this as a forwardingUse(), but
+  // ForwardingDefUseWalker does not recognize it as a forwarding
+  // instruction. This includes apply arguments.
+  //
+  // (b) OwnershipUseVisitor classified this as a ownershipLeafUse(), but
+  // it was not a recognized copy, destroy, or instantaneous use.
+  mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
+    if let apply = operand.instruction as? FullApplySite {
+      return visitAppliedUse(of: operand, by: apply)
+    }
+    if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
+      return returnedDependence(result: operand)
+    }
+    return escapingDependence(on: operand)
   }
 }
 
-// OwnershipUseVisitor
+// Implement OwnershipUseVisitor
 extension LifetimeDependenceDefUseWalker {
+  // Handle uses that do not propagate the OSSA lifetime. They may still
+  // copy the value, which propagates the dependence.
   mutating func ownershipLeafUse(of operand: Operand, isInnerLifetime: Bool)
     -> WalkResult {
+    if operand.ownership == .endBorrow {
+      // Record the leaf use here because, in some cases, like
+      // begin_apply, we have skipped the inner uses.
+      return leafUse(of: operand)
+    }
     switch operand.instruction {
-    case let copy as CopyValueInst:
+    case let copy as CopyingInstruction:
       return walkDownUses(of: copy, using: operand)
 
     case let move as MoveValueInst:
       return walkDownUses(of: move, using: operand)
 
+    case is ExistentialMetatypeInst, is FixLifetimeInst, is WitnessMethodInst,
+         is DynamicMethodBranchInst, is ValueMetatypeInst,
+         is IsEscapingClosureInst, is ClassMethodInst, is SuperMethodInst,
+         is ClassifyBridgeObjectInst, is DebugValueInst,
+         is ObjCMethodInst, is ObjCSuperMethodInst, is UnmanagedRetainValueInst,
+         is UnmanagedReleaseValueInst, is SelectEnumInst:
+      // Catch .instantaneousUse operations that are dependence leaf uses.
+      return leafUse(of: operand)
+
+    case is DestroyValueInst, is EndLifetimeInst, is DeallocRefInst,
+         is DeallocBoxInst, is DeallocExistentialBoxInst,
+         is BeginCOWMutationInst, is EndCOWMutationInst,
+         is EndInitLetRefInst, is DeallocPartialRefInst, is BeginDeallocRefInst:
+      // Catch .destroyingConsume operations that are dependence leaf
+      // uses.
+      return leafUse(of: operand)
+
+    case let si as StoringInstruction where si.sourceOperand == operand:
+      return visitStoredUses(of: operand, into: si.destinationOperand.value)
+
+    case let tai as TupleAddrConstructorInst:
+      return visitStoredUses(of: operand, into: tai.destinationOperand.value)
+
+    case let bi as BuiltinInst where bi.id == .Copy:  
+      // This must be a non-address-lowered form of Builtin.Copy that
+      // produces an owned value.
+      assert(bi.ownership == .owned)
+      return walkDownUses(of: bi, using: operand)
+
     default:
-      break
+      return nonForwardingUse(of: operand)
     }
-    return walkDownDefault(forwarding: operand)
   }
 
   mutating func forwardingUse(of operand: Operand, isInnerLifetime: Bool)
     -> WalkResult {
+    // Delegate ownership forwarding operations to the ForwardingDefUseWalker.
     return walkDownDefault(forwarding: operand)
   }
 
   mutating func interiorPointerUse(of: Operand, into address: Value)
     -> WalkResult {
     return walkDownAddressUses(of: address)
+  }
+
+  mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
+    return escapingDependence(on: operand)
   }
 
   mutating func dependentUse(of operand: Operand, into value: Value)
@@ -577,17 +771,18 @@ extension LifetimeDependenceDefUseWalker {
   mutating func borrowingUse(of operand: Operand,
                              by borrowInst: BorrowingInstruction)
     -> WalkResult {
-    return visitInnerBorrowUses(of: borrowInst)   
+    return visitAllBorrowUses(of: operand, by: borrowInst)
   }
 
   // TODO: Consider supporting lifetime dependence analysis of
   // guaranteed phis. See InteriorUseWalker.walkDown(guaranteedPhi: Phi)
   mutating func reborrowingUse(of operand: Operand, isInnerLifetime: Bool)
     -> WalkResult {
-    return pointerEscapingUse(of: operand)
+    return escapingDependence(on: operand)
   }
 }
 
+// Implement AddressUseVisitor
 extension LifetimeDependenceDefUseWalker {
   /// An address projection produces a single address result and does not
   /// escape its address operand in any other way.
@@ -599,35 +794,53 @@ extension LifetimeDependenceDefUseWalker {
   mutating func scopedAddressUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case let ba as BeginAccessInst:
-      return ba.endOperands.walk { leafUse(of: $0) }
+      return walkDownAddressUses(of: ba)
     case let ba as BeginApplyInst:
+      // visitAppliedUse only calls scopedAddressUse for ~Escapable
+      // arguments that are not propagated to a result. Here, we only
+      // care about the scope of the call.
       return ba.token.uses.walk { leafUse(of: $0) }
-    case let sb as StoreBorrowInst:
-      return sb.uses.filterUsers(ofType: EndBorrowInst.self).walk {
-        leafUse(of: $0)
-      }
+    case is StoreBorrowInst:
+      return leafUse(of: operand)
     case let load as LoadBorrowInst:
-      return load.uses.endingLifetime.walk { leafUse(of: $0) }
+      return walkDownUses(of: load, using: operand)
     default:
       fatalError("Unrecognized scoped address use: \(operand.instruction)")
     }
   }
 
+  mutating func scopeEndingAddressUse(of operand: Operand) -> WalkResult {
+    return leafUse(of: operand)
+  }
+
+  // Includes StoringInstruction.
   mutating func leafAddressUse(of operand: Operand) -> WalkResult {
     return leafUse(of: operand)
   }
 
+  mutating func appliedAddressUse(of operand: Operand,
+                                  by apply: FullApplySite) -> WalkResult {
+    return visitAppliedUse(of: operand, by: apply)
+  }
+
   mutating func loadedAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {
+    // Record the load itself, in case the loaded value is Escapable.
+    if leafUse(of: operand) == .abortWalk {
+      return .abortWalk
+    }
     return walkDownUses(of: value, using: operand)
   }    
 
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult {
+    if leafUse(of: operand) == .abortWalk {
+      return .abortWalk
+    }
     // TODO: Call reaching-def analysis on the local variable that
-    // defines `address`. Find all the uses of this store into
-    // `address`.
-    return pointerEscapingUse(of: operand)
+    // defines `address`. Find the store that reaches this load. Then
+    // find all reachable uses from that store.
+    return visitStoredUses(of: operand, into: address.value)
   }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
@@ -636,7 +849,10 @@ extension LifetimeDependenceDefUseWalker {
   }    
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
-    return pointerEscapingUse(of: operand)
+    if operand.instruction is ReturnInst, !operand.value.type.isEscapable {
+      return returnedDependence(result: operand)
+    }
+    return escapingDependence(on: operand)
   }
 
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
@@ -650,6 +866,122 @@ extension LifetimeDependenceDefUseWalker {
   }
 }
 
+// Helpers
+extension LifetimeDependenceDefUseWalker {
+  // Visit uses of borrowing instruction (operandOwnerhip == .borrow).
+  private mutating func visitAllBorrowUses(
+    of operand: Operand, by borrowInst: BorrowingInstruction) -> WalkResult {
+    switch borrowInst {
+    case let .beginBorrow(bbi):
+      return walkDownUses(of: bbi, using: operand)
+    case let .storeBorrow(sbi):
+      return walkDownAddressUses(of: sbi)
+    case .beginApply:
+      // Skip the borrow scope; the type system enforces non-escapable
+      // arguments.
+      return visitInnerBorrowUses(of: borrowInst)
+    case .partialApply, .markDependence:
+      fatalError("OwnershipUseVisitor should bypass partial_apply [on_stack] "
+                 + "and mark_dependence [nonescaping]")
+    case .startAsyncLet:
+      // TODO: If async-let takes a non-escaping closure, we can
+      // consider it nonescaping and visit the endAsyncLetLifetime
+      // uses here.
+      return escapingDependence(on: operand)
+    }
+  }
+
+  // Visit stores to a local variable (alloc_box), temporary storage
+  // (alloc_stack). This handles stores of the entire value and stores
+  // to a tuple element. Stores to a field within another nominal
+  // value are considered lifetime dependence leaf uses; the type
+  // system enforces non-escapability on the aggregate value.
+  private mutating func visitStoredUses(of operand: Operand,
+                                        into address: Value) -> WalkResult {
+    assert(address.type.isAddress)
+
+    // TODO: Call reaching-def analysis on the local variable that
+    // defines `address` (the analysis can be limited to this
+    // store). Then find all reachable uses from this store.
+    switch address.accessBase {
+    case let .box(projectBox):
+      if let allocBox = projectBox.box as? AllocBoxInst {
+        if !needWalk(for: allocBox) {
+          return .continueWalk
+        }
+        return walkDownUses(of: allocBox, using: operand)
+      }
+      break
+    case let .stack(allocStack):
+      if !needWalk(for: allocStack) {
+        return .continueWalk
+      }
+      return walkDownAddressUses(of: allocStack)
+    case let .argument(arg):
+      if arg.convention.isIndirectIn {
+        if !needWalk(for: arg) {
+          return .continueWalk
+        }
+        return walkDownAddressUses(of: arg)
+      }
+      if arg.convention.isIndirectOut, !arg.type.isEscapable {
+        return returnedDependence(address: arg, using: operand)
+      }
+      break
+    case .global, .class, .tail, .yield, .pointer, .unidentified:
+      break
+    }
+    return escapingDependence(on: operand)
+  }
+
+  private mutating func visitAppliedUse(of operand: Operand,
+                                        by apply: FullApplySite) -> WalkResult {
+    if let conv = apply.convention(of: operand), conv.isIndirectOut {
+      return leafUse(of: operand)
+    }
+
+    // Use the convention of the original, unsubstituted function to
+    // determine whether it provides a nonescapable guarantee on the
+    // argument.
+    guard let param = apply.operandConventions.originalParameter(of: operand)
+    else {
+      return leafUse(of: operand)
+    }
+    if param.interfaceType.isEscapable() {
+      return escapingDependence(on: operand)
+    }
+    // If the call site returns any ~Escapable results after substitution,
+    // then consider those results to be dependent uses.
+    //
+    // TODO: Replace these isEscapable checks with lifetime
+    // dependence checks. For each result:
+    //
+    // If the result has no lifetime dependence, ignore it
+    //
+    // If the result has a lifetime dependence on this ~Escapable
+    // operand, then ignore it. A mark-dependence was already
+    // emitted for these, which will be checked independently.
+    //
+    // If the result has at least one lifetime dependence, but none
+    // on this operand, it's use is considered dependent.
+    if let result = apply.singleDirectResult, !result.type.isEscapable {
+      if dependentUse(of: operand, into: result) == .abortWalk {
+        return .abortWalk
+      }
+    }
+    for resultAddr in apply.indirectResultOperands
+        where !resultAddr.value.type.isEscapable {
+      if visitStoredUses(of: operand, into: resultAddr.value) == .abortWalk {
+        return .abortWalk
+      }
+    }
+    if apply is BeginApplyInst {
+      return scopedAddressUse(of: operand)
+    }
+    return leafUse(of: operand)
+  }
+}
+
 let variableIntroducerTest = FunctionTest("variable_introducer") {
     function, arguments, context in
   let value = arguments.takeValue()
@@ -660,8 +992,7 @@ let variableIntroducerTest = FunctionTest("variable_introducer") {
 let lifetimeDependenceScopeTest = FunctionTest("lifetime_dependence_scope") {
     function, arguments, context in
   let markDep = arguments.takeValue() as! MarkDependenceInst
-  guard let dependence = LifetimeDependence(markDependence: markDep, context)
-  else {
+  guard let dependence = LifetimeDependence(markDep, context) else {
     print("Trivial Dependence")
     return
   }
@@ -715,8 +1046,19 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
     return .continueWalk
   }
 
-  mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
-    print("Pointer escaping use: \(operand)")
+  mutating func escapingDependence(on operand: Operand) -> WalkResult {
+    print("Escaping use: \(operand)")
+    return .continueWalk
+  }
+
+  mutating func returnedDependence(result: Operand) -> WalkResult {
+    print("Returned use: \(result)")
+    return .continueWalk
+  }
+
+  mutating func returnedDependence(address: FunctionArgument,
+                                   using operand: Operand) -> WalkResult {
+    print("Returned use: \(operand) in: \(address)")
     return .continueWalk
   }
 }

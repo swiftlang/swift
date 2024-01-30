@@ -181,6 +181,24 @@ struct BridgedParameterInfoArray {
   BridgedParameterInfo at(SwiftInt parameterIndex) const;
 };
 
+struct BridgedYieldInfoArray {
+  BridgedArrayRef yieldInfoArray;
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedYieldInfoArray(llvm::ArrayRef<swift::SILYieldInfo> yields)
+    : yieldInfoArray(yields) {}
+
+  llvm::ArrayRef<swift::SILYieldInfo> unbridged() const {
+    return yieldInfoArray.unbridged<swift::SILYieldInfo>();
+  }
+#endif
+
+  BRIDGED_INLINE SwiftInt count() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedParameterInfo at(SwiftInt resultIndex) const;
+};
+
 // Temporary access to the AST type within SIL until ASTBridging provides it.
 struct BridgedASTType {
   swift::TypeBase * _Nullable type;
@@ -194,6 +212,8 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
 
   BRIDGED_INLINE bool isOpenedExistentialWithError() const;
+
+  BRIDGED_INLINE bool isEscapable() const;
 
   // =========================================================================//
   //                              SILFunctionType
@@ -213,6 +233,9 @@ struct BridgedASTType {
   BridgedParameterInfoArray SILFunctionType_getParameters() const;
 
   BRIDGED_INLINE bool SILFunctionType_hasSelfParam() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedYieldInfoArray SILFunctionType_getYields() const;
 };
 
 struct BridgedType {
@@ -803,6 +826,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool CopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
+  BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
+  BRIDGED_INLINE bool ExplicitCopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE SwiftInt MarkUninitializedInst_getKind() const;
   BRIDGED_INLINE void RefCountingInst_setIsAtomic(bool isAtomic) const;
   BRIDGED_INLINE bool RefCountingInst_getIsAtomic() const;
@@ -874,6 +899,7 @@ struct BridgedArgument {
   BRIDGED_INLINE bool isSelf() const;
   BRIDGED_INLINE bool isReborrow() const;
   BRIDGED_INLINE bool hasResultDependsOn() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl getVarDecl() const;
 };
 
 struct OptionalBridgedArgument {
