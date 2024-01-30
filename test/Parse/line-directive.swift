@@ -14,6 +14,9 @@ x // expected-error {{parameterless closing #sourceLocation() directive without 
 
 #sourceLocation(file: x.swift, line: 1) // expected-error{{expected filename string literal}}
 
+// expected-warning@+1 {{expected starting line number}}
+#sourceLocation(file: "x.swift", line: 0xff)
+
 #sourceLocation(file: "x.swift", line: 42)
 x x ; // should be ignored by expected_error because it is in a different file
 x

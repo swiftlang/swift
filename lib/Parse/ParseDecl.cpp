@@ -7186,6 +7186,11 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       }
       SmallString<16> buffer;
       auto text = stripUnderscoresIfNeeded(Tok.getText(), buffer);
+      if (text.find_first_not_of("0123456789") != StringRef::npos) {
+        // Disallow non-decimal line numbers in Swift 6.
+        diagnose(Tok, diag::expected_line_directive_number)
+            .warnUntilSwiftVersion(6);
+      }
       if (text.getAsInteger(0, StartLine)) {
         diagnose(Tok, diag::expected_line_directive_number);
         return makeParserError();
