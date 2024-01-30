@@ -2323,6 +2323,7 @@ CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreBorrowInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
+CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
 
 //===---
 // Ignored
@@ -2452,7 +2453,6 @@ CONSTANT_TRANSLATION(StoreUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(DeinitExistentialAddrInst, Unhandled)
 CONSTANT_TRANSLATION(DeinitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Unhandled)
-CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
 
 //===---
