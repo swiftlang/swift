@@ -164,6 +164,16 @@ public:
            mutateLifetimeParamIndices == nullptr;
   }
 
+  bool hasInheritLifetimeParamIndices() const {
+    return inheritLifetimeParamIndices != nullptr;
+  }
+  bool hasBorrowLifetimeParamIndices() const {
+    return borrowLifetimeParamIndices != nullptr;
+  }
+  bool hasMutateLifetimeParamIndices() const {
+    return mutateLifetimeParamIndices != nullptr;
+  }
+
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;

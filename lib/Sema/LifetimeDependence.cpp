@@ -93,7 +93,7 @@ void LifetimeDependenceInfo::getConcatenatedData(
     }
     assert(!paramIndices->isEmpty());
 
-    for (auto i = 0; i < paramIndices->getCapacity(); i++) {
+    for (unsigned i = 0; i < paramIndices->getCapacity(); i++) {
       if (paramIndices->contains(i)) {
         concatenatedData.push_back(true);
         continue;
@@ -208,9 +208,19 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                        paramIndex);
         return llvm::None;
       }
+      if (paramIndex == 0) {
+        if (!afd->hasImplicitSelfDecl()) {
+          diags.diagnose(specifier.getLoc(),
+                         diag::lifetime_dependence_invalid_self);
+          return llvm::None;
+        }
+      }
+      auto ownership =
+          paramIndex == 0
+              ? afd->getImplicitSelfDecl()->getValueOwnership()
+              : afd->getParameters()->get(paramIndex - 1)->getValueOwnership();
       if (updateLifetimeDependenceInfo(
-              specifier, /*paramIndexToSet*/ specifier.getIndex() + 1,
-              afd->getParameters()->get(paramIndex)->getValueOwnership())) {
+              specifier, /*paramIndexToSet*/ specifier.getIndex(), ownership)) {
         return llvm::None;
       }
       break;

@@ -1060,6 +1060,10 @@ public:
   /// Reads a foreign async convention from \c DeclTypeCursor, if present.
   llvm::Optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
 
+  bool maybeReadLifetimeDependence(
+      SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
+      unsigned numParams);
+
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   llvm::Optional<StringRef> maybeReadInlinableBodyText();
 

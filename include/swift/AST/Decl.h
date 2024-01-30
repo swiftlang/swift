@@ -7797,6 +7797,9 @@ public:
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
+
+  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
+
   SourceRange getResultTypeSourceRange() const {
     return FnRetType.getSourceRange();
   }
