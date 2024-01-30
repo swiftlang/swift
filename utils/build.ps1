@@ -251,8 +251,16 @@ function Invoke-BuildStep([string]$Name) {
   }
 }
 
-function Get-ProjectBinaryCache($Arch, $ID) {
-  return "$BinaryCache\" + ($Arch.BuildID + $ID)
+enum Target {
+  LLVM
+  Runtime
+  Dispatch
+  Foundation
+  XCTest
+}
+
+function Get-ProjectBinaryCache($Arch, [Target]$Target) {
+  return "$BinaryCache\" + ($Arch.BuildID + $Target.value__)
 }
 
 function Copy-File($Src, $Dst) {
@@ -657,7 +665,7 @@ function Build-CMakeProject {
         if ($SwiftSDK -ne "") {
           $SwiftArgs += @("-sdk", $SwiftSDK)
         } else {
-          $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch 1
+          $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch Runtime
           $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
           $SwiftArgs += @("-resource-dir", "$SwiftResourceDir")
@@ -982,7 +990,7 @@ function Build-Compilers() {
 function Build-LLVM($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
-    -Bin (Get-ProjectBinaryCache $Arch 0) `
+    -Bin (Get-ProjectBinaryCache $Arch LLVM) `
     -Arch $Arch `
     -Defines @{
       LLVM_HOST_TRIPLE = $Arch.LLVMTarget;
@@ -1155,14 +1163,12 @@ function Build-ICU($Arch) {
 }
 
 function Build-Runtime($Arch) {
-  $LLVMBinaryCache = Get-ProjectBinaryCache $Arch 0
-
   Isolate-EnvVars {
     $env:Path = "$($HostArch.BinaryCache)\cmark-gfm-0.29.0.gfm.13\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
     Build-CMakeProject `
       -Src $SourceCache\swift `
-      -Bin (Get-ProjectBinaryCache $Arch 1) `
+      -Bin (Get-ProjectBinaryCache $Arch Runtime) `
       -InstallTo "$($Arch.SDKInstallRoot)\usr" `
       -Arch $Arch `
       -CacheScript $SourceCache\swift\cmake\caches\Runtime-Windows-$($Arch.LLVMName).cmake `
@@ -1171,7 +1177,7 @@ function Build-Runtime($Arch) {
       -Defines @{
         CMAKE_Swift_COMPILER_TARGET = $Arch.LLVMTarget;
         CMAKE_Swift_COMPILER_WORKS = "YES";
-        LLVM_DIR = "$LLVMBinaryCache\lib\cmake\llvm";
+        LLVM_DIR = "$(Get-ProjectBinaryCache $Arch LLVM)\lib\cmake\llvm";
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
@@ -1195,7 +1201,7 @@ function Build-Dispatch($Arch, [switch]$Test = $false) {
 
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-libdispatch `
-    -Bin (Get-ProjectBinaryCache $Arch 2) `
+    -Bin (Get-ProjectBinaryCache $Arch Dispatch) `
     -InstallTo "$($Arch.SDKInstallRoot)\usr" `
     -Arch $Arch `
     -UseBuiltCompilers C,CXX,Swift `
@@ -1208,20 +1214,19 @@ function Build-Dispatch($Arch, [switch]$Test = $false) {
 }
 
 function Build-Foundation($Arch, [switch]$Test = $false) {
-  $DispatchBinaryCache = Get-ProjectBinaryCache $Arch 2
-  $FoundationBinaryCache = Get-ProjectBinaryCache $Arch 3
+  $DispatchBinaryCache = Get-ProjectBinaryCache $Arch Dispatch
+  $FoundationBinaryCache = Get-ProjectBinaryCache $Arch Foundation
   $ShortArch = $Arch.ShortName
 
   Isolate-EnvVars {
     if ($Test) {
-      $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch 1
-      $XCTestBinaryCache = Get-ProjectBinaryCache $Arch 4
+      $XCTestBinaryCache = Get-ProjectBinaryCache $Arch XCTest
       $TestingDefines = @{
         ENABLE_TESTING = "YES";
         XCTest_DIR = "$XCTestBinaryCache\cmake\modules";
       }
       $Targets = @("default", "test")
-      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$RuntimeBinaryCache\bin;$env:Path"
+      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$(Get-ProjectBinaryCache $Arch Runtime)\bin;$env:Path"
     } else {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default", "install")
@@ -1258,23 +1263,21 @@ function Build-Foundation($Arch, [switch]$Test = $false) {
 }
 
 function Build-XCTest($Arch, [switch]$Test = $false) {
-  $LLVMBinaryCache = Get-ProjectBinaryCache $Arch 0
-  $DispatchBinaryCache = Get-ProjectBinaryCache $Arch 2
-  $FoundationBinaryCache = Get-ProjectBinaryCache $Arch 3
-  $XCTestBinaryCache = Get-ProjectBinaryCache $Arch 4
+  $DispatchBinaryCache = Get-ProjectBinaryCache $Arch Dispatch
+  $FoundationBinaryCache = Get-ProjectBinaryCache $Arch Foundation
+  $XCTestBinaryCache = Get-ProjectBinaryCache $Arch XCTest
 
   Isolate-EnvVars {
     if ($Test) {
-      $RuntimeBinaryCache = Get-ProjectBinaryCache $Arch 1
       $TestingDefines = @{
         ENABLE_TESTING = "YES";
-        LLVM_DIR = "$LLVMBinaryCache/lib/cmake/llvm";
+        LLVM_DIR = "$(Get-ProjectBinaryCache $Arch LLVM)/lib/cmake/llvm";
         XCTEST_PATH_TO_LIBDISPATCH_BUILD = $DispatchBinaryCache;
         XCTEST_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
         XCTEST_PATH_TO_FOUNDATION_BUILD = $FoundationBinaryCache;
       }
       $Targets = @("default", "check-xctest")
-      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$RuntimeBinaryCache\bin;$env:Path;$UnixToolsBinDir"
+      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$(Get-ProjectBinaryCache $Arch Runtime)\bin;$env:Path;$UnixToolsBinDir"
     } else {
       $TestingDefines = @{ ENABLE_TESTING = "NO" }
       $Targets = @("default", "install")
