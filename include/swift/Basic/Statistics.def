@@ -252,6 +252,10 @@ FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 
+/// Number of Swift 6 errors, including those that are downgraded to
+/// warnings in Swift 5 mode.
+FRONTEND_STATISTIC(Sema, NumSwift6Errors)
+
 /// Number of lookups into a module and its imports.
 
 /// All type check requests go into the Sema area.

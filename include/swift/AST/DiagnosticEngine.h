@@ -22,6 +22,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
@@ -888,6 +889,10 @@ namespace swift {
     /// until a specific language version, e.g. Swift 6.
     version::Version languageVersion;
 
+    /// The stats reporter used to keep track of Swift 6 errors
+    /// diagnosed via \c warnUntilSwiftVersion(6).
+    UnifiedStatsReporter *statsReporter = nullptr;
+
     /// Whether we are actively pretty-printing a declaration as part of
     /// diagnostics.
     bool IsPrettyPrintingDecl = false;
@@ -958,6 +963,10 @@ namespace swift {
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
 
     void setLanguageVersion(version::Version v) { languageVersion = v; }
+
+    void setStatsReporter(UnifiedStatsReporter *stats) {
+      statsReporter = stats;
+    }
 
     void setLocalization(StringRef locale, StringRef path) {
       assert(!locale.empty());
