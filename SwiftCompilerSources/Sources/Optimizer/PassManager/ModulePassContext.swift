@@ -123,6 +123,10 @@ struct ModulePassContext : Context, CustomStringConvertible {
     _bridged.endTransformFunction();
   }
 
+  func removeSerializedFlagFromAllFunctions() {
+    _bridged.removeSerializedFlagFromAllFunctions()
+  }
+
   func mangleAsyncRemoved(from function: Function) -> String {
     return String(taking: _bridged.mangleAsyncRemoved(function.bridged))
   }

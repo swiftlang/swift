@@ -596,6 +596,12 @@ bool specializeClassMethodInst(ClassMethodInst *cm);
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
                                  bool isMandatory);
+
+/// Removes all serialized flags from all functions and tables.
+///
+/// Implemented in the SerializeSILPass.
+void removeSerializedFlagFromAllFunctions(SILModule &M, SILPassManager *pm);
+
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H

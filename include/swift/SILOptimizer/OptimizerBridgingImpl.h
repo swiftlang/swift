@@ -155,6 +155,11 @@ bool BridgedPassContext::moduleIsSerialized() const {
   return invocation->getPassManager()->getModule()->isSerialized();
 }
 
+void BridgedPassContext::removeSerializedFlagFromAllFunctions() const {
+  auto *pm = invocation->getPassManager();
+  swift::removeSerializedFlagFromAllFunctions(*pm->getModule(), pm);
+}
+
 BridgedAliasAnalysis BridgedPassContext::getAliasAnalysis() const {
   return {invocation->getPassManager()->getAnalysis<swift::AliasAnalysis>(invocation->getFunction())};
 }

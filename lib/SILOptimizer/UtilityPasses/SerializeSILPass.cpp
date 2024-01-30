@@ -454,40 +454,6 @@ void updateOpaqueArchetypes(SILFunction &F) {
 /// pipeline.
 class SerializeSILPass : public SILModuleTransform {
     
-  /// Removes [serialized] from all functions. This allows for more
-  /// optimizations and for a better dead function elimination.
-  void removeSerializedFlagFromAllFunctions(SILModule &M) {
-    for (auto &F : M) {
-      bool wasSerialized = F.isSerialized() != IsNotSerialized;
-      F.setSerialized(IsNotSerialized);
-
-      // We are removing [serialized] from the function. This will change how
-      // opaque archetypes are lowered in SIL - they might lower to their
-      // underlying type. Update the function's opaque archetypes.
-      if (wasSerialized && F.isDefinition()) {
-        updateOpaqueArchetypes(F);
-        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::FunctionBody);
-      }
-
-      // After serialization we don't need to keep @alwaysEmitIntoClient
-      // functions alive, i.e. we don't need to treat them as public functions.
-      if (F.getLinkage() == SILLinkage::PublicNonABI && M.isWholeModule())
-        F.setLinkage(SILLinkage::Shared);
-    }
-
-    for (auto &WT : M.getWitnessTables()) {
-      WT.setSerialized(IsNotSerialized);
-    }
-
-    for (auto &VT : M.getVTables()) {
-      VT->setSerialized(IsNotSerialized);
-    }
-
-    for (auto &Deinit : M.getMoveOnlyDeinits()) {
-      Deinit->setSerialized(IsNotSerialized);
-    }
-  }
-
 public:
   SerializeSILPass() {}
   
@@ -500,10 +466,45 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
     M.serialize();
 
-    removeSerializedFlagFromAllFunctions(M);
+    removeSerializedFlagFromAllFunctions(M, getPassManager());
   }
 };
 
 SILTransform *swift::createSerializeSILPass() {
   return new SerializeSILPass();
 }
+
+/// Removes [serialized] from all functions. This allows for more
+/// optimizations and for a better dead function elimination.
+void swift::removeSerializedFlagFromAllFunctions(SILModule &M, SILPassManager *pm) {
+  for (auto &F : M) {
+    bool wasSerialized = F.isSerialized() != IsNotSerialized;
+    F.setSerialized(IsNotSerialized);
+
+    // We are removing [serialized] from the function. This will change how
+    // opaque archetypes are lowered in SIL - they might lower to their
+    // underlying type. Update the function's opaque archetypes.
+    if (wasSerialized && F.isDefinition()) {
+      updateOpaqueArchetypes(F);
+      pm->invalidateAnalysis(&F, SILAnalysis::InvalidationKind::FunctionBody);
+    }
+
+    // After serialization we don't need to keep @alwaysEmitIntoClient
+    // functions alive, i.e. we don't need to treat them as public functions.
+    if (F.getLinkage() == SILLinkage::PublicNonABI && M.isWholeModule())
+      F.setLinkage(SILLinkage::Shared);
+  }
+
+  for (auto &WT : M.getWitnessTables()) {
+    WT.setSerialized(IsNotSerialized);
+  }
+
+  for (auto &VT : M.getVTables()) {
+    VT->setSerialized(IsNotSerialized);
+  }
+
+  for (auto &Deinit : M.getMoveOnlyDeinits()) {
+    Deinit->setSerialized(IsNotSerialized);
+  }
+}
+

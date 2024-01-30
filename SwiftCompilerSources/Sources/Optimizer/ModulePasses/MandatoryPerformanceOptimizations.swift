@@ -29,6 +29,16 @@ import SIL
 let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-optimizations") {
   (moduleContext: ModulePassContext) in
 
+  if moduleContext.options.enableEmbeddedSwift {
+    // SILGen generates some functions with the serialized flag. This can prevent generic specialization.
+    // By clearing all serialized flags we make sure that all functions can be specialized.
+    // The CMO pass later in the pipeline can then decide which functions should be serialized and set the
+    // serialized flags again.
+    // Unfortunately we cannot clear the serialized flags in non-embedded mode. Therefore this problem still
+    // persists with performance-annotations.
+    moduleContext.removeSerializedFlagFromAllFunctions()
+  }
+
   var worklist = FunctionWorklist()
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
