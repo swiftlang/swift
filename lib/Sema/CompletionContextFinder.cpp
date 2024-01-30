@@ -27,12 +27,8 @@ CompletionContextFinder::CompletionContextFinder(
 
 ASTWalker::PreWalkResult<Expr *>
 CompletionContextFinder::walkToExprPre(Expr *E) {
-  if (auto *closure = dyn_cast<ClosureExpr>(E)) {
-    Contexts.push_back({closure->hasSingleExpressionBody()
-                            ? ContextKind::SingleStmtClosure
-                            : ContextKind::MultiStmtClosure,
-                        closure});
-  }
+  if (auto *closure = dyn_cast<ClosureExpr>(E))
+    Contexts.push_back({ContextKind::Closure, closure});
 
   if (isa<InterpolatedStringLiteralExpr>(E)) {
     Contexts.push_back({ContextKind::StringInterpolation, E});
@@ -120,15 +116,12 @@ CompletionContextFinder::getFallbackCompletionExpr() const {
         fallback = Fallback{context.E, fallbackDC, separatePrecheck};
       continue;
 
-    case ContextKind::SingleStmtClosure:
+    case ContextKind::Closure:
       if (!fallback && context.E != InitialExpr)
         fallback = Fallback{context.E, fallbackDC, separatePrecheck};
       fallbackDC = cast<AbstractClosureExpr>(context.E);
       continue;
 
-    case ContextKind::MultiStmtClosure:
-      fallbackDC = cast<AbstractClosureExpr>(context.E);
-      LLVM_FALLTHROUGH;
     case ContextKind::ErrorExpression:;
       fallback = llvm::None;
       separatePrecheck = true;

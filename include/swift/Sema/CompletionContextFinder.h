@@ -28,8 +28,7 @@ class CompletionContextFinder : public ASTWalker {
   enum class ContextKind {
     FallbackExpression,
     StringInterpolation,
-    SingleStmtClosure,
-    MultiStmtClosure,
+    Closure,
     ErrorExpression
   };
 
@@ -72,12 +71,6 @@ public:
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
-
-  /// Check whether code completion expression is located inside of a
-  /// multi-statement closure.
-  bool locatedInMultiStmtClosure() const {
-    return hasContext(ContextKind::MultiStmtClosure);
-  }
 
   bool locatedInStringInterpolation() const {
     return hasContext(ContextKind::StringInterpolation);
