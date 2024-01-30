@@ -216,6 +216,8 @@ bool CircularityChecker::expandType(CanType type, unsigned depth) {
 
 /// Visit a tuple type and try to expand it one level.
 bool CircularityChecker::expandTuple(CanTupleType tupleType, unsigned depth) {
+  LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ') << "expanding tuple "
+                          << tupleType << "\n";);
   startExpandingType(tupleType);
 
   for (auto eltType : tupleType.getElementTypes()) {
@@ -229,6 +231,8 @@ bool CircularityChecker::expandTuple(CanTupleType tupleType, unsigned depth) {
 /// Visit a nominal type and try to expand it one level.
 bool CircularityChecker::expandNominal(CanType type, NominalTypeDecl *D,
                                        unsigned depth) {
+  LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ') << "expanding nominal "
+                          << type << "\n";);
   if (auto S = dyn_cast<StructDecl>(D)) {
     return expandStruct(type, S, depth);
   } else if (auto E = dyn_cast<EnumDecl>(D)) {
