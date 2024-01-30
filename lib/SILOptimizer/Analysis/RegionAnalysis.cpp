@@ -192,6 +192,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
     return false;
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::CopyValueInst:
@@ -2306,6 +2307,7 @@ CONSTANT_TRANSLATION(UnownedToRefInst, LookThrough)
 CONSTANT_TRANSLATION(UnownedCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(DropDeinitInst, LookThrough)
 CONSTANT_TRANSLATION(ValueToBridgeObjectInst, LookThrough)
+CONSTANT_TRANSLATION(BeginCOWMutationInst, LookThrough)
 
 //===---
 // Store
@@ -2452,7 +2454,6 @@ CONSTANT_TRANSLATION(DeinitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Unhandled)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Unhandled)
 CONSTANT_TRANSLATION(PackElementSetInst, Unhandled)
-CONSTANT_TRANSLATION(BeginCOWMutationInst, Unhandled)
 
 //===---
 // Apply
