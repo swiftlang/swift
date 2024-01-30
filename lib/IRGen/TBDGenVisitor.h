@@ -61,7 +61,7 @@ class APIRecorder {
 public:
   virtual ~APIRecorder() {}
 
-  virtual void addSymbol(StringRef name, llvm::MachO::SymbolKind kind,
+  virtual void addSymbol(StringRef name, llvm::MachO::EncodeKind kind,
                          SymbolSource source, Decl *decl,
                          llvm::MachO::SymbolFlags flags) {}
   virtual void addObjCInterface(const ClassDecl *decl) {}
@@ -72,12 +72,12 @@ public:
 class SimpleAPIRecorder final : public APIRecorder {
 public:
   using SymbolCallbackFn =
-      llvm::function_ref<void(StringRef, llvm::MachO::SymbolKind, SymbolSource,
+      llvm::function_ref<void(StringRef, llvm::MachO::EncodeKind, SymbolSource,
                               Decl *, llvm::MachO::SymbolFlags)>;
 
   SimpleAPIRecorder(SymbolCallbackFn func) : func(func) {}
 
-  void addSymbol(StringRef symbol, llvm::MachO::SymbolKind kind,
+  void addSymbol(StringRef symbol, llvm::MachO::EncodeKind kind,
                  SymbolSource source, Decl *decl,
                  llvm::MachO::SymbolFlags flags) override {
     func(symbol, kind, source, decl, flags);
@@ -101,7 +101,7 @@ class TBDGenVisitor : public IRSymbolVisitor {
   const TBDGenOptions &Opts;
   APIRecorder &recorder;
 
-  using SymbolKind = llvm::MachO::SymbolKind;
+  using EncodeKind = llvm::MachO::EncodeKind;
   using SymbolFlags = llvm::MachO::SymbolFlags;
 
   std::vector<Decl*> DeclStack;
@@ -109,12 +109,12 @@ class TBDGenVisitor : public IRSymbolVisitor {
     previousInstallNameMap;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     parsePreviousModuleInstallNameMap();
-  void addSymbolInternal(StringRef name, SymbolKind kind, SymbolSource source,
+  void addSymbolInternal(StringRef name, EncodeKind kind, SymbolSource source,
                          SymbolFlags);
-  void addLinkerDirectiveSymbolsLdHide(StringRef name, SymbolKind kind);
-  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, SymbolKind kind);
+  void addLinkerDirectiveSymbolsLdHide(StringRef name, EncodeKind kind);
+  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, EncodeKind kind);
   void addSymbol(StringRef name, SymbolSource source, SymbolFlags flags,
-                 SymbolKind kind = SymbolKind::GlobalSymbol);
+                 EncodeKind kind = EncodeKind::GlobalSymbol);
 
   void addSymbol(LinkEntity entity);
   
