@@ -69,9 +69,14 @@ const LibPrespecializedData<InProcess> *swift::getLibPrespecializedData() {
   return SWIFT_LAZY_CONSTANT(findLibPrespecialized());
 }
 
+static bool disableForValidation = false;
+
 Metadata *
 swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
                                     const void *const *arguments) {
+  if (disableForValidation)
+    return nullptr;
+
   auto *data = getLibPrespecializedData();
   if (!data)
     return nullptr;
@@ -107,4 +112,51 @@ swift::getLibPrespecializedMetadata(const TypeContextDescriptor *description,
     fprintf(stderr, "Prespecializations library: found %p for key '%.*s'.\n",
             result, (int)key.size(), key.data());
   return result;
+}
+
+void _swift_validatePrespecializedMetadata(unsigned *outValidated,
+                                           unsigned *outFailed) {
+  if (outValidated)
+    *outValidated = 0;
+  if (outFailed)
+    *outFailed = 0;
+
+  auto *data = getLibPrespecializedData();
+  if (!data) {
+    return;
+  }
+
+  disableForValidation = true;
+
+  auto *metadataMap = data->getMetadataMap();
+  auto metadataMapSize = metadataMap->arraySize;
+  auto *array = metadataMap->array();
+  for (uint64_t i = 0; i < metadataMapSize; i++) {
+    auto &element = array[i];
+    if (!element.key || !element.value)
+      continue;
+
+    if (outValidated)
+      (*outValidated)++;
+
+    const char *mangledName = element.key;
+    // Skip the leading $.
+    if (mangledName[0] == '$')
+      mangledName++;
+
+    auto result = swift_getTypeByMangledName(MetadataState::Complete,
+                                             mangledName, nullptr, {}, {});
+    if (auto *error = result.getError()) {
+      fprintf(stderr,
+              "Prespecializations library validation: unable to build metadata "
+              "for mangled name '%s'\n",
+              mangledName);
+      if (outFailed)
+        (*outFailed)++;
+    }
+
+    if (!compareGenericMetadata(result.getType().getMetadata(), element.value))
+      if (outFailed)
+        (*outFailed)++;
+  }
 }

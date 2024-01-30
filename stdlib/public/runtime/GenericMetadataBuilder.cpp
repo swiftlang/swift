@@ -18,6 +18,7 @@
 #include "MetadataCache.h"
 #include "Private.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/TargetLayout.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
@@ -391,6 +392,141 @@ static bool equalVWTs(const ValueWitnessTable *a, const ValueWitnessTable *b) {
   return false;
 }
 
+bool swift::compareGenericMetadata(const Metadata *original,
+                                   const Metadata *newMetadata) {
+  if (original == newMetadata)
+    return true;
+
+  bool equal = true;
+
+  if (original->getKind() != newMetadata->getKind()) {
+    validationLog(true, "Kinds do not match");
+    equal = false;
+  } else {
+    auto originalDescriptor = original->getTypeContextDescriptor();
+    auto newDescriptor = newMetadata->getTypeContextDescriptor();
+
+    if (originalDescriptor != newDescriptor) {
+      validationLog(true, "Descriptors do not match");
+      equal = false;
+    } else if (!originalDescriptor->isGeneric()) {
+      validationLog(true,
+                    "Descriptor is not generic and pointers are not identical");
+      equal = false;
+    } else {
+      auto origVWT = asFullMetadata(original)->ValueWitnesses;
+      auto newVWT = asFullMetadata(newMetadata)->ValueWitnesses;
+
+      if (!equalVWTs(origVWT, newVWT)) {
+        validationLog(true, "VWTs do not match");
+        equal = false;
+      }
+
+      size_t originalSize = 0;
+      size_t newSize = 0;
+
+      // Find the range of the generic arguments. They can't be compared with
+      // bytewise equality.
+      auto &genericContextHeader =
+          originalDescriptor->getGenericContextHeader();
+      auto *genericArgumentsPtr =
+          originalDescriptor->getGenericArguments(original);
+      uintptr_t genericArgumentsStart =
+          (uintptr_t)genericArgumentsPtr - (uintptr_t)original;
+      uintptr_t genericArgumentsEnd =
+          genericArgumentsStart +
+          genericContextHeader.NumKeyArguments * sizeof(void *);
+      if (original->getKind() == MetadataKind::Class) {
+        originalSize =
+            reinterpret_cast<const ClassMetadata *>(original)->getSizeInWords();
+        newSize = reinterpret_cast<const ClassMetadata *>(newMetadata)
+                      ->getSizeInWords();
+      } else {
+        // Sizes are at least equal to genericArgumentsEnd.
+        originalSize = newSize = genericArgumentsEnd;
+
+        if (original->getKind() == MetadataKind::Struct) {
+          // If they're structs, try the trailing flags or field offsets.
+          auto getSize = [](const Metadata *metadata, size_t previous) {
+            auto *structMetadata =
+                reinterpret_cast<const StructMetadata *>(metadata);
+
+            const void *end;
+            if (auto *flags = structMetadata->getTrailingFlags())
+              end = &flags[1];
+            else if (auto *fieldOffsets = structMetadata->getFieldOffsets())
+              end = &fieldOffsets[structMetadata->getDescription()->NumFields];
+            else
+              return previous;
+
+            return (uintptr_t)end - (uintptr_t)metadata;
+          };
+
+          originalSize = getSize(original, originalSize);
+          newSize = getSize(newMetadata, newSize);
+        } else if (original->getKind() == MetadataKind::Enum) {
+          // If they're enums, try the trailing flags.
+          auto getSize = [](const Metadata *metadata, size_t previous) {
+            auto *enumMetadata =
+                reinterpret_cast<const EnumMetadata *>(metadata);
+
+            if (auto *flags = enumMetadata->getTrailingFlags())
+              return (uintptr_t)&flags[1] - (uintptr_t)metadata;
+            return previous;
+          };
+
+          originalSize = getSize(original, originalSize);
+          newSize = getSize(newMetadata, newSize);
+        }
+      }
+
+      if (originalSize != newSize) {
+        validationLog(true, "Sizes do not match");
+        equal = false;
+      }
+
+      if (memcmp(original, newMetadata, genericArgumentsStart)) {
+        validationLog(
+            true,
+            "Metadatas do not match in the part before generic arguments");
+        equal = false;
+      }
+
+      for (unsigned i = 0; i < genericContextHeader.NumKeyArguments; i++) {
+        auto *originalArg =
+            originalDescriptor->getGenericArguments(original)[i];
+        auto *newArg = newDescriptor->getGenericArguments(newMetadata)[i];
+        if (compareGenericMetadata(originalArg, newArg))
+          continue;
+        validationLog(true, "Generic argument %u does not match", i);
+        equal = false;
+      }
+
+      if (genericArgumentsEnd < originalSize) {
+        if (memcmp((const char *)original + genericArgumentsEnd,
+                   (const char *)newMetadata + genericArgumentsEnd,
+                   originalSize - genericArgumentsEnd)) {
+          validationLog(
+              true,
+              "Metadatas do not match in the part after generic arguments");
+        }
+      }
+    }
+  }
+
+  if (!equal) {
+    validationLog(true, "Error: original and new metadata do not match!");
+    validationLog(true, "Original metadata:");
+    if (auto *error = dumpMetadata(original).getError())
+      validationLog(true, "error dumping original metadata: %s", error->cStr());
+    validationLog(true, "New metadata builder:");
+    if (auto *error = dumpMetadata(newMetadata).getError())
+      validationLog(true, "error dumping new metadata: %s", error->cStr());
+  }
+
+  return equal;
+}
+
 void swift::validateExternalGenericMetadataBuilder(
     const Metadata *original, const TypeContextDescriptor *description,
     const void * const *arguments) {
@@ -422,32 +558,8 @@ void swift::validateExternalGenericMetadataBuilder(
       if (!success)
         return;
 
-      auto origVWT = asFullMetadata(original)->ValueWitnesses;
-      auto newVWT = asFullMetadata(newMetadata)->ValueWitnesses;
-
-      bool equal = true;
-      if (!equalVWTs(origVWT, newVWT)) {
-        validationLog(true, "VWTs do not match");
-        equal = false;
-      }
-      size_t totalSize = sizeof(ValueMetadata) + *extraDataSize.getValue();
-      if (memcmp(original, newMetadata, totalSize)) {
-        validationLog(true, "Metadatas do not match");
-        equal = false;
-      }
-
-      if (!equal) {
-        validationLog(true,
-                      "Error! Mismatch between new/old metadata builders!");
-        validationLog(true, "Original metadata:");
-        if (auto *error = dumpMetadata(original).getError())
-          validationLog(true, "error dumping original metadata: %s",
-                        error->cStr());
-        validationLog(true, "New metadata builder:");
-        if (auto *error = dumpMetadata(newMetadata).getError())
-          validationLog(true, "error dumping new metadata: %s", error->cStr());
+      if (!compareGenericMetadata(original, newMetadata))
         swift::fatalError(0, "Fatal error: mismatched metadata.\n");
-      }
 
       auto typeName = swift_getTypeName(original, false);
       validationLog(false, "Validated generic metadata builder on %.*s",
