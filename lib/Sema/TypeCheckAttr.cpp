@@ -160,7 +160,6 @@ public:
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(ImplicitSelfCapture)
   IGNORED_ATTR(InheritActorContext)
-  IGNORED_ATTR(Isolated)
   IGNORED_ATTR(Preconcurrency)
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
