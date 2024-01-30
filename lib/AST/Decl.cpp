@@ -1029,27 +1029,6 @@ Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   return body.get<Expr *>();
 }
 
-void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody(/*canSynthesize=*/false)->getLastElement();
-  if (auto *stmt = body.dyn_cast<Stmt *>()) {
-    if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
-      returnStmt->setResult(NewBody);
-      return;
-    } else if (isa<FailStmt>(stmt)) {
-      // We can only get to this point if we're a type-checked ConstructorDecl
-      // which was originally spelled init?(...) { nil }.  
-      //
-      // We can no longer write the single-expression which is being set on us 
-      // into anything because a FailStmt does not have such a child.  As a
-      // result we need to demand that the NewBody is null.
-      assert(NewBody == nullptr);
-      return;
-    }
-  }
-  getBody()->setLastElement(NewBody);
-}
-
 bool AbstractStorageDecl::isCompileTimeConst() const {
   return getAttrs().hasAttribute<CompileTimeConstAttr>();
 }
