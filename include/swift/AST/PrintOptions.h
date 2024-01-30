@@ -329,6 +329,11 @@ struct PrintOptions {
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
 
+  /// Whether to print generic signatures with inverse requirements (ie,
+  /// ~Copyable noting the absence of Copyable) or the internal desugared form
+  /// (where the implicit Copyable conformance is spelled explicitly).
+  bool PrintInverseRequirements = false;
+
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
 
