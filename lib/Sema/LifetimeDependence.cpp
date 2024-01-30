@@ -85,6 +85,33 @@ LifetimeDependenceInfo LifetimeDependenceInfo::getForParamIndex(
                                 /*mutateLifetimeParamIndices*/ indexSubset};
 }
 
+void LifetimeDependenceInfo::getConcatenatedData(
+    SmallVectorImpl<bool> &concatenatedData) const {
+  auto pushData = [&](IndexSubset *paramIndices) {
+    if (paramIndices == nullptr) {
+      return;
+    }
+    assert(!paramIndices->isEmpty());
+
+    for (auto i = 0; i < paramIndices->getCapacity(); i++) {
+      if (paramIndices->contains(i)) {
+        concatenatedData.push_back(true);
+        continue;
+      }
+      concatenatedData.push_back(false);
+    }
+  };
+  if (hasInheritLifetimeParamIndices()) {
+    pushData(inheritLifetimeParamIndices);
+  }
+  if (hasBorrowLifetimeParamIndices()) {
+    pushData(borrowLifetimeParamIndices);
+  }
+  if (hasMutateLifetimeParamIndices()) {
+    pushData(mutateLifetimeParamIndices);
+  }
+}
+
 llvm::Optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                                      bool allowIndex) {

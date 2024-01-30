@@ -166,6 +166,7 @@ public:
 
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
+  void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
 
   static llvm::Optional<LifetimeDependenceInfo>
   get(AbstractFunctionDecl *decl, Type resultType, bool allowIndex = false);
