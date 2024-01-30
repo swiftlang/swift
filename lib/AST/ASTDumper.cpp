@@ -1533,17 +1533,6 @@ namespace {
         });
       }
 
-      if (D->hasSingleExpressionBody()) {
-        // There won't be an expression if this is an initializer that was
-        // originally spelled "init?(...) { nil }", because "nil" is modeled
-        // via FailStmt in this context.
-        if (auto *Body = D->getSingleExpressionBody()) {
-          printRec(Body);
-
-          return;
-        }
-      }
-
       if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         printRec(Body, &D->getASTContext());
       }
