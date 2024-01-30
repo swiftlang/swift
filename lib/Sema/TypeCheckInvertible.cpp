@@ -388,7 +388,7 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     // Form a conformance.
     auto conformance = ctx.getNormalConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        conformanceDC, ProtocolConformanceState::Complete,
+        conformanceDC,
         /*isUnchecked=*/false, /*isPreconcurrency=*/false);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);

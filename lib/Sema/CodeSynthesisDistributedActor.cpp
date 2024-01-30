@@ -811,7 +811,6 @@ addDistributedActorCodableConformance(
   auto conformance = C.getNormalConformance(
       actor->getDeclaredInterfaceType(), proto,
       actor->getLoc(), /*dc=*/actor,
-      ProtocolConformanceState::Incomplete,
       /*isUnchecked=*/false,
       /*isPreconcurrency=*/false);
   conformance->setSourceKindAndImplyingConformance(

@@ -492,7 +492,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
   derived.addMembersToConformanceContext({structDecl});
 
-  TypeChecker::checkConformancesInContext(structDecl);
+  //TypeChecker::checkConformancesInContext(structDecl);
 
   return structDecl;
 }

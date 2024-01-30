@@ -25,6 +25,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
 #include "DerivedConformances.h"
 
@@ -176,7 +177,13 @@ addImplicitCodingKeys(NominalTypeDecl *target,
   }
 
   // Forcibly derive conformance to CodingKey.
-  TypeChecker::checkConformancesInContext(enumDecl);
+  auto conformance = target->getParentModule()->lookupConformance(
+      enumDecl->getDeclaredInterfaceType(), codingKeyProto);
+  auto *normal = conformance.getConcrete()->getRootNormalConformance();
+
+  evaluateOrDefault(C.evaluator,
+                    ResolveValueWitnessesRequest{normal},
+                    evaluator::SideEffect());
 
   // Add to the type.
   target->addMember(enumDecl);

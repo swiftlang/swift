@@ -2168,22 +2168,14 @@ static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
   return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
 }
 
+static void ensureRequirementsAreSatisfied(ASTContext &ctx,
+                                           NormalProtocolConformance *conformance);
+
 /// Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 void MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance) {
   PrettyStackTraceConformance trace("type-checking", conformance);
-
-  switch (conformance->getState()) {
-    case ProtocolConformanceState::Incomplete:
-      // Check the rest of the conformance below.
-      break;
-
-    case ProtocolConformanceState::Checking:
-    case ProtocolConformanceState::Complete:
-      // Nothing to do.
-      return;
-  }
 
   // Dig out some of the fields from the conformance.
   Type T = conformance->getType();
@@ -2191,11 +2183,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   auto Proto = conformance->getProtocol();
   auto ProtoType = Proto->getDeclaredInterfaceType();
   SourceLoc ComplainLoc = conformance->getLoc();
-  auto &C = ProtoType->getASTContext();
-
-  // Note that we are checking this conformance now.
-  conformance->setState(ProtocolConformanceState::Checking);
-  SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
@@ -2205,27 +2192,27 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
   // If the protocol requires a class, non-classes are a non-starter.
   if (Proto->requiresClass() && !DC->getSelfClassDecl()) {
-    C.Diags.diagnose(ComplainLoc,
-                     diag::non_class_cannot_conform_to_class_protocol, T,
-                     ProtoType);
+    Context.Diags.diagnose(ComplainLoc,
+                           diag::non_class_cannot_conform_to_class_protocol, T,
+                           ProtoType);
     conformance->setInvalid();
     return;
   }
 
   if (T->isActorType()) {
     if (auto globalActor = Proto->getGlobalActorAttr()) {
-      C.Diags.diagnose(ComplainLoc,
-                       diag::actor_cannot_conform_to_global_actor_protocol, T,
-                       ProtoType);
+      Context.Diags.diagnose(ComplainLoc,
+                             diag::actor_cannot_conform_to_global_actor_protocol, T,
+                             ProtoType);
 
       CustomAttr *attr;
       NominalTypeDecl *actor;
 
       std::tie(attr, actor) = *globalActor;
 
-      C.Diags.diagnose(attr->getLocation(),
-                       diag::protocol_isolated_to_global_actor_here, ProtoType,
-                       actor->getDeclaredInterfaceType());
+      Context.Diags.diagnose(attr->getLocation(),
+                             diag::protocol_isolated_to_global_actor_here, ProtoType,
+                             actor->getDeclaredInterfaceType());
 
       conformance->setInvalid();
       return;
@@ -2248,7 +2235,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
           break;
       }
       if (diagKind) {
-        C.Diags.diagnose(ComplainLoc, diagKind.value(), T, ProtoType);
+        Context.Diags.diagnose(ComplainLoc, diagKind.value(), T, ProtoType);
         conformance->setInvalid();
         return;
       }
@@ -2260,9 +2247,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     // with the Obj-C runtime when they're satisfied, but we'd still have solve
     // the problem with extensions that we check for below.
     if (!conformance->getConditionalRequirements().empty()) {
-      C.Diags.diagnose(ComplainLoc,
-                       diag::objc_protocol_cannot_have_conditional_conformance,
-                       T, ProtoType);
+      Context.Diags.diagnose(ComplainLoc,
+                             diag::objc_protocol_cannot_have_conditional_conformance,
+                             T, ProtoType);
       conformance->setInvalid();
       return;
     }
@@ -2274,9 +2261,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       if (auto classDecl = ext->getSelfClassDecl()) {
         if (classDecl->isGenericContext()) {
           if (!classDecl->isTypeErasedGenericClass()) {
-            C.Diags.diagnose(ComplainLoc,
-                             diag::objc_protocol_in_generic_extension,
-                             classDecl->isGeneric(), T, ProtoType);
+            Context.Diags.diagnose(ComplainLoc,
+                                   diag::objc_protocol_in_generic_extension,
+                                   classDecl->isGeneric(), T, ProtoType);
             conformance->setInvalid();
             return;
           }
@@ -2288,16 +2275,16 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   // Not every protocol/type is compatible with conditional conformances.
   auto conditionalReqs = conformance->getConditionalRequirements();
   if (!conditionalReqs.empty()) {
-    auto nestedType = DC->getSelfNominalTypeDecl()->getDeclaredInterfaceType();
+    auto nestedType = DC->getSelfInterfaceType();
     // Obj-C generics cannot be looked up at runtime, so we don't support
     // conditional conformances involving them. Check the full stack of nested
     // types for any obj-c ones.
     while (nestedType) {
       if (auto clazz = nestedType->getClassOrBoundGenericClass()) {
         if (clazz->isTypeErasedGenericClass()) {
-          C.Diags.diagnose(ComplainLoc,
-                           diag::objc_generics_cannot_conditionally_conform, T,
-                           ProtoType);
+          Context.Diags.diagnose(ComplainLoc,
+                                 diag::objc_generics_cannot_conditionally_conform,
+                                 T, ProtoType);
           conformance->setInvalid();
           return;
         }
@@ -2313,7 +2300,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       for (const auto &req : conditionalReqs) {
         if (req.getKind() == RequirementKind::Conformance &&
             req.getProtocolDecl()->isMarkerProtocol()) {
-          C.Diags.diagnose(
+          Context.Diags.diagnose(
             ComplainLoc, diag::marker_protocol_conditional_conformance,
             Proto->getName(), req.getFirstType(),
             req.getProtocolDecl()->getName());
@@ -2332,16 +2319,16 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       const auto effectiveVers =
           getASTContext().LangOpts.EffectiveLanguageVersion;
       if (serialized->getLanguageVersionBuiltWith() != effectiveVers) {
-        C.Diags.diagnose(ComplainLoc,
-                         diag::protocol_has_missing_requirements_versioned, T,
-                         ProtoType, serialized->getLanguageVersionBuiltWith(),
-                         effectiveVers);
+        Context.Diags.diagnose(ComplainLoc,
+                               diag::protocol_has_missing_requirements_versioned,
+                               T, ProtoType, serialized->getLanguageVersionBuiltWith(),
+                               effectiveVers);
         hasDiagnosed = true;
       }
     }
     if (!hasDiagnosed) {
-      C.Diags.diagnose(ComplainLoc, diag::protocol_has_missing_requirements, T,
-                       ProtoType);
+      Context.Diags.diagnose(ComplainLoc, diag::protocol_has_missing_requirements,
+                             T, ProtoType);
     }
     conformance->setInvalid();
     return;
@@ -2350,7 +2337,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   // Complain about the use of @unchecked for protocols that don't have
   // additional semantic checks.
   if (conformance->isUnchecked() && !hasAdditionalSemanticChecks(Proto)) {
-    C.Diags.diagnose(
+    Context.Diags.diagnose(
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
@@ -2379,9 +2366,32 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       // should go into the new extension we (might) suggest here.
 
       diagnoseConformanceImpliedByConditionalConformance(
-          C.Diags, conformance, implyingConf);
+          Context.Diags, conformance, implyingConf);
 
       conformance->setInvalid();
+    }
+  }
+
+  // Except in specific hardcoded cases for Foundation/Swift
+  // standard library compatibility, an _ObjectiveCBridgeable
+  // conformance must appear in the same module as the definition of
+  // the conforming type.
+  //
+  // Note that we check the module name to smooth over the difference
+  // between an imported Objective-C module and its overlay.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
+    auto nominal = DC->getSelfNominalTypeDecl();
+    if (!Context.isTypeBridgedInExternalModule(nominal)) {
+      auto clangLoader = Context.getClangModuleLoader();
+      if (nominal->getParentModule() != DC->getParentModule() &&
+          !(clangLoader &&
+            clangLoader->isInOverlayModuleForImportedModule(DC, nominal))) {
+        auto nominalModule = nominal->getParentModule();
+        Context.Diags.diagnose(conformance->getLoc(),
+                               diag::nonlocal_bridged_to_objc,
+                               nominal->getName(), Proto->getName(),
+                               nominalModule->getName());
+      }
     }
   }
 
@@ -2396,8 +2406,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
       if (ComplainLoc.isValid()) {
-        C.Diags.diagnose(Proto, diag::inherited_protocol_does_not_conform, T,
-                         InheritedProto->getDeclaredInterfaceType());
+        Context.Diags.diagnose(Proto, diag::inherited_protocol_does_not_conform,
+                               T, InheritedProto->getDeclaredInterfaceType());
       }
 
       conformance->setInvalid();
@@ -2405,11 +2415,18 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
   }
 
-  if (conformance->isComplete())
-    return;
+  // Resolve all of the type witnesses.
+  evaluateOrDefault(Context.evaluator,
+                    ResolveTypeWitnessesRequest{conformance},
+                    evaluator::SideEffect());
 
-  ConformanceChecker checker(getASTContext(), conformance);
-  checker.checkConformance();
+  // Check the requirements from the requirement signature.
+  ensureRequirementsAreSatisfied(Context, conformance);
+
+  // Check non-type requirements.
+  evaluateOrDefault(Context.evaluator,
+                    ResolveValueWitnessesRequest{conformance},
+                    evaluator::SideEffect());
 }
 
 /// Add the next associated type deduction to the string representation
@@ -5034,45 +5051,13 @@ void ConformanceChecker::resolveValueWitnesses() {
   }
 }
 
-void ConformanceChecker::checkConformance() {
-  assert(!Conformance->isComplete() && "Conformance is already complete");
-
-  FrontendStatsTracer statsTracer(getASTContext().Stats,
-                                  "check-conformance", Conformance);
-
-  // Resolve all of the type witnesses.
-  evaluateOrDefault(getASTContext().evaluator,
-                    ResolveTypeWitnessesRequest{Conformance},
-                    evaluator::SideEffect());
-
-  // Check the requirements from the requirement signature.
-  ensureRequirementsAreSatisfied(getASTContext(), Conformance);
-
-  // Check non-type requirements.
-  resolveValueWitnesses();
-
-  // Except in specific hardcoded cases for Foundation/Swift
-  // standard library compatibility, an _ObjectiveCBridgeable
-  // conformance must appear in the same module as the definition of
-  // the conforming type.
-  //
-  // Note that we check the module name to smooth over the difference
-  // between an imported Objective-C module and its overlay.
-  if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-    auto nominal = DC->getSelfNominalTypeDecl();
-    if (!getASTContext().isTypeBridgedInExternalModule(nominal)) {
-      auto clangLoader = getASTContext().getClangModuleLoader();
-      if (nominal->getParentModule() != DC->getParentModule() &&
-          !(clangLoader &&
-            clangLoader->isInOverlayModuleForImportedModule(DC, nominal))) {
-        auto nominalModule = nominal->getParentModule();
-        auto &C = nominal->getASTContext();
-        C.Diags.diagnose(Loc, diag::nonlocal_bridged_to_objc,
-                         nominal->getName(), Proto->getName(),
-                         nominalModule->getName());
-      }
-    }
-  }
+evaluator::SideEffect
+ResolveValueWitnessesRequest::evaluate(Evaluator &evaluator,
+                                NormalProtocolConformance *conformance) const {
+  auto &ctx = conformance->getDeclContext()->getASTContext();
+  ConformanceChecker checker(ctx, conformance);
+  checker.resolveValueWitnesses();
+  return evaluator::SideEffect();
 }
 
 void swift::diagnoseConformanceFailure(Type T,
@@ -5318,12 +5303,6 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
     return !M->lookupConformance(type, Proto, /*allowMissing=*/true)
                 .isInvalid();
   return !M->checkConformance(type, Proto).isInvalid();
-}
-
-void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
-  MultiConformanceChecker checker(conformance->getProtocol()->getASTContext());
-  checker.addConformance(conformance);
-  checker.checkAllConformances();
 }
 
 /// Determine the score when trying to match two identifiers together.
@@ -6446,11 +6425,8 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
   // an extremely convoluted caching scheme that doesn't fit nicely into the
   // evaluator's model. All of this should be refactored away.
   const auto known = conformance->Mapping.find(requirement);
-  if (known == conformance->Mapping.end()) {
-    assert((!conformance->isComplete() || conformance->isInvalid()) &&
-           "Resolver did not resolve requirement");
+  if (known == conformance->Mapping.end())
     return Witness();
-  }
   return known->second;
 }
 

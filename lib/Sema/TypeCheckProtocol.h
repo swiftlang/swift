@@ -9,12 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file provides the constraint-based type checker, anchored by the
-// \c ConstraintSystem class, which provides type checking and type
-// inference for expressions.
-//
-//===----------------------------------------------------------------------===//
 #ifndef SWIFT_SEMA_PROTOCOL_H
 #define SWIFT_SEMA_PROTOCOL_H
 
@@ -174,9 +168,6 @@ public:
   /// particular requirement and adoptee is required, before the
   /// conformance has been completed checked.
   void resolveSingleWitness(ValueDecl *requirement);
-
-  /// Check the entire protocol conformance.
-  void checkConformance();
 };
 
 /// Match the given witness to the given requirement.

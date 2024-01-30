@@ -811,8 +811,6 @@ bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
 /// \returns True if \p T conforms to the protocol \p Proto, false otherwise.
 bool couldDynamicallyConformToProtocol(Type T, ProtocolDecl *Proto,
                                        ModuleDecl *M);
-/// Completely check the given conformance.
-void checkConformance(NormalProtocolConformance *conformance);
 
 /// Check all of the conformances in the given context.
 void checkConformancesInContext(IterableDeclContext *idc);
