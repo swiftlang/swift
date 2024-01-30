@@ -1630,26 +1630,33 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
   builder.emit();
 }
 
-void IRGenModule::emitBuiltinReflectionMetadata() {
-  if (getSwiftModule()->isStdlibModule()) {
-    BuiltinTypes.insert(Context.TheNativeObjectType);
-    BuiltinTypes.insert(Context.getAnyObjectType());
-    BuiltinTypes.insert(Context.TheBridgeObjectType);
-    BuiltinTypes.insert(Context.TheRawPointerType);
-    BuiltinTypes.insert(Context.TheUnsafeValueBufferType);
+llvm::ArrayRef<CanType> IRGenModule::getOrCreateSpecialStlibBuiltinTypes() {
+  if (SpecialStdlibBuiltinTypes.empty()) {
+    SpecialStdlibBuiltinTypes.push_back(Context.TheNativeObjectType);
+    SpecialStdlibBuiltinTypes.push_back(Context.getAnyObjectType());
+    SpecialStdlibBuiltinTypes.push_back(Context.TheBridgeObjectType);
+    SpecialStdlibBuiltinTypes.push_back(Context.TheRawPointerType);
+    SpecialStdlibBuiltinTypes.push_back(Context.TheUnsafeValueBufferType);
 
     // This would not be necessary if RawPointer had the same set of
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
-    CanType thinFunction = CanFunctionType::get(
-      {}, Context.TheEmptyTupleType,
-      AnyFunctionType::ExtInfo().withRepresentation(
-          FunctionTypeRepresentation::Thin));
-    BuiltinTypes.insert(thinFunction);
+    CanType thinFunction =
+        CanFunctionType::get({}, Context.TheEmptyTupleType,
+                             AnyFunctionType::ExtInfo().withRepresentation(
+                                 FunctionTypeRepresentation::Thin));
+    SpecialStdlibBuiltinTypes.push_back(thinFunction);
 
-    CanType anyMetatype = CanExistentialMetatypeType::get(
-      Context.TheAnyType);
-    BuiltinTypes.insert(anyMetatype);
+    CanType anyMetatype = CanExistentialMetatypeType::get(Context.TheAnyType);
+    SpecialStdlibBuiltinTypes.push_back(anyMetatype);
+  }
+  return SpecialStdlibBuiltinTypes;
+}
+
+void IRGenModule::emitBuiltinReflectionMetadata() {
+  if (getSwiftModule()->isStdlibModule()) {
+    auto SpecialBuiltins = getOrCreateSpecialStlibBuiltinTypes();
+    BuiltinTypes.insert(SpecialBuiltins.begin(), SpecialBuiltins.end());
   }
 
   for (auto builtinType : BuiltinTypes)
