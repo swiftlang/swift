@@ -1597,8 +1597,15 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       getASTContext().LangOpts.hasFeature(Feature::PreconcurrencyConformances);
 
   llvm::Optional<ActorIsolation> isolation;
-  if ((F.isAsync() || emitExecutorPrecondition) && thunk.hasDecl()) {
-    isolation = getActorIsolation(thunk.getDecl());
+  if (F.isAsync()) {
+    if (thunk.hasDecl())
+      isolation = getActorIsolation(thunk.getDecl());
+  } else if (emitExecutorPrecondition) {
+    if (thunk.hasDecl()) {
+      isolation = getActorIsolation(thunk.getDecl());
+    } else if (auto globalActor = nativeInfo.FormalType->getGlobalActor()) {
+      isolation = ActorIsolation::forGlobalActor(globalActor);
+    }
   }
 
   // A hop/check is only needed in the thunk if it is global-actor isolated.

@@ -7442,10 +7442,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           if (!(overload && overload->choice.isDecl()))
             return false;
 
-          auto *overloadModule = overload->choice.getDecl()->getModuleContext();
-          return overloadModule != dc->getParentModule() &&
-                 !overloadModule->getLanguageVersionBuiltWith()
-                      .isVersionAtLeast(6);
+          auto *decl = overload->choice.getDecl();
+          // Function values passed to C/ObjC APIs are already thunked
+          // and that's where the check is going to go.
+          if (decl->hasClangNode())
+            return false;
+
+          auto *declaredIn = decl->getModuleContext();
+          return declaredIn && declaredIn != dc->getParentModule() &&
+                 !declaredIn->getLanguageVersionBuiltWith().isVersionAtLeast(6);
         };
 
         if (requiresRuntimeCheck()) {
