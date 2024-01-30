@@ -148,6 +148,10 @@ enum class BridgedArgumentConvention {
 struct BridgedParameterInfo {
   swift::TypeBase * _Nonnull type;
   BridgedArgumentConvention convention;
+  uint8_t options;
+
+  BridgedParameterInfo(swift::TypeBase * _Nonnull type, BridgedArgumentConvention convention, uint8_t options) :
+    type(type), convention(convention), options(options) {}
 
 #ifdef USED_IN_CPP_SOURCE
   inline static BridgedArgumentConvention
@@ -156,10 +160,34 @@ struct BridgedParameterInfo {
       swift::SILArgumentConvention(convention).Value);
   }
 
+  swift::ParameterConvention getParameterConvention() const {
+    switch (convention) {
+      case BridgedArgumentConvention::Indirect_In:             return swift::ParameterConvention::Indirect_In;
+      case BridgedArgumentConvention::Indirect_In_Guaranteed:  return swift::ParameterConvention::Indirect_In_Guaranteed;
+      case BridgedArgumentConvention::Indirect_Inout:          return swift::ParameterConvention::Indirect_Inout;
+      case BridgedArgumentConvention::Indirect_InoutAliasable: return swift::ParameterConvention::Indirect_InoutAliasable;
+      case BridgedArgumentConvention::Indirect_Out:            break;
+      case BridgedArgumentConvention::Direct_Owned:            return swift::ParameterConvention::Direct_Owned;
+      case BridgedArgumentConvention::Direct_Unowned:          return swift::ParameterConvention::Direct_Unowned;
+      case BridgedArgumentConvention::Direct_Guaranteed:       return swift::ParameterConvention::Direct_Guaranteed;
+      case BridgedArgumentConvention::Pack_Owned:              return swift::ParameterConvention::Pack_Owned;
+      case BridgedArgumentConvention::Pack_Inout:              return swift::ParameterConvention::Pack_Inout;
+      case BridgedArgumentConvention::Pack_Guaranteed:         return swift::ParameterConvention::Pack_Guaranteed;
+      case BridgedArgumentConvention::Pack_Out:                break;
+    }
+    llvm_unreachable("invalid parameter convention");
+  }
+
   BridgedParameterInfo(swift::SILParameterInfo parameterInfo):
     type(parameterInfo.getInterfaceType().getPointer()),
-    convention(castToArgumentConvention(parameterInfo.getConvention()))
+    convention(castToArgumentConvention(parameterInfo.getConvention())),
+    options(parameterInfo.getOptions().toRaw())
   {}
+
+  swift::SILParameterInfo unbridged() const {
+    return swift::SILParameterInfo(swift::CanType(type), getParameterConvention(),
+                                   swift::SILParameterInfo::Options(options));
+  }
 #endif
 };
 

@@ -165,6 +165,7 @@ public struct ParameterInfo : CustomStringConvertible {
   /// convention of the parameter.
   public let interfaceType: BridgedASTType
   public let convention: ArgumentConvention
+  public let options: UInt8
   public let hasLoweredAddresses: Bool
 
   /// Is this parameter passed indirectly in SIL? Most formally
@@ -276,6 +277,11 @@ extension ParameterInfo {
   init(bridged: BridgedParameterInfo, hasLoweredAddresses: Bool) {
     self.interfaceType = BridgedASTType(type: bridged.type)
     self.convention = bridged.convention.convention
+    self.options = bridged.options
     self.hasLoweredAddresses = hasLoweredAddresses
+  }
+
+  public var _bridged: BridgedParameterInfo {
+    BridgedParameterInfo(interfaceType.type!, convention.bridged, options)
   }
 }
