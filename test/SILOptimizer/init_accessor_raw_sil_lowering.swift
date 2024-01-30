@@ -429,11 +429,14 @@ func test_handling_of_nonmutating_set() {
     }
 
     // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF4TestL_V5countADSi_tcfC : $@convention(method) (Int, @thin Test.Type) -> Test
+    // CHECK: [[SELF:%.*]] = mark_uninitialized [rootself] %2 : $*Test
     // CHECK: [[INIT_VALUE:%.*]] = function_ref @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF4TestL_V5countSivpfi : $@convention(thin) () -> Int
     // CHECK-NEXT: [[VALUE:%.*]] = apply [[INIT_VALUE]]() : $@convention(thin) () -> Int
-    // CHECK: assign_or_init [init] #<abstract function>Test.count, self %3 : $*Test, value [[VALUE]] : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set {{.*}} : $@noescape @callee_guaranteed (Int) -> ()
-    // CHECK: assign_or_init [set] #<abstract function>Test.count, self %3 : $*Test, value %0 : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set {{.*}} : $@noescape @callee_guaranteed (Int) -> ()
-    // CHECK: assign_or_init [set] #<abstract function>Test.count, self %3 : $*Test, value [[ZERO:%.*]] : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set {{.*}} : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK: assign_or_init [init] #<abstract function>Test.count, self [[SELF]] : $*Test, value [[VALUE]] : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set {{.*}} : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK: [[SELF_REF:%.*]] = begin_access [read] [static] [[SELF]] : $*Test
+    // CHECK: assign_or_init [set] #<abstract function>Test.count, self [[SELF_REF]] : $*Test, value %0 : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set {{.*}} : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK: [[SELF_REF:%.*]] = begin_access [read] [static] [[SELF]] : $*Test
+    // CHECK: assign_or_init [set] #<abstract function>Test.count, self [[SELF_REF]] : $*Test, value [[ZERO:%.*]] : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set {{.*}} : $@noescape @callee_guaranteed (Int) -> ()
     init(count: Int) {
       self.count = count
       self.count = 0
@@ -453,25 +456,28 @@ func test_handling_of_nonmutating_set() {
 
     // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countADSi_tcfC
     // CHECK: [[SELF_REF:%.*]] = mark_uninitialized [rootself] %2
-    // CHECK: [[SELF:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    // CHECK: [[SELF_ACCESS:%.*]] = begin_access [read] [static] [[SELF_REF]] : $*TestWithStored
     // CHECK: [[SETTER_REF:%.*]] = function_ref @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countSivs : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK: [[SELF:%.*]] = load [copy] {{.*}} : $*TestWithStored
     // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
-    // CHECK-NEXT: assign_or_init [init] #<abstract function>TestWithStored.count, self [[SELF_REF]] : $*TestWithStored, value %0 : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: assign_or_init [init] #<abstract function>TestWithStored.count, self [[SELF_ACCESS]] : $*TestWithStored, value %0 : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
     init(count: Int) {
       self.count = count
     }
 
     // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5valueADSi_tcfC
-    // CHECK: [[SELF_REF:%.*]] = mark_uninitialized [rootself] %2
-    // CHECK: [[SELF:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    // CHECK: [[SELF:%.*]] = mark_uninitialized [rootself] %2
     //
+    // CHECK: [[SELF_REF:%.*]] = begin_access [read] [static] [[SELF]] : $*TestWithStored
     // CHECK: [[SETTER_REF:%.*]] = function_ref @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countSivs : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
-    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK: [[SELF_COPY:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF_COPY]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
     // CHECK-NEXT: assign_or_init [init] #<abstract function>TestWithStored.count, self [[SELF_REF]] : $*TestWithStored, value {{.*}} : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
     //
-    // CHECK: [[SELF:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    // CHECK: [[SELF_REF:%.*]] = begin_access [read] [static] [[SELF]] : $*TestWithStored
     // CHECK: [[SETTER_REF:%.*]] = function_ref @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countSivs : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
-    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK: [[SELF_COPY:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF_COPY]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
     // CHECK-NEXT: assign_or_init [set] #<abstract function>TestWithStored.count, self [[SELF_REF]] : $*TestWithStored, value %0 : $Int, init {{.*}} : $@noescape @callee_guaranteed (Int) -> @out Int, set [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
     init(value: Int) {
       self.count = 0
