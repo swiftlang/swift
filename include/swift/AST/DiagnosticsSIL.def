@@ -806,6 +806,12 @@ ERROR(sil_movechecking_capture_consumed, none,
 ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
       "after consume", (StringRef, bool))
+ERROR(sil_movechecking_not_reinitialized_before_end_of_coroutine, none,
+      "field '%0' was consumed but not reinitialized; "
+      "the field must be reinitialized during the access", (StringRef))
+ERROR(sil_movechecking_not_reinitialized_before_end_of_access, none,
+      "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
+      "after consume while accessing memory", (StringRef, bool))
 ERROR(sil_movechecking_value_consumed_in_a_loop, none,
       "'%0' consumed in a loop", (StringRef))
 ERROR(sil_movechecking_use_after_partial_consume, none,

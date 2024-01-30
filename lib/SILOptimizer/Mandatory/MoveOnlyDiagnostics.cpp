@@ -25,6 +25,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/Debug.h"
 
+#include "MoveOnlyTypeUtils.h"
 using namespace swift;
 using namespace swift::siloptimizer;
 
@@ -668,7 +669,7 @@ void DiagnosticEmitter::emitAddressExclusivityHazardDiagnostic(
 void DiagnosticEmitter::emitAddressDiagnostic(
     MarkUnresolvedNonCopyableValueInst *markedValue,
     SILInstruction *lastLiveUser, SILInstruction *violatingUser,
-    bool isUseConsuming, bool isInOutEndOfFunction) {
+    bool isUseConsuming, llvm::Optional<ScopeRequiringFinalInit> scopeKind) {
   if (!useWithDiagnostic.insert(violatingUser).second)
     return;
   registerDiagnosticEmitted(markedValue);
@@ -694,12 +695,24 @@ void DiagnosticEmitter::emitAddressDiagnostic(
     return;
   }
 
-  if (isInOutEndOfFunction) {
-    diagnose(
-        astContext, markedValue,
-        diag::
-            sil_movechecking_not_reinitialized_before_end_of_function,
-        varName, isClosureCapture(markedValue));
+  if (scopeKind.has_value()) {
+    switch (scopeKind.value()) {
+    case ScopeRequiringFinalInit::InoutArgument:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_function,
+               varName, isClosureCapture(markedValue));
+      break;
+    case ScopeRequiringFinalInit::Coroutine:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_coroutine,
+               varName);
+      break;
+    case ScopeRequiringFinalInit::ModifyMemoryAccess:
+      diagnose(astContext, markedValue,
+               diag::sil_movechecking_not_reinitialized_before_end_of_access,
+               varName, isClosureCapture(markedValue));
+      break;
+    }
     diagnose(astContext, violatingUser,
              diag::sil_movechecking_consuming_use_here);
     return;
@@ -931,13 +944,25 @@ void DiagnosticEmitter::emitPromotedBoxArgumentError(
   }
 }
 
-void DiagnosticEmitter::emitCannotPartiallyConsumeError(
-    MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-    NominalTypeDecl *nominal, SILInstruction *consumingUser, bool isForDeinit) {
+void DiagnosticEmitter::emitCannotPartiallyMutateError(
+    MarkUnresolvedNonCopyableValueInst *address, PartialMutationError error,
+    SILInstruction *user, TypeTreeLeafTypeRange usedBits,
+    PartialMutation kind) {
+
+  TypeOffsetSizePair pair(usedBits);
+
+  SmallString<128> pathString;
+  auto rootType = address->getType();
+  if (error.type != rootType) {
+    llvm::raw_svector_ostream os(pathString);
+    auto *fn = address->getFunction();
+    pair.constructPathString(error.type, {rootType, fn}, rootType, fn, os);
+  }
+
   auto &astContext = fn->getASTContext();
 
   SmallString<64> varName;
-  getVariableNameForValue(markedValue, varName);
+  getVariableNameForValue(address, varName);
 
   if (!pathString.empty())
     varName.append(pathString);
@@ -946,68 +971,43 @@ void DiagnosticEmitter::emitCannotPartiallyConsumeError(
       astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
   (void)hasPartialConsumption;
 
-  if (isForDeinit) {
-    assert(hasPartialConsumption);
-    diagnose(astContext, consumingUser,
-             diag::sil_movechecking_cannot_destructure_has_deinit, varName);
-
-  } else {
+  switch (error) {
+  case PartialMutationError::Kind::FeatureDisabled:
     assert(!hasPartialConsumption);
-    diagnose(astContext, consumingUser,
-             diag::sil_movechecking_cannot_destructure, varName);
-  }
-
-  registerDiagnosticEmitted(markedValue);
-
-  if (!isForDeinit)
+    switch (kind) {
+    case PartialMutation::Kind::Consume:
+      diagnose(astContext, user, diag::sil_movechecking_cannot_destructure,
+               varName);
+      break;
+    case PartialMutation::Kind::Reinit:
+      diagnose(astContext, user, diag::sil_movechecking_cannot_partially_reinit,
+               varName);
+      diagnose(astContext, &kind.getEarlierConsumingUse(),
+               diag::sil_movechecking_consuming_use_here);
+      break;
+    }
+    registerDiagnosticEmitted(address);
     return;
-
-  // Point to the deinit if we know where it is.
-  assert(nominal);
-  if (auto deinitLoc =
-          nominal->getValueTypeDestructor()->getLoc(/*SerializedOK=*/false))
-    astContext.Diags.diagnose(deinitLoc, diag::sil_movechecking_deinit_here);
-}
-
-void DiagnosticEmitter::emitCannotPartiallyReinitError(
-    MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
-    NominalTypeDecl *nominal, SILInstruction *initingUser,
-    SILInstruction *consumingUser, bool isForDeinit) {
-  auto &astContext = fn->getASTContext();
-
-  SmallString<64> varName;
-  getVariableNameForValue(markedValue, varName);
-
-  if (!pathString.empty())
-    varName.append(pathString);
-
-  bool hasPartialConsumption =
-      astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption);
-  (void)hasPartialConsumption;
-
-  if (isForDeinit) {
+  case PartialMutationError::Kind::HasDeinit: {
     assert(hasPartialConsumption);
-    diagnose(astContext, initingUser,
-             diag::sil_movechecking_cannot_partially_reinit_has_deinit,
-             varName);
-
-  } else {
-    assert(!hasPartialConsumption);
-    diagnose(astContext, initingUser,
-             diag::sil_movechecking_cannot_partially_reinit, varName);
-  }
-
-  diagnose(astContext, consumingUser,
-           diag::sil_movechecking_consuming_use_here);
-
-  registerDiagnosticEmitted(markedValue);
-
-  if (!isForDeinit)
-    return;
-
-  // Point to the deinit if we know where it is.
-  assert(nominal);
-  if (auto deinitLoc =
-          nominal->getValueTypeDestructor()->getLoc(/*SerializedOK=*/false))
+    switch (kind) {
+    case PartialMutation::Kind::Consume:
+      diagnose(astContext, user,
+               diag::sil_movechecking_cannot_destructure_has_deinit, varName);
+      break;
+    case PartialMutation::Kind::Reinit:
+      diagnose(astContext, user,
+               diag::sil_movechecking_cannot_partially_reinit_has_deinit,
+               varName);
+      break;
+    }
+    registerDiagnosticEmitted(address);
+    auto deinitLoc = error.getNominal().getValueTypeDestructor()->getLoc(
+        /*SerializedOK=*/false);
+    if (!deinitLoc)
+      return;
     astContext.Diags.diagnose(deinitLoc, diag::sil_movechecking_deinit_here);
+    return;
+  }
+  }
 }

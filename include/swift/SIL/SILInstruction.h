@@ -4649,9 +4649,9 @@ enum class SILAccessEnforcement : uint8_t {
   /// behavior.
   Unsafe,
 
-  /// Access to pointers that are signed via pointer authentication mechanishm.
+  /// Access to pointers that are signed via pointer authentication.
   /// Such pointers should be authenticated before read and signed before a
-  /// write. Optimizer should avoid promoting such accesses to values.
+  /// write. Optimizations should avoid promoting such accesses to values.
   Signed,
 
   // This enum is encoded.
