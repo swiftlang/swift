@@ -1612,7 +1612,6 @@ namespace  {
     UNINTERESTING_ATTR(Nonisolated)
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
-    UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(NoImplicitCopy)
     UNINTERESTING_ATTR(UnavailableFromAsync)
 

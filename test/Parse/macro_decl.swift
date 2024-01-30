@@ -44,7 +44,7 @@ func test() {
   dynamic #someFunc
 
   @CustomAttr
-  isolated #someFunc
+  #someFunc
 }
 
 public # someFunc // expected-error {{extraneous whitespace between '#' and macro name is not permitted}} {{9-10=}}
