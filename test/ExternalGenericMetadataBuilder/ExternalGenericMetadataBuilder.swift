@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-
 // RUN: %target-build-swift -I %swift-lib-dir -I %swift_src_root/lib/ExternalGenericMetadataBuilder -L%swift-lib-dir -lswiftGenericMetadataBuilder -enable-experimental-feature Extern %s -o %t/ExternalMetadataBuilderTest
 // RUN: %target-codesign %t/ExternalMetadataBuilderTest
 // RUN: %target-run %t/ExternalMetadataBuilderTest
+
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx && CPU=arm64
 
@@ -69,11 +69,11 @@ ExternalGenericMetadataBuilderTests.test("JSON output") {
     expectNil(addDylibError)
   }
 
-  let buildErrorCStr = swift_externalMetadataBuilder_buildMetadata(builder);
+  let buildErrorCStr = swift_externalMetadataBuilder_buildMetadata(builder)
   let buildError = buildErrorCStr.map { String(cString: $0) }
   expectNil(buildError)
 
-  let outputJSONCStr = swift_externalMetadataBuilder_getMetadataJSON(builder);
+  let outputJSONCStr = swift_externalMetadataBuilder_getMetadataJSON(builder)
   let outputJSON = outputJSONCStr.map { String(cString: $0) }
   expectNotNil(outputJSON)
 
@@ -120,19 +120,16 @@ var expectedJSON: String {
                 },
                 "0002000000000000",
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMn",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$ss4Int8VN",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$ss5Int16VN",
                     "addend": 0,
                     "kind": "ptr64"
@@ -153,25 +150,21 @@ var expectedJSON: String {
                 },
                 "0002000000000000",
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest13GenericStructVMn",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$ss4Int8VN",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$ss5Int16VN",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$sSdN",
                     "addend": 0,
                     "kind": "ptr64"
@@ -184,49 +177,41 @@ var expectedJSON: String {
             "contentType": "constData",
             "contents": [
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 1032,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 1376,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 1536,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 1768,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "__swift_pod_copy",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 2200,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 2420,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 2864,
                     "kind": "ptr64"
@@ -239,49 +224,41 @@ var expectedJSON: String {
             "contentType": "constData",
             "contents": [
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 3520,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 3892,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 4052,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 4312,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "__swift_pod_copy",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 4796,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 5044,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "ExternalMetadataBuilderTest",
                     "target": "_$s27ExternalMetadataBuilderTest12GenericFieldVMa",
                     "addend": 5160,
                     "kind": "ptr64"
@@ -295,20 +272,17 @@ var expectedJSON: String {
             "contents": [
                 "0000000000000000",
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$sBbWV",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 "0002000000000000",
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$sSaMn",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$sSdN",
                     "addend": 0,
                     "kind": "ptr64"
@@ -322,14 +296,12 @@ var expectedJSON: String {
             "contents": [
                 "0000000000000000",
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$sBbWV",
                     "addend": 0,
                     "kind": "ptr64"
                 },
                 "0002000000000000",
                 {
-                    "target": "/usr/lib/swift/libswiftCore.dylib",
                     "target": "_$sSaMn",
                     "addend": 0,
                     "kind": "ptr64"
