@@ -334,6 +334,12 @@ InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
       .wrapIn(diag::error_in_future_swift_version, majorVersion);
   }
 
+  if (majorVersion == 6) {
+    if (auto stats = Engine->statsReporter) {
+      ++stats->getFrontendCounters().NumSwift6Errors;
+    }
+  }
+
   return *this;
 }
 

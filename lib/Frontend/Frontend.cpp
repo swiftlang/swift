@@ -375,6 +375,7 @@ void CompilerInstance::setupStatsReporter() {
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
   getASTContext().setStatsReporter(Reporter.get());
+  Diagnostics.setStatsReporter(Reporter.get());
   Stats = std::move(Reporter);
 }
 
