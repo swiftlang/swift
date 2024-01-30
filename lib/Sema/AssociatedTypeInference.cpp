@@ -2956,6 +2956,14 @@ void AssociatedTypeInference::findSolutionsRec(
           unsigned numTypeWitnesses,
           unsigned numValueWitnessesInProtocolExtensions,
           unsigned reqDepth) {
+  // If this solution is going to be worse than what we've already recorded,
+  // give up now.
+  if (!solutions.empty() &&
+      solutions.front().NumValueWitnessesInProtocolExtensions
+          < numValueWitnessesInProtocolExtensions) {
+    return;
+  }
+
   using TypeWitnessesScope = decltype(typeWitnesses)::ScopeTy;
 
   // If we hit the last requirement, record and check this solution.
@@ -3088,6 +3096,13 @@ void AssociatedTypeInference::findSolutionsRec(
     solution.ValueWitnesses = valueWitnesses;
     solution.NumValueWitnessesInProtocolExtensions
       = numValueWitnessesInProtocolExtensions;
+
+    // If this solution was clearly better than the previous best solution,
+    // swap them.
+    if (solutionList.back().NumValueWitnessesInProtocolExtensions
+          < solutionList.front().NumValueWitnessesInProtocolExtensions) {
+      std::swap(solutionList.front(), solutionList.back());
+    }
 
     // We're done recording the solution.
     return;
@@ -3441,15 +3456,10 @@ bool AssociatedTypeInference::findBestSolution(
   if (solutions.empty()) return true;
   if (solutions.size() == 1) return false;
 
-  // Find the smallest number of value witnesses found in protocol extensions.
-  // FIXME: This is a silly heuristic that should go away.
+  // The solution at the front has the smallest number of value witnesses found
+  // in protocol extensions, by construction.
   unsigned bestNumValueWitnessesInProtocolExtensions
     = solutions.front().NumValueWitnessesInProtocolExtensions;
-  for (unsigned i = 1, n = solutions.size(); i != n; ++i) {
-    bestNumValueWitnessesInProtocolExtensions
-      = std::min(bestNumValueWitnessesInProtocolExtensions,
-                 solutions[i].NumValueWitnessesInProtocolExtensions);
-  }
 
   // Erase any solutions with more value witnesses in protocol
   // extensions than the best.
