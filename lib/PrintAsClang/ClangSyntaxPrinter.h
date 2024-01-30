@@ -183,16 +183,16 @@ public:
 
   /// Print the Swift generic signature as C++ template declaration alongside
   /// its requirements.
-  void printGenericSignature(const CanGenericSignature &signature);
+  void printGenericSignature(GenericSignature signature);
 
   /// Print the `static_assert` statements used for legacy type-checking for
   /// generics in C++14/C++17 mode.
   void
-  printGenericSignatureInnerStaticAsserts(const CanGenericSignature &signature);
+  printGenericSignatureInnerStaticAsserts(GenericSignature signature);
 
   /// Print the C++ template parameters that should be passed for a given
   /// generic signature.
-  void printGenericSignatureParams(const CanGenericSignature &signature);
+  void printGenericSignatureParams(GenericSignature signature);
 
   /// Print the call to the C++ type traits that computes the underlying type /
   /// witness table pointer value that are passed to Swift for the given generic
