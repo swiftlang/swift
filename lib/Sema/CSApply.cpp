@@ -7416,6 +7416,54 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
+    if (ctx.LangOpts.hasFeature(Feature::PreconcurrencyConformances)) {
+      // Passing a synchronous global actor-isolated function value and
+      // parameter that expects a synchronous non-isolated function type could
+      // require a runtime check to ensure that function is always called in
+      // expected context.
+      if (!toEI.getGlobalActor() && fromEI.getGlobalActor() &&
+          !toEI.isAsync()) {
+        // Runtime check is required when isolation function value
+        // is passed to an API that comes from a module that doesn't
+        // have full static concurrency checking enabled.
+        auto requiresRuntimeCheck = [&]() {
+          if (!locator.endsWith<LocatorPathElt::ApplyArgToParam>())
+            return false;
+
+          ConstraintLocator *calleeLoc = nullptr;
+          if (auto *call = getAsExpr<ApplyExpr>(locator.getAnchor())) {
+            calleeLoc = CalleeLocators[call];
+          } else {
+            calleeLoc =
+                solution.getCalleeLocator(cs.getConstraintLocator(locator));
+          }
+
+          auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
+          if (!(overload && overload->choice.isDecl()))
+            return false;
+
+          auto *overloadModule = overload->choice.getDecl()->getModuleContext();
+          return overloadModule != dc->getParentModule() &&
+                 !overloadModule->getLanguageVersionBuiltWith()
+                      .isVersionAtLeast(6);
+        };
+
+        if (requiresRuntimeCheck()) {
+          auto isolatedToType =
+              FunctionType::get(toFunc->getParams(), toFunc->getResult(),
+                                toEI.withGlobalActor(fromEI.getGlobalActor()));
+
+          // Global actor might not be the only difference, let's introduce
+          // a function conversion first but with matching isolation.
+          expr = cs.cacheType(new (ctx)
+                                  FunctionConversionExpr(expr, isolatedToType));
+
+          return cs.cacheType(new (ctx)
+                                  ActorIsolationErasureExpr(expr, toType));
+        }
+      }
+    }
+
     maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
 
     return cs.cacheType(new (ctx) FunctionConversionExpr(expr, toType));
