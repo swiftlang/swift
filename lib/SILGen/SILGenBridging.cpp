@@ -1594,7 +1594,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   Scope scope(Cleanups, CleanupLocation(loc));
 
   bool emitExecutorPrecondition =
-      getASTContext().LangOpts.hasFeature(Feature::PreconcurrencyConformances);
+      getASTContext().LangOpts.hasFeature(Feature::DynamicActorIsolation);
 
   llvm::Optional<ActorIsolation> isolation;
   if (F.isAsync()) {

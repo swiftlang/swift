@@ -3876,7 +3876,7 @@ static bool usesFeatureTransferringArgsAndResults(Decl *decl) {
   return false;
 }
 
-static bool usesFeaturePreconcurrencyConformances(Decl *decl) {
+static bool usesFeatureDynamicActorIsolation(Decl *decl) {
   auto usesPreconcurrencyConformance = [&](const InheritedTypes &inherited) {
     return llvm::any_of(
         inherited.getEntries(),

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -module-name preconcurrency_conformances -enable-experimental-feature PreconcurrencyConformances %s -verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen -disable-availability-checking -module-name preconcurrency_conformances -enable-experimental-feature DynamicActorIsolation %s -verify | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: concurrency

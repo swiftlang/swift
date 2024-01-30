@@ -7416,7 +7416,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    if (ctx.LangOpts.hasFeature(Feature::PreconcurrencyConformances)) {
+    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
       // Passing a synchronous global actor-isolated function value and
       // parameter that expects a synchronous non-isolated function type could
       // require a runtime check to ensure that function is always called in

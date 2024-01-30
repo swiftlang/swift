@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature PreconcurrencyConformances -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature DynamicActorIsolation -emit-silgen -verify %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
