@@ -275,10 +275,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
       Opts.ClangIncludeTrees.empty() &&
       FrontendOptions::supportCompilationCaching(Opts.RequestedAction)) {
-    if (!Args.hasArg(OPT_allow_unstable_cache_key_for_testing)) {
-        Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
-        return true;
-    }
+    Diags.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
+    return true;
   }
 
   if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {

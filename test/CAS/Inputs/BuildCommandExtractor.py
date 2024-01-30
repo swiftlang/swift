@@ -17,15 +17,22 @@ elif module_name.startswith('swiftPrebuiltExternal:'):
     mode = 'swiftPrebuiltExternal'
     module_name = module_name[22:]
 
+
+def printCmd(cmd):
+    for c in cmd:
+        print('"{}"'.format(c))
+
+
 with open(input_json, 'r') as file:
     deps = json.load(file)
-    module_names = deps['modules'][::2]
-    module_details = deps['modules'][1::2]
-    for name, detail in zip(module_names, module_details):
-        if name.get(mode, '') != module_name:
-            continue
+    if module_name == 'bridgingHeader':
+        cmd = deps['modules'][1]['details']['swift']['bridgingHeader']['commandLine']
+        printCmd(cmd)
+    else:
+        module_names = deps['modules'][::2]
+        module_details = deps['modules'][1::2]
+        for name, detail in zip(module_names, module_details):
+            if name.get(mode, '') != module_name:
+                continue
 
-        cmd = detail['details'][mode]['commandLine']
-        for c in cmd:
-            print('"{}"'.format(c))
-        break
+            printCmd(detail['details'][mode]['commandLine'])
