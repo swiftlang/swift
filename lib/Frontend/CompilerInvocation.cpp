@@ -1339,6 +1339,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_warn_redundant_requirements))
     Opts.WarnRedundantRequirements = true;
 
+  Opts.EnableExperimentalAssociatedTypeInference = true;
+
   if (Args.hasArg(OPT_enable_experimental_associated_type_inference))
     Opts.EnableExperimentalAssociatedTypeInference = true;
   if (Args.hasArg(OPT_disable_experimental_associated_type_inference))

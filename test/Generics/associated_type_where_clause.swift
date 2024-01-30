@@ -120,14 +120,14 @@ struct ConcreteInheritsDiffer: Inherits {
     typealias U = ConcreteConforms
     typealias X = ConcreteConforms2
 }
-/*
-FIXME: the sametype requirement gets dropped from the requirement signature
-(enumerateRequirements doesn't yield it), so this doesn't error as it should.
+
 struct BadConcreteInherits: Inherits {
+// expected-error@-1 {{type 'BadConcreteInherits' does not conform to protocol 'Inherits'}}
+// expected-error@-2 {{'Inherits' requires the types 'ConcreteConforms.T' (aka 'Int') and 'ConcreteConformsNonFoo2.T' (aka 'Float') be equivalent}}
+// expected-note@-3 {{requirement specified as 'Self.U.T' == 'Self.X.T' [with Self = BadConcreteInherits]}}
     typealias U = ConcreteConforms
     typealias X = ConcreteConformsNonFoo2
 }
-*/
 
 struct X { }
 

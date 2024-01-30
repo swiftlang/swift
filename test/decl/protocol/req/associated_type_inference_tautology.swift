@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -disable-experimental-associated-type-inference
 // RUN: %target-typecheck-verify-swift -enable-experimental-associated-type-inference
 
+// A := G<A> is unsatisfiable and not a tautology!
+
 protocol P1 {
   associatedtype A
   associatedtype B
@@ -26,6 +28,8 @@ struct S1: P1 {}
 let x1: String.Type = S1.A.self
 let y1: String.Type = S1.B.self
 
+// Potential witness has innermost generic parameters.
+
 protocol P2 {
   associatedtype A
   associatedtype B
@@ -48,3 +52,26 @@ struct S2: P2 {}
 
 let x2: String.Type = S2.A.self
 let y2: String.Type = S2.B.self
+
+// If all type witness bindings were tautological, we must still consider the
+// witness as introducing no bindings.
+
+protocol P3 {
+  associatedtype A
+
+  func f(_: A)
+  func g(_: A)
+}
+
+extension P3 {
+  func g(_: A) {}
+
+  // We should not be forced to choose g().
+  func g(_: String) {}
+}
+
+struct S3: P3 {
+  func f(_: Int) {}
+}
+
+let x3: Int.Type = S3.A.self
