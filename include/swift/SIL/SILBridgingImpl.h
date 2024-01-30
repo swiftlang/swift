@@ -78,6 +78,34 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 }
 
 //===----------------------------------------------------------------------===//
+//                       BridgedLifetimeDependenceInfo
+//===----------------------------------------------------------------------===//
+
+bool BridgedLifetimeDependenceInfo::empty() const {
+  return info == nullptr || info->empty();
+}
+
+bool BridgedLifetimeDependenceInfo::checkInherit(SwiftInt index) const {
+  assert(info);
+  return info->checkInherit(index);
+}
+
+bool BridgedLifetimeDependenceInfo::checkBorrow(SwiftInt index) const {
+  assert(info);
+  return info->checkBorrow(index);
+}
+
+bool BridgedLifetimeDependenceInfo::checkMutate(SwiftInt index) const {
+  assert(info);
+  return info->checkMutate(index);
+}
+
+BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
+  assert(info);
+  return BridgedOwnedString(info->getString());
+}
+
+//===----------------------------------------------------------------------===//
 //                               BridgedASTType
 //===----------------------------------------------------------------------===//
 
@@ -132,6 +160,11 @@ bool BridgedASTType::SILFunctionType_hasSelfParam() const {
 
 BridgedYieldInfoArray BridgedASTType::SILFunctionType_getYields() const {
   return unbridged()->castTo<swift::SILFunctionType>()->getYields();
+}
+
+BridgedLifetimeDependenceInfo BridgedASTType::SILFunctionType_getLifetimeDependenceInfo() const {
+  auto fnTy = unbridged()->castTo<swift::SILFunctionType>();
+  return {fnTy->getLifetimeDependenceInfoOrNull()};
 }
 
 //===----------------------------------------------------------------------===//

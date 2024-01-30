@@ -63,6 +63,7 @@ class VarDecl;
 class TypeBase;
 class SwiftPassInvocation;
 class GenericSpecializationInformation;
+class LifetimeDependenceInfo;
 }
 
 bool swiftModulesInitialized();
@@ -227,6 +228,17 @@ struct BridgedYieldInfoArray {
   BridgedParameterInfo at(SwiftInt resultIndex) const;
 };
 
+struct BridgedLifetimeDependenceInfo {
+  const swift::LifetimeDependenceInfo * _Nullable info = nullptr;
+
+  BRIDGED_INLINE bool empty() const;
+  BRIDGED_INLINE bool checkInherit(SwiftInt index) const;
+  BRIDGED_INLINE bool checkBorrow(SwiftInt index) const;
+  BRIDGED_INLINE bool checkMutate(SwiftInt index) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+};
+
 // Temporary access to the AST type within SIL until ASTBridging provides it.
 struct BridgedASTType {
   swift::TypeBase * _Nullable type;
@@ -270,6 +282,8 @@ struct BridgedASTType {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedYieldInfoArray SILFunctionType_getYields() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLifetimeDependenceInfo SILFunctionType_getLifetimeDependenceInfo() const;
 };
 
 struct BridgedType {

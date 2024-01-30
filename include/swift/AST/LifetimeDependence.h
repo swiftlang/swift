@@ -165,6 +165,21 @@ public:
   bool hasBorrowLifetimeParamIndices() const {
     return scopeLifetimeParamIndices != nullptr;
   }
+  
+  bool checkInherit(int index) const {
+    assert(!empty());
+    return inheritLifetimeParamIndices->contains(index);
+  }
+
+  bool checkBorrow(int index) const {
+    assert(!empty());
+    return borrowLifetimeParamIndices->contains(index);
+  }
+
+  bool checkMutate(int index) const {
+    assert(!empty());
+    return mutateLifetimeParamIndices->contains(index);
+  }
 
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;

@@ -7599,9 +7599,9 @@ public:
       }
       sub->Printer << ") -> ";
 
-      auto lifetimeDependenceInfo = T->getLifetimeDependenceInfo();
-      if (!lifetimeDependenceInfo.empty()) {
-        sub->Printer << lifetimeDependenceInfo.getString() << " ";
+      auto *lifetimeDependenceInfo = T->getLifetimeDependenceInfo();
+      if (lifetimeDependenceInfo && !lifetimeDependenceInfo->empty()) {
+        sub->Printer << lifetimeDependenceInfo->getString() << " ";
       }
 
       bool parenthesizeResults = mustParenthesizeResults(T);

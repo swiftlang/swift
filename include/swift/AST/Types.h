@@ -5224,7 +5224,15 @@ public:
 
   ClangTypeInfo getClangTypeInfo() const;
 
-  LifetimeDependenceInfo getLifetimeDependenceInfo() const;
+  /// Returns nullptr for an empty dependence list.
+  const LifetimeDependenceInfo *getLifetimeDependenceInfoOrNull() const;
+
+  inline LifetimeDependenceInfo getLifetimeDependenceInfo() const {
+    if (auto *depInfo = getLifetimeDependenceInfoOrNull()) {
+      return *depInfo;
+    }
+    return LifetimeDependenceInfo();
+  }
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if

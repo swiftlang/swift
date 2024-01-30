@@ -228,6 +228,10 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     return endIndex - 1
   }
 
+  public var resultDependencies: FunctionConvention.ResultDependencies? {
+    return originalFunctionConvention.resultDependencies
+  }
+
   public var description: String {
     var str = String(taking: originalFunctionConvention.bridgedFunctionType.getDebugDescription())
     if let substitutedFunctionConvention {

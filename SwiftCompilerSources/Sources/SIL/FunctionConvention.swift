@@ -25,24 +25,6 @@ public struct FunctionConvention : CustomStringConvertible {
     self.hasLoweredAddresses = function.hasLoweredAddresses
   }
 
-  public struct Results : Collection {
-    let bridged: BridgedResultInfoArray
-    let hasLoweredAddresses: Bool
-
-    public var startIndex: Int { 0 }
-
-    public var endIndex: Int { bridged.count() }
-
-    public func index(after index: Int) -> Int {
-      return index + 1
-    }
-
-    public subscript(_ index: Int) -> ResultInfo {
-      return ResultInfo(bridged: bridged.at(index),
-        hasLoweredAddresses: hasLoweredAddresses)
-    }
-  }
-
   /// All results including the error.
   public var results: Results {
     Results(bridged: bridgedFunctionType.SILFunctionType_getResultsWithError(),
@@ -71,24 +53,6 @@ public struct FunctionConvention : CustomStringConvertible {
     : results.lazy.filter { $0.convention == .pack }
   }
 
-  public struct Parameters : Collection {
-    let bridged: BridgedParameterInfoArray
-    let hasLoweredAddresses: Bool
-
-    public var startIndex: Int { 0 }
-
-    public var endIndex: Int { bridged.count() }
-
-    public func index(after index: Int) -> Int {
-      return index + 1
-    }
-
-    public subscript(_ index: Int) -> ParameterInfo {
-      return ParameterInfo(bridged: bridged.at(index),
-        hasLoweredAddresses: hasLoweredAddresses)
-    }
-  }
-
   public var parameters: Parameters {
     Parameters(bridged: bridgedFunctionType.SILFunctionType_getParameters(),
       hasLoweredAddresses: hasLoweredAddresses)
@@ -98,27 +62,21 @@ public struct FunctionConvention : CustomStringConvertible {
     bridgedFunctionType.SILFunctionType_hasSelfParam()
   }
 
-  public struct Yields : Collection {
-    let bridged: BridgedYieldInfoArray
-    let hasLoweredAddresses: Bool
-
-    public var startIndex: Int { 0 }
-
-    public var endIndex: Int { bridged.count() }
-
-    public func index(after index: Int) -> Int {
-      return index + 1
-    }
-
-    public subscript(_ index: Int) -> ParameterInfo {
-      return ParameterInfo(bridged: bridged.at(index),
-        hasLoweredAddresses: hasLoweredAddresses)
-    }
-  }
-
   public var yields: Yields {
     Yields(bridged: bridgedFunctionType.SILFunctionType_getYields(),
       hasLoweredAddresses: hasLoweredAddresses)
+  }
+
+  /// If the function result depends on any parameters, return a
+  /// Collection of LifetimeDependenceConvention indexed on the
+  /// function parameter.
+  public var resultDependencies: ResultDependencies? {
+    let deps = bridgedFunctionType.SILFunctionType_getLifetimeDependenceInfo()
+    if deps.empty() {
+      return nil
+    }
+    return ResultDependencies(bridged: deps, parameterCount: parameters.count,
+                              hasSelfParameter: hasSelfParameter)
   }
 
   public var description: String {
@@ -126,6 +84,9 @@ public struct FunctionConvention : CustomStringConvertible {
     parameters.forEach { str += "\nparameter: " + $0.description }
     results.forEach { str += "\n   result: " + $0.description }
     str += (hasLoweredAddresses ? "\n[lowered_address]" : "\n[sil_opaque]")
+    if let deps = resultDependencies {
+      str += "\nresult dependences \(deps)"
+    }
     return str
   }
 }
@@ -160,6 +121,26 @@ public struct ResultInfo : CustomStringConvertible {
   }
 }
 
+extension FunctionConvention {
+  public struct Results : Collection {
+    let bridged: BridgedResultInfoArray
+    let hasLoweredAddresses: Bool
+
+    public var startIndex: Int { 0 }
+
+    public var endIndex: Int { bridged.count() }
+
+    public func index(after index: Int) -> Int {
+      return index + 1
+    }
+
+    public subscript(_ index: Int) -> ResultInfo {
+      return ResultInfo(bridged: bridged.at(index),
+        hasLoweredAddresses: hasLoweredAddresses)
+    }
+  }
+}
+
 public struct ParameterInfo : CustomStringConvertible {
   /// The parameter type that describes the abstract calling
   /// convention of the parameter.
@@ -190,6 +171,109 @@ public struct ParameterInfo : CustomStringConvertible {
   public var description: String {
     convention.description + ": "
     + String(taking: interfaceType.getDebugDescription())
+  }
+}
+
+extension FunctionConvention {
+  public struct Parameters : Collection {
+    let bridged: BridgedParameterInfoArray
+    let hasLoweredAddresses: Bool
+
+    public var startIndex: Int { 0 }
+
+    public var endIndex: Int { bridged.count() }
+
+    public func index(after index: Int) -> Int {
+      return index + 1
+    }
+
+    public subscript(_ index: Int) -> ParameterInfo {
+      return ParameterInfo(bridged: bridged.at(index),
+        hasLoweredAddresses: hasLoweredAddresses)
+    }
+  }
+}
+
+extension FunctionConvention {
+  public struct Yields : Collection {
+    let bridged: BridgedYieldInfoArray
+    let hasLoweredAddresses: Bool
+
+    public var startIndex: Int { 0 }
+
+    public var endIndex: Int { bridged.count() }
+
+    public func index(after index: Int) -> Int {
+      return index + 1
+    }
+
+    public subscript(_ index: Int) -> ParameterInfo {
+      return ParameterInfo(bridged: bridged.at(index),
+        hasLoweredAddresses: hasLoweredAddresses)
+    }
+  }
+}
+
+public enum LifetimeDependenceConvention {
+  case inherit
+  case borrow
+  case mutate
+}
+
+extension FunctionConvention {
+  /// Collection of LifetimeDependenceConvention? that parallels parameters.
+  public struct ResultDependencies : Collection, CustomStringConvertible {
+    let bridged: BridgedLifetimeDependenceInfo
+    let paramCount: Int
+    let hasSelfParam: Bool
+
+    init(bridged: BridgedLifetimeDependenceInfo, parameterCount: Int,
+         hasSelfParameter: Bool) {
+      assert(!bridged.empty())
+      self.bridged = bridged
+      self.paramCount = parameterCount
+      self.hasSelfParam = hasSelfParameter
+    }
+
+    public var startIndex: Int { 0 }
+
+    public var endIndex: Int { paramCount }
+
+    public func index(after index: Int) -> Int {
+      return index + 1
+    }
+
+    public subscript(_ index: Int) -> LifetimeDependenceConvention? {
+      let inherit = bridged.checkInherit(bridgedIndex(parameterIndex: index))
+      let borrow = bridged.checkBorrow(bridgedIndex(parameterIndex: index))
+      let mutate = bridged.checkMutate(bridgedIndex(parameterIndex: index))
+      if inherit {
+        assert(!borrow && !mutate, "mutualy exclusive lifetime specifiers")
+        return .inherit
+      }
+      if borrow {
+        assert(!mutate, "mutualy exclusive lifetime specifiers")
+        return .borrow
+      }
+      if mutate {
+        return .mutate
+      }
+      return nil
+    }
+
+    // In Sema's LifetimeDependenceInfo, 'self' is always index zero,
+    // whether it exists or not. In SILFunctionType, 'self' is the
+    // last parameter if it exists.
+    private func bridgedIndex(parameterIndex: Int) -> Int {
+      if hasSelfParam, parameterIndex == (paramCount - 1) {
+        return 0
+      }
+      return parameterIndex + 1
+    }
+
+    public var description: String {
+      String(taking: bridged.getDebugDescription())
+    }
   }
 }
 
