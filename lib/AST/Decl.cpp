@@ -1010,25 +1010,6 @@ AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   return llvm::None;
 }
 
-Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto braceStmt = getBody();
-  assert(braceStmt != nullptr && "No body currently available.");
-  auto body = getBody()->getLastElement();
-  if (auto *stmt = body.dyn_cast<Stmt *>()) {
-    if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
-      return returnStmt->getResult();
-    } else if (isa<FailStmt>(stmt)) {
-      // We can only get to this point if we're a type-checked ConstructorDecl
-      // which was originally spelled init?(...) { nil }.  
-      //
-      // There no longer is a single-expression to return, so ignore null.
-      return nullptr;
-    }
-  }
-  return body.get<Expr *>();
-}
-
 bool AbstractStorageDecl::isCompileTimeConst() const {
   return getAttrs().hasAttribute<CompileTimeConstAttr>();
 }

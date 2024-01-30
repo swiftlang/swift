@@ -7219,8 +7219,6 @@ public:
     return Bits.AbstractFunctionDecl.HasSingleExpressionBody;
   }
 
-  Expr *getSingleExpressionBody() const;
-
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getName().isSpecial() && "Cannot get string for special names");

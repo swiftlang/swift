@@ -100,12 +100,6 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
   }
 
-  Expr *getSingleExpressionBody() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getSingleExpressionBody();
-    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
-  }
-
   ParameterList *getParameters() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getParameters();
