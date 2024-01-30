@@ -1263,7 +1263,7 @@ private:
                        cs.getConstraintLocator(
                            context.getAsAbstractClosureExpr().get(),
                            LocatorPathElt::ClosureBody(
-                               /*hasReturn=*/!returnStmt->isImplicit())));
+                               /*hasImpliedReturn=*/returnStmt->isImplied())));
       return;
     }
 
@@ -2284,8 +2284,7 @@ public:
     auto funcRef = context.getAsAnyFunctionRef();
     assert(funcRef);
 
-    funcRef->setTypecheckedBody(castToStmt<BraceStmt>(body),
-                                /*hasSingleExpression=*/false);
+    funcRef->setTypecheckedBody(castToStmt<BraceStmt>(body));
 
     if (auto *closure =
             getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
@@ -2582,9 +2581,7 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
   if (auto transform = solution.getAppliedBuilderTransform(fn)) {
     NullablePtr<BraceStmt> newBody;
 
-    auto transformedBody = transform->transformedBody;
-    fn.setParsedBody(transformedBody,
-                     /*singleExpression=*/false);
+    fn.setParsedBody(transform->transformedBody);
 
     ResultBuilderRewriter rewriter(solution, fn, *transform, rewriteTarget);
     return rewriter.apply() ? SolutionApplicationToFunctionResult::Failure
@@ -2627,10 +2624,7 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   if (!body || application.hadError)
     return true;
 
-  fn.setTypecheckedBody(cast<BraceStmt>(body),
-                        solution.getAppliedBuilderTransform(fn)
-                            ? false
-                            : fn.hasSingleExpressionBody());
+  fn.setTypecheckedBody(cast<BraceStmt>(body));
   return false;
 }
 

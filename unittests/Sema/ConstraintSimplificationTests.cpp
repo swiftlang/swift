@@ -89,8 +89,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
   closure->setImplicit();
 
   closure->setBody(BraceStmt::create(Context, /*startLoc=*/SourceLoc(), {},
-                                     /*endLoc=*/SourceLoc()),
-                   /*isSingleExpression=*/false);
+                                     /*endLoc=*/SourceLoc()));
 
   auto *closureLoc = cs.getConstraintLocator(closure);
 

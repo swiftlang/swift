@@ -279,7 +279,7 @@ private:
     ASTNode ClosureElements[] = {OriginalExpr, CheckExpectExpr};
     auto *ClosureBody = BraceStmt::create(Ctx, SourceLoc(), ClosureElements,
                                           SourceLoc(), /*Implicit=*/true);
-    Closure->setBody(ClosureBody, /*isSingleExpression=*/false);
+    Closure->setBody(ClosureBody);
 
     // Call the closure.
     auto *ClosureCall = CallExpr::createImplicitEmpty(Ctx, Closure);

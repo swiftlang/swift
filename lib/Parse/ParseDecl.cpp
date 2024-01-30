@@ -8814,7 +8814,7 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       SourceLoc LBraceLoc, RBraceLoc;
       LBraceLoc = consumeToken(tok::l_brace);
       auto *CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-      auto *Return = ReturnStmt::createImplicit(Context, CCE);
+      auto *Return = ReturnStmt::forSingleExprBody(Context, CCE);
       CodeCompletionCallbacks->setParsedDecl(accessor);
       CodeCompletionCallbacks->completeAccessorBeginning(CCE);
       RBraceLoc = Tok.getLoc();
@@ -8822,7 +8822,6 @@ Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       auto *BS =
           BraceStmt::create(Context, LBraceLoc, ASTNode(Return), RBraceLoc,
                             /*implicit*/ true);
-      AFD->setHasSingleExpressionBody();
       AFD->setBodyParsed(BS);
       return {BS, Fingerprint::ZERO()};
     }

@@ -6038,7 +6038,7 @@ bool ConstraintSystem::repairFailures(
 
     auto purpose = getContextualTypePurpose(anchor);
     if (rhs->isVoid() &&
-        (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
+        (purpose == CTP_ReturnStmt || purpose == CTP_ImpliedReturnStmt)) {
       conversionsOrFixes.push_back(
           RemoveReturn::create(*this, lhs, getConstraintLocator(locator)));
       return true;
@@ -7851,15 +7851,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // If a single statement closure has explicit `return` let's
         // forbid conversion to `Void` and report an error instead to
         // honor user's intent.
-        if (type1->isUninhabited() || !resultElt->hasExplicitReturn()) {
+        if (type1->isUninhabited() || resultElt->hasImpliedReturn()) {
           increaseScore(SK_FunctionConversion, locator);
           return getTypeMatchSuccess();
         }
       }
 
-      // Single expression function with implicit `return`.
+      // Function with an implied `return`, e.g a single expression body.
       if (auto contextualType = elt->getAs<LocatorPathElt::ContextualType>()) {
-        if (contextualType->isFor(CTP_ReturnSingleExpr)) {
+        if (contextualType->isFor(CTP_ImpliedReturnStmt)) {
           increaseScore(SK_FunctionConversion, locator);
           return getTypeMatchSuccess();
         }
@@ -15564,7 +15564,7 @@ void ConstraintSystem::addContextualConversionConstraint(
   auto constraintKind = ConstraintKind::Conversion;
   switch (purpose) {
   case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
+  case CTP_ImpliedReturnStmt:
   case CTP_Initialization: {
     if (conversionType->is<OpaqueTypeArchetypeType>())
       constraintKind = ConstraintKind::Equal;

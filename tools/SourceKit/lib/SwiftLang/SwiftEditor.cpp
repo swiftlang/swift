@@ -1837,7 +1837,7 @@ private:
       auto &outParam = outParams.back();
 
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        if (auto *E = CE->getBody()->getSingleActiveExpression()) {
+        if (auto *E = CE->getSingleExpressionBody()) {
           if (E->getStartLoc() == targetPlaceholderLoc) {
             targetPlaceholderIndex = outParams.size() - 1;
             if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(E)) {

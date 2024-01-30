@@ -131,8 +131,10 @@ TEST_F(SemaTest, TestCaptureListIsNotOpenedEarly) {
                                             /*inLoc=*/SourceLoc(),
                                             /*explicitResultType=*/nullptr, DC);
   closure->setImplicit();
-  closure->setBody(BraceStmt::createImplicit(Context, /*elements=*/{}),
-                   /*isSingleExpression=*/true);
+  // Create a return statement so this is treated as a single expression.
+  auto *RS = ReturnStmt::forSingleExprBody(
+      Context, TupleExpr::createImplicit(Context, {}, {}));
+  closure->setBody(BraceStmt::createImplicit(Context, /*elements=*/{RS}));
 
   SmallVector<CaptureListEntry> captures;
   {

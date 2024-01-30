@@ -1067,15 +1067,8 @@ public:
 
     Expr *E = RS->getResult();
     TypeCheckExprOptions options = {};
-    
-    ContextualTypePurpose ctp = CTP_ReturnStmt;
-    if (auto func =
-            dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
-      if (func->hasSingleExpressionBody()) {
-        ctp = CTP_ReturnSingleExpr;
-      }
-    }
 
+    auto ctp = RS->isImplied() ? CTP_ImpliedReturnStmt : CTP_ReturnStmt;
     auto exprTy =
         TypeChecker::typeCheckExpression(E, DC, {ResultTy, ctp}, options);
     RS->setResult(E);
@@ -2653,37 +2646,35 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   return false;
 }
 
-/// Insert an implicit return for a single expression body function if needed,
-/// returning \c true if the implicit return was added, \c false otherwise.
-static bool addSingleExprReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
+/// Insert an implicit return for a single expression body function if needed.
+static void addSingleExprReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
   // Must have a single active element.
   auto node = body->getSingleActiveElement();
   if (!node)
-    return false;
+    return;
 
   auto &ctx = dc->getASTContext();
-  auto makeResult = [&](Expr *E) -> bool {
-    body->setLastElement(ReturnStmt::createImplicit(ctx, E));
-    return true;
+  auto makeResult = [&](Expr *E) {
+    body->setLastElement(ReturnStmt::forSingleExprBody(ctx, E));
   };
 
   // For a constructor, we only support nil literals as the implicit result.
   if (auto *ctor = dyn_cast<ConstructorDecl>(dc)) {
     if (auto *E = node.dyn_cast<Expr *>()) {
       if (ctor->isFailable() && isa<NilLiteralExpr>(E))
-        return makeResult(E);
+        makeResult(E);
     }
-    return false;
+    return;
   }
 
   // Otherwise, we only support implicit results for FuncDecls and ClosureExprs.
   if (!isa<FuncDecl>(dc) && !isa<ClosureExpr>(dc))
-    return false;
+    return;
 
   if (auto *fd = dyn_cast<FuncDecl>(dc)) {
     // Don't apply if we have a result builder, or a Void return type.
     if (getResultBuilderType(fd) || fd->getResultInterfaceType()->isVoid())
-      return false;
+      return;
   }
 
   // A statement can potentially become an expression.
@@ -2691,23 +2682,8 @@ static bool addSingleExprReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
     if (S->mayProduceSingleValue(ctx)) {
       auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
           ctx, S, dc, /*mustBeExpr*/ false);
-      return makeResult(SVE);
-    }
-    // If we have a single statement 'return' in a closure, treat it as a
-    // single expression body. If we don't have a return value, synthesize
-    // 'return ()'. Don't do this in a FuncDecl since we know we have a
-    // non-Void return.
-    if (isa<ClosureExpr>(dc)) {
-      if (auto *returnStmt = dyn_cast<ReturnStmt>(S)) {
-        // Treat the existing result as a single expression return.
-        if (returnStmt->hasResult())
-          return true;
-
-        auto *returnExpr = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                                  /*implicit*/ true);
-        returnStmt->setResult(returnExpr);
-        return true;
-      }
+      makeResult(SVE);
+      return;
     }
   }
 
@@ -2720,14 +2696,13 @@ static bool addSingleExprReturnIfNeeded(BraceStmt *body, DeclContext *dc) {
       auto *SemanticExpr = E->getSemanticsProvidingExpr();
       if (auto *SE = dyn_cast<SequenceExpr>(SemanticExpr)) {
         if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1)))
-          return false;
+          return;
       }
       if (isa<AssignExpr>(SemanticExpr))
-        return false;
+        return;
     }
-    return makeResult(E);
+    makeResult(E);
   }
-  return false;
 }
 
 BraceStmt *
@@ -2741,8 +2716,7 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   assert(!AFD->isBodyTypeChecked() && "Body already type-checked?");
 
   // Insert an implicit return for a single expression body.
-  if (addSingleExprReturnIfNeeded(body, AFD))
-    AFD->setHasSingleExpressionBody();
+  addSingleExprReturnIfNeeded(body, AFD);
 
   // For constructors, we make sure that the body ends with a "return"
   // stmt, which we either implicitly synthesize, or the user can write.
@@ -2764,10 +2738,20 @@ BraceStmt *PreCheckClosureBodyRequest::evaluate(Evaluator &evaluator,
                                                 ClosureExpr *closure) const {
   auto *body = closure->getBody();
 
+  // If we have a single statement 'return', synthesize 'return ()' to ensure
+  // it's treated as a single expression body.
+  if (auto *S = body->getSingleActiveStatement()) {
+    if (auto *returnStmt = dyn_cast<ReturnStmt>(S)) {
+      if (!returnStmt->hasResult()) {
+        auto &ctx = closure->getASTContext();
+        auto *returnExpr = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                                  /*implicit*/ true);
+        returnStmt->setResult(returnExpr);
+      }
+    }
+  }
   // Insert an implicit return for a single expression body.
-  if (addSingleExprReturnIfNeeded(body, closure))
-    closure->setBody(body, /*isSingleExpression*/ true);
-
+  addSingleExprReturnIfNeeded(body, closure);
   return body;
 }
 
@@ -2923,16 +2907,16 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
     hadError = SC.typeCheckBody(body);
   }
 
-
-
-  // If this was a function with a single expression body, let's see
-  // if implicit return statement came out to be `Never` which means
-  // that we have eagerly converted something like `{ fatalError() }`
-  // into `{ return fatalError() }` that has to be corrected here.
-  if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
+  // If this was a function with an implied result, let's see if the result
+  // came out to be `Never` which means that we have eagerly converted something
+  // like `{ fatalError() }` into `{ return fatalError() }` that has to be
+  // corrected here.
+  // TODO: Could we introduce an implicit conversion node to avoid needing
+  // these fixups?
+  if (isa<FuncDecl>(AFD) && !body->empty()) {
     if (auto *stmt = body->getLastElement().dyn_cast<Stmt *>()) {
       if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
-        if (retStmt->isImplicit() && retStmt->hasResult()) {
+        if (retStmt->isImplied()) {
           auto returnType = retStmt->getResult()->getType();
           if (returnType && returnType->isUninhabited())
             body->setLastElement(retStmt->getResult());
@@ -2978,7 +2962,7 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
 
   bool HadError = StmtChecker(closure).typeCheckBody(body);
   if (body) {
-    closure->setBody(body, closure->hasSingleExpressionBody());
+    closure->setBody(body);
   }
   closure->setBodyState(ClosureExpr::BodyState::SeparatelyTypeChecked);
   return HadError;

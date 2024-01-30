@@ -3050,10 +3050,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
     closure->setHasAnonymousClosureVars();
   }
 
-  // Set the body of the closure. The computation of the single expression body
-  // is left up to the type-checker.
+  // Set the body of the closure.
   auto *BS = BraceStmt::create(Context, leftBrace, bodyElements, rightBrace);
-  closure->setBody(BS, /*hasSingleExpressionBody*/ false);
+  closure->setBody(BS);
 
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;

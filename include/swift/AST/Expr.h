@@ -3927,9 +3927,7 @@ public:
   bool hasSingleExpressionBody() const;
 
   /// Retrieve the body for closure that has a single expression for
-  /// its body.
-  ///
-  /// Only valid when \c hasSingleExpressionBody() is true.
+  /// its body, or \c nullptr if there is no single expression body.
   Expr *getSingleExpressionBody() const;
 
   /// Returns the body of closures that have a body
@@ -4055,9 +4053,9 @@ private:
   /// The explicitly-specified result type.
   llvm::PointerIntPair<TypeExpr *, 2, BodyState> ExplicitResultTypeAndBodyState;
 
-  /// The body of the closure, along with a bit indicating whether it
-  /// was originally just a single expression.
-  llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
+  /// The body of the closure.
+  BraceStmt *Body;
+
 public:
   ClosureExpr(const DeclAttributes &attributes,
               SourceRange bracketRange, VarDecl *capturedSelfDecl,
@@ -4083,11 +4081,8 @@ public:
   SourceLoc getEndLoc() const;
   SourceLoc getLoc() const;
 
-  BraceStmt *getBody() const { return Body.getPointer(); }
-  void setBody(BraceStmt *S, bool isSingleExpression) {
-    Body.setPointer(S);
-    Body.setInt(isSingleExpression);
-  }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *S) { Body = S; }
 
   DeclAttributes &getAttrs() { return Attributes; }
   const DeclAttributes &getAttrs() const { return Attributes; }
@@ -4202,13 +4197,11 @@ public:
   /// ... even if the closure has been coerced to return Void by the type
   /// checker. This function does not return true for empty closures.
   bool hasSingleExpressionBody() const {
-    return Body.getInt();
+    return getSingleExpressionBody();
   }
 
   /// Retrieve the body for closure that has a single expression for
-  /// its body.
-  ///
-  /// Only valid when \c hasSingleExpressionBody() is true.
+  /// its body, or \c nullptr if there is no single expression body.
   Expr *getSingleExpressionBody() const;
 
   /// Is this a completely empty closure?
