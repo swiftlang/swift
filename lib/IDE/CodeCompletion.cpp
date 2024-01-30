@@ -1609,39 +1609,6 @@ void CodeCompletionCallbacksImpl::afterPoundCompletion(SourceLoc CompletionLoc,
   Consumer.handleResults(CompletionContext);
 }
 
-// Undoes the single-expression closure/function body transformation on the
-// given DeclContext and its parent contexts if they have a single expression
-// body that contains the code completion location.
-//
-// FIXME: Remove this once all expression position completions are migrated
-// to work via TypeCheckCompletionCallback.
-static void undoSingleExpressionReturn(DeclContext *DC) {
-  auto updateBody = [](BraceStmt *BS, ASTContext &Ctx) -> bool {
-    ASTNode LastElem = BS->getLastElement();
-    auto *RS = dyn_cast_or_null<ReturnStmt>(LastElem.dyn_cast<Stmt*>());
-
-    if (!RS || !RS->isImplicit())
-      return false;
-
-    BS->setLastElement(RS->getResult());
-    return true;
-  };
-
-  while (ClosureExpr *CE = dyn_cast_or_null<ClosureExpr>(DC)) {
-    if (CE->hasSingleExpressionBody()) {
-      if (updateBody(CE->getBody(), CE->getASTContext()))
-        CE->setBody(CE->getBody(), false);
-    }
-    DC = DC->getParent();
-  }
-  if (FuncDecl *FD = dyn_cast_or_null<FuncDecl>(DC)) {
-    if (FD->hasSingleExpressionBody()) {
-      if (updateBody(FD->getBody(), FD->getASTContext()))
-        FD->setHasSingleExpressionBody(false);
-    }
-  }
-}
-
 void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   CompletionContext.CodeCompletionKind = Kind;
 
@@ -1699,7 +1666,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
-  undoSingleExpressionReturn(CurDeclContext);
   if (Kind != CompletionKind::TypeSimpleWithDot) {
     // Type member completion does not need a type-checked AST.
     typeCheckContextAt(
