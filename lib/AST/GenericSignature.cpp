@@ -1246,3 +1246,46 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
 
   return GenericSignature::get(getGenericParams(), reducedRequirements);
 }
+
+void GenericSignatureImpl::getRequirementsWithInverses(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  auto &ctx = getASTContext();
+
+  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
+      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    reqs.append(getRequirements().begin(), getRequirements().end());
+    return;
+  }
+
+  // Record the absence of conformances to invertible protocols.
+  for (auto gp : getGenericParams()) {
+    // Any generic parameter with a superclass bound or concrete type does not
+    // have an inverse.
+    if (getSuperclassBound(gp) || getConcreteType(gp))
+      continue;
+
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      // If we can derive a conformance to this protocol, then don't add an
+      // inverse.
+      if (requiresProtocol(gp, proto))
+        continue;
+
+      // Nothing implies a conformance to this protocol, so record the inverse.
+      inverses.push_back({gp, proto, SourceLoc()});
+    }
+  }
+
+  // Filter out explicit conformances to invertible protocols.
+  for (auto req : getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getFirstType()->is<GenericTypeParamType>() &&
+        req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      continue;
+    }
+
+    reqs.push_back(req);
+  }
+}
