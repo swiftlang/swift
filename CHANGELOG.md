@@ -63,7 +63,7 @@
 
   \_SwiftConcurrencyShims used to declare the `exit` function, even though it
   might not be available. The declaration has been removed, and must be imported
-  from the appropriate C library module (e.g. Darwin or SwiftGlibc)
+  from the appropriate C library module (e.g. Darwin or SwiftGlibc) - run source compat
 
 ## Swift 5.10
 
