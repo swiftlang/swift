@@ -4547,11 +4547,12 @@ void AttributeChecker::checkBackDeployedAttrs(
     // Unavailable decls cannot be back deployed.
     if (auto unavailableAttrPair = VD->getSemanticUnavailableAttr()) {
       auto unavailableAttr = unavailableAttrPair.value().first;
+      if (!inheritsAvailabilityFromPlatform(unavailableAttr->Platform,
+                                            Attr->Platform)) {
+        auto platformString = prettyPlatformString(Attr->Platform);
 
-      if (unavailableAttr->Platform == PlatformKind::none ||
-          unavailableAttr->Platform == Attr->Platform) {
-        diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr,
-                 VD, prettyPlatformString(Platform));
+        diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
+                 platformString);
         diagnose(unavailableAttr->AtLoc, diag::availability_marked_unavailable,
                  VD)
             .highlight(unavailableAttr->getRange());
@@ -4563,14 +4564,17 @@ void AttributeChecker::checkBackDeployedAttrs(
     // If it's not, the attribute doesn't make sense since the back deployment
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair = VD->getSemanticAvailableRangeAttr()) {
+      auto beforePlatformString = prettyPlatformString(Attr->Platform);
+      auto beforeVersion = Attr->Version;
       auto availableAttr = availableRangeAttrPair.value().first;
-      if (Attr->Version <= availableAttr->Introduced.value()) {
+      auto introVersion = availableAttr->Introduced.value();
+      StringRef introPlatformString = availableAttr->prettyPlatformString();
+
+      if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, VD, prettyPlatformString(Platform),
-                 Attr->Version);
+                 Attr, VD, beforePlatformString, beforeVersion);
         diagnose(availableAttr->AtLoc, diag::availability_introduced_in_version,
-                 VD, prettyPlatformString(availableAttr->Platform),
-                 *availableAttr->Introduced)
+                 VD, introPlatformString, introVersion)
             .highlight(availableAttr->getRange());
         continue;
       }

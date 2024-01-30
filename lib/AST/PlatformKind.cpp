@@ -83,14 +83,19 @@ swift::closestCorrectedPlatformString(StringRef candidate) {
   return (minDistance < distanceThreshold) ? result : llvm::None;
 }
 
-static bool isApplicationExtensionPlatform(PlatformKind Platform) {
+llvm::Optional<PlatformKind>
+swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   switch (Platform) {
   case PlatformKind::macOSApplicationExtension:
+    return PlatformKind::macOS;
   case PlatformKind::iOSApplicationExtension:
+    return PlatformKind::iOS;
   case PlatformKind::macCatalystApplicationExtension:
+    return PlatformKind::macCatalyst;
   case PlatformKind::tvOSApplicationExtension:
+    return PlatformKind::tvOS;
   case PlatformKind::watchOSApplicationExtension:
-    return true;
+    return PlatformKind::watchOS;
   case PlatformKind::macOS:
   case PlatformKind::iOS:
   case PlatformKind::macCatalyst:
@@ -99,9 +104,13 @@ static bool isApplicationExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
-    return false;
+    return llvm::None;
   }
   llvm_unreachable("bad PlatformKind");
+}
+
+static bool isApplicationExtensionPlatform(PlatformKind Platform) {
+  return basePlatformForExtensionPlatform(Platform).has_value();
 }
 
 static bool isPlatformActiveForTarget(PlatformKind Platform,
@@ -187,19 +196,20 @@ PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
 
 bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
                                              PlatformKind Parent) {
+  if (auto ChildPlatformBase = basePlatformForExtensionPlatform(Child)) {
+    if (Parent == ChildPlatformBase)
+      return true;
+  }
+
   if (Child == PlatformKind::macCatalyst && Parent == PlatformKind::iOS)
     return true;
 
   if (Child == PlatformKind::macCatalystApplicationExtension) {
     if (Parent == PlatformKind::iOS ||
-        Parent == PlatformKind::iOSApplicationExtension ||
-        Parent == PlatformKind::macCatalyst) {
+        Parent == PlatformKind::iOSApplicationExtension) {
       return true;
     }
   }
-
-  // Ideally we would have all ApplicationExtension platforms
-  // inherit from their non-extension platform.
 
   return false;
 }
