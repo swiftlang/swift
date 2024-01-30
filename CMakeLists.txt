@@ -655,6 +655,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION
   "Enable build of the Swift observation module"
   FALSE)
 
+option(SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE
+  "Build the stdlib with -strict-concurrency=complete"
+  FALSE)
+
 option(SWIFT_ENABLE_SYNCHRONIZATION
   "Enable build of the Swift Synchronization module"
   FALSE)

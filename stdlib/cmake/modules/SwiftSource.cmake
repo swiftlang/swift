@@ -613,6 +613,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-disable-round-trip-debug-types") # NOTE: temporary until we fix mangling!
   endif()
 
+  if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
+    list(APPEND swift_flags "-strict-concurrency=complete")
+  endif()
+
   if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
     list(APPEND swift_flags "-Xfrontend" "-enable-relative-protocol-witness-tables")
     list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")
