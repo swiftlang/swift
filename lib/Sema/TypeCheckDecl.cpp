@@ -1005,10 +1005,10 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
   // Function to check the generic parameters for an explicit ~TARGET marking
   // which would result in an Inferred ~TARGET marking for this context.
   auto hasInferredInverseTarget = [&](GenericContext *genCtx) -> Mark {
-    if (!genCtx->isGeneric())
+    auto *gpList = genCtx->getParsedGenericParams();
+    if (!gpList)
       return InverseMarking::Mark();
 
-    auto *gpList = genCtx->getParsedGenericParams();
     llvm::SmallSet<GenericTypeParamDecl*, 4> params;
 
     // Scan the inheritance clauses of generic parameters only for an inverse.
