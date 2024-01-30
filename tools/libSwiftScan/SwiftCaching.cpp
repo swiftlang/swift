@@ -47,6 +47,7 @@
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 #include <variant>
 
 namespace {
@@ -195,6 +196,53 @@ swiftscan_string_ref_t swiftscan_cas_store(swiftscan_cas_t cas, uint8_t *data,
   *error = swift::c_string_utils::create_null();
   return swift::c_string_utils::create_clone(
       CAS.getID(*Result).toString().c_str());
+}
+
+int64_t swiftscan_cas_get_ondisk_size(swiftscan_cas_t cas,
+                                      swiftscan_string_ref_t *error) {
+  auto &CAS = unwrap(cas)->getCAS();
+  std::optional<uint64_t> Size;
+  if (auto E = CAS.getStorageSize().moveInto(Size)) {
+    *error =
+        swift::c_string_utils::create_clone(toString(std::move(E)).c_str());
+    return -2;
+  }
+
+  *error = swift::c_string_utils::create_null();
+  return Size ? *Size : -1;
+}
+
+bool
+swiftscan_cas_set_ondisk_size_limit(swiftscan_cas_t cas, int64_t size_limit,
+    swiftscan_string_ref_t *error) {
+  if (size_limit < 0) {
+    *error = swift::c_string_utils::create_clone(
+        "invalid size limit passing to swiftscan_cas_set_ondisk_size_limit");
+    return true;
+  }
+  auto &CAS = unwrap(cas)->getCAS();
+  std::optional<uint64_t> SizeLimit;
+  if (size_limit > 0)
+    SizeLimit = size_limit;
+  if (auto E = CAS.setSizeLimit(SizeLimit)) {
+    *error =
+        swift::c_string_utils::create_clone(toString(std::move(E)).c_str());
+    return true;
+  }
+  *error = swift::c_string_utils::create_null();
+  return false;
+}
+
+bool swiftscan_cas_prune_ondisk_data(swiftscan_cas_t cas,
+                                     swiftscan_string_ref_t *error) {
+  auto &CAS = unwrap(cas)->getCAS();
+  if (auto E = CAS.pruneStorageData()) {
+    *error =
+        swift::c_string_utils::create_clone(toString(std::move(E)).c_str());
+    return true;
+  }
+  *error = swift::c_string_utils::create_null();
+  return false;
 }
 
 /// Expand the invocation if there is repsonseFile into Args that are passed in

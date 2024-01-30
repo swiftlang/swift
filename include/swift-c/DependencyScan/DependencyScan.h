@@ -496,6 +496,29 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_cas_store(swiftscan_cas_t cas, uint8_t *data, unsigned size,
                     swiftscan_string_ref_t *error);
 
+/// Get the local storage size for the CAS in bytes. Return the local storage
+/// size of the CAS/cache data, or -1 if the implementation does not support
+/// reporting such size, or -2 if an error occurred.
+/// If error happens, the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC int64_t
+swiftscan_cas_get_ondisk_size(swiftscan_cas_t, swiftscan_string_ref_t *error);
+
+/// Set the size for the limiting disk storage size for CAS. \c size_limit is
+/// the maximum size limit in bytes (0 means no limit, negative is invalid).
+/// Return true if error. If error happens, the error message is returned via
+/// `error` parameter, and caller needs to free the error message via
+/// `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC bool
+swiftscan_cas_set_ondisk_size_limit(swiftscan_cas_t, int64_t size_limit,
+                                    swiftscan_string_ref_t *error);
+
+/// Prune local CAS storage according to the size limit. Return true if error.
+/// If error happens, the error message is returned via `error` parameter, and
+/// caller needs to free the error message via `swiftscan_string_dispose`.
+SWIFTSCAN_PUBLIC bool
+swiftscan_cas_prune_ondisk_data(swiftscan_cas_t, swiftscan_string_ref_t *error);
+
 /// Dispose the \c cas instance.
 SWIFTSCAN_PUBLIC void swiftscan_cas_dispose(swiftscan_cas_t cas);
 
