@@ -128,6 +128,55 @@ struct TestSingleExprClosureGlobal {
 // TestSingleExprClosureGlobal-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
 }
 
+struct TestSingleExprClosureBinding {
+  func void() -> Void {}
+  func str() -> String { return "" }
+  func int() -> Int { return 0 }
+
+  func test() -> Int {
+    let fn = {
+      self.#^TestSingleExprClosureBinding^#
+    }
+    return fn()
+  }
+// Void is always valid in an implicit single expr closure.
+// TestSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
+}
+
+struct TestExplicitSingleExprClosureBinding {
+  func void() -> Void {}
+  func str() -> String { return "" }
+  func int() -> Int { return 0 }
+
+  func test() {
+    let fn = {
+      return self.#^TestExplicitSingleExprClosureBinding^#
+    }
+  }
+// FIXME: Because we have an explicit return, and no expected type, we shouldn't suggest Void.
+// TestExplicitSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestExplicitSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestExplicitSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
+}
+
+struct TestExplicitSingleExprClosureBindingWithContext {
+  func void() -> Void {}
+  func str() -> String { return "" }
+  func int() -> Int { return 0 }
+
+  func test() {
+    let fn: () -> Void = {
+      return self.#^TestExplicitSingleExprClosureBindingWithContext^#
+    }
+  }
+// We know Void is valid.
+// TestExplicitSingleExprClosureBindingWithContext-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestExplicitSingleExprClosureBindingWithContext-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestExplicitSingleExprClosureBindingWithContext-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: void()[#Void#];
+}
+
 struct TestNonSingleExprClosureGlobal {
   func void() -> Void {}
   func str() -> String { return "" }
@@ -188,6 +237,21 @@ struct TestSingleExprFunc {
 // TestSingleExprFunc-DAG: Decl[InstanceMethod]/CurrNominal:   str()[#String#];
 // TestSingleExprFunc-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: int()[#Int#];
 // TestSingleExprFunc-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
+}
+
+struct TestSingleExprFuncReturnVoid {
+  func void() -> Void {}
+  func str() -> String { return "" }
+  func int() -> Int { return 0 }
+
+  func test() {
+    return self.#^TestSingleExprFuncReturnVoid^#
+  }
+
+// Void is the only possible type that can be used here.
+// TestSingleExprFuncReturnVoid-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestSingleExprFuncReturnVoid-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestSingleExprFuncReturnVoid-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: void()[#Void#];
 }
 
 struct TestSingleExprFuncUnresolved {

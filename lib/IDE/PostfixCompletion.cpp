@@ -189,23 +189,27 @@ void PostfixCompletionCallback::sawSolutionImpl(
 
   bool BaseIsStaticMetaType = S.isStaticallyDerivedMetatype(ParsedExpr);
 
+  bool ExpectsNonVoid = false;
   SmallVector<Type, 4> ExpectedTypes;
   if (ExpectedTy) {
     ExpectedTypes.push_back(ExpectedTy);
-  }
+    ExpectsNonVoid = !ExpectedTy->isVoid();
+  } else {
+    // If we don't know what the expected type is, assume it must be non-Void
+    // if we have a contextual type that is not unused. This prevents us from
+    // suggesting Void values for e.g bindings without explicit types.
+    ExpectsNonVoid |= !ParentExpr &&
+                      CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
 
-  bool ExpectsNonVoid = false;
-  ExpectsNonVoid |= ExpectedTy && !ExpectedTy->isVoid();
-  ExpectsNonVoid |=
-      !ParentExpr && CS.getContextualTypePurpose(CompletionExpr) != CTP_Unused;
-
-  for (auto SAT : S.targets) {
-    if (ExpectsNonVoid) {
-      // ExpectsNonVoid is already set. No need to iterate further.
-      break;
-    }
-    if (SAT.second.getAsExpr() == CompletionExpr) {
-      ExpectsNonVoid |= SAT.second.getExprContextualTypePurpose() != CTP_Unused;
+    for (auto SAT : S.targets) {
+      if (ExpectsNonVoid) {
+        // ExpectsNonVoid is already set. No need to iterate further.
+        break;
+      }
+      if (SAT.second.getAsExpr() == CompletionExpr) {
+        ExpectsNonVoid |=
+            SAT.second.getExprContextualTypePurpose() != CTP_Unused;
+      }
     }
   }
 

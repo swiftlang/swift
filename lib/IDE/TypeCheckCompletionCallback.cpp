@@ -47,8 +47,11 @@ void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
 
 Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
                                       ASTNode Node) {
+  // Use the contextual type, unless it is still unresolved, in which case fall
+  // back to getting the type from the expression.
   if (auto ContextualType = S.getContextualType(Node)) {
-    return ContextualType;
+    if (!ContextualType->hasUnresolvedType())
+      return ContextualType;
   }
 
   if (!S.hasType(Node)) {
