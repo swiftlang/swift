@@ -1108,6 +1108,9 @@ CastsTests.test("Class metatype values should not cast to Obj-C existentials") {
   expectNil(C106973771.self as? any P106973771)
   // The following will crash if the cast succeeds
   (C106973771.self as? any P106973771)?.sayHello()
+
+  // But it's fine to cast a metatype to NSObjectProtocol:
+  expectTrue(C106973771.self is any NSObjectProtocol)
 }
 #endif
 

@@ -1348,12 +1348,15 @@ id swift_dynamicCastObjCProtocolUnconditional(id object,
     return object;
   }
   if (object_isClass(object)) {
-//    XXX TODO: ObjC classes do conform to some protocols ...
+    // Shield old apps from this behavior change
     if (!runtime::bincompat::useLegacyObjCMetatypeCasting()) {
-      // Shield old apps from this behavior change
-      Class sourceType = object_getClass(object);
-      swift_dynamicCastFailure(sourceType, class_getName(sourceType),
+      // Obj-C metatypes can conform to NSObject protocol,
+      // but no others. (TODO: Check with @MikeAsh)
+      if (numProtocols > 1 || protocols[0] != @protocol(NSObject)) {
+	Class sourceType = object_getClass(object);
+	swift_dynamicCastFailure(sourceType, class_getName(sourceType),
 			       protocols[0], protocol_getName(protocols[0]));
+      }
     }
   }
   for (size_t i = 0; i < numProtocols; ++i) {
@@ -1381,10 +1384,13 @@ id swift_dynamicCastObjCProtocolConditional(id object,
     return object;
   }
   if (object_isClass(object)) {
-//    XXX TODO: ObjC classes do conform to some protocols ...
+    // Shield old apps from this behavior change
     if (!runtime::bincompat::useLegacyObjCMetatypeCasting()) {
-      // Shield old apps from this behavior change
-      return nil;
+      // Obj-C metatypes can conform to NSObject protocol,
+      // but no others. (TODO: Check with @MikeAsh)
+      if (numProtocols > 1 || protocols[0] != @protocol(NSObject)) {
+	return nil;
+      }
     }
   }
   for (size_t i = 0; i < numProtocols; ++i) {
