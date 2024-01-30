@@ -520,10 +520,25 @@ public:
 
   /// Return a managed value that's appropriate for borrowing this
   /// value and promising not to consume it.
+  ///
+  /// TODO: Should be superseded by `asBorrowedOperand2` once existing code is
+  /// updated to tolerate address-only values being borrowed.
   ConsumableManagedValue asBorrowedOperand(SILGenFunction &SGF,
                                            SILLocation loc) const {
     if (getType().isAddress())
       return {asUnmanagedOwnedValue(), CastConsumptionKind::CopyOnSuccess};
+
+    if (Value.getOwnershipKind() == OwnershipKind::Guaranteed)
+      return {Value, CastConsumptionKind::BorrowAlways};
+
+    return {asUnmanagedOwnedValue().borrow(SGF, loc),
+            CastConsumptionKind::BorrowAlways};
+  }
+
+  ConsumableManagedValue asBorrowedOperand2(SILGenFunction &SGF,
+                                           SILLocation loc) const {
+    if (getType().isAddress())
+      return {asUnmanagedOwnedValue(), CastConsumptionKind::BorrowAlways};
 
     if (Value.getOwnershipKind() == OwnershipKind::Guaranteed)
       return {Value, CastConsumptionKind::BorrowAlways};

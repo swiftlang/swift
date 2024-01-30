@@ -159,7 +159,7 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupHandle;
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
   friend class CleanupCloner;
-
+  
   SILGenFunction &SGF;
 
   /// Stack - Currently active cleanups in this scope tree.
@@ -288,6 +288,9 @@ public:
 
   /// Verify that the given cleanup handle is valid.
   void checkIterator(CleanupHandle handle) const;
+
+  void endNoncopyablePatternMatchBorrow(CleanupsDepth depth, CleanupLocation l,
+                                        bool finalEndBorrow = false);
 
 private:
   // Look up the flags and optionally the writeback address associated with the
