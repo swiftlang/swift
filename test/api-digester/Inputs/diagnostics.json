@@ -1,0 +1,22 @@
+{
+  "kind": "Root",
+  "name": "TopLevel",
+  "printedName": "TopLevel",
+  "badKey": ["foo", "bar", "baz"],
+  "children": [
+    {
+      "kind": "Zyzyx",
+      "typeAttributes": ["autoclosure", "fnord", "inout", "Available", "BackDeploy"],
+      "declAttributes": ["Available", "Fnord", "ObjC", "inout"],
+      "declKind": "Subroutine"
+    },
+    {
+      "kind": "Function",
+      "declAttributes": ["Available", "Fnord", "ObjC", "inout", "BackDeploy"],
+      "declKind": "Func",
+      "name": "foo",
+      "children": [],
+      "usr": "s:11diagnostics3fooP"
+    }
+  ]
+}

@@ -1,0 +1,265 @@
+// This test compares the behavior of the toolchain compiler to the just-built
+// compiler using the currently installed SDK. That means its behavior depends
+// on the installed toolchain compiler and SDK. If you have trouble reproducing
+// a failure locally, make sure you're using the same Xcode that was used when
+// the test failure occurred.
+
+// Some failures will indicate regressions, but others will indicate intentional
+// changes to compiler behavior. If a failure is caused by an intentional
+// change, add it to the appropriate section of
+// 'Inputs/intentionally-changed-apis.txt'.
+
+// REQUIRES: VENDOR=apple
+
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/module-cache)
+
+// Generate a baseline digest using the toolchain API digester, capturing how the host toolchain imports APIs.
+// RUN: time env xcrun swift-api-digester -target %target-triple -dump-sdk -module-list-file %s -o %t/baseline.json -module-cache-path %t/module-cache -sdk %sdk -swift-version 5 -avoid-location -avoid-tool-args
+
+// Generate a digest using the just-built API digester, capturing how the just-built compiler imports APIs.
+// RUN: time %api-digester -dump-sdk -module-list-file %s -o %t/result.json -module-cache-path %t/module-cache -sdk %sdk -swift-version 5 -avoid-location -avoid-tool-args
+
+// Compare them.
+// RUN: time %api-digester -diagnose-sdk -module-list-file %s -input-paths %t/baseline.json -input-paths %t/result.json -module-cache-path %t/module-cache -sdk %sdk -swift-version 5 -avoid-location -avoid-tool-args -breakage-allowlist-path %S/Inputs/intentionally-changed-apis.txt
+
+// FIXME: Forces the test to fail so we can see the output from `time`
+// RUN: false
+
+// List of modules to test. Please keep it alphabetical.
+// Missing modules will not cause the test to fail.
+
+// usr/include
+Darwin
+Dispatch
+// FIXME: Complete this
+
+// System/Library/Frameworks
+AGL
+AVFAudio
+AVFoundation
+AVKit
+AVRouting
+Accelerate
+Accessibility
+Accounts
+AdServices
+AdSupport
+AddressBook
+AppIntents
+AppKit
+AppTrackingTransparency
+// AppleScriptKit - error: module 'AppleScriptKit' is incompatible with feature 'swift'
+AppleScriptObjC
+ApplicationServices
+AudioToolbox
+AudioUnit
+AudioVideoBridging
+AuthenticationServices
+// AutomaticAssessmentConfiguration - crash in ClangImporter (rdar://118540813)
+Automator
+BackgroundAssets
+BackgroundTasks
+BusinessChat
+CFNetwork
+// CalendarStore - error: module 'CalendarStore' is incompatible with feature 'swift'
+CallKit
+Carbon
+Charts
+ClassKit
+CloudKit
+Cocoa
+Collaboration
+ColorSync
+Combine
+Contacts
+ContactsUI
+CoreAudio
+CoreAudioKit
+CoreAudioTypes
+CoreBluetooth
+CoreData
+CoreFoundation
+CoreGraphics
+CoreHaptics
+CoreImage
+CoreLocation
+CoreMIDI
+CoreML
+CoreMedia
+CoreMediaIO
+CoreMotion
+CoreServices
+CoreSpotlight
+CoreTelephony
+CoreText
+CoreTransferable
+CoreVideo
+CoreWLAN
+CreateML
+CreateMLComponents
+CryptoKit
+CryptoTokenKit
+DVDPlayback
+DataDetection
+DeveloperToolsSupport
+DeviceActivity
+DeviceCheck
+DirectoryService
+DiscRecording
+DiscRecordingUI
+DiskArbitration
+EventKit
+ExceptionHandling
+ExecutionPolicy
+ExposureNotification
+ExtensionFoundation
+ExtensionKit
+ExternalAccessory
+FamilyControls
+FileProvider
+FileProviderUI
+FinderSync
+ForceFeedback
+Foundation
+GLKit
+GLUT
+GSS
+GameController
+// GameKit - disabled because SceneKit is disabled
+// GameplayKit - disabled because SceneKit is disabled
+GroupActivities
+HealthKit
+Hypervisor
+ICADevices
+IMServicePlugIn
+IOBluetooth
+IOBluetoothUI
+IOKit
+IOSurface
+IOUSBHost
+IdentityLookup
+ImageCaptureCore
+ImageIO
+InputMethodKit
+// InstallerPlugins - error: module 'InstallerPlugins' is incompatible with feature 'swift'
+// InstantMessage - error: module 'InstantMessage' is incompatible with feature 'swift'
+Intents
+IntentsUI
+// JavaNativeFoundation - warning: Unable to locate <jni.h>.  Ensure $(/usr/libexec/java_home)/include is in your header search paths.  Falling back on Java 6 Version.
+JavaRuntimeSupport
+JavaScriptCore
+// Kerberos - error: module 'Kerberos' is incompatible with feature 'swift'
+KernelManagement
+// LDAP - error: module 'LDAP' is incompatible with feature 'swift'
+LatentSemanticMapping
+LinkPresentation
+LocalAuthentication
+LocalAuthenticationEmbeddedUI
+MLCompute
+MailKit
+ManagedSettings
+MapKit
+Matter
+MediaAccessibility
+MediaLibrary
+MediaPlayer
+MediaToolbox
+Metal
+MetalFX
+MetalKit
+MetalPerformanceShaders
+MetalPerformanceShadersGraph
+MetricKit
+ModelIO
+MultipeerConnectivity
+MusicKit
+NaturalLanguage
+NearbyInteraction
+NetFS
+Network
+NetworkExtension
+NotificationCenter
+OSAKit
+OSLog
+OpenAL
+OpenCL
+OpenDirectory
+OpenGL
+// PCSC - error: module 'PCSC' is incompatible with feature 'swift'
+PDFKit
+PHASE
+ParavirtualizedGraphics
+PassKit
+PencilKit
+Photos
+PhotosUI
+PreferencePanes
+PushKit
+PushToTalk
+Quartz
+QuartzCore
+QuickLook
+QuickLookThumbnailing
+QuickLookUI
+RealityFoundation
+RealityKit
+ReplayKit
+SafariServices
+SafetyKit
+// SceneKit - error: duplicated mapping key 'Protocols'
+ScreenCaptureKit
+ScreenSaver
+ScreenTime
+ScriptingBridge
+Security
+SecurityFoundation
+SecurityInterface
+SensorKit
+ServiceManagement
+SharedWithYou
+SharedWithYouCore
+ShazamKit
+Social
+SoundAnalysis
+Speech
+SpriteKit
+StoreKit
+SwiftUI
+// SyncServices - error: module 'SyncServices' is incompatible with feature 'swift'
+SystemConfiguration
+SystemExtensions
+TWAIN
+TabularData
+Tcl
+ThreadNetwork
+UniformTypeIdentifiers
+UserNotifications
+UserNotificationsUI
+// VideoDecodeAcceleration - error: module 'VideoDecodeAcceleration' is incompatible with feature 'swift'
+VideoSubscriberAccount
+VideoToolbox
+Virtualization
+Vision
+VisionKit
+WeatherKit
+WebKit
+WidgetKit
+_AVKit_SwiftUI
+_AppIntents_AppKit
+_AppIntents_SwiftUI
+_AuthenticationServices_SwiftUI
+_CoreData_CloudKit
+_DeviceActivity_SwiftUI
+_GroupActivities_AppKit
+_LocalAuthentication_SwiftUI
+_MapKit_SwiftUI
+_MusicKit_SwiftUI
+_PassKit_SwiftUI
+_PhotosUI_SwiftUI
+_QuickLook_SwiftUI
+// _SceneKit_SwiftUI - disabled because SceneKit is disabled
+_SpriteKit_SwiftUI
+_StoreKit_SwiftUI
+iTunesLibrary
+vmnet

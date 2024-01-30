@@ -89,6 +89,17 @@ void SDKContext::addDiagConsumer(DiagnosticConsumer &Consumer) {
   }
 }
 
+CompilerInstance &SDKContext::newCompilerInstance() {
+  CIs.emplace_back(new CompilerInstance());
+
+  // Add our existing diagnostic consumers to this new compiler instance.
+  // (Note that we do the opposite in addDiagConsumer().)
+  for (auto &consumer : Diags.getConsumers())
+    CIs.back()->addDiagnosticConsumer(consumer);
+
+  return *CIs.back();
+}
+
 void SDKNodeRoot::registerDescendant(SDKNode *D) {
   // Operator doesn't have usr
   if (isa<SDKNodeDeclOperator>(D))
@@ -729,6 +740,10 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
             auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
   #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
   #include "swift/AST/Attr.def"
+            // BackDeployAttr was renamed to BackDeployedAttr, but not before a
+            // compiler shipped which used the old name in digests. Make the old
+            // name equivalent to the new one.
+            .Case("BackDeploy", DeclAttrKind::DAK_BackDeployed)
             .Default(DeclAttrKind::DAK_Count);
             if (Result == DAK_Count)
               Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
@@ -2606,6 +2621,8 @@ int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath
 
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
+  if (Ctx.getDiags().hadAnyError())
+    return 1;
   Collector.serialize(FS);
   return 0;
 }
@@ -2670,6 +2687,9 @@ int swift::ide::api::findDeclUsr(StringRef dumpPath, CheckerOptions Opts) {
 }
 
 void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+     "diagnosing changes between SDK nodes for type decls", this, Right);
+
   SDKNodeDecl::diagnose(Right);
   auto *R = dyn_cast<SDKNodeDeclType>(Right);
   if (!R)
@@ -2719,6 +2739,10 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
 }
 
 void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+       "diagnosing changes between SDK nodes for abstract function decls",
+       this, Right);
+
   SDKNodeDecl::diagnose(Right);
   auto *R = dyn_cast<SDKNodeDeclAbstractFunc>(Right);
   if (!R)
@@ -2752,6 +2776,9 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
 }
 
 void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+       "diagnosing changes between SDK nodes for func decls", this, Right);
+
   SDKNodeDeclAbstractFunc::diagnose(Right);
   auto *R = dyn_cast<SDKNodeDeclFunction>(Right);
   if (!R)
@@ -2809,6 +2836,9 @@ void swift::ide::api::detectRename(SDKNode *L, SDKNode *R) {
 }
 
 void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+      "diagnosing changes between SDK nodes for decls", this, Right);
+
   SDKNode::diagnose(Right);
   auto *RD = dyn_cast<SDKNodeDecl>(Right);
   if (!RD)
@@ -2869,6 +2899,10 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
 
   // Diagnose removing attributes.
   for (auto Kind: getDeclAttributes()) {
+    if (Kind == swift::DAK_Count)
+      // Unknown attribute, diagnosed elsewhere.
+      continue;
+
     if (!RD->hasDeclAttribute(Kind)) {
       if ((Ctx.checkingABI() ? DeclAttribute::isRemovingBreakingABI(Kind) :
                                DeclAttribute::isRemovingBreakingAPI(Kind)) &&
@@ -2881,6 +2915,10 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
 
   // Diagnose adding attributes.
   for (auto Kind: RD->getDeclAttributes()) {
+    if (Kind == swift::DAK_Count)
+      // Unknown attribute, diagnosed elsewhere.
+      continue;
+
     if (!hasDeclAttribute(Kind)) {
       if ((Ctx.checkingABI() ? DeclAttribute::isAddingBreakingABI(Kind) :
                                DeclAttribute::isAddingBreakingAPI(Kind)) &&
@@ -2908,10 +2946,14 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
 }
 
 void swift::ide::api::SDKNodeDeclOperator::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+      "diagnosing changes between SDK nodes for operators", this, Right);
+
   SDKNodeDecl::diagnose(Right);
   auto *RO = dyn_cast<SDKNodeDeclOperator>(Right);
   if (!RO)
     return;
+
   auto Loc = RO->getLoc();
   if (getDeclKind() != RO->getDeclKind()) {
     emitDiag(Loc, diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind(),
@@ -2920,6 +2962,9 @@ void swift::ide::api::SDKNodeDeclOperator::diagnose(SDKNode *Right) {
 }
 
 void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+      "diagnosing changes between SDK nodes for vars", this, Right);
+
   SDKNodeDecl::diagnose(Right);
   auto *RV = dyn_cast<SDKNodeDeclVar>(Right);
   if (!RV)
@@ -2937,6 +2982,9 @@ static bool shouldDiagnoseType(SDKNodeType *T) {
 }
 
 void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+      "diagnosing changes between SDK nodes for types", this, Right);
+
   SDKNode::diagnose(Right);
   auto *RT = dyn_cast<SDKNodeType>(Right);
   if (!RT || !shouldDiagnoseType(this))
@@ -2977,6 +3025,9 @@ void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
 }
 
 void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
+  PrettyStackTraceSDKNodes trace(
+      "diagnosing changes between SDK nodes for func types", this, Right);
+
   SDKNodeType::diagnose(Right);
   auto *RT = dyn_cast<SDKNodeTypeFunc>(Right);
   if (!RT || !shouldDiagnoseType(this))
@@ -2989,4 +3040,30 @@ void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
                                                 getTypeRoleDescription(),
                                                 isEscaping());
   }
+}
+
+void PrettyStackTraceSDKNode::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  printNode(Node, out);
+  out << '\n';
+}
+
+void PrettyStackTraceSDKNode::printNode(NodePtr node, llvm::raw_ostream &out) const {
+  if (!node)
+    out << "<null>";
+  else if (auto declNode = dyn_cast<SDKNodeDecl>(node)) {
+    out << '"';
+    declNode->printFullyQualifiedName(out);
+    out << '"';
+  }
+  else
+    out << QuotedString(node->getPrintedName());
+}
+
+void PrettyStackTraceSDKNodes::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  printNode(Node, out);
+  out << " and ";
+  printNode(OtherNode, out);
+  out << '\n';
 }

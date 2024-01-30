@@ -652,6 +652,9 @@ public:
         DebugMapping(DebugMapping) {}
 
   void diagnoseMissingAvailable(SDKNodeDecl *D) {
+    PrettyStackTraceSDKNode trace(
+        "diagnosing missing availability on SDK node", D);
+
     // For extensions of external types, we diagnose individual member's missing
     // available attribute instead of the extension itself.
     // The reason is we may merge several extensions into a single one; some
@@ -677,6 +680,9 @@ public:
     }
   }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
+    PrettyStackTraceSDKNodes trace(
+        "processing match between SDK nodes", Left, Right);
+
     if (DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
     switch (Reason) {
@@ -1909,39 +1915,20 @@ static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines,
 }
 
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
-                                SDKNodeRoot *RightModule, StringRef OutputPath,
+                                SDKNodeRoot *RightModule,
                                 llvm::StringSet<> ProtocolReqAllowlist,
-                                bool DisableFailOnError,
-                                bool CompilerStyleDiags,
-                                StringRef SerializedDiagPath,
-                                StringRef BreakageAllowlistPath,
-                                bool DebugMapping) {
+                                bool DebugMapping,
+                                bool FailOnError,
+                                FilteringDiagnosticConsumer *pConsumer) {
+  PrettyStackTraceSDKNodes trace(
+       "diagnosing changes between modules", LeftModule, RightModule);
+
   assert(LeftModule);
   assert(RightModule);
-  llvm::raw_ostream *OS = &llvm::errs();
   if (!LeftModule || !RightModule) {
-    *OS << "Cannot diagnose null SDKNodeRoot";
+    llvm::errs() << "Cannot diagnose null SDKNodeRoot";
     exit(1);
   }
-  std::unique_ptr<llvm::raw_ostream> FileOS;
-  if (!OutputPath.empty()) {
-    std::error_code EC;
-    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::OF_None));
-    OS = FileOS.get();
-  }
-  bool FailOnError;
-  auto allowedBreakages = std::make_unique<llvm::StringSet<>>();
-  if (readBreakageAllowlist(Ctx, *allowedBreakages, BreakageAllowlistPath)) {
-    Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
-                            BreakageAllowlistPath);
-  }
-  auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
-      createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
-                         SerializedDiagPath),
-      std::move(allowedBreakages),
-      /*DowngradeToWarning*/false);
-  SWIFT_DEFER { pConsumer->finishProcessing(); };
-  Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
                                 RightModule->getJsonFormatVersion()));
   TypeAliasDiffFinder(LeftModule, RightModule,
@@ -1956,14 +1943,12 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   return FailOnError && pConsumer->hasError() ? 1 : 0;
 }
 
-static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
-                                StringRef OutputPath, CheckerOptions Opts,
+static int diagnoseModuleChange(SDKContext &Ctx, StringRef LeftPath,
+                                StringRef RightPath,
                                 llvm::StringSet<> ProtocolReqAllowlist,
-                                bool DisableFailOnError,
-                                bool CompilerStyleDiags,
-                                StringRef SerializedDiagPath,
-                                StringRef BreakageAllowlistPath,
-                                bool DebugMapping) {
+                                bool DebugMapping,
+                                bool FailOnError,
+                                FilteringDiagnosticConsumer *pConsumer) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -1972,15 +1957,13 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx(Opts);
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
   return diagnoseModuleChange(
-      Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
-      std::move(ProtocolReqAllowlist), DisableFailOnError, CompilerStyleDiags, SerializedDiagPath,
-      BreakageAllowlistPath, DebugMapping);
+      Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
+      std::move(ProtocolReqAllowlist), DebugMapping, FailOnError, pConsumer);
 }
 
 static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
@@ -2570,26 +2553,46 @@ public:
                                        OutputFile, IgnoredUsrs, CheckerOpts,
                                        OutputInJson, DebugMapping);
       }
+      SDKContext Ctx(CheckerOpts);
+
+      llvm::raw_ostream *OS = &llvm::errs();
+      std::unique_ptr<llvm::raw_ostream> FileOS;
+      if (!OutputFile.empty()) {
+        std::error_code EC;
+        FileOS.reset(new llvm::raw_fd_ostream(OutputFile, EC, llvm::sys::fs::OF_None));
+        OS = FileOS.get();
+      }
+      bool FailOnError;
+      auto allowedBreakages = std::make_unique<llvm::StringSet<>>();
+      if (readBreakageAllowlist(Ctx, *allowedBreakages, BreakageAllowlistPath)) {
+        Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
+                                BreakageAllowlistPath);
+      }
+      auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
+          createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
+                             SerializedDiagPath),
+          std::move(allowedBreakages),
+          /*DowngradeToWarning*/false);
+      SWIFT_DEFER { pConsumer->finishProcessing(); };
+      Ctx.addDiagConsumer(*pConsumer);
+
       switch (Mode) {
       case ComparisonInputMode::BothJson: {
         return diagnoseModuleChange(
-            SDKJsonPaths[0], SDKJsonPaths[1], OutputFile, CheckerOpts,
-            std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            Ctx, SDKJsonPaths[0], SDKJsonPaths[1], std::move(protocolAllowlist),
+            DebugMapping, FailOnError, pConsumer.get());
       }
       case ComparisonInputMode::BaselineJson: {
-        SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
-            Ctx, getBaselineFromJson(Ctx), getSDKRoot(Ctx, false), OutputFile,
-            std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            Ctx, getBaselineFromJson(Ctx), getSDKRoot(Ctx, false),
+            std::move(protocolAllowlist), DebugMapping, FailOnError,
+            pConsumer.get());
       }
       case ComparisonInputMode::BothLoad: {
-        SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
-            Ctx, getSDKRoot(Ctx, true), getSDKRoot(Ctx, false), OutputFile,
-            std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            Ctx, getSDKRoot(Ctx, true), getSDKRoot(Ctx, false),
+            std::move(protocolAllowlist), DebugMapping, FailOnError,
+            pConsumer.get());
       }
       }
     }

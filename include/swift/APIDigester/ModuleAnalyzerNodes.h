@@ -234,10 +234,7 @@ public:
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   llvm::Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
 
-  CompilerInstance &newCompilerInstance() {
-    CIs.emplace_back(new CompilerInstance());
-    return *CIs.back();
-  }
+  CompilerInstance &newCompilerInstance();
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
@@ -856,6 +853,36 @@ void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
   NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);
 
 bool hasValidParentPtr(SDKNodeKind kind);
+
+/// A PrettyStackTraceEntry for performing an action involving an SDKNode.
+///
+/// The message is:
+///   While <action> "<Node name>"\n
+class PrettyStackTraceSDKNode : public llvm::PrettyStackTraceEntry {
+protected:
+  const char *Action;
+  NodePtr Node;
+public:
+  PrettyStackTraceSDKNode(const char *action, NodePtr node)
+    : Action(action), Node(node) {}
+
+  void print(llvm::raw_ostream &OS) const override;
+  void printNode(NodePtr node, llvm::raw_ostream &OS) const;
+};
+
+/// A PrettyStackTraceEntry for performing an action involving a pair of SDKNodes.
+///
+/// The message is:
+///   While <action> "<Node name>" and "<Other node name>"\n
+class PrettyStackTraceSDKNodes : public PrettyStackTraceSDKNode {
+  NodePtr OtherNode;
+public:
+  PrettyStackTraceSDKNodes(const char *action, NodePtr node, NodePtr otherNode)
+    : PrettyStackTraceSDKNode(action, node), OtherNode(otherNode) {}
+
+  void print(llvm::raw_ostream &OS) const override;
+};
+
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace

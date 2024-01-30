@@ -1,0 +1,588 @@
+/* Generic Signature Changes */
+
+// rdar://113157025: Known issue with the API digester's handling of existential `any`.
+Accessor GCPhysicalInputElementCollection.subscript(_:).Get() has generic signature change from <T where T == GameController.GCAxisElement> to <T where T == any GameController.GCAxisElement>
+Accessor GCPhysicalInputElementCollection.subscript(_:).Get() has generic signature change from <T where T == GameController.GCButtonElement> to <T where T == any GameController.GCButtonElement>
+Accessor GCPhysicalInputElementCollection.subscript(_:).Get() has generic signature change from <T where T == GameController.GCDirectionPadElement> to <T where T == any GameController.GCDirectionPadElement>
+Accessor GCPhysicalInputElementCollection.subscript(_:).Get() has generic signature change from <T where T == GameController.GCPhysicalInputElement> to <T where T == any GameController.GCPhysicalInputElement>
+Accessor GCPhysicalInputElementCollection.subscript(_:).Get() has generic signature change from <T where T == GameController.GCSwitchElement> to <T where T == any GameController.GCSwitchElement>
+Accessor MLShapedArrayProtocol.subscript(_:).Get() has generic signature change from <Self, C where Self : CoreML.MLShapedArrayProtocol, C : Swift.Collection, C.Element == CoreML.MLShapedArrayRangeExpression> to <Self, C where Self : CoreML.MLShapedArrayProtocol, C : Swift.Collection, C.Element == any CoreML.MLShapedArrayRangeExpression>
+Accessor MLShapedArrayProtocol.subscript(_:).Set() has generic signature change from <Self, C where Self : CoreML.MLShapedArrayProtocol, C : Swift.Collection, C.Element == CoreML.MLShapedArrayRangeExpression> to <Self, C where Self : CoreML.MLShapedArrayProtocol, C : Swift.Collection, C.Element == any CoreML.MLShapedArrayRangeExpression>
+Func LoadRequest.receive(subscriber:) has generic signature change from <Output, S where Output == S.Input, S : Combine.Subscriber, S.Failure == Swift.Error> to <Output, S where Output == S.Input, S : Combine.Subscriber, S.Failure == any Swift.Error>
+Func LoadRequest.subscribe(_:) has generic signature change from <Output, S where Output == S.Input, S : Combine.Subscriber, S.Failure == Swift.Error> to <Output, S where Output == S.Input, S : Combine.Subscriber, S.Failure == any Swift.Error>
+Func Publishers.Decode.receive(subscriber:) has generic signature change from <Upstream, Output, Coder, S where Upstream : Combine.Publisher, Output : Swift.Decodable, Output == S.Input, Coder : Combine.TopLevelDecoder, S : Combine.Subscriber, Upstream.Output == Coder.Input, S.Failure == Swift.Error> to <Upstream, Output, Coder, S where Upstream : Combine.Publisher, Output : Swift.Decodable, Output == S.Input, Coder : Combine.TopLevelDecoder, S : Combine.Subscriber, Upstream.Output == Coder.Input, S.Failure == any Swift.Error>
+Func Publishers.Encode.receive(subscriber:) has generic signature change from <Upstream, Coder, S where Upstream : Combine.Publisher, Coder : Combine.TopLevelEncoder, S : Combine.Subscriber, Upstream.Output : Swift.Encodable, Coder.Output == S.Input, S.Failure == Swift.Error> to <Upstream, Coder, S where Upstream : Combine.Publisher, Coder : Combine.TopLevelEncoder, S : Combine.Subscriber, Upstream.Output : Swift.Encodable, Coder.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryAllSatisfy.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, S.Failure == Swift.Error, S.Input == Swift.Bool> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, S.Failure == any Swift.Error, S.Input == Swift.Bool>
+Func Publishers.TryCatch.receive(subscriber:) has generic signature change from <Upstream, NewPublisher, S where Upstream : Combine.Publisher, NewPublisher : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == NewPublisher.Output, NewPublisher.Output == S.Input, S.Failure == Swift.Error> to <Upstream, NewPublisher, S where Upstream : Combine.Publisher, NewPublisher : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == NewPublisher.Output, NewPublisher.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryCompactMap.receive(subscriber:) has generic signature change from <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == Swift.Error> to <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == any Swift.Error>
+Func Publishers.TryComparison.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == Swift.Error> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryContainsWhere.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, S.Failure == Swift.Error, S.Input == Swift.Bool> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, S.Failure == any Swift.Error, S.Input == Swift.Bool>
+Func Publishers.TryDropWhile.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == Swift.Error> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryFilter.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == Swift.Error> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryFirstWhere.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == Swift.Error> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryLastWhere.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == Swift.Error> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryMap.receive(subscriber:) has generic signature change from <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == Swift.Error> to <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == any Swift.Error>
+Func Publishers.TryPrefixWhile.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == Swift.Error> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryReduce.receive(subscriber:) has generic signature change from <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == Swift.Error> to <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == any Swift.Error>
+Func Publishers.TryRemoveDuplicates.receive(subscriber:) has generic signature change from <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == Swift.Error> to <Upstream, S where Upstream : Combine.Publisher, S : Combine.Subscriber, Upstream.Output == S.Input, S.Failure == any Swift.Error>
+Func Publishers.TryScan.receive(subscriber:) has generic signature change from <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == Swift.Error> to <Upstream, Output, S where Upstream : Combine.Publisher, Output == S.Input, S : Combine.Subscriber, S.Failure == any Swift.Error>
+Protocol ResolverSpecification has generic signature change from <Self : Swift.Hashable, Self : Swift.Sendable, Self : Swift.Sequence, Self.Element == AppIntents.Resolver, Self.Output : AppIntents._IntentValue> to <Self : Swift.Hashable, Self : Swift.Sendable, Self : Swift.Sequence, Self.Element == any AppIntents.Resolver, Self.Output : AppIntents._IntentValue>
+Subscript GCPhysicalInputElementCollection.subscript(_:) has generic signature change from <T where T == GameController.GCAxisElement> to <T where T == any GameController.GCAxisElement>
+Subscript GCPhysicalInputElementCollection.subscript(_:) has generic signature change from <T where T == GameController.GCButtonElement> to <T where T == any GameController.GCButtonElement>
+Subscript GCPhysicalInputElementCollection.subscript(_:) has generic signature change from <T where T == GameController.GCDirectionPadElement> to <T where T == any GameController.GCDirectionPadElement>
+Subscript GCPhysicalInputElementCollection.subscript(_:) has generic signature change from <T where T == GameController.GCPhysicalInputElement> to <T where T == any GameController.GCPhysicalInputElement>
+Subscript GCPhysicalInputElementCollection.subscript(_:) has generic signature change from <T where T == GameController.GCSwitchElement> to <T where T == any GameController.GCSwitchElement>
+Subscript MLShapedArrayProtocol.subscript(_:) has generic signature change from <Self, C where Self : CoreML.MLShapedArrayProtocol, C : Swift.Collection, C.Element == CoreML.MLShapedArrayRangeExpression> to <Self, C where Self : CoreML.MLShapedArrayProtocol, C : Swift.Collection, C.Element == any CoreML.MLShapedArrayRangeExpression>
+
+/* RawRepresentable Changes */
+
+/* Removed Decls */
+
+// FIXME: Cause unknown; possibly a change in headers in the clang resource dir.
+Var __GNUC_VA_LIST has been removed
+
+// FIXME: Cause unknown; this is a block in a union, maybe that's broken now?
+Constructor glob_t.__Unnamed_union___Anonymous_field5.init(gl_errblk:) has been removed
+
+// https://reviews.llvm.org/D109239: Changed in 2022 to be based on a compiler
+// builtin that ClangImporter does not know how to expand.
+Var FLT_EVAL_METHOD has been removed
+
+/* Moved Decls */
+
+/* Renamed Decls */
+
+/* Type Changes */
+
+// FIXME: Cause unknown; possibly a regression. Header says `_Null_unspecified`.
+Var NSApp has declared type change from AppKit.NSApplication! to AppKit.NSApplication?
+
+// FIXME: Cause unknown; possibly a regression. Header has not been audited for nullability.
+Var _CurrentRuneLocale has declared type change from Swift.UnsafeMutablePointer<Darwin._RuneLocale>! to Swift.UnsafeMutablePointer<Darwin._RuneLocale>?
+Var __stderrp has declared type change from Swift.UnsafeMutablePointer<Darwin.FILE>! to Swift.UnsafeMutablePointer<Darwin.FILE>?
+Var __stdinp has declared type change from Swift.UnsafeMutablePointer<Darwin.FILE>! to Swift.UnsafeMutablePointer<Darwin.FILE>?
+Var __stdoutp has declared type change from Swift.UnsafeMutablePointer<Darwin.FILE>! to Swift.UnsafeMutablePointer<Darwin.FILE>?
+Var _c_locale has declared type change from Darwin.locale_t! to Darwin.locale_t?
+Var optarg has declared type change from Swift.UnsafeMutablePointer<Swift.CChar>! to Swift.UnsafeMutablePointer<Swift.CChar>?
+Var suboptarg has declared type change from Swift.UnsafeMutablePointer<Swift.CChar>! to Swift.UnsafeMutablePointer<Swift.CChar>?
+Var port_obj_table has declared type change from Swift.UnsafeMutablePointer<Darwin.port_obj_tentry>! to Swift.UnsafeMutablePointer<Darwin.port_obj_tentry>?
+Var vprintf_stderr_func has declared type change from ((Swift.UnsafePointer<Swift.CChar>?, Swift.CVaListPointer?) -> Swift.Int32)! to ((Swift.UnsafePointer<Swift.CChar>?, Swift.CVaListPointer?) -> Swift.Int32)?
+
+/* Decl Attribute changes */
+
+/* Fixed-layout Type Changes */
+
+/* Protocol Conformance Change */
+
+// SE-0331: These imported structs have pointer fields, so they became
+// non-Sendable once the Unsafe*Pointer types were no longer Sendable.
+Struct DIR has removed conformance to Sendable
+Struct FTS has removed conformance to Sendable
+Struct FTS.__Unnamed_union___Anonymous_field8 has removed conformance to Sendable
+Struct _RuneEntry has removed conformance to Sendable
+Struct _RuneLocale has removed conformance to Sendable
+Struct _RuneRange has removed conformance to Sendable
+Struct __Reply__host_lockgroup_info_t has removed conformance to Sendable
+Struct __Reply__host_processor_info_t has removed conformance to Sendable
+Struct __Reply__host_processor_sets_t has removed conformance to Sendable
+Struct __Reply__host_processors_t has removed conformance to Sendable
+Struct __Reply__host_virtual_physical_table_info_t has removed conformance to Sendable
+Struct __Reply__kext_request_t has removed conformance to Sendable
+Struct __Reply__kmod_control_t has removed conformance to Sendable
+Struct __Reply__kmod_get_info_t has removed conformance to Sendable
+Struct __Reply__mach_memory_info_t has removed conformance to Sendable
+Struct __Reply__mach_port_get_set_status_t has removed conformance to Sendable
+Struct __Reply__mach_port_names_t has removed conformance to Sendable
+Struct __Reply__mach_port_space_info_t has removed conformance to Sendable
+Struct __Reply__mach_ports_lookup_t has removed conformance to Sendable
+Struct __Reply__mach_vm_read_t has removed conformance to Sendable
+Struct __Reply__mach_vm_region_info_64_t has removed conformance to Sendable
+Struct __Reply__mach_vm_region_info_t has removed conformance to Sendable
+Struct __Reply__mach_zone_info_t has removed conformance to Sendable
+Struct __Reply__processor_set_tasks_t has removed conformance to Sendable
+Struct __Reply__processor_set_tasks_with_flavor_t has removed conformance to Sendable
+Struct __Reply__processor_set_threads_t has removed conformance to Sendable
+Struct __Reply__task_get_dyld_image_infos_t has removed conformance to Sendable
+Struct __Reply__task_get_emulation_vector_t has removed conformance to Sendable
+Struct __Reply__task_threads_t has removed conformance to Sendable
+Struct __Reply__task_zone_info_t has removed conformance to Sendable
+Struct __Reply__vm_mapped_pages_info_t has removed conformance to Sendable
+Struct __Reply__vm_read_t has removed conformance to Sendable
+Struct __Request__host_security_create_task_token_t has removed conformance to Sendable
+Struct __Request__kext_request_t has removed conformance to Sendable
+Struct __Request__kmod_control_t has removed conformance to Sendable
+Struct __Request__mach_port_construct_t has removed conformance to Sendable
+Struct __Request__mach_ports_register_t has removed conformance to Sendable
+Struct __Request__mach_vm_write_t has removed conformance to Sendable
+Struct __Request__task_create_t has removed conformance to Sendable
+Struct __Request__task_register_dyld_image_infos_t has removed conformance to Sendable
+Struct __Request__task_set_emulation_vector_t has removed conformance to Sendable
+Struct __Request__task_unregister_dyld_image_infos_t has removed conformance to Sendable
+Struct __Request__vm_write_t has removed conformance to Sendable
+Struct __darwin_pthread_handler_rec has removed conformance to Sendable
+Struct __darwin_sigaltstack has removed conformance to Sendable
+Struct __darwin_ucontext has removed conformance to Sendable
+Struct __darwin_ucontext64 has removed conformance to Sendable
+Struct __msfilterreq has removed conformance to Sendable
+Struct __nl_cat_d has removed conformance to Sendable
+Struct __sFILE has removed conformance to Sendable
+Struct __sbuf has removed conformance to Sendable
+Struct __shmid_ds_new has removed conformance to Sendable
+Struct __siginfo has removed conformance to Sendable
+Struct _ftsent has removed conformance to Sendable
+Struct _malloc_zone_t has removed conformance to Sendable
+Struct _opaque_pthread_t has removed conformance to Sendable
+Struct _pcred has removed conformance to Sendable
+Struct addrinfo has removed conformance to Sendable
+Struct aiocb has removed conformance to Sendable
+Struct au_arb_t has removed conformance to Sendable
+Struct au_arg32_t has removed conformance to Sendable
+Struct au_arg64_t has removed conformance to Sendable
+Struct au_cert_hash_t has removed conformance to Sendable
+Struct au_class_ent has removed conformance to Sendable
+Struct au_event_ent has removed conformance to Sendable
+Struct au_execarg_t has removed conformance to Sendable
+Struct au_execenv_t has removed conformance to Sendable
+Struct au_file_t has removed conformance to Sendable
+Struct au_identity_t has removed conformance to Sendable
+Struct au_invalid_t has removed conformance to Sendable
+Struct au_krb5_principal_t has removed conformance to Sendable
+Struct au_opaque_t has removed conformance to Sendable
+Struct au_path_t has removed conformance to Sendable
+Struct au_sdev_handle has removed conformance to Sendable
+Struct au_session has removed conformance to Sendable
+Struct au_text_t has removed conformance to Sendable
+Struct au_user_ent has removed conformance to Sendable
+Struct au_zonename_t has removed conformance to Sendable
+Struct bpf_program has removed conformance to Sendable
+Struct ctlname has removed conformance to Sendable
+Struct datum has removed conformance to Sendable
+Struct dk_error_description_t has removed conformance to Sendable
+Struct dk_format_capacities_t has removed conformance to Sendable
+Struct dk_provision_status_t has removed conformance to Sendable
+Struct dk_unmap_t has removed conformance to Sendable
+Struct dl_info has removed conformance to Sendable
+Struct entry has removed conformance to Sendable
+Struct eproc has removed conformance to Sendable
+Struct eventreq has removed conformance to Sendable
+Struct exception has removed conformance to Sendable
+Struct extern_proc has removed conformance to Sendable
+Struct fchecklv has removed conformance to Sendable
+Struct fsignatures has removed conformance to Sendable
+Struct fssearchblock has removed conformance to Sendable
+Struct fstab has removed conformance to Sendable
+Struct glob_t has removed conformance to Sendable
+Struct glob_t.__Unnamed_union___Anonymous_field5 has removed conformance to Sendable
+Struct gmonparam has removed conformance to Sendable
+Struct group has removed conformance to Sendable
+Struct hfs_mount_args has removed conformance to Sendable
+Struct hostent has removed conformance to Sendable
+Struct iconv_allocation_t has removed conformance to Sendable
+Struct iconv_fallbacks has removed conformance to Sendable
+Struct iconv_hooks has removed conformance to Sendable
+Struct if_clonereq has removed conformance to Sendable
+Struct if_nameindex has removed conformance to Sendable
+Struct ifaddrs has removed conformance to Sendable
+Struct ifdrv has removed conformance to Sendable
+Struct ifmaddrs has removed conformance to Sendable
+Struct ifmedia_description has removed conformance to Sendable
+Struct ifmediareq has removed conformance to Sendable
+Struct ifqueue has removed conformance to Sendable
+Struct iovec has removed conformance to Sendable
+Struct kevent has removed conformance to Sendable
+Struct kinfo_proc has removed conformance to Sendable
+Struct klist has removed conformance to Sendable
+Struct kmod_info has removed conformance to Sendable
+Struct kmod_reference has removed conformance to Sendable
+Struct lconv has removed conformance to Sendable
+Struct mach_msg_ool_descriptor_t has removed conformance to Sendable
+Struct mach_msg_ool_ports_descriptor_t has removed conformance to Sendable
+Struct mig_subsystem has removed conformance to Sendable
+Struct mig_symtab has removed conformance to Sendable
+Struct msg has removed conformance to Sendable
+Struct msgbuf has removed conformance to Sendable
+Struct msghdr has removed conformance to Sendable
+Struct ndrv_protocol_desc has removed conformance to Sendable
+Struct netent has removed conformance to Sendable
+Struct option has removed conformance to Sendable
+Struct passwd has removed conformance to Sendable
+Struct pipebuf has removed conformance to Sendable
+Struct port_obj_tentry has removed conformance to Sendable
+Struct protoent has removed conformance to Sendable
+Struct pseminfo has removed conformance to Sendable
+Struct pshminfo has removed conformance to Sendable
+Struct pstats has removed conformance to Sendable
+Struct qelem has removed conformance to Sendable
+Struct rb_node has removed conformance to Sendable
+Struct rb_tree has removed conformance to Sendable
+Struct rb_tree_ops_t has removed conformance to Sendable
+Struct regex_t has removed conformance to Sendable
+Struct routine_descriptor has removed conformance to Sendable
+Struct rpc_routine_descriptor has removed conformance to Sendable
+Struct rpc_signature has removed conformance to Sendable
+Struct rpc_subsystem has removed conformance to Sendable
+Struct rpcent has removed conformance to Sendable
+Struct rslvmulti_req has removed conformance to Sendable
+Struct rt_addrinfo has removed conformance to Sendable
+Struct sa_endpoints has removed conformance to Sendable
+Struct sbuf has removed conformance to Sendable
+Struct servent has removed conformance to Sendable
+Struct sf_hdtr has removed conformance to Sendable
+Struct sigevent has removed conformance to Sendable
+Struct sigstack has removed conformance to Sendable
+Struct tm has removed conformance to Sendable
+Struct tokenstr has removed conformance to Sendable
+Struct tokenstr.__Unnamed_union_tt has removed conformance to Sendable
+Struct uprof has removed conformance to Sendable
+Struct vfsidctl has removed conformance to Sendable
+Struct vfsstatfs has removed conformance to Sendable
+Struct vmspace has removed conformance to Sendable
+Struct wordexp_t has removed conformance to Sendable
+Struct NSAccessibility has removed conformance to Sendable
+
+// FIXME: Probably same as above, but not yet triaged
+Struct AEDesc has removed conformance to Sendable
+Struct AEKeyDesc has removed conformance to Sendable
+Struct AERemoteProcessResolverContext has removed conformance to Sendable
+Struct ATSFontQuerySourceContext has removed conformance to Sendable
+Struct ATSUGlyphInfo has removed conformance to Sendable
+Struct ATSUGlyphInfoArray has removed conformance to Sendable
+Struct AUInputSamplesInOutputCallbackStruct has removed conformance to Sendable
+Struct AUMIDIEvent has removed conformance to Sendable
+Struct AUMIDIEventList has removed conformance to Sendable
+Struct AUMIDIOutputCallbackStruct has removed conformance to Sendable
+Struct AUNodeRenderCallback has removed conformance to Sendable
+Struct AUParameterEvent has removed conformance to Sendable
+Struct AURenderCallbackStruct has removed conformance to Sendable
+Struct AURenderEventHeader has removed conformance to Sendable
+Struct AXMFiHearingDevice has removed conformance to Sendable
+Struct AlertStdAlertParamRec has removed conformance to Sendable
+Struct AudioBalanceFade has removed conformance to Sendable
+Struct AudioBuffer has removed conformance to Sendable
+Struct AudioBufferList has removed conformance to Sendable
+Struct AudioCodecMagicCookieInfo has removed conformance to Sendable
+Struct AudioComponentPlugInInterface has removed conformance to Sendable
+Struct AudioFormatInfo has removed conformance to Sendable
+Struct AudioHardwareIOProcStreamUsage has removed conformance to Sendable
+Struct AudioOutputUnitMIDICallbacks has removed conformance to Sendable
+Struct AudioPanningInfo has removed conformance to Sendable
+Struct AudioQueueBuffer has removed conformance to Sendable
+Struct AudioUnitConnection has removed conformance to Sendable
+Struct AudioUnitExternalBuffer has removed conformance to Sendable
+Struct AudioUnitParameter has removed conformance to Sendable
+Struct AudioUnitProperty has removed conformance to Sendable
+Struct AudioValueTranslation has removed conformance to Sendable
+Struct AuthorizationItem has removed conformance to Sendable
+Struct AuthorizationItemSet has removed conformance to Sendable
+Struct AuthorizationValue has removed conformance to Sendable
+Struct AuthorizationValueVector has removed conformance to Sendable
+Struct BNNSActivation has removed conformance to Sendable
+Struct BNNSArithmeticBinary has removed conformance to Sendable
+Struct BNNSArithmeticTernary has removed conformance to Sendable
+Struct BNNSArithmeticUnary has removed conformance to Sendable
+Struct BNNSConvolutionLayerParameters has removed conformance to Sendable
+Struct BNNSFullyConnectedLayerParameters has removed conformance to Sendable
+Struct BNNSLSTMDataDescriptor has removed conformance to Sendable
+Struct BNNSLSTMGateDescriptor has removed conformance to Sendable
+Struct BNNSLayerData has removed conformance to Sendable
+Struct BNNSLayerParametersActivation has removed conformance to Sendable
+Struct BNNSLayerParametersArithmetic has removed conformance to Sendable
+Struct BNNSLayerParametersBroadcastMatMul has removed conformance to Sendable
+Struct BNNSLayerParametersConvolution has removed conformance to Sendable
+Struct BNNSLayerParametersDropout has removed conformance to Sendable
+Struct BNNSLayerParametersEmbedding has removed conformance to Sendable
+Struct BNNSLayerParametersFullyConnected has removed conformance to Sendable
+Struct BNNSLayerParametersGram has removed conformance to Sendable
+Struct BNNSLayerParametersLSTM has removed conformance to Sendable
+Struct BNNSLayerParametersLossBase has removed conformance to Sendable
+Struct BNNSLayerParametersLossHuber has removed conformance to Sendable
+Struct BNNSLayerParametersLossSigmoidCrossEntropy has removed conformance to Sendable
+Struct BNNSLayerParametersLossSoftmaxCrossEntropy has removed conformance to Sendable
+Struct BNNSLayerParametersLossYolo has removed conformance to Sendable
+Struct BNNSLayerParametersMultiheadAttention has removed conformance to Sendable
+Struct BNNSLayerParametersNormalization has removed conformance to Sendable
+Struct BNNSLayerParametersPadding has removed conformance to Sendable
+Struct BNNSLayerParametersPermute has removed conformance to Sendable
+Struct BNNSLayerParametersPooling has removed conformance to Sendable
+Struct BNNSLayerParametersQuantization has removed conformance to Sendable
+Struct BNNSLayerParametersReduction has removed conformance to Sendable
+Struct BNNSLayerParametersResize has removed conformance to Sendable
+Struct BNNSLayerParametersTensorContraction has removed conformance to Sendable
+Struct BNNSMHAProjectionParameters has removed conformance to Sendable
+Struct BNNSNDArrayDescriptor has removed conformance to Sendable
+Struct BNNSPoolingLayerParameters has removed conformance to Sendable
+Struct BasicWindowDescription has removed conformance to Sendable
+Struct BasicWindowDescription.__Unnamed_union_windowDefinition has removed conformance to Sendable
+Struct BitMap has removed conformance to Sendable
+Struct BluetoothHCICurrentInquiryAccessCodes has removed conformance to Sendable
+Struct CFAllocatorContext has removed conformance to Sendable
+Struct CFBinaryHeapCompareContext has removed conformance to Sendable
+Struct CFFileDescriptorContext has removed conformance to Sendable
+Struct CFHostClientContext has removed conformance to Sendable
+Struct CFMachPortContext has removed conformance to Sendable
+Struct CFMessagePortContext has removed conformance to Sendable
+Struct CFNetServiceClientContext has removed conformance to Sendable
+Struct CFRunLoopObserverContext has removed conformance to Sendable
+Struct CFRunLoopSourceContext has removed conformance to Sendable
+Struct CFRunLoopSourceContext1 has removed conformance to Sendable
+Struct CFRunLoopTimerContext has removed conformance to Sendable
+Struct CFSocketContext has removed conformance to Sendable
+Struct CFStreamClientContext has removed conformance to Sendable
+Struct CFTreeContext has removed conformance to Sendable
+Struct CFXMLAttributeListDeclarationInfo has removed conformance to Sendable
+Struct CFXMLParserContext has removed conformance to Sendable
+Struct CGPathElement has removed conformance to Sendable
+Struct CMBlockBufferCustomBlockSource has removed conformance to Sendable
+Struct CMIODeviceAVCCommand has removed conformance to Sendable
+Struct CMIODeviceRS422Command has removed conformance to Sendable
+Struct CMIODeviceSMPTETimeCallback has removed conformance to Sendable
+Struct CMIOStreamScheduledOutputNotificationProcAndRefCon has removed conformance to Sendable
+Struct CSIdentityClientContext has removed conformance to Sendable
+Struct CSIdentityQueryClientContext has removed conformance to Sendable
+Struct CSSM_APPLE_CL_CSR_REQUEST has removed conformance to Sendable
+Struct CSSM_APPLE_TP_CERT_REQUEST has removed conformance to Sendable
+Struct CSSM_APPLE_TP_CRL_OPTIONS has removed conformance to Sendable
+Struct CSSM_APPLE_TP_NAME_OID has removed conformance to Sendable
+Struct CSSM_APPLE_TP_SMIME_OPTIONS has removed conformance to Sendable
+Struct CSSM_APPLE_TP_SSL_OPTIONS has removed conformance to Sendable
+Struct CTParagraphStyleSetting has removed conformance to Sendable
+Struct CVFillExtendedPixelsCallBackData has removed conformance to Sendable
+Struct CalibratorInfo has removed conformance to Sendable
+Struct ContextualMenuInterfaceStruct has removed conformance to Sendable
+Struct DRFileProductionInfo has removed conformance to Sendable
+Struct DRTrackProductionInfo has removed conformance to Sendable
+Struct DSPDoubleSplitComplex has removed conformance to Sendable
+Struct DSPSplitComplex has removed conformance to Sendable
+Struct DenseMatrix_Double has removed conformance to Sendable
+Struct DenseMatrix_Float has removed conformance to Sendable
+Struct DenseVector_Double has removed conformance to Sendable
+Struct DenseVector_Float has removed conformance to Sendable
+Struct EvQEl has removed conformance to Sendable
+Struct ExtendedAudioFormatInfo has removed conformance to Sendable
+Struct FFCUSTOMFORCE has removed conformance to Sendable
+Struct FFEFFECT has removed conformance to Sendable
+Struct FFEFFESCAPE has removed conformance to Sendable
+Struct FSEventStreamContext has removed conformance to Sendable
+Struct FileTranslationSpec has removed conformance to Sendable
+Struct GDevice has removed conformance to Sendable
+Struct GetGrowImageRegionRec has removed conformance to Sendable
+Struct GetWindowRegionRec has removed conformance to Sendable
+Struct HMenuBarHeader has removed conformance to Sendable
+Struct HostCallbackInfo has removed conformance to Sendable
+Struct ICACopyObjectDataPB has removed conformance to Sendable
+Struct ICACopyObjectPropertyDictionaryPB has removed conformance to Sendable
+Struct ICACopyObjectThumbnailPB has removed conformance to Sendable
+Struct ICADownloadFilePB has removed conformance to Sendable
+Struct ICAMessage has removed conformance to Sendable
+Struct ICAObjectSendMessagePB has removed conformance to Sendable
+Struct ICAUploadFilePB has removed conformance to Sendable
+Struct ICD_ObjectSendMessagePB has removed conformance to Sendable
+Struct ICD_ScannerObjectSendMessagePB has removed conformance to Sendable
+Struct IOBlitCopyRegionStruct has removed conformance to Sendable
+Struct IOBlitSurfaceStruct has removed conformance to Sendable
+Struct IOBluetoothDeviceSearchAttributes has removed conformance to Sendable
+Struct IOBluetoothL2CAPChannelDataBlock has removed conformance to Sendable
+Struct IOCFPlugInInterfaceStruct has removed conformance to Sendable
+Struct IOGraphicsAcceleratorInterfaceStruct has removed conformance to Sendable
+Struct IOGraphicsEngineContext has removed conformance to Sendable
+Struct IOHIDCompletion has removed conformance to Sendable
+Struct IOHIDDeviceDeviceInterface has removed conformance to Sendable
+Struct IOHIDDeviceInterface has removed conformance to Sendable
+Struct IOHIDDeviceInterface121 has removed conformance to Sendable
+Struct IOHIDDeviceInterface122 has removed conformance to Sendable
+Struct IOHIDDeviceQueueInterface has removed conformance to Sendable
+Struct IOHIDDeviceTimeStampedDeviceInterface has removed conformance to Sendable
+Struct IOHIDDeviceTransactionInterface has removed conformance to Sendable
+Struct IOHIDEventStruct has removed conformance to Sendable
+Struct IOHIDOutputTransactionInterface has removed conformance to Sendable
+Struct IOHIDQueueInterface has removed conformance to Sendable
+Struct IOHardwareCursorDescriptor has removed conformance to Sendable
+Struct IOHardwareCursorInfo has removed conformance to Sendable
+Struct IONamedValue has removed conformance to Sendable
+Struct IOPowerStateChangeNotification has removed conformance to Sendable
+Struct IORPC has removed conformance to Sendable
+Struct IOServiceInterestContent has removed conformance to Sendable
+Struct IUnknownVTbl has removed conformance to Sendable
+Struct JSClassDefinition has removed conformance to Sendable
+Struct JSStaticFunction has removed conformance to Sendable
+Struct JSStaticValue has removed conformance to Sendable
+Struct LSLaunchFSRefSpec has removed conformance to Sendable
+Struct LaunchParamBlockRec has removed conformance to Sendable
+Struct MDEFDrawItemsData has removed conformance to Sendable
+Struct MDEFHiliteItemData has removed conformance to Sendable
+Struct MDExporterInterfaceStruct has removed conformance to Sendable
+Struct MDImporterBundleWrapperURLInterfaceStruct has removed conformance to Sendable
+Struct MDImporterInterfaceStruct has removed conformance to Sendable
+Struct MDImporterURLInterfaceStruct has removed conformance to Sendable
+Struct MIDIDriverInterface has removed conformance to Sendable
+Struct MIDISysexSendRequest has removed conformance to Sendable
+Struct MTAudioProcessingTapCallbacks has removed conformance to Sendable
+Struct NColorPickerInfo has removed conformance to Sendable
+Struct NMRec has removed conformance to Sendable
+Struct NPMColor has removed conformance to Sendable
+Struct NullStRec has removed conformance to Sendable
+Struct OBEXAbortCommandData has removed conformance to Sendable
+Struct OBEXAbortCommandResponseData has removed conformance to Sendable
+Struct OBEXConnectCommandData has removed conformance to Sendable
+Struct OBEXConnectCommandResponseData has removed conformance to Sendable
+Struct OBEXDisconnectCommandData has removed conformance to Sendable
+Struct OBEXDisconnectCommandResponseData has removed conformance to Sendable
+Struct OBEXErrorData has removed conformance to Sendable
+Struct OBEXGetCommandData has removed conformance to Sendable
+Struct OBEXGetCommandResponseData has removed conformance to Sendable
+Struct OBEXPutCommandData has removed conformance to Sendable
+Struct OBEXPutCommandResponseData has removed conformance to Sendable
+Struct OBEXSessionEvent has removed conformance to Sendable
+Struct OBEXSessionEvent.__Unnamed_union_u has removed conformance to Sendable
+Struct OBEXSetPathCommandData has removed conformance to Sendable
+Struct OBEXSetPathCommandResponseData has removed conformance to Sendable
+Struct OBEXTransportEvent has removed conformance to Sendable
+Struct ObjectInfo has removed conformance to Sendable
+Struct PixMap has removed conformance to Sendable
+Struct PixPat has removed conformance to Sendable
+Struct ProcessInfoExtendedRec has removed conformance to Sendable
+Struct ProcessInfoRec has removed conformance to Sendable
+Struct QLGeneratorInterfaceStruct has removed conformance to Sendable
+Struct SCDynamicStoreContext has removed conformance to Sendable
+Struct SCNetworkConnectionContext has removed conformance to Sendable
+Struct SCNetworkReachabilityContext has removed conformance to Sendable
+Struct SCPreferencesContext has removed conformance to Sendable
+Struct SRCallBackParam has removed conformance to Sendable
+Struct SRCallBackStruct has removed conformance to Sendable
+Struct ScannerObjectInfo has removed conformance to Sendable
+Struct ScheduledAudioFileRegion has removed conformance to Sendable
+Struct ScheduledAudioSlice has removed conformance to Sendable
+Struct SecAsn1AlgId has removed conformance to Sendable
+Struct SecAsn1PubKeyInfo has removed conformance to Sendable
+Struct SecAsn1Template_struct has removed conformance to Sendable
+Struct SecKeychainAttribute has removed conformance to Sendable
+Struct SecKeychainAttributeInfo has removed conformance to Sendable
+Struct SecKeychainAttributeList has removed conformance to Sendable
+Struct SetupWindowProxyDragImageRec has removed conformance to Sendable
+Struct SparseMatrixStructure has removed conformance to Sendable
+Struct SparseMatrix_Double has removed conformance to Sendable
+Struct SparseMatrix_Float has removed conformance to Sendable
+Struct SparseNumericFactorOptions has removed conformance to Sendable
+Struct SparseOpaqueFactorization_Double has removed conformance to Sendable
+Struct SparseOpaqueFactorization_Float has removed conformance to Sendable
+Struct SparseOpaquePreconditioner_Double has removed conformance to Sendable
+Struct SparseOpaquePreconditioner_Float has removed conformance to Sendable
+Struct SparseOpaqueSubfactor_Double has removed conformance to Sendable
+Struct SparseOpaqueSubfactor_Float has removed conformance to Sendable
+Struct SparseOpaqueSymbolicFactorization has removed conformance to Sendable
+Struct SparseSymbolicFactorOptions has removed conformance to Sendable
+Struct StandardIconListCellDataRec has removed conformance to Sendable
+Struct TERec has removed conformance to Sendable
+Struct TEStyleRec has removed conformance to Sendable
+Struct TSMTERec has removed conformance to Sendable
+Struct TW_CALLBACK has removed conformance to Sendable
+Struct TW_CAPABILITY has removed conformance to Sendable
+Struct TW_CUSTOMDSDATA has removed conformance to Sendable
+Struct TW_EVENT has removed conformance to Sendable
+Struct TW_FILESYSTEM has removed conformance to Sendable
+Struct TW_IDENTITY has removed conformance to Sendable
+Struct TW_IMAGEMEMXFER has removed conformance to Sendable
+Struct TW_JPEGCOMPRESSION has removed conformance to Sendable
+Struct TW_MEMORY has removed conformance to Sendable
+Struct TW_PASSTHRU has removed conformance to Sendable
+Struct TW_SETUPFILEXFER2 has removed conformance to Sendable
+Struct TW_TWUNKDSENTRYPARAMS has removed conformance to Sendable
+Struct TW_TWUNKIDENTITY has removed conformance to Sendable
+Struct TW_USERINTERFACE has removed conformance to Sendable
+Struct TXNATSUIFeatures has removed conformance to Sendable
+Struct TXNATSUIVariations has removed conformance to Sendable
+Struct TXNMatchTextRecord has removed conformance to Sendable
+Struct TclPlatStubs has removed conformance to Sendable
+Struct TclStubHooks has removed conformance to Sendable
+Struct TclStubs has removed conformance to Sendable
+Struct TclTomMathStubs has removed conformance to Sendable
+Struct Tcl_CallFrame has removed conformance to Sendable
+Struct Tcl_ChannelType has removed conformance to Sendable
+Struct Tcl_CmdInfo has removed conformance to Sendable
+Struct Tcl_Config has removed conformance to Sendable
+Struct Tcl_DString has removed conformance to Sendable
+Struct Tcl_DictSearch has removed conformance to Sendable
+Struct Tcl_EncodingType has removed conformance to Sendable
+Struct Tcl_Event has removed conformance to Sendable
+Struct Tcl_Filesystem has removed conformance to Sendable
+Struct Tcl_GlobTypeData has removed conformance to Sendable
+Struct Tcl_HashEntry has removed conformance to Sendable
+Struct Tcl_HashEntry.__Unnamed_union_key has removed conformance to Sendable
+Struct Tcl_HashSearch has removed conformance to Sendable
+Struct Tcl_HashTable has removed conformance to Sendable
+Struct Tcl_Interp has removed conformance to Sendable
+Struct Tcl_Namespace has removed conformance to Sendable
+Struct Tcl_Obj has removed conformance to Sendable
+Struct Tcl_Obj.__Unnamed_union_internalRep has removed conformance to Sendable
+Struct Tcl_ObjType has removed conformance to Sendable
+Struct Tcl_Parse has removed conformance to Sendable
+Struct Tcl_RegExpInfo has removed conformance to Sendable
+Struct Tcl_SavedResult has removed conformance to Sendable
+Struct Tcl_Token has removed conformance to Sendable
+Struct TextServiceInfo has removed conformance to Sendable
+Struct TextServiceList has removed conformance to Sendable
+Struct TransitionWindowOptions has removed conformance to Sendable
+Struct URLCallbackInfo has removed conformance to Sendable
+Struct VDGammaRecord has removed conformance to Sendable
+Struct VTDecompressionOutputCallbackRecord has removed conformance to Sendable
+Struct _NXParsedKeyMapping_ has removed conformance to Sendable
+Struct __CE_AccessDescription has removed conformance to Sendable
+Struct __CE_AuthorityInfoAccess has removed conformance to Sendable
+Struct __CE_AuthorityKeyID has removed conformance to Sendable
+Struct __CE_CRLDistPointsSyntax has removed conformance to Sendable
+Struct __CE_CRLDistributionPoint has removed conformance to Sendable
+Struct __CE_CertPolicies has removed conformance to Sendable
+Struct __CE_ExtendedKeyUsage has removed conformance to Sendable
+Struct __CE_GeneralName has removed conformance to Sendable
+Struct __CE_GeneralNames has removed conformance to Sendable
+Struct __CE_GeneralSubtree has removed conformance to Sendable
+Struct __CE_GeneralSubtrees has removed conformance to Sendable
+Struct __CE_IssuingDistributionPoint has removed conformance to Sendable
+Struct __CE_NameConstraints has removed conformance to Sendable
+Struct __CE_OtherName has removed conformance to Sendable
+Struct __CE_PolicyInformation has removed conformance to Sendable
+Struct __CE_PolicyMapping has removed conformance to Sendable
+Struct __CE_PolicyMappings has removed conformance to Sendable
+Struct __CE_PolicyQualifierInfo has removed conformance to Sendable
+Struct __CE_QC_Statement has removed conformance to Sendable
+Struct __CE_QC_Statements has removed conformance to Sendable
+Struct __CE_SemanticsInformation has removed conformance to Sendable
+Struct _cl_image_desc has removed conformance to Sendable
+Struct ccntTokenRecord has removed conformance to Sendable
+Struct cssm_applecspdl_db_change_password_parameters has removed conformance to Sendable
+Struct cssm_authorizationgroup has removed conformance to Sendable
+Struct cssm_data has removed conformance to Sendable
+Struct cssm_kr_name has removed conformance to Sendable
+Struct cssm_list has removed conformance to Sendable
+Struct cssm_memory_funcs has removed conformance to Sendable
+Struct cssm_name_list has removed conformance to Sendable
+Struct cssm_parsed_cert has removed conformance to Sendable
+Struct cssm_parsed_crl has removed conformance to Sendable
+Struct cssm_tp_result_set has removed conformance to Sendable
+Struct evsioKeymapping has removed conformance to Sendable
+Struct gss_OID_desc_struct has removed conformance to Sendable
+Struct gss_OID_set_desc_struct has removed conformance to Sendable
+Struct gss_buffer_desc_struct has removed conformance to Sendable
+Struct gss_buffer_set_desc_struct has removed conformance to Sendable
+Struct gss_channel_bindings_struct has removed conformance to Sendable
+Struct gss_iov_buffer_desc_struct has removed conformance to Sendable
+Struct mp_int has removed conformance to Sendable
+Struct quadrature_integrate_function has removed conformance to Sendable
+Struct tDataList has removed conformance to Sendable
+Struct vImage_Buffer has removed conformance to Sendable
+Struct vImage_CGImageFormat has removed conformance to Sendable
+Struct vmpktdesc has removed conformance to Sendable
+
+// FIXME: Cause unknown; possibly the selective import of one AppKit header?
+Class SFSafariExtensionViewController has removed conformance to Sendable
+
+// FIXME: NS_SWIFT_SENDABLE doesn't work on protocols.
+// !!! But it did in Swift 5.7??? !!!
+Protocol URLSessionDelegate has removed inherited protocol Sendable
+
+/* Protocol Requirement Change */
+
+/* Class Inheritance Change */
+
+/* Others */
+

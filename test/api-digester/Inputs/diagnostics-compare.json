@@ -1,0 +1,15 @@
+{
+  "kind": "Root",
+  "name": "TopLevel",
+  "printedName": "TopLevel",
+  "children": [
+    {
+      "kind": "Function",
+      "declAttributes": ["Available", "ObjC", "BackDeployed"],
+      "declKind": "Func",
+      "name": "foo",
+      "children": [],
+      "usr": "s:11diagnostics3fooP"
+    }
+  ]
+}
