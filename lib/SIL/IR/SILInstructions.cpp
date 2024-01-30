@@ -2178,6 +2178,11 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILDebugLocation Loc, SILValue Existential, CanType ConcreteType,
     SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
+#ifndef NDEBUG
+  auto layout = Existential->getType().getASTType().getExistentialLayout();
+  assert(layout.getProtocols().size() == Conformances.size());
+#endif
+
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, *F, ConcreteType);
@@ -2196,6 +2201,11 @@ InitExistentialValueInst *InitExistentialValueInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F) {
+#ifndef NDEBUG
+  auto layout = ExistentialType.getASTType().getExistentialLayout();
+  assert(layout.getProtocols().size() == Conformances.size());
+#endif
+
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, *F, ConcreteType);
@@ -2212,6 +2222,11 @@ InitExistentialRefInst *InitExistentialRefInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
     SILFunction *F, ValueOwnershipKind forwardingOwnershipKind) {
+#ifndef NDEBUG
+  auto layout = ExistentialType.getASTType().getExistentialLayout();
+  assert(layout.getProtocols().size() == Conformances.size());
+#endif
+
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, *F, ConcreteType);
@@ -2232,6 +2247,11 @@ InitExistentialMetatypeInst::InitExistentialMetatypeInst(
                                                     TypeDependentOperands,
                                                     existentialMetatypeType),
       NumConformances(conformances.size()) {
+#ifndef NDEBUG
+  auto layout = existentialMetatypeType.getASTType().getExistentialLayout();
+  assert(layout.getProtocols().size() == conformances.size());
+#endif
+
   std::uninitialized_copy(conformances.begin(), conformances.end(),
                           getTrailingObjects<ProtocolConformanceRef>());
 }
