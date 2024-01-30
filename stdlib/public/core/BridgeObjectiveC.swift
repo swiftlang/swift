@@ -407,7 +407,7 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 /// already have writeback-scoped lifetime.
 @frozen
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
-  :  _Pointer {
+  :  _Pointer, @unchecked _BitwiseCopyable {
 
   public let _rawValue: Builtin.RawPointer
 

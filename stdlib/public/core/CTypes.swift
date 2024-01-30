@@ -142,7 +142,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @frozen
-public struct OpaquePointer {
+public struct OpaquePointer : @unchecked _BitwiseCopyable {
   @usableFromInline
   internal var _rawValue: Builtin.RawPointer
 
