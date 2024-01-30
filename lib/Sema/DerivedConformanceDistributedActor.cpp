@@ -645,6 +645,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   // }
   ASTContext &ctx = getter->getASTContext();
 
+  auto *module = getter->getParentModule();
+
   // Produce an empty brace statement on failure.
   auto failure = [&]() -> std::pair<BraceStmt *, bool> {
     auto body = BraceStmt::create(
@@ -680,9 +682,14 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
                                               ctx.getBoolType()));
   Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
   selfForIsLocalArg->setType(selfType);
+
+  auto conformances = module->collectExistentialConformances(selfType->getCanonicalType(),
+                                                             ctx.getAnyObjectType());
   auto *argListForIsLocal =
       ArgumentList::forImplicitSingle(ctx, Identifier(),
-                                      ErasureExpr::create(ctx, selfForIsLocalArg, ctx.getAnyObjectType(), {}, {}));
+                                      ErasureExpr::create(ctx, selfForIsLocalArg,
+                                                          ctx.getAnyObjectType(),
+                                                          conformances, {}));
   CallExpr *isLocalActorCall = CallExpr::createImplicit(ctx, isLocalActorExpr, argListForIsLocal);
   isLocalActorCall->setType(ctx.getBoolType());
   isLocalActorCall->setThrows(nullptr);
