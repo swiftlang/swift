@@ -41,6 +41,10 @@ for module_file in os.listdir(sdk_overlay_dir):
         extra_args = ["-I", os.path.join(source_dir, "stdlib",
                                          "public", "Backtracing", "modules"),
                       "-I", os.path.join(source_dir, "include")]
+    # _Concurrency needs its own additional modules in the module path
+    if module_name == "_Concurrency":
+        extra_args = ["-I", os.path.join(source_dir, "stdlib",
+                                         "public", "Concurrency", "InternalShims")]
 
     print("# " + module_name)
 

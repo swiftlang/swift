@@ -7,6 +7,15 @@
 // REQUIRES: backtracing
 
 @_spi(DwarfTest) import _Backtracing
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(SwiftWASILibc)
+import SwiftWASILibc
+#elseif canImport(ucrt)
+import ucrt
+#elseif canImport(SwiftGlibc)
+import SwiftGlibc
+#endif
 
 @main
 struct DwarfReader {

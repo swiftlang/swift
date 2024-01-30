@@ -214,7 +214,23 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
     B.createReturn(loc, exitCode);
   } else {
     FuncDecl *exitFuncDecl = SGM.getExit();
-    assert(exitFuncDecl && "Failed to find exit function declaration");
+    if (!exitFuncDecl) {
+      // If it doesn't exist, we can conjure one up instead of crashing
+      // @_extern(c)
+      // func exit(_: Int32) -> Never
+      ASTContext &ctx = getASTContext();
+      ModuleDecl *moduleDecl = mainFunc->getModuleContext();
+      ParameterList *params =
+          ParameterList::createWithoutLoc(ParamDecl::createImplicit(
+              ctx, Identifier(), Identifier(), ctx.getInt32Type(), moduleDecl));
+      exitFuncDecl = FuncDecl::createImplicit(
+          ctx, StaticSpellingKind::None,
+          DeclName(ctx, DeclBaseName(ctx.getIdentifier("exit")), params), {},
+          /*async*/ false, /*throws*/ false, /*thrownType*/ Type(), {}, params,
+          ctx.getNeverType(), moduleDecl);
+      exitFuncDecl->getAttrs().add(new (ctx) ExternAttr(
+          llvm::None, llvm::None, ExternKind::C, /*implicit*/ true));
+    }
     SILFunction *exitSILFunc = SGM.getFunction(
         SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
         NotForDefinition);
