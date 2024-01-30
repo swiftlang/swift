@@ -2139,22 +2139,17 @@ private:
 
     enum {
       convertToResult,
-      coerceToVoid,
-      coerceFromNever,
+      coerceToVoid
     } mode;
 
     auto resultExprType =
         solution.simplifyType(solution.getType(resultExpr))->getRValueType();
     // A closure with a non-void return expression can coerce to a closure
     // that returns Void.
+    // TODO: We probably ought to introduce an implicit conversion expr to Void
+    // and eliminate this case.
     if (resultType->isVoid() && !resultExprType->isVoid()) {
       mode = coerceToVoid;
-
-      // A single-expression closure with a Never expression type
-      // coerces to any other function type.
-    } else if (context.isSingleExpressionClosure(cs) &&
-               resultExprType->isUninhabited()) {
-      mode = coerceFromNever;
 
       // Normal rule is to coerce to the return expression to the closure type.
     } else {
@@ -2206,12 +2201,6 @@ private:
                                elements, returnStmt->getEndLoc(),
                                /*implicit*/ true);
     }
-
-    case coerceFromNever:
-      // Replace the return statement with its expression, so that the
-      // expression is evaluated directly. This only works because coercion
-      // from never is limited to single-expression closures.
-      return resultExpr;
     }
 
     return returnStmt;

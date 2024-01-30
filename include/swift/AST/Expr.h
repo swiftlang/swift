@@ -3591,6 +3591,22 @@ public:
   }
 };
 
+/// An expression that models an implicit conversion from an uninhabited value
+/// to any type. It cannot be evaluated.
+class UnreachableExpr : public ImplicitConversionExpr {
+  UnreachableExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::Unreachable, subExpr, ty) {}
+
+public:
+  static UnreachableExpr *create(ASTContext &ctx, Expr *subExpr, Type ty) {
+    return new (ctx) UnreachableExpr(subExpr, ty);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Unreachable;
+  }
+};
+
 /// The builtin unary '&' operator, which converts the
 /// given lvalue into an 'inout' argument value.
 class InOutExpr : public Expr {

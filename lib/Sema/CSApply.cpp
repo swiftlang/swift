@@ -7491,6 +7491,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     break;
   }
 
+  // Uninhabited types can be coerced to any other type via an UnreachableExpr.
+  if (fromType->isUninhabited())
+    return cs.cacheType(UnreachableExpr::create(ctx, expr, toType));
+
   // "Catch all" coercions.
   auto desugaredToType = toType->getDesugaredType();
   switch (desugaredToType->getKind()) {
@@ -9574,8 +9578,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       if (target.isOptionalSomePatternInit())
         return false;
 
-      if (solution.getResolvedType(resultExpr)->isUninhabited() ||
-          solution.simplifyType(convertType)->isVoid()) {
+      if (solution.simplifyType(convertType)->isVoid()) {
         auto contextPurpose = cs.getContextualTypePurpose(target.getAsExpr());
         if (contextPurpose == CTP_ImpliedReturnStmt ||
             contextPurpose == CTP_SingleValueStmtBranch) {

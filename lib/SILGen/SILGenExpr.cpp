@@ -499,6 +499,7 @@ namespace {
     RValue visitIsExpr(IsExpr *E, SGFContext C);
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, SGFContext C);
+    RValue visitUnreachableExpr(UnreachableExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
@@ -2393,6 +2394,22 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
   auto cast = SGF.B.createUncheckedBitCast(E, value,
                                            opaqueTL.getLoweredType());
   return RValue(SGF, E, cast);
+}
+
+RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
+  // Emit the expression, followed by an unreachable. To produce a value of
+  // arbitrary type, we emit a temporary allocation, with the use of the
+  // allocation in the unreachable block. The SILOptimizer will eliminate both
+  // the unreachable block and unused allocation.
+  SGF.emitIgnoredExpr(E->getSubExpr());
+
+  auto &lowering = SGF.getTypeLowering(E->getType());
+  auto resultAddr = SGF.emitTemporaryAllocation(E, lowering.getLoweredType());
+
+  SGF.B.createUnreachable(E);
+  SGF.B.emitBlock(SGF.createBasicBlock());
+
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
 }
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,

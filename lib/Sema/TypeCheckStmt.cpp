@@ -2907,24 +2907,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
     hadError = SC.typeCheckBody(body);
   }
 
-  // If this was a function with an implied result, let's see if the result
-  // came out to be `Never` which means that we have eagerly converted something
-  // like `{ fatalError() }` into `{ return fatalError() }` that has to be
-  // corrected here.
-  // TODO: Could we introduce an implicit conversion node to avoid needing
-  // these fixups?
-  if (isa<FuncDecl>(AFD) && !body->empty()) {
-    if (auto *stmt = body->getLastElement().dyn_cast<Stmt *>()) {
-      if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
-        if (retStmt->isImplied()) {
-          auto returnType = retStmt->getResult()->getType();
-          if (returnType && returnType->isUninhabited())
-            body->setLastElement(retStmt->getResult());
-        }
-      }
-    }
-  }
-
   // Class constructor checking.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
