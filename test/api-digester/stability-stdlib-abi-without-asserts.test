@@ -179,5 +179,8 @@ Protocol SIMDStorage has added inherited protocol _BitwiseCopyable
 Protocol SIMDStorage has generic signature change from <Self.Scalar : Swift.Decodable, Self.Scalar : Swift.Encodable, Self.Scalar : Swift.Hashable> to <Self : Swift._BitwiseCopyable, Self.Scalar : Swift.Decodable, Self.Scalar : Swift.Encodable, Self.Scalar : Swift.Hashable>
 Protocol _Pointer has added inherited protocol _BitwiseCopyable
 Protocol _Pointer has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomReflectable, Self : Swift.Hashable, Self : Swift.Strideable, Self : Swift._BitwiseCopyable>
+Protocol FixedWidthInteger has added inherited protocol _BitwiseCopyable
+Protocol FixedWidthInteger has generic signature change from <Self : Swift.BinaryInteger, Self : Swift.LosslessStringConvertible, Self.Magnitude : Swift.FixedWidthInteger, Self.Magnitude : Swift.UnsignedInteger, Self.Stride : Swift.FixedWidthInteger, Self.Stride : Swift.SignedInteger> to <Self : Swift.BinaryInteger, Self : Swift.LosslessStringConvertible, Self : Swift._BitwiseCopyable, Self.Magnitude : Swift.FixedWidthInteger, Self.Magnitude : Swift.UnsignedInteger, Self.Stride : Swift.FixedWidthInteger, Self.Stride : Swift.SignedInteger>
+
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
