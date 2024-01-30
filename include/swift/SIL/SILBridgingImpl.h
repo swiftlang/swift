@@ -1017,6 +1017,10 @@ BridgedGenericSpecializationInformation BridgedInstruction::ApplyInst_getSpecial
   return {getAs<swift::ApplyInst>()->getSpecializationInfo()};
 }
 
+BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpecializationInfo() const {
+  return {getAs<swift::TryApplyInst>()->getSpecializationInfo()};
+}
+
 SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
   return getAs<swift::ObjectInst>()->getNumBaseElements();
 }
@@ -1291,6 +1295,10 @@ BridgedArgument BridgedBasicBlock::getArgument(SwiftInt index) const {
 BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedValue::Ownership ownership) const {
   return {unbridged()->createPhiArgument(
       type.unbridged(), BridgedValue::castToOwnership(ownership))};
+}
+
+BridgedArgument BridgedBasicBlock::addFunctionArgument(BridgedType type) const {
+  return {unbridged()->createFunctionArgument(type.unbridged())};
 }
 
 void BridgedBasicBlock::eraseArgument(SwiftInt index) const {

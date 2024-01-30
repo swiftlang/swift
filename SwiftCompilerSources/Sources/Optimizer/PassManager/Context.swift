@@ -458,6 +458,11 @@ extension BasicBlock {
     return bridged.addBlockArgument(type.bridged, ownership._bridged).argument
   }
   
+  func addFunctionArgument(type: Type, _ context: some MutatingContext) -> FunctionArgument {
+    context.notifyInstructionsChanged()
+    return bridged.addFunctionArgument(type.bridged).argument as! FunctionArgument
+  }
+
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.eraseArgument(index)
@@ -601,5 +606,10 @@ extension Function {
 
   func fixStackNesting(_ context: FunctionPassContext) {
     context._bridged.fixStackNesting(bridged)
+  }
+
+  func appendNewBlock(_ context: FunctionPassContext) -> BasicBlock {
+    context.notifyBranchesChanged()
+    return context._bridged.appendBlock(bridged).block
   }
 }

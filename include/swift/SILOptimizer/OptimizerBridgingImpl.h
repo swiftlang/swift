@@ -212,6 +212,10 @@ BridgedBasicBlock BridgedPassContext::createBlockAfter(BridgedBasicBlock bridged
   return {block->getParent()->createBasicBlockAfter(block)};
 }
 
+BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunction) const {
+  return {bridgedFunction.getFunction()->createBasicBlock()};
+}
+
 void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
   invocation->eraseInstruction(inst.unbridged());
 }
