@@ -1070,6 +1070,12 @@ def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
 def enable_layout_string_value_witnesses : Flag<["-"], "enable-layout-string-value-witnesses">,
   HelpText<"Enable layout string based value witnesses">;
 
+def enable_large_loadable_types_reg2mem : Flag<["-"], "enable-large-loadable-types-reg2mem">,
+  HelpText<"Enable large loadable types register to memory pass">;
+
+def disable_large_loadable_types_reg2mem : Flag<["-"], "disable-large-loadable-types-reg2mem">,
+  HelpText<"Disable large loadable types register to memory pass">;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
     Joined<["-"], "enable-pack-metadata-stack-promotion=">,

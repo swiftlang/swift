@@ -1,0 +1,217 @@
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -c -o %t/t.o 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct X {
+  var x1 : Int
+  var x2 : Int
+  var x3 : Int
+  var x4: Int
+  var x5: Int
+  var x6: Int
+  var x7: Int
+  var x8: Int
+  var x9: Int
+  var x10: Int
+  var x11: Int
+  var x12: Int
+  var x13: Int
+  var x14: Int
+  var x15: Int
+  var x16: Int
+}
+
+struct Y {
+  var y1 : X
+  var y2: X
+}
+
+// CHECK: sil @test1 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   %0 = alloc_stack $Optional<X>
+// CHECK:   %1 = alloc_stack $X
+// CHECK:   %2 = alloc_stack $X
+// CHECK:   %3 = alloc_stack $Optional<X>
+// CHECK:   copy_addr [take] %2 to [init] %1 : $*X
+// CHECK:   %5 = init_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
+// CHECK:   copy_addr [take] %1 to [init] %5 : $*X
+// CHECK:   inject_enum_addr %0 : $*Optional<X>, #Optional.some!enumelt
+// CHECK:   copy_addr [take] %0 to [init] %3 : $*Optional<X>
+// CHECK:   dealloc_stack %3 : $*Optional<X>
+// CHECK:   dealloc_stack %2 : $*X
+// CHECK:   dealloc_stack %1 : $*X
+// CHECK:   dealloc_stack %0 : $*Optional<X>
+// CHECK: } // end sil function 'test1'
+
+sil @test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $X
+  %1 = alloc_stack $Optional<X>
+  %2 = load %0 : $*X
+  %3 = enum $Optional<X>, #Optional.some!enumelt, %2 : $X
+  store %3 to %1 : $*Optional<X>
+  dealloc_stack %1 : $*Optional<X>
+  dealloc_stack %0 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test2 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   %0 = alloc_stack $Optional<X>
+// CHECK:   %1 = alloc_stack $Optional<X>
+// CHECK:   %2 = alloc_stack $Optional<X>
+// CHECK:   copy_addr [take] %2 to [init] %1 : $*Optional<X>
+// CHECK:   copy_addr [take] %1 to [init] %0 : $*Optional<X>
+// CHECK:   switch_enum_addr %0 : $*Optional<X>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+// CHECK: bb1:
+// CHECK:   %6 = unchecked_take_enum_data_addr %0 : $*Optional<X>, #Optional.some!enumelt
+// CHECK:   br bb3
+
+// CHECK: bb2:
+// CHECK:   br bb3
+
+// CHECK: bb3:
+// CHECK:   dealloc_stack %2 : $*Optional<X>
+// CHECK:   dealloc_stack %1 : $*Optional<X>
+// CHECK:   dealloc_stack %0 : $*Optional<X>
+// CHECK: } // end sil function 'test2'
+
+sil @test2 : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Optional<X>
+  %2 = load %1 : $*Optional<X>
+  switch_enum %2 : $Optional<X>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3: $X):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %1 : $*Optional<X>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test3 : $@convention(thin) () -> Builtin.Int1 {
+// CHECK: bb0:
+// CHECK:   %0 = alloc_stack $Optional<X>
+// CHECK:   %1 = alloc_stack $Optional<X>
+// CHECK:   copy_addr [take] %1 to [init] %0 : $*Optional<X>
+// CHECK:   %3 = integer_literal $Builtin.Int1, -1
+// CHECK:   %4 = integer_literal $Builtin.Int1, 0
+// CHECK:   %5 = select_enum_addr %0 : $*Optional<X>, case #Optional.some!enumelt: %3, case #Optional.none!enumelt: %4 : $Builtin.Int1
+// CHECK:   dealloc_stack %1 : $*Optional<X>
+// CHECK:   dealloc_stack %0 : $*Optional<X>
+// CHECK:   return %5 : $Builtin.Int1
+// CHECK: } // end sil function 'test3'
+
+sil @test3 : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %1 = alloc_stack $Optional<X>
+  %2 = load %1 : $*Optional<X>
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = integer_literal $Builtin.Int1, 0
+  %r = select_enum %2 : $Optional<X>, case #Optional.some!enumelt: %3, case #Optional.none!enumelt: %4 : $Builtin.Int1
+  dealloc_stack %1 : $*Optional<X>
+  return %r : $Builtin.Int1
+}
+// CHECK: sil @test4 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   %0 = alloc_stack $(X, X)
+// CHECK:   %1 = alloc_stack $X
+// CHECK:   %2 = alloc_stack $X
+// CHECK:   %3 = alloc_stack $(X, X)
+// CHECK:   copy_addr [take] %2 to [init] %1 : $*X
+// CHECK:   %5 = tuple_element_addr %0 : $*(X, X), 0
+// CHECK:   copy_addr [take] %1 to [init] %5 : $*X
+// CHECK:   %7 = tuple_element_addr %0 : $*(X, X), 1
+// CHECK:   copy_addr [take] %1 to [init] %7 : $*X
+// CHECK:   copy_addr [take] %0 to [init] %3 : $*(X, X)
+// CHECK: } // end sil function 'test4'
+
+sil @test4 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $X
+  %1 = alloc_stack $(X, X)
+  %2 = load %0 : $*X
+  %3 = tuple (%2 : $X , %2 : $X)
+  store %3 to %1 : $*(X, X)
+  dealloc_stack %1 : $*(X,X)
+  dealloc_stack %0 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test5 : $@convention(thin) (@in (X, X)) -> () {
+// CHECK: bb0(%0 : $*(X, X)):
+// CHECK:   %1 = alloc_stack $(X, X)
+// CHECK:   %2 = alloc_stack $X
+// CHECK:   copy_addr [take] %0 to [init] %1 : $*(X, X)
+// CHECK:   %4 = tuple_element_addr %1 : $*(X, X), 1
+// CHECK:   copy_addr [take] %4 to [init] %2 : $*X
+// CHECK: } // end sil function 'test5'
+
+sil @test5 : $@convention(thin) (@in (X, X)) -> () {
+bb0(%0 : $*(X, X)):
+  %1 = alloc_stack $X
+  %2 = load %0 : $*(X, X)
+  %4 = tuple_extract %2 : $(X, X), 1
+  store %4 to %1 : $*X
+  dealloc_stack %1 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test6 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   %0 = alloc_stack $Y
+// CHECK:   %1 = alloc_stack $X
+// CHECK:   %2 = alloc_stack $X
+// CHECK:   %3 = alloc_stack $Y
+// CHECK:   copy_addr [take] %2 to [init] %1 : $*X
+// CHECK:   %5 = struct_element_addr %0 : $*Y, #Y.y1
+// CHECK:   copy_addr [take] %1 to [init] %5 : $*X
+// CHECK:   %7 = struct_element_addr %0 : $*Y, #Y.y2
+// CHECK:   copy_addr [take] %1 to [init] %7 : $*X
+// CHECK:   copy_addr [take] %0 to [init] %3 : $*Y
+// CHECK: } // end sil function 'test6'
+
+sil @test6 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $X
+  %1 = alloc_stack $Y
+  %2 = load %0 : $*X
+  %3 = struct $Y (%2 : $X , %2 : $X)
+  store %3 to %1 : $*Y
+  dealloc_stack %1 : $*Y
+  dealloc_stack %0 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test7 : $@convention(thin) (@in Y) -> () {
+// CHECK: bb0(%0 : $*Y):
+// CHECK:   %1 = alloc_stack $Y
+// CHECK:   %2 = alloc_stack $X
+// CHECK:   copy_addr [take] %0 to [init] %1 : $*Y
+// CHECK:   %4 = struct_element_addr %1 : $*Y, #Y.y1
+// CHECK:   copy_addr [take] %4 to [init] %2 : $*X
+// CHECK: } // end sil function 'test7'
+
+sil @test7 : $@convention(thin) (@in Y) -> () {
+bb0(%0 : $*Y):
+  %1 = alloc_stack $X
+  %2 = load %0 : $*Y
+  %4 = struct_extract %2 : $Y, #Y.y1
+  store %4 to %1 : $*X
+  dealloc_stack %1 : $*X
+  %t = tuple ()
+  return %t : $()
+}
