@@ -620,7 +620,8 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
 }
 
 void DistributedAccessor::emit() {
-  auto *actor = getDistributedActorOf(Target);
+  assert(getDistributedActorOf(Target) &&
+         "target of distributed accessor must be a distributed actor");
   auto targetTy = Target->getLoweredFunctionType();
   SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
@@ -663,6 +664,7 @@ void DistributedAccessor::emit() {
   // Witness table for decoder conformance to DistributedTargetInvocationDecoder
   auto *decoderProtocolWitness = params.claimNext();
   auto *distributedActorWitness = params.claimNext();
+  (void)distributedActorWitness;
 
   // Preliminary: Setup async context for this accessor.
   {
