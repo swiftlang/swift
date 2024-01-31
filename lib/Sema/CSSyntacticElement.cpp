@@ -1115,8 +1115,8 @@ private:
 
       for (auto node : braceStmt->getElements()) {
         if (auto expr = node.dyn_cast<Expr *>()) {
-          auto generatedExpr = cs.generateConstraints(
-            expr, context.getAsDeclContext(), /*isInputExpression=*/false);
+          auto generatedExpr =
+              cs.generateConstraints(expr, context.getAsDeclContext());
           if (!generatedExpr) {
             hadError = true;
           }
@@ -1250,8 +1250,7 @@ private:
       auto *expr = returnStmt->getResult();
       assert(expr && "single expression closure without expression?");
 
-      expr = cs.generateConstraints(expr, context.getAsDeclContext(),
-                                    /*isInputExpression=*/false);
+      expr = cs.generateConstraints(expr, context.getAsDeclContext());
       if (!expr) {
         hadError = true;
         return;

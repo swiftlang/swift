@@ -4959,10 +4959,8 @@ bool ConstraintSystem::generateConstraints(
   }
 }
 
-Expr *ConstraintSystem::generateConstraints(
-    Expr *expr, DeclContext *dc, bool isInputExpression) {
-  if (isInputExpression)
-    InputExprs.insert(expr);
+Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
+  InputExprs.insert(expr);
   return generateConstraintsFor(*this, expr, dc);
 }
 
