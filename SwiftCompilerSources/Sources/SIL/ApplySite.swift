@@ -69,10 +69,11 @@ public struct ApplyOperandConventions : Collection {
     guard let argIdx = calleeArgumentIndex(of: operand) else {
       return nil
     }
-    guard argIdx >= calleeArgumentConventions.firstParameterIndex else {
+    let firstParamIdx = calleeArgumentConventions.firstParameterIndex
+    guard argIdx >= firstParamIdx else {
       return nil
     }
-    return calleeArgumentConventions.originalParameters[argIdx]
+    return calleeArgumentConventions.originalParameters[argIdx - firstParamIdx]
   }
 
   public var firstParameterOperandIndex: Int {
