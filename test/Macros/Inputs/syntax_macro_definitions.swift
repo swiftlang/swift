@@ -2284,3 +2284,35 @@ public struct WrapperMacro: PeerMacro {
     []
   }
 }
+
+public struct AddDeinit: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      deinit {
+        print("deinit was called")
+      }
+      """
+    ]
+  }
+}
+
+public struct AddSubscript: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      """
+      subscript(unchecked index: Int) -> String {
+        return "\\(index)"
+      }
+      """
+    ]
+  }
+}
