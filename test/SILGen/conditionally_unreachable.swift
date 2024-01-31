@@ -3,6 +3,7 @@
 // RUN: %target-swift-emit-sil -O -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
 // RUN: %target-swift-emit-sil -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
 // RUN: %target-swift-emit-sil -O -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
+// RUN: %target-swift-emit-sil -assert-config ReleaseWithBoundsSafety -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELWITHBOUNDSSAFETY %s
 
 import Swift
 
@@ -35,3 +36,26 @@ func condUnreachable() {
 // RELEASE-NOT:     return
 // RELEASE-NOT:     builtin
 // RELEASE:         {{ unreachable}}
+
+
+@_silgen_name("bar") func bar()
+
+// RELEASE-LABEL: sil hidden @$s25conditionally_unreachable14doBoundsChecksyyF : $@convention(thin) () -> ()
+// RELEASE-NOT:     cond_br
+// RELEASE-NOT:     function_ref @bar
+// RELEASE-NOT:     return
+// RELEASE-NOT:     builtin
+// RELEASE: unreachable
+
+// RELWITHBOUNDSSAFETY-LABEL: sil hidden @$s25conditionally_unreachable14doBoundsChecksyyF : $@convention(thin) () -> ()
+// RELWITHBOUNDSSAFETY-NOT: cond_br
+// RELWITHBOUNDSSAFETY-NOT: builtin
+// RELWITHBOUNDSSAFETY: function_ref @bar : $@convention(thin) () -> ()
+// RELWITHBOUNDSSAFETY: return
+func doBoundsChecks() {
+  if Int32(Builtin.assert_configuration()) == 3 {
+    bar()
+  } else {
+    Builtin.conditionallyUnreachable()
+  }
+}

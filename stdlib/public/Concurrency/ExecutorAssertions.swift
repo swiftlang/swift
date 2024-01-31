@@ -53,7 +53,8 @@ extension SerialExecutor {
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
-    guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
+    guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() ||
+        _isReleaseAssertWithBoundsSafetyConfiguration() else {
       return
     }
 
@@ -102,7 +103,8 @@ extension Actor {
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
-    guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
+    guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() ||
+        _isReleaseAssertWithBoundsSafetyConfiguration() else {
       return
     }
 

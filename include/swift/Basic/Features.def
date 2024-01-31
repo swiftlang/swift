@@ -129,6 +129,8 @@ UPCOMING_FEATURE(FullTypedThrows, 413, 6)
 
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
 
+EXPERIMENTAL_FEATURE(UnsafePointerBoundsSafety, true)
+
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)

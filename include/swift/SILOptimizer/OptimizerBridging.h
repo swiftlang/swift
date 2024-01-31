@@ -298,7 +298,8 @@ struct BridgedPassContext {
   enum class AssertConfiguration {
     Debug = 0,
     Release = 1,
-    Unchecked = 2
+    Unchecked = 2,
+    ReleaseWithBoundsSafety = 3,
   };
 
   BRIDGED_INLINE bool enableStackProtection() const;

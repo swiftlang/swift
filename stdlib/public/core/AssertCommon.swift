@@ -26,6 +26,7 @@ func _isDebugAssertConfiguration() -> Bool {
   // 0: Debug
   // 1: Release
   // 2: Fast
+  // 3: Release w/ UnsafePointerBoundsSafety
   return Int32(Builtin.assert_configuration()) == 0
 }
 
@@ -36,7 +37,20 @@ func _isReleaseAssertConfiguration() -> Bool {
   // 0: Debug
   // 1: Release
   // 2: Fast
+  // 3: Release w/ UnsafePointerBoundsSafety
   return Int32(Builtin.assert_configuration()) == 1
+}
+
+@_transparent
+@_alwaysEmitIntoClient
+public // @testable, used in _Concurrency executor preconditions
+func _isReleaseAssertWithBoundsSafetyConfiguration() -> Bool {
+  // The values for the assert_configuration call are:
+  // 0: Debug
+  // 1: Release
+  // 2: Fast
+  // 3: Release w/ UnsafePointerBoundsSafety
+  return Int32(Builtin.assert_configuration()) == 3
 }
 
 @_transparent
@@ -46,6 +60,7 @@ func _isFastAssertConfiguration() -> Bool {
   // 0: Debug
   // 1: Release
   // 2: Fast
+  // 3: Release w/ UnsafePointerBoundsSafety
   return Int32(Builtin.assert_configuration()) == 2
 }
 

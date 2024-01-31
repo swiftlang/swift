@@ -1055,7 +1055,7 @@ def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
 def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Specify the assert_configuration replacement. "
-           "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
+           "Possible values are Debug, Release, Unchecked, ReleaseWithBoundsSafety, DisableReplacement.">;
 
 // Code formatting options
 
