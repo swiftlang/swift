@@ -1731,8 +1731,6 @@ function Build-Installer($Arch) {
     BundleFlavor = "offline";
     DEVTOOLS_ROOT = "$($Arch.ToolchainInstallRoot)\";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
-    INCLUDE_SWIFT_FORMAT = "true";
-    SWIFT_FORMAT_BUILD = "$($Arch.BinaryCache)\swift-format\release";
     INCLUDE_SWIFT_INSPECT = "true";
     SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
     INCLUDE_SWIFT_DOCC = "true";
