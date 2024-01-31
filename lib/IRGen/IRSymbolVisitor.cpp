@@ -162,6 +162,10 @@ public:
     Visitor.addObjCInterface(CD);
   }
 
+  void addObjCMetaclass(ClassDecl *CD) override {
+    addLinkEntity(LinkEntity::forObjCMetaclass(CD));
+  }
+
   void addObjCMethod(AbstractFunctionDecl *AFD) override {
     // Pass through; Obj-C methods don't have linkable symbols.
     Visitor.addObjCMethod(AFD);

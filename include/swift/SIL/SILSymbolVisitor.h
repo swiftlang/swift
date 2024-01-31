@@ -109,6 +109,7 @@ public:
   virtual void addMethodLookupFunction(ClassDecl *CD) {}
   virtual void addNominalTypeDescriptor(NominalTypeDecl *NTD) {}
   virtual void addObjCInterface(ClassDecl *CD) {}
+  virtual void addObjCMetaclass(ClassDecl *CD) {}
   virtual void addObjCMethod(AbstractFunctionDecl *AFD) {}
   virtual void addObjCResilientClassStub(ClassDecl *CD) {}
   virtual void addOpaqueTypeDescriptor(OpaqueTypeDecl *OTD) {}

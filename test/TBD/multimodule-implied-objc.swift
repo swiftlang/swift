@@ -23,10 +23,9 @@
 
 // RUN: %validate-json %t/client.tbd | %FileCheck %s
 
-// CHECK: "objc_class": 
-// CHECK: "_TtCO6client11extendedAPI6Square"
-// CHECK-NOT: _OBJC_CLASS_$
-// CHECK-NOT: _OBJC_METACLASS_$
+// CHECK: "_OBJC_METACLASS_$__TtCO6client11extendedAPI6Square"
+// CHECK-NOT: "objc_class"
+// CHECK-NOT: _OBJC_C
 
 //--- module.modulemap
 module IndirectMixedDependency {
