@@ -4128,9 +4128,9 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Performs some pre-checking of a function body, including inserting and
-/// removing implict returns where needed. This request is currently
-/// side-effectful, as it will mutate the body in-place.
+/// Performs some pre-checking of a function body, including inserting implicit
+/// returns where needed. This request is currently side-effectful, as it will
+/// mutate the body in-place.
 ///
 /// Note this request is currently uncached as:
 /// - The result will ultimately be cached by TypeCheckFunctionBodyRequest.
@@ -4150,6 +4150,23 @@ private:
   friend SimpleRequest;
 
   BraceStmt *evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
+};
+
+/// Performs some pre-checking of a closure's body, including inserting implicit
+/// returns where needed. This request is currently side-effectful, as it will
+/// mutate the body in-place. Like PreCheckFunctionBodyRequest, it is currently
+/// uncached.
+class PreCheckClosureBodyRequest
+    : public SimpleRequest<PreCheckClosureBodyRequest,
+                           BraceStmt *(ClosureExpr *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  BraceStmt *evaluate(Evaluator &evaluator, ClosureExpr *closure) const;
 };
 
 /// The result of the query for whether a statement can produce a single value.

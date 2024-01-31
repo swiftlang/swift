@@ -28,6 +28,9 @@ CompletionContextFinder::CompletionContextFinder(
 ASTWalker::PreWalkResult<Expr *>
 CompletionContextFinder::walkToExprPre(Expr *E) {
   if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+    // NOTE: We're querying hasSingleExpressionBody before the single-expression
+    // body transform has happened, so this won't take e.g SingleValueStmtExprs
+    // into account.
     Contexts.push_back({closure->hasSingleExpressionBody()
                             ? ContextKind::SingleStmtClosure
                             : ContextKind::MultiStmtClosure,

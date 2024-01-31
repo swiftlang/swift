@@ -464,7 +464,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+2+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+2+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -491,9 +491,6 @@ protected:
 
     /// Whether the function body throws.
     Throws : 1,
-
-    /// Whether this member's body consists of a single expression.
-    HasSingleExpressionBody : 1,
 
     /// Whether peeking into this function detected nested type declarations.
     /// This is set when skipping over the decl at parsing.
@@ -7177,7 +7174,6 @@ protected:
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Async = Async;
     Bits.AbstractFunctionDecl.Throws = Throws;
-    Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
     Bits.AbstractFunctionDecl.HasNestedTypeDeclarations = false;
     Bits.AbstractFunctionDecl.DistributedThunk = false;
   }
@@ -7211,17 +7207,6 @@ protected:
   }
 
 public:
-  void setHasSingleExpressionBody(bool Has = true) { 
-    Bits.AbstractFunctionDecl.HasSingleExpressionBody = Has;
-  }
-
-  bool hasSingleExpressionBody() const {
-    return Bits.AbstractFunctionDecl.HasSingleExpressionBody;
-  }
-
-  Expr *getSingleExpressionBody() const;
-  void setSingleExpressionBody(Expr *NewBody);
-
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getName().isSpecial() && "Cannot get string for special names");

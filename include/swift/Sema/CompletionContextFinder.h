@@ -73,12 +73,6 @@ public:
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
-  /// Check whether code completion expression is located inside of a
-  /// multi-statement closure.
-  bool locatedInMultiStmtClosure() const {
-    return hasContext(ContextKind::MultiStmtClosure);
-  }
-
   bool locatedInStringInterpolation() const {
     return hasContext(ContextKind::StringInterpolation);
   }

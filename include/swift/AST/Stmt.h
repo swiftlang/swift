@@ -99,6 +99,12 @@ protected:
     : NumPadBits,
     CaseCount : 32
   );
+    
+  SWIFT_INLINE_BITFIELD(ReturnStmt, Stmt, 1,
+    /// Whether the result is an implied return, e.g for an implicit single
+    /// expression return.
+    IsImplied : 1
+  );
 
   SWIFT_INLINE_BITFIELD_FULL(YieldStmt, Stmt, 32,
     : NumPadBits,
@@ -244,7 +250,9 @@ class ReturnStmt : public Stmt {
 
   ReturnStmt(SourceLoc returnLoc, Expr *result, bool isImplicit)
       : Stmt(StmtKind::Return, isImplicit), ReturnLoc(returnLoc),
-        Result(result) {}
+        Result(result) {
+    Bits.ReturnStmt.IsImplied = false;
+  }
 
 public:
   static ReturnStmt *createParsed(ASTContext &ctx, SourceLoc returnLoc,
@@ -261,10 +269,24 @@ public:
     return createImplicit(ctx, SourceLoc(), result);
   }
 
+  /// Create an implicit implied ReturnStmt for a single expression body.
+  static ReturnStmt *forSingleExprBody(ASTContext &ctx, Expr *result) {
+    assert(result && "Result must be present to be implied");
+    auto *RS = createImplicit(ctx, result);
+    RS->Bits.ReturnStmt.IsImplied = true;
+    return RS;
+  }
+
   SourceLoc getReturnLoc() const { return ReturnLoc; }
 
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
+
+  /// Whether the result is an implied return, e.g for an implicit single
+  /// expression return.
+  bool isImplied() const {
+    return Bits.ReturnStmt.IsImplied;
+  }
 
   bool hasResult() const { return Result != 0; }
   Expr *getResult() const {

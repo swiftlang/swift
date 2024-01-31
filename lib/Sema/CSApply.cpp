@@ -7491,6 +7491,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     break;
   }
 
+  // Uninhabited types can be coerced to any other type via an UnreachableExpr.
+  if (fromType->isUninhabited())
+    return cs.cacheType(UnreachableExpr::create(ctx, expr, toType));
+
   // "Catch all" coercions.
   auto desugaredToType = toType->getDesugaredType();
   switch (desugaredToType->getKind()) {
@@ -9369,7 +9373,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_ExprPattern:
     case CTP_ForEachStmt:
     case CTP_ForEachSequence:
-    case CTP_ReturnSingleExpr:
+    case CTP_ImpliedReturnStmt:
     case CTP_YieldByValue:
     case CTP_YieldByReference:
     case CTP_ThrowStmt:
@@ -9574,10 +9578,9 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
       if (target.isOptionalSomePatternInit())
         return false;
 
-      if (solution.getResolvedType(resultExpr)->isUninhabited() ||
-          solution.simplifyType(convertType)->isVoid()) {
+      if (solution.simplifyType(convertType)->isVoid()) {
         auto contextPurpose = cs.getContextualTypePurpose(target.getAsExpr());
-        if (contextPurpose == CTP_ReturnSingleExpr ||
+        if (contextPurpose == CTP_ImpliedReturnStmt ||
             contextPurpose == CTP_SingleValueStmtBranch) {
           return false;
         }
@@ -9603,7 +9606,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
           locator = cs.getConstraintLocator(
               closure, LocatorPathElt::ClosureBody(
-                           /*hasReturn=*/!returnStmt->isImplicit()));
+                           /*hasImpliedReturn*/ returnStmt->isImplied()));
         } else {
           locator = cs.getConstraintLocator(
               expr, LocatorPathElt::ContextualType(contextualTypePurpose));

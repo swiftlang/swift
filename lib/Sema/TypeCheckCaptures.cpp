@@ -499,6 +499,10 @@ public:
     if (isa<DiscardAssignmentExpr>(E))
       return false;
 
+    // Unreachables are a no-op.
+    if (isa<UnreachableExpr>(E))
+      return false;
+
     // Opening an @objc existential or metatype is a no-op.
     if (auto open = dyn_cast<OpenExistentialExpr>(E))
       return (!open->getSubExpr()->getType()->isObjCExistentialType()

@@ -455,6 +455,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
+  PASS_THROUGH_REFERENCE(Unreachable, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -820,6 +821,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
   case ExprKind::UnderlyingToOpaque:
+  case ExprKind::Unreachable:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -1000,6 +1002,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
   case ExprKind::UnderlyingToOpaque:
+  case ExprKind::Unreachable:
   case ExprKind::DifferentiableFunction:
   case ExprKind::LinearFunction:
   case ExprKind::DifferentiableFunctionExtractOriginal:
@@ -2034,18 +2037,28 @@ swift::__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE) {
     return (NODE)->getStartLoc();                 \
   }
 
-FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
+FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body)
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getLastElement();
-  if (auto stmt = body.dyn_cast<Stmt *>()) {
-    if (auto braceStmt = dyn_cast<BraceStmt>(stmt))
-      return braceStmt->getLastElement().get<Expr *>();
+  auto *body = getBody();
+  if (!body)
+    return nullptr;
 
-    return cast<ReturnStmt>(stmt)->getResult();
-  }
-  return body.get<Expr *>();
+  // If we have a lone expression, use it.
+  if (auto *E = body->getSingleActiveExpression())
+    return E;
+
+  // Otherwise we must have a return of an expression.
+  auto elt = body->getSingleActiveStatement();
+  if (!elt)
+    return nullptr;
+
+  // Any lone ReturnStmt, even explicit, is treated as a single expression body.
+  auto *RS = dyn_cast<ReturnStmt>(elt);
+  if (!RS || !RS->hasResult())
+    return nullptr;
+
+  return RS->getResult();
 }
 
 bool ClosureExpr::hasEmptyBody() const {

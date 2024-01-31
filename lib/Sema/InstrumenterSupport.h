@@ -82,7 +82,7 @@ protected:
         if (B) {
           const ParameterList *PL = CE->getParameters();
           BraceStmt *NB = I.transformBraceStmt(B, PL);
-          CE->setBody(NB, false);
+          CE->setBody(NB);
           // just with the entry and exit logging this is going to
           // be more than a single expression!
         }

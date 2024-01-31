@@ -3050,35 +3050,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
     closure->setHasAnonymousClosureVars();
   }
 
-  auto *BS = BraceStmt::create(Context, leftBrace, bodyElements, rightBrace);
-
-  // If the body consists of a single expression, turn it into a return
-  // statement.
-  bool hasSingleExpressionBody = false;
-  if (!missingRBrace) {
-    if (auto Element = BS->getSingleActiveElement()) {
-      if (Element.is<Stmt *>()) {
-        if (auto returnStmt = dyn_cast<ReturnStmt>(Element.get<Stmt *>())) {
-          hasSingleExpressionBody = true;
-          if (!returnStmt->hasResult()) {
-            auto returnExpr = TupleExpr::createEmpty(Context,
-                                                     SourceLoc(),
-                                                     SourceLoc(),
-                                                     /*implicit*/true);
-            returnStmt->setResult(returnExpr);
-          }
-        }
-      } else if (Element.is<Expr *>()) {
-        // Create the wrapping return.
-        hasSingleExpressionBody = true;
-        auto returnExpr = Element.get<Expr*>();
-        BS->setLastElement(ReturnStmt::createImplicit(Context, returnExpr));
-      }
-    }
-  }
-
   // Set the body of the closure.
-  closure->setBody(BS, hasSingleExpressionBody);
+  auto *BS = BraceStmt::create(Context, leftBrace, bodyElements, rightBrace);
+  closure->setBody(BS);
 
   // If the closure includes a capture list, create an AST node for it as well.
   Expr *result = closure;

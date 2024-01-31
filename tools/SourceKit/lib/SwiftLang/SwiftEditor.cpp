@@ -1741,9 +1741,19 @@ private:
           return RS->isImplicit() && RS->getSourceRange().Start == TargetLoc;
 
         if (auto BS = dyn_cast<BraceStmt>(S)) {
-          if (BS->getNumElements() == 1) {
-            if (auto innerS = BS->getFirstElement().dyn_cast<Stmt *>())
-              return isImplicitReturnBody(innerS);
+          if (BS->getNumElements() != 1)
+            return false;
+
+          if (auto *innerS = BS->getSingleActiveStatement())
+            return isImplicitReturnBody(innerS);
+
+          // Before pre-checking, the implicit return will not have been
+          // inserted. Look for a single expression body in a closure.
+          if (auto *ParentE = getWalker().Parent.getAsExpr()) {
+            if (isa<ClosureExpr>(ParentE)) {
+              if (auto *innerE = BS->getSingleActiveExpression())
+                return innerE->getStartLoc() == TargetLoc;
+            }
           }
         }
 
@@ -1827,17 +1837,16 @@ private:
       auto &outParam = outParams.back();
 
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        if (CE->hasSingleExpressionBody() &&
-            CE->getSingleExpressionBody()->getStartLoc() ==
-                targetPlaceholderLoc) {
-          targetPlaceholderIndex = outParams.size() - 1;
-          if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(
-                  CE->getSingleExpressionBody())) {
-            outParam.isWrappedWithBraces = true;
-            ClosureInfo info;
-            if (scanClosureType(PHE, info))
-              outParam.placeholderClosure = info;
-            continue;
+        if (auto *E = CE->getSingleExpressionBody()) {
+          if (E->getStartLoc() == targetPlaceholderLoc) {
+            targetPlaceholderIndex = outParams.size() - 1;
+            if (auto *PHE = dyn_cast<EditorPlaceholderExpr>(E)) {
+              outParam.isWrappedWithBraces = true;
+              ClosureInfo info;
+              if (scanClosureType(PHE, info))
+                outParam.placeholderClosure = info;
+              continue;
+            }
           }
         }
         // else...

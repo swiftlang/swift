@@ -94,18 +94,6 @@ public:
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
   }
 
-  bool hasSingleExpressionBody() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasSingleExpressionBody();
-    return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
-  }
-
-  Expr *getSingleExpressionBody() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getSingleExpressionBody();
-    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
-  }
-
   ParameterList *getParameters() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getParameters();
@@ -152,16 +140,15 @@ public:
     return cast<AutoClosureExpr>(ACE)->getBody();
   }
 
-  void setParsedBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setParsedBody(BraceStmt *stmt) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::Parsed);
-      AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }
 
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setBody(stmt, isSingleExpression);
+      CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::ReadyForTypeChecking);
       return;
     }
@@ -169,16 +156,15 @@ public:
     llvm_unreachable("autoclosures don't have statement bodies");
   }
 
-  void setTypecheckedBody(BraceStmt *stmt, bool isSingleExpression) {
+  void setTypecheckedBody(BraceStmt *stmt) {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       AFD->setBody(stmt, AbstractFunctionDecl::BodyKind::TypeChecked);
-      AFD->setHasSingleExpressionBody(isSingleExpression);
       return;
     }
 
     auto *ACE = TheFunction.get<AbstractClosureExpr *>();
     if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-      CE->setBody(stmt, isSingleExpression);
+      CE->setBody(stmt);
       CE->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
       return;
     }

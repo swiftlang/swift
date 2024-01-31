@@ -67,6 +67,8 @@ func test7() {
 
 func test8(_: Int) {}
 
+func test9() -> Int { 0 }
+
 func testVars() {
   var a = 0
   var b: Int = 0
@@ -74,9 +76,8 @@ func testVars() {
   var e, f: Int, g, h, i: String
   let j: Int = 0, k: String = ""
 
-  // FIXME: We don't yet handle single expression bodies.
-  var l: Int { return 0 }
-  var m: Int { get { return 0 } }
+  var l: Int { 0 }
+  var m: Int { get { 0 } }
   var n: Int {
     get { return m }
     set {}
@@ -113,9 +114,8 @@ struct TestVars {
   var e, f: Int, g, h, i: String
   let j: Int = 0, k: String = ""
 
-  // FIXME: We don't yet handle single expression bodies.
-  var l: Int { return 0 }
-  var m: Int { get { return 0 } }
+  var l: Int { 0 }
+  var m: Int { get { 0 } }
   var n: Int {
     get { return m }
     set {}
@@ -151,8 +151,7 @@ extension TestVars {
 
 struct TestSubscripts {
   subscript(x: Int) -> Int {
-    // FIXME: We don't yet handle single expression bodies.
-    return 0
+    0
   }
   subscript(y x: Int) -> Int {
     get {
