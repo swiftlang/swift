@@ -261,6 +261,21 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isSerialized: Bool { bridged.isSerialized() }
   public var hasValidLinkageForFragileRef: Bool { bridged.hasValidLinkageForFragileRef() }
 
+  public enum ThunkKind {
+    case noThunk, thunk, reabstractionThunk, signatureOptimizedThunk
+  }
+
+  var thunkKind: ThunkKind {
+    switch bridged.isThunk() {
+    case .IsNotThunk:                return .noThunk
+    case .IsThunk:                   return .thunk
+    case .IsReabstractionThunk:      return .reabstractionThunk
+    case .IsSignatureOptimizedThunk: return .signatureOptimizedThunk
+    default:
+      fatalError()
+    }
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.

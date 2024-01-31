@@ -610,6 +610,16 @@ extension Function {
     bridged.setNeedStackProtection(needStackProtection)
   }
 
+  func set(thunkKind: ThunkKind, _ context: FunctionPassContext) {
+    context.notifyEffectsChanged()
+    switch thunkKind {
+    case .noThunk:                 bridged.setThunk(.IsNotThunk)
+    case .thunk:                   bridged.setThunk(.IsThunk)
+    case .reabstractionThunk:      bridged.setThunk(.IsReabstractionThunk)
+    case .signatureOptimizedThunk: bridged.setThunk(.IsSignatureOptimizedThunk)
+    }
+  }
+
   func fixStackNesting(_ context: FunctionPassContext) {
     context._bridged.fixStackNesting(bridged)
   }

@@ -499,6 +499,13 @@ struct BridgedFunction {
     AlwaysInline
   };
 
+  enum class ThunkKind {
+    IsNotThunk,
+    IsThunk,
+    IsReabstractionThunk,
+    IsSignatureOptimizedThunk
+  };
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILFunction * _Nonnull getFunction() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   SWIFT_IMPORT_UNSAFE BridgedOwnedString getDebugDescription() const;
@@ -531,6 +538,8 @@ struct BridgedFunction {
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;
   BRIDGED_INLINE bool isSerialized() const;
   BRIDGED_INLINE bool hasValidLinkageForFragileRef() const;
+  BRIDGED_INLINE ThunkKind isThunk() const;
+  BRIDGED_INLINE void setThunk(ThunkKind) const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedNominalTypeDecl decl) const;
