@@ -6192,7 +6192,7 @@ void SILGenFunction::emitApplyOfUnavailableCodeReached() {
   }
 
   auto declRef = SILDeclRef(fd);
-  if (fd->isBackDeployed(getASTContext())) {
+  if (SGM.requiresBackDeploymentThunk(fd, F.getResilienceExpansion())) {
     // The standard library entry point for the diagnostic function was
     // introduced in Swift 5.9 so we call the back deployment thunk in case this
     // code will execute on an older runtime.
