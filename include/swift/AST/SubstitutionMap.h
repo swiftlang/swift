@@ -101,24 +101,27 @@ public:
   /// Build an empty substitution map.
   SubstitutionMap() { }
 
-  /// Build an interface type substitution map for the given generic
-  /// signature and a vector of Substitutions that correspond to the
-  /// requirements of this generic signature.
+  /// The primitive constructor.
   static SubstitutionMap get(GenericSignature genericSig,
                              ArrayRef<Type> replacementTypes,
                              ArrayRef<ProtocolConformanceRef> conformances) {
     return SubstitutionMap(genericSig, replacementTypes, conformances);
   }
 
-  /// Build an interface type substitution map for the given generic
-  /// signature using the mapping in the given substitutions.
+  /// Translate a substitution map from one generic signature to another
+  /// "compatible" one. Think carefully before using this.
   static SubstitutionMap get(GenericSignature genericSig,
                              SubstitutionMap substitutions);
 
-  /// Build an interface type substitution map for the given generic signature
-  /// from a type substitution function and conformance lookup function.
+  /// General form that takes two callbacks.
   static SubstitutionMap get(GenericSignature genericSig,
                              TypeSubstitutionFn subs,
+                             LookupConformanceFn lookupConformance);
+
+  /// Takes an array of replacement types already in the correct form, together
+  /// with a conformance lookup callback.
+  static SubstitutionMap get(GenericSignature genericSig,
+                             ArrayRef<Type> replacementTypes,
                              LookupConformanceFn lookupConformance);
 
   /// Build a substitution map from the substitutions represented by
@@ -305,6 +308,15 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   subs.dump(OS);
   return OS;
 }
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an array of replacement types.
+struct QueryReplacementTypeArray {
+  GenericSignature sig;
+  ArrayRef<Type> types;
+
+  Type operator()(SubstitutableType *type) const;
+};
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c SubstitutionMap.

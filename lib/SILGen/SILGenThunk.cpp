@@ -493,7 +493,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
+                                         LookUpConformanceInModule(SwiftModule));
         SGF.emitApplyOfLibraryIntrinsic(loc, errorIntrinsic, subs,
                                         {continuation, nativeError},
                                         SGFContext());
@@ -591,7 +591,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
+                                         LookUpConformanceInModule(SwiftModule));
         SGF.emitApplyOfLibraryIntrinsic(loc, resumeIntrinsic, subs,
                                         {continuation, resumeArg},
                                         SGFContext());

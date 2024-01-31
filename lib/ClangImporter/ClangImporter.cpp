@@ -4804,12 +4804,14 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
     return selfRef;
   }(funcDecl);
 
+  auto *module = funcDecl->getParentModule();
+
   auto createCallToBuiltin = [&](Identifier name, ArrayRef<Type> substTypes,
                                  Argument arg) {
     auto builtinFn = cast<FuncDecl>(getBuiltinValueDecl(ctx, name));
     auto substMap =
         SubstitutionMap::get(builtinFn->getGenericSignature(), substTypes,
-                             ArrayRef<ProtocolConformanceRef>());
+                             LookUpConformanceInModule(module));
     ConcreteDeclRef builtinFnRef(builtinFn, substMap);
     auto builtinFnRefExpr =
         new (ctx) DeclRefExpr(builtinFnRef, DeclNameLoc(), /*implicit*/ true);
@@ -4852,7 +4854,8 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
 
   SubstitutionMap pointeeSubst = SubstitutionMap::get(
       ctx.getUnsafeMutablePointerDecl()->getGenericSignature(),
-      {baseStruct->getSelfInterfaceType()}, {});
+      {baseStruct->getSelfInterfaceType()},
+      LookUpConformanceInModule(module));
   VarDecl *pointeePropertyDecl =
       ctx.getPointerPointeePropertyDecl(PTK_UnsafeMutablePointer);
   auto pointeePropertyRefExpr = new (ctx) MemberRefExpr(

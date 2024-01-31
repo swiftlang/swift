@@ -32,6 +32,14 @@ using namespace swift;
 // Type::subst() and friends
 //===----------------------------------------------------------------------===//
 
+Type QueryReplacementTypeArray::operator()(SubstitutableType *type) const {
+  auto *genericParam = cast<GenericTypeParamType>(type);
+  auto genericParams = sig.getGenericParams();
+  auto replacementIndex =
+    GenericParamKey(genericParam).findIndexIn(genericParams);
+  return types[replacementIndex];
+}
+
 Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   auto key = type->getCanonicalType()->castTo<SubstitutableType>();
   auto known = substitutions.find(key);

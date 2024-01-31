@@ -953,7 +953,8 @@ ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
 SubstitutionMap
 ASTBuilder::createSubstitutionMap(BuiltGenericSignature sig,
                                   ArrayRef<BuiltType> replacements) {
-  return SubstitutionMap::get(sig, replacements, {});
+  return SubstitutionMap::get(sig, replacements,
+                              LookUpConformanceInSignature(sig.getPointer()));
 }
 
 Type ASTBuilder::subst(Type subject, const BuiltSubstitutionMap &Subs) const {

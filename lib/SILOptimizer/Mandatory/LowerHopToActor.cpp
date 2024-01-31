@@ -226,7 +226,8 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
         getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
       auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
       auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
-                                       {actorType}, {});
+                                       {actorType},
+                                       LookUpConformanceInModule(module));
       return B.createBuiltin(loc, builtinName, executorType, subs, {actor});
     }
 
