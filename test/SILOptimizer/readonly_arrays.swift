@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-future-triple -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -target %module-target-future -primary-file %s -O -sil-verify-all -disable-availability-checking -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
