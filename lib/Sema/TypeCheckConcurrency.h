@@ -387,6 +387,9 @@ struct SendableCheckContext {
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
 
+  llvm::Optional<DiagnosticBehavior>
+  preconcurrencyBehavior(Decl *decl) const;
+
   /// Whether we are in an explicit conformance to Sendable.
   bool isExplicitSendableConformance() const;
 };
@@ -434,13 +437,15 @@ bool diagnoseNonSendableTypes(
     return diagnoseNonSendableTypes(
         type, fromContext, derivedConformance, typeLoc,
         [&](Type specificType, DiagnosticBehavior behavior) {
+          auto preconcurrency =
+              fromContext.preconcurrencyBehavior(type->getAnyNominal());
 
-          if (behavior != DiagnosticBehavior::Ignore) {
-            ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-                .limitBehavior(behavior);
-          }
+          ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
+              .limitBehaviorUntilSwiftVersion(behavior, 6)
+              .limitBehaviorIf(preconcurrency);
 
-          return false;
+          return (behavior == DiagnosticBehavior::Ignore ||
+                  preconcurrency == DiagnosticBehavior::Ignore);
         });
 }
 

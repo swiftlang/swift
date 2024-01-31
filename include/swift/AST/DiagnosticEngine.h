@@ -575,6 +575,17 @@ namespace swift {
       return limitBehavior(limit);
     }
 
+    /// Conditionally limit the diagnostic behavior if the given \c limit
+    /// is not \c None.
+    InFlightDiagnostic &limitBehaviorIf(
+        llvm::Optional<DiagnosticBehavior> limit) {
+      if (!limit) {
+        return *this;
+      }
+
+      return limitBehavior(*limit);
+    }
+
     /// Limit the diagnostic behavior to \c limit until the specified
     /// version.
     ///
