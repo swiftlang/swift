@@ -631,13 +631,13 @@ importer::getNormalInvocationArguments(
       });
     }
 
-    // To support -apple-none triples, which are non-Darwin, we need to #define
-    // a few things that the Apple SDKs expect.
+    // To support -apple-none, -apple-none-macho, -unknown-none-wasm triples.
     if (triple.getVendor() == llvm::Triple::VendorType::Apple) {
-      invocationArgStrs.insert(invocationArgStrs.end(),
-                               {"-D__APPLE__", "-D__MACH__"});
+      invocationArgStrs.insert(invocationArgStrs.end(), {"-D__APPLE__"});
     }
-
+    if (triple.isOSBinFormatMachO()) {
+      invocationArgStrs.insert(invocationArgStrs.end(), {"-D__MACH__"});
+    }
     if (triple.isOSBinFormatWasm()) {
       invocationArgStrs.insert(invocationArgStrs.end(), {"-D__wasi__"});
     }
