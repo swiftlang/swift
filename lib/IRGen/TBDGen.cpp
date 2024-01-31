@@ -61,7 +61,7 @@ using namespace swift::irgen;
 using namespace swift::tbdgen;
 using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
-using SymbolKind = llvm::MachO::SymbolKind;
+using EncodeKind = llvm::MachO::EncodeKind;
 using SymbolFlags = llvm::MachO::SymbolFlags;
 
 TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
@@ -69,13 +69,13 @@ TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
     : TBDGenVisitor(desc.getTarget(), desc.getDataLayoutString(),
                     desc.getParentModule(), desc.getOptions(), recorder) {}
 
-void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
+void TBDGenVisitor::addSymbolInternal(StringRef name, EncodeKind kind,
                                       SymbolSource source, SymbolFlags flags) {
   if (!source.isLinkerDirective() && Opts.LinkerDirectivesOnly)
     return;
 
 #ifndef NDEBUG
-  if (kind == SymbolKind::GlobalSymbol) {
+  if (kind == EncodeKind::GlobalSymbol) {
     if (!DuplicateSymbolChecker.insert(name).second) {
       llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
       assert(false && "TBDGen symbol appears twice");
@@ -291,9 +291,9 @@ static llvm::VersionTuple calculateLdPreviousVersionStart(ASTContext &ctx,
   return introVer;
 }
 
-void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
-                                                llvm::MachO::SymbolKind kind) {
-  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
+    StringRef name, llvm::MachO::EncodeKind kind) {
+  if (kind != llvm::MachO::EncodeKind::GlobalSymbol)
     return;
   if(DeclStack.empty())
     return;
@@ -341,14 +341,14 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(StringRef name,
     OS << verStart.getMajor() << "." << getMinor(verStart.getMinor()) << "$";
     OS << Ver.Version.getMajor() << "." << getMinor(Ver.Version.getMinor()) << "$";
     OS << name << "$";
-    addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
+    addSymbolInternal(OS.str(), EncodeKind::GlobalSymbol,
                       SymbolSource::forLinkerDirective(), SymbolFlags::Data);
   }
 }
 
-void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
-                                                    llvm::MachO::SymbolKind kind) {
-  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(
+    StringRef name, llvm::MachO::EncodeKind kind) {
+  if (kind != llvm::MachO::EncodeKind::GlobalSymbol)
     return;
   if (DeclStack.empty())
     return;
@@ -387,19 +387,19 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
       OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
-      addSymbolInternal(OS.str(), SymbolKind::GlobalSymbol,
+      addSymbolInternal(OS.str(), EncodeKind::GlobalSymbol,
                         SymbolSource::forLinkerDirective(), SymbolFlags::Data);
     }
   }
 }
 
 void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
-                              SymbolFlags flags, SymbolKind kind) {
+                              SymbolFlags flags, EncodeKind kind) {
   // The linker expects to see mangled symbol names in TBD files,
   // except when being passed objective c classes,
   // so make sure to mangle before inserting the symbol.
   SmallString<32> mangled;
-  if (kind == SymbolKind::ObjectiveCClass) {
+  if (kind == EncodeKind::ObjectiveCClass) {
     mangled = name;
   } else {
     if (!DataLayout)
@@ -461,7 +461,7 @@ void TBDGenVisitor::addObjCInterface(ClassDecl *CD) {
   // FIXME: We ought to have a symbol source for this.
   SmallString<128> buffer;
   addSymbol(CD->getObjCRuntimeName(buffer), SymbolSource::forUnknown(),
-            SymbolFlags::Data, SymbolKind::ObjectiveCClass);
+            SymbolFlags::Data, EncodeKind::ObjectiveCClass);
   recorder.addObjCInterface(CD);
 }
 
@@ -619,7 +619,7 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
     targets.push_back(targetVar);
   }
 
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+  auto addSymbol = [&](StringRef symbol, EncodeKind kind, SymbolSource source,
                        Decl *decl, SymbolFlags flags) {
     file.addSymbol(kind, symbol, targets, flags);
   };
@@ -633,12 +633,12 @@ std::vector<std::string>
 PublicSymbolsRequest::evaluate(Evaluator &evaluator,
                                TBDGenDescriptor desc) const {
   std::vector<std::string> symbols;
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+  auto addSymbol = [&](StringRef symbol, EncodeKind kind, SymbolSource source,
                        Decl *decl, SymbolFlags flags) {
-    if (kind == SymbolKind::GlobalSymbol)
+    if (kind == EncodeKind::GlobalSymbol)
       symbols.push_back(symbol.str());
     // TextAPI ObjC Class Kinds represents two symbols.
-    else if (kind == SymbolKind::ObjectiveCClass) {
+    else if (kind == EncodeKind::ObjectiveCClass) {
       symbols.push_back((llvm::MachO::ObjC2ClassNamePrefix + symbol).str());
       symbols.push_back((llvm::MachO::ObjC2MetaClassNamePrefix + symbol).str());
     }
@@ -681,9 +681,9 @@ public:
   }
   ~APIGenRecorder() {}
 
-  void addSymbol(StringRef symbol, SymbolKind kind, SymbolSource source,
+  void addSymbol(StringRef symbol, EncodeKind kind, SymbolSource source,
                  Decl *decl, SymbolFlags flags) override {
-    if (kind != SymbolKind::GlobalSymbol)
+    if (kind != EncodeKind::GlobalSymbol)
       return;
 
     apigen::APIAvailability availability;
@@ -885,7 +885,7 @@ SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
   auto &Ctx = desc.getParentModule()->getASTContext();
   auto *SymbolSources = Ctx.Allocate<SymbolSourceMap>();
 
-  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source,
+  auto addSymbol = [=](StringRef symbol, EncodeKind kind, SymbolSource source,
                        Decl *decl, SymbolFlags flags) {
     SymbolSources->insert({symbol, source});
   };
