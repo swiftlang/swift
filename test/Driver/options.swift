@@ -135,6 +135,13 @@
 // RUN: %swift_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 // RUN: %swiftc_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
 
+// RUN: %swiftc_driver -### -g -dwarf-fission -o dwarf-fission.o %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION %s
+// DWARF_FISSION: -dwarf-fission-path {{.*}}options{{.*}}.dwo
+
+// RUN: %swiftc_driver -### -g -dwarf-fission -emit-object -module-name test -output-file-map %S/Inputs/fission-ofm.json %S/Inputs/main.swift %S/Inputs/lib.swift %s 2>&1 | %FileCheck -check-prefix DWARF_FISSION_MULTI %s
+// DWARF_FISSION_MULTI: -primary-file {{.*}}main.swift {{.*}} -dwarf-fission-path {{.*}}main{{.*}}.dwo {{.*}}
+// DWARF_FISSION_MULTI: -primary-file {{.*}}lib.swift {{.*}} -dwarf-fission-path {{.*}}lib{{.*}}.dwo {{.*}}
+
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s

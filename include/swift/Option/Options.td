@@ -1037,6 +1037,13 @@ def dwarf_version : Joined<["-"], "dwarf-version=">,
   Flags<[FrontendOption]>,
   HelpText<"DWARF debug info version to produce if requested">,
   MetaVarName<"<version>">;
+def dwarf_fission : Flag<["-"], "dwarf-fission">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit debug info as split-DWARF (Fission) in a separate .dwo file">;
+def dwarf_fission_path : Separate<["-"], "dwarf-fission-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
+  HelpText<"Output debug info as split-DWARF (Fission) .dwo file to <path>">;
 
 def prefix_serialized_debugging_options : Flag<["-"], "prefix-serialized-debugging-options">,
   Flags<[FrontendOption]>,

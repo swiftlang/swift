@@ -76,6 +76,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -133,6 +134,9 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   // Set option to select the CASBackendMode.
   TargetOpts.MCOptions.CASObjMode = Opts.CASObjMode;
+
+  // Set option to split debug-info into a separate .dwo file.
+  TargetOpts.MCOptions.SplitDwarfFile = Opts.DWOPath;
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
@@ -620,16 +624,40 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     }
   }
 
+  llvm::Optional<llvm::vfs::OutputFile> DWOFile;
+  SWIFT_DEFER {
+    if (!DWOFile)
+      return;
+    if (auto E = DWOFile->keep()) {
+      diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_closing_output,
+                   Opts.DWOPath, toString(std::move(E)));
+    }
+  };
+  if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
+      !Opts.DWOPath.empty()) {
+    // Try to open the output file.  Clobbering an existing file is fine.
+    // Open in binary mode if we're doing binary output.
+    llvm::vfs::OutputConfig Config;
+    if (auto Err = Backend.createFile(Opts.DWOPath, Config)
+                       .moveInto(DWOFile)) {
+      diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
+                   Opts.DWOPath, toString(std::move(Err)));
+      return true;
+    }
+  }
+
   return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
                              *OutputFile, DiagMutex,
-                             CASIDFile ? CASIDFile.get() : nullptr);
+                             CASIDFile ? CASIDFile.get() : nullptr,
+                             DWOFile ? &DWOFile->getOS() : nullptr);
 }
 
 bool swift::compileAndWriteLLVM(
     llvm::Module *module, llvm::TargetMachine *targetMachine,
     const IRGenOptions &opts, UnifiedStatsReporter *stats,
     DiagnosticEngine &diags, llvm::raw_pwrite_stream &out,
-    llvm::sys::Mutex *diagMutex, llvm::raw_pwrite_stream *casid) {
+    llvm::sys::Mutex *diagMutex, llvm::raw_pwrite_stream *casid,
+    llvm::raw_pwrite_stream *dwoOut) {
 
   // Set up the final code emission pass. Bitcode/LLVM IR is emitted as part of
   // the optimization pass pipeline.
@@ -650,11 +678,12 @@ bool swift::compileAndWriteLLVM(
     FileType =
         (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
                                                             : CGFT_ObjectFile);
+
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
     bool fail = targetMachine->addPassesToEmitFile(
-        EmitPasses, out, nullptr, FileType, !opts.Verify, nullptr, casid);
+        EmitPasses, out, dwoOut, FileType, !opts.Verify, nullptr, casid);
     if (fail) {
       diagnoseSync(diags, diagMutex, SourceLoc(),
                    diag::error_codegen_init_fail);

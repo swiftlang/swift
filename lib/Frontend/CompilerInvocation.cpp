@@ -2573,6 +2573,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      : "-gdwarf_types");
   }
 
+  if (FrontendOpts.InputsAndOutputs.hasSplitDwarfObjectPath()) {
+    Opts.DWOPath =
+        FrontendOpts.InputsAndOutputs.getSingleSplitDwarfObjectPath();
+  }
+
   if (auto A = Args.getLastArg(OPT_dwarf_version)) {
     unsigned vers;
     if (!StringRef(A->getValue()).getAsInteger(10, vers) && vers >= 2 &&

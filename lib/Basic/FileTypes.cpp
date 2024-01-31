@@ -137,6 +137,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
   case file_types::TY_CachedDiagnostics:
+  case file_types::TY_SplitDwarfObjectFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -152,6 +153,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_LLVM_IR:
   case file_types::TY_LLVM_BC:
   case file_types::TY_Object:
+  case file_types::TY_SplitDwarfObjectFile:
     return true;
   case file_types::TY_Swift:
   case file_types::TY_PCH:
@@ -253,6 +255,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
   case file_types::TY_CachedDiagnostics:
+  case file_types::TY_SplitDwarfObjectFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -311,6 +314,7 @@ bool file_types::isProducedFromDiagnostics(ID Id) {
   case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
   case file_types::TY_ModuleSemanticInfo:
+  case file_types::TY_SplitDwarfObjectFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
