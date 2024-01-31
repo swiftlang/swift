@@ -7718,7 +7718,8 @@ bool VarDecl::isLet() const {
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
     return PD->isImmutableInFunctionBody();
   }
-  return getIntroducer() == Introducer::Let;
+  return getIntroducer() == Introducer::Let
+    || getIntroducer() == Introducer::Borrowing;
 }
 
 bool VarDecl::isAsyncLet() const {

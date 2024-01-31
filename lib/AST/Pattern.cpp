@@ -51,8 +51,15 @@ DescriptivePatternKind Pattern::getDescriptiveKind() const {
     TRIVIAL_PATTERN_KIND(Expr);
 
   case PatternKind::Binding:
-    return cast<BindingPattern>(this)->isLet() ? DescriptivePatternKind::Let
-                                               : DescriptivePatternKind::Var;
+    switch (cast<BindingPattern>(this)->getIntroducer()) {
+    case VarDecl::Introducer::Let:
+    case VarDecl::Introducer::Borrowing:
+      return DescriptivePatternKind::Let;
+      
+    case VarDecl::Introducer::Var:
+    case VarDecl::Introducer::InOut:
+      return DescriptivePatternKind::Var;
+    }
   }
 #undef TRIVIAL_PATTERN_KIND
   llvm_unreachable("bad DescriptivePatternKind");
@@ -770,7 +777,24 @@ Pattern::getOwnership(
     void visitNamedPattern(NamedPattern *p) {
       // `var` and `let` bindings consume the matched value.
       // TODO: borrowing/mutating/consuming parameters
-      increaseOwnership(ValueOwnership::Owned, p);
+      switch (p->getDecl()->getIntroducer()) {
+      case VarDecl::Introducer::Let:
+      case VarDecl::Introducer::Var:
+        // `let` and `var` consume the bound value to move it into a new
+        // independent variable.
+        increaseOwnership(ValueOwnership::Owned, p);
+        break;
+        
+      case VarDecl::Introducer::InOut:
+        // `inout` bindings modify the value in-place.
+        increaseOwnership(ValueOwnership::InOut, p);
+        break;
+        
+      case VarDecl::Introducer::Borrowing:
+        // `borrow` bindings borrow parts of the value in-place so they don't
+        // need stronger access to the subject value.
+        break;
+      }
     }
     
     void visitAnyPattern(AnyPattern *p) {

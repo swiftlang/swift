@@ -2560,6 +2560,8 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
     return uint8_t(serialization::VarDeclIntroducer::Var);
   case swift::VarDecl::Introducer::InOut:
     return uint8_t(serialization::VarDeclIntroducer::InOut);
+  case swift::VarDecl::Introducer::Borrowing:
+    return uint8_t(serialization::VarDeclIntroducer::Borrowing);
   }
   llvm_unreachable("bad variable decl introducer kind");
 }
@@ -3674,7 +3676,7 @@ private:
 
       unsigned abbrCode = S.DeclTypeAbbrCodes[BindingPatternLayout::Code];
       BindingPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                       var->isLet());
+                           getRawStableVarDeclIntroducer(var->getIntroducer()));
       writePattern(var->getSubPattern());
       break;
     }

@@ -514,6 +514,21 @@ ParameterList *ModuleFile::readParameterList() {
   return ParameterList::create(getContext(), params);
 }
 
+static llvm::Optional<swift::VarDecl::Introducer>
+getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::VarDeclIntroducer::ID: \
+    return swift::VarDecl::Introducer::ID;
+  CASE(Let)
+  CASE(Var)
+  CASE(InOut)
+  CASE(Borrowing)
+  }
+#undef CASE
+  return llvm::None;
+}
+
 Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   // Currently, the only case in which this function can fail (return an error)
   // is when reading a pattern for a single variable declaration.
@@ -643,15 +658,18 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     return result;
   }
   case decls_block::VAR_PATTERN: {
-    bool isLet;
-    BindingPatternLayout::readRecord(scratch, isLet);
+    unsigned rawIntroducer;
+    BindingPatternLayout::readRecord(scratch, rawIntroducer);
 
     Pattern *subPattern = readPatternUnchecked(owningDC);
 
+    auto introducer = getActualVarDeclIntroducer(
+        (serialization::VarDeclIntroducer) rawIntroducer);
+    if (!introducer)
+      return diagnoseFatal();
+
     auto result = BindingPattern::createImplicit(
-        getContext(),
-        isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-        subPattern);
+        getContext(), *introducer, subPattern);
     if (Type interfaceType = subPattern->getDelayedInterfaceType())
       result->setDelayedInterfaceType(interfaceType, owningDC);
     else
@@ -2866,20 +2884,6 @@ getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   CASE(LegacyShared)
   CASE(LegacyOwned)
   CASE(Transferring)
-  }
-#undef CASE
-  return llvm::None;
-}
-
-static llvm::Optional<swift::VarDecl::Introducer>
-getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
-  switch (raw) {
-#define CASE(ID) \
-  case serialization::VarDeclIntroducer::ID: \
-    return swift::VarDecl::Introducer::ID;
-  CASE(Let)
-  CASE(Var)
-  CASE(InOut)
   }
 #undef CASE
   return llvm::None;
