@@ -94,21 +94,6 @@ struct S_Explicit_With_Metatype_Optional_AnyObject : _BitwiseCopyable {
   var ty: Optional<AnyObject>.Type
 }
 
-struct S_Unchecked : @unchecked _BitwiseCopyable {}
-
-struct S_Implicit_With_S_Unchecked {
-  var s: S_Unchecked
-}
-
-func passS_Implicit_With_S_Unchecked(_ s: S_Implicit_With_S_Unchecked) {
-  take1(s) // expected-error{{type_does_not_conform_decl_owner}}
-           // expected-note@-92 {{where_requirement_failure_one_subst}}
-}
-
-struct S_Explicit_With_S_Unchecked : _BitwiseCopyable {
-  var s: S_Unchecked
-}
-
 //==============================================================================
 //===========================DEPENDENCY-FREE TESTS=(END)======================}}
 //==============================================================================

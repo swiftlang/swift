@@ -28,7 +28,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -3010,21 +3009,6 @@ void TypeConverter::verifyLexicalLowering(const TypeLowering &lowering,
   }
 }
 
-static bool isUnchecked(ProtocolConformanceRef conformance) {
-  if (!conformance)
-    return false;
-  if (!conformance.isConcrete())
-    return false;
-  auto concrete = conformance.getConcrete();
-  assert(concrete);
-  auto *root = concrete->getRootConformance();
-  assert(root);
-  auto *normal = dyn_cast<NormalProtocolConformance>(root);
-  if (!normal)
-    return false;
-  return normal->isUnchecked();
-}
-
 void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                                           AbstractionPattern origType,
                                           CanType substType,
@@ -3058,17 +3042,10 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (!nominal)
             return false;
 
-          // Don't walk into types whose conformance is unchecked--such
-          // conformances obstruct automatic inference of BitwiseCopyable.
-          auto conformance = M.checkConformance(ty, bitwiseCopyableProtocol);
-          if (isUnchecked(conformance)) {
-            return true;
-          }
-
-          // Nominals with fields that conditionally conform to BitwiseCopyable
-          // must be explicitly conditionally conformed.  Such a field must be a
-          // generic context.
-          if (nominal->isGenericContext()) {
+          // Nominals with generic parameters must be explicitly conformed to
+          // BitwiseCopyable.
+          auto *generic = ty.getAnyGeneric();
+          if (generic && generic->isGenericContext()) {
             return true;
           }
 
@@ -3082,12 +3059,10 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           // Return false to indicate seeing a leaf which justifies the type
           // being trivial but not conforming to BitwiseCopyable.
 
-          // A BitwiseCopyable conformer appearing within its layout explains a
-          // non-conformance iff the conformance is @unchecked.
-          auto conformance = M.checkConformance(ty, bitwiseCopyableProtocol);
-          if (conformance) {
-            return !isUnchecked(conformance);
-          }
+          // A BitwiseCopyable conformer appearing within its layout doesn't
+          // explain why substType doesn't itself conform.
+          if (M.checkConformance(ty, bitwiseCopyableProtocol))
+            return true;
 
           // ModuleTypes are trivial but don't warrant being given a conformance
           // to BitwiseCopyable.
@@ -3124,15 +3099,15 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return true;
           }
 
-          /// A field of conditionally-BitwiseCopyable type justifies the
-          /// aggregate not conforming because the aggregate must be conformed
-          /// explicitly in that case.
-          if (nominal->isGenericContext()) {
+          /// A non-conforming generic nominal type justifies substType not
+          /// conforming.
+          auto *generic = ty.getAnyGeneric();
+          if (generic && generic->isGenericContext()) {
             return false;
           }
 
           // The field is trivial and the whole type is nonconforming.  That's
-          // legal iff the field's type is public.
+          // legal iff the type is public.
           return !nominal
                       ->getFormalAccessScope(
                           /*useDC=*/nullptr,
@@ -3173,7 +3148,6 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
       llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
-      llvm::errs() << "\n";
       assert(false);
     }
   }
