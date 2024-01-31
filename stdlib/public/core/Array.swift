@@ -401,6 +401,28 @@ extension Array {
   }
 
   /// Check that the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`, but only in debug buikds.
+  @inlinable
+  @_semantics("array.check_subscript")
+  @_effects(notEscaping self.**)
+  public // @testable
+  func _debugCheckSubscript(
+    _ index: Int, wasNativeTypeChecked: Bool
+  ) -> _DependenceToken {
+#if _runtime(_ObjC)
+    // There is no need to do bounds checking for the non-native case because
+    // ObjectiveC arrays do bounds checking by their own.
+    // And in the native-non-type-checked case, it's also not needed to do bounds
+    // checking here, because it's done in ArrayBuffer._getElementSlowPath.
+    if _fastPath(wasNativeTypeChecked) {
+      _buffer._native._debugCheckValidSubscript(index)
+    }
+#else
+    _buffer._debugCheckValidSubscript(index)
+#endif
+    return _DependenceToken()
+  }
+  /// Check that the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be uniquely referenced and native.
@@ -411,6 +433,17 @@ extension Array {
     _buffer._checkValidSubscriptMutating(index)
   }
 
+  /// Check that the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`, but only in debug configurations.
+  ///
+  /// - Precondition: The buffer must be uniquely referenced and native.
+  @_alwaysEmitIntoClient
+  @_semantics("array.check_subscript")
+  @_effects(notEscaping self.**)
+  internal func _debugCheckSubscript_mutating(_ index: Int) {
+    _buffer._debugCheckValidSubscriptMutating(index)
+  }
+  
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @inlinable
   @_semantics("array.check_index")
@@ -420,6 +453,16 @@ extension Array {
     _precondition(index >= startIndex, "Negative Array index is out of range")
   }
 
+  /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`,
+  /// but only in debug configurations.
+  @inlinable
+  @_semantics("array.check_index")
+  @_effects(notEscaping self.**)
+  internal func _debugCheckIndex(_ index: Int) {
+    _debugPrecondition(index <= endIndex, "Array index is out of range")
+    _debugPrecondition(index >= startIndex, "Negative Array index is out of range")
+  }
+  
   @_semantics("array.get_element")
   @_effects(notEscaping self.value**)
   @_effects(escaping self.value**.class*.value** -> return.value**)
@@ -761,6 +804,38 @@ extension Array: RandomAccessCollection, MutableCollection {
     }
   }
 
+  /// Accesses the element at the specified position without bounds
+  /// checking.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @inlinable @_alwaysEmitIntoClient
+  public subscript(unchecked index: Int) -> Element {
+    get {
+      // This call may be hoisted or eliminated by the optimizer.  If
+      // there is an inout violation, this value may be stale so needs to be
+      // checked again below.
+      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
+
+      // Make sure the index is in range and wasNativeTypeChecked is
+      // still valid.
+      let token = _debugCheckSubscript(
+        index, wasNativeTypeChecked: wasNativeTypeChecked)
+
+      return _getElement(
+        index, wasNativeTypeChecked: wasNativeTypeChecked,
+        matchingSubscriptCheck: token)
+    }
+    _modify {
+      _makeMutableAndUnique() // makes the array native, too
+      _debugCheckSubscript_mutating(index)
+      let address = _buffer.mutableFirstElementAddress + index
+      defer { _endMutation() }
+      yield &address.pointee
+    }
+  }
+  
   /// Accesses a contiguous subrange of the array's elements.
   ///
   /// The returned `ArraySlice` instance uses the same indices for the same
@@ -795,6 +870,31 @@ extension Array: RandomAccessCollection, MutableCollection {
     set(rhs) {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
+      // If the replacement buffer has same identity, and the ranges match,
+      // then this was a pinned in-place modification, nothing further needed.
+      if self[bounds]._buffer.identity != rhs._buffer.identity
+      || bounds != rhs.startIndex..<rhs.endIndex {
+        self.replaceSubrange(bounds, with: rhs)
+      }
+    }
+  }
+  
+  /// Accesses a contiguous subrange of the array's elements without
+  /// bounds checks on the range.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @inlinable @_alwaysEmitIntoClient
+  public subscript(uncheckedBounds bounds: Range<Int>) -> ArraySlice<Element> {
+    get {
+      _debugCheckIndex(bounds.lowerBound)
+      _debugCheckIndex(bounds.upperBound)
+      return ArraySlice(_buffer: _buffer[bounds])
+    }
+    set(rhs) {
+      _debugCheckIndex(bounds.lowerBound)
+      _debugCheckIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,
       // then this was a pinned in-place modification, nothing further needed.
       if self[bounds]._buffer.identity != rhs._buffer.identity

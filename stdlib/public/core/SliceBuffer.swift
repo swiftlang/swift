@@ -307,6 +307,14 @@ internal struct _SliceBuffer<Element>
       index >= startIndex && index < endIndex, "Index out of bounds")
   }
 
+  /// Traps unless the given `index` is valid for subscripting, i.e.
+  /// `startIndex ≤ index < endIndex`, but only in debug builkds.
+  @inlinable
+  internal func _debugCheckValidSubscript(_ index: Int) {
+    _debugPrecondition(
+      index >= startIndex && index < endIndex, "Index out of bounds")
+  }
+
   @inlinable
   internal var capacity: Int {
     let count = self.count

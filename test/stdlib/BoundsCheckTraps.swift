@@ -88,4 +88,52 @@ BoundsCheckTraps.test("Character")
   _blackHole(char)
 }
 
+BoundsCheckTraps.test("ArrayUnchecked")
+  .skip(.custom(
+    { _isFastAssertConfiguration() || _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() },
+    reason: "this trap is not guaranteed to happen"))
+  .code {
+  expectCrashLater()
+  var array = [1, 2]
+  array.append(3)
+  let value = array[unchecked: 3]
+  _blackHole(value)
+}
+
+BoundsCheckTraps.test("ArrayUncheckedBounds")
+  .skip(.custom(
+    { _isFastAssertConfiguration() || _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() },
+    reason: "this trap is not guaranteed to happen"))
+  .code {
+  expectCrashLater()
+  var array = [1, 2]
+  array.append(3)
+  let value = array[uncheckedBounds: 3..<4]
+  _blackHole(value)
+}
+
+BoundsCheckTraps.test("ContiguousArrayUnchecked")
+  .skip(.custom(
+    { _isFastAssertConfiguration() || _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() },
+    reason: "this trap is not guaranteed to happen"))
+  .code {
+  expectCrashLater()
+  var array: ContiguousArray = [1, 2]
+  array.append(3)
+  let value = array[unchecked: 3]
+  _blackHole(value)
+}
+
+BoundsCheckTraps.test("ContiguousArrayUncheckedBounds")
+  .skip(.custom(
+    { _isFastAssertConfiguration() || _isReleaseAssertConfiguration() || _isReleaseAssertWithBoundsSafetyConfiguration() },
+    reason: "this trap is not guaranteed to happen"))
+  .code {
+  expectCrashLater()
+  var array: ContiguousArray = [1, 2]
+  array.append(3)
+  let value = array[uncheckedBounds: 3..<4]
+  _blackHole(value)
+}
+
 runAllTests()

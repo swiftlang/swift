@@ -92,6 +92,14 @@ extension ContiguousArray {
   }
 
   /// Check that the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`, but only in debug builds.
+  @inlinable
+  @inline(__always)
+  internal func _debugCheckSubscript_native(_ index: Int) {
+    _buffer._debugCheckValidSubscript(index)
+  }
+  
+  /// Check that the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be uniquely referenced and native.
@@ -101,6 +109,16 @@ extension ContiguousArray {
     _buffer._checkValidSubscriptMutating(index)
   }
 
+  /// Check that the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`, but only in debug builds.
+  ///
+  /// - Precondition: The buffer must be uniquely referenced and native.
+  @_alwaysEmitIntoClient
+  @_semantics("array.check_subscript")
+  internal func _debugCheckSubscript_mutating(_ index: Int) {
+    _buffer._debugCheckValidSubscriptMutating(index)
+  }
+  
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @inlinable
   @_semantics("array.check_index")
@@ -109,6 +127,14 @@ extension ContiguousArray {
     _precondition(index >= startIndex, "Negative ContiguousArray index is out of range")
   }
 
+  /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`, but only in debug builds.
+  @inlinable
+  @_semantics("array.check_index")
+  internal func _debugCheckIndex(_ index: Int) {
+    _debugPrecondition(index <= endIndex, "ContiguousArray index is out of range")
+    _debugPrecondition(index >= startIndex, "Negative ContiguousArray index is out of range")
+  }
+  
   @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
@@ -421,6 +447,27 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
     }
   }
 
+  /// Accesses the element at the specified position without
+  /// bounds checking.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @inlinable @_alwaysEmitIntoClient
+  public subscript(unchecked index: Int) -> Element {
+    get {
+      _debugCheckSubscript_native(index)
+      return _buffer.getElement(index)
+    }
+    _modify {
+      _makeMutableAndUnique()
+      _debugCheckSubscript_mutating(index)
+      let address = _buffer.mutableFirstElementAddress + index
+      defer { _endMutation() }
+      yield &address.pointee
+    }
+  }
+
   /// Accesses a contiguous subrange of the array's elements.
   ///
   /// The returned `ArraySlice` instance uses the same indices for the same
@@ -455,6 +502,30 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
     set(rhs) {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
+      // If the replacement buffer has same identity, and the ranges match,
+      // then this was a pinned in-place modification, nothing further needed.
+      if self[bounds]._buffer.identity != rhs._buffer.identity
+      || bounds != rhs.startIndex..<rhs.endIndex {
+        self.replaceSubrange(bounds, with: rhs)
+      }
+    }
+  }
+
+  /// Accesses a contiguous subrange of the array's elements.
+  ///
+  /// This unsafe operation should only be used when performance analysis
+  /// has determined that the bounds checks are not being eliminated
+  /// by the optimizer despite being ensured by a higher-level invariant.
+  @inlinable @_alwaysEmitIntoClient
+  public subscript(uncheckedBounds bounds: Range<Int>) -> ArraySlice<Element> {
+    get {
+      _debugCheckIndex(bounds.lowerBound)
+      _debugCheckIndex(bounds.upperBound)
+      return ArraySlice(_buffer: _buffer[bounds])
+    }
+    set(rhs) {
+      _debugCheckIndex(bounds.lowerBound)
+      _debugCheckIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,
       // then this was a pinned in-place modification, nothing further needed.
       if self[bounds]._buffer.identity != rhs._buffer.identity

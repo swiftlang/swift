@@ -193,7 +193,7 @@ extension Array: Differentiable where Element: Differentiable {
 
 extension Array where Element: Differentiable {
   @usableFromInline
-  @derivative(of: subscript)
+  @derivative(of: subscript(_:))
   func _vjpSubscript(index: Int) -> (
     value: Element, pullback: (Element.TangentVector) -> TangentVector
   ) {
@@ -208,7 +208,7 @@ extension Array where Element: Differentiable {
   }
 
   @usableFromInline
-  @derivative(of: subscript)
+  @derivative(of: subscript(_:))
   func _jvpSubscript(index: Int) -> (
     value: Element, differential: (TangentVector) -> Element.TangentVector
   ) {

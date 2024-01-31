@@ -467,6 +467,14 @@ extension _ArrayBuffer {
     _native._checkValidSubscriptMutating(index)
   }
 
+  /// Traps unless the given `index` is valid for subscripting, i.e.
+  /// `0 ≤ index < count`.
+  ///
+  /// - Precondition: The buffer must be mutable.
+  @_alwaysEmitIntoClient
+  internal func _debugCheckValidSubscriptMutating(_ index: Int) {
+    _native._debugCheckValidSubscriptMutating(index)
+  }
   /// The number of elements the buffer can store without reallocation.
   ///
   /// This property is obsolete. It's only used for the ArrayBufferProtocol and
