@@ -43,9 +43,21 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     }
   }
   for instruction in function.instructions {
-    guard let markDep = instruction as? MarkDependenceInst else { continue }
-    if let lifetimeDep = LifetimeDependence(markDep, context) {
-      analyze(dependence: lifetimeDep, context)
+    if let markDep = instruction as? MarkDependenceInst {
+      if let lifetimeDep = LifetimeDependence(markDep, context) {
+        analyze(dependence: lifetimeDep, context)
+      }
+      continue
+    }
+    if let apply = instruction as? FullApplySite {
+      // Handle ~Escapable results that do not have a lifetime
+      // dependence (@_unsafeNonescapableResult).
+      apply.dependentValues.forEach {
+        if let lifetimeDep = LifetimeDependence(applyResult: $0, context) {
+          analyze(dependence: lifetimeDep, context)
+        }
+      }
+      continue
     }
   }
 }

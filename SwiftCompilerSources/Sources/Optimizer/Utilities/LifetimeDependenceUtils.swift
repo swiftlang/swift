@@ -174,6 +174,20 @@ extension LifetimeDependence {
     self.dependentValue = arg
   }
 
+  // Handle ~Escapable results that do not have a lifetime dependence
+  // (@_unsafeNonescapableResult).
+  init?(applyResult value: Value, _ context: some Context) {
+    if value.type.isEscapable {
+      return nil
+    }
+    let applySite = value.definingInstruction as! FullApplySite
+    if applySite.calleeArgumentConventions.resultDependencies != nil {
+      return nil
+    }
+    self.scope = Scope(base: value, context)!
+    self.dependentValue = value
+  }
+
   /// Construct LifetimeDependence from mark_dependence [nonescaping]
   ///
   /// TODO: Add SIL verification that all mark_depedence [nonescaping]
