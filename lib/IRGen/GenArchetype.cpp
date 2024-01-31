@@ -179,8 +179,8 @@ class BitwiseCopyableArchetypeTypeInfo
   using Super = WitnessSizedTypeInfo<Self>;
   BitwiseCopyableArchetypeTypeInfo(llvm::Type *type,
                                    IsABIAccessible_t abiAccessible)
-      : Super(type, Alignment(1), IsTriviallyDestroyable, IsBitwiseTakable,
-              IsCopyable, abiAccessible) {}
+      : Super(type, Alignment(1), IsNotTriviallyDestroyable,
+              IsNotBitwiseTakable, IsCopyable, abiAccessible) {}
 
 public:
   static const BitwiseCopyableArchetypeTypeInfo *
