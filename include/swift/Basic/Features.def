@@ -237,14 +237,14 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 EXPERIMENTAL_FEATURE(Embedded, true)
 
 /// Enables noncopyable generics
-EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
+EXPERIMENTAL_FEATURE(NoncopyableGenerics, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
-EXPERIMENTAL_FEATURE(NonescapableTypes, false)
+EXPERIMENTAL_FEATURE(NonescapableTypes, true)
 
 // Infer Sendability of unapplied and partial applied methods,
 // global functions and key paths.

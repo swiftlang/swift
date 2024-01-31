@@ -5,6 +5,7 @@
 // RUN:   -enable-experimental-feature NoncopyableGenerics
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: noncopyable_generics
 
 import Builtin
 

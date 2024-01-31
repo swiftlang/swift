@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NonescapableTypes -disable-experimental-parser-round-trip   -enable-experimental-feature NoncopyableGenerics -enable-builtin-module
-// REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 import Builtin
 
 struct BufferView : ~Escapable {
@@ -136,4 +136,3 @@ struct ArrayOfBufferView : ~Escapable {
         return arr[index]
     }
 }
-

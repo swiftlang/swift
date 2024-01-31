@@ -4,8 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: GH_ISSUE_70246
 
-// For -enable-experimental-feature NoncopyableGenerics
-// REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 
 import MoveOnlyCxxValueType
 import StdlibUnittest
@@ -40,4 +39,3 @@ MoveOnlyCxxValueType.test("Test move only type ref return pointee borrow") {
 }
 
 runAllTests()
-

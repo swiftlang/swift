@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s > /dev/null
 // RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -emit-sil -verify %s > /dev/null
 
-// REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 
 // SIL verification failed: 'MoveOnly' types can only be copied in Raw SIL?!
 // REQUIRES: rdar118135397

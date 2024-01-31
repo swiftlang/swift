@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics -warn-redundant-requirements
 
-// REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 
 protocol U {}
 

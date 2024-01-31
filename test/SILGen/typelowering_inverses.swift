@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature NoncopyableGenerics -disable-availability-checking -module-name main %s | %FileCheck %s
 
-// REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 
 struct NC: ~Copyable {}
 
