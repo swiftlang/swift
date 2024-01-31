@@ -466,11 +466,16 @@ class RefCountBitsT {
     }
     else {
       // this is out-of-line and not the same layout as inline newbits.
-      // Copy field-by-field.
-      copyFieldFrom(newbits, UnownedRefCount);
-      copyFieldFrom(newbits, IsDeiniting);
-      copyFieldFrom(newbits, StrongExtraRefCount);
-      copyFieldFrom(newbits, UseSlowRC);
+      // Copy field-by-field. If it's immortal, just set that.
+      if (newbits.isImmortal(false)) {
+        setField(IsImmortal, Offsets::IsImmortalMask);
+      } else {
+        copyFieldFrom(newbits, PureSwiftDealloc);
+        copyFieldFrom(newbits, UnownedRefCount);
+        copyFieldFrom(newbits, IsDeiniting);
+        copyFieldFrom(newbits, StrongExtraRefCount);
+        copyFieldFrom(newbits, UseSlowRC);
+      }
     }
   }
 
