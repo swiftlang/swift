@@ -78,7 +78,7 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public struct ExplicitHello<T> : ~Copyable where T : ~Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.ExplicitHello : Swift.Copyable where T : Swift.Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.ExplicitHello : Swift.Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public struct Hello<T> where T : ~Copyable, T : ~Escapable {

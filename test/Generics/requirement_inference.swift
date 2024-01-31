@@ -282,23 +282,15 @@ struct X22<T, U> {
                   U == X20<T> { }
 }
 
-// CHECK: Generic signature: <Self where Self : P22>
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P22>
-// CHECK: Protocol requirement signature:
 // CHECK: .P22@
 // CHECK-NEXT: Requirement signature: <Self where Self.[P22]A == X20<Self.[P22]B>, Self.[P22]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P22]A == X20<τ_0_0.[P22]B>, τ_0_0.[P22]B : P20>
 protocol P22 {
   associatedtype A
   associatedtype B: P20 where A == X20<B>
 }
 
-// CHECK: Generic signature: <Self where Self : P23>
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P23>
-// CHECK: Protocol requirement signature:
 // CHECK: .P23@
 // CHECK-NEXT: Requirement signature: <Self where Self.[P23]A == X20<Self.[P23]B>, Self.[P23]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P23]A == X20<τ_0_0.[P23]B>, τ_0_0.[P23]B : P20>
 protocol P23 {
   associatedtype A
   associatedtype B: P20
@@ -332,8 +324,7 @@ struct X28 : P2 {
 }
 
 // CHECK-LABEL: .P28@
-// CHECK-NEXT: Requirement signature: <Self where Self : P3, Self.[P3]P3Assoc == X28>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : P3, τ_0_0.[P3]P3Assoc == X28>
+// CHECK: Requirement signature: <Self where Self : P3, Self.[P3]P3Assoc == X28>
 protocol P28: P3 {
   typealias P3Assoc = X28   // expected-warning{{typealias overriding associated type}}
 }

@@ -3449,27 +3449,17 @@ public:
         TypeChecker::inferDefaultWitnesses(PD);
 
     if (Ctx.TypeCheckerOpts.DebugGenericSignatures) {
-      auto sig = PD->getRequirementSignatureAsGenericSignature();
-      llvm::errs() << "\n";
-      llvm::errs() << "Protocol requirement signature:\n";
+      auto sig = PD->getRequirementSignature();
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
       PrintOptions Opts;
       Opts.ProtocolQualifiedDependentMemberTypes = true;
-      Opts.PrintInverseRequirements = true;
-      sig->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
-
-      llvm::errs() << "Canonical requirement signature: ";
-      auto canSig =
-        CanGenericSignature::getCanonical(sig.getGenericParams(),
-                                          sig.getRequirements());
-      canSig->print(llvm::errs(), Opts);
+      Opts.PrintInverseRequirements =
+          Ctx.TypeCheckerOpts.DebugInverseRequirements;
+      sig.print(PD, llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
-
-    dumpGenericSignature(Ctx, PD);
 
     if (!reqSig.getErrors()) {
       // Always verify signatures, even if building without asserts.

@@ -970,6 +970,10 @@ public:
       ArrayRef<InverseRequirement> inverses,
       bool &isFirstReq, unsigned flags,
       llvm::function_ref<bool(const Requirement &)> filter);
+  void printRequirementSignature(ProtocolDecl *owner,
+                                 RequirementSignature sig,
+                                 unsigned flags,
+                                 TypeDecl *attachingTo);
   void printRequirement(const Requirement &req);
   void printRequirement(const InverseRequirement &inverse,
                         bool forInherited);
@@ -1566,46 +1570,20 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 }
 
 void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
-                                                      TypeDecl* attachingTo) {
-  Type attachedGP[1];
-  if (auto proto = dyn_cast<ProtocolDecl>(attachingTo))
-    attachedGP[0] = proto->getSelfInterfaceType();
-  else if (auto assoc = dyn_cast<AssociatedTypeDecl>(attachingTo))
-    attachedGP[0] = assoc->getDeclaredInterfaceType();
-  else
-    llvm_unreachable("nonexhaustive");
-
-  printGenericSignature(
-      proto->getRequirementSignatureAsGenericSignature(),
-      PrintInherited,
-      [&](const Requirement &req) {
-        // Skip the inferred 'Self : AnyObject' constraint if this is an
-        // @objc protocol.
-        if ((req.getKind() == RequirementKind::Layout) &&
-            req.getFirstType()->isEqual(proto->getSelfInterfaceType()) &&
-            req.getLayoutConstraint()->getKind() ==
-                LayoutConstraintKind::Class &&
-            proto->isObjC()) {
-          return false;
-        }
-
-        auto location = bestRequirementPrintLocation(proto, req);
-        return location.AttachedTo == attachingTo && !location.InWhereClause;
-      });
+                                                      TypeDecl *attachingTo) {
+  printRequirementSignature(
+      proto, proto->getRequirementSignature(),
+      PrintInherited | PrintInverseRequirements,
+      attachingTo);
 }
 
 void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                         TypeDecl *attachingTo) {
-  unsigned flags = PrintRequirements;
+  unsigned flags = PrintRequirements | PrintInverseRequirements;
   if (isa<AssociatedTypeDecl>(attachingTo))
     flags |= SwapSelfAndDependentMemberType;
-  printGenericSignature(
-      proto->getRequirementSignatureAsGenericSignature(),
-      flags,
-      [&](const Requirement &req) {
-        auto location = bestRequirementPrintLocation(proto, req);
-        return location.AttachedTo == attachingTo && location.InWhereClause;
-      });
+  printRequirementSignature(proto, proto->getRequirementSignature(), flags,
+                            attachingTo);
 }
 
 /// A helper function to return the depth of a requirement.
@@ -1924,6 +1902,62 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
   if (printParams && !genericParams.empty())
     Printer << ">";
+}
+
+void PrintAST::printRequirementSignature(ProtocolDecl *owner,
+                                         RequirementSignature sig,
+                                         unsigned flags,
+                                         TypeDecl *attachingTo) {
+  SmallVector<Requirement, 2> requirements;
+  SmallVector<InverseRequirement, 2> inverses;
+
+  if (flags & PrintInverseRequirements) {
+    sig.getRequirementsWithInverses(owner, requirements, inverses);
+  } else {
+    requirements.append(sig.getRequirements().begin(),
+                        sig.getRequirements().end());
+  }
+
+  if (attachingTo) {
+    llvm::erase_if(requirements,
+                   [&](Requirement req) {
+      // Skip the inferred 'Self : AnyObject' constraint if this is an
+      // @objc protocol.
+      if ((req.getKind() == RequirementKind::Layout) &&
+          req.getFirstType()->isEqual(owner->getSelfInterfaceType()) &&
+          req.getLayoutConstraint()->getKind() ==
+              LayoutConstraintKind::Class &&
+          owner->isObjC()) {
+        return true;
+      }
+
+      auto location = bestRequirementPrintLocation(owner, req);
+      if (location.AttachedTo != attachingTo)
+        return true;
+
+      if (flags & PrintRequirements)
+        return !location.InWhereClause;
+
+      return location.InWhereClause;
+    });
+
+    auto interfaceTy =
+      (isa<ProtocolDecl>(attachingTo)
+       ? cast<ProtocolDecl>(attachingTo)->getSelfInterfaceType()
+       : cast<AssociatedTypeDecl>(attachingTo)->getDeclaredInterfaceType());
+
+    llvm::erase_if(inverses,
+                   [&](InverseRequirement req) {
+      // We print inverse requirements in the inheritance clause only.
+      if (flags & PrintRequirements)
+        return true;
+      return !req.subject->isEqual(interfaceTy);
+    });
+  }
+
+  printSingleDepthOfGenericSignature(
+     owner->getGenericSignature().getGenericParams(), requirements, inverses,
+     flags, [&](Requirement) { return true; });
 }
 
 void PrintAST::printRequirement(const Requirement &req) {
@@ -2786,13 +2820,12 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
                                              ExtensionDecl *ExtDecl) {
   auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
-    // NOTE: As with normal extensions, we do not collapse defaults.
     auto Sig = ED->getGenericSignature();
     printSingleDepthOfGenericSignature(Sig.getGenericParams(),
                                        Sig.getRequirements(),
                                        /*inverses=*/{},
                                        IsFirst,
-                                       PrintRequirements,
+                                       PrintRequirements | PrintInverseRequirements,
                                        [](const Requirement &Req){
       return true;
     });
@@ -7944,6 +7977,22 @@ void GenericSignature::print(ASTPrinter &Printer,
   if (Opts.PrintInverseRequirements)
     flags |=  PrintAST::PrintInverseRequirements;
   PrintAST(Printer, Opts).printGenericSignature(*this, flags);
+}
+
+void RequirementSignature::print(ProtocolDecl *owner,
+                                 raw_ostream &OS,
+                                 const PrintOptions &Opts) const {
+  StreamPrinter Printer(OS);
+  print(owner, Printer, Opts);
+}
+
+void RequirementSignature::print(ProtocolDecl *owner,
+                                 ASTPrinter &Printer,
+                                 const PrintOptions &Opts) const {
+  auto flags = PrintAST::PrintParams | PrintAST::PrintRequirements;
+  if (Opts.PrintInverseRequirements)
+    flags |=  PrintAST::PrintInverseRequirements;
+  PrintAST(Printer, Opts).printRequirementSignature(owner, *this, flags, nullptr);
 }
 
 void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {
