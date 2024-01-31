@@ -80,7 +80,8 @@ public protocol SIMDScalar : _BitwiseCopyable {
 public protocol SIMD<Scalar>:
   SIMDStorage,
   Hashable,
-  ExpressibleByArrayLiteral
+  ExpressibleByArrayLiteral,
+  _BitwiseCopyable
 {
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD
@@ -95,7 +96,8 @@ public protocol SIMD<Scalar>:
   Codable,
   Hashable,
   CustomStringConvertible,
-  ExpressibleByArrayLiteral
+  ExpressibleByArrayLiteral,
+  _BitwiseCopyable
 {
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype MaskStorage: SIMD

@@ -106,6 +106,7 @@ private:
 
   bool visitMemberDecl(ValueDecl *storage, Type ty);
   bool visitMemberType(Type type, SourceLoc loc);
+  bool isUnchecked(ProtocolConformanceRef conformance);
   bool visitNonconformingMemberType(Type type, SourceLoc loc);
   void emitNonconformingMemberTypeDiagnostic(Type ty, SourceLoc loc);
 };
@@ -136,6 +137,13 @@ bool BitwiseCopyableStorageVisitor::visitMemberType(Type ty, SourceLoc loc) {
     return visitNonconformingMemberType(ty, loc);
   }
 
+  if (isImplicit(check) && isUnchecked(conformance)) {
+    // Do not automatically derive conformance if one of the field's
+    // conformance is @unchecked.
+    invalid = true;
+    return true;
+  }
+
   // Walk the conformance, diagnosing any missing BitwiseCopyable conformances.
   bool anyMissing = false;
   conformance.forEachMissingConformance(
@@ -148,6 +156,20 @@ bool BitwiseCopyableStorageVisitor::visitMemberType(Type ty, SourceLoc loc) {
       });
 
   return anyMissing;
+}
+
+bool BitwiseCopyableStorageVisitor::isUnchecked(
+    ProtocolConformanceRef conformance) {
+  if (!conformance.isConcrete())
+    return false;
+  auto concrete = conformance.getConcrete();
+  assert(concrete);
+  auto *root = concrete->getRootConformance();
+  assert(root);
+  auto *normal = dyn_cast<NormalProtocolConformance>(root);
+  if (!normal)
+    return false;
+  return normal->isUnchecked();
 }
 
 bool BitwiseCopyableStorageVisitor::visitNonconformingMemberType(

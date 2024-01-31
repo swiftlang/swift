@@ -2165,7 +2165,8 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 /// to the given protocol. This should return true when @unchecked can be
 /// used to disable those semantic checks.
 static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
-  return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
+  return proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+         proto->isSpecificProtocol(KnownProtocolKind::BitwiseCopyable);
 }
 
 /// Determine whether the type \c T conforms to the protocol \c Proto,
