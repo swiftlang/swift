@@ -575,6 +575,14 @@ namespace swift {
       return limitBehavior(limit);
     }
 
+    /// Limit the diagnostic behavior to \c limit until the specified
+    /// version.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
+        DiagnosticBehavior limit, unsigned majorVersion);
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings

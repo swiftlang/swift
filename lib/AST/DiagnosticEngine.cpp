@@ -328,9 +328,10 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
+InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
+    DiagnosticBehavior limit, unsigned majorVersion) {
   if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
-    limitBehavior(DiagnosticBehavior::Warning)
+    limitBehavior(limit)
       .wrapIn(diag::error_in_future_swift_version, majorVersion);
   }
 
@@ -341,6 +342,12 @@ InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
   }
 
   return *this;
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
+  return limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning,
+                                        majorVersion);
 }
 
 InFlightDiagnostic &
