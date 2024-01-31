@@ -951,7 +951,7 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
   }
 
   // Legacy support stops here.
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+  if (!ctx.LangOpts.AssumesNoncopyableGenerics)
     return InverseMarking::forInverse(Kind::None);
 
   // FIXME: just never allow lexical-lifetimes to be disabled?

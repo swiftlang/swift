@@ -425,12 +425,6 @@ static ValidationInfo validateControlBlock(
       break;
     }
     case control_block::HAS_NONCOPYABLE_GENERICS: {
-      // FIXME: temporary hack until the stdlib is actually building.
-      // This skips over the module mismatch error if the stdlib wasn't built
-      // with noncopyable generics, so that tests may still run in CI.
-      if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
-        break;
-
       auto hasNoncopyableGenerics = scratch[0];
       if (requiresNoncopyableGenerics && !hasNoncopyableGenerics)
         result.status = Status::NotUsingNoncopyableGenerics;

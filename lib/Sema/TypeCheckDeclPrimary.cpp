@@ -2016,7 +2016,7 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
   auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
       proto->getSelfInterfaceType());
   const bool EnabledNoncopyableGenerics =
-      proto->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics);
+      proto->getASTContext().LangOpts.AssumesNoncopyableGenerics;
 
   for (auto *otherProto : requiredProtos) {
     // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
@@ -3175,7 +3175,7 @@ public:
   }
 
   static void diagnoseIncompatibleProtocolsForMoveOnlyType(Decl *decl) {
-    if (decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    if (decl->getASTContext().LangOpts.AssumesNoncopyableGenerics)
       return; // taken care of elsewhere.
 
     if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl)) {
@@ -4028,10 +4028,6 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    auto haveFeature = [=](Feature f) -> bool {
-      return DD->getASTContext().LangOpts.hasFeature(f);
-    };
-
     // Only check again for destructor decl outside of a class if our destructor
     // is not marked as invalid.
     if (!DD->isInvalid()) {
@@ -4040,7 +4036,7 @@ public:
       if (!nom || isa<ProtocolDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
 
-      } else if (!haveFeature(Feature::NoncopyableGenerics)
+      } else if (!DD->getASTContext().LangOpts.AssumesNoncopyableGenerics
                   && !isa<ClassDecl>(nom)
                   && nom->canBeCopyable()) {
         // When we have NoncopyableGenerics, deinits get validated as part of
@@ -4050,7 +4046,7 @@ public:
 
       // Temporarily ban deinit on noncopyable enums, unless the experimental
       // feature flag is set.
-      if (!haveFeature(Feature::MoveOnlyEnumDeinits)
+      if (!DD->getASTContext().LangOpts.hasFeature(Feature::MoveOnlyEnumDeinits)
           && isa<EnumDecl>(nom)
           && !nom->canBeCopyable()) {
         DD->diagnose(diag::destructor_decl_on_noncopyable_enum);
