@@ -111,7 +111,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
     changed = context.optimizeMemoryAccesses(in: function) || changed
-    _ = context.eliminateDeadAllocations(in: function)
+    changed = context.eliminateDeadAllocations(in: function) || changed
   }
 
   worklist.add(calleesOf: function)
