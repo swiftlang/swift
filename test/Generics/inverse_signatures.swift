@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s --implicit-check-not "error:"
+// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures -debug-inverse-requirements 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
 // REQUIRES: asserts
 
@@ -195,6 +195,10 @@ struct ImplicitCond<T: ~Escapable & ~Copyable> {}
 
 // CHECK-LABEL: StructDecl name=ImplicitCond
 // CHECK-NEXT:    (normal_conformance type="ImplicitCond<T>" protocol="Sendable")
+
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
+// CHECK: Generic signature: <T>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0>
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
 // CHECK-NEXT: (normal_conformance type="ImplicitCond<T>" protocol="Empty")

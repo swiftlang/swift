@@ -2630,9 +2630,6 @@ void PrintAST::printDeclGenericRequirements(GenericContext *decl) {
   if (parentSig && parentSig->isEqual(genericSig))
     return;
 
-  SmallVector<Type, 2> genericParams;
-  InverseRequirement::enumerateDefaultedParams(decl, genericParams);
-
   Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
   printGenericSignature(genericSig,
                         PrintRequirements | PrintInverseRequirements,

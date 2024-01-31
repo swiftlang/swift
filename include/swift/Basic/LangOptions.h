@@ -790,6 +790,10 @@ namespace swift {
     /// Debug the generic signatures computed by the generic signature builder.
     bool DebugGenericSignatures = false;
 
+    /// If this is set, we skip the inverse transform and print explicit
+    /// Copyable/Escapable requirements in the above.
+    bool DebugInverseRequirements = false;
+
     /// Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
