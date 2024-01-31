@@ -431,6 +431,11 @@ public:
     expression.contextualInfo.typeLoc = type;
   }
 
+  void setExprContextualTypePurpose(ContextualTypePurpose ctp) {
+    assert(kind == Kind::expression);
+    expression.contextualInfo.purpose = ctp;
+  }
+
   /// Whether this target is for an initialization expression and pattern.
   bool isForInitialization() const {
     return kind == Kind::expression &&
