@@ -52,4 +52,26 @@ BoundsCheckTraps.test("UnsafeRawBufferPointer")
   _blackHole(array)
 }
 
+BoundsCheckTraps.test("EmptyCollection")
+  .skip(.custom(
+    { _isFastAssertConfiguration() || _isReleaseAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen"))
+  .code {
+  expectCrashLater()
+  var empty = EmptyCollection<Int>()
+  print(empty[0])
+  _blackHole(empty)
+}
+
+BoundsCheckTraps.test("Character")
+  .skip(.custom(
+    { _isFastAssertConfiguration() || _isReleaseAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen"))
+  .code {
+  expectCrashLater()
+  let twoChars = "ab"
+  let char = Character(twoChars)
+  _blackHole(char)
+}
+
 runAllTests()

@@ -67,9 +67,9 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   public init(
     @_nonEphemeral start: Unsafe${Mutable}Pointer<Element>?, count: Int
   ) {
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
     self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
@@ -499,7 +499,7 @@ extension Unsafe${Mutable}BufferPointer {
   ) rethrows -> R? {
     let (oldBase, oldCount) = (self.baseAddress, self.count)
     defer { 
-      _debugPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
+      _boundsCheckPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
       "UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
     } 
     return try body(&self)
@@ -1140,7 +1140,7 @@ extension Unsafe${Mutable}BufferPointer {
       return try body(.init(start: nil, count: 0))
     }
 
-    _debugPrecondition(
+    _boundsCheckPrecondition(
       Int(bitPattern: .init(base)) & (MemoryLayout<T>.alignment-1) == 0,
       "baseAddress must be a properly aligned pointer for types Element and T"
     )
@@ -1150,7 +1150,7 @@ extension Unsafe${Mutable}BufferPointer {
       newCount = count
     } else {
       newCount = count * MemoryLayout<Element>.stride / MemoryLayout<T>.stride
-      _debugPrecondition(
+      _boundsCheckPrecondition(
         MemoryLayout<T>.stride > MemoryLayout<Element>.stride
         ? MemoryLayout<T>.stride % MemoryLayout<Element>.stride == 0
         : MemoryLayout<Element>.stride % MemoryLayout<T>.stride == 0,
