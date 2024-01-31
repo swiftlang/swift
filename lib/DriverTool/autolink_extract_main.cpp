@@ -32,7 +32,9 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Object/IRObjectFile.h"
 #include "llvm/Object/Wasm.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/BinaryFormat/Wasm.h"
 
 using namespace swift;
@@ -161,7 +163,8 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                CompilerInstance &Instance,
                                StringRef BinaryFileName,
                                std::vector<std::string> &LinkerFlags,
-                               std::unordered_map<std::string, bool> &SwiftRuntimeLibraries) {
+                               std::unordered_map<std::string, bool> &SwiftRuntimeLibraries,
+                               llvm::LLVMContext *LLVMCtx) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
     return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, SwiftRuntimeLibraries, Instance);
   } else if (auto *ObjectFile =
@@ -170,7 +173,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     llvm::Error Error = llvm::Error::success();
     for (const auto &Child : Archive->children(Error)) {
-      auto ChildBinary = Child.getAsBinary();
+      auto ChildBinary = Child.getAsBinary(LLVMCtx);
       // FIXME: BinaryFileName below should instead be ld-style names for
       // object files in archives, e.g. "foo.a(bar.o)".
       if (!ChildBinary) {
@@ -180,12 +183,15 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
         return true;
       }
       if (extractLinkerFlags(ChildBinary->get(), Instance, BinaryFileName,
-                             LinkerFlags, SwiftRuntimeLibraries)) {
+                             LinkerFlags, SwiftRuntimeLibraries, LLVMCtx)) {
         return true;
       }
     }
     return bool(Error);
-  } else {
+  } else if (auto *IRObjectFile = llvm::dyn_cast<llvm::object::IRObjectFile>(Bin)) {
+    // Ignore the LLVM IR files (LTO)
+    return false;
+  }  else {
     Instance.getDiags().diagnose(SourceLoc(), diag::error_open_input_file,
                                  BinaryFileName,
                                  "Don't know how to extract from object file"
@@ -259,8 +265,9 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
   }
 
   // Extract the linker flags from the objects.
+  llvm::LLVMContext LLVMCtx;
   for (const auto &BinaryFileName : Invocation.getInputFilenames()) {
-    auto BinaryOwner = llvm::object::createBinary(BinaryFileName);
+    auto BinaryOwner = llvm::object::createBinary(BinaryFileName, &LLVMCtx);
     if (!BinaryOwner) {
       std::string message;
       {
@@ -274,7 +281,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
     }
 
     if (extractLinkerFlags(BinaryOwner->getBinary(), Instance, BinaryFileName,
-                           LinkerFlags, SwiftRuntimeLibraries)) {
+                           LinkerFlags, SwiftRuntimeLibraries, &LLVMCtx)) {
       return 1;
     }
   }
