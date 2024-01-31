@@ -472,18 +472,7 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
     auto builtinModule = decl->getModuleContext();
     auto generics = genericFnType->getGenericSignature();
-
-    auto genericParams = generics.getGenericParams();
-    assert(genericParams.size() == typeArgs.size());
-
-    TypeSubstitutionMap map;
-    for (auto i : indices(genericParams))
-      map.insert({genericParams[i]->getCanonicalType()
-                                  ->getAs<SubstitutableType>(),
-                  typeArgs[i]});
-
-    auto subs = SubstitutionMap::get(generics,
-                                     QueryTypeSubstitutionMap{map},
+    auto subs = SubstitutionMap::get(generics, typeArgs,
                                      LookUpConformanceInModule{builtinModule});
     declRef = ConcreteDeclRef(decl, subs);
     fnType = genericFnType->substGenericArgs(subs);
