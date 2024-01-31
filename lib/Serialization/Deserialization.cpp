@@ -5208,6 +5208,7 @@ public:
 
       // Macro replacements block.
       SmallVector<ExpandedMacroReplacement, 2> replacements;
+      SmallVector<ExpandedMacroReplacement, 2> genericReplacements;
       if (hasReplacements) {
         llvm::BitstreamEntry entry =
             MF.fatalIfUnexpected(
@@ -5232,12 +5233,26 @@ public:
               replacements.push_back(replacement);
             }
           }
+
+          ArrayRef<uint64_t> serializedGenericReplacements;
+          decls_block::ExpandedMacroReplacementsLayout::readRecord(
+              scratch, serializedGenericReplacements);
+          if (serializedGenericReplacements.size() % 3 == 0) {
+            for (unsigned i : range(0, serializedGenericReplacements.size() / 3)) {
+              ExpandedMacroReplacement genericReplacement{
+                static_cast<unsigned>(serializedGenericReplacements[3*i]),
+                static_cast<unsigned>(serializedGenericReplacements[3*i + 1]),
+                static_cast<unsigned>(serializedGenericReplacements[3*i + 2])
+              };
+              genericReplacements.push_back(genericReplacement);
+            }
+          }
         }
       }
 
       ctx.evaluator.cacheOutput(
           MacroDefinitionRequest{macro},
-          MacroDefinition::forExpanded(ctx, expansionText, replacements)
+          MacroDefinition::forExpanded(ctx, expansionText, replacements, genericReplacements)
       );
     }
 

@@ -35,6 +35,16 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 @freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(declaration, names: named(value)) macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+@freestanding(expression) macro checkGeneric_root<A>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression) macro checkGeneric<A>() = #checkGeneric_root<A>()
+
+@freestanding(expression) macro checkGeneric2_root<A, B>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression) macro checkGeneric2<A, B>() = #checkGeneric2_root<A, B>()
+
+@freestanding(expression) macro checkGenericHashableCodable_root<A: Hashable, B: Codable>() = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+@freestanding(expression) macro checkGenericHashableCodable<A: Hashable, B: Codable>() = #checkGenericHashableCodable_root<A, B>()
+
 #endif
 
 // Test unqualified lookup from within a macro expansion
@@ -128,3 +138,10 @@ protocol Initializable {
 struct S {
   init(a: Int, b: Int) {}
 }
+
+// Check that generic type arguments are passed along in expansions,
+// when macro is implemented using another macro.
+
+#checkGeneric<String>()
+#checkGeneric2<String, Int>()
+#checkGenericHashableCodable<String, Int>()

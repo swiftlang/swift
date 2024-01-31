@@ -1819,6 +1819,17 @@ public struct VarValueMacro: DeclarationMacro, PeerMacro {
   }
 }
 
+public struct GenericToVoidMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    return """
+           ()
+           """
+  }
+}
+
 public struct SingleMemberMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,

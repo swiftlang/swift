@@ -262,9 +262,10 @@ struct MacroExpansionInfo {
     };
     std::string expansionText;
     std::vector<Replacement> replacements;
+    std::vector<Replacement> genericReplacements;
 
     ExpandedMacroDefinition(StringRef expansionText)
-        : expansionText(expansionText), replacements(){};
+        : expansionText(expansionText), replacements(), genericReplacements() {};
   };
 
   // Offset of the macro expansion syntax (i.e. attribute or #<macro name>) from

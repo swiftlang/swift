@@ -11846,10 +11846,12 @@ llvm::Optional<BuiltinMacroKind> MacroDecl::getBuiltinKind() const {
 MacroDefinition MacroDefinition::forExpanded(
     ASTContext &ctx,
     StringRef expansionText,
-    ArrayRef<ExpandedMacroReplacement> replacements
+    ArrayRef<ExpandedMacroReplacement> replacements,
+    ArrayRef<ExpandedMacroReplacement> genericReplacements
 ) {
   return ExpandedMacroDefinition{ctx.AllocateCopy(expansionText),
-                                 ctx.AllocateCopy(replacements)};
+                                 ctx.AllocateCopy(replacements),
+                                 ctx.AllocateCopy(genericReplacements)};
 }
 
 MacroExpansionDecl::MacroExpansionDecl(DeclContext *dc,
