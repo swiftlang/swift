@@ -166,7 +166,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isDestructor: Bool { bridged.isDestructor() }
 
-  public var isGenericFunction: Bool { bridged.isGenericFunction() }
+  public var isGeneric: Bool { bridged.isGeneric() }
 
   /// Kinds of effect attributes which can be defined for a Swift function.
   public enum EffectAttribute {
