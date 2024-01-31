@@ -36,4 +36,20 @@ BoundsCheckTraps.test("UnsafeMutableBufferPointer")
   _blackHole(array)
 }
 
+BoundsCheckTraps.test("UnsafeRawBufferPointer")
+  .skip(.custom(
+    { _isFastAssertConfiguration() || _isReleaseAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen"))
+  .code {
+  expectCrashLater()
+  var array = [1, 2, 3]
+  array.withUnsafeBufferPointer { buffer in
+    print(UnsafeRawBufferPointer(buffer).load(fromByteOffset: MemoryLayout<Int>.stride * 3, as: Int.self))
+  }
+  array.withUnsafeMutableBufferPointer { buffer in
+    UnsafeMutableRawBufferPointer(buffer).storeBytes(of: 17, toByteOffset: MemoryLayout<Int>.stride * 3, as: Int.self)
+  }
+  _blackHole(array)
+}
+
 runAllTests()
