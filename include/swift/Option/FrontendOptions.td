@@ -660,6 +660,14 @@ def disable_experimental_associated_type_inference :
   Flag<["-"], "disable-experimental-associated-type-inference">,
   HelpText<"Disable experimental associated type inference improvements">;
 
+def enable_experimental_lifetime_dependence_inference :
+  Flag<["-"], "enable-experimental-lifetime-dependence-inference">,
+  HelpText<"Enable experimental lifetime dependence inference">;
+
+def disable_experimental_lifetime_dependence_inference :
+  Flag<["-"], "disable-experimental-lifetime-dependence-inference">,
+  HelpText<"Disable experimental lifetime dependence inference">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
