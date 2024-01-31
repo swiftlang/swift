@@ -3005,34 +3005,28 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
     appendOperator("d");
 }
 
-/// Filters out requirements stating that a type conforms to one of the
-/// invertible protocols.
-/// TODO: reconsituteInverses so the absence of conformances gets mangled
-static void withoutInvertibleRequirements(ArrayRef<Requirement> requirements,
-                                          SmallVector<Requirement, 4> &output) {
-  for (auto req : requirements) {
-    // Skip conformance requirements for invertible protocols.
-    if (req.getKind() == RequirementKind::Conformance
-        && req.getProtocolDecl()->getInvertibleProtocolKind())
-      continue;
-
-    output.push_back(req);
-  }
-}
-
 bool ASTMangler::appendGenericSignature(GenericSignature sig,
                                         GenericSignature contextSig) {
   auto canSig = sig.getCanonicalSignature();
 
+  // FIXME: We just ignore invertible requirements for now.
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  canSig->getRequirementsWithInverses(reqs, inverseReqs);
+
   unsigned initialParamDepth;
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> genericParams;
-  SmallVector<Requirement, 4> requirements;
   if (contextSig) {
     // If the signature is the same as the context signature, there's nothing
     // to do.
     if (contextSig.getCanonicalSignature() == canSig) {
       return false;
     }
+
+    // FIXME: We just ignore invertible requirements for now.
+    SmallVector<Requirement, 2> contextReqs;
+    SmallVector<InverseRequirement, 2> contextInverseReqs;
+    contextSig->getRequirementsWithInverses(contextReqs, contextInverseReqs);
 
     // The signature depth starts above the depth of the context signature.
     if (!contextSig.getGenericParams().empty()) {
@@ -3053,26 +3047,25 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
     // have a special-case mangling for that.
     if (genericParams.empty() &&
         contextSig.getGenericParams().size() == 1 &&
-        contextSig.getRequirements().empty()) {
+        contextReqs.empty()) {
       initialParamDepth = 0;
       genericParams = canSig.getGenericParams();
-      withoutInvertibleRequirements(canSig.getRequirements(), requirements);
     } else {
-      withoutInvertibleRequirements(
-          canSig.requirementsNotSatisfiedBy(contextSig), requirements);
+      llvm::erase_if(reqs, [&](Requirement req) {
+        return contextSig->isRequirementSatisfied(req);
+      });
     }
   } else {
     // Use the complete canonical signature.
     initialParamDepth = 0;
     genericParams = canSig.getGenericParams();
-    withoutInvertibleRequirements(canSig.getRequirements(), requirements);
   }
 
-  if (genericParams.empty() && requirements.empty())
+  if (genericParams.empty() && reqs.empty())
     return false;
 
   appendGenericSignatureParts(sig, genericParams,
-                              initialParamDepth, requirements);
+                              initialParamDepth, reqs);
   return true;
 }
 
