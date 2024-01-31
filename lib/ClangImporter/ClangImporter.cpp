@@ -6281,7 +6281,7 @@ ClangImporter::Implementation::loadNamedMembers(
     if (member->getDeclContext() != CDC) continue;
 
     SmallVector<Decl*, 4> tmp;
-    insertMembersAndAlternates(member, tmp);
+    insertMembersAndAlternates(member, tmp, DC);
     for (auto *TD : tmp) {
       if (auto *V = dyn_cast<ValueDecl>(TD)) {
         // Skip ValueDecls if they import under different names.
@@ -6313,7 +6313,7 @@ ClangImporter::Implementation::loadNamedMembers(
     if (member->getDeclContext() != CDC) continue;
 
     SmallVector<Decl*, 4> tmp;
-    insertMembersAndAlternates(member, tmp);
+    insertMembersAndAlternates(member, tmp, DC);
     for (auto *TD : tmp) {
       if (auto *V = dyn_cast<ValueDecl>(TD)) {
         // Skip ValueDecls if they import under different names.

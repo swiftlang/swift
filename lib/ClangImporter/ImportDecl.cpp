@@ -9136,6 +9136,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         (isa<clang::FieldDecl>(nd) || nd == nd->getCanonicalDecl());
     if (isCanonicalInContext && nd->getDeclContext() == clangRecord &&
         isVisibleClangEntry(nd))
+      // We don't pass `swiftDecl` as `expectedDC` because we might be in a
+      // recursive call that adds base class members to a derived class.
       insertMembersAndAlternates(nd, members);
   }
 
@@ -9376,7 +9378,9 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
 }
 
 void ClangImporter::Implementation::insertMembersAndAlternates(
-    const clang::NamedDecl *nd, SmallVectorImpl<Decl *> &members) {
+    const clang::NamedDecl *nd,
+    SmallVectorImpl<Decl *> &members,
+    DeclContext *expectedDC) {
 
   size_t start = members.size();
   llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
@@ -9391,9 +9395,13 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
       return false;
     }
 
+    // If no DC was provided, use wherever the primary decl was imported into.
+    if (!expectedDC)
+      expectedDC = member->getDeclContext();
+
     // If there are alternate declarations for this member, add them.
     for (auto alternate : getAlternateDecls(member)) {
-      if (alternate->getDeclContext() == member->getDeclContext() &&
+      if (alternate->getDeclContext() == expectedDC &&
           knownAlternateMembers.insert(alternate).second) {
         members.push_back(alternate);
       }
@@ -9404,7 +9412,8 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
     if (shouldSuppressDeclImport(nd))
       return true;
 
-    members.push_back(member);
+    if (member->getDeclContext() == expectedDC)
+      members.push_back(member);
     if (nameVersion.supportsConcurrency()) {
       assert(!asyncImport &&
              "Should only have a single version with concurrency enabled");
@@ -9436,7 +9445,7 @@ void ClangImporter::Implementation::collectMembersToAdd(
     if (nd && nd == nd->getCanonicalDecl() &&
         nd->getDeclContext() == objcContainer &&
         isVisibleClangEntry(nd))
-      insertMembersAndAlternates(nd, members);
+      insertMembersAndAlternates(nd, members, DC);
   }
 
   // Objective-C protocols don't require any special handling.
