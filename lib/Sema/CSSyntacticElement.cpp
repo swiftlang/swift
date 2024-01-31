@@ -178,6 +178,12 @@ public:
     return Action::Continue(stmt);
   }
 
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    /// Decls get type-checked separately, except for PatternBindingDecls,
+    /// whose initializers we want to walk into.
+    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+  }
+
 private:
   DeclContext *currentClosureDC() const {
     return ClosureDCs.empty() ? nullptr : ClosureDCs.back();
