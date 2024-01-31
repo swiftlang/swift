@@ -1,7 +1,17 @@
 // RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
+// RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
+// RUN: echo "\"-disable-implicit-concurrency-module-import\"" >> %t/MyApp.cmd
+// RUN: echo "\"-parse-stdlib\"" >> %t/MyApp.cmd
+
 // RUN: %{python} %S/Inputs/PrintResponseFile.py  %target-swift-frontend -cache-compile-job -Rcache-compile-job %s \
 // RUN:   -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies -module-name Test -o %t/test.o -cas-path %t/cas \
-// RUN:   -allow-unstable-cache-key-for-testing > %t/cmd.resp
+// RUN:   @%t/MyApp.cmd > %t/cmd.resp
 
 // RUN: %swift-scan-test -action compute_cache_key -cas-path %t/cas -input %s -- %swift_frontend_plain @%t/cmd.resp > %t/key.casid
 
@@ -17,7 +27,7 @@
 
 // RUN: %{python} %S/Inputs/PrintResponseFile.py  %target-swift-frontend -cache-compile-job -Rcache-compile-job %s \
 // RUN:   -emit-module -emit-module-path %t/Test2.swiftmodule -c -emit-dependencies -module-name Test -o %t/test.o -cas-path %t/cas \
-// RUN:   -allow-unstable-cache-key-for-testing > %t/cmd2.resp
+// RUN:   @%t/MyApp.cmd > %t/cmd2.resp
 // RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key.casid -- %swift_frontend_plain @%t/cmd2.resp
 
 // RUN: diff %t/Test.swiftmodule %t/Test2.swiftmodule
