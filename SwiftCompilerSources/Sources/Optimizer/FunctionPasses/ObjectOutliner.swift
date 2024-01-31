@@ -76,7 +76,14 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
     return nil
   }
 
-  guard let endOfInitInst = findEndOfInitialization(of: allocRef) else {
+  guard let endOfInitInst = findEndOfInitialization(
+    of: allocRef,
+    // An object with tail allocated elements is in risk of being passed to malloc_size, which does
+    // not work for non-heap allocated objects. Conservatively, disable objects with tail allocations.
+    // Note, that this does not affect Array because Array always has an end_cow_mutation at the end of
+    // initialization.
+    canStoreToGlobal: allocRef.tailAllocatedCounts.count == 0)
+  else {
     return nil
   }
 
@@ -98,7 +105,7 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
 // The end-of-initialization is either an end_cow_mutation, because it guarantees that the originally initialized
 // object is not mutated (it must be copied before mutation).
 // Or it is the store to a global let variable in the global's initializer function.
-private func findEndOfInitialization(of object: Value) -> Instruction? {
+private func findEndOfInitialization(of object: Value, canStoreToGlobal: Bool) -> Instruction? {
   for use in object.uses {
     let user = use.instruction
     switch user {
@@ -106,7 +113,7 @@ private func findEndOfInitialization(of object: Value) -> Instruction? {
          is UncheckedRefCastInst,
          is MoveValueInst,
          is EndInitLetRefInst:
-      if let ecm = findEndOfInitialization(of: user as! SingleValueInstruction) {
+      if let ecm = findEndOfInitialization(of: user as! SingleValueInstruction, canStoreToGlobal: canStoreToGlobal) {
         return ecm
       }
     case let ecm as EndCOWMutationInst:
@@ -115,7 +122,8 @@ private func findEndOfInitialization(of object: Value) -> Instruction? {
       }
       return ecm
     case let store as StoreInst:
-      if let ga = store.destination as? GlobalAddrInst,
+      if canStoreToGlobal,
+         let ga = store.destination as? GlobalAddrInst,
          ga.global.isLet,
          ga.parentFunction.initializedGlobal == ga.global
       {
