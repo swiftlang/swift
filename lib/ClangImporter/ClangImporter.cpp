@@ -631,6 +631,17 @@ importer::getNormalInvocationArguments(
       });
     }
 
+    // To support -apple-none triples, which are non-Darwin, we need to #define
+    // a few things that the Apple SDKs expect.
+    if (triple.getVendor() == llvm::Triple::VendorType::Apple) {
+      invocationArgStrs.insert(invocationArgStrs.end(),
+                               {"-D__APPLE__", "-D__MACH__"});
+    }
+
+    if (triple.isOSBinFormatWasm()) {
+      invocationArgStrs.insert(invocationArgStrs.end(), {"-D__wasi__"});
+    }
+
     if (triple.isOSWindows()) {
       switch (triple.getArch()) {
       default: llvm_unreachable("unsupported Windows architecture");
