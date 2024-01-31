@@ -219,9 +219,15 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     return llvm::None;
   }
 
+  // Perform lifetime dependence inference under a flag only. Currently all
+  // stdlib types can appear is ~Escapable and ~Copyable.
+  if (!ctx.LangOpts.EnableExperimentalLifetimeDependenceInference) {
+    return llvm::None;
+  }
+
   auto &diags = ctx.Diags;
   auto returnTypeRepr = afd->getResultTypeRepr();
-  auto returnLoc = returnTypeRepr->getLoc();
+  auto returnLoc = returnTypeRepr ? returnTypeRepr->getLoc() : afd->getLoc();
   Type returnTyInContext = afd->mapTypeIntoContext(resultType);
 
   if (returnTyInContext->isEscapable()) {
@@ -231,7 +237,7 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
     return llvm::None;
   }
 
-  if (afd->hasImplicitSelfDecl()) {
+  if (afd->getKind() == DeclKind::Func && afd->hasImplicitSelfDecl()) {
     auto ownership = afd->getImplicitSelfDecl()->getValueOwnership();
     if (ownership == ValueOwnership::Default) {
       diags.diagnose(
@@ -285,13 +291,14 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd, Type resultType) {
 llvm::Optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::get(AbstractFunctionDecl *afd, Type resultType,
                             bool allowIndex) {
-  auto *returnTypeRepr = afd->getResultTypeRepr();
-  if (!returnTypeRepr) {
+  if (afd->getKind() != DeclKind::Func &&
+      afd->getKind() != DeclKind::Constructor) {
     return llvm::None;
   }
-  if (!isa<LifetimeDependentReturnTypeRepr>(returnTypeRepr)) {
-    return LifetimeDependenceInfo::infer(afd, resultType);
+  auto *returnTypeRepr = afd->getResultTypeRepr();
+  if (isa_and_nonnull<LifetimeDependentReturnTypeRepr>(returnTypeRepr)) {
+    return LifetimeDependenceInfo::fromTypeRepr(afd, resultType, allowIndex);
   }
-  return LifetimeDependenceInfo::fromTypeRepr(afd, resultType, allowIndex);
+  return LifetimeDependenceInfo::infer(afd, resultType);
 }
 } // namespace swift
