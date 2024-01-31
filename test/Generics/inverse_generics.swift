@@ -138,14 +138,13 @@ typealias err1 = RequireCopyable<Maybe<NC>>
 typealias err2 = RequireCopyable<NC>
 // expected-error@-1{{type 'NC' does not conform to protocol 'Copyable'}}
 
-// plain extension doesn't treat Self as Copyable
-extension Maybe {
+extension Maybe where Wrapped: ~Copyable {
   func check1(_ t: RequireCopyable<Self>) {}
   // expected-error@-1 {{type 'Wrapped' does not conform to protocol 'Copyable'}}
   // expected-error@-2 {{'RequireCopyable' requires that 'Wrapped' conform to 'Copyable'}}
 }
 
-extension Maybe where Self: Copyable {
+extension Maybe {
   func check2(_ t: RequireCopyable<Self>) {}
 }
 
@@ -181,8 +180,7 @@ enum EnumExtendo {}
 extension EnumExtendo: ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
 
 extension NeedsCopyable where Self: ~Copyable {}
-// expected-error@-1 {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
-// expected-error@-2 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
+// expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
 protocol NoCopyP: ~Copyable {}
 

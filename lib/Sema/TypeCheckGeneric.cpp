@@ -679,9 +679,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (!genericParams && where)
-    allowConcreteGenericParams = true;
-
   GenericSignature parentSig;
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> extraReqs;
@@ -793,7 +790,9 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // the right sugared types, since we don't want to expose the
     // name of the generic parameter of BuiltinTupleDecl itself.
     if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
-        !isa<BuiltinTupleDecl>(extendedNominal)) {
+        !isa<BuiltinTupleDecl>(extendedNominal) &&
+        !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      // FIXME: Recover this optimization even with NoncopyableGenerics on.
       return parentSig;
     }
 

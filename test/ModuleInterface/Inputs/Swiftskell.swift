@@ -19,15 +19,9 @@ public protocol Eq: ~Copyable {
   static func /=(_ a: borrowing Self, _ b: borrowing Self) -> Bool
 }
 
-public extension Eq {
+public extension Eq where Self: ~Copyable {
   static func /=(_ a: borrowing Self, _ b: borrowing Self) -> Bool {
     return !(a == b)
-  }
-}
-
-public extension Eq where Self: Equatable {
-  static func ==(_ a: borrowing Self, _ b: borrowing Self) -> Bool {
-    return a == b
   }
 }
 
@@ -70,13 +64,13 @@ public enum Maybe<Value: ~Copyable> {
   case nothing
 }
 
-extension Maybe: Show {
+extension Maybe: Show where Value: ~Copyable {
   public borrowing func show() -> String {
     fatalError("need borrowing switches")
   }
 }
 
-extension Maybe: Eq where Value: Eq {
+extension Maybe: Eq where Value: Eq, Value: ~Copyable {
   public static func ==(_ a: borrowing Self, _ b: borrowing Self) -> Bool {
     fatalError("need borrowing switches")
   }

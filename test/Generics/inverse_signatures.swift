@@ -202,7 +202,7 @@ struct ImplicitCond<T: ~Escapable & ~Copyable> {}
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
 // CHECK-NEXT: (normal_conformance type="ImplicitCond<T>" protocol="Empty")
-extension ImplicitCond: Empty {}
+extension ImplicitCond: Empty where T: ~Copyable, T: ~Escapable {}
 
 
 // NOTE: the following extensions were implicitly synthesized, so they appear at the end!

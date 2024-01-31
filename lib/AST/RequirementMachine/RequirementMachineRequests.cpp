@@ -791,6 +791,10 @@ InferredGenericSignatureRequest::evaluate(
     return false;
   };
 
+  // "Local" generic parameters to which we apply default Copyable and
+  // Escapable.
+  SmallVector<Type, 4> paramTypes;
+
   if (genericParamList) {
     // Extensions never have a parent signature.
     assert(genericParamList->getOuterParameters() == nullptr || !parentSig);
@@ -807,6 +811,10 @@ InferredGenericSignatureRequest::evaluate(
     // We walk them backwards to order outer parameters before inner
     // parameters.
     for (auto *gpList : llvm::reverse(gpLists)) {
+      for (auto *gpDecl : *gpList) {
+        paramTypes.push_back(gpDecl->getDeclaredInterfaceType());
+      }
+
       assert(gpList->size() > 0 &&
              "Parsed an empty generic parameter list?");
 
@@ -864,15 +872,16 @@ InferredGenericSignatureRequest::evaluate(
 
   desugarRequirements(requirements, inverses, errors);
 
+  if (!genericParamList && allowConcreteGenericParams) {
+    for (auto paramTy : genericParams) {
+      paramTypes.push_back(paramTy);
+    }
+  }
+
   // After realizing requirements, expand default requirements only for local
   // generic parameters, as the outer parameters have already been expanded.
-  SmallVector<Type, 4> localGPs;
-  if (genericParamList)
-    for (auto *gtpd : genericParamList->getParams())
-      localGPs.push_back(gtpd->getDeclaredInterfaceType());
-
-  InverseRequirement::expandDefaults(ctx, localGPs, requirements);
-  applyInverses(ctx, localGPs, inverses, requirements, errors);
+  InverseRequirement::expandDefaults(ctx, paramTypes, requirements);
+  applyInverses(ctx, paramTypes, inverses, requirements, errors);
 
   // Re-order requirements so that inferred requirements appear last. This
   // ensures that if an inferred requirement is redundant with some other
@@ -947,7 +956,7 @@ InferredGenericSignatureRequest::evaluate(
     if (attempt == 0) {
       machine->computeRequirementDiagnostics(errors, inverses, loc);
       diagnoseRequirementErrors(ctx, errors,
-                                allowConcreteGenericParams
+                                (allowConcreteGenericParams || !genericParamList)
                                 ? AllowConcreteTypePolicy::All
                                 : AllowConcreteTypePolicy::AssocTypes);
     }
@@ -978,7 +987,7 @@ InferredGenericSignatureRequest::evaluate(
                                            std::move(machine));
     }
 
-    if (!allowConcreteGenericParams) {
+    if (genericParamList && !allowConcreteGenericParams) {
       for (auto genericParam : result.getInnermostGenericParams()) {
         auto reduced = result.getReducedType(genericParam);
 
