@@ -1415,7 +1415,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Binding: {
     auto bPattern = cast<BindingPattern>(pattern);
     Printer.printIntroducerKeyword(
-        bPattern->isLet() ? "let" : "var",
+        bPattern->getIntroducerStringRef(),
         Options, " ");
     printPattern(bPattern->getSubPattern());
   }
@@ -4634,7 +4634,10 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->getKind() == DeclKind::Var || Options.PrintParameterSpecifiers) {
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
-    Printer.printIntroducerKeyword(decl->isLet() ? "let" : "var", Options, " ");
+    
+    Printer.printIntroducerKeyword(
+      decl->getIntroducer() == VarDecl::Introducer::Let ? "let" : "var",
+      Options, " ");
   }
   printContextIfNeeded(decl);
   recordDeclLoc(decl,

@@ -440,6 +440,9 @@ static StringRef getDumpString(RequirementKind kind) {
 
   llvm_unreachable("Unhandled RequirementKind in switch.");
 }
+static StringRef getDumpString(StringRef s) {
+  return s;
+}
 static unsigned getDumpString(unsigned value) {
   return value;
 }
@@ -1015,7 +1018,8 @@ namespace {
       printFoot();
     }
     void visitBindingPattern(BindingPattern *P, StringRef label) {
-      printCommon(P, P->isLet() ? "pattern_let" : "pattern_var", label);
+      printCommon(P, "pattern_binding", label);
+      printField(P->getIntroducerStringRef(), "kind");
       printRec(P->getSubPattern());
       printFoot();
     }

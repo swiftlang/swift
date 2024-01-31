@@ -817,17 +817,8 @@ public:
     return VP;
   }
 
-  bool isLet() const { return getIntroducer() == VarDecl::Introducer::Let; }
-
   StringRef getIntroducerStringRef() const {
-    switch (getIntroducer()) {
-    case VarDecl::Introducer::Let:
-      return "let";
-    case VarDecl::Introducer::Var:
-      return "var";
-    case VarDecl::Introducer::InOut:
-      return "inout";
-    }
+    return VarDecl::getIntroducerStringRef(getIntroducer());
   }
 
   SourceLoc getLoc() const { return VarLoc; }

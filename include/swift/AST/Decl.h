@@ -5909,7 +5909,21 @@ public:
     Let = 0,
     Var = 1,
     InOut = 2,
+    Borrowing = 3,
   };
+  
+  static StringRef getIntroducerStringRef(Introducer i) {
+    switch (i) {
+    case VarDecl::Introducer::Let:
+      return "let";
+    case VarDecl::Introducer::Var:
+      return "var";
+    case VarDecl::Introducer::InOut:
+      return "inout";
+    case VarDecl::Introducer::Borrowing:
+      return "_borrowing";
+    }
+  }
 
 protected:
   PointerUnion<PatternBindingDecl *,
@@ -6155,6 +6169,10 @@ public:
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
+  }
+  
+  StringRef getIntroducerStringRef() const {
+    return getIntroducerStringRef(getIntroducer());
   }
 
   CaptureListExpr *getParentCaptureList() const {

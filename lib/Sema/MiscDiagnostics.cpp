@@ -3545,8 +3545,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               foundVP = VP;
         });
 
-        if (foundVP && !foundVP->isLet())
+        if (foundVP && foundVP->getIntroducer() != VarDecl::Introducer::Let) {
           FixItLoc = foundVP->getLoc();
+        }
       }
 
       // If this is a parameter explicitly marked 'var', remove it.
