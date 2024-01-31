@@ -22,6 +22,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/CachingUtils.h"
+#include "swift/Frontend/CompileJobCacheResult.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Parse/ParseVersion.h"
@@ -2446,12 +2447,19 @@ struct ExplicitCASModuleLoader::Implementation {
     if (!moduleRef)
       return nullptr;
 
-    clang::cas::CompileJobResultSchema schema(CAS);
+    auto proxy = CAS.getProxy(*moduleRef);
+    if (!proxy)
+      return proxy.takeError();
+
+    swift::cas::CompileJobResultSchema schema(CAS);
+    if (!schema.isRootNode(*proxy))
+      return nullptr;
+
     auto result = schema.load(*moduleRef);
     if (!result)
       return result.takeError();
-    auto output = result->getOutput(
-        clang::cas::CompileJobCacheResult::OutputKind::MainOutput);
+
+    auto output = result->getOutput(file_types::ID::TY_SwiftModuleFile);
     if (!output)
       return nullptr;
 
