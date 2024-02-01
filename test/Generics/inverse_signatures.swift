@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes -verify -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
-// REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 
 // CHECK-LABEL: (file).genericFn@
 // CHECK: Generic signature: <T where T : Copyable, T : Escapable>

@@ -7,6 +7,7 @@
 // RUN: -enable-experimental-feature NoncopyableGenerics \
 // RUN: -enable-experimental-lifetime-dependence-inference | %FileCheck %s
 // REQUIRES: asserts
+// REQUIRES: noncopyable_generics
 
 import Builtin
 
@@ -75,4 +76,3 @@ struct Wrapper : ~Escapable {
     return view
   }
 }
-

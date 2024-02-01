@@ -10,6 +10,7 @@
 // RUN: %FileCheck %s
 
 // For -enable-experimental-feature NoncopyableGenerics/NonescapableTypes
+// REQUIRES: noncopyable_generics
 // REQUIRES: asserts
 // TODO: Once NoncopyableGenerics/NonescapableTypes is no longer behind a feature flag, merge this into basic2.
 
@@ -30,4 +31,3 @@ struct NCG<T> : ~Copyable {
 struct NEG<T> : ~Escapable {
   var t: T
 }
-

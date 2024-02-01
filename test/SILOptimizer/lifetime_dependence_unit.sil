@@ -5,6 +5,7 @@
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: noncopyable_generics
 
 sil_stage canonical
 

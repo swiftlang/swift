@@ -15,6 +15,8 @@
 // RUN:    -I %t -source-filename=%s                                           \
 // RUN:    | %FileCheck -check-prefix=CHECK-PRINT %s
 
+// REQUIRES: noncopyable_generics
+
 // CHECK-NOT: UnknownCode
 
 // CHECK-PRINT-DAG: protocol Generator<Value> {
@@ -48,5 +50,3 @@ func check() {
 
     let x: Maybe<NC> = .none // expected-error {{noncopyable type 'NC' cannot be used with generic type 'Maybe<Wrapped>' yet}}
 }
-
-
