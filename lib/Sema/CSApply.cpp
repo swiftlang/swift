@@ -7448,9 +7448,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           if (decl->hasClangNode())
             return false;
 
-          auto *declaredIn = decl->getModuleContext();
-          return declaredIn && declaredIn != dc->getParentModule() &&
-                 !declaredIn->getLanguageVersionBuiltWith().isVersionAtLeast(6);
+          auto declaredIn = decl->findImport(dc);
+          if (!declaredIn)
+            return false;
+
+          return !declaredIn->module.importedModule->isConcurrencyChecked();
         };
 
         if (requiresRuntimeCheck()) {
