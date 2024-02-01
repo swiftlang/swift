@@ -205,7 +205,7 @@
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
-public struct UnsafePointer<Pointee>: _Pointer, @unchecked _BitwiseCopyable {
+public struct UnsafePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
@@ -578,8 +578,7 @@ public struct UnsafePointer<Pointee>: _Pointer, @unchecked _BitwiseCopyable {
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
-public struct UnsafeMutablePointer<Pointee>
-  : _Pointer, @unchecked _BitwiseCopyable {
+public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
