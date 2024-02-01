@@ -1252,8 +1252,7 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = getASTContext();
 
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
-      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+  if (!ctx.LangOpts.AssumesNoncopyableGenerics) {
     reqs.append(getRequirements().begin(), getRequirements().end());
     return;
   }
@@ -1296,7 +1295,7 @@ void RequirementSignature::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = owner->getASTContext();
 
-  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
+  if (!ctx.LangOpts.AssumesNoncopyableGenerics &&
       !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     reqs.append(getRequirements().begin(), getRequirements().end());
     return;
