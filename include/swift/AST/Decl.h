@@ -2734,6 +2734,10 @@ protected:
   }
 
 public:
+  /// Find the import that makes the given declaration available.
+  llvm::Optional<AttributedImport<ImportedModule>>
+  findImport(const DeclContext *fromDC);
+
   /// Return true if this protocol member is a protocol requirement.
   ///
   /// Asserts if this is not a member of a protocol.

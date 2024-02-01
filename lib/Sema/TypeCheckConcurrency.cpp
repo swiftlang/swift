@@ -810,38 +810,6 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
           conformance.getConcrete())->isMissing());
 }
 
-/// Find the import that makes the given declaration available.
-static llvm::Optional<AttributedImport<ImportedModule>>
-findImportFor(const DeclContext *dc, const DeclContext *fromDC) {
-  // If the type is from the current module, there's no import.
-  auto module = dc->getParentModule();
-  if (module == fromDC->getParentModule())
-    return llvm::None;
-
-  auto fromSourceFile = fromDC->getParentSourceFile();
-  if (!fromSourceFile)
-    return llvm::None;
-
-  // Look to see if the owning module was directly imported.
-  for (const auto &import : fromSourceFile->getImports()) {
-    if (import.module.importedModule == module)
-      return import;
-  }
-
-  // Now look for transitive imports.
-  auto &importCache = dc->getASTContext().getImportCache();
-  for (const auto &import : fromSourceFile->getImports()) {
-    auto &importSet = importCache.getImportSet(import.module.importedModule);
-    for (const auto &transitive : importSet.getTransitiveImports()) {
-      if (transitive.importedModule == module) {
-        return import;
-      }
-    }
-  }
-
-  return llvm::None;
-}
-
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
@@ -870,7 +838,7 @@ SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
   if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // Determine whether this nominal type is visible via a @preconcurrency
     // import.
-    auto import = findImportFor(nominal, fromDC);
+    auto import = nominal->findImport(fromDC);
     auto sourceFile = fromDC->getParentSourceFile();
 
     if (!import || !import->options.contains(ImportFlags::Preconcurrency))
@@ -937,7 +905,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
       // This type was imported from another module; try to find the
       // corresponding import.
       llvm::Optional<AttributedImport<swift::ImportedModule>> import =
-          findImportFor(nominal, fromContext.fromDC);
+          nominal->findImport(fromContext.fromDC);
 
       // If we found the import that makes this nominal type visible, remark
       // that it can be @preconcurrency import.
@@ -3012,8 +2980,7 @@ namespace {
         return false;
       }
 
-      const auto import =
-          findImportFor(var->getDeclContext(), getDeclContext());
+      const auto import = var->findImport(getDeclContext());
       const bool isPreconcurrencyImport =
           import && import->options.contains(ImportFlags::Preconcurrency);
       const auto isPreconcurrencyUnspecifiedIsolation =

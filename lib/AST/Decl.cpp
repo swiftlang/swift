@@ -30,6 +30,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
@@ -3787,6 +3788,37 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
     return {};
 
   return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
+}
+
+llvm::Optional<AttributedImport<ImportedModule>>
+ValueDecl::findImport(const DeclContext *fromDC) {
+  // If the type is from the current module, there's no import.
+  auto module = getModuleContext();
+  if (module == fromDC->getParentModule())
+    return llvm::None;
+
+  auto fromSourceFile = fromDC->getParentSourceFile();
+  if (!fromSourceFile)
+    return llvm::None;
+
+  // Look to see if the owning module was directly imported.
+  for (const auto &import : fromSourceFile->getImports()) {
+    if (import.module.importedModule == module)
+      return import;
+  }
+
+  // Now look for transitive imports.
+  auto &importCache = getASTContext().getImportCache();
+  for (const auto &import : fromSourceFile->getImports()) {
+    auto &importSet = importCache.getImportSet(import.module.importedModule);
+    for (const auto &transitive : importSet.getTransitiveImports()) {
+      if (transitive.importedModule == module) {
+        return import;
+      }
+    }
+  }
+
+  return llvm::None;
 }
 
 bool ValueDecl::isProtocolRequirement() const {
