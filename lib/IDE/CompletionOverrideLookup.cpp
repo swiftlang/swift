@@ -87,24 +87,15 @@ Type CompletionOverrideLookup::getOpaqueResultType(
     // If it has same type requrement, we will emit the concrete type.
     return nullptr;
 
-  // Collect requirements on the associatedtype.
-  SmallVector<Type, 2> opaqueTypes;
-  bool hasExplicitAnyObject = false;
-  if (auto superTy = genericSig->getSuperclassBound(ResultT))
-    opaqueTypes.push_back(superTy);
-  for (const auto proto : genericSig->getRequiredProtocols(ResultT))
-    opaqueTypes.push_back(proto->getDeclaredInterfaceType());
-  if (auto layout = genericSig->getLayoutConstraint(ResultT))
-    hasExplicitAnyObject = layout->isClass();
+  auto upperBound = genericSig->getUpperBound(
+      ResultT,
+      /*forExistentialSelf=*/false,
+      /*withParameterizedProtocols=*/false);
 
-  if (!hasExplicitAnyObject) {
-    if (opaqueTypes.empty())
-      return nullptr;
-    if (opaqueTypes.size() == 1)
-      return opaqueTypes.front();
-  }
-  return ProtocolCompositionType::get(VD->getASTContext(), opaqueTypes,
-                                      hasExplicitAnyObject);
+  if (upperBound->isAny())
+    return nullptr;
+
+  return upperBound;
 }
 
 void CompletionOverrideLookup::addValueOverride(
