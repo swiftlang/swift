@@ -210,9 +210,9 @@ func func_with_unknown_attr3(x: @unknown(Int) -> Int) {} // expected-error {{unk
 func func_with_unknown_attr4(x: @unknown(Int) throws -> Int) {} // expected-error {{unknown attribute 'unknown'}}
 func func_with_unknown_attr5(x: @unknown (x: Int, y: Int)) {} // expected-error {{unknown attribute 'unknown'}}
 func func_with_unknown_attr6(x: @unknown(x: Int, y: Int)) {} // expected-error {{unknown attribute 'unknown'}}
-func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {{unknown attribute 'unknown'}}
+func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {{unknown attribute 'unknown'}} expected-warning {{extraneous whitespace between attribute name and '('; this is an error in Swift 6}}
 
-func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Known attributes can have space before its paren.
+func func_type_attribute_with_space(x: @convention(c) () -> Int) {} // OK. Known attributes can have space before its paren.
 
 // @thin and @pseudogeneric are not supported except in SIL.
 var thinFunc : @thin () -> () // expected-error {{unknown attribute 'thin'}}
