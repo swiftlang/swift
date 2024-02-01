@@ -308,6 +308,12 @@ struct StructWithSomeProtocolInline: SomeProtocol {
     let x: SimpleClass
 }
 
+struct StructWithSomeProtocolInlineShifted: SomeProtocol {
+    let y: Int = 0
+    let y2: Int = 0
+    let x: SimpleClass
+}
+
 func testExistentialStructInline() {
     let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
 
@@ -395,6 +401,47 @@ func testExistentialStructBox() {
 }
 
 testExistentialStructBox()
+
+func testExistentialStructTypeChange() {
+    let ptr = UnsafeMutablePointer<ExistentialWrapper>.allocate(capacity: 1)
+
+    do {
+        let x = StructWithSomeProtocolInline(x: SimpleClass(x: 23))
+        testInit(ptr, to: createExistentialWrapper(x))
+    }
+
+    do {
+        let y = StructWithSomeProtocolInlineShifted(x: SimpleClass(x: 32))
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(y)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
+    do {
+        let z = StructWithSomeProtocolBox(x: SimpleClass(x: 32))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+        var wrapper = createExistentialWrapper(z)
+        testAssignCopy(ptr, from: &wrapper)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testExistentialStructTypeChange()
 
 func testAnyWrapper() {
     let ptr = UnsafeMutablePointer<AnyWrapper>.allocate(capacity: 1)
