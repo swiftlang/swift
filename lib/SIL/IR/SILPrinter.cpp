@@ -2464,9 +2464,11 @@ public:
   void visitOpenPackElementInst(OpenPackElementInst *OPEI) {
     auto env = OPEI->getOpenedGenericEnvironment();
     auto subs = env->getPackElementContextSubstitutions();
-    *this << Ctx.getID(OPEI->getIndexOperand())
-          << " of " << subs.getGenericSignature()
-          << " at ";
+    *this << Ctx.getID(OPEI->getIndexOperand()) << " of ";
+    PrintOptions Opts;
+    Opts.PrintInverseRequirements = true;
+    subs.getGenericSignature().print(PrintState.OS, Opts);
+    *this << " at ";
     printSubstitutions(subs);
     // The shape class in the opened environment is a canonical interface
     // type, which won't resolve in the generic signature we just printed.
