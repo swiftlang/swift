@@ -5654,11 +5654,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.ref.protocol,
         key.name: "_Pointer",
         key.usr: "s:s8_PointerP"
-      },
-      {
-        key.kind: source.lang.swift.ref.protocol,
-        key.name: "_BitwiseCopyable",
-        key.usr: "s:s16_BitwiseCopyableP"
       }
     ]
   },
