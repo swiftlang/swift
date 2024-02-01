@@ -32,8 +32,6 @@ using namespace swift;
 SILFunction *GenericCloner::createDeclaration(
     SILOptFunctionBuilder &FunctionBuilder, SILFunction *Orig,
     const ReabstractionInfo &ReInfo, StringRef NewName) {
-  assert((!ReInfo.isSerialized() || Orig->isSerialized())
-         && "Specialization cannot make body more resilient");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())

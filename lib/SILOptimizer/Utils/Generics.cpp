@@ -3210,11 +3210,17 @@ void swift::trySpecializeApplyOfGeneric(
   // not have an external entry point, Since the callee is not
   // fragile we cannot serialize the body of the specialized
   // callee either.
-  if (F->isSerialized() && !RefF->hasValidLinkageForFragileInline())
-      return;
+  bool needSetLinkage = false;
+  if (isMandatory) {
+    if (F->isSerialized() && !RefF->hasValidLinkageForFragileInline())
+      needSetLinkage = true;
+  } else {
+    if (F->isSerialized() && !RefF->hasValidLinkageForFragileInline())
+        return;
 
-  if (shouldNotSpecialize(RefF, F))
-    return;
+    if (shouldNotSpecialize(RefF, F))
+      return;
+  }
 
   // If the caller and callee are both fragile, preserve the fragility when
   // cloning the callee. Otherwise, strip it off so that we can optimize
@@ -3331,7 +3337,15 @@ void swift::trySpecializeApplyOfGeneric(
     return;
   }
 
-  if (F->isSerialized() && !SpecializedF->hasValidLinkageForFragileInline()) {
+  if (needSetLinkage) {
+    assert(F->isSerialized() && !RefF->hasValidLinkageForFragileInline());
+    // If called from a serialized function we cannot make the specialized function
+    // shared and non-serialized. The only other option is to keep the original
+    // function's linkage. It's not great, because it can prevent dead code
+    // elimination - usually the original function is a public function.
+    SpecializedF->setLinkage(RefF->getLinkage());
+    SpecializedF->setSerialized(IsNotSerialized);
+  } else if (F->isSerialized() && !SpecializedF->hasValidLinkageForFragileInline()) {
     // If the specialized function already exists as a "IsNotSerialized" function,
     // but now it's called from a "IsSerialized" function, we need to mark it as
     // IsSerialized.
