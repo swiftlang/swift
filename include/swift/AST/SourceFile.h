@@ -144,6 +144,9 @@ private:
   /// This is \c None until it is filled in by the import resolution phase.
   llvm::Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
+  /// The underlying clang module, if imported in this file.
+  ModuleDecl *ImportedUnderlyingModule = nullptr;
+
   /// Which imports have made use of @preconcurrency.
   llvm::SmallDenseSet<AttributedImport<ImportedModule>>
       PreconcurrencyImportsUsed;
@@ -691,6 +694,17 @@ public:
   /// a designated main class.
   bool hasEntryPoint() const override {
     return isScriptMode() || hasMainDecl();
+  }
+
+  ModuleDecl *getUnderlyingModuleIfOverlay() const override {
+    return ImportedUnderlyingModule;
+  }
+
+  const clang::Module *getUnderlyingClangModule() const override {
+    if (!ImportedUnderlyingModule)
+      return nullptr;
+
+    return ImportedUnderlyingModule->findUnderlyingClangModule();
   }
 
   /// Get the root refinement context for the file. The root context may be

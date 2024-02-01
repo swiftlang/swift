@@ -2566,6 +2566,20 @@ void
 SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
+
+  // Find and cache the import of the underlying module, if present.
+  auto parentModuleName = getParentModule()->getName();
+  for (auto import : imports) {
+    if (!import.options.contains(ImportFlags::Exported))
+      continue;
+
+    auto importedModule = import.module.importedModule;
+    if (importedModule->getName() == parentModuleName &&
+        importedModule->findUnderlyingClangModule()) {
+      ImportedUnderlyingModule = import.module.importedModule;
+      break;
+    }
+  }
 }
 
 bool SourceFile::hasImportUsedPreconcurrency(

@@ -438,8 +438,6 @@ swift::dependencies::checkImportNotTautological(const ImportPath::Module moduleP
                        filename, modulePath.front().Item);
 
   return false;
-
-  return false;
 }
 
 void SwiftDependencyTracker::addCommonSearchPathDeps(
