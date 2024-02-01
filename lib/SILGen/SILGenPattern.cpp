@@ -1391,13 +1391,14 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   assert(value.getFinalConsumption() == CastConsumptionKind::BorrowAlways);
   
   auto bindValue = value.asBorrowedOperand2(SGF, pattern).getFinalManagedValue();
-  if (bindValue.getType().isObject()) {
-    // Create a notional copy for the borrow checker to use.
-    bindValue = bindValue.copy(SGF, pattern);
+  if (bindValue.getType().isMoveOnly()) {
+    if (bindValue.getType().isObject()) {
+      // Create a notional copy for the borrow checker to use.
+      bindValue = bindValue.copy(SGF, pattern);
+    }
+    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(pattern, bindValue,
+                MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
   }
-  bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(pattern, bindValue,
-              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
-  
   SGF.VarLocs[var] = SILGenFunction::VarLoc::get(bindValue.getValue());
 }
 
