@@ -1005,14 +1005,11 @@ private:
   }
 
   void visitSwitchStmt(SwitchStmt *switchStmt) {
-    auto *switchLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::SyntacticElement(switchStmt));
-
     SmallVector<ElementInfo, 4> elements;
     {
       auto *subjectExpr = switchStmt->getSubjectExpr();
       {
-        elements.push_back(makeElement(subjectExpr, switchLoc));
+        elements.push_back(makeElement(subjectExpr, locator));
 
         SyntacticElementTarget target(subjectExpr, context.getAsDeclContext(),
                                       CTP_Unused, Type(),
@@ -1022,16 +1019,13 @@ private:
       }
 
       for (auto rawCase : switchStmt->getRawCases())
-        elements.push_back(makeElement(rawCase, switchLoc));
+        elements.push_back(makeElement(rawCase, locator));
     }
 
-    createConjunction(elements, switchLoc);
+    createConjunction(elements, locator);
   }
 
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
-    auto *doLoc = cs.getConstraintLocator(
-        locator, LocatorPathElt::SyntacticElement(doStmt));
-
     SmallVector<ElementInfo, 4> elements;
 
     // First, let's record a body of `do` statement. Note we need to add a
@@ -1039,15 +1033,15 @@ private:
     // brace conjunction as being isolated if 'doLoc' is for an isolated
     // conjunction (as is the case with 'do' expressions).
     auto *doBodyLoc = cs.getConstraintLocator(
-        doLoc, LocatorPathElt::SyntacticElement(doStmt->getBody()));
+        locator, LocatorPathElt::SyntacticElement(doStmt->getBody()));
     elements.push_back(makeElement(doStmt->getBody(), doBodyLoc));
 
     // After that has been type-checked, let's switch to
     // individual `catch` statements.
     for (auto *catchStmt : doStmt->getCatches())
-      elements.push_back(makeElement(catchStmt, doLoc));
+      elements.push_back(makeElement(catchStmt, locator));
 
-    createConjunction(elements, doLoc);
+    createConjunction(elements, locator);
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
@@ -1546,7 +1540,9 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
 
   // Generate the conjunction for the branches.
   auto context = SyntacticElementContext::forSingleValueStmtExpr(E, join);
-  SyntacticElementConstraintGenerator generator(*this, context, loc);
+  auto *stmtLoc =
+      getConstraintLocator(loc, LocatorPathElt::SyntacticElement(S));
+  SyntacticElementConstraintGenerator generator(*this, context, stmtLoc);
   generator.visit(S);
   return generator.hadError;
 }
