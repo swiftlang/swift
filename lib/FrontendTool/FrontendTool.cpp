@@ -664,7 +664,7 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasReferenceDependenciesPath() &&
+          .InputsAndOutputs.hasReferenceDependenciesFilePath() &&
       Instance.getPrimarySourceFiles().empty()) {
     Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);

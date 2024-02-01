@@ -750,12 +750,12 @@ bool ArgsToFrontendOptionsConverter::checkBuildFromInterfaceOnlyOptions()
 bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     const {
   if (!FrontendOptions::canActionEmitDependencies(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasDependenciesPath()) {
+      Opts.InputsAndOutputs.hasDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
   if (!FrontendOptions::canActionEmitReferenceDependencies(Opts.RequestedAction)
-      && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
+      && Opts.InputsAndOutputs.hasReferenceDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;
