@@ -37,17 +37,6 @@
 
 using namespace swift;
 
-static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
-  switch (kind) {
-#define TYPE_ATTR(X, C)                                                        \
-  case BridgedTypeAttrKind_##X:                                                \
-    return TAK_##X;
-#include "swift/AST/Attr.def"
-  case BridgedTypeAttrKind_Count:
-    return {};
-  }
-}
-
 static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
@@ -183,9 +172,9 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
 #include "swift/AST/PatternNodes.def"
 
 #define SIMPLE_DECL_ATTR(...)
-#define DECL_ATTR(_, Id, ...)                                                  \
-  BridgedDeclAttribute Bridged##Id##Attr_asDeclAttribute(                      \
-      Bridged##Id##Attr attr) {                                                \
+#define DECL_ATTR(_, CLASS, ...)                                               \
+  BridgedDeclAttribute Bridged##CLASS##Attr_asDeclAttribute(                   \
+      Bridged##CLASS##Attr attr) {                                             \
     return static_cast<DeclAttribute *>(attr.unbridged());                     \
   }
 #include "swift/AST/Attr.def"
@@ -363,27 +352,34 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 //===----------------------------------------------------------------------===//
 
 BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
-  return llvm::StringSwitch<BridgedDeclAttrKind>(cStr.unbridged())
-#define DECL_ATTR(Name, Id, ...) .Case(#Name, BridgedDeclAttrKind##Id)
+  auto kind = DeclAttribute::getAttrKindFromString(cStr.unbridged());
+  switch (kind) {
+#define DECL_ATTR(_, CLASS, ...)                                               \
+  case DAK_##CLASS:                                                            \
+    return BridgedDeclAttrKind##CLASS;
 #include "swift/AST/Attr.def"
-      .Default(BridgedDeclAttrKindNone);
+  case DAK_Count:
+    return BridgedDeclAttrKindNone;
+  }
+}
+
+DeclAttrKind unbridged(BridgedDeclAttrKind kind) {
+  switch (kind) {
+#define DECL_ATTR(_, CLASS, ...)                                               \
+  case BridgedDeclAttrKind##CLASS:                                             \
+    return DAK_##CLASS;
+#include "swift/AST/Attr.def"
+  case BridgedDeclAttrKindNone:
+    return DAK_Count;
+  }
 }
 
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, BridgedDeclAttrKind cKind,
-    BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc) {
-  auto &ctx = cContext.unbridged();
-  switch (cKind) {
-#define SIMPLE_DECL_ATTR(Name, Id, ...)                                        \
-  case BridgedDeclAttrKind##Id:                                                \
-    return new (ctx) Id##Attr(cAtLoc.unbridged(), cNameLoc.unbridged());
-#define DECL_ATTR(Name, Id, ...)                                               \
-  case BridgedDeclAttrKind##Id:                                                \
-    llvm_unreachable("'" #Name "' is not a simple decl attribute");
-#include "swift/AST/Attr.def"
-  case BridgedDeclAttrKindNone:
-    llvm_unreachable("not a decl attribute");
-  }
+    BridgedSourceLoc cAtLoc, BridgedSourceLoc cAttrLoc) {
+  auto kind = unbridged(cKind);
+  return DeclAttribute::createSimple(cContext.unbridged(), kind,
+                                     cAtLoc.unbridged(), cAttrLoc.unbridged());
 }
 
 void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
@@ -1945,51 +1941,63 @@ BridgedYieldStmt BridgedYieldStmt_createParsed(BridgedASTContext cContext,
 // MARK: TypeAttributes
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-  class TypeAttributes {
-  public:
-    ASTContext &ctx;
-    SmallVector<TypeOrCustomAttr> attrs;
-
-    TypeAttributes(ASTContext &ctx) : ctx(ctx) {}
-  };
-}
-
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
-  if (!optKind) return BridgedTypeAttrKind_Count;
+  if (!optKind)
+    return BridgedTypeAttrKind_None;
   switch (*optKind) {
-#define TYPE_ATTR(X, C)                                                        \
-  case TAK_##X:                                                                \
-    return BridgedTypeAttrKind_##X;
+#define TYPE_ATTR(SPELLING, _)                                                 \
+  case TAK_##SPELLING:                                                         \
+    return BridgedTypeAttrKind_##SPELLING;
 #include "swift/AST/Attr.def"
   }
 }
 
-BridgedTypeAttributes BridgedTypeAttributes_create(BridgedASTContext cContext) {
-  return {new TypeAttributes(cContext.unbridged())};
+static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
+  switch (kind) {
+#define TYPE_ATTR(SPELLING, _)                                                 \
+  case BridgedTypeAttrKind_##SPELLING:                                         \
+    return TAK_##SPELLING;
+#include "swift/AST/Attr.def"
+  case BridgedTypeAttrKind_None:
+    return llvm::None;
+  }
+  llvm_unreachable("unhandled enum value");
 }
 
-void BridgedTypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
-                                         BridgedTypeAttrKind cKind,
-                                         BridgedSourceLoc cAtLoc,
-                                         BridgedSourceLoc cAttrLoc) {
-  TypeAttributes *typeAttributes = cAttributes.unbridged();
+namespace swift {
+class TypeAttributes {
+public:
+  SmallVector<TypeOrCustomAttr> attrs;
+  TypeAttributes() {}
+};
+} // namespace swift
 
-  auto atLoc = cAtLoc.unbridged();
-  auto attrLoc = cAttrLoc.unbridged();
+BridgedTypeAttributes BridgedTypeAttributes_create() {
+  return new TypeAttributes();
+}
 
-  auto optKind = unbridged(cKind);
-  assert(optKind && "creating attribute of invalid kind?");
+void BridgedTypeAttributes_delete(BridgedTypeAttributes cAttributes) {
+  delete cAttributes.unbridged();
+}
 
-  auto attr = TypeAttribute::createSimple(typeAttributes->ctx,
-                                          *optKind, atLoc, attrLoc);
-  typeAttributes->attrs.push_back(attr);
+void BridgedTypeAttributes_add(BridgedTypeAttributes cAttributes,
+                               BridgedTypeAttribute cAttribute) {
+  cAttributes.unbridged()->attrs.push_back(cAttribute.unbridged());
 }
 
 bool BridgedTypeAttributes_isEmpty(BridgedTypeAttributes cAttributes) {
   TypeAttributes *typeAttributes = cAttributes.unbridged();
   return typeAttributes->attrs.empty();
+}
+
+BridgedTypeAttribute BridgedTypeAttribute_createSimple(
+    BridgedASTContext cContext, BridgedTypeAttrKind cKind,
+    BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc) {
+  auto optKind = unbridged(cKind);
+  assert(optKind && "creating attribute of invalid kind?");
+  return TypeAttribute::createSimple(cContext.unbridged(), *optKind,
+                                     cAtLoc.unbridged(), cNameLoc.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2104,14 +2112,14 @@ BridgedPackExpansionTypeRepr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedAttributedTypeRepr
-BridgedAttributedTypeRepr_createParsed(BridgedTypeRepr base,
+BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
+                                       BridgedTypeRepr base,
                                        BridgedTypeAttributes cAttributes) {
   TypeAttributes *typeAttributes = cAttributes.unbridged();
   assert(!typeAttributes->attrs.empty());
 
-  ASTContext &ctx = typeAttributes->ctx;
-  auto attributedType =
-      AttributedTypeRepr::create(ctx, typeAttributes->attrs, base.unbridged());
+  auto attributedType = AttributedTypeRepr::create(
+      cContext.unbridged(), typeAttributes->attrs, base.unbridged());
   delete typeAttributes;
   return attributedType;
 }

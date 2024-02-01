@@ -27,8 +27,8 @@ endif()
 
 add_pure_swift_host_library(swiftASTGen STATIC
   Sources/ASTGen/ASTGen.swift
-  Sources/ASTGen/Attrs.swift
   Sources/ASTGen/Bridge.swift
+  Sources/ASTGen/DeclAttrs.swift
   Sources/ASTGen/Decls.swift
   Sources/ASTGen/Diagnostics.swift
   Sources/ASTGen/DiagnosticsBridge.swift
@@ -45,6 +45,7 @@ add_pure_swift_host_library(swiftASTGen STATIC
   Sources/ASTGen/SourceManager.swift
   Sources/ASTGen/SourceManager+MacroExpansionContext.swift
   Sources/ASTGen/Stmts.swift
+  Sources/ASTGen/TypeAttrs.swift
   Sources/ASTGen/Types.swift
 
   DEPENDENCIES

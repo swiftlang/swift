@@ -972,8 +972,10 @@ extension ASTGenVisitor {
     _ valueGeneratorFunction: (TokenSyntax) -> R?
   ) -> R? {
     return generateConsumingAttrOption(args: &args, label: nil) {
-      guard let declRefExpr = $0.as(DeclReferenceExprSyntax.self),
-            declRefExpr.argumentNames == nil else {
+      guard
+        let declRefExpr = $0.as(DeclReferenceExprSyntax.self),
+        declRefExpr.argumentNames == nil
+      else {
         // TODO: Diagnose.
         return nil
       }

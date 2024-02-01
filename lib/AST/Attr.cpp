@@ -261,6 +261,26 @@ DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
   .Default(DAK_Count);
 }
 
+DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
+                                           DeclAttrKind kind, SourceLoc atLoc,
+                                           SourceLoc attrLoc) {
+  switch (kind) {
+    // The simple cases should all be doing the exact same thing, and we
+    // can reasonably hope that the optimizer will unify them so that this
+    // function doesn't actually need a switch.
+#define DECL_ATTR(SPELLING, CLASS, ...)                                        \
+  case DAK_##CLASS:                                                            \
+    llvm_unreachable("not a simple attribute");
+#define SIMPLE_DECL_ATTR(SPELLING, CLASS, ...)                                 \
+  case DAK_##CLASS:                                                            \
+    return new (context) CLASS##Attr(atLoc, attrLoc);
+#include "swift/AST/Attr.def"
+  case DAK_Count:
+    llvm_unreachable("bad decl attribute kind");
+  }
+  llvm_unreachable("bad decl attribute kind");
+}
+
 /// Returns true if this attribute can appear on the specified decl.
 bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
   if ((getOptions(DK) & OnAnyClangDecl) && D->hasClangNode())
