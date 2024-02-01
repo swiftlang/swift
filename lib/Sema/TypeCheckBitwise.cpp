@@ -57,7 +57,8 @@ getImplicitCheckForNominal(NominalTypeDecl *nominal) {
   if (!nominal
            ->getFormalAccessScope(
                /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true)
-           .isPublic())
+           .isPublic() ||
+      !nominal->isResilient())
     return {BitwiseCopyableCheck::Implicit};
 
   if (nominal->hasClangNode() ||

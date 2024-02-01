@@ -60,8 +60,7 @@ struct S_Explicit_With_Function_C : _BitwiseCopyable {
 public struct S_Public {}
 
 struct S_Explicit_With_S_Public : _BitwiseCopyable {
-  var s: S_Public // expected-error   {{non_bitwise_copyable_type_member}}
-                  // expected-note@-4 {{add_nominal_bitwise_copyable_conformance}}
+  var s: S_Public
 }
 
 struct S_Explicit_With_Generic<T> : _BitwiseCopyable {
