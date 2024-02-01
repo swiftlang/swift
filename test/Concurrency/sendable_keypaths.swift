@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InferSendableFromCaptures -strict-concurrency=complete
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

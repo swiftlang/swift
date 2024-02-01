@@ -126,8 +126,9 @@ UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
 UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
 UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
 UPCOMING_FEATURE(FullTypedThrows, 413, 6)
-
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
+UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
+
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -245,10 +246,6 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
 EXPERIMENTAL_FEATURE(NonescapableTypes, false)
-
-// Infer Sendability of unapplied and partial applied methods,
-// global functions and key paths.
-EXPERIMENTAL_FEATURE(InferSendableFromCaptures, false)
 
 // Allow optional isolated parameters.
 EXPERIMENTAL_FEATURE(OptionalIsolatedParameters, true)

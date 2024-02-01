@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InferSendableFromCaptures -disable-availability-checking
-// RUN: %target-swift-emit-silgen %s -verify -enable-experimental-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking
+// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
