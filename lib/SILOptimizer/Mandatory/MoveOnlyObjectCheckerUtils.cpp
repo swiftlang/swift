@@ -488,10 +488,10 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
 
           // Handle:
           //
-          // bb0(%0 : @guaranteed $Type):
-          //   %1 = copy_value %0
-          //   %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
-          if (auto *arg = dyn_cast<SILFunctionArgument>(i->getOperand(0))) {
+          // bb(%arg : @guaranteed $Type):
+          //   %copy = copy_value %arg
+          //   %mark = mark_unresolved_non_copyable_value [no_consume_or_assign] %copy
+          if (auto *arg = dyn_cast<SILArgument>(i->getOperand(0))) {
             if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
               for (auto *use : markedInst->getConsumingUses()) {
                 destroys.push_back(cast<DestroyValueInst>(use->getUser()));

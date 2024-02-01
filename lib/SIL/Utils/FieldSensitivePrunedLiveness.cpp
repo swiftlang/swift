@@ -304,10 +304,22 @@ SubElementOffset::computeForValue(SILValue projectionDerivedFromRoot,
     // So our payload is always going to start at the current field number since
     // we are the left most child of our parent enum. So we just need to look
     // through to our parent enum.
+    //
+    // Enum projections can happen either directly via an unchecked instruction…
     if (auto *enumData =
             dyn_cast<UncheckedEnumDataInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = enumData->getOperand();
       continue;
+    }
+    
+    // …or via the bb arg of a `switch_enum` successor.
+    if (auto bbArg = dyn_cast<SILArgument>(projectionDerivedFromRoot)) {
+      if (auto pred = bbArg->getParent()->getSinglePredecessorBlock()) {
+        if (auto switchEnum = dyn_cast<SwitchEnumInst>(pred->getTerminator())) {
+          projectionDerivedFromRoot = switchEnum->getOperand();
+          continue;
+        }
+      }
     }
 
     // If we do not know how to handle this case, just return None.

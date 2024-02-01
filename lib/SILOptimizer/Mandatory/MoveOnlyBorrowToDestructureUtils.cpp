@@ -372,6 +372,29 @@ bool Implementation::gatherUses(SILValue value) {
     }
 
     case OperandOwnership::GuaranteedForwarding: {
+      // Always treat switches as full liveness uses of the enum being switched
+      // since the control flow is significant, and we can't destructure through
+      // the switch dispatch. If the final pattern match ends up destructuring
+      // the value, then SILGen emits that as a separate access.
+      if (auto switchEnum = dyn_cast<SwitchEnumInst>(nextUse->getUser())) {
+        auto leafRange = TypeTreeLeafTypeRange::get(switchEnum->getOperand(),
+                                                    getRootValue());
+        if (!leafRange) {
+          LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
+          return false;
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "        Found non lifetime ending use!\n");
+        blocksToUses.insert(nextUse->getParentBlock(),
+                            {nextUse,
+                             {liveness.getNumSubElements(), *leafRange,
+                              false /*is lifetime ending*/}});
+        liveness.updateForUse(nextUse->getUser(), *leafRange,
+                              false /*is lifetime ending*/);
+        instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
+        continue;
+      }
+    
       // Look through guaranteed forwarding if we have at least one non-trivial
       // value. If we have all non-trivial values, treat this as a liveness use.
       SmallVector<SILValue, 8> forwardedValues;
@@ -1044,6 +1067,23 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
                                  borrow);
       return true;
     });
+  } else if (auto swi = dyn_cast<SwitchEnumInst>(op->getUser())) {
+    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow for switch:\n"
+                               "    ";
+               swi->print(llvm::dbgs()));
+    // End the borrow where the original borrow of the subject was ended.
+    // TODO: handle if the switch isn't directly on a borrow?
+    auto beginBorrow = cast<BeginBorrowInst>(swi->getOperand());
+    BorrowingOperand(&beginBorrow->getOperandRef())
+      .visitScopeEndingUses([&](Operand *endScope) -> bool {
+        auto *endScopeInst = endScope->getUser();
+        LLVM_DEBUG(llvm::dbgs() << "       ";
+                   endScopeInst->print(llvm::dbgs()));
+        SILBuilderWithScope endBuilder(endScopeInst);
+        endBuilder.createEndBorrow(getSafeLoc(endScopeInst),
+                                   borrow);
+        return true;
+      });
   } else {
     auto *nextInst = op->getUser()->getNextInstruction();
     LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after momentary use at: ";
@@ -1521,9 +1561,17 @@ static bool gatherBorrows(SILValue rootValue,
 static bool
 gatherSwitchEnum(SILValue value,
                  SmallVectorImpl<SwitchEnumInst *> &switchEnumWorklist) {
+  auto *fn = value->getFunction();
+  auto &C = fn->getASTContext();
+  // TODO: For borrowing switches, we want to leave the switch as a borrowing
+  // operation. This phase of the pass should become moot once borrowing
+  // switch is on by default.
+  if (C.LangOpts.hasFeature(Feature::BorrowingSwitch)) {
+    return true;
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "Gathering switch enums for value: " << *value);
 
-  auto *fn = value->getFunction();
   StackList<Operand *> useWorklist(fn);
   for (auto *use : value->getUses()) {
     useWorklist.push_back(use);
@@ -1639,8 +1687,10 @@ gatherSwitchEnum(SILValue value,
 //===----------------------------------------------------------------------===//
 
 bool BorrowToDestructureTransform::transform() {
-  LLVM_DEBUG(llvm::dbgs() << "Performing Borrow To Destructure Tranform!\n");
   auto *fn = mmci->getFunction();
+  LLVM_DEBUG(llvm::dbgs() << "Performing Borrow To Destructure Transform!\n";
+             fn->print(llvm::dbgs()));
+  auto &C = fn->getASTContext();
   StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
 
   // If we failed to gather borrows due to the transform not understanding part
