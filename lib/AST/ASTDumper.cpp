@@ -1192,9 +1192,13 @@ namespace {
       printCommon(PD, "protocol", label);
 
       if (PD->isRequirementSignatureComputed()) {
-        auto requirements = PD->getRequirementSignatureAsGenericSignature();
-        std::string reqSigStr = requirements->getAsString();
-        printFieldQuoted(reqSigStr, "requirement_signature");
+        auto reqSig = PD->getRequirementSignature();
+
+        std::string reqSigStr;
+        llvm::raw_string_ostream out(reqSigStr);
+        reqSig.print(PD, out);
+
+        printFieldQuoted(out.str(), "requirement_signature");
       } else {
         printFlag("uncomputed_requirement_signature");
       }

@@ -1391,8 +1391,17 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
 
     if (auto *conformance = dyn_cast<NormalProtocolConformance>(
             ref.getConcrete()->getRootConformance())) {
-      if (conformance->getState() == ProtocolConformanceState::Incomplete) {
-        TypeChecker::checkConformance(conformance);
+      // Complete evaluate the conformance.
+      evaluateOrDefault(evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+
+      // FIXME: This should be more fine-grained to avoid having to check
+      // for a cycle here.
+      if (!evaluator.hasActiveRequest(ResolveValueWitnessesRequest{conformance})) {
+        evaluateOrDefault(evaluator,
+                          ResolveValueWitnessesRequest{conformance},
+                          evaluator::SideEffect());
       }
     }
 

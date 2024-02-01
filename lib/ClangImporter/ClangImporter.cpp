@@ -4742,7 +4742,9 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 
 // Just create a specialized function decl for "__swift_interopStaticCast"
 // using the types base and derived.
+static
 DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
+                                             ModuleDecl *swiftModule,
                                              const clang::Module *owningModule,
                                              Type base, Type derived) {
   if (base->isForeignReferenceType() && derived->isForeignReferenceType()) {
@@ -4767,7 +4769,7 @@ DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
   // this yet because it can't infer the "To" type.
   auto subst =
       SubstitutionMap::get(staticCastFn->getGenericSignature(), {derived, base},
-                           ArrayRef<ProtocolConformanceRef>());
+                           LookUpConformanceInModule(swiftModule));
   auto functionTemplate = const_cast<clang::FunctionTemplateDecl *>(
       cast<clang::FunctionTemplateDecl>(staticCastFn->getClangDecl()));
   auto spec = ctx.getClangModuleLoader()->instantiateCXXFunctionTemplate(
@@ -4789,6 +4791,7 @@ DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
 // %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
 // %3 = %2!
 // return %3.pointee
+static
 MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
                                         NominalTypeDecl *baseStruct,
                                         NominalTypeDecl *derivedStruct) {
@@ -4804,12 +4807,14 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
     return selfRef;
   }(funcDecl);
 
+  auto *module = funcDecl->getParentModule();
+
   auto createCallToBuiltin = [&](Identifier name, ArrayRef<Type> substTypes,
                                  Argument arg) {
     auto builtinFn = cast<FuncDecl>(getBuiltinValueDecl(ctx, name));
     auto substMap =
         SubstitutionMap::get(builtinFn->getGenericSignature(), substTypes,
-                             ArrayRef<ProtocolConformanceRef>());
+                             LookUpConformanceInModule(module));
     ConcreteDeclRef builtinFnRef(builtinFn, substMap);
     auto builtinFnRefExpr =
         new (ctx) DeclRefExpr(builtinFnRef, DeclNameLoc(), /*implicit*/ true);
@@ -4838,7 +4843,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
   selfPointer->setType(derivedPtrType);
 
   auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
-      ctx, baseStruct->getClangDecl()->getOwningModule(),
+      ctx, module, baseStruct->getClangDecl()->getOwningModule(),
       baseStruct->getSelfInterfaceType()->wrapInPointer(
           PTK_UnsafeMutablePointer),
       derivedStruct->getSelfInterfaceType()->wrapInPointer(
@@ -4852,7 +4857,8 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
 
   SubstitutionMap pointeeSubst = SubstitutionMap::get(
       ctx.getUnsafeMutablePointerDecl()->getGenericSignature(),
-      {baseStruct->getSelfInterfaceType()}, {});
+      {baseStruct->getSelfInterfaceType()},
+      LookUpConformanceInModule(module));
   VarDecl *pointeePropertyDecl =
       ctx.getPointerPointeePropertyDecl(PTK_UnsafeMutablePointer);
   auto pointeePropertyRefExpr = new (ctx) MemberRefExpr(

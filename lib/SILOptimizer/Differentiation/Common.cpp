@@ -390,7 +390,8 @@ SILValue emitMemoryLayoutSize(
   return builder.createBuiltin(
       loc, id, SILType::getBuiltinWordType(ctx),
       SubstitutionMap::get(
-          builtin->getGenericSignature(), ArrayRef<Type>{type}, {}),
+          builtin->getGenericSignature(), ArrayRef<Type>{type},
+          LookUpConformanceInSignature(builtin->getGenericSignature().getPointer())),
       {metatypeVal});
 }
 

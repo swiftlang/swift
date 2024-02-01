@@ -782,16 +782,19 @@ public:
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
 
+      auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+          continuationTy, ctx.TheAnyType);
+
       // In this case block storage captures `Any` which would be initialized
       // with an checked continuation.
       auto underlyingContinuationAddr =
           SGF.B.createInitExistentialAddr(loc, continuationAddr, continuationTy,
                                           SGF.getLoweredType(continuationTy),
-                                          /*conformances=*/{});
+                                          conformances);
 
       auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
                                        {calleeTypeInfo.substResultType},
-                                       ArrayRef<ProtocolConformanceRef>{});
+                                       conformances);
 
       InitializationPtr underlyingInit(
           new KnownAddressInitialization(underlyingContinuationAddr));
@@ -968,7 +971,7 @@ public:
             SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                                         ArrayRef<ProtocolConformanceRef>{});
+                         LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
 
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,

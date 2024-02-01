@@ -643,23 +643,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     auto req =
         Requirement(RequirementKind::Conformance, self,
                     PD->getDeclaredInterfaceType());
-    auto sig = GenericSignature::get({self}, {req});
-
-    // Debugging of the generic signature builder and generic signature
-    // generation.
-    if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
-      llvm::errs() << "\n";
-      PD->printContext(llvm::errs());
-      llvm::errs() << "Generic signature: ";
-      PrintOptions Opts;
-      Opts.ProtocolQualifiedDependentMemberTypes = true;
-      sig->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
-      llvm::errs() << "Canonical generic signature: ";
-      sig.getCanonicalSignature()->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
-    }
-    return sig;
+    return GenericSignature::get({self}, {req});
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(GC))
@@ -694,9 +678,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
   }
-
-  if (!genericParams && where)
-    allowConcreteGenericParams = true;
 
   GenericSignature parentSig;
   SmallVector<TypeLoc, 2> inferenceSources;
@@ -809,7 +790,9 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // the right sugared types, since we don't want to expose the
     // name of the generic parameter of BuiltinTupleDecl itself.
     if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
-        !isa<BuiltinTupleDecl>(extendedNominal)) {
+        !isa<BuiltinTupleDecl>(extendedNominal) &&
+        !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      // FIXME: Recover this optimization even with NoncopyableGenerics on.
       return parentSig;
     }
 
@@ -824,30 +807,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       genericParams, WhereClauseOwner(GC),
       extraReqs, inferenceSources,
       allowConcreteGenericParams};
-  auto sig = evaluateOrDefault(ctx.evaluator, request,
-                               GenericSignatureWithError()).getPointer();
-
-  // Debugging of the generic signature builder and generic signature
-  // generation.
-  if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
-    llvm::errs() << "\n";
-    if (auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
-      VD->dumpRef(llvm::errs());
-      llvm::errs() << "\n";
-    } else {
-      GC->printContext(llvm::errs());
-    }
-    llvm::errs() << "Generic signature: ";
-    PrintOptions Opts;
-    Opts.ProtocolQualifiedDependentMemberTypes = true;
-    sig->print(llvm::errs(), Opts);
-    llvm::errs() << "\n";
-    llvm::errs() << "Canonical generic signature: ";
-    sig.getCanonicalSignature()->print(llvm::errs(), Opts);
-    llvm::errs() << "\n";
-  }
-
-  return sig;
+  return evaluateOrDefault(ctx.evaluator, request,
+                           GenericSignatureWithError()).getPointer();
 }
 
 ///

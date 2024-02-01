@@ -440,6 +440,9 @@ def disable_round_trip_debug_types : Flag<["-"], "disable-round-trip-debug-types
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 
+def debug_inverse_requirements : Flag<["-"], "debug-inverse-requirements">,
+  HelpText<"Print real requirements in -debug_generic_signatures output">;
+
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;

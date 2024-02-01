@@ -7,7 +7,7 @@ protocol Eq: ~Copyable {
   func different(from: borrowing Self) -> Bool
 }
 
-extension Eq {
+extension Eq where Self: ~Copyable {
   func different(from other: borrowing Self) -> Bool { !same(as: other) }
 }
 

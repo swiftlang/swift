@@ -46,8 +46,8 @@ func check(_ t: CondCopyableEnum<Int>) {}
 // CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyAA2NCVGF : $@convention(thin) (@guaranteed CondCopyableEnum<NC>) -> () {
 func check(_ t: borrowing CondCopyableEnum<NC>) {}
 
-// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGlF : $@convention(thin) <T where T : Copyable, T : Escapable> (@in_guaranteed CondCopyableEnum<T>) -> () {
+// CHECK: sil hidden [ossa] @$s4main5checkyyAA16CondCopyableEnumOyxGlF : $@convention(thin) <T> (@in_guaranteed CondCopyableEnum<T>) -> () {
 func check<T>(_ t: CondCopyableEnum<T>) {}
 
-// CHECK: sil hidden [ossa] @$s4main13check_noClashyyAA16CondCopyableEnumOyxGlF : $@convention(thin) <U where U : Escapable> (@in_guaranteed CondCopyableEnum<U>) -> () {
+// CHECK: sil hidden [ossa] @$s4main13check_noClashyyAA16CondCopyableEnumOyxGlF : $@convention(thin) <U where U : ~Copyable> (@in_guaranteed CondCopyableEnum<U>) -> () {
 func check_noClash<U: ~Copyable>(_ t: borrowing CondCopyableEnum<U>) {}

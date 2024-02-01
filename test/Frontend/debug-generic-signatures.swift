@@ -1,32 +1,23 @@
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
-// CHECK: Generic signature: <Self where Self : P1>
-// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : P1>
 // CHECK-LABEL: main.(file).P1@
 // CHECK: Requirement signature: <Self>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0>
 protocol P1 {
     associatedtype A
     func f() -> A
 }
 
 // Recursion, and where clauses.
-// CHECK: Generic signature: <Self where Self : P2>
-// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : P2>
 // CHECK-LABEL: main.(file).P2@
-// CHECK: Requirement signature: <Self where Self.[P2]A : P2, Self.[P2]B : P2, Self.[P2]A.[P2]A == Self.[P2]B.[P2]A>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P2]A : P2, τ_0_0.[P2]B : P2, τ_0_0.[P2]A.[P2]A == τ_0_0.[P2]B.[P2]A>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P2]A : P2, Self.[P2]B : P2, Self.[P2]A.[P2]A == Self.[P2]B.[P2]A>
 protocol P2 {
     associatedtype A: P2
     associatedtype B: P2 where Self.A.A == Self.B.A
 }
 
 // Simpler recursion
-// CHECK: Generic signature: <Self where Self : P3>
-// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : P3>
 // CHECK-LABEL: main.(file).P3@
-// CHECK: Requirement signature: <Self where Self.[P3]A : P3>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P3]A : P3>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P3]A : P3>
 protocol P3 {
     associatedtype A: P3
 }

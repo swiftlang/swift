@@ -3073,7 +3073,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       WhereClauseOwner(const_cast<AbstractFunctionDecl *>(FD), attr),
       /*addedRequirements=*/{},
       /*inferenceSources=*/{},
-      /*allowConcreteGenericParams=*/true};
+      /*allowConcreteGenericParams=*/false};
 
   auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
                                           GenericSignatureWithError())

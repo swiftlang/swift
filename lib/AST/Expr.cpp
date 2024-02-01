@@ -1318,6 +1318,9 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
 ErasureExpr *ErasureExpr::create(ASTContext &ctx, Expr *subExpr, Type type,
                                  ArrayRef<ProtocolConformanceRef> conformances,
                                  ArrayRef<ConversionPair> argConversions) {
+  auto layout = type->getExistentialLayout();
+  assert(layout.getProtocols().size() == conformances.size());
+
   auto size = totalSizeToAlloc<ProtocolConformanceRef, ConversionPair>(conformances.size(),
                                                                        argConversions.size());
   auto mem = ctx.Allocate(size, alignof(ErasureExpr));

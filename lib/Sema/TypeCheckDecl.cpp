@@ -1005,10 +1005,10 @@ InvertibleAnnotationRequest::evaluate(Evaluator &evaluator,
   // Function to check the generic parameters for an explicit ~TARGET marking
   // which would result in an Inferred ~TARGET marking for this context.
   auto hasInferredInverseTarget = [&](GenericContext *genCtx) -> Mark {
-    if (!genCtx->isGeneric())
+    auto *gpList = genCtx->getParsedGenericParams();
+    if (!gpList)
       return InverseMarking::Mark();
 
-    auto *gpList = genCtx->getParsedGenericParams();
     llvm::SmallSet<GenericTypeParamDecl*, 4> params;
 
     // Scan the inheritance clauses of generic parameters only for an inverse.
@@ -3057,33 +3057,27 @@ static ArrayRef<Decl *> evaluateMembersRequest(
 
   // Force any conformances that may introduce more members.
   for (auto conformance : idc->getLocalConformances()) {
+    auto *normal = dyn_cast<NormalProtocolConformance>(
+        conformance->getRootConformance());
+    if (normal == nullptr)
+      continue;
+
     auto proto = conformance->getProtocol();
-    bool isDerivable =
-      conformance->getState() == ProtocolConformanceState::Incomplete &&
-      proto->getKnownDerivableProtocolKind();
+    bool isDerivable = proto->getKnownDerivableProtocolKind().has_value();
 
-    switch (kind) {
-    case MembersRequestKind::ABI:
-      // Force any derivable conformances in this context.
-      if (isDerivable)
-        break;
 
-      continue;
-
-    case MembersRequestKind::All:
-      // Force any derivable conformances.
-      if (isDerivable)
-        break;
-
-      // If there are any associated types in the protocol, they might add
-      // type aliases here.
-      if (!proto->getAssociatedTypeMembers().empty())
-        break;
-
-      continue;
+    if (kind == MembersRequestKind::All &&
+        !proto->getAssociatedTypeMembers().empty()) {
+      evaluateOrDefault(ctx.evaluator,
+                        ResolveTypeWitnessesRequest{normal},
+                        evaluator::SideEffect());
     }
 
-    TypeChecker::checkConformance(conformance->getRootNormalConformance());
+    if (isDerivable) {
+      evaluateOrDefault(ctx.evaluator,
+                        ResolveValueWitnessesRequest{normal},
+                        evaluator::SideEffect());
+    }
   }
 
   if (nominal) {

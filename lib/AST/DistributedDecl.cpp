@@ -528,9 +528,13 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   auto sig = getGenericSignature();
-  auto requirements = sig.getRequirements();
 
-  if (requirements.size() != expectedRequirementsNum) {
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  sig->getRequirementsWithInverses(reqs, inverseReqs);
+  assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+  if (reqs.size() != expectedRequirementsNum) {
     return false;
   }
 
@@ -545,7 +549,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // same_type: Act.ID FakeActorSystem.ActorID // LAST one
 
   // --- Check requirement: conforms_to: Act DistributedActor
-  auto actorReq = requirements[0];
+  auto actorReq = reqs[0];
   if (actorReq.getKind() != RequirementKind::Conformance) {
     return false;
   }
@@ -554,7 +558,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // --- Check requirement: conforms_to: Err Error
-  auto errorReq = requirements[1];
+  auto errorReq = reqs[1];
   if (errorReq.getKind() != RequirementKind::Conformance) {
     return false;
   }
@@ -593,7 +597,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // -- Check requirement: same_type Actor.ID Self.ActorID
-  auto actorIdReq = requirements.back();
+  auto actorIdReq = reqs.back();
   if (actorIdReq.getKind() != RequirementKind::SameType) {
     return false;
   }
@@ -667,10 +671,14 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
     return false;
   }
 
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  fd->getGenericSignature()->getRequirementsWithInverses(reqs, inverseReqs);
+  assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
   // No requirements on the generic parameter
-  if (fd->getGenericRequirements().size() != 0) {
+  if (!reqs.empty())
     return false;
-  }
 
   if (!fd->getResultInterfaceType()->isVoid())
     return false;
@@ -785,9 +793,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 
 
     auto sig = getGenericSignature();
-    auto requirements = sig.getRequirements();
 
-    if (requirements.size() != expectedRequirementsNum) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+    if (reqs.size() != expectedRequirementsNum) {
       return false;
     }
 
@@ -891,9 +903,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
 
   auto sig = getGenericSignature();
-  auto requirements = sig.getRequirements();
 
-  if (requirements.size() != expectedRequirementsNum) {
+  SmallVector<Requirement, 2> reqs;
+  SmallVector<InverseRequirement, 2> inverseReqs;
+  sig->getRequirementsWithInverses(reqs, inverseReqs);
+  assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+  if (reqs.size() != expectedRequirementsNum) {
     return false;
   }
 
@@ -1000,8 +1016,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
 
     // --- Check: Argument: SerializationRequirement
     auto sig = getGenericSignature();
-    auto requirements = sig.getRequirements();
-    if (requirements.size() != 1) {
+
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+    if (reqs.size() != 1) {
       return false;
     }
 
@@ -1016,7 +1037,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     }
 
     // --- Check requirement: conforms_to: Err Error
-    auto errorReq = requirements[0];
+    auto errorReq = reqs[0];
     if (errorReq.getKind() != RequirementKind::Conformance) {
       return false;
     }

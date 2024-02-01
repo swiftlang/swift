@@ -99,6 +99,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -1517,12 +1518,12 @@ private:
     }
 
     // Tuple types can be subtypes of existentials.
-    if (innerSubstType->isAny()) {
-      return expandOuterTupleInnerSingleAny(innerOrigType,
-                                            innerSubstType,
-                                            outerOrigType,
-                                            outerSubstType,
-                                            innerParam);
+    if (innerSubstType->isExistentialType()) {
+      return expandOuterTupleInnerSingleExistential(innerOrigType,
+                                                    innerSubstType,
+                                                    outerOrigType,
+                                                    outerSubstType,
+                                                    innerParam);
     }
 
     // Otherwise, the inner type had better be a tuple.
@@ -1750,21 +1751,24 @@ private:
   /// Handle a tuple that has been exploded in the outer but wrapped
   /// in an existential in the inner.
   ManagedValue
-  expandOuterTupleInnerSingleAny(AbstractionPattern innerOrigType,
-                                 CanType innerSubstType,
-                                 AbstractionPattern outerOrigType,
-                                 CanTupleType outerSubstType,
-                                 ParamInfo innerAnySlot) {
+  expandOuterTupleInnerSingleExistential(AbstractionPattern innerOrigType,
+                                         CanType innerSubstType,
+                                         AbstractionPattern outerOrigType,
+                                         CanTupleType outerSubstType,
+                                         ParamInfo innerAnySlot) {
     auto existentialBuf = innerAnySlot.allocate(SGF, Loc);
 
     auto opaque = AbstractionPattern::getOpaque();
     auto &concreteTL = SGF.getTypeLowering(opaque, outerSubstType);
 
+    auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+        outerSubstType, innerSubstType);
+
     auto innerTupleAddr =
       SGF.B.createInitExistentialAddr(Loc, existentialBuf,
                                       outerSubstType,
                                       concreteTL.getLoweredType(),
-                                      /*conformances=*/{});
+                                      conformances);
     ParamInfo innerTupleSlot(IndirectSlot(innerTupleAddr),
                              ParameterConvention::Indirect_In);
 
@@ -1788,7 +1792,7 @@ private:
       auto &anyTL = SGF.getTypeLowering(opaque, innerSubstType);
       anyMV = SGF.B.createInitExistentialValue(
         Loc, anyTL.getLoweredType(), outerSubstType, loadedPayload,
-        /*Conformances=*/{});
+        conformances);
     }
     return maybeBorrowTemporary(anyMV, innerAnySlot);
   }
@@ -4319,14 +4323,15 @@ ResultPlanner::expandInnerTupleOuterIndirect(AbstractionPattern innerOrigType,
       return;
     }
 
-    assert(outerSubstType->isAny());
+    auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+        innerSubstType, outerSubstType);
 
     // Prepare the value slot in the existential.
     auto opaque = AbstractionPattern::getOpaque();
     SILValue outerConcreteResultAddr
       = SGF.B.createInitExistentialAddr(Loc, outerResultAddr, innerSubstType,
                                         SGF.getLoweredType(opaque, innerSubstType),
-                                        /*conformances=*/{});
+                                        conformances);
 
     // Emit into that address.
     expandInnerTupleOuterIndirect(innerOrigType, innerSubstType,

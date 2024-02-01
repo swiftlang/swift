@@ -2064,6 +2064,30 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
   }
 }
 
+static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
+  if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
+    if (auto sig = GC->getGenericSignature()) {
+      llvm::errs() << "\n";
+      if (auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
+        VD->dumpRef(llvm::errs());
+        llvm::errs() << "\n";
+      } else {
+        GC->printContext(llvm::errs());
+      }
+      llvm::errs() << "Generic signature: ";
+      PrintOptions Opts;
+      Opts.ProtocolQualifiedDependentMemberTypes = true;
+      Opts.PrintInverseRequirements =
+          ctx.TypeCheckerOpts.DebugInverseRequirements;
+      sig->print(llvm::errs(), Opts);
+      llvm::errs() << "\n";
+      llvm::errs() << "Canonical generic signature: ";
+      sig.getCanonicalSignature()->print(llvm::errs(), Opts);
+      llvm::errs() << "\n";
+    }
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2093,7 +2117,7 @@ public:
       }, /*visitFreestandingExpanded=*/false);
     }
 
-    if (auto *Stats = getASTContext().Stats)
+    if (auto *Stats = Ctx.Stats)
       ++Stats->getFrontendCounters().NumDeclsTypechecked;
 
     FrontendStatsTracer StatsTracer(getASTContext().Stats,
@@ -2108,14 +2132,13 @@ public:
     TypeChecker::checkExistentialTypes(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
-      auto &Context = getASTContext();
-      TypeChecker::checkForForbiddenPrefix(Context, VD->getBaseName());
+      TypeChecker::checkForForbiddenPrefix(Ctx, VD->getBaseName());
 
       // Force some requests, which can produce diagnostics.
 
       // Check redeclaration.
       (void)evaluateOrDefault(
-          Context.evaluator,
+          Ctx.evaluator,
           CheckRedeclarationRequest{
               VD, VD->getDeclContext()->getSelfNominalTypeDecl()},
           {});
@@ -2142,11 +2165,11 @@ public:
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
       if (VD->getDeclContext()->isTypeContext() &&
-          (VD->getName().isSimpleName(Context.Id_Type) ||
-           VD->getName().isSimpleName(Context.Id_Protocol)) &&
+          (VD->getName().isSimpleName(Ctx.Id_Type) ||
+           VD->getName().isSimpleName(Ctx.Id_Protocol)) &&
           VD->getNameLoc().isValid() &&
-          Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
-        auto &DE = Context.Diags;
+          Ctx.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
+        auto &DE = Ctx.Diags;
         DE.diagnose(VD->getNameLoc(), diag::reserved_member_name,
                     VD, VD->getBaseIdentifier().str());
         DE.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
@@ -2182,24 +2205,23 @@ public:
 
     auto target = ID->getModule();
     if (target && // module would be nil if loading fails
-        !getASTContext().LangOpts.PackageName.empty() &&
-        getASTContext().LangOpts.PackageName == target->getPackageName().str() &&
+        !Ctx.LangOpts.PackageName.empty() &&
+        Ctx.LangOpts.PackageName == target->getPackageName().str() &&
         !target->isNonSwiftModule() && // target is a Swift module
         target->isNonUserModule()) { // target module is in distributed SDK
       // If reached here, a binary module (.swiftmodule) instead of interface of the
       // target was loaded for the main module, where both belong to the same package;
       // this is an expected behavior, but it should have been loaded from the local
       // build directory, not from distributed SDK. In such case, we show a warning.
-      auto &diags = ID->getASTContext().Diags;
-      diags.diagnose(ID,
-                     diag::in_package_module_not_compiled_locally,
-                     target->getBaseIdentifier(),
-                     target->getPackageName(),
-                     target->getModuleFilename());
+      Ctx.Diags.diagnose(ID,
+                         diag::in_package_module_not_compiled_locally,
+                         target->getBaseIdentifier(),
+                         target->getPackageName(),
+                         target->getModuleFilename());
     }
 
     // Report the public import of a private module.
-    if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
+    if (Ctx.LangOpts.LibraryLevel == LibraryLevel::API) {
       auto importer = ID->getModuleContext();
       if (target &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
@@ -2207,10 +2229,9 @@ public:
           ID->getAccessLevel() == AccessLevel::Public &&
           target->getLibraryLevel() == LibraryLevel::SPI) {
 
-        auto &diags = ID->getASTContext().Diags;
         InFlightDiagnostic inFlight =
-            diags.diagnose(ID, diag::error_public_import_of_private_module,
-                           target->getName(), importer->getName());
+            Ctx.Diags.diagnose(ID, diag::error_public_import_of_private_module,
+                               target->getName(), importer->getName());
         if (ID->getAttrs().isEmpty()) {
            inFlight.fixItInsert(ID->getStartLoc(),
                               "@_implementationOnly ");
@@ -2462,7 +2483,7 @@ public:
     //
     // NOTE: We do this here instead of TypeCheckAttr since types are not
     // completely type checked at that point.
-    auto &DE = getASTContext().Diags;
+    auto &DE = Ctx.Diags;
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
         if (!nom->canBeCopyable()) {
@@ -2475,10 +2496,10 @@ public:
 
     // @_staticExclusiveOnly types cannot be put into 'var's, only 'let'.
     if (auto SD = VD->getInterfaceType()->getStructOrBoundGenericStruct()) {
-      if (getASTContext().LangOpts.hasFeature(Feature::StaticExclusiveOnly) &&
+      if (Ctx.LangOpts.hasFeature(Feature::StaticExclusiveOnly) &&
           SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
           !VD->isLet()) {
-        SD->getASTContext().Diags.diagnoseWithNotes(
+        Ctx.Diags.diagnoseWithNotes(
           VD->diagnose(diag::attr_static_exclusive_only_let_only,
                        VD->getInterfaceType()),
           [&]() {
@@ -2515,7 +2536,6 @@ public:
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
     bool isTypeContext = DC->isTypeContext();
 
-    auto &Ctx = getASTContext();
     for (auto i : range(PBD->getNumPatternEntries())) {
       const auto *entry = PBD->isFullyValidated(i)
                               ? &PBD->getPatternList()[i]
@@ -2711,9 +2731,12 @@ public:
   void visitSubscriptDecl(SubscriptDecl *SD) {
     auto *DC = SD->getDeclContext();
 
+    // Force creation of the generic signature.
+    (void) SD->getGenericSignature();
+    dumpGenericSignature(Ctx, SD);
+
     // Force requests that can emit diagnostics.
     (void) SD->getInterfaceType();
-    (void) SD->getGenericSignature();
 
     if (!SD->isInvalid()) {
       TypeChecker::checkReferencedGenericParams(SD);
@@ -2803,8 +2826,11 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    // Force requests that can emit diagnostics.
+    // Force creation of the generic signature.
     (void) TAD->getGenericSignature();
+    dumpGenericSignature(Ctx, TAD);
+
+    // Force requests that can emit diagnostics.
     (void) TAD->getUnderlyingType();
 
     // Make sure to check the underlying type.
@@ -2852,7 +2878,7 @@ public:
         });
 
       if (mentionsItself) {
-        auto &DE = getASTContext().Diags;
+        auto &DE = Ctx.Diags;
         DE.diagnose(AT->getDefaultDefinitionTypeRepr()->getLoc(),
                     diag::recursive_decl_reference, AT);
         AT->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
@@ -2930,6 +2956,10 @@ public:
   void visitEnumDecl(EnumDecl *ED) {
     checkUnsupportedNestedType(ED);
 
+    // Force creation of the generic signature.
+    (void) ED->getGenericSignature();
+    dumpGenericSignature(Ctx, ED);
+
     // Temporary restriction until we figure out pattern matching and
     // enum case construction with packs.
     if (auto genericSig = ED->getGenericSignature()) {
@@ -2960,7 +2990,7 @@ public:
 
     TypeChecker::checkPatternBindingCaptures(ED);
 
-    auto &DE = getASTContext().Diags;
+    auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
       if (!computeAutomaticEnumValueKind(ED)) {
@@ -3011,6 +3041,10 @@ public:
 
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
+
+    // Force creation of the generic signature.
+    (void) SD->getGenericSignature();
+    dumpGenericSignature(Ctx, SD);
 
     checkGenericParams(SD);
 
@@ -3206,6 +3240,7 @@ public:
 
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();
+    dumpGenericSignature(Ctx, CD);
 
     checkGenericParams(CD);
 
@@ -3317,7 +3352,7 @@ public:
         auto *superFile = Super->getModuleScopeContext();
         if (auto *serialized = dyn_cast<SerializedASTFile>(superFile)) {
           const auto effVersion =
-              CD->getASTContext().LangOpts.EffectiveLanguageVersion;
+              Ctx.LangOpts.EffectiveLanguageVersion;
           if (serialized->getLanguageVersionBuiltWith() != effVersion) {
             CD->diagnose(
                 diag::
@@ -3338,7 +3373,7 @@ public:
         }
       }
 
-      if (!getASTContext().isAccessControlDisabled()) {
+      if (!Ctx.isAccessControlDisabled()) {
         // Require the superclass to be open if this is outside its
         // defining module.  But don't emit another diagnostic if we
         // already complained about the class being inherently
@@ -3413,23 +3448,16 @@ public:
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
 
-    if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-      auto sig = PD->getRequirementSignatureAsGenericSignature();
-      llvm::errs() << "\n";
-      llvm::errs() << "Protocol requirement signature:\n";
+    if (Ctx.TypeCheckerOpts.DebugGenericSignatures) {
+      auto sig = PD->getRequirementSignature();
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
       PrintOptions Opts;
       Opts.ProtocolQualifiedDependentMemberTypes = true;
-      sig->print(llvm::errs(), Opts);
-      llvm::errs() << "\n";
-
-      llvm::errs() << "Canonical requirement signature: ";
-      auto canSig =
-        CanGenericSignature::getCanonical(sig.getGenericParams(),
-                                          sig.getRequirements());
-      canSig->print(llvm::errs(), Opts);
+      Opts.PrintInverseRequirements =
+          Ctx.TypeCheckerOpts.DebugInverseRequirements;
+      sig.print(PD, llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
 
@@ -3463,6 +3491,8 @@ public:
     (void) FD->getOperatorDecl();
     (void) FD->getDynamicallyReplacedDecl();
     
+    dumpGenericSignature(Ctx, FD);
+
     if (!isa<AccessorDecl>(FD)) {
       if (!FD->isInvalid()) {
         checkGenericParams(FD);
@@ -3570,13 +3600,12 @@ public:
       if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
-          getASTContext().Diags.diagnose(
+          Ctx.Diags.diagnose(
               CDeclAttr->getLocation(), diag::attr_decl_async,
               CDeclAttr->getAttrName(), FD->getDescriptiveKind());
         } else if (FD->hasThrows()) {
           FD->setForeignErrorConvention(*errorConvention);
-          getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
-                                         diag::cdecl_throws);
+          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
         }
       } else {
         reason.setAttrInvalid();
@@ -3605,7 +3634,7 @@ public:
       checkVariadicParameters(PL, EED);
     }
 
-    auto &DE = getASTContext().Diags;
+    auto &DE = Ctx.Diags;
     // We don't yet support raw values on payload cases.
     if (EED->hasAssociatedValues()) {
       if (auto rawTy = ED->getRawType()) {
@@ -3800,10 +3829,11 @@ public:
 
     // Produce any diagnostics for the generic signature.
     (void) ED->getGenericSignature();
+    dumpGenericSignature(Ctx, ED);
 
     checkInheritanceClause(ED);
 
-    diagnoseRetroactiveConformances(ED, getASTContext().Diags);
+    diagnoseRetroactiveConformances(ED, Ctx.Diags);
 
     // Only generic and protocol types are permitted to have
     // trailing where clauses.
@@ -3866,8 +3896,7 @@ public:
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
     if (PDD->hasBeenEmitted()) { return; }
     PDD->markEmitted();
-    getASTContext()
-        .Diags
+    Ctx.Diags
         .diagnose(PDD->getMessage()->getStartLoc(),
                   PDD->isError() ? diag::pound_error : diag::pound_warning,
                   PDD->getMessage()->getValue())
@@ -3875,9 +3904,12 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    (void) CD->getInterfaceType();
+    // Force creation of the generic signature.
+    (void) CD->getGenericSignature();
+    dumpGenericSignature(Ctx, CD);
 
     // Compute these requests in case they emit diagnostics.
+    (void) CD->getInterfaceType();
     (void) CD->getInitKind();
 
     if (!CD->isInvalid()) {
@@ -3927,8 +3959,7 @@ public:
             } else {
               CD->diagnose(diag::required_initializer_override_wrong_keyword)
                   .fixItReplace(attr->getLocation(), "required");
-              CD->getAttrs().add(new (getASTContext())
-                                     RequiredAttr(/*IsImplicit=*/true));
+              CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
             }
 
             auto *reqInit =
@@ -3970,8 +4001,7 @@ public:
         auto *reqInit = findNonImplicitRequiredInit(CD->getOverriddenDecl());
         reqInit->diagnose(diag::overridden_required_initializer_here);
 
-        CD->getAttrs().add(new (getASTContext())
-                               RequiredAttr(/*IsImplicit=*/true));
+        CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
       }
     }
 
@@ -4028,10 +4058,6 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    auto haveFeature = [=](Feature f) -> bool {
-      return DD->getASTContext().LangOpts.hasFeature(f);
-    };
-
     // Only check again for destructor decl outside of a class if our destructor
     // is not marked as invalid.
     if (!DD->isInvalid()) {
@@ -4040,7 +4066,7 @@ public:
       if (!nom || isa<ProtocolDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
 
-      } else if (!haveFeature(Feature::NoncopyableGenerics)
+      } else if (!Ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
                   && !isa<ClassDecl>(nom)
                   && nom->canBeCopyable()) {
         // When we have NoncopyableGenerics, deinits get validated as part of
@@ -4050,7 +4076,7 @@ public:
 
       // Temporarily ban deinit on noncopyable enums, unless the experimental
       // feature flag is set.
-      if (!haveFeature(Feature::MoveOnlyEnumDeinits)
+      if (!Ctx.LangOpts.hasFeature(Feature::MoveOnlyEnumDeinits)
           && isa<EnumDecl>(nom)
           && !nom->canBeCopyable()) {
         DD->diagnose(diag::destructor_decl_on_noncopyable_enum);

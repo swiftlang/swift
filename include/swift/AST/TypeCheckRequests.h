@@ -2910,6 +2910,24 @@ public:
   void cacheResult(Witness value) const;
 };
 
+class ResolveValueWitnessesRequest
+    : public SimpleRequest<ResolveValueWitnessesRequest,
+                           evaluator::SideEffect(NormalProtocolConformance *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class AssociatedConformanceRequest
     : public SimpleRequest<AssociatedConformanceRequest,
                            ProtocolConformanceRef(NormalProtocolConformance *,

@@ -22,6 +22,9 @@ using namespace swift;
 using namespace ide;
 using TypeRelation = CodeCompletionResultTypeRelation;
 
+#define DEBUG_TYPE "CodeCompletionResultType"
+#include "llvm/Support/Debug.h"
+
 // MARK: - Utilities
 
 /// Returns the kind of attributes \c Ty can be used as.
@@ -217,13 +220,21 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     return ExistingTypeIt->second;
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "enter USRBasedType(" << Ty << ", USR = "
+                          << USR << ")\n";
+             Ty->dump(llvm::dbgs()););
+
   SmallVector<const USRBasedType *, 2> Supertypes;
   ;
   if (auto Nominal = Ty->getAnyNominal()) {
     if (auto *Proto = dyn_cast<ProtocolDecl>(Nominal)) {
       Proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
         if (Proto != inherited &&
-            !inherited->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+            !inherited->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+            !inherited->getInvertibleProtocolKind()) {
+          LLVM_DEBUG(llvm::dbgs() << "Adding inherited protocol "
+                                  << inherited->getName()
+                                  << "\n";);
           Supertypes.push_back(USRBasedType::fromType(
             inherited->getDeclaredInterfaceType(), Arena));
         }
@@ -234,6 +245,11 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
       auto Conformances = Nominal->getAllConformances();
       Supertypes.reserve(Conformances.size());
       for (auto Conformance : Conformances) {
+        if (isa<InheritedProtocolConformance>(Conformance)) {
+          // Skip inherited conformances; we'll collect them when we visit the
+          // superclass.
+          continue;
+        }
         if (Conformance->getDeclContext()->getParentModule() !=
             Nominal->getModuleContext()) {
           // Only include conformances that are declared within the module of the
@@ -241,14 +257,21 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
           // exist when using the code completion cache from a different module.
           continue;
         }
-        if (Conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        if (Conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+            Conformance->getProtocol()->getInvertibleProtocolKind()) {
           // FIXME: Sendable conformances are lazily synthesized as they are
           // needed by the compiler. Depending on whether we checked whether a
           // type conforms to Sendable before constructing the USRBasedType, we
           // get different results for its conformance. For now, always drop the
           // Sendable conformance.
+          //
+          // FIXME: Copyable and Escapable conformances are skipped because the
+          // USR mangling produces the type 'Any' for the protocol type.
           continue;
         }
+        LLVM_DEBUG(llvm::dbgs() << "Adding conformed protocol "
+                                << Conformance->getProtocol()->getName()
+                                << "\n";);
         Supertypes.push_back(USRBasedType::fromType(
             Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
       }
@@ -284,11 +307,17 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
 
   Type Superclass = getSuperclass(Ty);
   while (Superclass) {
+    LLVM_DEBUG(llvm::dbgs() << "Adding superclass "
+                            << Superclass
+                            << "\n";);
     Supertypes.push_back(USRBasedType::fromType(Superclass, Arena));
     Superclass = getSuperclass(Superclass);
   }
 
   assert(llvm::all_of(Supertypes, [&USR](const USRBasedType *Ty) {
+    if (Ty->getUSR() == USR) {
+      LLVM_DEBUG(llvm::dbgs() << "Duplicate USR: " << USR << "\n";);
+    }
     return Ty->getUSR() != USR;
   }) && "Circular supertypes?");
 
@@ -300,6 +329,9 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
   llvm::erase_if(Supertypes, [&ImpliedSupertypes](const USRBasedType *Ty) {
     return ImpliedSupertypes.contains(Ty);
   });
+
+  LLVM_DEBUG(llvm::dbgs() << "leave USRBasedType(" << Ty << ")\n";
+             Ty->dump(llvm::dbgs()););
 
   return USRBasedType::fromUSR(USR, Supertypes, ::getCustomAttributeKinds(Ty),
                                Arena);

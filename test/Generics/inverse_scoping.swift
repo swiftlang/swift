@@ -19,10 +19,10 @@ protocol P {
 
 protocol U {}
 
-extension U where Self: ~Copyable {} // expected-error {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
+extension U where Self: ~Copyable {}
 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
-extension P {
+extension P where Self: ~Copyable {
   func g() where Self: ~Copyable, // expected-error {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
                                   // FIXME: why no similar 2nd error as Escapable here on Self?
 
@@ -53,7 +53,7 @@ struct S<T> {
             {}
 }
 
-extension S where T: NoCopyReq & ~Copyable {} // expected-error {{cannot add inverse constraint 'T: ~Copyable' on generic parameter 'T' defined in outer scope}}
+extension S where T: NoCopyReq & ~Copyable {}
 // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
 
 struct ExtraInverse<T: ~Copyable> {

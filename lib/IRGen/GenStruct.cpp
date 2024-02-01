@@ -592,14 +592,7 @@ namespace {
       auto sig = ptrTypeDecl->getGenericSignature();
 
       // Map the generic parameter to T
-      auto params = sig.getGenericParams();
-      assert(params.size() == 1);
-      auto param = params[0]->getCanonicalType()->castTo<SubstitutableType>();
-      TypeSubstitutionMap map;
-      map[param] = T.getASTType();
-
-      auto subst = SubstitutionMap::get(sig,
-                              QueryTypeSubstitutionMap{map},
+      auto subst = SubstitutionMap::get(sig, {T.getASTType()},
                               LookUpConformanceInModule{IGF.getSwiftModule()});
       auto ptrType = ptrTypeDecl->getDeclaredInterfaceType().subst(subst);
       SILParameterInfo ptrParam(ptrType->getCanonicalType(),

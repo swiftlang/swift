@@ -180,21 +180,27 @@ void ClangValueTypePrinter::printValueTypeDecl(
     DeclAndTypePrinter &declAndTypePrinter) {
   // FIXME: Add support for generic structs.
   llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
-  llvm::Optional<CanGenericSignature> genericSignature;
+  GenericSignature genericSignature;
   auto printGenericSignature = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignature(*genericSignature);
+    ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
   };
   auto printGenericParamRefs = [&](raw_ostream &os) {
     if (!genericSignature)
       return;
-    ClangSyntaxPrinter(os).printGenericSignatureParams(*genericSignature);
+    ClangSyntaxPrinter(os).printGenericSignatureParams(genericSignature);
   };
   if (typeDecl->isGeneric()) {
-    genericSignature = typeDecl->getGenericSignature().getCanonicalSignature();
+    genericSignature = typeDecl->getGenericSignature();
+
     // FIXME: Support generic requirements.
-    assert(genericSignature->getRequirements().empty());
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    genericSignature->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+    assert(reqs.empty());
+
     // FIXME: Can we make some better layout than opaque layout for generic
     // types.
   } else if (!typeDecl->isResilient()) {
@@ -275,7 +281,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "public:\n";
   if (genericSignature)
     ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
-        *genericSignature);
+        genericSignature);
 
   // Print out the destructor.
   os << "  ";
@@ -457,7 +463,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
         os << "public:\n";
         if (genericSignature)
           ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
-              *genericSignature);
+              genericSignature);
 
         os << "  static ";
         ClangSyntaxPrinter(os).printInlineForThunk();

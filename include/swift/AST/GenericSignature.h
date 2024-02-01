@@ -310,6 +310,13 @@ public:
     return Mem;
   }
 
+  /// Transform the requirements into a form where implicit Copyable and
+  /// Escapable conformances are omitted, and their absence is explicitly
+  /// noted.
+  void getRequirementsWithInverses(
+      SmallVector<Requirement, 2> &reqs,
+      SmallVector<InverseRequirement, 2> &inverses) const;
+
   /// Look up a stored conformance in the generic signature. These are formed
   /// from same-type constraints placed on associated types of generic
   /// parameters which have conformance constraints on them.

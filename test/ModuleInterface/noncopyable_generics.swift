@@ -78,7 +78,7 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public struct ExplicitHello<T> : ~Copyable where T : ~Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.ExplicitHello : Swift.Copyable where T : Swift.Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.ExplicitHello : Swift.Copyable {
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-MISC-NEXT: public struct Hello<T> where T : ~Copyable, T : ~Escapable {
@@ -108,7 +108,7 @@ import NoncopyableGenerics_Misc
 // Synthesized conditional conformances are next
 
 // CHECK-MISC: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-MISC-NEXT: extension {{.*}}.Hello : Swift.Copyable where T : Swift.Copyable {
+// CHECK-MISC-NEXT: extension {{.*}}.Hello : Swift.Copyable where T : ~Escapable {
 
 ////////////////////////////////////////////////////////////////////////
 //    At the end, ensure there are no synthesized Copyable extensions
@@ -127,10 +127,7 @@ import Swiftskell
 // CHECK-NEXT: public protocol Eq : ~Copyable {
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Eq {
-
-// CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Eq where Self : Swift.Equatable {
+// CHECK-NEXT: extension Swiftskell.Eq where Self : ~Copyable {
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-NEXT: public protocol Generator : ~Copyable {
@@ -143,10 +140,10 @@ import Swiftskell
 // CHECK-NEXT: public enum Maybe<Value> where Value : ~Copyable {
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Show {
+// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Show where Value : ~Copyable {
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
-// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Eq where Value : Swiftskell.Eq {
+// CHECK-NEXT: extension Swiftskell.Maybe : Swiftskell.Eq where Value : Swiftskell.Eq, Value : ~Copyable {
 
 // CHECK: #if compiler(>=5.3) && $NoncopyableGenerics
 // CHECK-NEXT: public func maybe<A, B>(_ defaultVal: B, _ fn: (consuming A) -> B) -> (consuming Swiftskell.Maybe<A>) -> B where A : ~Copyable

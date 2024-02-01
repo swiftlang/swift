@@ -5365,10 +5365,6 @@ public:
   /// view of the generic system; see RequirementSignature.h for details.
   RequirementSignature getRequirementSignature() const;
 
-  /// Sometimes we want to make a fake generic signature from the requirements
-  /// of a requirement signature.
-  GenericSignature getRequirementSignatureAsGenericSignature() const;
-
   /// Is the requirement signature currently being computed?
   bool isComputingRequirementSignature() const;
 

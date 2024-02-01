@@ -2388,20 +2388,19 @@ public:
     
     auto nomGenericSig = decl->getGenericSignature();
     
-    TypeSubstitutionMap replacementTypes;
+    SmallVector<Type, 2> replacementTypes;
     for (auto gp : nomGenericSig.getGenericParams()) {
       auto origParamTy = Type(gp).subst(origSubMap)
         ->getCanonicalType();
       auto substParamTy = Type(gp).subst(substSubMap)
         ->getCanonicalType();
 
-      replacementTypes[gp->getCanonicalType()->castTo<SubstitutableType>()]
-          = visit(substParamTy,
-                  AbstractionPattern(origPatternSubs, origSig, origParamTy));
+      replacementTypes.push_back(
+          visit(substParamTy,
+                AbstractionPattern(origPatternSubs, origSig, origParamTy)));
     }
 
-    auto newSubMap = SubstitutionMap::get(nomGenericSig,
-      QueryTypeSubstitutionMap{replacementTypes},
+    auto newSubMap = SubstitutionMap::get(nomGenericSig, replacementTypes,
       LookUpConformanceInModule(moduleDecl));
     
     for (auto reqt : nomGenericSig.getRequirements()) {

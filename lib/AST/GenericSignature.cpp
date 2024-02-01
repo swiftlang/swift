@@ -1246,3 +1246,103 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
 
   return GenericSignature::get(getGenericParams(), reducedRequirements);
 }
+
+void GenericSignatureImpl::getRequirementsWithInverses(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  auto &ctx = getASTContext();
+
+  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
+      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    reqs.append(getRequirements().begin(), getRequirements().end());
+    return;
+  }
+
+  // Record the absence of conformances to invertible protocols.
+  for (auto gp : getGenericParams()) {
+    // Any generic parameter with a superclass bound or concrete type does not
+    // have an inverse.
+    if (getSuperclassBound(gp) || getConcreteType(gp))
+      continue;
+
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      // If we can derive a conformance to this protocol, then don't add an
+      // inverse.
+      if (requiresProtocol(gp, proto))
+        continue;
+
+      // Nothing implies a conformance to this protocol, so record the inverse.
+      inverses.push_back({gp, proto, SourceLoc()});
+    }
+  }
+
+  // Filter out explicit conformances to invertible protocols.
+  for (auto req : getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getFirstType()->is<GenericTypeParamType>() &&
+        req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      continue;
+    }
+
+    reqs.push_back(req);
+  }
+}
+
+void RequirementSignature::getRequirementsWithInverses(
+    ProtocolDecl *owner,
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  auto &ctx = owner->getASTContext();
+
+  if (!SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS &&
+      !ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    reqs.append(getRequirements().begin(), getRequirements().end());
+    return;
+  }
+
+  auto sig = owner->getGenericSignature();
+
+  llvm::SmallDenseSet<CanType, 2> assocTypes;
+
+  auto visit = [&](Type interfaceType) {
+    assocTypes.insert(interfaceType->getCanonicalType());
+
+    // Any associated type declaration with a superclass bound or concrete type
+    // does not have an inverse.
+    if (sig->getSuperclassBound(interfaceType) ||
+        sig->getConcreteType(interfaceType))
+      return;
+
+    for (auto ip : InvertibleProtocolSet::full()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      // If we can derive a conformance to this protocol, then don't add an
+      // inverse.
+      if (sig->requiresProtocol(interfaceType, proto))
+        continue;
+
+      // Nothing implies a conformance to this protocol, so record the inverse.
+      inverses.push_back({interfaceType, proto, SourceLoc()});
+    }
+  };
+
+  visit(owner->getSelfInterfaceType());
+
+  // Record the absence of conformances to invertible protocols.
+  for (auto assocType : owner->getAssociatedTypeMembers()) {
+    visit(assocType->getDeclaredInterfaceType());
+  }
+
+  // Filter out explicit conformances to invertible protocols.
+  for (auto req : getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        assocTypes.count(req.getFirstType()->getCanonicalType()) &&
+        req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      continue;
+    }
+
+    reqs.push_back(req);
+  }
+}

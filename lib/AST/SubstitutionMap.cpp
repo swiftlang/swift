@@ -203,13 +203,19 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
            LookUpConformanceInSubstitutionMap(substitutions));
 }
 
-/// Build an interface type substitution map for the given generic signature
-/// from a type substitution function and conformance lookup function.
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      TypeSubstitutionFn subs,
                                      LookupConformanceFn lookupConformance) {
   InFlightSubstitution IFS(subs, lookupConformance, llvm::None);
   return get(genericSig, IFS);
+}
+
+SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
+                                     ArrayRef<Type> types,
+                                     LookupConformanceFn lookupConformance) {
+  return get(genericSig,
+             QueryReplacementTypeArray{genericSig, types},
+             lookupConformance);
 }
 
 SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,

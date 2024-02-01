@@ -441,6 +441,9 @@ SWIFT_REQUEST(TypeChecker, ResolveTypeWitnessesRequest,
 SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
               Witness(NormalProtocolConformance *, ValueDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveValueWitnessesRequest,
+              evaluator::SideEffect(NormalProtocolConformance *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PatternTypeRequest,
               Type(ContextualPattern),
               Cached, HasNearestLocation)
