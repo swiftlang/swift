@@ -9817,7 +9817,16 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     isAsync = true;
   }
 
-  if (FuncRetTy) {
+  if (auto *lifetimeTyR =
+          dyn_cast_or_null<LifetimeDependentReturnTypeRepr>(FuncRetTy)) {
+    auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(lifetimeTyR->getBase());
+    if (!identTyR ||
+        identTyR->getNameRef().getBaseIdentifier() != Context.Id_Self) {
+      diagnose(FuncRetTy->getStartLoc(),
+               diag::lifetime_dependence_invalid_init_return);
+      return nullptr;
+    }
+  } else if (FuncRetTy) {
     diagnose(FuncRetTy->getStartLoc(), diag::initializer_result_type)
       .fixItRemove(FuncRetTy->getSourceRange());
   }
@@ -9836,7 +9845,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                            isAsync, asyncLoc,
                                            throwsLoc.isValid(), throwsLoc,
                                            thrownTy, BodyParams, GenericParams,
-                                           CurDeclContext);
+                                           CurDeclContext, FuncRetTy);
   CD->setImplicitlyUnwrappedOptional(IUO);
   CD->getAttrs() = Attributes;
 

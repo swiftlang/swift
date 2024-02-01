@@ -2179,6 +2179,10 @@ ERROR(requires_experimental_feature, none,
       "%2 is enabled",
       (StringRef, bool, StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: Lifetime dependence
+//------------------------------------------------------------------------------
+
 ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
       "expected '(' after lifetime dependence specifier", ())
 
@@ -2193,5 +2197,9 @@ ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
 ERROR(expected_param_index_lifetime_dependence, PointsToFirstBadToken,
       "expected unsigned parameter index in lifetime dependence specifier", ())
 
+ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
+      "expected Self return type for initializers with lifetime dependence "
+      "specifiers",
+      ())
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -423,15 +423,16 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
   
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
-  
+
   auto initDecl =
-    new (C) ConstructorDecl(name, SourceLoc(),
-                            /*Failable=*/ true, /*FailabilityLoc=*/SourceLoc(),
-                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                            /*ThrownType=*/TypeLoc(), paramList,
-                            /*GenericParams=*/nullptr, parentDC);
-  
+      new (C) ConstructorDecl(name, SourceLoc(),
+                              /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                              /*ThrownType=*/TypeLoc(), paramList,
+                              /*GenericParams=*/nullptr, parentDC,
+                              /*LifetimeDependentReturnTypeRepr*/ nullptr);
+
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
   addNonIsolatedToSynthesized(enumDecl, initDecl);

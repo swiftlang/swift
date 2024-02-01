@@ -3532,6 +3532,7 @@ public:
       return thrownTypeOrError.takeError();
     const auto thrownType = thrownTypeOrError.get();
 
+    // Handle LifetimeDependence here
     auto ctor = MF.createDecl<ConstructorDecl>(name, SourceLoc(), isFailable,
                                                /*FailabilityLoc=*/SourceLoc(),
                                                /*Async=*/async,
@@ -3540,7 +3541,8 @@ public:
                                                /*ThrowsLoc=*/SourceLoc(),
                                                TypeLoc::withoutLoc(thrownType),
                                                /*BodyParams=*/nullptr,
-                                               genericParams, parent);
+                                               genericParams, parent,
+                                               nullptr);
     declOrOffset = ctor;
 
     ctor->setGenericSignature(MF.getGenericSignature(genericSigID));
