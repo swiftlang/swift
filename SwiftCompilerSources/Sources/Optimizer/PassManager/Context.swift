@@ -50,6 +50,12 @@ extension Context {
   }
 
   func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
+
+  func lookupFunction(name: String) -> Function? {
+    name._withBridgedStringRef {
+      _bridged.lookupFunction($0).function
+    }
+  }
 }
 
 /// A context which allows mutation of a function's SIL.
@@ -61,6 +67,10 @@ protocol MutatingContext : Context {
 extension MutatingContext {
   func notifyInvalidatedStackNesting() { _bridged.notifyInvalidatedStackNesting() }
   var needFixStackNesting: Bool { _bridged.getNeedFixStackNesting() }
+
+  func verifyIsTransforming(function: Function) {
+    precondition(_bridged.isTransforming(function.bridged), "pass modifies wrong function")
+  }
 
   /// Splits the basic block, which contains `inst`, before `inst` and returns the
   /// new block.
@@ -88,6 +98,9 @@ extension MutatingContext {
   }
 
   func erase(instruction: Instruction) {
+    if !instruction.isInStaticInitializer {
+      verifyIsTransforming(function: instruction.parentFunction)
+    }
     if instruction is FullApplySite {
       notifyCallsChanged()
     }
@@ -374,18 +387,21 @@ extension Type {
 extension Builder {
   /// Creates a builder which inserts _before_ `insPnt`, using a custom `location`.
   init(before insPnt: Instruction, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
     self.init(insertAt: .before(insPnt), location: location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts _before_ `insPnt`, using the location of `insPnt`.
   init(before insPnt: Instruction, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
     self.init(insertAt: .before(insPnt), location: insPnt.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
   init(after insPnt: Instruction, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
     if let nextInst = insPnt.next {
       self.init(insertAt: .before(nextInst), location: location,
                 context.notifyInstructionChanged, context._bridged.asNotificationHandler())
@@ -397,17 +413,20 @@ extension Builder {
 
   /// Creates a builder which inserts _after_ `insPnt`, using the location of `insPnt`.
   init(after insPnt: Instruction, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: insPnt.parentFunction)
     self.init(after: insPnt, location: insPnt.location, context)
   }
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
   init(atEndOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: block.parentFunction)
     self.init(insertAt: .atEndOf(block), location: location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
   /// Creates a builder which inserts at the begin of `block`, using a custom `location`.
   init(atBeginOf block: BasicBlock, location: Location, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst), location: location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
@@ -416,6 +435,7 @@ extension Builder {
   /// Creates a builder which inserts at the begin of `block`, using the location of the first
   /// instruction of `block`.
   init(atBeginOf block: BasicBlock, _ context: some MutatingContext) {
+    context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst), location: firstInst.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
@@ -444,6 +464,11 @@ extension BasicBlock {
     return bridged.addBlockArgument(type.bridged, ownership._bridged).argument
   }
   
+  func addFunctionArgument(type: Type, _ context: some MutatingContext) -> FunctionArgument {
+    context.notifyInstructionsChanged()
+    return bridged.addFunctionArgument(type.bridged).argument as! FunctionArgument
+  }
+
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.eraseArgument(index)
@@ -585,7 +610,22 @@ extension Function {
     bridged.setNeedStackProtection(needStackProtection)
   }
 
+  func set(thunkKind: ThunkKind, _ context: FunctionPassContext) {
+    context.notifyEffectsChanged()
+    switch thunkKind {
+    case .noThunk:                 bridged.setThunk(.IsNotThunk)
+    case .thunk:                   bridged.setThunk(.IsThunk)
+    case .reabstractionThunk:      bridged.setThunk(.IsReabstractionThunk)
+    case .signatureOptimizedThunk: bridged.setThunk(.IsSignatureOptimizedThunk)
+    }
+  }
+
   func fixStackNesting(_ context: FunctionPassContext) {
     context._bridged.fixStackNesting(bridged)
+  }
+
+  func appendNewBlock(_ context: FunctionPassContext) -> BasicBlock {
+    context.notifyBranchesChanged()
+    return context._bridged.appendBlock(bridged).block
   }
 }

@@ -499,3 +499,22 @@ extension BridgedArgumentConvention {
     }
   }
 }
+
+extension ArgumentConvention {
+  var bridged: BridgedArgumentConvention {
+    switch self {
+      case .indirectIn:             return .Indirect_In
+      case .indirectInGuaranteed:   return .Indirect_In_Guaranteed
+      case .indirectInout:          return .Indirect_Inout
+      case .indirectInoutAliasable: return .Indirect_InoutAliasable
+      case .indirectOut:            return .Indirect_Out
+      case .directOwned:            return .Direct_Owned
+      case .directUnowned:          return .Direct_Unowned
+      case .directGuaranteed:       return .Direct_Guaranteed
+      case .packOut:                return .Pack_Out
+      case .packInout:              return .Pack_Inout
+      case .packOwned:              return .Pack_Owned
+      case .packGuaranteed:         return .Pack_Guaranteed
+    }
+  }
+}

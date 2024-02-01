@@ -221,6 +221,11 @@ static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift:
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
 static_assert((int)BridgedFunction::InlineStrategy::AlwaysInline == (int)swift::AlwaysInline);
 
+static_assert((int)BridgedFunction::ThunkKind::IsNotThunk == (int)swift::IsNotThunk);
+static_assert((int)BridgedFunction::ThunkKind::IsThunk == (int)swift::IsThunk);
+static_assert((int)BridgedFunction::ThunkKind::IsReabstractionThunk == (int)swift::IsReabstractionThunk);
+static_assert((int)BridgedFunction::ThunkKind::IsSignatureOptimizedThunk == (int)swift::IsSignatureOptimizedThunk);
+
 BridgedOwnedString BridgedFunction::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);

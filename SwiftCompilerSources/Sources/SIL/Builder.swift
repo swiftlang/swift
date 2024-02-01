@@ -230,6 +230,34 @@ public struct Builder {
     return notifyNew(apply.getAs(ApplyInst.self))
   }
   
+  @discardableResult
+  public func createTryApply(
+    function: Value,
+    _ substitutionMap: SubstitutionMap,
+    arguments: [Value],
+    normalBlock: BasicBlock,
+    errorBlock: BasicBlock,
+    isNonAsync: Bool = false,
+    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+  ) -> TryApplyInst {
+    let apply = arguments.withBridgedValues { valuesRef in
+      bridged.createTryApply(function.bridged, substitutionMap.bridged, valuesRef,
+                             normalBlock.bridged, errorBlock.bridged,
+                             isNonAsync, specializationInfo)
+    }
+    return notifyNew(apply.getAs(TryApplyInst.self))
+  }
+  
+  @discardableResult
+  public func createReturn(of value: Value) -> ReturnInst {
+    return notifyNew(bridged.createReturn(value.bridged).getAs(ReturnInst.self))
+  }
+
+  @discardableResult
+  public func createThrow(of value: Value) -> ThrowInst {
+    return notifyNew(bridged.createThrow(value.bridged).getAs(ThrowInst.self))
+  }
+
   public func createUncheckedEnumData(enum enumVal: Value,
                                       caseIndex: Int,
                                       resultType: Type) -> UncheckedEnumDataInst {
@@ -364,6 +392,16 @@ public struct Builder {
                                                            existentialType.bridged,
                                                            useConformancesOf.bridged)
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
+  }
+
+  public func createInitExistentialMetatype(
+    metatype: Value,
+    existentialType: Type,
+    useConformancesOf: InitExistentialMetatypeInst) -> InitExistentialMetatypeInst {
+    let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
+                                                                existentialType.bridged,
+                                                                useConformancesOf.bridged)
+    return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 
   public func createMetatype(of type: Type, representation: Type.MetatypeRepresentation) -> MetatypeInst {

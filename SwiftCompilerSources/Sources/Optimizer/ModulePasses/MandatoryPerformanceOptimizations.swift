@@ -52,6 +52,13 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
 
       optimize(function: f, context, &worklist)
     }
+
+    // Generic specialization takes care of removing metatype arguments of generic functions.
+    // But sometimes non-generic functions have metatype arguments which must be removed.
+    // We need handle this case with a function signature optimization.
+    removeMetatypeArgumentsInCallees(of: f, moduleContext)
+
+    worklist.addCallees(of: f)
   }
 }
 
@@ -100,6 +107,11 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
           context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
         }
 
+      case let iem as InitExistentialMetatypeInst:
+        if iem.uses.ignoreDebugUses.isEmpty {
+          context.erase(instructionIncludingDebugUses: iem)
+        }
+
       default:
         break
       }
@@ -111,10 +123,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
     changed = context.optimizeMemoryAccesses(in: function) || changed
-    _ = context.eliminateDeadAllocations(in: function)
+    changed = context.eliminateDeadAllocations(in: function) || changed
   }
-
-  worklist.add(calleesOf: function)
 }
 
 private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
@@ -150,6 +160,14 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
     }
 
     simplifyCtxt.inlineFunction(apply: apply, mandatoryInline: true)
+  }
+}
+
+private func removeMetatypeArgumentsInCallees(of function: Function, _ context: ModulePassContext) {
+  for inst in function.instructions {
+    if let apply = inst as? FullApplySite {
+      specializeByRemovingMetatypeArguments(apply: apply, context)
+    }
   }
 }
 
@@ -351,7 +369,7 @@ fileprivate struct FunctionWorklist {
   }
 
   mutating func addAllNonGenericFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where !f.isGenericFunction {
+    for f in moduleContext.functions where !f.isGeneric {
       pushIfNotVisited(f)
     }
     return
@@ -366,7 +384,7 @@ fileprivate struct FunctionWorklist {
     }
   }
 
-  mutating func add(calleesOf function: Function) {
+  mutating func addCallees(of function: Function) {
     for inst in function.instructions {
       switch inst {
       case let apply as ApplySite:

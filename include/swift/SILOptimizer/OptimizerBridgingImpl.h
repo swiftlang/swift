@@ -155,6 +155,10 @@ bool BridgedPassContext::moduleIsSerialized() const {
   return invocation->getPassManager()->getModule()->isSerialized();
 }
 
+bool BridgedPassContext::isTransforming(BridgedFunction function) const {
+  return invocation->getFunction() == function.getFunction();
+}
+
 BridgedAliasAnalysis BridgedPassContext::getAliasAnalysis() const {
   return {invocation->getPassManager()->getAnalysis<swift::AliasAnalysis>(invocation->getFunction())};
 }
@@ -206,6 +210,10 @@ BridgedBasicBlock BridgedPassContext::splitBlockAfter(BridgedInstruction bridged
 BridgedBasicBlock BridgedPassContext::createBlockAfter(BridgedBasicBlock bridgedBlock) const {
   swift::SILBasicBlock *block = bridgedBlock.unbridged();
   return {block->getParent()->createBasicBlockAfter(block)};
+}
+
+BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunction) const {
+  return {bridgedFunction.getFunction()->createBasicBlock()};
 }
 
 void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
@@ -354,6 +362,11 @@ getNextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
   if (nextIter == t->getModule().getDefaultWitnessTables().end())
     return {nullptr};
   return {&*nextIter};
+}
+
+OptionalBridgedFunction BridgedPassContext::lookupFunction(BridgedStringRef name) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpFunction(name.unbridged())};
 }
 
 OptionalBridgedFunction BridgedPassContext::loadFunction(BridgedStringRef name, bool loadCalleesRecursively) const {

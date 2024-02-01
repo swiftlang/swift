@@ -166,7 +166,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isDestructor: Bool { bridged.isDestructor() }
 
-  public var isGenericFunction: Bool { bridged.isGenericFunction() }
+  public var isGeneric: Bool { bridged.isGeneric() }
 
   /// Kinds of effect attributes which can be defined for a Swift function.
   public enum EffectAttribute {
@@ -260,6 +260,21 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isSerialized: Bool { bridged.isSerialized() }
   public var hasValidLinkageForFragileRef: Bool { bridged.hasValidLinkageForFragileRef() }
+
+  public enum ThunkKind {
+    case noThunk, thunk, reabstractionThunk, signatureOptimizedThunk
+  }
+
+  var thunkKind: ThunkKind {
+    switch bridged.isThunk() {
+    case .IsNotThunk:                return .noThunk
+    case .IsThunk:                   return .thunk
+    case .IsReabstractionThunk:      return .reabstractionThunk
+    case .IsSignatureOptimizedThunk: return .signatureOptimizedThunk
+    default:
+      fatalError()
+    }
+  }
 
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized

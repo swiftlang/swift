@@ -620,8 +620,8 @@ bool BridgedFunction::isDestructor() const {
   return false;
 }
 
-bool BridgedFunction::isGenericFunction() const {
-  return !getFunction()->getGenericSignature().isNull();
+bool BridgedFunction::isGeneric() const {
+  return getFunction()->isGeneric();
 }
 
 bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
@@ -646,6 +646,14 @@ BridgedFunction::PerformanceConstraints BridgedFunction::getPerformanceConstrain
 
 BridgedFunction::InlineStrategy BridgedFunction::getInlineStrategy() const {
   return (InlineStrategy)getFunction()->getInlineStrategy();
+}
+
+BridgedFunction::ThunkKind BridgedFunction::isThunk() const {
+  return (ThunkKind)getFunction()->isThunk();
+}
+
+void BridgedFunction::setThunk(ThunkKind kind) const {
+  getFunction()->setThunk((swift::IsThunk_t)kind);
 }
 
 bool BridgedFunction::isSerialized() const {
@@ -772,6 +780,10 @@ BridgedInstruction BridgedInstruction::getLastInstOfParent() const {
 
 bool BridgedInstruction::isDeleted() const {
   return unbridged()->isDeleted();
+}
+
+bool BridgedInstruction::isInStaticInitializer() const {
+  return unbridged()->isStaticInitializerInst();
 }
 
 BridgedOperandArray BridgedInstruction::getOperands() const {
@@ -1011,6 +1023,10 @@ bool BridgedInstruction::ApplyInst_getNonAsync() const {
 
 BridgedGenericSpecializationInformation BridgedInstruction::ApplyInst_getSpecializationInfo() const {
   return {getAs<swift::ApplyInst>()->getSpecializationInfo()};
+}
+
+BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpecializationInfo() const {
+  return {getAs<swift::TryApplyInst>()->getSpecializationInfo()};
 }
 
 SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
@@ -1289,6 +1305,10 @@ BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedVal
       type.unbridged(), BridgedValue::castToOwnership(ownership))};
 }
 
+BridgedArgument BridgedBasicBlock::addFunctionArgument(BridgedType type) const {
+  return {unbridged()->createFunctionArgument(type.unbridged())};
+}
+
 void BridgedBasicBlock::eraseArgument(SwiftInt index) const {
   unbridged()->eraseArgument(index);
 }
@@ -1521,6 +1541,28 @@ BridgedInstruction BridgedBuilder::createApply(BridgedValue function, BridgedSub
       arguments.getValues(argValues), applyOpts, specInfo.data)};
 }
 
+BridgedInstruction BridgedBuilder::createTryApply(BridgedValue function, BridgedSubstitutionMap subMap,
+                               BridgedValueArray arguments,
+                               BridgedBasicBlock normalBB, BridgedBasicBlock errorBB,
+                               bool isNonAsync,
+                               BridgedGenericSpecializationInformation specInfo) const {
+  llvm::SmallVector<swift::SILValue, 16> argValues;
+  swift::ApplyOptions applyOpts;
+  if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
+
+  return {unbridged().createTryApply(
+      regularLoc(), function.getSILValue(), subMap.unbridged(),
+      arguments.getValues(argValues), normalBB.unbridged(), errorBB.unbridged(), applyOpts, specInfo.data)};
+}
+
+BridgedInstruction BridgedBuilder::createReturn(BridgedValue op) const {
+  return {unbridged().createReturn(regularLoc(), op.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createThrow(BridgedValue op) const {
+  return {unbridged().createThrow(regularLoc(), op.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal, SwiftInt caseIdx,
                                            BridgedType resultType) const {
   swift::SILValue en = enumVal.getSILValue();
@@ -1638,6 +1680,15 @@ BridgedInstruction BridgedBuilder::createInitExistentialRef(BridgedValue instanc
   return {unbridged().createInitExistentialRef(
       regularLoc(), type.unbridged(), src->getFormalConcreteType(),
       instance.getSILValue(), src->getConformances())};
+}
+
+BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue metatype,
+                                            BridgedType existentialType,
+                                            BridgedInstruction useConformancesOf) const {
+  auto *src = useConformancesOf.getAs<swift::InitExistentialMetatypeInst>();
+  return {unbridged().createInitExistentialMetatype(
+      regularLoc(), metatype.getSILValue(), existentialType.unbridged(),
+      src->getConformances())};
 }
 
 BridgedInstruction BridgedBuilder::createMetatype(BridgedType type,

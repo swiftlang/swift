@@ -889,6 +889,9 @@ bool SILFunction::shouldBePreservedForDebugger() const {
   if (!isDefinition())
     return false;
 
+  if (getLinkage() == SILLinkage::Shared)
+    return false;
+
   // Don't preserve anything markes as always emit into client.
   if (markedAsAlwaysEmitIntoClient())
     return false;

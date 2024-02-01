@@ -41,6 +41,8 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.isDeleted()
   }
 
+  final public var isInStaticInitializer: Bool { bridged.isInStaticInitializer() }
+
   final public var operands: OperandArray {
     let operands = bridged.getOperands()
     return OperandArray(base: operands.base, count: operands.count)
@@ -1249,6 +1251,8 @@ final public class TryApplyInst : TermInst, FullApplySite {
   public var errorBlock: BasicBlock { successors[1] }
 
   public var singleDirectResult: Value? { normalBlock.arguments[0] }
+
+  public var specializationInfo: ApplyInst.SpecializationInfo { bridged.TryApplyInst_getSpecializationInfo() }
 }
 
 final public class BranchInst : TermInst {
