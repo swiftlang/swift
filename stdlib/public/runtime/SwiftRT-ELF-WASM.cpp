@@ -38,7 +38,7 @@ static const void *__backtraceRef __attribute__((used))
 #if defined(__ELF__)
 # define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"a\"\n");
 #elif defined(__wasm__)
-# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"\",@\n");
+# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"R\",@\n");
 #endif
 
 #define DECLARE_SWIFT_SECTION(name)                                                          \
