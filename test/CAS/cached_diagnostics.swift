@@ -1,3 +1,6 @@
+// rdar://119964830 Temporarily disabling in Linux
+// UNSUPPORTED: OS=linux-gnu
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -O -import-objc-header %S/Inputs/objc.h \
