@@ -700,9 +700,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   }
   if (FD->isGeneric()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
-    auto Requirements = Signature.getRequirements();
+
     // FIXME: Support generic requirements.
-    if (!Requirements.empty())
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    Signature->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+    if (!reqs.empty())
       return ClangRepresentation::unsupported;
     // Print the template and requires clauses for this function.
     if (kind == FunctionSignatureKind::CxxInlineThunk)

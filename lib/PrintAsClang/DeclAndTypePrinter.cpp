@@ -383,10 +383,16 @@ private:
           printMembers(SD->getMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
-            auto sign = ed->getGenericSignature();
-            // FIXME: support requirements.
-            if (!sign.getRequirements().empty())
-              continue;
+            SmallVector<Requirement, 2> reqs;
+            SmallVector<InverseRequirement, 2> inverseReqs;
+            if (auto sig = ed->getGenericSignature()) {
+              sig->getRequirementsWithInverses(reqs, inverseReqs);
+              assert(inverseReqs.empty() &&
+                     "Non-copyable generics not supported here!");
+              // FIXME: support requirements.
+              if (!reqs.empty())
+                continue;
+            }
             printMembers(ed->getMembers());
           }
         },
