@@ -2793,6 +2793,17 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 }
 
 namespace swift::test {
+static FunctionTest PrintASTTypeLowering(
+    "print_ast_type_lowering", [](auto &function, auto &arguments, auto &test) {
+      auto value = arguments.takeValue();
+      auto silTy = value->getType();
+      auto canTy = silTy.getRawASTType();
+      auto *ty = canTy.getPointer();
+      function.getModule()
+          .Types.getTypeLowering(AbstractionPattern(ty), ty, function)
+          .print(llvm::outs());
+    });
+
 // Arguments:
 // - value: whose type will be printed
 // Dumps:
@@ -3034,6 +3045,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //     unconditionally but in this particular instantiation is trivial
     // (3) being a special type that's not worth forming a conformance for
     //     - ModuleType
+    //     - SILTokenType
     // (4) being an unowned(unsafe) reference to a class/class-bound existential
     //     NOTE: ReferenceStorageType(C) does not conform HOWEVER the presence
     //           of an unowned(unsafe) field within an aggregate DOES NOT allow
@@ -3076,7 +3088,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // ModuleTypes are trivial but don't warrant being given a
           // conformance to BitwiseCopyable (case (3)).
-          if (isa<ModuleType>(ty)) {
+          if (isa<ModuleType, SILTokenType>(ty)) {
             // These types should never appear within aggregates.
             assert(isTopLevel && "aggregate containing marker type!?");
             // If they did, though, they would not justify the aggregate's
