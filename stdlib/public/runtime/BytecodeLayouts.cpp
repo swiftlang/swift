@@ -1435,14 +1435,32 @@ static void existentialAssignWithCopy(const Metadata *metadata,
                                uint8_t *dest,
                                uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  auto *type = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
+  auto *srcType = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
+  auto *destType = getExistentialTypeMetadata((OpaqueValue*)(dest + _addrOffset));
   auto *destObject = (OpaqueValue *)(dest + _addrOffset);
   auto *srcObject = (OpaqueValue *)(src + _addrOffset);
   addrOffset = _addrOffset + (sizeof(uintptr_t) * NumWords_ValueBuffer);
-  if (type->getValueWitnesses()->isValueInline()) {
-    type->vw_assignWithCopy(destObject, srcObject);
+
+  if (srcType == destType) {
+    if (srcType->getValueWitnesses()->isValueInline()) {
+      srcType->vw_assignWithCopy(destObject, srcObject);
+    } else {
+      swift_release(*(HeapObject**)destObject);
+      memcpy(destObject, srcObject, sizeof(uintptr_t));
+      swift_retain(*(HeapObject**)srcObject);
+    }
+    return;
+  }
+
+  if (destType->getValueWitnesses()->isValueInline()) {
+      destType->vw_destroy(destObject);
   } else {
     swift_release(*(HeapObject**)destObject);
+  }
+
+  if (srcType->getValueWitnesses()->isValueInline()) {
+    srcType->vw_initializeWithCopy(destObject, srcObject);
+  } else {
     memcpy(destObject, srcObject, sizeof(uintptr_t));
     swift_retain(*(HeapObject**)srcObject);
   }
