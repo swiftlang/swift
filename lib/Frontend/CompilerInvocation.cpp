@@ -1521,6 +1521,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     Opts.DeferToRuntime = true;
 
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
+  Opts.DebugInverseRequirements |= Args.hasArg(OPT_debug_inverse_requirements);
 
   Opts.EnableLazyTypecheck |= Args.hasArg(OPT_experimental_lazy_typecheck);
   Opts.EnableLazyTypecheck |=

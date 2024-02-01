@@ -2078,7 +2078,7 @@ static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
       PrintOptions Opts;
       Opts.ProtocolQualifiedDependentMemberTypes = true;
       Opts.PrintInverseRequirements =
-          ctx.TypeCheckerOpts.DebugInverseRequirements;
+          !ctx.TypeCheckerOpts.DebugInverseRequirements;
       sig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
       llvm::errs() << "Canonical generic signature: ";
@@ -3456,7 +3456,7 @@ public:
       PrintOptions Opts;
       Opts.ProtocolQualifiedDependentMemberTypes = true;
       Opts.PrintInverseRequirements =
-          Ctx.TypeCheckerOpts.DebugInverseRequirements;
+          !Ctx.TypeCheckerOpts.DebugInverseRequirements;
       sig.print(PD, llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
