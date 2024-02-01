@@ -1539,6 +1539,10 @@ bool ClangImporter::Implementation::importHeader(
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer,
     bool implicitImport) {
 
+  // Progress update for the debugger.
+  SwiftContext.PreModuleImportHook(
+      headerName, ASTContext::ModuleImportKind::BridgingHeader);
+
   // Don't even try to load the bridging header if the Clang AST is in a bad
   // state. It could cause a crash.
   auto &clangDiags = getClangASTContext().getDiagnostics();

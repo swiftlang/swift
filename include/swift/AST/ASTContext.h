@@ -295,10 +295,19 @@ public:
   /// OutputBackend for writing outputs.
   llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
 
+  enum ModuleImportKind {
+    Module = 0,
+    Overlay,
+    BridgingHeader
+  };
+  using PreModuleImportCallbackPtr =
+      std::function<void(StringRef ModuleName, ModuleImportKind Kind)>;
   /// Set the callback function that is invoked before Swift module importing is
-  /// performed
-  void SetPreModuleImportCallback(
-      std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback);
+  /// performed.
+  void SetPreModuleImportCallback(PreModuleImportCallbackPtr callback);
+
+  /// Call the PreModuleImportCallback. Used by ClangImporter.
+  void PreModuleImportHook(StringRef ModuleName, ModuleImportKind Kind) const;
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
@@ -414,8 +423,7 @@ private:
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
   /// An optional generic callback function invoked prior to importing a module.
-  mutable std::function<void(llvm::StringRef ModuleName, bool IsOverlay)>
-      PreModuleImportCallback;
+  mutable PreModuleImportCallbackPtr PreModuleImportCallback;
 
 public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
