@@ -67,7 +67,9 @@ extension String {
   ///     An array containing a null-terminated sequence of UTF-8 code units.
   @inlinable
   @_alwaysEmitIntoClient
-  @available(swift, deprecated: 6, message: "Use String(decoding: array, as: UTF8.self) instead")
+  @available(swift, deprecated: 6, message:
+    "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
+  )
   public init(cString nullTerminatedUTF8: [CChar]) {
     self = nullTerminatedUTF8.withUnsafeBufferPointer {
       $0.withMemoryRebound(to: UInt8.self, String.init(_checkingCString:))
@@ -129,7 +131,9 @@ extension String {
   ///     An array containing a null-terminated UTF-8 code unit sequence.
   @inlinable
   @_alwaysEmitIntoClient
-  @available(swift, deprecated: 6, message: "Use String(decoding: array, as: UTF8.self) instead")
+  @available(swift, deprecated: 6, message:
+    "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
+  )
   public init(cString nullTerminatedUTF8: [UInt8]) {
     self = nullTerminatedUTF8.withUnsafeBufferPointer {
       String(_checkingCString: $0)
@@ -244,7 +248,9 @@ extension String {
   ///     An array containing a null-terminated sequence of UTF-8 code units.
   @inlinable
   @_alwaysEmitIntoClient
-  @available(swift, deprecated: 6, message: "Use String(validating: array, as: UTF8.self) instead")
+  @available(swift, deprecated: 6, message:
+    "Use String(validating: array, as: UTF8.self) instead, after truncating the null termination."
+  )
   public init?(validatingCString nullTerminatedUTF8: [CChar]) {
     guard let length = nullTerminatedUTF8.firstIndex(of: 0) else {
       _preconditionFailure(
@@ -272,7 +278,9 @@ extension String {
   ///     An array containing a null-terminated sequence of UTF-8 code units.
   @inlinable
   @_alwaysEmitIntoClient
-  @available(swift, deprecated: 6, message: "Use String(validating: array, as: UTF8.self) instead")
+  @available(swift, deprecated: 6, message:
+    "Use String(validating: array, as: UTF8.self) instead, after truncating the null termination."
+  )
   public init?(validatingUTF8 cString: [CChar]) {
     self.init(validatingCString: cString)
   }
@@ -491,7 +499,9 @@ extension String {
   ///     interpreted.
   @inlinable
   @_alwaysEmitIntoClient
-  @available(swift, deprecated: 6, message: "Use String(decoding: array, as: Encoding.self) instead")
+  @available(swift, deprecated: 6, message:
+    "Use String(decoding: array, as: Encoding.self) instead, after truncating the null termination."
+  )
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: [Encoding.CodeUnit],
     as encoding: Encoding.Type
