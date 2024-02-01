@@ -1080,13 +1080,18 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 }
 
 llvm::Optional<StringRef>
-Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText) {
+Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText,
+                                          bool AllowMultiline) {
   assert(Tok.is(tok::string_literal));
 
   // FIXME: Support extended escaping string literal.
   if (Tok.getCustomDelimiterLen()) {
     diagnose(Loc, diag::forbidden_extended_escaping_string, DiagText);
     return llvm::None;
+  }
+  if (!AllowMultiline && Tok.isMultilineString()) {
+    diagnose(Loc, diag::forbidden_multiline_string, DiagText)
+        .warnUntilSwiftVersion(6);
   }
 
   SmallVector<Lexer::StringSegment, 1> Segments;

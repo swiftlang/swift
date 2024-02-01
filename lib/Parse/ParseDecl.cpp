@@ -568,7 +568,8 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
       }
 
       auto Value = getStringLiteralIfNotInterpolated(
-          AttrLoc, ("'" + ArgumentKindStr + "'").str());
+          AttrLoc, ("'" + ArgumentKindStr + "'").str(),
+          /*AllowMultiline=*/true);
       consumeToken();
       if (!Value) {
         AnyArgumentInvalid = true;
@@ -1453,7 +1454,8 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
       return std::nullopt;
     }
     llvm::Optional<StringRef> importModuleName =
-        getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
+        getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str(),
+                                          /*AllowMultiline=*/false);
     consumeToken(tok::string_literal);
 
     if (!importModuleName.has_value()) {
@@ -3233,8 +3235,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
 
-      AsmName =
-          getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
+      AsmName = getStringLiteralIfNotInterpolated(
+          Loc, ("'" + AttrName + "'").str(), /*AllowMultiline=*/false);
 
       consumeToken(tok::string_literal);
 
@@ -3305,7 +3307,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     auto Name = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
+        Loc, ("'" + AttrName + "'").str(), /*AllowMultiline=*/false);
 
     consumeToken(tok::string_literal);
 
@@ -3392,7 +3394,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     auto Value = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
+        Loc, ("'" + AttrName + "'").str(), /*AllowMultiline=*/false);
 
     consumeToken(tok::string_literal);
 
@@ -3455,8 +3457,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         // Parse the next string literal as the original module name.
         auto ModuleNameLoc = Tok.getLoc();
         if (Tok.is(tok::string_literal)) {
-          auto NameOp = getStringLiteralIfNotInterpolated(Tok.getLoc(),
-                                                          "original module name");
+          auto NameOp = getStringLiteralIfNotInterpolated(
+              Tok.getLoc(), "original module name", /*AllowMultiline=*/false);
           if (NameOp.has_value())
             OriginalModuleName = *NameOp;
           consumeToken();
@@ -3545,7 +3547,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         diagnose(ColonLoc, diag::attr_private_import_expected_sourcefile_name);
         return makeParserSuccess();
       }
-      filename = getStringLiteralIfNotInterpolated(Loc, "_private");
+      filename = getStringLiteralIfNotInterpolated(Loc, "_private",
+                                                   /*AllowMultiline=*/false);
       if (!filename.has_value()) {
         diagnose(ColonLoc, diag::attr_private_import_expected_sourcefile_name);
         return makeParserSuccess();
@@ -3818,8 +3821,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
 
-      llvm::Optional<StringRef> value =
-          getStringLiteralIfNotInterpolated(Tok.getLoc(), flag);
+      llvm::Optional<StringRef> value = getStringLiteralIfNotInterpolated(
+          Tok.getLoc(), flag, /*AllowMultiline=*/false);
       if (!value)
         return makeParserSuccess();
       Token stringTok = Tok;
@@ -4533,7 +4536,8 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
         diagnose(Tok, diag::convention_attribute_ctype_expected_string);
       return true;
     }
-    if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)")) {
+    if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)",
+                                                    /*AllowMultiline=*/false)) {
       cType = Located<StringRef>(ty.value(), Tok.getLoc());
     }
     consumeToken(tok::string_literal);
@@ -7167,8 +7171,8 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
         return makeParserError();
       }
 
-      Filename =
-          getStringLiteralIfNotInterpolated(Loc, "'#sourceLocation'");
+      Filename = getStringLiteralIfNotInterpolated(Loc, "'#sourceLocation'",
+                                                   /*AllowMultiline=*/false);
       if (!Filename.has_value())
         return makeParserError();
       SourceLoc filenameLoc = consumeToken(tok::string_literal);
@@ -7186,6 +7190,11 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       }
       SmallString<16> buffer;
       auto text = stripUnderscoresIfNeeded(Tok.getText(), buffer);
+      if (text.find_first_not_of("0123456789") != StringRef::npos) {
+        // Disallow non-decimal line numbers in Swift 6.
+        diagnose(Tok, diag::expected_line_directive_number)
+            .warnUntilSwiftVersion(6);
+      }
       if (text.getAsInteger(0, StartLine)) {
         diagnose(Tok, diag::expected_line_directive_number);
         return makeParserError();
@@ -7233,8 +7242,9 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       diagnose(Tok, diag::expected_line_directive_name);
       return makeParserError();
     }
-    
-    Filename = getStringLiteralIfNotInterpolated(Loc, "'#line'");
+
+    Filename = getStringLiteralIfNotInterpolated(Loc, "'#line'",
+                                                 /*AllowMultiline=*/false);
     if (!Filename.has_value())
       return makeParserError();
   }
