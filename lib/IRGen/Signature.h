@@ -204,7 +204,8 @@ public:
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
                                FunctionPointerKind kind,
-                               bool forStaticCall = false);
+                               bool forStaticCall = false,
+                               bool forCXXConstructorCall = false);
 
   static SignatureExpansionABIDetails
   getUncachedABIDetails(IRGenModule &IGM, CanSILFunctionType formalType,

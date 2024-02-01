@@ -1574,10 +1574,11 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
-  Signature getSignature(CanSILFunctionType fnType);
   Signature getSignature(CanSILFunctionType fnType,
-                         FunctionPointerKind kind,
-                         bool forStaticCall = false);
+                         bool isCXXConstructorCall = false);
+  Signature getSignature(CanSILFunctionType fnType, FunctionPointerKind kind,
+                         bool forStaticCall = false,
+                         bool isCXXConstructorCall = false);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);

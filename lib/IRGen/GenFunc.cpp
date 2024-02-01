@@ -125,11 +125,13 @@ namespace {
     const CanSILFunctionType FormalType;
 
     mutable Signature TheSignature;
+    mutable Signature TheCXXConstructorSignature;
 
   public:
     FuncSignatureInfo(CanSILFunctionType formalType)
       : FormalType(formalType) {}
 
+    Signature getCXXConstructorSignature(IRGenModule &IGM) const;
     Signature getSignature(IRGenModule &IGM) const;
   };
 
@@ -674,6 +676,21 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
   return TheSignature;
 }
 
+Signature
+FuncSignatureInfo::getCXXConstructorSignature(IRGenModule &IGM) const {
+  // If it's already been filled in, we're done.
+  if (TheCXXConstructorSignature.isValid())
+    return TheCXXConstructorSignature;
+
+  // Update the cache and return.
+  TheCXXConstructorSignature =
+      Signature::getUncached(IGM, FormalType, FunctionPointerKind(FormalType),
+                             /*forStaticCall*/ false,
+                             /*forCXXConstructorCall*/ true);
+  assert(TheCXXConstructorSignature.isValid());
+  return TheCXXConstructorSignature;
+}
+
 Signature ObjCFuncSignatureInfo::getDirectSignature(IRGenModule &IGM) const {
   // If it's already been filled in, we're done.
   if (TheDirectSignature.isValid())
@@ -712,13 +729,16 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   llvm_unreachable("bad function type representation");
 }
 
-Signature IRGenModule::getSignature(CanSILFunctionType type) {
-  return getSignature(type, FunctionPointerKind(type));
+Signature IRGenModule::getSignature(CanSILFunctionType type,
+                                    bool isCXXConstructorCall) {
+  return getSignature(type, FunctionPointerKind(type), /*forStaticCall*/ false,
+                      isCXXConstructorCall);
 }
 
 Signature IRGenModule::getSignature(CanSILFunctionType type,
                                     FunctionPointerKind kind,
-                                    bool forStaticCall) {
+                                    bool forStaticCall,
+                                    bool isCXXConstructorCall) {
   // Don't bother caching if we're working with a special kind.
   if (kind.isSpecial())
     return Signature::getUncached(*this, type, kind);
@@ -730,6 +750,10 @@ Signature IRGenModule::getSignature(CanSILFunctionType type,
     auto &objcSigInfo = static_cast<const ObjCFuncSignatureInfo &>(sigInfo);
     return objcSigInfo.getDirectSignature(*this);
   }
+
+  if (isCXXConstructorCall)
+    return sigInfo.getCXXConstructorSignature(*this);
+
   return sigInfo.getSignature(*this);
 }
 

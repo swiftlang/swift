@@ -3583,7 +3583,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     }
 
     if (cxxCtor) {
-      Signature signature = getSignature(f->getLoweredFunctionType());
+      Signature signature = getSignature(f->getLoweredFunctionType(),
+                                         /*isCXXConstructorCall*/ true);
 
       // The thunk has private linkage, so it doesn't need to have a predictable
       // mangled name -- we just need to make sure the name is unique.
