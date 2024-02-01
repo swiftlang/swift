@@ -523,7 +523,8 @@ private:
                              const FailureHandler &failure);
 
   void emitGuardBranch(SILLocation loc, Expr *guard,
-                       const FailureHandler &failure);
+                       const FailureHandler &failure,
+                       const ClauseRow &row, ArgArray args);
 
   // Bind copyable variable bindings as independent variables.
   void bindIrrefutablePatterns(const ClauseRow &row, ArgArray args,
@@ -1183,25 +1184,21 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
 
   if (auto ownership = getNoncopyableOwnership()) {
     // A noncopyable pattern match always happens over a borrow first.
-    // If there is a guard expression, then we also have to match pattern
-    // variables as borrows while executing the guard. This ensures
-    // the guard can't consume or modify the value without us committing to this
-    // case branch. If the final pattern match is only borrowing as well,
+    // If the final pattern match is only borrowing as well,
     // we can bind the variables immediately here too.
-    if (hasGuard || *ownership <= ValueOwnership::Shared) {
+    if (*ownership <= ValueOwnership::Shared) {
       bindIrrefutableBorrows(clauses[row], args);
     }
     
     if (hasGuard) {
-      this->emitGuardBranch(guardExpr, guardExpr, failure);
+      // The guard will bind borrows locally if necessary.
+      this->emitGuardBranch(guardExpr, guardExpr, failure,
+                            clauses[row], args);
     }
     
     if (*ownership > ValueOwnership::Shared) {
-      // Unbind the variables and unborrow the subject so we can consume it
-      // later.
       unbindAndEndBorrows(clauses[row], args);
     }
-    
   } else {
     // Bind the rest of the patterns.
     // For noncopyable bindings, this will bind them as borrows initially if there
@@ -1211,7 +1208,8 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
 
     // Emit the guard branch, if it exists.
     if (guardExpr) {
-      this->emitGuardBranch(guardExpr, guardExpr, failure);
+      this->emitGuardBranch(guardExpr, guardExpr, failure,
+                            clauses[row], args);
     }
   }
 
@@ -1244,7 +1242,8 @@ bindRefutablePatterns(const ClauseRow &row, ArgArray args,
       FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
       bindVariable(pattern, exprPattern->getMatchVar(), args[i],
                    /*isForSuccess*/ false, /* hasMultipleItems */ false);
-      emitGuardBranch(pattern, exprPattern->getMatchExpr(), failure);
+      emitGuardBranch(pattern, exprPattern->getMatchExpr(), failure,
+                      row, args);
       break;
     }
     default:
@@ -1391,14 +1390,23 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
                                       ConsumableManagedValue value) {
   assert(value.getFinalConsumption() == CastConsumptionKind::BorrowAlways);
   
-  SGF.VarLocs[var] = SILGenFunction::VarLoc::get(
-    value.asBorrowedOperand2(SGF, pattern).getValue());
+  auto bindValue = value.asBorrowedOperand2(SGF, pattern).getFinalManagedValue();
+  if (bindValue.getType().isMoveOnly()) {
+    if (bindValue.getType().isObject()) {
+      // Create a notional copy for the borrow checker to use.
+      bindValue = bindValue.copy(SGF, pattern);
+    }
+    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(pattern, bindValue,
+                MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+  }
+  SGF.VarLocs[var] = SILGenFunction::VarLoc::get(bindValue.getValue());
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
 /// the given destination.
 void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
-                                           const FailureHandler &failure) {
+                                           const FailureHandler &failure,
+                                           const ClauseRow &row, ArgArray args){
   SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
@@ -1406,6 +1414,15 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
   SILValue testBool;
   {
     FullExpr scope(SGF.Cleanups, CleanupLocation(guard));
+    
+    // If the final pattern match is destructive, then set up borrow bindings
+    // to evaluate the guard expression without allowing it to destruct the
+    // subject yet.
+    if (auto ownership = getNoncopyableOwnership()) {
+      if (*ownership > ValueOwnership::Shared) {
+        bindIrrefutableBorrows(row, args);
+      }
+    }
     testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
   }
 
@@ -2720,33 +2737,28 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
                                       CleanupState::PersistentlyActive);
     }
     
-    {
-      // Create a scope to break down the subject value.
-      Scope caseScope(SGF, pattern);
-      
-      // Clone the original subject's cleanup state so that it will be reliably
-      // consumed in this scope, while leaving the original for other case
-      // blocks to re-consume.
-      ManagedValue subject = SGF.emitManagedRValueWithCleanup(
-                                       NoncopyableConsumableValue.forward(SGF));
-
-      // TODO: handle fallthroughs and multiple cases bindings
-      // In those cases we'd need to forward bindings through the shared case
-      // destination blocks.
-      assert(!stmt->hasFallthroughDest()
-             && stmt->getCaseLabelItems().size() == 1);
-
-      // Bind variables from the pattern.
-      if (stmt->hasCaseBodyVariables()) {
-        ConsumingPatternBindingVisitor(*this, stmt)
-          .visit(pattern, subject);
-      }
-      
-      // By this point, whatever parts of the value we bound are forwarded into
-      // variables, so we can pop the scope and destroy the remainder before
-      // entering the case body (TODO: or common block).
-    }
+    // Create a scope to break down the subject value.
+    Scope caseScope(SGF, pattern);
     
+    // Clone the original subject's cleanup state so that it will be reliably
+    // consumed in this scope, while leaving the original for other case
+    // blocks to re-consume.
+    ManagedValue subject = SGF.emitManagedRValueWithCleanup(
+                                     NoncopyableConsumableValue.forward(SGF));
+
+    // TODO: handle fallthroughs and multiple cases bindings
+    // In those cases we'd need to forward bindings through the shared case
+    // destination blocks.
+    assert(!stmt->hasFallthroughDest()
+           && stmt->getCaseLabelItems().size() == 1);
+
+    // Bind variables from the pattern.
+    if (stmt->hasCaseBodyVariables()) {
+      ConsumingPatternBindingVisitor(*this, stmt)
+        .visit(pattern, subject);
+    }
+
+    // Emit the case body.
     emitCaseBody(stmt);
   }
 }
