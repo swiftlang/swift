@@ -59,9 +59,9 @@ extension String {
   /// initializer replaces them with the Unicode replacement character
   /// (`"\u{FFFD}"`).
   ///
-  /// Note: This initializer is deprecated. Use the initializer
-  ///       `String.init(decoding: array, as: UTF8.self)` instead,
-  ///       remembering that "\0" is a valid character in Swift.
+  /// - Note: This initializer is deprecated. Use the initializer
+  ///         `String.init(decoding: array, as: UTF8.self)` instead,
+  ///         remembering that "\0" is a valid character in Swift.
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
@@ -121,9 +121,9 @@ extension String {
   /// This is identical to `init(cString: [CChar])` but operates on
   /// an unsigned sequence of bytes.
   ///
-  /// Note: This initializer is deprecated. Use the initializer
-  ///       `String.init(decoding: array, as: UTF8.self)` instead,
-  ///       remembering that "\0" is a valid character in Swift.
+  /// - Note: This initializer is deprecated. Use the initializer
+  ///         `String.init(decoding: array, as: UTF8.self)` instead,
+  ///         remembering that "\0" is a valid character in Swift.
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated UTF-8 code unit sequence.
@@ -214,8 +214,8 @@ extension String {
   ///     }
   ///     // Prints "nil"
   ///
-  /// Note: This initializer has been renamed. Use
-  ///       `String.init?(validatingCString:)` instead.
+  /// - Note: This initializer has been renamed. Use
+  ///         `String.init?(validatingCString:)` instead.
   ///
   /// - Parameter cString:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
@@ -236,9 +236,9 @@ extension String {
   /// This initializer does not try to repair ill-formed UTF-8 code unit
   /// sequences. If any are found, the result of the initializer is `nil`.
   ///
-  /// Note: This initializer is deprecated. Use the initializer
-  ///       `String.init?(validating: array, as: UTF8.self)` instead,
-  ///       remembering that "\0" is a valid character in Swift.
+  /// - Note: This initializer is deprecated. Use the initializer
+  ///         `String.init?(validating: array, as: UTF8.self)` instead,
+  ///         remembering that "\0" is a valid character in Swift.
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
@@ -264,9 +264,9 @@ extension String {
   /// This initializer does not try to repair ill-formed UTF-8 code unit
   /// sequences. If any are found, the result of the initializer is `nil`.
   ///
-  /// Note: This initializer is deprecated. Use the initializer
-  ///       `String.init?(validating: array, as: UTF8.self)` instead,
-  ///       remembering that "\0" is a valid character in Swift.
+  /// - Note: This initializer is deprecated. Use the initializer
+  ///         `String.init?(validating: array, as: UTF8.self)` instead,
+  ///         remembering that "\0" is a valid character in Swift.
   ///
   /// - Parameter cString:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
@@ -480,9 +480,9 @@ extension String {
   /// initializer replaces them with the Unicode replacement character
   /// (`"\u{FFFD}"`).
   ///
-  /// Note: This initializer is deprecated. Use the initializer
-  ///       `String.init(decoding: array, as: Encoding.self)` instead,
-  ///       remembering that "\0" is a valid character in Swift.
+  /// - Note: This initializer is deprecated. Use the initializer
+  ///         `String.init(decoding: array, as: Encoding.self)` instead,
+  ///         remembering that "\0" is a valid character in Swift.
   ///
   /// - Parameters:
   ///   - nullTerminatedCodeUnits: An array containing a null-terminated
