@@ -2526,23 +2526,30 @@ bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
 }
 
 
-bool swift::diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
-                                     ParamSpecifier ownership,
+bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
                                      TypeRepr *repr, Type ty,
-                                     TypeResolutionOptions options) {
+                                     const TypeResolution &resolution) {
+  auto options = resolution.getOptions();
+
   assert(!ty->hasError());
   assert(!options.contains(TypeResolutionFlags::SILType));
 
   if (options.hasBase(TypeResolverContext::EnumElementDecl))
     return false; // no need for ownership in enum cases.
 
-  if (!isInterfaceTypeNoncopyable(ty, dc->getGenericEnvironmentOfContext()))
+  // The parameter type is written with respect to the surrounding
+  // generic environment.
+  ty = GenericEnvironment::mapTypeIntoContext(
+             resolution.getGenericSignature().getGenericEnvironment(),
+             ty);
+
+  if (ty->hasError() || !ty->isNoncopyable())
     return false; // copyable types do not need ownership
 
   if (ownership != ParamSpecifier::Default)
     return false; // it has ownership
 
-  auto &diags = ctx.Diags;
+  auto &diags = resolution.getASTContext().Diags;
   auto loc = repr->getLoc();
   repr->setInvalid();
 
@@ -3776,8 +3783,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     if (inStage(TypeResolutionStage::Interface)
         && !ty->hasUnboundGenericType()
         && !options.contains(TypeResolutionFlags::SILMode)) {
-      diagnoseMissingOwnership(getASTContext(), dc, ownership,
-                               eltTypeRepr, ty, options);
+      diagnoseMissingOwnership(ownership, eltTypeRepr, ty, resolution);
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
       // types.

@@ -674,12 +674,10 @@ void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
 /// \param repr the repr for the type of the parameter.
 /// \param ty the non-error resolved type of the repr.
 /// \param ownership the ownership kind of the parameter
-/// \param dc the decl context used for resolving the type
 /// \returns true iff a diagnostic was emitted and the \c repr was invalidated.
-bool diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
-                              ParamSpecifier ownership,
+bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
-                              TypeResolutionOptions options);
+                              const TypeResolution &resolution);
 
 } // end namespace swift
 
