@@ -95,6 +95,7 @@ extension ContiguousArray {
   /// `0 ≤ index < count`, but only in debug builds.
   @inlinable
   @inline(__always)
+  @_alwaysEmitIntoClient
   internal func _debugCheckSubscript_native(_ index: Int) {
     _buffer._debugCheckValidSubscript(index)
   }
@@ -130,6 +131,7 @@ extension ContiguousArray {
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`, but only in debug builds.
   @inlinable
   @_semantics("array.check_index")
+  @_alwaysEmitIntoClient
   internal func _debugCheckIndex(_ index: Int) {
     _debugPrecondition(index <= endIndex, "ContiguousArray index is out of range")
     _debugPrecondition(index >= startIndex, "Negative ContiguousArray index is out of range")

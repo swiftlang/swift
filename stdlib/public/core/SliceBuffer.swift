@@ -310,6 +310,7 @@ internal struct _SliceBuffer<Element>
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`, but only in debug builkds.
   @inlinable
+  @_alwaysEmitIntoClient
   internal func _debugCheckValidSubscript(_ index: Int) {
     _debugPrecondition(
       index >= startIndex && index < endIndex, "Index out of bounds")

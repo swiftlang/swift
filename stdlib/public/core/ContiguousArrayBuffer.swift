@@ -675,6 +675,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// - Precondition: The buffer must be immutable.
   @inlinable
   @inline(__always)
+  @_alwaysEmitIntoClient
   internal func _debugCheckValidSubscript(_ index: Int) {
     _debugPrecondition(
       (index >= 0) && (index < immutableCount),
@@ -686,8 +687,8 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
   @inline(__always)
+  @_alwaysEmitIntoClient
   internal func _checkValidSubscriptMutating(_ index: Int) {
     _precondition(
       (index >= 0) && (index < mutableCount),
@@ -699,8 +700,8 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// `0 ≤ index < count`, but only in debug builds.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
   @inline(__always)
+  @_alwaysEmitIntoClient
   internal func _debugCheckValidSubscriptMutating(_ index: Int) {
     _debugPrecondition(
       (index >= 0) && (index < mutableCount),

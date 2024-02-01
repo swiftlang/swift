@@ -405,6 +405,7 @@ extension Array {
   @inlinable
   @_semantics("array.check_subscript")
   @_effects(notEscaping self.**)
+  @_alwaysEmitIntoClient
   public // @testable
   func _debugCheckSubscript(
     _ index: Int, wasNativeTypeChecked: Bool
@@ -458,6 +459,7 @@ extension Array {
   @inlinable
   @_semantics("array.check_index")
   @_effects(notEscaping self.**)
+  @_alwaysEmitIntoClient
   internal func _debugCheckIndex(_ index: Int) {
     _debugPrecondition(index <= endIndex, "Array index is out of range")
     _debugPrecondition(index >= startIndex, "Negative Array index is out of range")

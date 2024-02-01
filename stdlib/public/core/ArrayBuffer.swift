@@ -471,6 +471,7 @@ extension _ArrayBuffer {
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be mutable.
+  @inlinable
   @_alwaysEmitIntoClient
   internal func _debugCheckValidSubscriptMutating(_ index: Int) {
     _native._debugCheckValidSubscriptMutating(index)
