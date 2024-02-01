@@ -2808,7 +2808,7 @@ namespace {
       // If this module is declared as a C++ module, try to synthesize
       // conformances to Swift protocols from the Cxx module.
       auto clangModule = Impl.getClangOwningModule(result->getClangNode());
-      if (clangModule && requiresCPlusPlus(clangModule)) {
+      if (!clangModule || requiresCPlusPlus(clangModule)) {
         if (auto nominalDecl = dyn_cast<NominalTypeDecl>(result)) {
           conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
           conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);

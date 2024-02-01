@@ -1,13 +1,21 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
-//
+
+// Also test this with a bridging header instead of the StdSet module.
+// RUN: %empty-directory(%t2)
+// RUN: cp %S/Inputs/std-set.h %t2/std-set-bridging-header.h
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-set-bridging-header.h -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-D BRIDGING_HEADER -import-objc-header %t2/std-set-bridging-header.h -cxx-interoperability-mode=upcoming-swift)
+
 // REQUIRES: executable_test
 //
 // Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
 // REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
+#if !BRIDGING_HEADER
 import StdSet
+#endif
 import CxxStdlib
 import Cxx
 
