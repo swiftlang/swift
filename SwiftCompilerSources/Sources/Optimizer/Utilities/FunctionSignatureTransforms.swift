@@ -82,7 +82,7 @@ private func createSpecializedFunction(
 ) -> Function {
   let (aliveParameters, hasSelfParameter) = getAliveParameters(of: originalFunction)
 
-  let specializedFunction = context.createSpecializedFunctionDeclaration(
+  let specializedFunction = context.createEmptyFunction(
     name: name,
     parameters: aliveParameters,
     hasSelfParameter: hasSelfParameter,

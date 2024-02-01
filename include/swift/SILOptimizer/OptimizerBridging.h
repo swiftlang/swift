@@ -286,11 +286,11 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinIntegerType(SwiftInt bitWidth) const;
-  SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunction(BridgedStringRef name,
-                                                                const BridgedParameterInfo * _Nullable bridgedParams,
-                                                                SwiftInt paramCount,
-                                                                bool hasSelfParam,
-                                                                BridgedFunction fromFunc) const;
+  SWIFT_IMPORT_UNSAFE BridgedFunction createEmptyFunction(BridgedStringRef name,
+                                                          const BridgedParameterInfo * _Nullable bridgedParams,
+                                                          SwiftInt paramCount,
+                                                          bool hasSelfParam,
+                                                          BridgedFunction fromFunc) const;
   void moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const;
 
   // Passmanager housekeeping
