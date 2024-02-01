@@ -207,6 +207,33 @@ extension ASTGenVisitor {
       end: self.generateSourceLoc(end)
     )
   }
+
+  /// Obtains bridged token source range of a syntax node.
+  @inline(__always)
+  func generateSourceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+    guard let start = node.firstToken(viewMode: .sourceAccurate) else {
+      return BridgedSourceRange(start: nil, end: nil)
+    }
+    return generateSourceRange(start: start, end: node.lastToken(viewMode: .sourceAccurate)!)
+  }
+
+  /// Obtains bridged character source range.
+  @inline(__always)
+  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> BridgedCharSourceRange {
+    BridgedCharSourceRange(
+      start: BridgedSourceLoc(at: start, in: self.base),
+      byteLength: UInt32(length.utf8Length)
+    )
+  }
+
+  /// Extract `SyntaxText` of the node.
+  @inline(__always)
+  func extractRawText(_ node: some SyntaxProtocol) -> SyntaxText {
+    SyntaxText(
+      baseAddress: self.base.baseAddress! + node.positionAfterSkippingLeadingTrivia.utf8Offset,
+      count: node.trimmedLength.utf8Length
+    )
+  }
 }
 
 extension ASTGenVisitor {

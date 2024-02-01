@@ -324,7 +324,7 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, fn: callee, args: argumentTuple)
   }
 
-  func createDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
+  func generateDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
     name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
   ) {
     let baseName: BridgedDeclBaseName
@@ -370,7 +370,7 @@ extension ASTGenVisitor {
   }
 
   func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedUnresolvedDeclRefExpr {
-    let nameAndLoc = createDeclNameRef(declReferenceExpr: node)
+    let nameAndLoc = generateDeclNameRef(declReferenceExpr: node)
     return .createParsed(
       self.ctx,
       name: nameAndLoc.name,
@@ -385,7 +385,7 @@ extension ASTGenVisitor {
 
   func generate(memberAccessExpr node: MemberAccessExprSyntax) -> BridgedExpr {
     let dotLoc = self.generateSourceLoc(node.period)
-    let nameAndLoc = createDeclNameRef(declReferenceExpr: node.declName)
+    let nameAndLoc = generateDeclNameRef(declReferenceExpr: node.declName)
 
     if let base = node.base {
       if node.declName.baseName.keywordKind == .`self` {
@@ -642,6 +642,7 @@ extension ASTGenVisitor {
     leftParen: TokenSyntax?,
     rightParen: TokenSyntax?
   ) -> BridgedTupleExpr {
+    // FIXME: This should return bridged 'ArgumentList' instead of `TupleExpr`
     let expressions = node.lazy.map {
       self.generate(expr: $0.expression)
     }
