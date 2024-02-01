@@ -667,58 +667,91 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
-Type GenericSignatureImpl::getUpperBound(Type type) const {
+Type GenericSignatureImpl::getUpperBound(Type type,
+                                         bool forExistentialSelf,
+                                         bool includeParameterizedProtocols) const {
   assert(type->isTypeParameter());
 
   llvm::SmallVector<Type, 2> types;
   unsigned rootDepth = type->getRootGenericParam()->getDepth();
 
+  auto accept = [forExistentialSelf, rootDepth](Type t) {
+    if (!forExistentialSelf)
+      return true;
+
+    return !t.findIf([rootDepth](Type t) {
+      if (auto *paramTy = t->getAs<GenericTypeParamType>())
+        return (paramTy->getDepth() == rootDepth);
+      return false;
+    });
+  };
+
+  // We start with the assumption we'll add a '& AnyObject' member to our
+  // composition, but we might clear this below.
   bool hasExplicitAnyObject = requiresClass(type);
 
-  if (Type superclass = getSuperclassBound(type)) {
+  // Look for the most derived superclass that does not involve the type
+  // being erased.
+  Type superclass = getSuperclassBound(type);
+  if (superclass) {
     do {
       superclass = getReducedType(superclass);
-
-      if (!superclass.findIf([&](Type t) {
-            if (auto *paramTy = t->getAs<GenericTypeParamType>())
-              return (paramTy->getDepth() == rootDepth);
-            return false;
-          })) {
+      if (accept(superclass))
         break;
-      }
     } while ((superclass = superclass->getSuperclass()));
 
+    // If we're going to have a superclass, we can drop the '& AnyObject'.
     if (superclass) {
-      types.push_back(superclass);
+      types.push_back(getSugaredType(superclass));
       hasExplicitAnyObject = false;
     }
   }
 
+  auto &ctx = getASTContext();
+
+  // Record the absence of Copyable and Escapable conformance, but only if
+  // we didn't have a superclass or require AnyObject.
+  InvertibleProtocolSet inverses;
+
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS ||
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    if (!superclass && !hasExplicitAnyObject) {
+      for (auto ip : InvertibleProtocolSet::full()) {
+        auto *kp = ctx.getProtocol(::getKnownProtocolKind(ip));
+        if (!requiresProtocol(type, kp))
+          inverses.insert(ip);
+      }
+    }
+  }
+
   for (auto *proto : getRequiredProtocols(type)) {
+    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS ||
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+      // Don't add invertible protocols to the composition, because we recorded
+      // their absence above.
+      if (proto->getInvertibleProtocolKind())
+        continue;
+    }
+
     if (proto->requiresClass())
       hasExplicitAnyObject = false;
 
     auto *baseType = proto->getDeclaredInterfaceType()->castTo<ProtocolType>();
 
     auto primaryAssocTypes = proto->getPrimaryAssociatedTypes();
-    if (!primaryAssocTypes.empty()) {
+    if (includeParameterizedProtocols && !primaryAssocTypes.empty()) {
       SmallVector<Type, 2> argTypes;
 
       // Attempt to recover same-type requirements on primary associated types.
       for (auto *assocType : primaryAssocTypes) {
         // For each primary associated type A of P, compute the reduced type
         // of T.[P]A.
-        auto *memberType = DependentMemberType::get(type, assocType);
-        auto reducedType = getReducedType(memberType);
+        auto memberType = getReducedType(DependentMemberType::get(type, assocType));
 
         // If the reduced type is at a lower depth than the root generic
         // parameter of T, then it's constrained.
-        if (!reducedType.findIf([&](Type t) {
-            if (auto *paramTy = t->getAs<GenericTypeParamType>())
-              return (paramTy->getDepth() == rootDepth);
-            return false;
-          })) {
-          argTypes.push_back(reducedType);
+        if (accept(memberType)) {
+          argTypes.push_back(getSugaredType(memberType));
         }
       }
 
@@ -740,15 +773,18 @@ Type GenericSignatureImpl::getUpperBound(Type type) const {
     types.push_back(baseType);
   }
 
-  auto constraint = ProtocolCompositionType::get(getASTContext(), types,
-                                                 hasExplicitAnyObject);
+  return ProtocolCompositionType::get(ctx, types, inverses,
+                                      hasExplicitAnyObject);
+}
 
-  if (!constraint->isConstraintType()) {
-    assert(constraint->getClassOrBoundGenericClass());
-    return constraint;
-  }
-
-  return ExistentialType::get(constraint);
+Type GenericSignatureImpl::getExistentialType(Type paramTy) const {
+  auto upperBound = getUpperBound(paramTy,
+                                  /*forExistentialSelf=*/true,
+                                  /*includeParameterizedProtocols=*/true);
+  if (upperBound->isConstraintType())
+    return ExistentialType::get(upperBound);
+  assert(upperBound->getClassOrBoundGenericClass());
+  return upperBound;
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {

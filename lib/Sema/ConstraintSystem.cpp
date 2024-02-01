@@ -2343,7 +2343,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
       if (paramTy->is<GenericTypeParamType>()) {
         erasedTy = baseTy;
       } else {
-        erasedTy = existentialSig->getUpperBound(paramTy);
+        erasedTy = existentialSig->getExistentialType(paramTy);
       }
 
       if (metatypeDepth) {

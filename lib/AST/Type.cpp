@@ -3727,9 +3727,8 @@ Type ArchetypeType::getExistentialType() const {
   auto interfaceType = getInterfaceType();
   auto genericSig = genericEnv->getGenericSignature();
 
-  auto upperBound = genericSig->getUpperBound(interfaceType);
-
-  return genericEnv->mapTypeIntoContext(upperBound);
+  auto existentialType = genericSig->getExistentialType(interfaceType);
+  return genericEnv->mapTypeIntoContext(existentialType);
 }
 
 bool ArchetypeType::requiresClass() const {
