@@ -674,6 +674,10 @@ NOTE(nonisolated_blame, none, "after %1%2 %3, "
 ERROR(non_sendable_from_deinit,none,
         "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
         (Type, DescriptiveDeclKind, DeclName))
+ERROR(isolated_property_mutation_in_nonisolated_context,none,
+      "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
+      "from a non-isolated context",
+      (const ValueDecl *, bool))
 
 // Yield usage errors
 ERROR(return_before_yield, none, "accessor must yield before returning",())
