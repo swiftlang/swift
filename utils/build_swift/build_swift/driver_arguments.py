@@ -750,6 +750,8 @@ def create_argument_parser():
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
+    option(['--wasmkit'], toggle_true('build_wasmkit'),
+           help='build WasmKit')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')

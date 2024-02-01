@@ -85,6 +85,9 @@
             "remote": { "id": "apple/llvm-project" } },
         "wasi-libc": {
             "remote": { "id": "WebAssembly/wasi-libc" } },
+        "wasmkit": {
+          "remote": { "id": "swiftwasm/WasmKit" }
+        },
         "curl": {
           "remote": { "id": "curl/curl" }
         },
@@ -142,6 +145,7 @@
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main",
                 "wasi-libc": "wasi-sdk-20",
+                "wasmkit": "0.0.3",
                 "curl": "curl-8_4_0",
                 "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
@@ -237,7 +241,8 @@
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main",
-                "wasi-libc": "wasi-sdk-20"
+                "wasi-libc": "wasi-sdk-20",
+                "wasmkit": "0.0.3"
             }
         },
         "release/5.9": {
@@ -606,6 +611,7 @@
                 "swift-installer-scripts": "main",
                 "swift-experimental-string-processing": "swift/main",
                 "wasi-libc": "wasi-sdk-20",
+                "wasmkit": "0.0.3",
                 "curl": "curl-8_4_0",
                 "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
