@@ -12,6 +12,6 @@
 func acceptSendable<T: Sendable>(_: T) { }
 
 func useSendable(ns: NSString) {
-  // Note: warning below is downgraded due to @preconcurrency
-  acceptSendable(ns) // expected-warning{{type 'NSString' does not conform to the 'Sendable' protocol}}
+  // Note: warning below is suppressed due to @preconcurrency
+  acceptSendable(ns)
 }

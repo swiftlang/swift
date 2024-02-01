@@ -734,16 +734,6 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   });
 }
 
-/// Determine the default diagnostic behavior for this language mode.
-static DiagnosticBehavior defaultSendableDiagnosticBehavior(
-    const LangOptions &langOpts) {
-  // Prior to Swift 6, all Sendable-related diagnostics are warnings at most.
-  if (!langOpts.isSwiftVersionAtLeast(6))
-    return DiagnosticBehavior::Warning;
-
-  return DiagnosticBehavior::Unspecified;
-}
-
 bool SendableCheckContext::isExplicitSendableConformance() const {
   if (!conformanceCheck)
     return false;
@@ -766,7 +756,7 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
       !shouldDiagnoseExistingDataRaces(fromDC))
     return DiagnosticBehavior::Ignore;
 
-  return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
+  return DiagnosticBehavior::Warning;
 }
 
 DiagnosticBehavior
@@ -856,36 +846,8 @@ findImportFor(const DeclContext *dc, const DeclContext *fromDC) {
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     NominalTypeDecl *nominal) const {
-  // Determine whether this nominal type is visible via a @preconcurrency
-  // import.
-  auto import = findImportFor(nominal, fromDC);
-  auto sourceFile = fromDC->getParentSourceFile();
-
-  // When the type is explicitly non-Sendable...
-  if (hasExplicitSendableConformance(nominal)) {
-    // @preconcurrency imports downgrade the diagnostic to a warning in Swift 6,
-    if (import && import->options.contains(ImportFlags::Preconcurrency)) {
-      if (sourceFile)
-        sourceFile->setImportUsedPreconcurrency(*import);
-
-      return DiagnosticBehavior::Warning;
-    }
-
-    return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
-  }
-
-  // When the type is implicitly non-Sendable...
-
-  // @preconcurrency suppresses the diagnostic in Swift 5.x, and
-  // downgrades it to a warning in Swift 6 and later.
-  if (import && import->options.contains(ImportFlags::Preconcurrency)) {
-    if (sourceFile)
-      sourceFile->setImportUsedPreconcurrency(*import);
-
-    return nominal->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
-        ? DiagnosticBehavior::Warning
-        : DiagnosticBehavior::Ignore;
-  }
+  if (hasExplicitSendableConformance(nominal))
+    return DiagnosticBehavior::Warning;
 
   DiagnosticBehavior defaultBehavior = implicitSendableDiagnosticBehavior();
 
@@ -898,6 +860,38 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     return DiagnosticBehavior::Warning;
 
   return defaultBehavior;
+}
+
+llvm::Optional<DiagnosticBehavior>
+SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
+  if (!decl)
+    return llvm::None;
+
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    // Determine whether this nominal type is visible via a @preconcurrency
+    // import.
+    auto import = findImportFor(nominal, fromDC);
+    auto sourceFile = fromDC->getParentSourceFile();
+
+    if (!import || !import->options.contains(ImportFlags::Preconcurrency))
+      return llvm::None;
+
+    if (sourceFile)
+      sourceFile->setImportUsedPreconcurrency(*import);
+
+    // When the type is explicitly non-Sendable, @preconcurrency imports
+    // downgrade the diagnostic to a warning in Swift 6.
+    if (hasExplicitSendableConformance(nominal))
+      return DiagnosticBehavior::Warning;
+
+    // When the type is implicitly non-Sendable, `@preconcurrency` suppresses
+    // diagnostics until the imported module enables Swift 6.
+    return import->module.importedModule->isConcurrencyChecked()
+        ? DiagnosticBehavior::Warning
+        : DiagnosticBehavior::Ignore;
+  }
+
+  return llvm::None;
 }
 
 static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
@@ -2104,7 +2098,8 @@ namespace {
 
     /// Note when the enclosing context could be put on a global actor.
     // FIXME: This should handle closures too.
-    static bool missingGlobalActorOnContext(DeclContext *dc, Type globalActor, DiagnosticBehavior behavior) {
+    static bool missingGlobalActorOnContext(DeclContext *dc, Type globalActor,
+                                            DiagnosticBehavior behavior) {
       // If we are in a synchronous function on the global actor,
       // suggest annotating with the global actor itself.
       if (auto fn = findAnnotatableFunction(dc)) {
@@ -2123,13 +2118,19 @@ namespace {
               return false;
 
           case ActorIsolation::Unspecified:
+            if (behavior != DiagnosticBehavior::Note) {
+              fn->diagnose(diag::invalid_isolated_calls_in_body,
+                           globalActor->getWithoutParens().getString(), fn)
+                  .limitBehaviorUntilSwiftVersion(behavior, 6);
+            }
+
+            // Always emit the note with fix-it.
             fn->diagnose(diag::add_globalactor_to_function,
                          globalActor->getWithoutParens().getString(),
                          fn, globalActor)
-            .limitBehavior(behavior)
-            .fixItInsert(fn->getAttributeInsertionLoc(false),
-                         diag::insert_globalactor_attr, globalActor);
-              return true;
+                .fixItInsert(fn->getAttributeInsertionLoc(false),
+                             diag::insert_globalactor_attr, globalActor);
+            return true;
           }
         }
       }
@@ -2161,7 +2162,7 @@ namespace {
           // Diagnose actor_isolated_non_self_reference as note
           // if fix-it provided in missingGlobalActorOnContext
           ctx.Diags.diagnose(error.loc, error.diag)
-              .limitBehavior(behavior);
+              .limitBehaviorUntilSwiftVersion(behavior, 6);
         }
       }
 
@@ -2186,7 +2187,7 @@ namespace {
           // Diagnose actor_isolated_call as note if
           // fix-it provided in missingGlobalActorOnContext
           ctx.Diags.diagnose(error.loc, error.diag)
-              .limitBehavior(behavior);
+              .limitBehaviorUntilSwiftVersion(behavior, 6);
         }
       }
 
@@ -3010,12 +3011,21 @@ namespace {
           import && import->options.contains(ImportFlags::Preconcurrency);
       const auto isPreconcurrencyUnspecifiedIsolation =
           isPreconcurrencyImport && isolation.isUnspecified();
+
+      // If the global variable is preconcurrency without an explicit
+      // isolation, ignore the warning. Otherwise, limit the behavior
+      // to a warning until Swift 6.
+      DiagnosticBehavior limit;
+      if (isPreconcurrencyUnspecifiedIsolation) {
+        limit = DiagnosticBehavior::Ignore;
+      } else {
+        limit = DiagnosticBehavior::Warning;
+      }
+
       ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value)
-          .warnUntilSwiftVersionIf(!isPreconcurrencyUnspecifiedIsolation, 6)
-          .limitBehaviorIf(isPreconcurrencyImport, DiagnosticBehavior::Warning)
-          .limitBehaviorIf(!ctx.isSwiftVersionAtLeast(6) &&
-                               isPreconcurrencyUnspecifiedIsolation,
-                           DiagnosticBehavior::Ignore);
+          .limitBehaviorUntilSwiftVersion(limit, 6)
+          // Preconcurrency global variables are warnings even in Swift 6
+          .limitBehaviorIf(isPreconcurrencyImport, DiagnosticBehavior::Warning);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
       if (const auto sourceFile = getDeclContext()->getParentSourceFile();
           sourceFile && isPreconcurrencyImport) {
@@ -5246,7 +5256,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   value->diagnose(
       diag::actor_isolation_override_mismatch, isolation,
       value, overriddenIsolation)
-    .limitBehavior(behavior);
+    .limitBehaviorUntilSwiftVersion(behavior, 6);
   overridden->diagnose(diag::overridden_here);
 }
 
@@ -5344,7 +5354,7 @@ static bool checkSendableInstanceStorage(
           && SendableCheckContext(dc, check)
                .defaultDiagnosticBehavior() != DiagnosticBehavior::Ignore) {
         sd->diagnose(diag::sendable_raw_storage, sd->getName())
-          .limitBehavior(behavior);
+          .limitBehaviorUntilSwiftVersion(behavior, 6);
       }
       return true;
     }
@@ -5379,7 +5389,7 @@ static bool checkSendableInstanceStorage(
             property
                 ->diagnose(diag::concurrent_value_class_mutable_property,
                            property->getName(), nominal)
-                .limitBehavior(behavior);
+                .limitBehaviorUntilSwiftVersion(behavior, 6);
           }
           invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
           return true;
@@ -5391,10 +5401,13 @@ static bool checkSendableInstanceStorage(
       }
 
       // Check that the property type is Sendable.
+      SendableCheckContext context(dc, check);
       diagnoseNonSendableTypes(
-          propertyType, SendableCheckContext(dc, check),
+          propertyType, context,
           /*inDerivedConformance*/Type(), property->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
+            auto preconcurrency =
+                context.preconcurrencyBehavior(type->getAnyNominal());
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
@@ -5403,8 +5416,9 @@ static bool checkSendableInstanceStorage(
               }
 
               // If we are to ignore this diagnostic, just continue.
-              if (behavior == DiagnosticBehavior::Ignore)
-                return false;
+              if (behavior == DiagnosticBehavior::Ignore ||
+                  preconcurrency == DiagnosticBehavior::Ignore)
+                return true;
 
               invalid = true;
               return true;
@@ -5413,7 +5427,8 @@ static bool checkSendableInstanceStorage(
             property->diagnose(diag::non_concurrent_type_member,
                                propertyType, false, property->getName(),
                                nominal)
-                .limitBehavior(behavior);
+                .limitBehaviorUntilSwiftVersion(behavior, 6)
+                .limitBehaviorIf(preconcurrency);
             return false;
           });
 
@@ -5428,10 +5443,13 @@ static bool checkSendableInstanceStorage(
 
     /// Handle an enum associated value.
     bool operator()(EnumElementDecl *element, Type elementType) override {
+      SendableCheckContext context (dc, check);
       diagnoseNonSendableTypes(
-          elementType, SendableCheckContext(dc, check),
+          elementType, context,
           /*inDerivedConformance*/Type(), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
+            auto preconcurrency =
+                context.preconcurrencyBehavior(elementType->getAnyNominal());
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
@@ -5440,7 +5458,8 @@ static bool checkSendableInstanceStorage(
               }
 
               // If we are to ignore this diagnostic, just continue.
-              if (behavior == DiagnosticBehavior::Ignore)
+              if (behavior == DiagnosticBehavior::Ignore ||
+                  preconcurrency == DiagnosticBehavior::Ignore)
                 return false;
 
               invalid = true;
@@ -5449,7 +5468,8 @@ static bool checkSendableInstanceStorage(
 
             element->diagnose(diag::non_concurrent_type_member, type,
                               true, element->getName(), nominal)
-                .limitBehavior(behavior);
+                .limitBehaviorUntilSwiftVersion(behavior, 6)
+                .limitBehaviorIf(preconcurrency);
             return false;
           });
 
@@ -5508,7 +5528,7 @@ bool swift::checkSendableConformance(
       nominal->getOutermostParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
                               nominal)
-      .limitBehavior(behavior);
+      .limitBehaviorUntilSwiftVersion(behavior, 6);
 
     if (behavior == DiagnosticBehavior::Unspecified)
       return true;
@@ -5521,7 +5541,7 @@ bool swift::checkSendableConformance(
     if (!classDecl->isSemanticallyFinal()) {
       classDecl->diagnose(diag::concurrent_value_nonfinal_class,
                           classDecl->getName())
-        .limitBehavior(behavior);
+        .limitBehaviorUntilSwiftVersion(behavior, 6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
@@ -5536,7 +5556,7 @@ bool swift::checkSendableConformance(
               ->diagnose(diag::concurrent_value_inherit,
                          nominal->getASTContext().LangOpts.EnableObjCInterop,
                          classDecl->getName())
-              .limitBehavior(behavior);
+              .limitBehaviorUntilSwiftVersion(behavior, 6);
 
           if (behavior == DiagnosticBehavior::Unspecified)
             return true;

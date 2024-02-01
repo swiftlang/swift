@@ -328,10 +328,17 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
+InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
+    DiagnosticBehavior limit, unsigned majorVersion) {
   if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
-    limitBehavior(DiagnosticBehavior::Warning)
-      .wrapIn(diag::error_in_future_swift_version, majorVersion);
+    // If the behavior limit is a warning or less, wrap the diagnostic
+    // in a message that this will become an error in a later Swift
+    // version. We do this before limiting the behavior, because
+    // wrapIn will result in the behavior of the wrapping diagnostic.
+    if (limit >= DiagnosticBehavior::Warning)
+      wrapIn(diag::error_in_future_swift_version, majorVersion);
+
+    limitBehavior(limit);
   }
 
   if (majorVersion == 6) {
@@ -341,6 +348,12 @@ InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
   }
 
   return *this;
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
+  return limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning,
+                                        majorVersion);
 }
 
 InFlightDiagnostic &

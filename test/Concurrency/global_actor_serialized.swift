@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -emit-module -swift-version 5 -emit-module-path %t/SerializedStruct.swiftmodule -module-name SerializedStruct %S/Inputs/SerializedStruct.swift
 
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -disable-availability-checking -swift-version 6 -I %t
-// RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -disable-availability-checking -swift-version 6 -I %t -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -16,5 +15,5 @@ import SerializedStruct // expected-warning {{add '@preconcurrency' to treat 'Se
 // use it to force the right checks happen.
 func test() async -> Int {
   let x = MySerializedStruct()
-  return await x.counter // expected-warning {{non-sendable type 'MySerializedStruct' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
+  return await x.counter // expected-error {{non-sendable type 'MySerializedStruct' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
 }

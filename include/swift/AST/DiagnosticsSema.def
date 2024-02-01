@@ -5270,7 +5270,10 @@ NOTE(note_add_async_and_throws_to_decl,none,
 NOTE(note_add_distributed_to_decl,none,
      "add 'distributed' to %0 to make this %kindonly0 satisfy the protocol requirement",
      (const ValueDecl *))
-ERROR(add_globalactor_to_function,none,
+ERROR(invalid_isolated_calls_in_body,none,
+     "calls to '@%0'-isolated' code in %kind1",
+     (StringRef, const ValueDecl *))
+NOTE(add_globalactor_to_function,none,
      "add '@%0' to make %kind1 part of global actor %2",
      (StringRef, const ValueDecl *, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
@@ -5565,43 +5568,43 @@ ERROR(isolation_macro_experimental,none,
 NOTE(in_derived_conformance, none,
      "in derived conformance to %0",
      (Type))
-WARNING(non_sendable_param_type,none,
-        "non-sendable type %0 %select{passed in call to %3 %kind2|"
-        "exiting %3 context in call to non-isolated %kind2|"
-        "passed in implicitly asynchronous call to %3 %kind2|"
-        "in parameter of the protocol requirement satisfied by %3 %kind2|"
-        "in parameter of superclass method overridden by %3 %kind2|"
-        "in parameter of %3 '@objc' %kind2}1 cannot cross actor boundary",
-        (Type, unsigned, const ValueDecl *, ActorIsolation))
-WARNING(non_sendable_call_argument,none,
-        "passing argument of non-sendable type %0 %select{into %2 context|"
-        "outside of %2 context}1 may introduce data races",
-        (Type, bool, ActorIsolation))
-WARNING(non_sendable_result_type,none,
-        "non-sendable type %0 returned by %select{call to %3 %kind2|"
-        "call from %4 context to non-isolated %kind2|"
-        "implicitly asynchronous call to %3 %kind2|"
-        "%3 %kind2 satisfying protocol requirement|"
-        "%3 overriding %kind2|"
-        "%3 '@objc' %kind2}1 cannot cross actor boundary",
-        (Type, unsigned, const ValueDecl *, ActorIsolation))
-WARNING(non_sendable_call_result_type,none,
-        "non-sendable type %0 returned by %select{implicitly asynchronous |}1"
-        "call to %2 function cannot cross actor boundary",
-        (Type, bool, ActorIsolation))
-WARNING(non_sendable_property_type,none,
-        "non-sendable type %0 in %select{"
-        "%select{asynchronous access to %4 %kind1|"
-        "asynchronous access from %4 context to non-isolated %kind1|"
-        "implicitly asynchronous access to %4 %kind1|"
-        "conformance of %4 %kind1 to protocol requirement|"
-        "%4 overriding %kind1|"
-        "%4 '@objc' %kind1}3|captured local %1}2 cannot "
-        "cross %select{actor|task}2 boundary",
-        (Type, const ValueDecl *, bool, unsigned, ActorIsolation))
-WARNING(non_sendable_keypath_capture,none,
-        "cannot form key path that captures non-sendable type %0",
-        (Type))
+ERROR(non_sendable_param_type,none,
+      "non-sendable type %0 %select{passed in call to %3 %kind2|"
+      "exiting %3 context in call to non-isolated %kind2|"
+      "passed in implicitly asynchronous call to %3 %kind2|"
+      "in parameter of the protocol requirement satisfied by %3 %kind2|"
+      "in parameter of superclass method overridden by %3 %kind2|"
+      "in parameter of %3 '@objc' %kind2}1 cannot cross actor boundary",
+      (Type, unsigned, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_call_argument,none,
+      "passing argument of non-sendable type %0 %select{into %2 context|"
+      "outside of %2 context}1 may introduce data races",
+      (Type, bool, ActorIsolation))
+ERROR(non_sendable_result_type,none,
+      "non-sendable type %0 returned by %select{call to %3 %kind2|"
+      "call from %4 context to non-isolated %kind2|"
+      "implicitly asynchronous call to %3 %kind2|"
+      "%3 %kind2 satisfying protocol requirement|"
+      "%3 overriding %kind2|"
+      "%3 '@objc' %kind2}1 cannot cross actor boundary",
+      (Type, unsigned, const ValueDecl *, ActorIsolation))
+ERROR(non_sendable_call_result_type,none,
+      "non-sendable type %0 returned by %select{implicitly asynchronous |}1"
+      "call to %2 function cannot cross actor boundary",
+      (Type, bool, ActorIsolation))
+ERROR(non_sendable_property_type,none,
+      "non-sendable type %0 in %select{"
+      "%select{asynchronous access to %4 %kind1|"
+      "asynchronous access from %4 context to non-isolated %kind1|"
+      "implicitly asynchronous access to %4 %kind1|"
+      "conformance of %4 %kind1 to protocol requirement|"
+      "%4 overriding %kind1|"
+      "%4 '@objc' %kind1}3|captured local %1}2 cannot "
+      "cross %select{actor|task}2 boundary",
+      (Type, const ValueDecl *, bool, unsigned, ActorIsolation))
+ERROR(non_sendable_keypath_capture,none,
+      "cannot form key path that captures non-sendable type %0",
+      (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %2|associated value %2}1 of "
       "'Sendable'-conforming %kind3 has non-sendable type %0",

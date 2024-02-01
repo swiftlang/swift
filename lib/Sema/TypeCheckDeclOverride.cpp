@@ -560,7 +560,8 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     diagnoseSendabilityErrorBasedOn(baseDeclClass, fromContext,
                                     [&](DiagnosticBehavior limit) {
       diags.diagnose(decl, diag::override_sendability_mismatch, decl->getName())
-          .limitBehavior(limit);
+          .limitBehaviorUntilSwiftVersion(limit, 6)
+          .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
       return false;
     });
     break;
@@ -1301,9 +1302,9 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                     [&](DiagnosticBehavior limit) {
       diags.diagnose(decl, diag::override_sendability_mismatch,
                      decl->getName())
-        .limitBehavior(limit);
-      diags.diagnose(baseDecl, diag::overridden_here)
-        .limitBehavior(limit);
+        .limitBehaviorUntilSwiftVersion(limit, 6)
+        .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
+      diags.diagnose(baseDecl, diag::overridden_here);
       return false;
     });
   }

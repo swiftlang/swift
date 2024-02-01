@@ -3231,7 +3231,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   witness->diagnose(diag::actor_isolated_witness,
                     isDistributed && !isDistributedDecl(witness),
                     refResult.isolation, witness, requirementIsolation)
-    .limitBehavior(behavior);
+    .limitBehaviorUntilSwiftVersion(behavior, 6);
 
   // If we need 'distributed' on the witness, add it.
   if (missingOptions.contains(MissingFlags::WitnessDistributed)) {
@@ -4094,14 +4094,15 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       SendableCheckContext sendFrom(witness->getDeclContext(),
                                     SendableCheck::Explicit);
 
-      auto behavior = sendFrom.diagnosticBehavior(Conformance->getProtocol());
+      auto *nominal = Conformance->getProtocol();
+      auto behavior = sendFrom.diagnosticBehavior(nominal);
       if (behavior != DiagnosticBehavior::Ignore) {
         bool isError = behavior < DiagnosticBehavior::Warning;
         
         // Avoid relying on the lifetime of 'this'.
         const DeclContext *DC = this->DC;
         getASTContext().addDelayedConformanceDiag(Conformance, isError,
-                        [DC, requirement, witness, sendFrom](
+                        [DC, requirement, witness, sendFrom, nominal](
                           NormalProtocolConformance *conformance) {
           diagnoseSendabilityErrorBasedOn(conformance->getProtocol(), sendFrom,
                                           [&](DiagnosticBehavior limit) {
@@ -4109,9 +4110,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
                            diag::witness_not_as_sendable,
                            witness, conformance->getProtocol())
-                .limitBehavior(limit);
-            diags.diagnose(requirement, diag::less_sendable_reqt_here)
-                .limitBehavior(limit);
+                .limitBehaviorUntilSwiftVersion(limit, 6)
+                .limitBehaviorIf(sendFrom.preconcurrencyBehavior(nominal));
+            diags.diagnose(requirement, diag::less_sendable_reqt_here);
             return false;
           });
         });
