@@ -38,7 +38,7 @@ TEST_F(SemaTest, TestImplicitForceCastConstraintGeneration) {
   auto *castExpr = ForcedCheckedCastExpr::createImplicit(Context, literal,
                                                          Context.TheAnyType);
 
-  auto *expr = cs.generateConstraints(castExpr, DC, /*isInputExpression=*/true);
+  auto *expr = cs.generateConstraints(castExpr, DC);
 
   ASSERT_NE(expr, nullptr);
 
@@ -66,7 +66,7 @@ TEST_F(SemaTest, TestImplicitCoercionConstraintGeneration) {
   auto *castExpr = CoerceExpr::createImplicit(Context, literal,
                                               getStdlibType("Double"));
 
-  auto *expr = cs.generateConstraints(castExpr, DC, /*isInputExpression=*/true);
+  auto *expr = cs.generateConstraints(castExpr, DC);
 
   ASSERT_NE(expr, nullptr);
 
@@ -95,7 +95,7 @@ TEST_F(SemaTest, TestImplicitConditionalCastConstraintGeneration) {
   auto *castExpr = ConditionalCheckedCastExpr::createImplicit(
       Context, literal, getStdlibType("Double"));
 
-  auto *expr = cs.generateConstraints(castExpr, DC, /*isInputExpression=*/true);
+  auto *expr = cs.generateConstraints(castExpr, DC);
 
   ASSERT_NE(expr, nullptr);
 
@@ -178,4 +178,45 @@ TEST_F(SemaTest, TestCaptureListIsNotOpenedEarly) {
   for (const auto &capture : captureList->getCaptureList()) {
     ASSERT_TRUE(cs.hasType(capture.getVar()));
   }
+}
+
+TEST_F(SemaTest, TestMultiStmtClosureBodyParentAndDepth) {
+  // {
+  //   ()
+  //   return ()
+  // }
+  DeclAttributes attrs;
+  auto *closure = new (Context) ClosureExpr(attrs,
+                                            /*braceRange=*/SourceRange(),
+                                            /*capturedSelfDecl=*/nullptr,
+                                            ParameterList::createEmpty(Context),
+                                            /*asyncLoc=*/SourceLoc(),
+                                            /*throwsLoc=*/SourceLoc(),
+                                            /*thrownType*/ nullptr,
+                                            /*arrowLoc=*/SourceLoc(),
+                                            /*inLoc=*/SourceLoc(),
+                                            /*explicitResultType=*/nullptr, DC);
+  closure->setImplicit();
+
+  auto *RS = ReturnStmt::createImplicit(
+      Context, TupleExpr::createImplicit(Context, {}, {}));
+
+  closure->setBody(BraceStmt::createImplicit(Context, {
+    TupleExpr::createImplicit(Context, {}, {}), RS
+  }));
+
+  SyntacticElementTarget target(closure, DC, ContextualTypeInfo(),
+                                /*isDiscarded*/ true);
+
+  ConstraintSystem cs(DC, ConstraintSystemOptions());
+  cs.solve(target);
+
+  ASSERT_EQ(cs.getParentExpr(closure), nullptr);
+  ASSERT_EQ(cs.getExprDepth(closure), 0);
+
+  // We visit the ReturnStmt twice when computing the parent map, ensure we
+  // don't invalidate its parent on the second walk during the conjunction.
+  auto *result = RS->getResult();
+  ASSERT_EQ(cs.getParentExpr(result), closure);
+  ASSERT_EQ(cs.getExprDepth(result), 1);
 }

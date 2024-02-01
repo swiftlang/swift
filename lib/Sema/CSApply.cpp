@@ -9595,22 +9595,8 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
       auto *locator = target.getExprConvertTypeLocator();
       if (!locator) {
-        // Bodies of single-expression closures use a special locator
-        // for contextual type conversion to make sure that result is
-        // convertible to `Void` when `return` is not used explicitly.
-        auto *closure = dyn_cast<ClosureExpr>(target.getDeclContext());
-        if (closure && closure->hasSingleExpressionBody() &&
-            contextualTypePurpose == CTP_ClosureResult) {
-          auto *returnStmt =
-              castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
-
-          locator = cs.getConstraintLocator(
-              closure, LocatorPathElt::ClosureBody(
-                           /*hasImpliedReturn*/ returnStmt->isImplied()));
-        } else {
-          locator = cs.getConstraintLocator(
-              expr, LocatorPathElt::ContextualType(contextualTypePurpose));
-        }
+        locator = cs.getConstraintLocator(
+            expr, LocatorPathElt::ContextualType(contextualTypePurpose));
       }
       assert(locator);
 

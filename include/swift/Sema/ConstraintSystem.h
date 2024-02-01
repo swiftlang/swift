@@ -4562,8 +4562,7 @@ public:
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
   [[nodiscard]]
-  Expr *generateConstraints(Expr *E, DeclContext *dc,
-                            bool isInputExpression = true);
+  Expr *generateConstraints(Expr *E, DeclContext *dc);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.

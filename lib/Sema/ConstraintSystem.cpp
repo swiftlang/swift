@@ -822,6 +822,12 @@ void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
 static void extendDepthMap(
    Expr *expr,
    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+  // If we already have an entry in the map, we don't need to update it. This
+  // avoids invalidating previous entries when solving a smaller component of a
+  // larger AST node, e.g during conjunction solving.
+  if (depthMap.contains(expr))
+    return;
+
   class RecordingTraversal : public ASTWalker {
     SmallVector<ClosureExpr *, 4> Closures;
 

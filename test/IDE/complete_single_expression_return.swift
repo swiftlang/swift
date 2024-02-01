@@ -155,10 +155,27 @@ struct TestExplicitSingleExprClosureBinding {
       return self.#^TestExplicitSingleExprClosureBinding^#
     }
   }
-// FIXME: Because we have an explicit return, and no expected type, we shouldn't suggest Void.
+// We have an explicit return, and no expected type, so we don't suggest Void.
 // TestExplicitSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
 // TestExplicitSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
-// TestExplicitSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: void()[#Void#];
+// TestExplicitSingleExprClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
+}
+
+struct TestExplicitMultiStmtClosureBinding {
+  func void() -> Void {}
+  func str() -> String { return "" }
+  func int() -> Int { return 0 }
+
+  func test() {
+    let fn = {
+      ()
+      return self.#^TestExplicitMultiStmtClosureBinding^#
+    }
+  }
+// We have an explicit return, and no expected type, so we don't suggest Void.
+// TestExplicitMultiStmtClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#];
+// TestExplicitMultiStmtClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#];
+// TestExplicitMultiStmtClosureBinding-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: void()[#Void#];
 }
 
 struct TestExplicitSingleExprClosureBindingWithContext {
