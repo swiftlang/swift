@@ -39,3 +39,11 @@ enum Context<T> {
 }
 
 func doit() -> Context<Int>.Here { .init(t: 0) }
+
+public enum E {
+  case a
+}
+
+func take<T : _BitwiseCopyable>(_ t: T) {}
+
+func pass(_ e: E) { take(e) }
