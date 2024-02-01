@@ -33,11 +33,11 @@ using namespace swift;
 extern "C" void __cxa_begin_catch(void *);
 
 SWIFT_RUNTIME_STDLIB_API _Unwind_Reason_Code
-swift_exceptionPersonality(int version,
-                           _Unwind_Action actions,
-                           uint64_t exceptionClass,
-                           struct _Unwind_Exception *exceptionObject,
-                           struct _Unwind_Context *context)
+_swift_exceptionPersonality(int version,
+                            _Unwind_Action actions,
+                            uint64_t exceptionClass,
+                            struct _Unwind_Exception *exceptionObject,
+                            struct _Unwind_Context *context)
 {
   // Handle exceptions by catching them and calling std::terminate().
   // This, in turn, will trigger the unhandled exception routine in the

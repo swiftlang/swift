@@ -32,7 +32,7 @@ func testObjCMethodCall() {
 
 testObjCMethodCall()
 
-// CHECK: define {{.*}} @"$s4test0A14ObjCMethodCallyyF"() #[[#UWATTR:]] personality ptr @swift_exceptionPersonality
+// CHECK: define {{.*}} @"$s4test0A14ObjCMethodCallyyF"() #[[#UWATTR:]] personality ptr @_swift_exceptionPersonality
 // CHECK: invoke void {{.*}}@objc_msgSend
 // CHECK-NEXT: to label %[[CONT1:.*]] unwind label %[[UNWIND1:.*]]
 // CHECK-EMPTY:
