@@ -135,7 +135,12 @@ class WasmStdlib(cmake_product.CMakeProduct):
             test_target = "check-swift-wasi-wasm32-custom"
             bin_paths = [os.path.dirname(wasmkit_bin_path)] + bin_paths
 
-        env = {'PATH': os.path.pathsep.join(bin_paths)}
+        env = {
+            'PATH': os.path.pathsep.join(bin_paths),
+            # FIXME: WasmKit takes too long to run these exhaustive tests for now
+            'LIT_FILTER_OUT':
+                '(Concurrency/Runtime/clock.swift|stdlib/StringIndex.swift)',
+        }
         self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
 
     @property
