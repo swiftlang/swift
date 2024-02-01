@@ -578,6 +578,7 @@ function Build-CMakeProject {
 
     $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
     if ($UseMSVCCompilers.Contains("C") -Or $UseMSVCCompilers.Contains("CXX") -Or
+        $UseBuiltCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("CXX") -Or
         $UsePinnedCompilers.Contains("C") -Or $UsePinnedCompilers.Contains("CXX")) {
       if ($DebugInfo) {
         $CFlags += if ($EnableCaching) { "/Z7" } else { "/Zi" }
