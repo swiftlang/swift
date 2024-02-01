@@ -591,6 +591,12 @@ public:
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
 
+  // Compare two pieces of metadata that should be identical. Returns true if
+  // they are, false if they are not equal. Dumps the metadata contents to
+  // stderr if they are not equal.
+  bool compareGenericMetadata(const Metadata *original,
+                              const Metadata *newMetadata);
+
   void validateExternalGenericMetadataBuilder(
       const Metadata *original, const TypeContextDescriptor *description,
       const void * const *arguments);

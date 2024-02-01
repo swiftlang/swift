@@ -51,4 +51,17 @@ Metadata *getLibPrespecializedMetadata(const TypeContextDescriptor *description,
 
 } // namespace swift
 
+// Validate the prespecialized metadata map by building each entry dynamically
+// and comparing. This should be called before any metadata is built for other
+// purposes, as any prespecialized entries that have already been cached will
+// not be rebuilt, so the validation will be comparing the prespecialized
+// metadata with itself.
+//
+// On return, outValidated is set to the total number of metadata records that
+// were validated (which is the total number in the table), and outFailed is set
+// to the number that failed validation.
+SWIFT_RUNTIME_EXPORT
+void _swift_validatePrespecializedMetadata(unsigned *outValidated,
+                                           unsigned *outFailed);
+
 #endif // SWIFT_LIB_PRESPECIALIZED_H
