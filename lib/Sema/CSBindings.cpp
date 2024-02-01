@@ -593,7 +593,7 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
     auto *sendable = ctx.getProtocol(KnownProtocolKind::Sendable);
     keyPathTy = ProtocolCompositionType::get(
         ctx, {keyPathTy, sendable->getDeclaredInterfaceType()},
-        /*hasExplicitAnyObject=*/false);
+        /*inverses=*/{}, /*hasExplicitAnyObject=*/false);
     return ExistentialType::get(keyPathTy);
   }
 
@@ -2203,6 +2203,7 @@ static Type getOptionalSuperclass(Type type) {
 
       superclass = ExistentialType::get(
           ProtocolCompositionType::get(type->getASTContext(), members,
+                                       compositionTy->getInverses(),
                                        compositionTy->hasExplicitAnyObject()));
     } else {
       // Avoid producing superclass for situations like `any P` where `P` is

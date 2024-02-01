@@ -1243,6 +1243,7 @@ namespace {
 
         importedType = ExistentialType::get(
             ProtocolCompositionType::get(Impl.SwiftContext, members,
+                                         /*Inverses=*/{},
                                          /*HasExplicitAnyObject=*/false));
       }
 
