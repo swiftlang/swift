@@ -1474,12 +1474,7 @@ void MemberLookupTable::addMembers(DeclRange members) {
 void MemberLookupTable::addExtension(ExtensionDecl *ext) {
   // If we can lazy-load this extension, only take the members we've loaded
   // so far.
-  //
-  // FIXME: This should be 'e->hasLazyMembers()' but that crashes` because
-  // some imported extensions don't have a Clang node, and only support
-  // LazyMemberLoader::loadAllMembers() and not
-  // LazyMemberLoader::loadNamedMembers().
-  if (ext->wasDeserialized() || ext->hasClangNode()) {
+  if (ext->hasLazyMembers()) {
     addMembers(ext->getCurrentMembersWithoutLoading());
     clearLazilyCompleteCache();
     clearLazilyCompleteForMacroExpansionCache();
@@ -1618,8 +1613,6 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
       continue;
     }
 
-    assert(e->wasDeserialized() || e->hasClangNode() &&
-           "Extension without deserializable content has lazy members!");
     assert(!e->hasUnparsedMembers());
 
     populateLookupTableEntryFromLazyIDCLoader(ctx, table, name, e);

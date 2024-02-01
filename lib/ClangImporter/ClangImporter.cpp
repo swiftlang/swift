@@ -6222,13 +6222,11 @@ swift::extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc) {
 
 TinyPtrVector<ValueDecl *>
 ClangImporter::Implementation::loadNamedMembers(
-    const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
-
+    const IterableDeclContext *IDC, DeclBaseName N, uint64_t extra) {
   auto *D = IDC->getDecl();
   auto *DC = D->getInnermostDeclContext();
   auto *CD = D->getClangDecl();
-  auto *CDC = cast<clang::DeclContext>(CD);
-  assert(CD && "loadNamedMembers on a Decl without a clangDecl");
+  auto *CDC = cast_or_null<clang::DeclContext>(CD);
 
   auto *nominal = DC->getSelfNominalTypeDecl();
   auto effectiveClangContext = getEffectiveClangContext(nominal);
@@ -6248,15 +6246,22 @@ ClangImporter::Implementation::loadNamedMembers(
   // findLookupTable, below, handles the first two cases; we assert on the
   // third.
 
-  auto CMO = getClangSubmoduleForDecl(CD);
+  llvm::Optional<clang::Module *> CMO;
+  if (CD)
+    CMO = getClangSubmoduleForDecl(CD);
+  else {
+    // IDC is an extension containing globals imported as members, so it doesn't
+    // have a clang node but the submodule pointer has been stashed in `extra`.
+    CMO = reinterpret_cast<clang::Module *>(static_cast<uintptr_t>(extra));
+  }
   assert(CMO && "loadNamedMembers on a forward-declared Decl");
 
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  assert(!isa<clang::NamespaceDecl>(CD) && "Namespace members should be loaded"
-                                           "via a request.");
-  assert(isa<clang::ObjCContainerDecl>(CD));
+  assert(!isa_and_nonnull<clang::NamespaceDecl>(CD)
+            && "Namespace members should be loaded via a request.");
+  assert(!CD || isa<clang::ObjCContainerDecl>(CD));
 
   // Force the members of the entire inheritance hierarchy to be loaded and
   // deserialized before loading the named member of a class. This warms up
@@ -6271,32 +6276,37 @@ ClangImporter::Implementation::loadNamedMembers(
 
   // TODO: update this to use the requestified lookup.
   TinyPtrVector<ValueDecl *> Members;
-  for (auto entry : table->lookup(SerializedSwiftName(N),
-                                  effectiveClangContext)) {
-    if (!entry.is<clang::NamedDecl *>()) continue;
-    auto member = entry.get<clang::NamedDecl *>();
-    if (!isVisibleClangEntry(member)) continue;
 
-    // Skip Decls from different clang::DeclContexts
-    if (member->getDeclContext() != CDC) continue;
+  // Lookup actual, factual clang-side members of the context. No need to do
+  // this if we're handling an import-as-member extension.
+  if (CD) {
+    for (auto entry : table->lookup(SerializedSwiftName(N),
+                                    effectiveClangContext)) {
+      if (!entry.is<clang::NamedDecl *>()) continue;
+      auto member = entry.get<clang::NamedDecl *>();
+      if (!isVisibleClangEntry(member)) continue;
 
-    SmallVector<Decl*, 4> tmp;
-    insertMembersAndAlternates(member, tmp, DC);
-    for (auto *TD : tmp) {
-      if (auto *V = dyn_cast<ValueDecl>(TD)) {
-        // Skip ValueDecls if they import under different names.
-        if (V->getBaseName() == N) {
-          Members.push_back(V);
+      // Skip Decls from different clang::DeclContexts
+      if (member->getDeclContext() != CDC) continue;
+
+      SmallVector<Decl*, 4> tmp;
+      insertMembersAndAlternates(member, tmp, DC);
+      for (auto *TD : tmp) {
+        if (auto *V = dyn_cast<ValueDecl>(TD)) {
+          // Skip ValueDecls if they import under different names.
+          if (V->getBaseName() == N) {
+            Members.push_back(V);
+          }
         }
-      }
 
-      // If the property's accessors have alternate decls, we might have
-      // to import those too.
-      if (auto *ASD = dyn_cast<AbstractStorageDecl>(TD)) {
-        for (auto *AD : ASD->getAllAccessors()) {
-          for (auto *D : getAlternateDecls(AD)) {
-            if (D->getBaseName() == N)
-              Members.push_back(D);
+        // If the property's accessors have alternate decls, we might have
+        // to import those too.
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(TD)) {
+          for (auto *AD : ASD->getAllAccessors()) {
+            for (auto *D : getAlternateDecls(AD)) {
+              if (D->getBaseName() == N)
+                Members.push_back(D);
+            }
           }
         }
       }
@@ -6309,8 +6319,11 @@ ClangImporter::Implementation::loadNamedMembers(
     auto member = entry.get<clang::NamedDecl *>();
     if (!isVisibleClangEntry(member)) continue;
 
-    // Skip Decls from different clang::DeclContexts
-    if (member->getDeclContext() != CDC) continue;
+    // Skip Decls from different clang::DeclContexts. We don't do this for
+    // import-as-member extensions because we don't know what decl context to
+    // expect; for instance, an enum constant is inside the enum decl, not in
+    // the translation unit.
+    if (CDC && member->getDeclContext() != CDC) continue;
 
     SmallVector<Decl*, 4> tmp;
     insertMembersAndAlternates(member, tmp, DC);
@@ -6324,7 +6337,7 @@ ClangImporter::Implementation::loadNamedMembers(
     }
   }
 
-  if (N.isConstructor()) {
+  if (CD && N.isConstructor()) {
     if (auto *classDecl = dyn_cast<ClassDecl>(D)) {
       SmallVector<Decl *, 4> ctors;
       importInheritedConstructors(cast<clang::ObjCInterfaceDecl>(CD),
@@ -6334,7 +6347,7 @@ ClangImporter::Implementation::loadNamedMembers(
     }
   }
 
-  if (!isa<ProtocolDecl>(D)) {
+  if (CD && !isa<ProtocolDecl>(D)) {
     if (auto *OCD = dyn_cast<clang::ObjCContainerDecl>(CD)) {
       SmallVector<Decl *, 1> newMembers;
       importMirroredProtocolMembers(OCD, DC, N, newMembers);
