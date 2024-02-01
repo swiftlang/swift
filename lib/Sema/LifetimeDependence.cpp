@@ -85,6 +85,33 @@ LifetimeDependenceInfo LifetimeDependenceInfo::getForParamIndex(
                                 /*mutateLifetimeParamIndices*/ indexSubset};
 }
 
+void LifetimeDependenceInfo::getConcatenatedData(
+    SmallVectorImpl<bool> &concatenatedData) const {
+  auto pushData = [&](IndexSubset *paramIndices) {
+    if (paramIndices == nullptr) {
+      return;
+    }
+    assert(!paramIndices->isEmpty());
+
+    for (unsigned i = 0; i < paramIndices->getCapacity(); i++) {
+      if (paramIndices->contains(i)) {
+        concatenatedData.push_back(true);
+        continue;
+      }
+      concatenatedData.push_back(false);
+    }
+  };
+  if (hasInheritLifetimeParamIndices()) {
+    pushData(inheritLifetimeParamIndices);
+  }
+  if (hasBorrowLifetimeParamIndices()) {
+    pushData(borrowLifetimeParamIndices);
+  }
+  if (hasMutateLifetimeParamIndices()) {
+    pushData(mutateLifetimeParamIndices);
+  }
+}
+
 llvm::Optional<LifetimeDependenceInfo>
 LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                                      bool allowIndex) {
@@ -181,9 +208,19 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
                        paramIndex);
         return llvm::None;
       }
+      if (paramIndex == 0) {
+        if (!afd->hasImplicitSelfDecl()) {
+          diags.diagnose(specifier.getLoc(),
+                         diag::lifetime_dependence_invalid_self);
+          return llvm::None;
+        }
+      }
+      auto ownership =
+          paramIndex == 0
+              ? afd->getImplicitSelfDecl()->getValueOwnership()
+              : afd->getParameters()->get(paramIndex - 1)->getValueOwnership();
       if (updateLifetimeDependenceInfo(
-              specifier, /*paramIndexToSet*/ specifier.getIndex() + 1,
-              afd->getParameters()->get(paramIndex)->getValueOwnership())) {
+              specifier, /*paramIndexToSet*/ specifier.getIndex(), ownership)) {
         return llvm::None;
       }
       break;
@@ -205,9 +242,15 @@ LifetimeDependenceInfo::fromTypeRepr(AbstractFunctionDecl *afd, Type resultType,
   }
 
   return LifetimeDependenceInfo(
-      IndexSubset::get(ctx, inheritLifetimeParamIndices),
-      IndexSubset::get(ctx, borrowLifetimeParamIndices),
-      IndexSubset::get(ctx, mutateLifetimeParamIndices));
+      inheritLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
+          : nullptr,
+      borrowLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, borrowLifetimeParamIndices)
+          : nullptr,
+      mutateLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, mutateLifetimeParamIndices)
+          : nullptr);
 }
 
 llvm::Optional<LifetimeDependenceInfo>

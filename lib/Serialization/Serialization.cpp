@@ -3509,6 +3509,20 @@ private:
                                              fac.completionHandlerFlagIsErrorOnZero());
   }
 
+  void
+  writeLifetimeDependenceInfo(LifetimeDependenceInfo lifetimeDependenceInfo) {
+    using namespace decls_block;
+    SmallVector<bool> paramIndices;
+    lifetimeDependenceInfo.getConcatenatedData(paramIndices);
+
+    auto abbrCode = S.DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
+    LifetimeDependenceLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        lifetimeDependenceInfo.hasInheritLifetimeParamIndices(),
+        lifetimeDependenceInfo.hasBorrowLifetimeParamIndices(),
+        lifetimeDependenceInfo.hasMutateLifetimeParamIndices(), paramIndices);
+  }
+
   void writeGenericParams(const GenericParamList *genericParams) {
     using namespace decls_block;
 
@@ -4481,6 +4495,12 @@ public:
 
     // Write the body parameters.
     writeParameterList(fn->getParameters());
+
+    auto fnType = ty->getAs<FunctionType>();
+    if (fnType && fnType->hasLifetimeDependenceInfo()) {
+      assert(!fnType->getLifetimeDependenceInfo().empty());
+      writeLifetimeDependenceInfo(fnType->getLifetimeDependenceInfo());
+    }
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -5949,6 +5969,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
   registerDeclTypeAbbr<ForeignAsyncConventionLayout>();
+  registerDeclTypeAbbr<LifetimeDependenceLayout>();
   registerDeclTypeAbbr<AbstractClosureExprLayout>();
   registerDeclTypeAbbr<PatternBindingInitializerLayout>();
   registerDeclTypeAbbr<DefaultArgumentInitializerLayout>();

@@ -4105,6 +4105,13 @@ public:
 
     ParameterList *paramList = MF.readParameterList();
     fn->setParameters(paramList);
+    SmallVector<LifetimeDependenceSpecifier> specifierList;
+    if (MF.maybeReadLifetimeDependence(specifierList, paramList->size())) {
+      auto typeRepr = new (ctx) FixedTypeRepr(resultType, SourceLoc());
+      auto lifetimeTypeRepr =
+          LifetimeDependentReturnTypeRepr::create(ctx, typeRepr, specifierList);
+      fn->setDeserializedResultTypeLoc(TypeLoc(lifetimeTypeRepr, resultType));
+    }
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
@@ -8547,4 +8554,59 @@ ModuleFile::maybeReadForeignAsyncConvention() {
       completionHandlerErrorParamIndex,
       completionHandlerErrorFlagParamIndex,
       errorFlagPolarity);
+}
+
+bool ModuleFile::maybeReadLifetimeDependence(
+    SmallVectorImpl<LifetimeDependenceSpecifier> &specifierList,
+    unsigned numParams) {
+  using namespace decls_block;
+  SmallVector<uint64_t, 8> scratch;
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+  llvm::BitstreamEntry next =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return false;
+
+  unsigned recKind =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
+  switch (recKind) {
+  case LIFETIME_DEPENDENCE:
+    restoreOffset.reset();
+    break;
+
+  default:
+    return false;
+  }
+
+  bool hasInheritLifetimeParamIndices, hasBorrowLifetimeParamIndices,
+      hasMutateLifetimeParamIndices;
+  ArrayRef<uint64_t> lifetimeDependenceData;
+  LifetimeDependenceLayout::readRecord(
+      scratch, hasInheritLifetimeParamIndices, hasBorrowLifetimeParamIndices,
+      hasMutateLifetimeParamIndices, lifetimeDependenceData);
+
+  unsigned startIndex = 0;
+  auto pushData = [&](LifetimeDependenceKind kind) {
+    for (unsigned i = 0; i < numParams + 1; i++) {
+      if (lifetimeDependenceData[startIndex + i]) {
+        specifierList.push_back(
+            LifetimeDependenceSpecifier::getOrderedLifetimeDependenceSpecifier(
+                SourceLoc(), kind, i));
+      }
+    }
+    startIndex += numParams + 1;
+  };
+
+  if (hasInheritLifetimeParamIndices) {
+    pushData(LifetimeDependenceKind::Consume);
+  }
+  if (hasBorrowLifetimeParamIndices) {
+    pushData(LifetimeDependenceKind::Borrow);
+  }
+  if (hasMutateLifetimeParamIndices) {
+    pushData(LifetimeDependenceKind::Mutate);
+  }
+  return true;
 }

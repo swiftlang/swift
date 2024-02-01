@@ -9976,6 +9976,10 @@ void FuncDecl::setResultInterfaceType(Type type) {
                                         std::move(type));
 }
 
+void FuncDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
+  FnRetType = ResultTyR;
+}
+
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
