@@ -70,9 +70,9 @@ llvm::cl::opt<bool>
                           llvm::cl::desc("Enable the DestroyHoisting pass."));
 
 llvm::cl::opt<bool>
-DisableLifetimeDependenceDiagnostics(
-  "disable-lifetime-dependence-diagnostics", llvm::cl::init(false),
-  llvm::cl::desc("Disable lifetime dependence diagnostics."));
+EnableLifetimeDependenceDiagnostics(
+  "enable-lifetime-dependence-diagnostics", llvm::cl::init(false),
+  llvm::cl::desc("Enable lifetime dependence diagnostics."));
 
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
@@ -168,7 +168,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMoveOnlyChecker();
 
   // Check ~Escapable.
-  if (!DisableLifetimeDependenceDiagnostics) {
+  if (EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceDiagnostics();
   }
   if (EnableDeinitDevirtualizer)
