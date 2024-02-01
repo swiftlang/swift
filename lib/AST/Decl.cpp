@@ -6738,12 +6738,6 @@ RequirementSignature ProtocolDecl::getRequirementSignature() const {
                RequirementSignature());
 }
 
-GenericSignature ProtocolDecl::getRequirementSignatureAsGenericSignature() const {
-  return GenericSignature::get(
-      {getSelfInterfaceType()->castTo<GenericTypeParamType>()},
-      getRequirementSignature().getRequirements());
-}
-
 bool ProtocolDecl::isComputingRequirementSignature() const {
   return getASTContext().evaluator.hasActiveRequest(
                  RequirementSignatureRequest{const_cast<ProtocolDecl*>(this)});
