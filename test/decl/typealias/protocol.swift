@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 // Tests for typealias inside protocols
 
@@ -146,15 +146,12 @@ protocol P3 {
 // FIXME: Nonsense redundant requirement warnings
 protocol Circular {
   typealias Y = Self.Y // expected-error {{type alias 'Y' references itself}} expected-note {{while resolving type 'Self.Y'}}
-  // expected-warning@-1 {{redundant same-type constraint 'Self.Y' == 'Self.Y'}}
 
   typealias Y2 = Y2 // expected-error {{type alias 'Y2' references itself}} expected-note {{while resolving type 'Y2'}}
-  // expected-warning@-1 {{redundant same-type constraint 'Self.Y2' == 'Self.Y2'}}
 
   typealias Y3 = Y4 // expected-error {{type alias 'Y3' references itself}} expected-note {{while resolving type 'Y4'}}
 
   typealias Y4 = Y3 // expected-note {{through reference here}} expected-note {{while resolving type 'Y3'}}
-  // expected-warning@-1 {{redundant same-type constraint 'Self.Y4' == 'Self.Y3'}}
 }
 
 // Qualified and unqualified references to protocol typealiases from concrete type
@@ -285,7 +282,7 @@ protocol P10 {
   typealias U = Float
 }
 
-extension P10 where T == Int { } // expected-warning{{redundant same-type constraint 'Self.T' == 'Int'}}
+extension P10 where T == Int { }
 
 extension P10 where A == X<T> { }
 
@@ -294,7 +291,6 @@ extension P10 where A == X<U> { }
 extension P10 where A == X<Self.U> { }
 
 extension P10 where V == Int { } // expected-warning {{'V' is deprecated: just use Int, silly}}
-// expected-warning@-1{{redundant same-type constraint 'Self.V' == 'Int'}}
 
 // rdar://problem/36003312
 protocol P11 {

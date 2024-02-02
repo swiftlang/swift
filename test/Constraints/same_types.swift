@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol Fooable {
@@ -57,7 +57,6 @@ func test2a<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
 // CHECK-NEXT: Generic signature: <T, U where T : Fooable, U : Fooable, T.[Fooable]Foo == X, U.[Fooable]Foo == X>
 func test3<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
   where T.Foo == X, U.Foo == X, T.Foo == U.Foo {
-	// expected-warning@-1{{redundant same-type constraint 'T.Foo' == 'X'}}
   return (t.foo, u.foo)
 }
 
@@ -101,7 +100,6 @@ func test6<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y {
 // CHECK-LABEL: same_types.(file).test7@
 // CHECK-NEXT: Generic signature: <T where T : Barrable, T.[Barrable]Bar == Y>
 func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
-	// expected-warning@-1{{redundant same-type constraint 'Y.Foo' (aka 'X') == 'X'}}
   return (t.bar, t.bar.foo)
 }
 
@@ -143,7 +141,7 @@ func fail6<T>(_ t: T) -> Int where T == Int { // expected-warning{{same-type req
 // CHECK-NEXT: Generic signature: <T, U where T : Barrable, U : Barrable, T.[Barrable]Bar == Y, U.[Barrable]Bar == Y>
 func test8<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
   where T.Bar == Y,
-        U.Bar.Foo == X, T.Bar == U.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
+        U.Bar.Foo == X, T.Bar == U.Bar {
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 
@@ -152,14 +150,14 @@ func test8<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
 func test8a<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
   where
   T.Bar == Y,
-  U.Bar.Foo == X, U.Bar == T.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
+  U.Bar.Foo == X, U.Bar == T.Bar {
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 
 // CHECK-LABEL: same_types.(file).test8b(_:u:)@
 // CHECK-NEXT: Generic signature: <T, U where T : Barrable, U : Barrable, T.[Barrable]Bar == Y, U.[Barrable]Bar == Y>
 func test8b<T: Barrable, U: Barrable>(_ t: T, u: U)
-  where U.Bar.Foo == X, // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
+  where U.Bar.Foo == X,
         T.Bar == Y,
         T.Bar == U.Bar {
 }
@@ -205,7 +203,6 @@ struct S2<T : P> where T.A == T.B {
   // CHECK-LABEL: same_types.(file).S2.foo(x:y:)@
   // CHECK-NEXT: <T, X, Y where T : P, X == Y, Y == T.[P]A, T.[P]A == T.[P]B>
   func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {  // expected-warning{{same-type requirement makes generic parameters 'Y' and 'X' equivalent}}
-  // expected-warning@-1 {{redundant same-type constraint 'X' == 'T.A'}}
     print(X.self)
     print(Y.self)
     print(x)
@@ -278,7 +275,6 @@ func structuralSameType3<T, U, V, W>(_: T, _: U, _: V, _: W)
   where X1<T, U> == X1<V, W> { }
 // expected-warning@-2{{same-type requirement makes generic parameters 'V' and 'T' equivalent}}
 // expected-warning@-3{{same-type requirement makes generic parameters 'W' and 'U' equivalent}}
-// expected-warning@-3{{redundant same-type constraint 'X1<T, U>' == 'X1<V, W>'}}
 
 protocol P2 {
   associatedtype Assoc1
@@ -337,7 +333,6 @@ func test9<T: P6, U: P6>(_ t: T, u: U) // expected-error{{no type for 'T.Bar.Foo
 func testMetatypeSameType<T, U>(_ t: T, _ u: U)
   where T.Type == U.Type { }
 // expected-warning@-2{{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
-// expected-warning@-2{{redundant same-type constraint 'T.Type' == 'U.Type'}}
 
 // CHECK-LABEL: same_types.(file).testSameTypeCommutativity1@
 // CHECK-NEXT: Generic signature: <U, T where U == T.Type>
