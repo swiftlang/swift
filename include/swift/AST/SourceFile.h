@@ -406,6 +406,13 @@ public:
   /// resolution.
   void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
 
+  /// Set the imported underlying clang module for this source file. This gets
+  /// called by import resolution.
+  void setImportedUnderlyingModule(ModuleDecl *module) {
+    assert(!ImportedUnderlyingModule && "underlying module already set");
+    ImportedUnderlyingModule = module;
+  }
+
   /// Whether the given import has used @preconcurrency.
   bool hasImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import) const;

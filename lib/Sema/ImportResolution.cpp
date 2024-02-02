@@ -177,6 +177,10 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// much, much smaller than \c crossImportableModules.
   SmallVector<AttributedImport<ImportedModule>, 16> crossImportDeclaringModules;
 
+  /// The underlying clang module of the source file's parent module, if
+  /// imported.
+  ModuleDecl *underlyingClangModule = nullptr;
+
   /// The index of the next module in \c visibleModules that should be
   /// cross-imported.
   size_t nextModuleToCrossImport = 0;
@@ -192,6 +196,10 @@ public:
   ArrayRef<AttributedImport<ImportedModule>> getFinishedImports() const {
     return boundImports;
   }
+
+  /// Retrieve the underlying clang module which will be cached if it was loaded
+  /// when resolving imports.
+  ModuleDecl *getUnderlyingClangModule() const { return underlyingClangModule; }
 
 private:
   // We only need to visit import decls.
@@ -287,6 +295,7 @@ void swift::performImportResolution(SourceFile &SF) {
     resolver.visit(D);
 
   SF.setImports(resolver.getFinishedImports());
+  SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
 
   SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
@@ -396,8 +405,10 @@ ImportResolver::getModule(ImportPath::Module modulePath) {
   // for clang overlays as well.
   if (ctx.getRealModuleName(moduleID.Item) == loadingModule->getName() &&
       modulePath.size() == 1) {
-    if (auto importer = ctx.getClangModuleLoader())
-      return importer->loadModule(moduleID.Loc, modulePath);
+    if (auto importer = ctx.getClangModuleLoader()) {
+      underlyingClangModule = importer->loadModule(moduleID.Loc, modulePath);
+      return underlyingClangModule;
+    }
     return nullptr;
   }
 
