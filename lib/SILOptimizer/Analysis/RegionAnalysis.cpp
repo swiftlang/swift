@@ -1157,6 +1157,13 @@ enum class TranslationSemantics {
   /// handle every instruction to ensure we cover the IR.
   Asserting,
 
+  /// An instruction that the checker thinks it can ignore as long as all of its
+  /// operands are Sendable. If we see that such an instruction has a
+  /// non-Sendable parameter, then someone added an instruction to the compiler
+  /// without updating this code correctly. This is most likely driver error and
+  /// should be caught in testing when we assert.
+  AssertingIfNonSendable,
+
   /// An instruction that we do not handle yet. Just for now during bring
   /// up. Will be removed.
   Unhandled,
@@ -1198,6 +1205,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     return os;
   case TranslationSemantics::Asserting:
     os << "asserting";
+    return os;
+  case TranslationSemantics::AssertingIfNonSendable:
+    os << "asserting_if_nonsendable";
     return os;
   case TranslationSemantics::Unhandled:
     os << "unhandled";
@@ -2104,6 +2114,16 @@ public:
     case TranslationSemantics::Unhandled:
       LLVM_DEBUG(llvm::dbgs() << "Unhandled inst: " << *inst);
       return;
+    case TranslationSemantics::AssertingIfNonSendable:
+      // Do not error if all of our operands are sendable.
+      if (llvm::none_of(inst->getOperandValues(), [&](SILValue value) {
+            return ::isNonSendableType(value->getType(), inst->getFunction());
+          }))
+        return;
+      llvm::report_fatal_error(
+          "transfer-non-sendable: Found instruction that is not allowed to "
+          "have non-Sendable parameters with such parameters?!");
+      return;
     }
 
     llvm_unreachable("Covered switch isn't covered?!");
@@ -2400,6 +2420,10 @@ CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 
+// Today, await_async_continuation just takes Sendable values
+// (UnsafeContinuation and UnsafeThrowingContinuation).
+CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, AssertingIfNonSendable)
+
 //===---
 // Existential Box
 //
@@ -2441,7 +2465,6 @@ CONSTANT_TRANSLATION(ExtractExecutorInst, Unhandled)
 CONSTANT_TRANSLATION(BindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
-CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 
