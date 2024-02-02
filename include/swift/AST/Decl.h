@@ -8334,6 +8334,8 @@ public:
 
   TypeRepr *getResultTypeRepr() const { return InitRetType.getTypeRepr(); }
 
+  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
+
   /// Get the typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.
   Expr *getSuperInitCall() { return CallToSuperInit; }

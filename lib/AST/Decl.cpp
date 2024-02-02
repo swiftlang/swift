@@ -10423,6 +10423,10 @@ ConstructorDecl *ConstructorDecl::createImported(
   return ctor;
 }
 
+void ConstructorDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
+  InitRetType = ResultTyR;
+}
+
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   // The initializer must have a single, non-empty argument name.
   if (getName().getArgumentNames().size() != 1 ||

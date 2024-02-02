@@ -3532,7 +3532,6 @@ public:
       return thrownTypeOrError.takeError();
     const auto thrownType = thrownTypeOrError.get();
 
-    // Handle LifetimeDependence here
     auto ctor = MF.createDecl<ConstructorDecl>(name, SourceLoc(), isFailable,
                                                /*FailabilityLoc=*/SourceLoc(),
                                                /*Async=*/async,
@@ -3555,6 +3554,15 @@ public:
     auto *bodyParams = MF.readParameterList();
     assert(bodyParams && "missing parameters for constructor");
     ctor->setParameters(bodyParams);
+
+    SmallVector<LifetimeDependenceSpecifier> specifierList;
+    if (MF.maybeReadLifetimeDependence(specifierList, bodyParams->size())) {
+      auto SelfType = ctor->getDeclaredInterfaceType();
+      auto typeRepr = new (ctx) FixedTypeRepr(SelfType, SourceLoc());
+      auto lifetimeTypeRepr =
+          LifetimeDependentReturnTypeRepr::create(ctx, typeRepr, specifierList);
+      ctor->setDeserializedResultTypeLoc(TypeLoc(lifetimeTypeRepr, SelfType));
+    }
 
     if (auto errorConvention = MF.maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
