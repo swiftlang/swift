@@ -6591,19 +6591,8 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 
 bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
   // Specially handle when asking if an invertible protocol requires another.
-  if (auto thisIP = getInvertibleProtocolKind()) {
-    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
-      // Hardcode that the invertible protocols do not require themselves.
-      // Otherwise, defer to what the stdlib says by walking the protocol.
-      if (thisIP == ip)
-        return false;
-    } else {
-      // The stdlib was NOT built with noncopyable generics, so claim that
-      // this invertible protocol require no others.
-      // FIXME: this configuration will eventually go away.
+  if (getInvertibleProtocolKind())
       return false;
-    }
-  }
 
   auto kp = ::getKnownProtocolKind(ip);
   return walkInheritedProtocols([kp, ip](ProtocolDecl *proto) {
