@@ -1627,3 +1627,23 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil @use_bridge_object : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
+
+// ref_to_bridge_object is lookthrough in its first parameter. So we should
+// error on the use, not that instruction.
+sil [ossa] @ref_to_bridge_object_test : $@convention(thin) @async (Builtin.Word) -> () {
+bb0(%arg : $Builtin.Word):
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %b = ref_to_bridge_object %value : $NonSendableKlass, %arg : $Builtin.Word
+  %bridgeUse = function_ref @use_bridge_object : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> ()
+  apply %bridgeUse(%b) : $@convention(thin) (@guaranteed Builtin.BridgeObject) -> () // expected-note {{access here could race}}
+  destroy_value %b : $Builtin.BridgeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}

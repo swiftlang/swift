@@ -2304,7 +2304,6 @@ CONSTANT_TRANSLATION(TupleInst, Assign)
 CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
 CONSTANT_TRANSLATION(BeginBorrowInst, LookThrough)
 CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
-CONSTANT_TRANSLATION(RefToBridgeObjectInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
@@ -2613,6 +2612,13 @@ CAST_WITH_MAYBE_SENDABLE_NONSENDABLE_OP_AND_RESULT(UncheckedValueCastInst)
 //===---
 // Custom Handling
 //
+
+TranslationSemantics
+PartitionOpTranslator::visitRefToBridgeObjectInst(RefToBridgeObjectInst *r) {
+  translateSILLookThrough(
+      SILValue(r), r->getOperand(RefToBridgeObjectInst::ConvertedOperand));
+  return TranslationSemantics::Special;
+}
 
 TranslationSemantics
 PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
