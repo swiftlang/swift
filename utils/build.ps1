@@ -107,6 +107,7 @@ param(
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
+  [switch] $Summary,
   [switch] $ToBatch
 )
 
@@ -203,6 +204,8 @@ $HostArch = switch ($NativeProcessorArchName) {
   "ARM64" { $ArchARM64 }
   default { throw "Unsupported processor architecture" }
 }
+
+$TimingData = New-Object System.Collections.Generic.List[System.Object]
 
 function Get-InstallDir($Arch) {
   if ($Arch -eq $HostArch) {
@@ -760,6 +763,15 @@ function Build-CMakeProject {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.ShortName)' in $($Stopwatch.Elapsed)"
     Write-Host ""
   }
+
+  if ($Summary) {
+    $TimingData.Add([PSCustomObject]@{
+      Arch = $Arch.ShortName
+      Checkout = $Src
+      BuildID = Split-Path -Path $Bin -Leaf
+      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
+    })
+  }
 }
 
 function Build-SPMProject {
@@ -810,6 +822,15 @@ function Build-SPMProject {
   if (-not $ToBatch) {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.ShortName)' in $($Stopwatch.Elapsed)"
     Write-Host ""
+  }
+
+  if ($Summary) {
+    $TimingData.Add([PSCustomObject]@{
+      Arch = $Arch.ShortName
+      Checkout = $Src
+      BuildID = Split-Path -Path $Bin -Leaf
+      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
+    })
   }
 }
 
@@ -1858,6 +1879,10 @@ if (-not $SkipPackaging) {
 
 if ($Stage) {
   Stage-BuildArtifacts $HostArch
+}
+
+if ($Summary) {
+  $TimingData | Select Arch,Checkout,BuildID,"Elapsed Time" | Sort -Descending -Property "Elapsed Time" | Format-Table -AutoSize
 }
 
 if ($Test -ne $null -and (Compare-Object $Test @("clang", "lld", "lldb", "llvm", "swift") -PassThru -IncludeEqual -ExcludeDifferent) -ne $null) {
