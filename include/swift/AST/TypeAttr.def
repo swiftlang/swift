@@ -46,6 +46,10 @@
 #define SIMPLE_TYPE_ATTR(SPELLING, CLASS) TYPE_ATTR(SPELLING, CLASS)
 #endif
 
+#ifndef LAST_TYPE_ATTR
+#define LAST_TYPE_ATTR(CLASS)
+#endif
+
 // Type attributes
 SIMPLE_TYPE_ATTR(autoclosure, Autoclosure)
 TYPE_ATTR(convention, Convention)
@@ -105,7 +109,10 @@ SIMPLE_SIL_TYPE_ATTR(isolated, Isolated)
 SIMPLE_SIL_TYPE_ATTR(thin, Thin)
 SIMPLE_SIL_TYPE_ATTR(thick, Thick)
 
+LAST_TYPE_ATTR(Thick)
+
 #undef SIMPLE_SIL_TYPE_ATTR
 #undef SIMPLE_TYPE_ATTR
 #undef SIL_TYPE_ATTR
 #undef TYPE_ATTR
+#undef LAST_TYPE_ATTR

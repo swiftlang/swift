@@ -42,6 +42,9 @@
                    DECL_ATTR_ALIAS(SPELLING, CLASS)
 #endif
 
+#ifndef LAST_DECL_ATTR
+#define LAST_DECL_ATTR(CLASS)
+#endif
 
 // Declaration Attributes and Modifers
 DECL_ATTR(_silgen_name, SILGenName,
@@ -482,6 +485,7 @@ SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
 SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   155)
+LAST_DECL_ATTR(NoObjCBridging)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
@@ -489,3 +493,4 @@ SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
 #undef CONTEXTUAL_SIMPLE_DECL_ATTR
 #undef DECL_ATTR
 #undef CONTEXTUAL_DECL_ATTR
+#undef LAST_DECL_ATTR
