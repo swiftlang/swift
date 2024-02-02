@@ -54,7 +54,7 @@ internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
     _enqueueJobGlobal(job.context)
   }
 
-  public func asUnownedTaskExecutor() {
+  public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
     // The "default global concurrent executor" is simply the "undefined" one.
     // We represent it as the `(0, 0)` ExecutorRef and it is handled properly
     // by the runtime, without having to call through to the
