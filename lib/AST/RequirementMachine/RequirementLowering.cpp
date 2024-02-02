@@ -1037,7 +1037,10 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   desugarRequirements(result, inverses, errors);
 
-  InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
+  // We do not expand defaults for invertible protocols themselves.
+  if (!proto->getInvertibleProtocolKind())
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result);
+
   applyInverses(ctx, needsDefaultRequirements, inverses, result, errors);
 
   diagnoseRequirementErrors(ctx, errors,

@@ -290,21 +290,27 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
 
-    // Type-check macro-generated or implicitly-synthesized extensions.
+    // Type-check macro-generated or implicitly-synthesized decls.
     if (auto *synthesizedSF = SF->getSynthesizedFile()) {
       for (auto *decl : synthesizedSF->getTopLevelDecls()) {
-        auto extension = cast<ExtensionDecl>(decl);
+        assert(isa<ExtensionDecl>(decl) || isa<ProtocolDecl>(decl));
 
-        // Limit typechecking of synthesized _implicit_ extensions to conformance
-        // checking. This is done because a conditional conformance to Copyable
-        // is synthesized as an extension, based on the markings of `~Copyable`
-        // in a value type. This call to `checkConformancesInContext` will
-        // the actual check to verify that the conditional extension is correct,
-        // as it may be an invalid conformance.
-        if (extension->isImplicit())
-          TypeChecker::checkConformancesInContext(extension);
-        else
-          TypeChecker::typeCheckDecl(extension);
+        // Limit typechecking of synthesized _implicit_ extensions to
+        // conformance checking. This is done because a conditional
+        // conformance to Copyable is synthesized as an extension, based on
+        // the markings of ~Copyable in a value type. This call to
+        // checkConformancesInContext will the actual check to verify that
+        // the conditional extension is correct, as it may be an invalid
+        // conformance.
+        if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+          if (extension->isImplicit()) {
+            TypeChecker::checkConformancesInContext(extension);
+            continue;
+          }
+        }
+
+        // For other kinds of decls, do normal typechecking.
+        TypeChecker::typeCheckDecl(decl);
       }
     }
     SF->typeCheckDelayedFunctions();

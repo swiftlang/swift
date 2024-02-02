@@ -169,17 +169,8 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()
 }
 
-#if $NoncopyableGenerics && $NonescapableTypes
-@_marker public protocol Copyable: ~Escapable {}
-@_marker public protocol Escapable: ~Copyable {}
-
-#elseif $NoncopyableGenerics
 @_marker public protocol Copyable {}
-@_marker public protocol Escapable: ~Copyable {}
 
-#else
-@_marker public protocol Copyable {}
 @_marker public protocol Escapable {}
-#endif
 
 @_marker public protocol _BitwiseCopyable {}

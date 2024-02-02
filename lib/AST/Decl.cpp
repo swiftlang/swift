@@ -6590,34 +6590,35 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresInvertible(InvertibleProtocolKind ip) const {
-  // Specially handle when asking if an invertible protocol requires another.
+  // Protocols don't inherit from themselves.
   if (auto thisIP = getInvertibleProtocolKind()) {
-    if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS) {
-      // Hardcode that the invertible protocols do not require themselves.
-      // Otherwise, defer to what the stdlib says by walking the protocol.
-      if (thisIP == ip)
-        return false;
-    } else {
-      // The stdlib was NOT built with noncopyable generics, so claim that
-      // this invertible protocol require no others.
-      // FIXME: this configuration will eventually go away.
+    if (thisIP == ip)
       return false;
-    }
   }
 
   auto kp = ::getKnownProtocolKind(ip);
+
+  // Otherwise, check for inverses on all of the inherited protocols. If there
+  // is one protocol missing an inverse for this `super` protocol, then it is
+  // implicitly inherited.
   return walkInheritedProtocols([kp, ip](ProtocolDecl *proto) {
     if (proto->isSpecificProtocol(kp))
-      return TypeWalker::Action::Stop; // it is required.
+      return TypeWalker::Action::Stop; // It is explicitly inherited.
 
+    // There is no implicit inheritance of an invertible protocol requirement
+    // on an invertible protocol itself.
+    if (proto->getInvertibleProtocolKind())
+      return TypeWalker::Action::Continue;
+
+    // Otherwise, check to see if there's an inverse on this protocol.
     switch (proto->getMarking(ip).getInverse().getKind()) {
     case InverseMarking::Kind::None:
-      return TypeWalker::Action::Stop; // it is required.
+      return TypeWalker::Action::Stop; // No inverse, so implicitly inherited.
 
     case InverseMarking::Kind::LegacyExplicit:
     case InverseMarking::Kind::Explicit:
     case InverseMarking::Kind::Inferred:
-      // the implicit requirement was suppressed on this protocol, keep looking.
+      // The implicit requirement was suppressed on this protocol, keep looking.
       return TypeWalker::Action::Continue;
     }
   });
@@ -6750,6 +6751,7 @@ ProtocolDecl::setLazyPrimaryAssociatedTypeMembers(
 void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
+      module != module->getASTContext().TheBuiltinModule &&
       !module->getName().is("Foundation") &&
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&

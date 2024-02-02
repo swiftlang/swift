@@ -2404,6 +2404,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   if (Id == Context.Id_TheTupleType)
     return Context.getBuiltinTupleDecl();
 
+  if (Id == Context.Id_Copyable)
+    return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Copyable);
+  if (Id == Context.Id_Escapable)
+    return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Escapable);
+
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
 
