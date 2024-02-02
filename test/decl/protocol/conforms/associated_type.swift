@@ -136,27 +136,25 @@ struct S3b: P3b {
   typealias A = Never
 }
 
-// FIXME: resolveTypeWitnessViaLookup must not happen independently in the
-// general case.
 protocol P4 {
-  associatedtype A: GenClass<B> // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A: GenClass<B>
   associatedtype B
 }
-struct S4: P4 { // expected-error {{type 'S4' does not conform to protocol 'P4'}}
-  typealias A = GenClass<B> // expected-note {{possibly intended match 'S4.A' (aka 'GenClass<Never>') does not inherit from 'GenClass<S4.B>'}}
+struct S4: P4 {
+  typealias A = GenClass<B>
   typealias B = Never
 }
 
-// FIXME: Associated type inference via value witnesses should consider
-// tentative witnesses when checking a candidate.
+// Associated type inference via value witnesses should consider tentative
+// witnesses when checking a candidate.
 protocol P5 {
   associatedtype X = Never
 
-  associatedtype A: GenClass<X> // expected-note {{unable to infer associated type 'A' for protocol 'P5'}}
+  associatedtype A: GenClass<X>
   func foo(arg: A)
 }
-struct S5: P5 { // expected-error {{type 'S5' does not conform to protocol 'P5'}}
-  func foo(arg: GenClass<Never>) {} // expected-note {{candidate would match and infer 'A' = 'GenClass<Never>' if 'GenClass<Never>' inherited from 'GenClass<S5.X>'}}
+struct S5: P5 {
+  func foo(arg: GenClass<Never>) {}
 }
 
 // Abstract type witnesses.
