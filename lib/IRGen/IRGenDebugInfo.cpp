@@ -1079,8 +1079,6 @@ private:
             llvm::dwarf::DW_TAG_structure_type, UniqueID, Scope, File, Line,
             llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
     }
-    if (OffsetInBits > SizeInBits)
-      SizeInBits = OffsetInBits;
 
     auto DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
@@ -1526,8 +1524,7 @@ private:
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
     unsigned Encoding = 0;
-    uint32_t NumExtraInhabitants =
-        DbgTy.getNumExtraInhabitants() ? *DbgTy.getNumExtraInhabitants() : 0;
+    uint32_t NumExtraInhabitants = DbgTy.getNumExtraInhabitants().value_or(0);
 
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
@@ -1644,6 +1641,25 @@ private:
       unsigned FwdDeclLine = 0;
       assert(SizeInBits ==
              CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
+        auto *DIType = createStructType(
+            DbgTy, Decl, ClassTy, Scope, File, L.Line, SizeInBits, AlignInBits,
+            Flags, nullptr, llvm::dwarf::DW_LANG_Swift, MangledName);
+        assert(DIType && "Unexpected null DIType!");
+        assert(DIType && "createStructType should never return null!");
+        auto SuperClassTy = ClassTy->getSuperclass();
+        if (SuperClassTy) {
+          auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
+              SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM,
+              false);
+
+          llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
+          assert(SuperClassDITy && "getOrCreateType should never return null!");
+          DBuilder.retainType(DBuilder.createInheritance(
+              DIType, SuperClassDITy, 0, 0, llvm::DINode::FlagZero));
+        }
+        return DIType;
+      }
       return createPointerSizedStruct(Scope, Decl->getNameStr(), L.File,
                                       FwdDeclLine, Flags, MangledName);
     }
@@ -2021,7 +2037,7 @@ private:
   void createSpecialStlibBuiltinTypes() {
     if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes) 
       return;
-    for (auto BuiltinType: IGM.getSpecialBuiltinTypes()) {
+    for (auto BuiltinType: IGM.getOrCreateSpecialStlibBuiltinTypes()) {
       auto DbgTy = DebugTypeInfo::getFromTypeInfo(
           BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM, false);
       DBuilder.retainType(getOrCreateType(DbgTy));
