@@ -2109,6 +2109,7 @@ public:
     }
 
     case TranslationSemantics::Asserting:
+      llvm::errs() << "BannedInst: " << *inst;
       llvm::report_fatal_error(
           "transfer-non-sendable: Found banned instruction?!");
       return;
@@ -2119,6 +2120,7 @@ public:
             return ::isNonSendableType(value->getType(), inst->getFunction());
           }))
         return;
+      llvm::errs() << "BadInst: " << *inst;
       llvm::report_fatal_error(
           "transfer-non-sendable: Found instruction that is not allowed to "
           "have non-Sendable parameters with such parameters?!");
