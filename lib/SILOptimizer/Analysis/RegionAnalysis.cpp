@@ -2372,6 +2372,9 @@ CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Require)
 CONSTANT_TRANSLATION(BridgeObjectToWordInst, Require)
 CONSTANT_TRANSLATION(IsUniqueInst, Require)
 CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Require)
+CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Require)
+CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Require)
+CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
 
 //===---
 // Terminators
@@ -2439,9 +2442,6 @@ CONSTANT_TRANSLATION(BindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, Unhandled)
-CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Unhandled)
-CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
-CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 
