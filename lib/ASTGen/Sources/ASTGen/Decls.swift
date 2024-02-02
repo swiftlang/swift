@@ -557,7 +557,7 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
       asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsSpecifier),
+      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
       returnType: self.generate(type: node.signature.returnClause?.type),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
@@ -585,7 +585,7 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.signature.parameterClause, forSubscript: false),
       asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsSpecifier),
+      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
       thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )

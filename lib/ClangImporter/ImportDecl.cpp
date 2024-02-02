@@ -3381,13 +3381,6 @@ namespace {
                    d->getName() == "cos" || d->getName() == "exit";
           return false;
         };
-        auto topLevelModuleEq =
-            [](const clang::FunctionDecl *d, StringRef n) -> bool {
-          return d->getOwningModule() &&
-                 d->getOwningModule()
-                    ->getTopLevelModule()
-                    ->getFullModuleName() == n;
-        };
         
         if (clang::Module *owningModule = decl->getOwningModule();
             owningModule && importer::isCxxStdModule(owningModule)) {
