@@ -729,18 +729,30 @@ struct ImmutableAddressUseVerifier {
 };
 
 static void checkAddressWalkerCanVisitAllTransitiveUses(SILValue address) {
+  SmallVector<SILInstruction *, 8> badUsers;
   struct Visitor : TransitiveAddressWalker<Visitor> {
+    SmallVectorImpl<SILInstruction *> &badUsers;
+    Visitor(SmallVectorImpl<SILInstruction *> &badUsers)
+        : TransitiveAddressWalker<Visitor>(), badUsers(badUsers) {}
     bool visitUse(Operand *use) { return true; }
-    void onError(Operand *use) {}
+    void onError(Operand *use) {
+      badUsers.push_back(use->getUser());
+    }
   };
 
-  Visitor visitor;
+  Visitor visitor(badUsers);
   if (std::move(visitor).walk(address) != AddressUseKind::Unknown)
     return;
 
   llvm::errs() << "TransitiveAddressWalker walker failed to know how to visit "
                   "a user when visiting: "
-               << *address << '\n';
+               << *address;
+  if (badUsers.size()) {
+    llvm::errs() << "Bad Users:\n";
+    for (auto *user : badUsers) {
+      llvm::errs() << "    " << *user;
+    }
+  }
   llvm::report_fatal_error("invoking standard assertion failure");
 }
 
