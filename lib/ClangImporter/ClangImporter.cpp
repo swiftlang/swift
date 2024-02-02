@@ -638,9 +638,6 @@ importer::getNormalInvocationArguments(
     if (triple.isOSBinFormatMachO()) {
       invocationArgStrs.insert(invocationArgStrs.end(), {"-D__MACH__"});
     }
-    if (triple.isOSBinFormatWasm()) {
-      invocationArgStrs.insert(invocationArgStrs.end(), {"-D__wasi__"});
-    }
 
     if (triple.isOSWindows()) {
       switch (triple.getArch()) {
