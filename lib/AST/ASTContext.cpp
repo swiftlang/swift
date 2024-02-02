@@ -761,8 +761,14 @@ ASTContext::~ASTContext() {
 }
 
 void ASTContext::SetPreModuleImportCallback(
-    std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback) {
+    PreModuleImportCallbackPtr callback) {
   PreModuleImportCallback = callback;
+}
+
+void ASTContext::PreModuleImportHook(StringRef ModuleName,
+                                     ModuleImportKind Kind) const {
+  if (PreModuleImportCallback)
+    PreModuleImportCallback(ModuleName, Kind);
 }
 
 llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
@@ -2475,8 +2481,7 @@ ASTContext::getModule(ImportPath::Module ModulePath, bool AllowMemoryCached) {
       return M;
 
   auto moduleID = ModulePath[0];
-  if (PreModuleImportCallback)
-    PreModuleImportCallback(moduleID.Item.str(), false /*=IsOverlay*/);
+  PreModuleImportHook(moduleID.Item.str(), ModuleImportKind::Module);
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath,
                                              AllowMemoryCached)) {
@@ -2509,7 +2514,7 @@ ModuleDecl *ASTContext::getOverlayModule(const FileUnit *FU) {
     SmallString<16> path;
     ModPath.getString(path);
     if (!path.empty())
-      PreModuleImportCallback(path.str(), /*IsOverlay=*/true);
+      PreModuleImportCallback(path.str(), ModuleImportKind::Overlay);
   }
   for (auto &importer : getImpl().ModuleLoaders) {
     if (importer.get() == getClangModuleLoader())
