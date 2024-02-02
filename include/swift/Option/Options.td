@@ -1349,6 +1349,11 @@ def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">
   HelpText<"Require inlinable code with no '@available' attribute to back-deploy "
            "to this version of the '-target' OS">;
 
+def min_runtime_version : Separate<["-"], "min-runtime-version">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Specify the minimum runtime version to build force on non-Darwin "
+           "systems">;
+
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;

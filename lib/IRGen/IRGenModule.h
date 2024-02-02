@@ -934,6 +934,13 @@ public:
 
   ClassDecl *getStaticArrayStorageDecl();
 
+#define FEATURE(N, V)                                           \
+  bool is##N##FeatureAvailable(const ASTContext &context);      \
+  inline bool is##N##FeatureAvailable() {                       \
+    return is##N##FeatureAvailable(Context);                    \
+  }
+  #include "swift/AST/FeatureAvailability.def"
+
   bool canUseObjCSymbolicReferences();
 
   Size getAtomicBoolSize() const { return AtomicBoolSize; }

@@ -28,14 +28,19 @@
 
 using namespace swift;
 
-AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &Ctx) {
+AvailabilityContext AvailabilityContext::forDeploymentTarget(const ASTContext &Ctx) {
   return AvailabilityContext(
       VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
 }
 
-AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &Ctx) {
+AvailabilityContext AvailabilityContext::forInliningTarget(const ASTContext &Ctx) {
   return AvailabilityContext(
       VersionRange::allGTE(Ctx.LangOpts.MinimumInliningTargetVersion));
+}
+
+AvailabilityContext AvailabilityContext::forRuntimeTarget(const ASTContext &Ctx) {
+  return AvailabilityContext(
+    VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
 }
 
 namespace {

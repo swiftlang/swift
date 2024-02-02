@@ -1998,6 +1998,20 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
+#define FEATURE(N, V)                                                   \
+bool IRGenModule::is##N##FeatureAvailable(const ASTContext &context) {  \
+  auto deploymentAvailability                                           \
+    = AvailabilityContext::forDeploymentTarget(context);                \
+  auto runtimeAvailability                                              \
+    = AvailabilityContext::forRuntimeTarget(context);                   \
+  return deploymentAvailability.isContainedIn(                          \
+    context.get##N##Availability())                                     \
+    && runtimeAvailability.isContainedIn(                               \
+      context.get##N##RuntimeAvailability());                           \
+}
+
+#include "swift/AST/FeatureAvailability.def"
+
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
       (Triple.isOSDarwin() || Triple.isOSWindows() ||
@@ -2017,11 +2031,9 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
 bool IRGenModule::canUseObjCSymbolicReferences() {
   if (!IRGen.Opts.EnableObjectiveCProtocolSymbolicReferences)
     return false;
-  auto &context = getSwiftModule()->getASTContext();
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(context);
-  return deploymentAvailability.isContainedIn(
-      context.getObjCSymbolicReferencesAvailability());
+  return isObjCSymbolicReferencesFeatureAvailable(
+    getSwiftModule()->getASTContext()
+  );
 }
 
 bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
@@ -2043,7 +2055,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (clDecl->getNameStr() != "_ContiguousArrayStorage")
     return false;
 
-  if (!getAvailabilityContext().isContainedIn(Context.getStaticReadOnlyArraysAvailability()))
+  if (!isStaticReadOnlyArraysFeatureAvailable())
     return false;
 
   if (!getStaticArrayStorageDecl())
