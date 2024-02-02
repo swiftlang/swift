@@ -724,19 +724,18 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       }
       case KeyKind::KK_declAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-        std::transform(
-            Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
-            [&](llvm::yaml::Node &N) {
-              auto Result =
-                  llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
+        for (auto &N : *Seq) {
+          auto Result = llvm::StringSwitch<llvm::Optional<DeclAttrKind>>(
+                            GetScalarString(&N))
 #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::NAME)
 #include "swift/AST/DeclAttr.def"
-                      .Default(DeclAttrKind::Count);
-              if (Result == DeclAttrKind::Count)
-                Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
-                             GetScalarString(&N));
-              return Result;
-            });
+                            .Default(llvm::None);
+          if (!Result)
+            Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
+                         GetScalarString(&N));
+          else
+            Info.DeclAttrs.push_back(*Result);
+        }
         break;
       }
       case KeyKind::KK_accessors: {
@@ -2781,8 +2780,6 @@ static StringRef getAttrName(DeclAttrKind Kind) {
     return DeclAttribute::isDeclModifier(DeclAttrKind::CLASS) ? #NAME          \
                                                               : "@" #NAME;
 #include "swift/AST/DeclAttr.def"
-  case DeclAttrKind::Count:
-    llvm_unreachable("unrecognized attribute kind.");
   }
   llvm_unreachable("covered switch");
 }

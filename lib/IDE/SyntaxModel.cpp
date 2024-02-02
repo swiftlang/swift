@@ -135,8 +135,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       // This token is following @, see if it's a known attribute name.
       // Type attribute, decl attribute, or '@unknown' for swift case statement.
       if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value() ||
-          DeclAttribute::getAttrKindFromString(Tok.getText()) !=
-              DeclAttrKind::Count ||
+          DeclAttribute::getAttrKindFromString(Tok.getText()).has_value() ||
           Tok.getText() == "unknown") {
         // It's a known attribute, so treat it as a syntactic attribute node for
         // syntax coloring. If swift gets user attributes then all identifiers

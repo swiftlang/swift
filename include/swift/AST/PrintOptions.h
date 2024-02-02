@@ -93,8 +93,7 @@ public:
     static_assert(NumTypeAttrKinds < UINT_MAX, "TypeAttrKind is > 31 bits");
   }
   AnyAttrKind(DeclAttrKind K) : kind(static_cast<unsigned>(K)), isType(0) {
-    static_assert(static_cast<unsigned>(DeclAttrKind::Count) < UINT_MAX,
-                  "DeclAttrKind is > 31 bits");
+    static_assert(NumDeclAttrKinds < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
   AnyAttrKind() : kind(NumTypeAttrKinds), isType(1) {}
 
@@ -103,10 +102,11 @@ public:
     if (!isType || kind == NumTypeAttrKinds) return {};
     return static_cast<TypeAttrKind>(kind);
   }
-  /// Returns the DeclAttrKind, or DeclAttrKind::Count if this is not a decl
-  /// attribute.
-  DeclAttrKind decl() const {
-    return isType ? DeclAttrKind::Count : static_cast<DeclAttrKind>(kind);
+  /// Returns the DeclAttrKind.
+  llvm::Optional<DeclAttrKind> decl() const {
+    if (isType || kind == NumDeclAttrKinds)
+      return {};
+    return static_cast<DeclAttrKind>(kind);
   }
 
   bool operator==(AnyAttrKind K) const {

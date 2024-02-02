@@ -423,7 +423,7 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedDeclAttrKind {
 #define DECL_ATTR(_, CLASS, ...) BridgedDeclAttrKind##CLASS,
-#include "swift/AST/DelAttr.def"
+#include "swift/AST/DeclAttr.def"
   BridgedDeclAttrKindNone,
 };
 

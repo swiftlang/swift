@@ -352,33 +352,35 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 //===----------------------------------------------------------------------===//
 
 BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
-  auto kind = DeclAttribute::getAttrKindFromString(cStr.unbridged());
-  switch (kind) {
+  auto optKind = DeclAttribute::getAttrKindFromString(cStr.unbridged());
+  if (!optKind)
+    return BridgedDeclAttrKindNone;
+  switch (*optKind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case DeclAttrKind::CLASS:                                                    \
     return BridgedDeclAttrKind##CLASS;
 #include "swift/AST/DeclAttr.def"
-  case DeclAttrKind::Count:
-    return BridgedDeclAttrKindNone;
   }
 }
 
-DeclAttrKind unbridged(BridgedDeclAttrKind kind) {
+llvm::Optional<DeclAttrKind> unbridged(BridgedDeclAttrKind kind) {
   switch (kind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case BridgedDeclAttrKind##CLASS:                                             \
     return DeclAttrKind::CLASS;
 #include "swift/AST/DeclAttr.def"
   case BridgedDeclAttrKindNone:
-    return DeclAttrKind::Count;
+    return llvm::None;
   }
+  llvm_unreachable("unhandled enum value");
 }
 
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, BridgedDeclAttrKind cKind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cAttrLoc) {
-  auto kind = unbridged(cKind);
-  return DeclAttribute::createSimple(cContext.unbridged(), kind,
+  auto optKind = unbridged(cKind);
+  assert(optKind && "creating attribute of invalid kind?");
+  return DeclAttribute::createSimple(cContext.unbridged(), *optKind,
                                      cAtLoc.unbridged(), cAttrLoc.unbridged());
 }
 

@@ -2694,9 +2694,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::PrivateImport:
       llvm_unreachable("cannot serialize attribute");
 
-    case DeclAttrKind::Count:
-      llvm_unreachable("not a real attribute");
-
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
   case DeclAttrKind::CLASS: {                                                  \
     auto abbrCode = S.DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code];          \

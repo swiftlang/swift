@@ -142,9 +142,6 @@ public:
     return static_cast<ImplClass *>(this)->visit##CLASS##Attr(                 \
         static_cast<CLASS##Attr *>(A), ::std::forward<Args>(AA)...);
 #include "swift/AST/DeclAttr.def"
-
-    case DeclAttrKind::Count:
-      llvm_unreachable("Not an attribute kind");
     }
   }
 

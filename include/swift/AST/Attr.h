@@ -470,10 +470,9 @@ public:
   /// of the 'unowned(unsafe)' attribute, the string passed in is 'unowned'.
   ///
   /// Also note that this recognizes both attributes like '@inline' (with no @)
-  /// and decl modifiers like 'final'.  This returns DeclAttrKind::Count on
-  /// failure.
+  /// and decl modifiers like 'final'.
   ///
-  static DeclAttrKind getAttrKindFromString(StringRef Str);
+  static llvm::Optional<DeclAttrKind> getAttrKindFromString(StringRef Str);
 
   static DeclAttribute *createSimple(const ASTContext &context,
                                      DeclAttrKind kind, SourceLoc atLoc,

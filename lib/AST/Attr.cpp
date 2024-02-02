@@ -251,16 +251,16 @@ void PackElementTypeAttr::printImpl(ASTPrinter &printer,
 /// of the 'unowned(unsafe)' attribute, the string passed in is 'unowned'.
 ///
 /// Also note that this recognizes both attributes like '@inline' (with no @)
-/// and decl modifiers like 'final'.  This returns DeclAttrKind::Count on
-/// failure.
+/// and decl modifiers like 'final'.
 ///
-DeclAttrKind DeclAttribute::getAttrKindFromString(StringRef Str) {
-  return llvm::StringSwitch<DeclAttrKind>(Str)
+llvm::Optional<DeclAttrKind>
+DeclAttribute::getAttrKindFromString(StringRef Str) {
+  return llvm::StringSwitch<llvm::Optional<DeclAttrKind>>(Str)
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DeclAttrKind::CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DeclAttrKind::CLASS)
 #include "swift/AST/DeclAttr.def"
       .Case(SPI_AVAILABLE_ATTRNAME, DeclAttrKind::Available)
-      .Default(DeclAttrKind::Count);
+      .Default(llvm::None);
 }
 
 DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
@@ -277,8 +277,6 @@ DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
   case DeclAttrKind::CLASS:                                                    \
     return new (context) CLASS##Attr(atLoc, attrLoc);
 #include "swift/AST/DeclAttr.def"
-  case DeclAttrKind::Count:
-    llvm_unreachable("bad decl attribute kind");
   }
   llvm_unreachable("bad decl attribute kind");
 }
@@ -1703,9 +1701,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::Count:
-    llvm_unreachable("exceed declaration attribute kinds");
-
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1737,8 +1732,6 @@ void DeclAttribute::print(llvm::raw_ostream &OS, const Decl *D) const {
 
 uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
   switch (DK) {
-  case DeclAttrKind::Count:
-    llvm_unreachable("getOptions needs a valid attribute");
 #define DECL_ATTR(_, CLASS, OPTIONS, ...)                                      \
   case DeclAttrKind::CLASS:                                                    \
     return OPTIONS;
@@ -1749,8 +1742,6 @@ uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
 
 StringRef DeclAttribute::getAttrName() const {
   switch (getKind()) {
-  case DeclAttrKind::Count:
-    llvm_unreachable("getAttrName needs a valid attribute");
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)                                     \
   case DeclAttrKind::CLASS:                                                    \
     return #NAME;
@@ -2890,19 +2881,20 @@ void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
 
 bool swift::hasAttribute(
     const LangOptions &langOpts, llvm::StringRef attributeName) {
-  DeclAttrKind kind = DeclAttribute::getAttrKindFromString(attributeName);
-  if (kind == DeclAttrKind::Count)
+  llvm::Optional<DeclAttrKind> kind =
+      DeclAttribute::getAttrKindFromString(attributeName);
+  if (!kind)
     return false;
 
-  if (DeclAttribute::isUserInaccessible(kind))
+  if (DeclAttribute::isUserInaccessible(*kind))
     return false;
-  if (DeclAttribute::isDeclModifier(kind))
+  if (DeclAttribute::isDeclModifier(*kind))
     return false;
-  if (DeclAttribute::shouldBeRejectedByParser(kind))
+  if (DeclAttribute::shouldBeRejectedByParser(*kind))
     return false;
-  if (DeclAttribute::isSilOnly(kind))
+  if (DeclAttribute::isSilOnly(*kind))
     return false;
-  if (DeclAttribute::isConcurrencyOnly(kind))
+  if (DeclAttribute::isConcurrencyOnly(*kind))
     return false;
 
   return true;

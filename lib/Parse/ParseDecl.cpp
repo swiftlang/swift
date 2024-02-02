@@ -2896,9 +2896,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   ParserStatus Status;
 
   switch (DK) {
-  case DeclAttrKind::Count:
-    llvm_unreachable("DeclAttrKind::Count should not appear in parsing switch");
-
   case DeclAttrKind::RawDocComment:
   case DeclAttrKind::ObjCBridged:
   case DeclAttrKind::RestatedObjCConformance:
@@ -4248,7 +4245,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
-  DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
+  llvm::Optional<DeclAttrKind> DK =
+      DeclAttribute::getAttrKindFromString(Tok.getText());
   if (DK == DeclAttrKind::Rethrows) {
     DK = DeclAttrKind::AtRethrows;
   }
@@ -4259,7 +4257,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   auto checkInvalidAttrName =
       [&](StringRef invalidName, StringRef correctName, DeclAttrKind kind,
           llvm::Optional<Diag<StringRef, StringRef>> diag = llvm::None) {
-        if (DK == DeclAttrKind::Count && Tok.getText() == invalidName) {
+        if (!DK && Tok.getText() == invalidName) {
           DK = kind;
 
           if (diag) {
@@ -4313,7 +4311,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                        diag::attr_renamed_warning);
 
   // Historical name for 'nonisolated'.
-  if (DK == DeclAttrKind::Count && Tok.getText() == "actorIndependent") {
+  if (!DK && Tok.getText() == "actorIndependent") {
     diagnose(
         Tok, diag::attr_renamed_to_modifier_warning, "actorIndependent", 
         "nonisolated")
@@ -4327,7 +4325,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                        DeclAttrKind::Preconcurrency,
                        diag::attr_renamed_warning);
 
-  if (DK == DeclAttrKind::Count && Tok.getText() == "warn_unused_result") {
+  if (!DK && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
     SourceLoc attrLoc = consumeToken();
@@ -4364,8 +4362,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   }
 
   // @_unsafeSendable and @_unsafeMainActor have been removed; warn about them.
-  if (DK == DeclAttrKind::Count && (Tok.getText() == "_unsafeSendable" ||
-                                    Tok.getText() == "_unsafeMainActor")) {
+  if (!DK && (Tok.getText() == "_unsafeSendable" ||
+              Tok.getText() == "_unsafeMainActor")) {
     StringRef attrName = Tok.getText();
     SourceLoc attrLoc = consumeToken();
     diagnose(AtLoc, diag::warn_attr_unsafe_removed, attrName)
@@ -4374,7 +4372,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   }
 
   // Old spelling for @freestanding(expression).
-  if (DK == DeclAttrKind::Count && Tok.getText() == "expression") {
+  if (!DK && Tok.getText() == "expression") {
     SourceLoc attrLoc = consumeToken();
     diagnose(attrLoc, diag::macro_expression_attribute_removed)
       .fixItReplace(SourceRange(AtLoc, attrLoc), "@freestanding(expression)");
@@ -4388,7 +4386,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // Rewrite @_unavailableInEmbedded into @available(*, unavailable) when in
   // embedded Swift mode, or into nothing when in regular mode.
-  if (DK == DeclAttrKind::Count && Tok.getText() == "_unavailableInEmbedded") {
+  if (!DK && Tok.getText() == "_unavailableInEmbedded") {
     SourceLoc attrLoc = consumeToken();
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
       StringRef Message = "unavailable in embedded Swift", Renamed;
@@ -4405,9 +4403,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     return makeParserSuccess();
   }
 
-  if (DK != DeclAttrKind::Count &&
-      !DeclAttribute::shouldBeRejectedByParser(DK)) {
-    return parseNewDeclAttribute(Attributes, AtLoc, DK, isFromClangAttribute);
+  if (DK && !DeclAttribute::shouldBeRejectedByParser(*DK)) {
+    return parseNewDeclAttribute(Attributes, AtLoc, *DK, isFromClangAttribute);
   }
 
   if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value())
@@ -4686,7 +4683,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   if (!optAttr) {
     auto declAttrID = DeclAttribute::getAttrKindFromString(Tok.getText());
-    if (declAttrID != DeclAttrKind::Count) {
+    if (declAttrID) {
       // This is a valid decl attribute so they should have put it on the decl
       // instead of the type.
       if (justChecking) return makeParserError();
@@ -5160,16 +5157,17 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
       if (Tok.isEscapedIdentifier())
         break;
 
-      DeclAttrKind Kind = llvm::StringSwitch<DeclAttrKind>(Tok.getText())
+      auto Kind =
+          llvm::StringSwitch<llvm::Optional<DeclAttrKind>>(Tok.getText())
 #define CONTEXTUAL_CASE(KW, CLASS) .Case(#KW, DeclAttrKind::CLASS)
 #define CONTEXTUAL_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(KW, CLASS) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
 #include <swift/AST/DeclAttr.def>
 #undef CONTEXTUAL_CASE
-                              .Default(DeclAttrKind::Count);
+              .Default(llvm::None);
 
-      if (Kind == DeclAttrKind::Count)
+      if (!Kind)
         break;
 
       Tok.setKind(tok::contextual_keyword);
@@ -5205,7 +5203,7 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
         continue;
       }
 
-      status |= parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, Kind,
+      status |= parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, *Kind,
                                       isFromClangAttribute);
       continue;
     }
@@ -5700,7 +5698,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // this isn't considered a valid Swift decl start.
   if (Tok.isKeyword()) {
     auto DAK = DeclAttribute::getAttrKindFromString(Tok.getText());
-    if (DAK != DeclAttrKind::Count && DeclAttribute::isDeclModifier(DAK)) {
+    if (DAK && DeclAttribute::isDeclModifier(*DAK)) {
       BacktrackingScope backtrack(*this);
       consumeToken();
 
@@ -5805,7 +5803,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
     
     // Handle 'package(set)' access modifier
     auto DAK = DeclAttribute::getAttrKindFromString(Tok.getText());
-    if (DAK != DeclAttrKind::Count && DeclAttribute::isDeclModifier(DAK)) {
+    if (DAK && DeclAttribute::isDeclModifier(*DAK)) {
       BacktrackingScope backtrack(*this);
       // First consume `package`
       consumeToken();
@@ -9976,8 +9974,7 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   const auto maybeDiagnoseInvalidCharInOperatorName = [this](const Token &Tk) {
     if (Tk.is(tok::identifier)) {
       if (Tk.getText().equals("$") ||
-          DeclAttribute::getAttrKindFromString(Tk.getText()) ==
-              DeclAttrKind::Count) {
+          !DeclAttribute::getAttrKindFromString(Tk.getText())) {
         diagnose(Tk, diag::identifier_within_operator_name, Tk.getText());
         return true;
       }

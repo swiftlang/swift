@@ -849,8 +849,6 @@ SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
   }
 
   switch (Attr->getKind()) {
-  case DeclAttrKind::Count:
-    break;
 #define DECL_ATTR(X, CLASS, ...)                                               \
   case DeclAttrKind::CLASS: {                                                  \
     static UIdent Attr_##X("source.decl.attribute." #X);                       \
