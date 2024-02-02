@@ -56,6 +56,16 @@ protocol P {
   func doSomething()
 }
 
+sil @initP : $@convention(thin) () -> @owned P
+sil @transferP : $@async @convention(thin) (@guaranteed P) -> ()
+
+protocol PAnyObject : AnyObject {}
+
+sil @initPAnyObject : $@convention(thin) () -> @owned PAnyObject
+sil @initPAnyObjectOptional : $@convention(thin) () -> @owned Optional<PAnyObject>
+sil @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
+sil @usePAnyObjectWeak : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> ()
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -97,9 +107,6 @@ bb0:
   return %9999 : $()
 }
 
-sil @initP : $@convention(thin) () -> @owned P
-sil @transferP : $@async @convention(thin) (@guaranteed P) -> ()
-
 sil [ossa] @open_existential_value_test : $@async @convention(thin) () -> () {
 bb0:
   %f = function_ref @initP : $@convention(thin) () -> @owned P
@@ -114,6 +121,28 @@ bb0:
   apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{access here could race}}
   end_borrow %b : $P
   destroy_value %p : $P
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @weak_copy_value_test : $@async @convention(thin) () -> () {
+bb0:
+  %f = function_ref @initPAnyObjectOptional : $@convention(thin) () -> @owned Optional<PAnyObject>
+  %p = apply %f() : $@convention(thin) () -> @owned Optional<PAnyObject>
+
+  %pBorrowed = begin_borrow %p : $Optional<PAnyObject>
+  %pExt = unchecked_enum_data %pBorrowed : $Optional<PAnyObject>, #Optional.some!enumelt
+  %transferP = function_ref @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%pExt) : $@async @convention(thin) (@guaranteed PAnyObject) -> () // expected-warning {{transferring value of non-Sendable type 'any PAnyObject' from nonisolated context to global actor '<null>'-isolated context}}
+
+  %w = weak_copy_value %pBorrowed : $Optional<PAnyObject>
+  %weakFunc = function_ref @usePAnyObjectWeak : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> ()
+  apply %weakFunc(%w) : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> () // expected-note {{access here could race}}
+  destroy_value %w : $@sil_weak Optional<PAnyObject>
+
+  end_borrow %pBorrowed : $Optional<PAnyObject>
+  destroy_value %p : $Optional<PAnyObject>
 
   %9999 = tuple ()
   return %9999 : $()

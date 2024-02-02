@@ -223,6 +223,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UnownedToRefInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
+  case SILInstructionKind::WeakCopyValueInst:
     return true;
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
@@ -2342,6 +2343,7 @@ CONSTANT_TRANSLATION(DropDeinitInst, LookThrough)
 CONSTANT_TRANSLATION(ValueToBridgeObjectInst, LookThrough)
 CONSTANT_TRANSLATION(BeginCOWMutationInst, LookThrough)
 CONSTANT_TRANSLATION(OpenExistentialValueInst, LookThrough)
+CONSTANT_TRANSLATION(WeakCopyValueInst, LookThrough)
 
 //===---
 // Store
@@ -2473,7 +2475,6 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
