@@ -3494,12 +3494,15 @@ void AddressAssignment::finish(DominanceInfo *dominance,
   for (auto *inst : llvm::reverse(toDelete)) {
 #ifndef NDEBUG
     for (auto res : inst->getResults()) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code-loop-increment"
       for (auto *use : res->getUses()) {
         inst->dump();
         use->getUser()->dump();
         inst->getFunction()->dump();
         break;
       }
+#pragma clang diagnostic pop
     }
 #endif
     inst->eraseFromParent();
