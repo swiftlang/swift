@@ -1393,7 +1393,7 @@ ValueDecl *SerializedASTFile::getMainDecl() const {
   return cast_or_null<ValueDecl>(File.getDecl(File.getEntryPointDeclID()));
 }
 
-const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
+version::Version SerializedASTFile::getLanguageVersionBuiltWith() const {
   return File.getCompatibilityVersion();
 }
 

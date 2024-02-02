@@ -268,8 +268,10 @@ EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 // Allow for the 'transferring' keyword to be applied to arguments and results.
 EXPERIMENTAL_FEATURE(TransferringArgsAndResults, true)
 
-// Enable `@preconcurrency` attribute on protocol conformances.
-EXPERIMENTAL_FEATURE(PreconcurrencyConformances, false)
+// Enable `@preconcurrency` attribute on protocol conformances and runtime checks
+// of actor isolation in @obj thunks and arguments of APIs that haven't yet adopted
+// strict concurrency checking.
+EXPERIMENTAL_FEATURE(DynamicActorIsolation, false)
 
 // Allow for `switch` of noncopyable values to be borrowing or consuming.
 EXPERIMENTAL_FEATURE(BorrowingSwitch, true)

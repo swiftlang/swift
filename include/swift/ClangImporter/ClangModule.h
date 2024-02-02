@@ -17,6 +17,7 @@
 #define SWIFT_CLANGIMPORTER_CLANGMODULE_H
 
 #include "swift/AST/FileUnit.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ExternalASTSource.h"
 #include "clang/Basic/Module.h"
@@ -107,6 +108,10 @@ public:
   Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const override {
     llvm_unreachable("no private decls in Clang modules");
+  }
+
+  virtual version::Version getLanguageVersionBuiltWith() const override {
+    return version::Version();
   }
 
   virtual StringRef getFilename() const override;

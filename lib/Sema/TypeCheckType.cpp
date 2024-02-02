@@ -3355,7 +3355,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
 
   if (auto preconcurrencyAttr = claim<PreconcurrencyTypeAttr>(attrs)) {
     auto &ctx = getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::PreconcurrencyConformances)) {
+    if (ctx.LangOpts.hasFeature(Feature::DynamicActorIsolation)) {
       if (ty->hasError())
         return ty;
 

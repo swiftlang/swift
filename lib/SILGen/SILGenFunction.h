@@ -908,6 +908,13 @@ public:
   /// new task.
   SILFunction *emitNativeAsyncToForeignThunk(SILDeclRef thunk);
 
+  /// Generates a thunk that contains a runtime precondition that
+  /// the given function is called on the expected executor.
+  ManagedValue emitActorIsolationErasureThunk(SILLocation loc,
+                                              ManagedValue func,
+                                              CanAnyFunctionType isolatedType,
+                                              CanAnyFunctionType nonIsolatedType);
+
   /// Generate a nullary function that returns the given value.
   /// If \p emitProfilerIncrement is set, emit a profiler increment for
   /// \p value.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -enable-experimental-feature PreconcurrencyConformances -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -enable-experimental-feature DynamicActorIsolation -emit-silgen %s | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: concurrency

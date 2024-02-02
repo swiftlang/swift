@@ -810,38 +810,6 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
           conformance.getConcrete())->isMissing());
 }
 
-/// Find the import that makes the given declaration available.
-static llvm::Optional<AttributedImport<ImportedModule>>
-findImportFor(const DeclContext *dc, const DeclContext *fromDC) {
-  // If the type is from the current module, there's no import.
-  auto module = dc->getParentModule();
-  if (module == fromDC->getParentModule())
-    return llvm::None;
-
-  auto fromSourceFile = fromDC->getParentSourceFile();
-  if (!fromSourceFile)
-    return llvm::None;
-
-  // Look to see if the owning module was directly imported.
-  for (const auto &import : fromSourceFile->getImports()) {
-    if (import.module.importedModule == module)
-      return import;
-  }
-
-  // Now look for transitive imports.
-  auto &importCache = dc->getASTContext().getImportCache();
-  for (const auto &import : fromSourceFile->getImports()) {
-    auto &importSet = importCache.getImportSet(import.module.importedModule);
-    for (const auto &transitive : importSet.getTransitiveImports()) {
-      if (transitive.importedModule == module) {
-        return import;
-      }
-    }
-  }
-
-  return llvm::None;
-}
-
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
@@ -870,7 +838,7 @@ SendableCheckContext::preconcurrencyBehavior(Decl *decl) const {
   if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // Determine whether this nominal type is visible via a @preconcurrency
     // import.
-    auto import = findImportFor(nominal, fromDC);
+    auto import = nominal->findImport(fromDC);
     auto sourceFile = fromDC->getParentSourceFile();
 
     if (!import || !import->options.contains(ImportFlags::Preconcurrency))
@@ -937,7 +905,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
       // This type was imported from another module; try to find the
       // corresponding import.
       llvm::Optional<AttributedImport<swift::ImportedModule>> import =
-          findImportFor(nominal, fromContext.fromDC);
+          nominal->findImport(fromContext.fromDC);
 
       // If we found the import that makes this nominal type visible, remark
       // that it can be @preconcurrency import.
@@ -2343,14 +2311,13 @@ namespace {
 
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
-    void checkFunctionConversion(FunctionConversionExpr *funcConv) {
-      auto subExprType = funcConv->getSubExpr()->getType();
-      if (auto fromType = subExprType->getAs<FunctionType>()) {
-        if (auto fromActor = fromType->getGlobalActor()) {
-          if (auto toType = funcConv->getType()->getAs<FunctionType>()) {
+    void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
+      if (auto fromFnType = fromType->getAs<FunctionType>()) {
+        if (auto fromActor = fromFnType->getGlobalActor()) {
+          if (auto toFnType = toType->getAs<FunctionType>()) {
 
             // ignore some kinds of casts, as they're diagnosed elsewhere.
-            if (toType->hasGlobalActor() || toType->isAsync())
+            if (toFnType->hasGlobalActor() || toFnType->isAsync())
               return;
 
             auto dc = const_cast<DeclContext*>(getDeclContext());
@@ -2732,7 +2699,15 @@ namespace {
 
       // The constraint solver may not have chosen legal casts.
       if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
-        checkFunctionConversion(funcConv);
+        checkFunctionConversion(funcConv,
+                                funcConv->getSubExpr()->getType(),
+                                funcConv->getType());
+      }
+
+      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
+        checkFunctionConversion(isolationErasure,
+                                isolationErasure->getSubExpr()->getType(),
+                                isolationErasure->getType());
       }
 
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
@@ -3005,8 +2980,7 @@ namespace {
         return false;
       }
 
-      const auto import =
-          findImportFor(var->getDeclContext(), getDeclContext());
+      const auto import = var->findImport(getDeclContext());
       const bool isPreconcurrencyImport =
           import && import->options.contains(ImportFlags::Preconcurrency);
       const auto isPreconcurrencyUnspecifiedIsolation =
