@@ -1683,7 +1683,8 @@ static void diagnoseRetroactiveConformances(
         // check to make sure it's not erroneously marked @retroactive when it's
         // not actually retroactive.
         if (decl == proto && entry.isRetroactive()) {
-          auto loc = entry.getTypeRepr()->findAttrLoc(TAK_retroactive);
+          auto loc =
+              entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
           bool typeIsSameModule =
               extTypeModule->isSameModuleLookingThroughOverlays(module);
           auto incorrectTypeName = typeIsSameModule ? 

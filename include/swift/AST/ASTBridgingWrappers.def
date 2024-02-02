@@ -61,10 +61,10 @@
 #include "swift/AST/PatternNodes.def"
 
 #ifndef DECL_ATTR
-#define SIMPLE_DECL_ATTR(X, CLASS, OPTIONS, CODE)
+#define SIMPLE_DECL_ATTR(...)
 #define DECL_ATTR(_, Id, ...) AST_BRIDGING_WRAPPER_NONNULL(Id##Attr)
 #endif
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.

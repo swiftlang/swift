@@ -287,7 +287,7 @@ namespace swift {
   SWIFT_NAME("getter:Bridged" #CLASS "Attr.asDeclAttribute(self:)")            \
   BridgedDeclAttribute Bridged##CLASS##Attr_asDeclAttribute(                   \
       Bridged##CLASS##Attr attr);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 struct BridgedPatternBindingEntry {
   BridgedPattern pattern;
@@ -423,7 +423,7 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedDeclAttrKind {
 #define DECL_ATTR(_, CLASS, ...) BridgedDeclAttrKind##CLASS,
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
   BridgedDeclAttrKindNone,
 };
 
@@ -1440,9 +1440,9 @@ void BridgedStmt_dump(BridgedStmt statement);
 
 // Bridged type attribute kinds, which mirror TypeAttrKind exactly.
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind {
-#define TYPE_ATTR(SPELLING, _) BridgedTypeAttrKind_##SPELLING,
-#include "swift/AST/Attr.def"
-  BridgedTypeAttrKind_None,
+#define TYPE_ATTR(_, CLASS) BridgedTypeAttrKind##CLASS,
+#include "swift/AST/TypeAttr.def"
+  BridgedTypeAttrKindNone,
 };
 
 SWIFT_NAME("BridgedTypeAttrKind.init(from:)")

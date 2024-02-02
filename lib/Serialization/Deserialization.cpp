@@ -6109,7 +6109,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         Attr = new (ctx) CLASS##Attr(isImplicit); \
         break; \
       }
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
       default:
         // We don't know how to deserialize this kind of attribute.

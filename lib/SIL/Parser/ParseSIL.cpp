@@ -650,7 +650,7 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
 
       if (SILMod.getASTContext().LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
         if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(Req.getSubjectRepr())) {
-          if (attributedTy->has(TAK__noMetadata)) {
+          if (attributedTy->has(TypeAttrKind::NoMetadata)) {
             typeErasedParams.push_back(Subject);
           }
         }

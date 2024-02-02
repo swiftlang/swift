@@ -75,30 +75,39 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define TYPE_ATTR(X, C) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
-#include "swift/AST/Attr.def"
+#define TYPE_ATTR(X, C)                                                        \
+  ExcludeAttrs.insert(std::make_pair("TypeAttrKind::" #C, TypeAttrKind::C));
+#include "swift/AST/TypeAttr.def"
 
   // Allow the following type attributes:
-  ExcludeAttrs.erase("TAK_autoclosure");
-  ExcludeAttrs.erase("TAK_convention");
-  ExcludeAttrs.erase("TAK_noescape");
-  ExcludeAttrs.erase("TAK_escaping");
-  ExcludeAttrs.erase("TAK_inout");
+  ExcludeAttrs.erase("TypeAttrKind::Autoclosure");
+  ExcludeAttrs.erase("TypeAttrKind::Convention");
+  ExcludeAttrs.erase("TypeAttrKind::NoEscape");
+  ExcludeAttrs.erase("TypeAttrKind::Escaping");
+  ExcludeAttrs.erase("TypeAttrKind::Inout");
 
   // Don't allow the following decl attributes:
   // These can be large and are already included elsewhere in
   // symbol graphs.
-  ExcludeAttrs.insert(std::make_pair("DAK_Available", DAK_Available));
-  ExcludeAttrs.insert(std::make_pair("DAK_Inline", DAK_Inline));
-  ExcludeAttrs.insert(std::make_pair("DAK_Inlinable", DAK_Inlinable));
-  ExcludeAttrs.insert(std::make_pair("DAK_Prefix", DAK_Prefix));
-  ExcludeAttrs.insert(std::make_pair("DAK_Postfix", DAK_Postfix));
-  ExcludeAttrs.insert(std::make_pair("DAK_Infix", DAK_Infix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Available", DeclAttrKind::Available));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Inline", DeclAttrKind::Inline));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Inlinable", DeclAttrKind::Inlinable));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Prefix", DeclAttrKind::Prefix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Postfix", DeclAttrKind::Postfix));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::Infix", DeclAttrKind::Infix));
 
   // In "emit modules separately" jobs, access modifiers show up as attributes,
   // but we don't want them to be printed in declarations
-  ExcludeAttrs.insert(std::make_pair("DAK_AccessControl", DAK_AccessControl));
-  ExcludeAttrs.insert(std::make_pair("DAK_SetterAccess", DAK_SetterAccess));
+  ExcludeAttrs.insert(std::make_pair("DeclAttrKind::AccessControl",
+                                     DeclAttrKind::AccessControl));
+  ExcludeAttrs.insert(
+      std::make_pair("DeclAttrKind::SetterAccess", DeclAttrKind::SetterAccess));
 
   for (const auto &Entry : ExcludeAttrs) {
     Opts.ExcludeAttrList.push_back(Entry.getValue());
@@ -129,17 +138,16 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   Options.PrintOverrideKeyword = false;
   Options.PrintGenericRequirements = false;
 
-  #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
-    Options.ExcludeAttrList.push_back(DAK_##CLASS);
-  #define TYPE_ATTR(X, C) \
-    Options.ExcludeAttrList.push_back(TAK_##X);
-  #include "swift/AST/Attr.def"
+#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)                              \
+  Options.ExcludeAttrList.push_back(DeclAttrKind::CLASS);
+#define TYPE_ATTR(X, C) Options.ExcludeAttrList.push_back(TypeAttrKind::C);
+#include "swift/AST/DeclAttr.def"
 
   // Don't include these attributes in subheadings.
-  Options.ExcludeAttrList.push_back(DAK_Final);
-  Options.ExcludeAttrList.push_back(DAK_Mutating);
-  Options.ExcludeAttrList.push_back(DAK_NonMutating);
-  Options.ExcludeAttrList.push_back(TAK_escaping);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::Final);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::Mutating);
+  Options.ExcludeAttrList.push_back(DeclAttrKind::NonMutating);
+  Options.ExcludeAttrList.push_back(TypeAttrKind::Escaping);
 
   return Options;
 }

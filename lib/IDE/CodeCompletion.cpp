@@ -750,19 +750,19 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
       // These modifiers are invalid for decls in function body.
       if (DAK) {
         switch (*DAK) {
-        case DeclAttrKind::DAK_Lazy:
-        case DeclAttrKind::DAK_Final:
-        case DeclAttrKind::DAK_Infix:
-        case DeclAttrKind::DAK_Frozen:
-        case DeclAttrKind::DAK_Prefix:
-        case DeclAttrKind::DAK_Postfix:
-        case DeclAttrKind::DAK_Dynamic:
-        case DeclAttrKind::DAK_Override:
-        case DeclAttrKind::DAK_Optional:
-        case DeclAttrKind::DAK_Required:
-        case DeclAttrKind::DAK_Convenience:
-        case DeclAttrKind::DAK_AccessControl:
-        case DeclAttrKind::DAK_Nonisolated:
+        case DeclAttrKind::Lazy:
+        case DeclAttrKind::Final:
+        case DeclAttrKind::Infix:
+        case DeclAttrKind::Frozen:
+        case DeclAttrKind::Prefix:
+        case DeclAttrKind::Postfix:
+        case DeclAttrKind::Dynamic:
+        case DeclAttrKind::Override:
+        case DeclAttrKind::Optional:
+        case DeclAttrKind::Required:
+        case DeclAttrKind::Convenience:
+        case DeclAttrKind::AccessControl:
+        case DeclAttrKind::Nonisolated:
           return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
 
         default:
@@ -811,11 +811,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     AddDeclKeyword(Name, CodeCompletionKeywordKind::None, Kind);
   };
 
-#define CONTEXTUAL_CASE(KW, CLASS) AddCSKeyword(#KW, DAK_##CLASS);
+#define CONTEXTUAL_CASE(KW, CLASS) AddCSKeyword(#KW, DeclAttrKind::CLASS);
 #define CONTEXTUAL_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(KW, CLASS) CONTEXTUAL_CASE(KW, CLASS)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
-#include <swift/AST/Attr.def>
+#include <swift/AST/DeclAttr.def>
 #undef CONTEXTUAL_CASE
 }
 

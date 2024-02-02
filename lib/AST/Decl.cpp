@@ -1553,9 +1553,10 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
     : InheritedEntry(typeLoc, /*isUnchecked=*/false, /*isRetroactive=*/false,
                      /*isPreconcurrency=*/false) {
   if (auto typeRepr = typeLoc.getTypeRepr()) {
-    IsUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
-    IsRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
-    IsPreconcurrency = typeRepr->findAttrLoc(TAK_preconcurrency).isValid();
+    IsUnchecked = typeRepr->findAttrLoc(TypeAttrKind::Unchecked).isValid();
+    IsRetroactive = typeRepr->findAttrLoc(TypeAttrKind::Retroactive).isValid();
+    IsPreconcurrency =
+        typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency).isValid();
   }
 }
 
@@ -4546,7 +4547,8 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   if (source->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
       !getAttrs().hasAttribute<UsableFromInlineAttr>() &&
       !getAttrs().hasAttribute<InlinableAttr>() &&
-      DeclAttribute::canAttributeAppearOnDecl(DAK_UsableFromInline, this)) {
+      DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::UsableFromInline,
+                                              this)) {
     auto &ctx = getASTContext();
     auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     getAttrs().add(clonedAttr);

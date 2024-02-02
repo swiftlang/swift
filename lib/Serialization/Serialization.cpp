@@ -2682,31 +2682,28 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
 
     switch (DA->getKind()) {
-    case DAK_RawDocComment:
-    case DAK_ReferenceOwnership: // Serialized as part of the type.
-    case DAK_AccessControl:
-    case DAK_SetterAccess:
-    case DAK_ObjCBridged:
-    case DAK_SynthesizedProtocol:
-    case DAK_ObjCRuntimeName:
-    case DAK_RestatedObjCConformance:
-    case DAK_ClangImporterSynthesizedType:
-    case DAK_PrivateImport:
+    case DeclAttrKind::RawDocComment:
+    case DeclAttrKind::ReferenceOwnership: // Serialized as part of the type.
+    case DeclAttrKind::AccessControl:
+    case DeclAttrKind::SetterAccess:
+    case DeclAttrKind::ObjCBridged:
+    case DeclAttrKind::SynthesizedProtocol:
+    case DeclAttrKind::ObjCRuntimeName:
+    case DeclAttrKind::RestatedObjCConformance:
+    case DeclAttrKind::ClangImporterSynthesizedType:
+    case DeclAttrKind::PrivateImport:
       llvm_unreachable("cannot serialize attribute");
 
-    case DAK_Count:
-      llvm_unreachable("not a real attribute");
+#define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
+  case DeclAttrKind::CLASS: {                                                  \
+    auto abbrCode = S.DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code];          \
+    CLASS##DeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,        \
+                                      DA->isImplicit());                       \
+    return;                                                                    \
+  }
+#include "swift/AST/DeclAttr.def"
 
-  #define SIMPLE_DECL_ATTR(_, CLASS, ...)\
-    case DAK_##CLASS: { \
-      auto abbrCode = S.DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code]; \
-      CLASS##DeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, \
-                                        DA->isImplicit()); \
-      return; \
-    }
-  #include "swift/AST/Attr.def"
-
-    case DAK_SILGenName: {
+    case DeclAttrKind::SILGenName: {
       auto *theAttr = cast<SILGenNameAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SILGenNameDeclAttrLayout::Code];
       SILGenNameDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2715,7 +2712,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Implements: {
+    case DeclAttrKind::Implements: {
       auto *theAttr = cast<ImplementsAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ImplementsDeclAttrLayout::Code];
 
@@ -2738,7 +2735,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_CDecl: {
+    case DeclAttrKind::CDecl: {
       auto *theAttr = cast<CDeclAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[CDeclDeclAttrLayout::Code];
       CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2747,7 +2744,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_SPIAccessControl: {
+    case DeclAttrKind::SPIAccessControl: {
       auto theAttr = cast<SPIAccessControlAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];
 
@@ -2765,7 +2762,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Alignment: {
+    case DeclAttrKind::Alignment: {
       auto *theAlignment = cast<AlignmentAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];
       AlignmentDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2774,7 +2771,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_SwiftNativeObjCRuntimeBase: {
+    case DeclAttrKind::SwiftNativeObjCRuntimeBase: {
       auto *theBase = cast<SwiftNativeObjCRuntimeBaseAttr>(DA);
       auto abbrCode
         = S.DeclTypeAbbrCodes[SwiftNativeObjCRuntimeBaseDeclAttrLayout::Code];
@@ -2786,7 +2783,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Semantics: {
+    case DeclAttrKind::Semantics: {
       auto *theAttr = cast<SemanticsAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SemanticsDeclAttrLayout::Code];
       SemanticsDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2795,7 +2792,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Inline: {
+    case DeclAttrKind::Inline: {
       auto *theAttr = cast<InlineAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[InlineDeclAttrLayout::Code];
       InlineDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2803,7 +2800,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_NonSendable: {
+    case DeclAttrKind::NonSendable: {
       auto *theAttr = cast<NonSendableAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonSendableDeclAttrLayout::Code];
       NonSendableDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2811,7 +2808,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Optimize: {
+    case DeclAttrKind::Optimize: {
       auto *theAttr = cast<OptimizeAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[OptimizeDeclAttrLayout::Code];
       OptimizeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2819,7 +2816,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Exclusivity: {
+    case DeclAttrKind::Exclusivity: {
       auto *theAttr = cast<ExclusivityAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ExclusivityDeclAttrLayout::Code];
       ExclusivityDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -2827,7 +2824,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Effects: {
+    case DeclAttrKind::Effects: {
       auto *theAttr = cast<EffectsAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
       IdentifierID customStringID = 0;
@@ -2840,7 +2837,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_OriginallyDefinedIn: {
+    case DeclAttrKind::OriginallyDefinedIn: {
       auto *theAttr = cast<OriginallyDefinedInAttr>(DA);
       ENCODE_VER_TUPLE(Moved, llvm::Optional<llvm::VersionTuple>(theAttr->MovedVersion));
       auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
@@ -2856,7 +2853,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Available: {
+    case DeclAttrKind::Available: {
       auto *theAttr = cast<AvailableAttr>(DA);
       ENCODE_VER_TUPLE(Introduced, theAttr->Introduced)
       ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
@@ -2886,7 +2883,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_BackDeployed: {
+    case DeclAttrKind::BackDeployed: {
       auto *theAttr = cast<BackDeployedAttr>(DA);
       ENCODE_VER_TUPLE(Version, llvm::Optional<llvm::VersionTuple>(theAttr->Version));
       auto abbrCode = S.DeclTypeAbbrCodes[BackDeployedDeclAttrLayout::Code];
@@ -2898,7 +2895,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_ObjC: {
+    case DeclAttrKind::ObjC: {
       auto *theAttr = cast<ObjCAttr>(DA);
       SmallVector<IdentifierID, 4> pieces;
       unsigned numArgs = 0;
@@ -2915,7 +2912,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_ObjCImplementation: {
+    case DeclAttrKind::ObjCImplementation: {
       auto *theAttr = cast<ObjCImplementationAttr>(DA);
       auto categoryNameID = S.addDeclBaseNameRef(theAttr->CategoryName);
       auto abbrCode =
@@ -2926,14 +2923,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_MainType: {
+    case DeclAttrKind::MainType: {
       auto abbrCode = S.DeclTypeAbbrCodes[MainTypeDeclAttrLayout::Code];
       MainTypeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                          DA->isImplicit());
       return;
     }
 
-    case DAK_Specialize: {
+    case DeclAttrKind::Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
       auto attr = cast<SpecializeAttr>(DA);
       auto targetFun = attr->getTargetFunctionName();
@@ -2982,7 +2979,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_StorageRestrictions: {
+    case DeclAttrKind::StorageRestrictions: {
       auto abbrCode = S.DeclTypeAbbrCodes[StorageRestrictionsDeclAttrLayout::Code];
       auto attr = cast<StorageRestrictionsAttr>(DA);
 
@@ -3006,7 +3003,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_DynamicReplacement: {
+    case DeclAttrKind::DynamicReplacement: {
       auto abbrCode =
           S.DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
       auto theAttr = cast<DynamicReplacementAttr>(DA);
@@ -3023,7 +3020,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_TypeEraser: {
+    case DeclAttrKind::TypeEraser: {
       auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];
       auto attr = cast<TypeEraserAttr>(DA);
       auto typeEraser = attr->getResolvedType(cast<ProtocolDecl>(D));
@@ -3034,7 +3031,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Custom: {
+    case DeclAttrKind::Custom: {
       auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);
 
@@ -3054,7 +3051,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_ProjectedValueProperty: {
+    case DeclAttrKind::ProjectedValueProperty: {
       auto abbrCode =
           S.DeclTypeAbbrCodes[ProjectedValuePropertyDeclAttrLayout::Code];
       auto theAttr = cast<ProjectedValuePropertyAttr>(DA);
@@ -3064,7 +3061,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       break;
     }
 
-    case DAK_Differentiable: {
+    case DeclAttrKind::Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto *attr = cast<DifferentiableAttr>(DA);
       assert(attr->getOriginalDeclaration() &&
@@ -3084,7 +3081,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Derivative: {
+    case DeclAttrKind::Derivative: {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       auto &ctx = S.getASTContext();
@@ -3113,7 +3110,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Transpose: {
+    case DeclAttrKind::Transpose: {
       auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
       auto *attr = cast<TransposeAttr>(DA);
       assert(attr->getOriginalFunction() &&
@@ -3133,7 +3130,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_UnavailableFromAsync: {
+    case DeclAttrKind::UnavailableFromAsync: {
       auto abbrCode =
           S.DeclTypeAbbrCodes[UnavailableFromAsyncDeclAttrLayout::Code];
       auto *theAttr = cast<UnavailableFromAsyncAttr>(DA);
@@ -3143,7 +3140,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Expose: {
+    case DeclAttrKind::Expose: {
       auto *theAttr = cast<ExposeAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ExposeDeclAttrLayout::Code];
       ExposeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3151,7 +3148,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Extern: {
+    case DeclAttrKind::Extern: {
       auto *theAttr = cast<ExternAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ExternDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
@@ -3166,7 +3163,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Section: {
+    case DeclAttrKind::Section: {
       auto *theAttr = cast<SectionAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
       SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3175,7 +3172,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Documentation: {
+    case DeclAttrKind::Documentation: {
       auto *theAttr = cast<DocumentationAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[DocumentationDeclAttrLayout::Code];
       auto metadataIDPair = S.addUniquedString(theAttr->Metadata);
@@ -3192,7 +3189,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_Nonisolated: {
+    case DeclAttrKind::Nonisolated: {
       auto *theAttr = cast<NonisolatedAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonisolatedDeclAttrLayout::Code];
       NonisolatedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3201,7 +3198,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_MacroRole: {
+    case DeclAttrKind::MacroRole: {
       auto *theAttr = cast<MacroRoleAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[MacroRoleDeclAttrLayout::Code];
       auto rawMacroRole =
@@ -3243,8 +3240,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           introducedDeclNames);
       return;
     }
-    
-    case DAK_RawLayout: {
+
+    case DeclAttrKind::RawLayout: {
       auto *attr = cast<RawLayoutAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[RawLayoutDeclAttrLayout::Code];
       
@@ -6007,7 +6004,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
   bool wroteSomething;
   do {

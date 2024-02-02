@@ -222,8 +222,9 @@ ReferenceOwnership AttributedTypeRepr::getSILOwnership() const {
     auto typeAttr = attr.dyn_cast<TypeAttribute*>();
     if (!typeAttr) continue;
     switch (typeAttr->getKind()) {
-#define REF_STORAGE(Name, name, ...) \
-    case TAK_sil_##name: return ReferenceOwnership::Name;
+#define REF_STORAGE(Name, name, ...)                                           \
+  case TypeAttrKind::SIL##Name:                                                \
+    return ReferenceOwnership::Name;
 #include "swift/AST/ReferenceStorage.def"
     default: continue;
     }

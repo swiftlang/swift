@@ -661,7 +661,7 @@ void UnboundImport::validatePrivate(ModuleDecl *topLevelModule) {
   if (topLevelModule->arePrivateImportsEnabled())
     return;
 
-  diagnoseInvalidAttr(DAK_PrivateImport, ctx.Diags,
+  diagnoseInvalidAttr(DeclAttrKind::PrivateImport, ctx.Diags,
                       diag::module_not_compiled_for_private_import);
   import.sourceFileArg = StringRef();
 }
@@ -685,8 +685,9 @@ void UnboundImport::validateRestrictedImport(ASTContext &ctx) {
   for (auto iter = conflicts.begin(); iter != std::prev(conflicts.end()); iter ++)
     import.options -= *iter;
 
-  DeclAttrKind attrToRemove = conflicts[0] == ImportFlags::ImplementationOnly?
-                                      DAK_Exported : DAK_ImplementationOnly;
+  DeclAttrKind attrToRemove = conflicts[0] == ImportFlags::ImplementationOnly
+                                  ? DeclAttrKind::Exported
+                                  : DeclAttrKind::ImplementationOnly;
 
   // More dense enum with some cases of ImportFlags,
   // used by import_restriction_conflict.
@@ -734,7 +735,8 @@ void UnboundImport::validateTestable(ModuleDecl *topLevelModule) {
       !ctx.LangOpts.EnableTestableAttrRequiresTestableModule)
     return;
 
-  diagnoseInvalidAttr(DAK_Testable, ctx.Diags, diag::module_not_testable);
+  diagnoseInvalidAttr(DeclAttrKind::Testable, ctx.Diags,
+                      diag::module_not_testable);
 }
 
 void UnboundImport::validateAllowableClient(ModuleDecl *importee,

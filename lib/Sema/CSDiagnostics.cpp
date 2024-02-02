@@ -1180,7 +1180,7 @@ bool AttributedFuncToTypeConversionFailure::
 
   TypeAttribute *autoclosureAttr = nullptr;
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(argRepr)) {
-    autoclosureAttr = attrRepr->get(TAK_autoclosure);
+    autoclosureAttr = attrRepr->get(TypeAttrKind::Autoclosure);
   }
 
   if (autoclosureAttr) {
@@ -1275,7 +1275,7 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
   } else {
     SourceLoc autoclosureEndLoc;
     if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
-      if (auto *attr = attrRepr->get(TAK_autoclosure))
+      if (auto *attr = attrRepr->get(TypeAttrKind::Autoclosure))
         autoclosureEndLoc = attr->getEndLoc();
     }
     if (autoclosureEndLoc.isValid()) {

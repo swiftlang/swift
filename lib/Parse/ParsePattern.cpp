@@ -587,7 +587,7 @@ mapParsedParameters(Parser &parser,
             // this parameter declaration as `autoclosure` because type has
             // not been resolved yet - it should either be a function type
             // or typealias with underlying function type.
-            if (ATR->has(TAK_autoclosure))
+            if (ATR->has(TypeAttrKind::Autoclosure))
               param->setAutoClosure(true);
 
             unwrappedType = ATR->getTypeRepr();

@@ -51,23 +51,23 @@ extension ASTGenVisitor {
       // Simple type attributes.
       case .autoclosure,
         .escaping,
-        .noescape,
+        .noEscape,
         .noDerivative,
         .async,
         .sendable,
         .retroactive,
         .unchecked,
         .preconcurrency,
-        ._local,
-        ._noMetadata,
-        .pack_owned,
-        .pack_guaranteed,
-        .pack_inout,
-        .pack_out,
+        .local,
+        .noMetadata,
+        .packGuaranteed,
+        .packInout,
+        .packOut,
+        .packOwned,
         .pseudogeneric,
         .yields,
-        .yield_once,
-        .yield_many,
+        .yieldMany,
+        .yieldOnce,
         .thin,
         .thick,
         .unimplementable:
@@ -75,42 +75,42 @@ extension ASTGenVisitor {
 
       case .opened:
         fatalError("unimplemented")
-      case .pack_element:
+      case .packElement:
         fatalError("unimplemented")
       case .differentiable:
         fatalError("unimplemented")
       case .convention:
         fatalError("unimplemented")
-      case ._opaqueReturnTypeOf:
+      case .opaqueReturnTypeOf:
         fatalError("unimplemented")
 
       // SIL type attributes are not supported.
       case .autoreleased,
-        .block_storage,
+        .blockStorage,
         .box,
-        .callee_guaranteed,
-        .callee_owned,
-        .captures_generics,
+        .calleeGuaranteed,
+        .calleeOwned,
+        .capturesGenerics,
         .direct,
-        .dynamic_self,
+        .dynamicSelf,
         .error,
-        .error_indirect,
-        .error_unowned,
+        .errorIndirect,
+        .errorUnowned,
         .guaranteed,
         .in,
-        .in_constant,
-        .in_guaranteed,
+        .inConstant,
+        .inGuaranteed,
         .inout,
-        .inout_aliasable,
+        .inoutAliasable,
         .isolated,
         .moveOnly,
-        .objc_metatype,
+        .objCMetatype,
         .out,
         .owned,
-        .sil_unmanaged,
-        .sil_unowned,
-        .sil_weak,
-        .unowned_inner_pointer:
+        .silUnmanaged,
+        .silUnowned,
+        .silWeak,
+        .unownedInnerPointer:
         break;
 
       // Not a type attribute.

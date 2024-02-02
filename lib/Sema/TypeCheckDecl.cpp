@@ -1164,7 +1164,7 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
 bool
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
-  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
     return false;
 
   // Add dynamic if -enable-implicit-dynamic was requested.

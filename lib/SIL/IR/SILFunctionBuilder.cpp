@@ -57,7 +57,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   // function as force emitting all optremarks including assembly vision
   // remarks. This allows us to emit the assembly vision remarks without needing
   // to change any of the underlying optremark mechanisms.
-  if (auto *A = Attrs.getAttribute(DAK_EmitAssemblyVisionRemarks))
+  if (auto *A = Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
   // Propagate @_specialize.

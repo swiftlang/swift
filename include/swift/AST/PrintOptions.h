@@ -36,7 +36,7 @@ class TypeBase;
 class DeclContext;
 class Type;
 class ModuleDecl;
-enum DeclAttrKind : unsigned;
+enum class DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 class SILPrintContext;
@@ -93,7 +93,7 @@ public:
     static_assert(NumTypeAttrKinds < UINT_MAX, "TypeAttrKind is > 31 bits");
   }
   AnyAttrKind(DeclAttrKind K) : kind(static_cast<unsigned>(K)), isType(0) {
-    static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
+    static_assert(NumDeclAttrKinds < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
   AnyAttrKind() : kind(NumTypeAttrKinds), isType(1) {}
 
@@ -102,9 +102,11 @@ public:
     if (!isType || kind == NumTypeAttrKinds) return {};
     return static_cast<TypeAttrKind>(kind);
   }
-  /// Returns the DeclAttrKind, or DAK_Count if this is not a decl attribute.
-  DeclAttrKind decl() const {
-    return isType ? DAK_Count : static_cast<DeclAttrKind>(kind);
+  /// Returns the DeclAttrKind.
+  llvm::Optional<DeclAttrKind> decl() const {
+    if (isType || kind == NumDeclAttrKinds)
+      return {};
+    return static_cast<DeclAttrKind>(kind);
   }
 
   bool operator==(AnyAttrKind K) const {
@@ -371,9 +373,9 @@ struct PrintOptions {
   bool SuppressExpandedMacros = true;
 
   /// List of attribute kinds that should not be printed.
-  std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
-                                              DAK_FixedLayout,
-                                              DAK_ShowInInterface};
+  std::vector<AnyAttrKind> ExcludeAttrList = {
+      DeclAttrKind::Transparent, DeclAttrKind::Effects,
+      DeclAttrKind::FixedLayout, DeclAttrKind::ShowInInterface};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -652,10 +654,10 @@ struct PrintOptions {
     result.SynthesizeSugarOnTypes = true;
     result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
-    result.ExcludeAttrList.push_back(DAK_Exported);
-    result.ExcludeAttrList.push_back(DAK_Inline);
-    result.ExcludeAttrList.push_back(DAK_Optimize);
-    result.ExcludeAttrList.push_back(DAK_Rethrows);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Exported);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Inline);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Optimize);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Rethrows);
     result.PrintOverrideKeyword = false;
     result.AccessFilter = accessFilter;
     result.PrintIfConfig = false;
@@ -773,7 +775,7 @@ struct PrintOptions {
   static PrintOptions printDeclarations() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
-    result.ExcludeAttrList.push_back(DAK_FixedLayout);
+    result.ExcludeAttrList.push_back(DeclAttrKind::FixedLayout);
     result.PrintStorageRepresentationAttrs = true;
     result.AbstractAccessors = false;
     result.PrintAccess = true;
@@ -791,7 +793,7 @@ struct PrintOptions {
     PO.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
-    PO.ExcludeAttrList.push_back(DAK_Available);
+    PO.ExcludeAttrList.push_back(DeclAttrKind::Available);
     PO.SkipPrivateStdlibDecls = true;
     PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;

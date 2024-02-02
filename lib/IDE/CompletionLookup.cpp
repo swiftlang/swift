@@ -3027,10 +3027,10 @@ void CompletionLookup::getAttributeDeclCompletions(
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, DK,     \
-                            #KEYWORD))                                         \
+  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, IsConcurrencyEnabled, \
+                            DK, #KEYWORD))                                     \
     addDeclAttrKeyword(#KEYWORD, Description);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 }
 
 void CompletionLookup::getAttributeDeclParamCompletions(

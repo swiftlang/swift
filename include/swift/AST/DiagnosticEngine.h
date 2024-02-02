@@ -55,7 +55,7 @@ namespace swift {
   enum class ReferenceOwnership : uint8_t;
   enum class StaticSpellingKind : uint8_t;
   enum class DescriptiveDeclKind : uint8_t;
-  enum DeclAttrKind : unsigned;
+  enum class DeclAttrKind : unsigned;
   enum class StmtKind;
 
   /// Enumeration describing all of possible diagnostics.

@@ -779,84 +779,82 @@ llvm::Optional<UIdent>
 SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
   // Check special-case names first.
   switch (Attr->getKind()) {
-    case DAK_IBAction: {
-      return Attr_IBAction;
+  case DeclAttrKind::IBAction: {
+    return Attr_IBAction;
+  }
+  case DeclAttrKind::IBSegueAction: {
+    static UIdent Attr_IBSegueAction("source.decl.attribute.ibsegueaction");
+    return Attr_IBSegueAction;
+  }
+  case DeclAttrKind::IBOutlet: {
+    return Attr_IBOutlet;
+  }
+  case DeclAttrKind::IBDesignable: {
+    return Attr_IBDesignable;
+  }
+  case DeclAttrKind::IBInspectable: {
+    return Attr_IBInspectable;
+  }
+  case DeclAttrKind::GKInspectable: {
+    return Attr_GKInspectable;
+  }
+  case DeclAttrKind::ObjC: {
+    if (cast<ObjCAttr>(Attr)->hasName()) {
+      return Attr_ObjcNamed;
+    } else {
+      return Attr_Objc;
     }
-    case DAK_IBSegueAction: {
-      static UIdent Attr_IBSegueAction("source.decl.attribute.ibsegueaction");
-      return Attr_IBSegueAction;
+  }
+  case DeclAttrKind::AccessControl: {
+    switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
+    case AccessLevel::Private:
+      return Attr_Private;
+    case AccessLevel::FilePrivate:
+      return Attr_FilePrivate;
+    case AccessLevel::Internal:
+      return Attr_Internal;
+    case AccessLevel::Package:
+      return Attr_Package;
+    case AccessLevel::Public:
+      return Attr_Public;
+    case AccessLevel::Open:
+      return Attr_Open;
     }
-    case DAK_IBOutlet: {
-      return Attr_IBOutlet;
+  }
+  case DeclAttrKind::SetterAccess: {
+    switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
+    case AccessLevel::Private:
+      return Attr_Setter_Private;
+    case AccessLevel::FilePrivate:
+      return Attr_Setter_FilePrivate;
+    case AccessLevel::Internal:
+      return Attr_Setter_Internal;
+    case AccessLevel::Package:
+      return Attr_Setter_Package;
+    case AccessLevel::Public:
+      return Attr_Setter_Public;
+    case AccessLevel::Open:
+      return Attr_Setter_Open;
     }
-    case DAK_IBDesignable: {
-      return Attr_IBDesignable;
-    }
-    case DAK_IBInspectable: {
-      return Attr_IBInspectable;
-    }
-    case DAK_GKInspectable: {
-      return Attr_GKInspectable;
-    }
-    case DAK_ObjC: {
-      if (cast<ObjCAttr>(Attr)->hasName()) {
-        return Attr_ObjcNamed;
-      } else {
-        return Attr_Objc;
-      }
-    }
-    case DAK_AccessControl: {
-      switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
-        case AccessLevel::Private:
-          return Attr_Private;
-        case AccessLevel::FilePrivate:
-          return Attr_FilePrivate;
-        case AccessLevel::Internal:
-          return Attr_Internal;
-        case AccessLevel::Package:
-          return Attr_Package;
-        case AccessLevel::Public:
-          return Attr_Public;
-        case AccessLevel::Open:
-          return Attr_Open;
-      }
-    }
-    case DAK_SetterAccess: {
-      switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
-        case AccessLevel::Private:
-          return Attr_Setter_Private;
-        case AccessLevel::FilePrivate:
-          return Attr_Setter_FilePrivate;
-        case AccessLevel::Internal:
-          return Attr_Setter_Internal;
-        case AccessLevel::Package:
-          return Attr_Setter_Package;
-        case AccessLevel::Public:
-          return Attr_Setter_Public;
-        case AccessLevel::Open:
-          return Attr_Setter_Open;
-      }
-    }
+  }
 
     // Ignore these.
-    case DAK_ShowInInterface:
-    case DAK_RawDocComment:
-    case DAK_HasInitialValue:
-    case DAK_HasStorage:
-      return llvm::None;
-    default:
-      break;
+  case DeclAttrKind::ShowInInterface:
+  case DeclAttrKind::RawDocComment:
+  case DeclAttrKind::HasInitialValue:
+  case DeclAttrKind::HasStorage:
+    return llvm::None;
+  default:
+    break;
   }
 
   switch (Attr->getKind()) {
-    case DAK_Count:
-      break;
-#define DECL_ATTR(X, CLASS, ...)\
-    case DAK_##CLASS: {\
-      static UIdent Attr_##X("source.decl.attribute."#X); \
-      return Attr_##X; \
-    }
-#include "swift/AST/Attr.def"
+#define DECL_ATTR(X, CLASS, ...)                                               \
+  case DeclAttrKind::CLASS: {                                                  \
+    static UIdent Attr_##X("source.decl.attribute." #X);                       \
+    return Attr_##X;                                                           \
+  }
+#include "swift/AST/DeclAttr.def"
   }
 
   return llvm::None;

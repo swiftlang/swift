@@ -177,7 +177,7 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
       Bridged##CLASS##Attr attr) {                                             \
     return static_cast<DeclAttribute *>(attr.unbridged());                     \
   }
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 
 //===----------------------------------------------------------------------===//
 // MARK: Diagnostics
@@ -352,33 +352,35 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 //===----------------------------------------------------------------------===//
 
 BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
-  auto kind = DeclAttribute::getAttrKindFromString(cStr.unbridged());
-  switch (kind) {
-#define DECL_ATTR(_, CLASS, ...)                                               \
-  case DAK_##CLASS:                                                            \
-    return BridgedDeclAttrKind##CLASS;
-#include "swift/AST/Attr.def"
-  case DAK_Count:
+  auto optKind = DeclAttribute::getAttrKindFromString(cStr.unbridged());
+  if (!optKind)
     return BridgedDeclAttrKindNone;
+  switch (*optKind) {
+#define DECL_ATTR(_, CLASS, ...)                                               \
+  case DeclAttrKind::CLASS:                                                    \
+    return BridgedDeclAttrKind##CLASS;
+#include "swift/AST/DeclAttr.def"
   }
 }
 
-DeclAttrKind unbridged(BridgedDeclAttrKind kind) {
+llvm::Optional<DeclAttrKind> unbridged(BridgedDeclAttrKind kind) {
   switch (kind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case BridgedDeclAttrKind##CLASS:                                             \
-    return DAK_##CLASS;
-#include "swift/AST/Attr.def"
+    return DeclAttrKind::CLASS;
+#include "swift/AST/DeclAttr.def"
   case BridgedDeclAttrKindNone:
-    return DAK_Count;
+    return llvm::None;
   }
+  llvm_unreachable("unhandled enum value");
 }
 
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, BridgedDeclAttrKind cKind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cAttrLoc) {
-  auto kind = unbridged(cKind);
-  return DeclAttribute::createSimple(cContext.unbridged(), kind,
+  auto optKind = unbridged(cKind);
+  assert(optKind && "creating attribute of invalid kind?");
+  return DeclAttribute::createSimple(cContext.unbridged(), *optKind,
                                      cAtLoc.unbridged(), cAttrLoc.unbridged());
 }
 
@@ -1944,22 +1946,22 @@ BridgedYieldStmt BridgedYieldStmt_createParsed(BridgedASTContext cContext,
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
   if (!optKind)
-    return BridgedTypeAttrKind_None;
+    return BridgedTypeAttrKindNone;
   switch (*optKind) {
-#define TYPE_ATTR(SPELLING, _)                                                 \
-  case TAK_##SPELLING:                                                         \
-    return BridgedTypeAttrKind_##SPELLING;
-#include "swift/AST/Attr.def"
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case TypeAttrKind::CLASS:                                                    \
+    return BridgedTypeAttrKind##CLASS;
+#include "swift/AST/TypeAttr.def"
   }
 }
 
 static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
   switch (kind) {
-#define TYPE_ATTR(SPELLING, _)                                                 \
-  case BridgedTypeAttrKind_##SPELLING:                                         \
-    return TAK_##SPELLING;
-#include "swift/AST/Attr.def"
-  case BridgedTypeAttrKind_None:
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case BridgedTypeAttrKind##CLASS:                                             \
+    return TypeAttrKind::CLASS;
+#include "swift/AST/TypeAttr.def"
+  case BridgedTypeAttrKindNone:
     return llvm::None;
   }
   llvm_unreachable("unhandled enum value");
