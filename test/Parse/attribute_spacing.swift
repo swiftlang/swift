@@ -26,3 +26,8 @@ let closure1 = { @MainActor (a, b) in // expected-warning {{extraneous whitespac
 let closure2 = { @MainActor
   (a: Int, b: Int) in
 }
+
+// expected-warning@+1{{extraneous whitespace between '@' and attribute name; this is an error in Swift 6}}
+@ 
+MainActor
+func mainActorFunc() {}
