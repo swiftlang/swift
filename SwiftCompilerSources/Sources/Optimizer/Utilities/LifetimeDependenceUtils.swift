@@ -55,7 +55,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context) -> [Value]
     return .continueWalk
   }
   defer { useDefVisitor.deinitialize() }
-  _ = useDefVisitor.walkUp(value: value)
+  _ = useDefVisitor.walkUp(value: value, nil)
   return introducers
 }
 
@@ -431,7 +431,8 @@ extension LifetimeDependence {
   -> WalkResult {
     var useDefVisitor = UseDefVisitor(context, visitor)
     defer { useDefVisitor.deinitialize() }
-    return useDefVisitor.walkUp(value: value)
+    let owner = value.ownership == .owned ? value : nil
+    return useDefVisitor.walkUp(value: value, owner)
   }
   
   private struct UseDefVisitor : LifetimeDependenceUseDefWalker {
@@ -453,7 +454,10 @@ extension LifetimeDependence {
       visitedValues.deinitialize()
     }
     
-    mutating func needWalk(for value: Value) -> Bool {
+    mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
+      // FIXME: cache the value's owner, and support walking up
+      // multiple guaranteed forwards to different owners, then
+      // reconverging.
       visitedValues.insert(value)
     }
 
@@ -464,8 +468,12 @@ extension LifetimeDependence {
     // of an access scope. An address type mark_dependence
     // [nonescaping]` can only result from an indirect function result
     // when opaque values are not enabled.
-    mutating func introducer(_ value: Value) -> WalkResult {
-      guard let scope = LifetimeDependence.Scope(base: value, context)
+    //
+    // FIXME: Recursively handle .initialized scope by checking
+    // findSingleStore and walking the stored value.
+    mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult {
+      let base = owner ?? value
+      guard let scope = LifetimeDependence.Scope(base: base, context)
       else {
         return .continueWalk
       }
@@ -494,28 +502,28 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
     visitedValues.deinitialize()
   }
  
-  mutating func needWalk(for value: Value) -> Bool {
+  mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
     visitedValues.insert(value)
   }
 
-  mutating func introducer(_ value: Value) -> WalkResult {
+  mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult {
     return visitorClosure(value)
   }
 
-  mutating func walkUp(value: Value) -> WalkResult {
+  mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
     switch value.definingInstruction {
     case let moveInst as MoveValueInst:
       if moveInst.isFromVarDecl {
-        return introducer(moveInst)
+        return introducer(moveInst, owner)
       }
     case let borrow as BeginBorrowInst:
       if borrow.isFromVarDecl {
-        return introducer(borrow)
+        return introducer(borrow, owner)
       }
     default:
       break
     }
-    return walkUpDefault(dependent: value)
+    return walkUpDefault(dependent: value, owner: owner)
   }
 }
 
@@ -573,20 +581,22 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 ///
 /// Start walking:
 ///   walkUp(value: Value) -> WalkResult
-protocol LifetimeDependenceUseDefWalker : ForwardingUseDefWalker {
+protocol LifetimeDependenceUseDefWalker : ForwardingUseDefWalker where PathContext == Value? {
   var context: Context { get }
 
-  mutating func introducer(_ value: Value) -> WalkResult
+  mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult
 
-  // Minimally, check a ValueSet. This walker may traverse chains of aggregation and destructuring along with phis.
-  mutating func needWalk(for value: Value) -> Bool
+  // Minimally, check a ValueSet. This walker may traverse chains of
+  // aggregation and destructuring along with phis.
+  mutating func needWalk(for value: Value, _ owner: Value?) -> Bool
 
-  mutating func walkUp(value: Value) -> WalkResult
+  mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult
 }
 
+// Implement ForwardingUseDefWalker
 extension LifetimeDependenceUseDefWalker {
-  mutating func walkUp(value: Value) -> WalkResult {
-    walkUpDefault(dependent: value)
+  mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
+    walkUpDefault(dependent: value, owner: owner)
   }
 
   // Extend ForwardingUseDefWalker to handle copies, moves, and
@@ -599,19 +609,25 @@ extension LifetimeDependenceUseDefWalker {
   //
   // Handles loads as a convenience so the client receives the load's
   // address as an introducer.
-  mutating func walkUpDefault(dependent value: Value) -> WalkResult {
+  mutating func walkUpDefault(dependent value: Value, owner: Value?)
+    -> WalkResult {
     switch value.definingInstruction {
     case let copyInst as CopyValueInst:
-      return walkUp(value: copyInst.fromValue)
+      return walkUp(newLifetime: copyInst.fromValue)
     case let moveInst as MoveValueInst:
-      return walkUp(value: moveInst.fromValue)
+      return walkUp(value: moveInst.fromValue, owner)
     case let borrow as BeginBorrowInst:
-      return walkUp(value: borrow.borrowedValue)
+      return walkUp(newLifetime: borrow.borrowedValue)
     case let load as LoadInstruction:
-      return walkUp(value: load.address)
+      return introducer(load.address, owner)
     case let markDep as MarkDependenceInst:
       if let dependence = LifetimeDependence(markDep, context) {
-        return walkUp(value: dependence.parentValue)
+        let parent = dependence.parentValue
+        if markDep.isForwarded(from: parent) {
+          return walkUp(value: dependence.parentValue, owner)
+        } else {
+          return walkUp(newLifetime: dependence.parentValue)
+        }
       }
     default:
       break
@@ -619,9 +635,14 @@ extension LifetimeDependenceUseDefWalker {
     // If the dependence chain has a phi, consider it a root. Dependence roots
     // are currently expected to dominate all dependent values.
     if Phi(value) != nil {
-      return introducer(value)
+      return introducer(value, owner)
     }
-    return walkUpDefault(forwarded: value)
+    return walkUpDefault(forwarded: value, owner)
+  }
+
+  private mutating func walkUp(newLifetime: Value) -> WalkResult {
+    let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
+    return walkUp(value: newLifetime, newOwner)
   }
 }
 
