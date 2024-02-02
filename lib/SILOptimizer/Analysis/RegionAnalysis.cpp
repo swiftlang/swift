@@ -212,6 +212,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::ProjectBlockStorageInst:
   case SILInstructionKind::ProjectBoxInst:
   case SILInstructionKind::RefToBridgeObjectInst:
@@ -2336,6 +2337,7 @@ CONSTANT_TRANSLATION(UnownedCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(DropDeinitInst, LookThrough)
 CONSTANT_TRANSLATION(ValueToBridgeObjectInst, LookThrough)
 CONSTANT_TRANSLATION(BeginCOWMutationInst, LookThrough)
+CONSTANT_TRANSLATION(OpenExistentialValueInst, LookThrough)
 
 //===---
 // Store
@@ -2466,7 +2468,6 @@ CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(OpenExistentialValueInst, Unhandled)
 
 //===---
 // Differentiable

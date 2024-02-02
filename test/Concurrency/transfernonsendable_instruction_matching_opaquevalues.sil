@@ -52,6 +52,10 @@ case none
 case some(T)
 }
 
+protocol P {
+  func doSomething()
+}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -89,6 +93,28 @@ bb0:
 
   end_borrow %1 : $(repeat each T)
   destroy_value %0 : $(repeat each T)
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil @initP : $@convention(thin) () -> @owned P
+sil @transferP : $@async @convention(thin) (@guaranteed P) -> ()
+
+sil [ossa] @open_existential_value_test : $@async @convention(thin) () -> () {
+bb0:
+  %f = function_ref @initP : $@convention(thin) () -> @owned P
+  %p = apply %f() : $@convention(thin) () -> @owned P
+
+  %transferP = function_ref @transferP : $@async @convention(thin) (@guaranteed P) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%p) : $@async @convention(thin) (@guaranteed P) -> () // expected-warning {{transferring value of non-Sendable type 'any P' from nonisolated context to global actor '<null>'-isolated context}}
+
+  %b = begin_borrow %p : $P
+  %v = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %w = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.doSomething, %v : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{access here could race}}
+  end_borrow %b : $P
+  destroy_value %p : $P
+
   %9999 = tuple ()
   return %9999 : $()
 }
