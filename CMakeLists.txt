@@ -101,9 +101,11 @@ include(FetchContent)
 check_language(Swift)
 if(CMAKE_Swift_COMPILER)
   enable_language(Swift)
+  set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION "${CMAKE_Swift_COMPILER_VERSION}")
 else()
   message(STATUS "WARNING! Did not find a host compiler swift?! Can not build
                   any compiler host sources written in Swift")
+  set(DEFAULT_SWIFT_MIN_RUNTIME_VERSION)
 endif()
 
 # A convenience pattern to match Darwin platforms. Example:
@@ -464,6 +466,10 @@ set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
 targets on Darwin platforms. These targets are in addition to the full \
 library targets.")
 
+set(SWIFT_MIN_RUNTIME_VERSION "${DEFAULT_SWIFT_MIN_RUNTIME_VERSION}" CACHE STRING
+  "Specify the minimum version of the runtime that we target when building \
+the compiler itself. This is used on non-Darwin platforms to ensure \
+that it's possible to build the compiler using host tools.")
 
 #
 # User-configurable Android specific options.
