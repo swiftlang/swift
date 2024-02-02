@@ -2461,7 +2461,6 @@ CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
 CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(VectorInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
@@ -2519,6 +2518,9 @@ CONSTANT_TRANSLATION(AssignInst, Asserting)
 CONSTANT_TRANSLATION(AssignByWrapperInst, Asserting)
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
 
+// We should never hit this since it can only appear as a final instruction in a
+// global variable static initializer list.
+CONSTANT_TRANSLATION(VectorInst, Asserting)
 
 #undef CONSTANT_TRANSLATION
 
