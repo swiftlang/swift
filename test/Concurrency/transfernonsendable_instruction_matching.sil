@@ -1541,3 +1541,49 @@ bb0(%index : $Builtin.Word):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @begin_unpaired_access_test : $@async @convention(thin) () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+  %a = alloc_stack $NonSendableKlass
+  %valueCopy = copy_value %value : $NonSendableKlass
+  store %valueCopy to [init] %a : $*NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [no_nested_conflict] %a : $*NonSendableKlass, %9 : $*Builtin.UnsafeValueBuffer // expected-note {{access here could race}}
+  destroy_value %value : $NonSendableKlass
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  destroy_addr %a : $*NonSendableKlass
+  dealloc_stack %a : $*NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @end_unpaired_access_test : $@async @convention(thin) () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+  %a = alloc_stack $NonSendableKlass
+  %valueCopy = copy_value %value : $NonSendableKlass
+  store %valueCopy to [init] %a : $*NonSendableKlass
+
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [no_nested_conflict] %a : $*NonSendableKlass, %9 : $*Builtin.UnsafeValueBuffer
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+  end_unpaired_access [dynamic] %9 : $*Builtin.UnsafeValueBuffer
+  destroy_value %value : $NonSendableKlass
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  destroy_addr %a : $*NonSendableKlass
+  dealloc_stack %a : $*NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}

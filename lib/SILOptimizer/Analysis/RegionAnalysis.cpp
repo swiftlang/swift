@@ -2375,6 +2375,7 @@ CONSTANT_TRANSLATION(DestroyValueInst, Ignored)
 CONSTANT_TRANSLATION(EndAccessInst, Ignored)
 CONSTANT_TRANSLATION(EndBorrowInst, Ignored)
 CONSTANT_TRANSLATION(EndLifetimeInst, Ignored)
+CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
@@ -2400,6 +2401,7 @@ CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Require)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
 CONSTANT_TRANSLATION(RebindMemoryInst, Require)
 CONSTANT_TRANSLATION(BindMemoryInst, Require)
+CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
 
 //===---
 // Terminators
@@ -2469,8 +2471,6 @@ CONSTANT_TRANSLATION(LinearFunctionInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, Unhandled)
 CONSTANT_TRANSLATION(LinearFunctionExtractInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, Unhandled)
-CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
-CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 
 //===---
 // Packs
