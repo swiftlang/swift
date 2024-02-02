@@ -61,6 +61,7 @@ sil @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
 
 sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil @initIndirect : $@convention(thin) <T> () -> @out T
 
 enum FakeOptional<T> {
 case none
