@@ -58,6 +58,7 @@ sil @transferStruct : $@convention(thin) @async (@guaranteed NonSendableStruct) 
 
 sil @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
 sil @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+sil @initRawPointer : $@convention(thin) () -> Builtin.RawPointer
 
 sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -1381,4 +1382,28 @@ sil [ossa] @throw_addr_test : $@convention(thin) @async <E where E : Error> (@in
 bb0(%result : $*NonSendableKlass, %result2 : $*E, %arg : $*E):
   copy_addr %arg to [init] %result2 : $*E
   throw_addr
+}
+
+sil [ossa] @bind_memory_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @initRawPointer : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (Builtin.RawPointer) -> () // expected-warning {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = bind_memory %1 : $Builtin.RawPointer, %4 : $Builtin.Word to $NonSendableKlass // expected-note {{access here could race}}
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @rebind_memory_test : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @initRawPointer : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = function_ref @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (Builtin.RawPointer) -> () // expected-warning {{transferring value of non-Sendable type 'Builtin.RawPointer' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = rebind_memory %1 : $Builtin.RawPointer to %4 : $Builtin.Word // expected-note {{access here could race}}
+  %9999 = tuple ()
+  return %9999 : $()
 }

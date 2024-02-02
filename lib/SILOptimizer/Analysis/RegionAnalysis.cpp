@@ -2395,6 +2395,8 @@ CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Require)
 CONSTANT_TRANSLATION(UnmanagedRetainValueInst, Require)
 CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Require)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
+CONSTANT_TRANSLATION(RebindMemoryInst, Require)
+CONSTANT_TRANSLATION(BindMemoryInst, Require)
 
 //===---
 // Terminators
@@ -2464,8 +2466,6 @@ CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, Unhandled)
 CONSTANT_TRANSLATION(GetAsyncContinuationInst, Unhandled)
 CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Unhandled)
 CONSTANT_TRANSLATION(ExtractExecutorInst, Unhandled)
-CONSTANT_TRANSLATION(BindMemoryInst, Unhandled)
-CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 
