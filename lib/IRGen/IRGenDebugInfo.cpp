@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenDebugInfo.h"
+#include "GenEnum.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
 #include "GenType.h"
@@ -1525,7 +1526,9 @@ private:
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
     unsigned Encoding = 0;
-    uint32_t NumExtraInhabitants = 0;
+    uint32_t NumExtraInhabitants =
+        DbgTy.getNumExtraInhabitants() ? *DbgTy.getNumExtraInhabitants() : 0;
+
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
     TypeBase *BaseTy = DbgTy.getType();
@@ -1549,8 +1552,6 @@ private:
       Encoding = llvm::dwarf::DW_ATE_unsigned;
       if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
-      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
-        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
@@ -1558,8 +1559,6 @@ private:
       Encoding = llvm::dwarf::DW_ATE_unsigned; // ?
       if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
-      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
-        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
@@ -1568,48 +1567,30 @@ private:
       // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
       SizeInBits = FloatTy->getBitWidth();
       Encoding = llvm::dwarf::DW_ATE_float;
-      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
-        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
-    case TypeKind::BuiltinNativeObject: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                            /* DWARFAddressSpace */ llvm::None,
-                                            MangledName);
-      return DBuilder.createObjectPointerType(PTy);
-    }
-
-    case TypeKind::BuiltinBridgeObject: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                            /* DWARFAddressSpace */ llvm::None,
-                                            MangledName);
-      return DBuilder.createObjectPointerType(PTy);
-    }
-
-    case TypeKind::BuiltinRawPointer: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      return DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                        /* DWARFAddressSpace */ llvm::None,
-                                        MangledName);
-    }
-
-    case TypeKind::BuiltinRawUnsafeContinuation: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      return DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                        /* DWARFAddressSpace */ llvm::None,
-                                        MangledName);
-    }
-
+    case TypeKind::BuiltinNativeObject: 
+    case TypeKind::BuiltinBridgeObject:
+    case TypeKind::BuiltinRawPointer:
+    case TypeKind::BuiltinRawUnsafeContinuation:
     case TypeKind::BuiltinJob: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      return DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                        /* DWARFAddressSpace */ llvm::None,
-                                        MangledName);
-    }
+      unsigned PtrSize =
+          CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
+        Flags |= llvm::DINode::FlagArtificial;
+        llvm::DICompositeType *PTy = DBuilder.createStructType(
+            Scope, MangledName, File, 0, PtrSize, 0, Flags, nullptr, nullptr,
+            llvm::dwarf::DW_LANG_Swift, nullptr, {}, NumExtraInhabitants);
+        return PTy;
 
+      }
+      llvm::DIDerivedType *PTy = DBuilder.createPointerType(
+          nullptr, PtrSize, 0,
+          /* DWARFAddressSpace */ llvm::None, MangledName);
+
+      return DBuilder.createObjectPointerType(PTy);
+    }
     case TypeKind::BuiltinExecutor: {
       return createDoublePointerSizedStruct(
           Scope, "Builtin.Executor", nullptr, MainFile, 0,
@@ -2033,6 +2014,20 @@ private:
   }
 #endif
 
+  /// Emits the special builtin types into the debug info. These types are the
+  /// ones that are unconditionally emitted into the stdlib's metadata and are
+  /// needed to correctly calculate the layout of more complex types built on
+  /// top of them.
+  void createSpecialStlibBuiltinTypes() {
+    if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes) 
+      return;
+    for (auto BuiltinType: IGM.getSpecialBuiltinTypes()) {
+      auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+          BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM, false);
+      DBuilder.retainType(getOrCreateType(DbgTy));
+    }
+  }
+
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy) {
     // Is this an empty type?
     if (DbgTy.isNull())
@@ -2079,6 +2074,8 @@ private:
       TypeDecl = ND;
       Context = ND->getParent();
       ClangDecl = ND->getClangDecl();
+    } else if (auto BNO = dyn_cast<BuiltinType>(DbgTy.getType())) {
+      Context = BNO->getASTContext().TheBuiltinModule;
     }
     if (ClangDecl) {
       clang::ASTReader &Reader = *CI.getClangInstance().getASTReader();
@@ -2255,6 +2252,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
       }
     OS << '"';
   }
+  createSpecialStlibBuiltinTypes();
 }
 
 void IRGenDebugInfoImpl::finalize() {
