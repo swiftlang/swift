@@ -1172,10 +1172,6 @@ enum class TranslationSemantics {
   /// without updating this code correctly. This is most likely driver error and
   /// should be caught in testing when we assert.
   AssertingIfNonSendable,
-
-  /// An instruction that we do not handle yet. Just for now during bring
-  /// up. Will be removed.
-  Unhandled,
 };
 
 } // namespace
@@ -1217,9 +1213,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     return os;
   case TranslationSemantics::AssertingIfNonSendable:
     os << "asserting_if_nonsendable";
-    return os;
-  case TranslationSemantics::Unhandled:
-    os << "unhandled";
     return os;
   }
 
@@ -2120,9 +2113,6 @@ public:
           "transfer-non-sendable: Found banned instruction?!");
       return;
 
-    case TranslationSemantics::Unhandled:
-      LLVM_DEBUG(llvm::dbgs() << "Unhandled inst: " << *inst);
-      return;
     case TranslationSemantics::AssertingIfNonSendable:
       // Do not error if all of our operands are sendable.
       if (llvm::none_of(inst->getOperandValues(), [&](SILValue value) {
