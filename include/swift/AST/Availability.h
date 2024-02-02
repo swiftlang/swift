@@ -238,11 +238,15 @@ public:
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// deployment target.
-  static AvailabilityContext forDeploymentTarget(ASTContext &Ctx);
+  static AvailabilityContext forDeploymentTarget(const ASTContext &Ctx);
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// inlining target (i.e. minimum inlining version).
-  static AvailabilityContext forInliningTarget(ASTContext &Ctx);
+  static AvailabilityContext forInliningTarget(const ASTContext &Ctx);
+
+  /// Creates a context that imposes the constraints of the ASTContext's
+  /// minimum runtime version.
+  static AvailabilityContext forRuntimeTarget(const ASTContext &Ctx);
 
   /// Creates a context that imposes no constraints.
   ///

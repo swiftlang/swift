@@ -174,6 +174,9 @@ namespace swift {
     /// User-overridable language version to compile for.
     version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
 
+    /// Swift runtime version to compile for.
+    version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
+
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 

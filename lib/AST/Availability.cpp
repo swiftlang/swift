@@ -28,14 +28,19 @@
 
 using namespace swift;
 
-AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &Ctx) {
+AvailabilityContext AvailabilityContext::forDeploymentTarget(const ASTContext &Ctx) {
   return AvailabilityContext(
       VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
 }
 
-AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &Ctx) {
+AvailabilityContext AvailabilityContext::forInliningTarget(const ASTContext &Ctx) {
   return AvailabilityContext(
       VersionRange::allGTE(Ctx.LangOpts.MinimumInliningTargetVersion));
+}
+
+AvailabilityContext AvailabilityContext::forRuntimeTarget(const ASTContext &Ctx) {
+  return AvailabilityContext(
+    VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
 }
 
 namespace {
@@ -452,343 +457,7 @@ AvailabilityContext AvailabilityInference::inferForType(Type t) {
   return walker.AvailabilityInfo;
 }
 
-AvailabilityContext ASTContext::getObjCMetadataUpdateCallbackAvailability() {
-  return getSwift50Availability();
-}
-
-AvailabilityContext ASTContext::getObjCGetClassHookAvailability() {
-  return getSwift50Availability();
-}
-
-AvailabilityContext ASTContext::getSwift50Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.getArchName() == "arm64e")
-    return AvailabilityContext::alwaysAvailable();
-
-  if (target.isMacOSX()) {
-    if (target.isAArch64())
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-                            VersionRange::allGTE(llvm::VersionTuple(10,14,4)));
-  } else if (target.isiOS()) {
-    if (target.isAArch64() &&
-        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-                            VersionRange::allGTE(llvm::VersionTuple(12,2)));
-  } else if (target.isWatchOS()) {
-    if (target.isArch64Bit())
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-                            VersionRange::allGTE(llvm::VersionTuple(5,2)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getOpaqueTypeAvailability() {
-  return getSwift51Availability();
-}
-
-AvailabilityContext ASTContext::getObjCClassStubsAvailability() {
-  return getSwift51Availability();
-}
-
-AvailabilityContext ASTContext::getSwift51Availability() {
-  auto target = LangOpts.Target;
-  
-  if (target.getArchName() == "arm64e")
-    return AvailabilityContext::alwaysAvailable();
-
-  if (target.isMacOSX()) {
-    if (target.isAArch64())
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-                            VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
-  } else if (target.isiOS()) {
-    if (target.isAArch64() &&
-        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-                            VersionRange::allGTE(llvm::VersionTuple(13,0,0)));
-  } else if (target.isWatchOS()) {
-    if (target.isArch64Bit())
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-                            VersionRange::allGTE(llvm::VersionTuple(6,0,0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getTypesInAbstractMetadataStateAvailability() {
-  return getSwift52Availability();
-}
-
-AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
-  return getSwift54Availability();
-}
-
-AvailabilityContext ASTContext::getCompareTypeContextDescriptorsAvailability() {
-  return getSwift54Availability();
-}
-
-AvailabilityContext
-ASTContext::getCompareProtocolConformanceDescriptorsAvailability() {
-  return getSwift54Availability();
-}
-
-AvailabilityContext
-ASTContext::getIntermodulePrespecializedGenericMetadataAvailability() {
-  return getSwift54Availability();
-}
-
-AvailabilityContext ASTContext::getConcurrencyAvailability() {
-  return getSwift55Availability();
-}
-
-AvailabilityContext ASTContext::getTaskExecutorAvailability() {
-  return getSwiftFutureAvailability();
-}
-
-AvailabilityContext ASTContext::getConcurrencyDiscardingTaskGroupAvailability() {
-  return getSwift59Availability();
-}
-
-AvailabilityContext ASTContext::getBackDeployedConcurrencyAvailability() {
-  return getSwift51Availability();
-}
-
-AvailabilityContext ASTContext::getConcurrencyDistributedActorWithCustomExecutorAvailability() {
-  return getSwift59Availability();
-}
-
-AvailabilityContext ASTContext::getDifferentiationAvailability() {
-  return getSwiftFutureAvailability();
-}
-
-AvailabilityContext ASTContext::getTypedThrowsAvailability() {
-  return getSwift511Availability();
-}
-
-AvailabilityContext ASTContext::getMultiPayloadEnumTagSinglePayload() {
-  return getSwift56Availability();
-}
-
-AvailabilityContext ASTContext::getObjCIsUniquelyReferencedAvailability() {
-  return getSwift56Availability();
-}
-
-AvailabilityContext
-ASTContext::getParameterizedExistentialRuntimeAvailability() {
-  return getSwift57Availability();
-}
-
-AvailabilityContext
-ASTContext::getStaticReadOnlyArraysAvailability() {
-  return getSwift511Availability();
-}
-
-AvailabilityContext
-ASTContext::getVariadicGenericTypeAvailability() {
-  return getSwift59Availability();
-}
-
-AvailabilityContext
-ASTContext::getSignedConformsToProtocolAvailability() {
-  return getSwift59Availability();
-}
-
-AvailabilityContext
-ASTContext::getSignedDescriptorAvailability() {
-  return getSwift59Availability();
-}
-
-AvailabilityContext
-ASTContext::getInitRawStructMetadataAvailability() {
-  return getSwiftFutureAvailability();
-}
-
-AvailabilityContext ASTContext::getObjCSymbolicReferencesAvailability() {
-  return getSwift511Availability();
-}
-
-AvailabilityContext ASTContext::getSwift52Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.getArchName() == "arm64e")
-    return AvailabilityContext::alwaysAvailable();
-
-  if (target.isMacOSX()) {
-    if (target.isAArch64())
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(10, 15, 4)));
-  } else if (target.isiOS()) {
-    if (target.isAArch64() &&
-        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(13, 4, 0)));
-  } else if (target.isWatchOS()) {
-    if (target.isArch64Bit())
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(6, 2, 0)));
-  }
-  return AvailabilityContext::alwaysAvailable();
-}
-
-AvailabilityContext ASTContext::getSwift53Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.getArchName() == "arm64e")
-    return AvailabilityContext::alwaysAvailable();
-
-  if (target.isMacOSX() ) {
-    if (target.isAArch64())
-      return AvailabilityContext::alwaysAvailable();
-
-    llvm::VersionTuple macOVersion53(10, 16, 0);
-    macOVersion53 = canonicalizePlatformVersion(PlatformKind::macOS, macOVersion53);
-    return AvailabilityContext(
-        VersionRange::allGTE(macOVersion53));
-  } else if (target.isiOS()) {
-    if (target.isAArch64() &&
-        (target.isSimulatorEnvironment() || target.isMacCatalystEnvironment()))
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(14, 0, 0)));
-  } else if (target.isWatchOS()) {
-    if (target.isArch64Bit())
-      return AvailabilityContext::alwaysAvailable();
-
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(7, 0, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getSwift54Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.isMacOSX()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(11, 3, 0)));
-  } else if (target.isiOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(14, 5, 0)));
-  } else if (target.isWatchOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(7, 4, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getSwift55Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.isMacOSX() ) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(12, 0, 0)));
-  } else if (target.isiOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(15, 0, 0)));
-  } else if (target.isWatchOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(8, 0, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getSwift56Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.isMacOSX() ) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(12, 3, 0)));
-  } else if (target.isiOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(15, 4, 0)));
-  } else if (target.isWatchOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(8, 5, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getSwift57Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.isMacOSX()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(13, 0, 0)));
-  } else if (target.isiOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(16, 0, 0)));
-  } else if (target.isWatchOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(9, 0, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getSwift58Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.isMacOSX()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(13, 3, 0)));
-  } else if (target.isiOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(16, 4, 0)));
-  } else if (target.isWatchOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(9, 4, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getSwift59Availability() {
-  auto target = LangOpts.Target;
-
-  if (target.isMacOSX()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(14, 0, 0)));
-  } else if (target.isiOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(17, 0, 0)));
-  } else if (target.isWatchOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(10, 0, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-AvailabilityContext ASTContext::getSwift511Availability() {
-  // Placeholder
-  return getSwiftFutureAvailability();
-}
-
-AvailabilityContext ASTContext::getSwiftFutureAvailability() {
+AvailabilityContext ASTContext::getSwiftFutureAvailability() const {
   auto target = LangOpts.Target;
 
   if (target.isMacOSX() ) {
@@ -806,26 +475,60 @@ AvailabilityContext ASTContext::getSwiftFutureAvailability() {
 }
 
 AvailabilityContext
-ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
-  if (swiftVersion.getMajor() == 5) {
-    switch (*swiftVersion.getMinor()) {
-    case 0: return getSwift50Availability();
-    case 1: return getSwift51Availability();
-    case 2: return getSwift52Availability();
-    case 3: return getSwift53Availability();
-    case 4: return getSwift54Availability();
-    case 5: return getSwift55Availability();
-    case 6: return getSwift56Availability();
-    case 7: return getSwift57Availability();
-    case 8: return getSwift58Availability();
-    case 9: return getSwift59Availability();
-    case 11: return getSwift511Availability();
-    default: break;
-    }
+ASTContext::getSwiftAvailability(unsigned major, unsigned minor) const {
+  auto target = LangOpts.Target;
+
+  // Deal with special cases for Swift 5.3 and lower
+  if (major == 5 && minor <= 3) {
+    if (target.getArchName() == "arm64e")
+      return AvailabilityContext::alwaysAvailable();
+    if (target.isMacOSX() && target.isAArch64())
+      return AvailabilityContext::alwaysAvailable();
+    if (target.isiOS() && target.isAArch64()
+        && (target.isSimulatorEnvironment()
+            || target.isMacCatalystEnvironment()))
+      return AvailabilityContext::alwaysAvailable();
+    if (target.isWatchOS() && target.isArch64Bit())
+      return AvailabilityContext::alwaysAvailable();
   }
+
+  switch (major) {
+#define MAJOR_VERSION(V) case V: switch (minor) {
+#define END_MAJOR_VERSION(V) } break;
+#define PLATFORM(P, V)                                                  \
+    if (IS_PLATFORM(P))                                                 \
+      return AvailabilityContext(VersionRange::allGTE(llvm::VersionTuple V));
+#define IS_PLATFORM(P) PLATFORM_TEST_##P
+#define FUTURE                  return getSwiftFutureAvailability();
+#define PLATFORM_TEST_macOS     target.isMacOSX()
+#define PLATFORM_TEST_iOS       target.isiOS()
+#define PLATFORM_TEST_watchOS   target.isWatchOS()
+
+#define _SECOND(A, B) B
+#define SECOND(T) _SECOND T
+
+#define RUNTIME_VERSION(V, PLATFORMS)           \
+     case SECOND(V):                            \
+        PLATFORMS                               \
+        return AvailabilityContext::alwaysAvailable();
+
+    #include "swift/AST/RuntimeVersions.def"
+
+#undef PLATFORM_TEST_macOS
+#undef PLATFORM_TEST_iOS
+#undef PLATFORM_TEST_watchOS
+#undef _SECOND
+#undef SECOND
+
+  case 99:
+    if (minor == 99)
+      return getSwiftFutureAvailability();
+    break;
+  }
+
   llvm::report_fatal_error(
-      Twine("Missing call to getSwiftXYAvailability for Swift ") +
-      swiftVersion.getAsString());
+    Twine("Missing runtime version data for Swift ") +
+    Twine(major) + Twine('.') + Twine(minor));
 }
 
 bool ASTContext::supportsVersionedAvailability() const {

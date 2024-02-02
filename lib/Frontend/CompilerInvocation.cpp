@@ -1213,6 +1213,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // FIXME: Should we diagnose if it's below the default?
     Opts.MinimumInliningTargetVersion = *vers;
 
+  if (auto vers = parseVersionArg(OPT_min_runtime_version))
+    Opts.RuntimeVersion = version::Version(*vers);
+
   if (auto vers = parseVersionArg(OPT_target_sdk_version))
     Opts.SDKVersion = *vers;
 
