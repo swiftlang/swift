@@ -1731,11 +1731,11 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
 }
 
 BridgedFunction BridgedPassContext::
-createSpecializedFunction(BridgedStringRef name,
-                          const BridgedParameterInfo * _Nullable bridgedParams,
-                          SwiftInt paramCount,
-                          bool hasSelfParam,
-                          BridgedFunction fromFunc) const {
+createEmptyFunction(BridgedStringRef name,
+                    const BridgedParameterInfo * _Nullable bridgedParams,
+                    SwiftInt paramCount,
+                    bool hasSelfParam,
+                    BridgedFunction fromFunc) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   SILFunction *fromFn = fromFunc.getFunction();
 
@@ -1761,7 +1761,7 @@ createSpecializedFunction(BridgedStringRef name,
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
 
   SILFunction *newF = functionBuilder.createFunction(
-    SILLinkage::Shared, name.unbridged(), newTy, nullptr, fromFn->getLocation(), fromFn->isBare(),
+    fromFn->getLinkage(), name.unbridged(), newTy, nullptr, fromFn->getLocation(), fromFn->isBare(),
     fromFn->isTransparent(), fromFn->isSerialized(), IsNotDynamic, IsNotDistributed,
     IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
     fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(), fromFn->getEffectsKind(),

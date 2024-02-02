@@ -131,7 +131,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return function.isDefinition
   }
 
-  func createSpecializedFunctionDeclaration(
+  func createEmptyFunction(
     name: String,
     parameters: [ParameterInfo],
     hasSelfParameter: Bool,
@@ -140,8 +140,8 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return name._withBridgedStringRef { nameRef in
       let bridgedParamInfos = parameters.map { $0._bridged }
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        _bridged.createSpecializedFunction(nameRef, paramBuf.baseAddress, paramBuf.count,
-                                           hasSelfParameter, originalFunction.bridged).function
+        _bridged.createEmptyFunction(nameRef, paramBuf.baseAddress, paramBuf.count,
+                                     hasSelfParameter, originalFunction.bridged).function
       }
     }
   }
