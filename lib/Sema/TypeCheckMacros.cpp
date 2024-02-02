@@ -813,32 +813,30 @@ static std::string expandMacroDefinition(
     ExpandedMacroReplacement replacement;
     bool isExpressionReplacement = true;
 
-    // TODO: simplify... basically we need "pick replacements in order of lowest startOffset"
     // Pick the "next" replacement, in order as they appear in the source text
-    if (replacementsIdx < def.getReplacements().size()) {
-       auto expressionReplacement = def.getReplacements()[replacementsIdx];
-
-       if (genericReplacementsIdx < def.getGenericReplacements().size()) {
-        auto genericReplacement = def.getGenericReplacements()[genericReplacementsIdx];
-          isExpressionReplacement =
-              expressionReplacement.startOffset < genericReplacement.startOffset;
-          replacement = isExpressionReplacement ? expressionReplacement : genericReplacement;
-      } else {
-          isExpressionReplacement = true;
-          replacement = expressionReplacement;
-       }
-    } else if (genericReplacementsIdx < def.getGenericReplacements().size()) {
-      auto genericReplacement = def.getGenericReplacements()[replacementsIdx];
-
+    auto canPickExpressionReplacement = replacementsIdx < def.getReplacements().size();
+    auto canPickGenericReplacement = genericReplacementsIdx < def.getGenericReplacements().size();
+    if (canPickExpressionReplacement && canPickGenericReplacement) {
+      auto expressionReplacement = def.getReplacements()[replacementsIdx];
+      auto genericReplacement =
+          def.getGenericReplacements()[genericReplacementsIdx];
+      isExpressionReplacement =
+          expressionReplacement.startOffset < genericReplacement.startOffset;
+      replacement =
+          isExpressionReplacement ? expressionReplacement : genericReplacement;
+    } else if (canPickExpressionReplacement) {
+      isExpressionReplacement = true;
+      replacement = def.getReplacements()[replacementsIdx];
+    } else if (canPickGenericReplacement) {
       isExpressionReplacement = false;
-      replacement = genericReplacement;
+      replacement = def.getGenericReplacements()[replacementsIdx];
     } else {
       assert(false && "should always select a requirement explicitly rather "
                       "than fall through");
     }
 
     replacementsIdx += isExpressionReplacement ? 1 : 0;
-    genericReplacementsIdx += isExpressionReplacement ? 1 : 0;
+    genericReplacementsIdx += isExpressionReplacement ? 0 : 1;
 
     // Add the original text up to the first replacement.
     expandedResult.append(originalText.begin() + startIdx,
