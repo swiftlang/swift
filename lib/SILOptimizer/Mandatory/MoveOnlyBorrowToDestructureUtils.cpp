@@ -1690,7 +1690,6 @@ bool BorrowToDestructureTransform::transform() {
   auto *fn = mmci->getFunction();
   LLVM_DEBUG(llvm::dbgs() << "Performing Borrow To Destructure Transform!\n";
              fn->print(llvm::dbgs()));
-  auto &C = fn->getASTContext();
   StackList<BeginBorrowInst *> borrowWorklist(mmci->getFunction());
 
   // If we failed to gather borrows due to the transform not understanding part
