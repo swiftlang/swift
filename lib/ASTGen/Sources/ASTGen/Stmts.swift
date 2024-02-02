@@ -446,7 +446,7 @@ extension ASTGenVisitor {
       switch node {
       case .switchCase(let node):
         return ASTNode.stmt(self.generate(switchCase: node).asStmt).bridged
-      case .ifConfigDecl(let node):
+      case .ifConfigDecl(_):
         fatalError("unimplemented")
       }
     }).bridgedArray(in: self)

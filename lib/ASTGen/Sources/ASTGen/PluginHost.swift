@@ -31,7 +31,6 @@ public func _initializePlugin(
   cxxDiagnosticEngine: UnsafeMutableRawPointer?
 ) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
-  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
 
   do {
     try plugin.initialize()
