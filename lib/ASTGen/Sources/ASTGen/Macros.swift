@@ -567,7 +567,7 @@ func expandFreestandingMacroInProcess(
     discriminator: discriminator
   )
 
-  let macroName = expansionSyntax.macro.text
+  let macroName = expansionSyntax.macroName.text
 
   // Make sure we emit all of the diagnostics from the context.
   defer {
