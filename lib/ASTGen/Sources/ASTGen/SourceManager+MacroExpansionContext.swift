@@ -131,6 +131,11 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
 
     case .afterTrailingTrivia:
       rawPosition = node.endPosition
+
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
 
     let offsetWithinSyntaxNode =
@@ -164,6 +169,11 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
 
     case .filePath:
       break
+
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
 
     // Do the location lookup.

@@ -73,6 +73,11 @@ fileprivate func emitDiagnosticParts(
       replaceStartLoc = bridgedSourceLoc(at: oldToken.endPositionBeforeTrailingTrivia)
       replaceEndLoc = bridgedSourceLoc(at: oldToken.endPosition)
       newText = newTrivia.description
+
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
 
     newText.withBridgedString { bridgedMessage in
@@ -208,6 +213,11 @@ extension SourceManager {
           at: oldToken.endPosition
         )
         newText = newTrivia.description
+
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
 
       newText.withBridgedString { bridgedMessage in

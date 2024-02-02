@@ -88,6 +88,10 @@ extension ASTGenVisitor {
       colonLocs = elementNodes.lazy
         .map({ self.generateSourceLoc($0.colon) })
         .bridgedArray(in: self)
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     return .createParsed(
       self.ctx,
