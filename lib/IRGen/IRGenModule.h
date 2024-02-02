@@ -1430,6 +1430,14 @@ public:
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
 
+  /// Returns the special builtin types that should be emitted in the stdlib
+  /// module.
+  llvm::ArrayRef<CanType> getOrCreateSpecialStlibBuiltinTypes();
+
+private:
+  /// The special builtin types that should be emitted in the stdlib module.
+  llvm::SmallVector<CanType, 7> SpecialStdlibBuiltinTypes;
+
 //--- Runtime ---------------------------------------------------------------
 public:
   llvm::Constant *getEmptyTupleMetadata();
