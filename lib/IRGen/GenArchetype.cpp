@@ -438,8 +438,10 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       IGM.getSwiftModule()->getASTContext().getProtocol(
           KnownProtocolKind::BitwiseCopyable);
   // The protocol won't be present in swiftinterfaces from older SDKs.
-  if (bitwiseCopyableProtocol && IGM.getSwiftModule()->lookupConformance(
-                                     archetype, bitwiseCopyableProtocol)) {
+  if (IGM.Context.LangOpts.hasFeature(Feature::BitwiseCopyable) &&
+      bitwiseCopyableProtocol &&
+      IGM.getSwiftModule()->lookupConformance(archetype,
+                                              bitwiseCopyableProtocol)) {
     return BitwiseCopyableArchetypeTypeInfo::create(storageType, abiAccessible);
   }
 
