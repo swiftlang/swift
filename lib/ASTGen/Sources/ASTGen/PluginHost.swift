@@ -81,7 +81,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
       assert(diagnostics.isEmpty)
       return true
     }
-    var errorMsgs = diagnostics.map({ $0.message }).joined(separator: ", ");
+    let errorMsgs = diagnostics.map({ $0.message }).joined(separator: ", ");
     errorOut?.pointee = allocateBridgedString(errorMsgs);
     return false
   } catch {

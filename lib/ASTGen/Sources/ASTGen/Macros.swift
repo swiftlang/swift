@@ -393,7 +393,7 @@ func makeExpansionOutputResult(
   expandedSource: String?,
   outputPointer: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
-  guard var expandedSource = expandedSource else {
+  guard let expandedSource = expandedSource else {
     outputPointer.pointee = BridgedStringRef()
     return -1
   }
