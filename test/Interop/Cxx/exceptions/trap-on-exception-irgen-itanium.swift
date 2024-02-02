@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-emit-ir %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s
-// RUN: %target-swift-emit-ir %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=DEBUG %s
+// RUN: %target-swift-emit-ir -target %target-future-triple -min-runtime-version 5.11 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-ir -target %target-future-triple -min-runtime-version 5.11 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=DEBUG %s
+// RUN: %target-swift-emit-ir -target %target-triple -min-runtime-version 5.9 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop | %FileCheck --check-prefix=GXX %s
+// RUN: %target-swift-emit-ir -target %target-triple -min-runtime-version 5.9 %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -g | %FileCheck --check-prefix=GXX %s
 
 // UNSUPPORTED: OS=windows-msvc
 
@@ -335,7 +337,7 @@ public func test() {
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 
-// CHECK: i32 @_swift_exceptionPersonality(...)
+// CHECK: i32 @_swift_exceptionPersonality(i32, i32, i64, ptr, ptr)
 
 // CHECK: define {{.*}} @"$s4test0A11MethodCallss5Int32VyF"() #[[#SWIFTUWMETA]] personality
 // CHECK: call swiftcc i32 @"$s4test8makeCInts5Int32VyF"()
@@ -502,3 +504,6 @@ public func test() {
 // DEBUG: ![[#DEBUGLOC_TRAP1]] = !DILocation(line: 0, scope: ![[#TRAPSCOPE:]], inlinedAt: ![[#DEBUGLOC_FREEFUNCTIONTHROWS1]])
 // DEBUG: ![[#TRAPSCOPE]] = distinct !DISubprogram(name: "Swift runtime failure: unhandled C++{{ / Objective-C | }}exception"
 // DEBUG: ![[#DEBUGLOC_TRAP2]] = !DILocation(line: 0, scope: ![[#TRAPSCOPE]], inlinedAt: ![[#DEBUGLOC_FREEFUNCTIONTHROWS2]])
+
+// GXX: __gxx_personality_v0
+// GXX-NOT: _swift_exceptionPersonality

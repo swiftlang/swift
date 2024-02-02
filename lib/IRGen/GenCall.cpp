@@ -4997,11 +4997,9 @@ void IRGenFunction::emitEpilogue() {
 
     auto deploymentAvailability =
       AvailabilityContext::forDeploymentTarget(IGM.Context);
-    bool canUseSwiftPersonality = deploymentAvailability.isContainedIn(
-      IGM.Context.getSwift511Availability());
     llvm::Constant *personality;
 
-    if (canUseSwiftPersonality) {
+    if (IGM.isSwiftExceptionPersonalityFeatureAvailable()) {
       // The function should use our personality routine
       auto swiftPersonality = IGM.getExceptionPersonalityFunctionPointer();
       personality = swiftPersonality.getDirectPointer();

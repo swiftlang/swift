@@ -59,6 +59,7 @@ FEATURE(SignedDescriptor,                               (5, 9))
 FEATURE(ObjCSymbolicReferences,                         (5, 11))
 FEATURE(TypedThrows,                                    (5, 11))
 FEATURE(StaticReadOnlyArrays,                           (5, 11))
+FEATURE(SwiftExceptionPersonality,                      (5, 11))
 
 FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)
