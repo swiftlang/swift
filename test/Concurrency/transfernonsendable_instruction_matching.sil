@@ -1297,3 +1297,22 @@ bb0:
   return %9999 : $()
 }
 
+sil [ossa] @mark_function_escape_test : $@convention(thin) @async () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+  %a = alloc_stack $NonSendableKlass
+  %valueCopy = copy_value %value : $NonSendableKlass
+  store %valueCopy to [init] %a : $*NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context; later accesses could race}}
+
+  destroy_value %value : $NonSendableKlass
+  mark_function_escape %a : $*NonSendableKlass // expected-note {{access here could race}}
+  destroy_addr %a : $*NonSendableKlass
+  dealloc_stack %a : $*NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}

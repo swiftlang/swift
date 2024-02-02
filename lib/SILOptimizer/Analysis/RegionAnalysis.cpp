@@ -2371,6 +2371,7 @@ CONSTANT_TRANSLATION(FixLifetimeInst, Require)
 CONSTANT_TRANSLATION(ClassifyBridgeObjectInst, Require)
 CONSTANT_TRANSLATION(BridgeObjectToWordInst, Require)
 CONSTANT_TRANSLATION(IsUniqueInst, Require)
+CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Require)
 
 //===---
 // Terminators
@@ -2446,7 +2447,6 @@ CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(AssignInst, Unhandled)
 CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
 CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
-CONSTANT_TRANSLATION(MarkFunctionEscapeInst, Unhandled)
 
 //===---
 // Packs
