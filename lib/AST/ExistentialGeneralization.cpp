@@ -107,6 +107,7 @@ private:
       newMembers.push_back(generalizeStructure(origMember));
     }
     return ProtocolCompositionType::get(ctx, newMembers,
+                                        origType->getInverses(),
                                         origType->hasExplicitAnyObject());
   }
 

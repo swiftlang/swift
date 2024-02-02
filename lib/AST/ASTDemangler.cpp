@@ -673,7 +673,10 @@ Type ASTBuilder::createProtocolCompositionType(
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
 
-  Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
+  // FIXME: move-only generics
+  InvertibleProtocolSet inverses;
+  Type composition = ProtocolCompositionType::get(Ctx, members, inverses,
+                                                  isClassBound);
   if (forRequirement)
     return composition;
 

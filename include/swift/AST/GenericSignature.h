@@ -465,9 +465,22 @@ public:
   /// Given a type parameter, compute the most specific supertype (upper bound),
   /// possibly dependent on other type parameters.
   ///
+  ///
+  /// \param forExistentialSelf If true, we ensure the result does not include
+  /// any type parameters rooted in the same generic parameter as the one given.
+  ///
+  /// \param includeParameterizedProtocols If true, we form parameterized
+  /// protocol types if we find that the given type's primary associated types
+  /// are sufficiently constrained.
+  ///
   /// \note If the upper bound is a protocol or protocol composition,
   /// will return an instance of \c ExistentialType.
-  Type getUpperBound(Type type) const;
+  Type getUpperBound(Type type,
+                     bool forExistentialSelf,
+                     bool includeParameterizedProtocols) const;
+
+  /// Utility wrapper for use when this is an opened existential signature.
+  Type getExistentialType(Type type) const;
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

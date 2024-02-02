@@ -4426,6 +4426,9 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 
+  if (SWIFT_ENABLE_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+    InitInvok.getLangOptions().enableFeature(Feature::NoncopyableGenerics);
+
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {

@@ -13,6 +13,8 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 
@@ -555,15 +557,10 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
   if (!genericSig)
     return type;
 
-  auto buildProtocolComposition = [&](ArrayRef<ProtocolDecl *> protos) -> Type {
-    SmallVector<Type, 2> types;
-    for (auto proto : protos)
-      types.push_back(proto->getDeclaredInterfaceType());
-    return ProtocolCompositionType::get(Ctx, types,
-                                        /*HasExplicitAnyObject=*/false);
-  };
-
   if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
+    assert(genericFuncType->getGenericSignature()->isEqual(genericSig) &&
+           "if not, just use the GFT's signature instead below");
+
     SmallVector<AnyFunctionType::Param, 8> erasedParams;
     for (const auto &param : genericFuncType->getParams()) {
       auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
@@ -584,15 +581,24 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
           archetypeType->isRoot())
         return t;
 
-      auto protos = archetypeType->getConformsTo();
-      if (!protos.empty())
-        return buildProtocolComposition(protos);
+      auto genericSig = archetypeType->getGenericEnvironment()->getGenericSignature();
+      auto upperBound = genericSig->getUpperBound(
+          archetypeType->getInterfaceType(),
+          /*forExistentialSelf=*/false,
+          /*withParameterizedProtocols=*/false);
+
+      if (!upperBound->isAny())
+        return upperBound;
     }
 
     if (t->isTypeParameter()) {
-      const auto protos = genericSig->getRequiredProtocols(t);
-      if (!protos.empty())
-        return buildProtocolComposition(protos);
+      auto upperBound = genericSig->getUpperBound(
+          t,
+          /*forExistentialSelf=*/false,
+          /*withParameterizedProtocols=*/false);
+
+      if (!upperBound->isAny())
+        return upperBound;
     }
 
     return t;

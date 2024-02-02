@@ -1141,6 +1141,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     if (!newMembers.empty()) {
       return ProtocolCompositionType::get(
           getASTContext(), newMembers,
+          protocolCompositionType->getInverses(),
           protocolCompositionType->hasExplicitAnyObject());
     }
 
@@ -1606,6 +1607,7 @@ static void addProtocols(Type T,
                          SmallVectorImpl<ProtocolDecl *> &Protocols,
                          ParameterizedProtocolMap &Parameterized,
                          Type &Superclass,
+                         InvertibleProtocolSet &Inverses,
                          bool &HasExplicitAnyObject) {
   if (auto Proto = T->getAs<ProtocolType>()) {
     Protocols.push_back(Proto->getDecl());
@@ -1613,11 +1615,12 @@ static void addProtocols(Type T,
   }
 
   if (auto PC = T->getAs<ProtocolCompositionType>()) {
-    if (PC->hasExplicitAnyObject())
-      HasExplicitAnyObject = true;
-    for (auto P : PC->getMembers())
-      addProtocols(P, Protocols, Parameterized, Superclass,
+    Inverses.insertAll(PC->getInverses());
+    HasExplicitAnyObject |= PC->hasExplicitAnyObject();
+    for (auto P : PC->getMembers()) {
+      addProtocols(P, Protocols, Parameterized, Superclass, Inverses,
                    HasExplicitAnyObject);
+    }
     return;
   }
 
@@ -1918,6 +1921,7 @@ CanType TypeBase::computeCanonicalType() {
     assert(!CanProtos.empty() && "Non-canonical empty composition?");
     const ASTContext &C = CanProtos[0]->getASTContext();
     Type Composition = ProtocolCompositionType::get(C, CanProtos,
+                                                    PCT->getInverses(),
                                                     PCT->hasExplicitAnyObject());
     Result = Composition.getPointer();
     break;
@@ -3727,9 +3731,8 @@ Type ArchetypeType::getExistentialType() const {
   auto interfaceType = getInterfaceType();
   auto genericSig = genericEnv->getGenericSignature();
 
-  auto upperBound = genericSig->getUpperBound(interfaceType);
-
-  return genericEnv->mapTypeIntoContext(upperBound);
+  auto existentialType = genericSig->getExistentialType(interfaceType);
+  return genericEnv->mapTypeIntoContext(existentialType);
 }
 
 bool ArchetypeType::requiresClass() const {
@@ -4010,25 +4013,20 @@ bool ProtocolCompositionType::requiresClass() {
 
 /// Constructs a protocol composition corresponding to the `Any` type.
 Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
-  return ProtocolCompositionType::get(C, {}, /*HasExplicitAnyObject=*/false);
+  return ProtocolCompositionType::get(C, {}, /*Inverses=*/{},
+                                      /*HasExplicitAnyObject=*/false);
 }
 
 /// Constructs a protocol composition containing the `AnyObject` constraint.
 Type ProtocolCompositionType::theAnyObjectType(const ASTContext &C) {
-  return ProtocolCompositionType::get(C, {}, /*HasExplicitAnyObject=*/true);
+  return ProtocolCompositionType::get(C, {}, /*Inverses=*/{},
+                                      /*HasExplicitAnyObject=*/true);
 }
 
 Type ProtocolCompositionType::getInverseOf(const ASTContext &C,
                                            InvertibleProtocolKind IP) {
-  return ProtocolCompositionType::get(C, {}, {IP},
+  return ProtocolCompositionType::get(C, {}, /*Inverses=*/{IP},
                                       /*HasExplicitAnyObject=*/false);
-}
-
-Type ProtocolCompositionType::get(const ASTContext &C, ArrayRef<Type> Members,
-                                  bool HasExplicitAnyObject) {
-  return ProtocolCompositionType::get(C, Members,
-                                      /*Inverses=*/{},
-                                      HasExplicitAnyObject);
 }
 
 Type ProtocolCompositionType::get(const ASTContext &C,
@@ -4056,29 +4054,29 @@ Type ProtocolCompositionType::get(const ASTContext &C,
     if (!t->isCanonical())
       return build(C, Members, Inverses, HasExplicitAnyObject);
   }
-    
+
   Type Superclass;
   SmallVector<ProtocolDecl *, 4> Protocols;
   ParameterizedProtocolMap Parameterized;
   for (Type t : Members) {
-    addProtocols(t, Protocols, Parameterized, Superclass, HasExplicitAnyObject);
+    addProtocols(t, Protocols, Parameterized, Superclass,
+                 Inverses, HasExplicitAnyObject);
   }
-
-  // The presence of a superclass constraint makes AnyObject redundant.
-  if (Superclass)
-    HasExplicitAnyObject = false;
-
-  // If there are any parameterized protocols, the canonicalization
-  // algorithm gets more complex.
 
   // Form the set of canonical component types.
   SmallVector<Type, 4> CanTypes;
-  if (Superclass)
-    CanTypes.push_back(Superclass->getCanonicalType());
 
+  // The presence of a superclass constraint makes AnyObject redundant.
+  if (Superclass) {
+    HasExplicitAnyObject = false;
+    CanTypes.push_back(Superclass->getCanonicalType());
+  }
+
+  // If there are any parameterized protocols, the canonicalization
+  // algorithm gets more complex.
   canonicalizeProtocols(Protocols, &Parameterized);
 
-  for (auto proto: Protocols) {
+  for (auto proto : Protocols) {
     // If we have a parameterized type for this protocol, use the
     // canonical type of that.  Sema should prevent us from building
     // compositions with the same protocol and conflicting constraints.
@@ -5347,6 +5345,7 @@ case TypeKind::Id:
     
     return ProtocolCompositionType::get(Ptr->getASTContext(),
                                         substMembers,
+                                        pc->getInverses(),
                                         pc->hasExplicitAnyObject());
   }
 

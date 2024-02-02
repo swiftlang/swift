@@ -5943,22 +5943,19 @@ class ProtocolCompositionType final : public TypeBase,
   
 public:
   /// Retrieve an instance of a protocol composition type with the
-  /// given set of members. A "hidden member" is an implicit constraint that
-  /// is present for all protocol compositions.
+  /// given set of members.
   ///
-  /// \param Members the regular members of this composition.
-  /// \param Inverses the set of inverses that are a member of the composition,
-  ///                 i.e., if \c IP is in this set, then \c ~IP is a member of
-  ///                 this composition.
-  /// \param HasExplicitAnyObject indicates whether this composition should be
-  /// treated as if \c AnyObject was a member.
+  /// This presents a syntactic view of the world, where an empty composition
+  /// has implicit Copyable and Escapable members, unless they are supressed
+  /// with the Inverses field.
+  ///
+  /// The list of members consists of zero or more ProtocolType,
+  /// ProtocolCompositionType, ParameterizedProtocolType, together with at
+  /// most one ClassType or BoundGenericClassType.
+  ///
+  /// HasExplicitAnyObject is the 'AnyObject' member.
   static Type get(const ASTContext &C, ArrayRef<Type> Members,
                   InvertibleProtocolSet Inverses,
-                  bool HasExplicitAnyObject);
-
-  /// Retrieve an instance of a protocol composition type with the
-  /// given set of members. Assumes no inverses are present in \c Members.
-  static Type get(const ASTContext &C, ArrayRef<Type> Members,
                   bool HasExplicitAnyObject);
 
   /// Constructs a protocol composition corresponding to the `Any` type.
