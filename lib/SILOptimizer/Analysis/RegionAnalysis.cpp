@@ -2262,6 +2262,7 @@ CONSTANT_TRANSLATION(ClassMethodInst, Assign)
 CONSTANT_TRANSLATION(ObjCMethodInst, Assign)
 CONSTANT_TRANSLATION(SuperMethodInst, Assign)
 CONSTANT_TRANSLATION(ObjCSuperMethodInst, Assign)
+CONSTANT_TRANSLATION(LoadUnownedInst, Assign)
 
 // These instructions are in between look through and a true assign. We should
 // probably eventually treat them as look through but we haven't done the work
@@ -2462,7 +2463,6 @@ CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
-CONSTANT_TRANSLATION(LoadUnownedInst, Unhandled)
 CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)

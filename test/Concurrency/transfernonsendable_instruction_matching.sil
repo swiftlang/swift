@@ -1587,3 +1587,21 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+sil [ossa] @load_unowned_test : $@async @convention(thin) () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+  %a = alloc_stack $@sil_unowned NonSendableKlass
+  store_unowned %value to [init] %a : $*@sil_unowned NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
+
+  %b = load_unowned [take] %a : $*@sil_unowned NonSendableKlass // expected-note {{access here could race}}
+  destroy_value %b : $NonSendableKlass
+  destroy_value %value : $NonSendableKlass
+  dealloc_stack %a : $*@sil_unowned NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
