@@ -1,9 +1,7 @@
-//
-// Unlike its counterparts in the other *_resilience.swift files, the goal is
-// for the package's component modules to all be considered within the same
-// resilience domain. This file ensures that we use direct access as much as
-// possible.
-//
+// This verifies package decls are treated as resilient as (non-frozen) public
+// decls by default. When non-resilience optimization is enabled, references
+// to package decls at a use site can be treated as non-resilient, which is
+// verified in test/IRGen/package_resilience.swift.
 
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/package_resilience.swift
