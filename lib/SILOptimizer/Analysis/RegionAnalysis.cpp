@@ -2407,6 +2407,8 @@ CONSTANT_TRANSLATION(CondFailInst, Ignored)
 CONSTANT_TRANSLATION(SwitchValueInst, Ignored)
 CONSTANT_TRANSLATION(UnreachableInst, Ignored)
 CONSTANT_TRANSLATION(UnwindInst, Ignored)
+// Doesn't take a parameter.
+CONSTANT_TRANSLATION(ThrowAddrInst, Ignored)
 
 // Terminators that only need require.
 CONSTANT_TRANSLATION(ReturnInst, Require)
@@ -2464,7 +2466,6 @@ CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Unhandled)
 CONSTANT_TRANSLATION(ExtractExecutorInst, Unhandled)
 CONSTANT_TRANSLATION(BindMemoryInst, Unhandled)
 CONSTANT_TRANSLATION(RebindMemoryInst, Unhandled)
-CONSTANT_TRANSLATION(ThrowAddrInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 

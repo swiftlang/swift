@@ -1377,3 +1377,8 @@ bb0:
   return %9999 : $()
 }
 
+sil [ossa] @throw_addr_test : $@convention(thin) @async <E where E : Error> (@in_guaranteed E) -> (@out NonSendableKlass, @error_indirect E) {
+bb0(%result : $*NonSendableKlass, %result2 : $*E, %arg : $*E):
+  copy_addr %arg to [init] %result2 : $*E
+  throw_addr
+}
