@@ -7637,6 +7637,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   abort();
 }
 
+static bool isSelfRefInInitializer(Expr *baseExpr,
+                                   DeclContext *useDC) {
+  auto *CD = dyn_cast<ConstructorDecl>(useDC);
+  return CD && baseExpr->isSelfExprOf(CD);
+}
+
 /// Detect whether an assignment to \c baseExpr.member in the given
 /// decl context can potentially be initialization of a property wrapper.
 static bool isPotentialPropertyWrapperInit(Expr *baseExpr,
@@ -7649,15 +7655,19 @@ static bool isPotentialPropertyWrapperInit(Expr *baseExpr,
 
   // Assignment to a wrapped property can only be re-written to
   // initialization in an init.
-  auto *CD = dyn_cast<ConstructorDecl>(UseDC);
-  if (!CD)
+  return isSelfRefInInitializer(baseExpr, UseDC);
+}
+
+/// Detect whether an assignment to \c baseExpr.member in the given
+/// decl context can potentially be initialization via an init accessor.
+static bool isPotentialInitViaInitAccessor(Expr *baseExpr,
+                                           ValueDecl *member,
+                                           DeclContext *useDC) {
+  auto *VD = dyn_cast<VarDecl>(member);
+  if (!(VD && VD->hasInitAccessor()))
     return false;
 
-  // This is not an assignment on self
-  if (!baseExpr->isSelfExprOf(CD))
-    return false;
-
-  return true;
+  return isSelfRefInInitializer(baseExpr, useDC);
 }
 
 /// Adjust the given type to become the self type when referring to
@@ -7694,12 +7704,13 @@ static Type adjustSelfTypeForMember(Expr *baseExpr,
 
   // If neither the property's getter nor its setter are mutating,
   // the base can be an rvalue unless the assignment is potentially
-  // initializing a property wrapper. If the assignment can be re-
-  // written to property wrapper initialization, the base type should
-  // be an lvalue.
+  // initializing a property wrapper or using init accessor. If the
+  // assignment can be re-written to property wrapper or init accessor
+  // initialization, the base type should be an lvalue.
   if (!SD->isGetterMutating() &&
       (!isSettableFromHere || !SD->isSetterMutating()) &&
-      !isPotentialPropertyWrapperInit(baseExpr, member, UseDC))
+      !isPotentialPropertyWrapperInit(baseExpr, member, UseDC) &&
+      !isPotentialInitViaInitAccessor(baseExpr, member, UseDC))
     return baseObjectTy;
 
   if (isa<SubscriptDecl>(member))
