@@ -3692,8 +3692,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   auto inheritedTypes = InheritedTypes(decl);
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
-    uncheckedLoc = typeRepr->findAttrLoc(TAK_Unchecked);
-    preconcurrencyLoc = typeRepr->findAttrLoc(TAK_Preconcurrency);
+    uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
+    preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
   }
 
   // Form the result.

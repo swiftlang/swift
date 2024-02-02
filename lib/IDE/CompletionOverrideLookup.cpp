@@ -156,12 +156,12 @@ void CompletionOverrideLookup::addValueOverride(
 
   PO.SkipUnderscoredKeywords = true;
   PO.PrintImplicitAttrs = false;
-  PO.ExclusiveAttrList.push_back(TAK_Escaping);
-  PO.ExclusiveAttrList.push_back(TAK_Autoclosure);
+  PO.ExclusiveAttrList.push_back(TypeAttrKind::Escaping);
+  PO.ExclusiveAttrList.push_back(TypeAttrKind::Autoclosure);
   // Print certain modifiers only when the introducer is not written.
   // Otherwise, the user can add it after the completion.
   if (!hasDeclIntroducer) {
-    PO.ExclusiveAttrList.push_back(DAK_Nonisolated);
+    PO.ExclusiveAttrList.push_back(DeclAttrKind::Nonisolated);
   }
 
   PO.PrintAccess = false;

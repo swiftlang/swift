@@ -131,7 +131,7 @@ public:
     Options.VarInitializers = true;
     Options.PrintExprs = true;
     Options.TypeDefinitions = true;
-    Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::HasInitialValue);
 
     Printer.printNewline();
     D->print(Printer, Options);

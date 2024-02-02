@@ -1989,7 +1989,7 @@ static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
   // If is a parameter declaration marked as @autoclosure.
   if (options.is(TypeResolverContext::FunctionInput)) {
     if (auto *ATR = dyn_cast<AttributedTypeRepr>(TR)) {
-      const auto attrLoc = ATR->getAttrLoc(TAK_Autoclosure);
+      const auto attrLoc = ATR->getAttrLoc(TypeAttrKind::Autoclosure);
       if (attrLoc.isValid())
         return validateAutoClosureAttr(Diags, attrLoc, type);
     }
@@ -2961,59 +2961,60 @@ static unsigned countIsolatedParamsUpTo(FunctionTypeRepr* fnTy,
 // is likely also structurally invalid on the value.  (This is useful
 // for that specific case because some of the attributes are used for
 // multiple roles, like `owned`.)
-static constexpr TypeAttrKind TAR_SILValueConvention = TAK_Owned;
-static constexpr TypeAttrKind TAR_SILMetatype = TAK_Thin;
-static constexpr TypeAttrKind TAR_TypeTransformer = TAK_Opened;
-static constexpr TypeAttrKind TAR_SILCoroutine = TAK_YieldOnce;
-static constexpr TypeAttrKind TAR_SILCalleeConvention = TAK_CalleeOwned;
-static constexpr TypeAttrKind TAR_SILReferenceStorage = TAK_SILWeak;
+static constexpr TypeAttrKind TAR_SILValueConvention = TypeAttrKind::Owned;
+static constexpr TypeAttrKind TAR_SILMetatype = TypeAttrKind::Thin;
+static constexpr TypeAttrKind TAR_TypeTransformer = TypeAttrKind::Opened;
+static constexpr TypeAttrKind TAR_SILCoroutine = TypeAttrKind::YieldOnce;
+static constexpr TypeAttrKind TAR_SILCalleeConvention =
+    TypeAttrKind::CalleeOwned;
+static constexpr TypeAttrKind TAR_SILReferenceStorage = TypeAttrKind::SILWeak;
 
 TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   switch (kind) {
   // Most attributes are singleton for the purposes of this analysis.
   default: return kind;
 
-  case TAK_Autoreleased:
-  case TAK_InGuaranteed:
-  case TAK_In:
-  case TAK_InConstant:
-  case TAK_Inout:
-  case TAK_InoutAliasable:
-  case TAK_Owned:
-  case TAK_Guaranteed:
-  case TAK_PackOwned:
-  case TAK_PackGuaranteed:
-  case TAK_PackInout:
-  case TAK_Out:
-  case TAK_PackOut:
-  case TAK_UnownedInnerPointer:
-  case TAK_Error:
-  case TAK_ErrorIndirect:
-  case TAK_ErrorUnowned:
+  case TypeAttrKind::Autoreleased:
+  case TypeAttrKind::InGuaranteed:
+  case TypeAttrKind::In:
+  case TypeAttrKind::InConstant:
+  case TypeAttrKind::Inout:
+  case TypeAttrKind::InoutAliasable:
+  case TypeAttrKind::Owned:
+  case TypeAttrKind::Guaranteed:
+  case TypeAttrKind::PackOwned:
+  case TypeAttrKind::PackGuaranteed:
+  case TypeAttrKind::PackInout:
+  case TypeAttrKind::Out:
+  case TypeAttrKind::PackOut:
+  case TypeAttrKind::UnownedInnerPointer:
+  case TypeAttrKind::Error:
+  case TypeAttrKind::ErrorIndirect:
+  case TypeAttrKind::ErrorUnowned:
     return TAR_SILValueConvention;
 
-  case TAK_Thin:
-  case TAK_Thick:
-  case TAK_ObjCMetatype:
+  case TypeAttrKind::Thin:
+  case TypeAttrKind::Thick:
+  case TypeAttrKind::ObjCMetatype:
     return TAR_SILMetatype;
 
-  case TAK_YieldMany:
-  case TAK_YieldOnce:
+  case TypeAttrKind::YieldMany:
+  case TypeAttrKind::YieldOnce:
     return TAR_SILCoroutine;
 
-  case TAK_CalleeOwned:
-  case TAK_CalleeGuaranteed:
+  case TypeAttrKind::CalleeOwned:
+  case TypeAttrKind::CalleeGuaranteed:
     return TAR_SILCalleeConvention;
 
-#define REF_STORAGE(Name, name, ...) case TAK_SIL##Name:
+#define REF_STORAGE(Name, name, ...) case TypeAttrKind::SIL##Name:
 #include "swift/AST/ReferenceStorage.def"
     return TAR_SILReferenceStorage;
 
   // These are total transforms on the type, and one of them can apply
   // at once.
-  case TAK_Opened:
-  case TAK_PackElement:
-  case TAK_OpaqueReturnTypeOf:
+  case TypeAttrKind::Opened:
+  case TypeAttrKind::PackElement:
+  case TypeAttrKind::OpaqueReturnTypeOf:
     return TAR_TypeTransformer;
   };
 }
@@ -3134,9 +3135,9 @@ void TypeAttrSet::diagnoseUnclaimed(CustomAttr *attr,
 
 static bool isSILAttribute(TypeAttrKind attrKind) {
   switch (attrKind) {
-#define SIL_TYPE_ATTR(SPELLING, CLASS) case TAK_##CLASS:
+#define SIL_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
 #include "swift/AST/Attr.def"
-  case TAK_NoEscape: // noescape is only used in SIL now
+  case TypeAttrKind::NoEscape: // noescape is only used in SIL now
     return true;
 
   default:
@@ -3146,11 +3147,19 @@ static bool isSILAttribute(TypeAttrKind attrKind) {
 
 static bool isFunctionAttribute(TypeAttrKind attrKind) {
   static const TypeAttrKind FunctionAttrs[] = {
-      TAK_Convention,  TAK_Pseudogeneric,    TAK_Unimplementable,
-      TAK_CalleeOwned, TAK_CalleeGuaranteed, TAK_NoEscape,
-      TAK_Autoclosure, TAK_Differentiable,   TAK_Escaping,
-      TAK_Sendable,    TAK_YieldOnce,        TAK_YieldMany,
-      TAK_Async,
+      TypeAttrKind::Convention,
+      TypeAttrKind::Pseudogeneric,
+      TypeAttrKind::Unimplementable,
+      TypeAttrKind::CalleeOwned,
+      TypeAttrKind::CalleeGuaranteed,
+      TypeAttrKind::NoEscape,
+      TypeAttrKind::Autoclosure,
+      TypeAttrKind::Differentiable,
+      TypeAttrKind::Escaping,
+      TypeAttrKind::Sendable,
+      TypeAttrKind::YieldOnce,
+      TypeAttrKind::YieldMany,
+      TypeAttrKind::Async,
   };
   return llvm::any_of(FunctionAttrs, [attrKind](TypeAttrKind functionAttr) {
                         return functionAttr == attrKind;
@@ -3466,7 +3475,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
       diagnose(
           noDerivativeAttr->getAtLoc(),
           diag::differentiable_programming_attr_used_without_required_module,
-          TypeAttribute::getAttrName(TAK_NoDerivative),
+          TypeAttribute::getAttrName(TypeAttrKind::NoDerivative),
           getASTContext().Id_Differentiation);
     } else if (!isNoDerivativeAllowed) {
       bool isVariadicFunctionParam =
@@ -3493,7 +3502,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     // "recursive structure" of the type constructors.
     attrs.reversedClaimAllWhere([&](TypeAttribute *attr) {
       switch (attrs.getRepresentative(attr->getKind())) {
-      case TAK_DynamicSelf:
+      case TypeAttrKind::DynamicSelf:
         ty = rebuildWithDynamicSelf(getASTContext(), ty);
         return true;
 
@@ -3501,21 +3510,21 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
         ty = resolveSILReferenceStorage(attr, ty);
         return true;
 
-      case TAK_BlockStorage:
+      case TypeAttrKind::BlockStorage:
         if (options & TypeResolutionFlags::SILType) {
           ty = SILBlockStorageType::get(ty->getCanonicalType());;
           return true;
         }
         return false;
 
-      case TAK_Box:
+      case TypeAttrKind::Box:
         if (options & TypeResolutionFlags::SILType) {
           ty = SILBoxType::get(ty->getCanonicalType());
           return true;
         }
         return false;
 
-      case TAK_MoveOnly:
+      case TypeAttrKind::MoveOnly:
         if (options & TypeResolutionFlags::SILType) {
           ty = SILMoveOnlyWrappedType::get(ty->getCanonicalType());
           return true;
@@ -3691,10 +3700,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     bool noDerivative = false;
 
     while (auto *ATR = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
-      if (ATR->has(TAK_Autoclosure))
+      if (ATR->has(TypeAttrKind::Autoclosure))
         autoclosure = true;
 
-      if (ATR->has(TAK_NoDerivative)) {
+      if (ATR->has(TypeAttrKind::NoDerivative)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
             isDifferentiableProgrammingEnabled(
                 *dc->getParentSourceFile()))
@@ -4404,7 +4413,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
       switch (attr->getKind()) {
 
 #define OWNERSHIP(ATTR, KIND)                                                  \
-  case TAK_##ATTR:                                                             \
+  case TypeAttrKind::ATTR:                                                     \
     convention = ParameterConvention::KIND;                                    \
     return true;
         OWNERSHIP(InGuaranteed, Indirect_In_Guaranteed)
@@ -4419,11 +4428,11 @@ SILParameterInfo TypeResolver::resolveSILParameter(
         OWNERSHIP(PackInout, Pack_Inout)
 #undef OWNERSHIP
 
-      case TAK_NoDerivative:
+      case TypeAttrKind::NoDerivative:
         parameterOptions |= SILParameterInfo::NotDifferentiable;
         return true;
 
-      case TAK_Isolated:
+      case TypeAttrKind::Isolated:
         parameterOptions |= SILParameterInfo::Isolated;
         return true;
 
@@ -4486,12 +4495,12 @@ bool TypeResolver::resolveSingleSILResult(
     if (auto conventionAttr = attrs.claim(TAR_SILValueConvention)) {
       switch (conventionAttr->getKind()) {
 #define ERROR(ATTR, CONVENTION)                                                \
-  case TAK_##ATTR:                                                             \
+  case TypeAttrKind::ATTR:                                                     \
     isErrorResult = true;                                                      \
     convention = ResultConvention::CONVENTION;                                 \
     break;
 #define NORMAL(ATTR, CONVENTION)                                               \
-  case TAK_##ATTR:                                                             \
+  case TypeAttrKind::ATTR:                                                     \
     convention = ResultConvention::CONVENTION;                                 \
     break;
 

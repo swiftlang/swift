@@ -3542,17 +3542,17 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     // Skip 'mutating' only inside classes: mutating methods usually
     // don't have a sensible non-mutating implementation.
     if (AdopterIsClass)
-      Options.ExcludeAttrList.push_back(DAK_Mutating);
+      Options.ExcludeAttrList.push_back(DeclAttrKind::Mutating);
     // 'nonmutating' is only meaningful on value type member accessors.
     if (AdopterIsClass || !isa<AbstractStorageDecl>(Requirement))
-      Options.ExcludeAttrList.push_back(DAK_NonMutating);
+      Options.ExcludeAttrList.push_back(DeclAttrKind::NonMutating);
 
     // FIXME: Once we support move-only types in generics, remove this if the
     //        conforming type is move-only. Until then, don't suggest printing
     //        ownership modifiers on a protocol requirement.
-    Options.ExcludeAttrList.push_back(DAK_LegacyConsuming);
-    Options.ExcludeAttrList.push_back(DAK_Consuming);
-    Options.ExcludeAttrList.push_back(DAK_Borrowing);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::LegacyConsuming);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::Consuming);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
 
     Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
       Printer << " {";

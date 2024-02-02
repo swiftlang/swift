@@ -477,19 +477,19 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
 
   SelfAccessKind attrModifier;
   switch (attr->getKind()) {
-  case DeclAttrKind::DAK_LegacyConsuming:
+  case DeclAttrKind::LegacyConsuming:
     attrModifier = SelfAccessKind::LegacyConsuming;
     break;
-  case DeclAttrKind::DAK_Mutating:
+  case DeclAttrKind::Mutating:
     attrModifier = SelfAccessKind::Mutating;
     break;
-  case DeclAttrKind::DAK_NonMutating:
+  case DeclAttrKind::NonMutating:
     attrModifier = SelfAccessKind::NonMutating;
     break;
-  case DeclAttrKind::DAK_Consuming:
+  case DeclAttrKind::Consuming:
     attrModifier = SelfAccessKind::Consuming;
     break;
-  case DeclAttrKind::DAK_Borrowing:
+  case DeclAttrKind::Borrowing:
     attrModifier = SelfAccessKind::Borrowing;
     break;
   default:
@@ -1293,8 +1293,8 @@ static bool checkObjCDeclContext(Decl *D) {
 static void diagnoseObjCAttrWithoutFoundation(DeclAttribute *attr, Decl *decl,
                                               ObjCReason reason,
                                               DiagnosticBehavior behavior) {
-  assert(attr->getKind() == DeclAttrKind::DAK_ObjC ||
-         attr->getKind() == DeclAttrKind::DAK_ObjCMembers);
+  assert(attr->getKind() == DeclAttrKind::ObjC ||
+         attr->getKind() == DeclAttrKind::ObjCMembers);
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
 
@@ -3088,7 +3088,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
          attr->getTrailingWhereClause()->getRequirements()) {
       if (reqRepr.getKind() == RequirementReprKind::LayoutConstraint) {
         if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
-          if (attributedTy->has(TAK_NoMetadata)) {
+          if (attributedTy->has(TypeAttrKind::NoMetadata)) {
             const auto resolution = TypeResolution::forInterface(
                 FD->getDeclContext(), genericSig, llvm::None,
                 /*unboundTyOpener*/ nullptr,
@@ -4770,7 +4770,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
 
   // Add the attribute if the decl kind allows it and it is not an accessor
   // decl. Accessor decls should always infer the var/subscript's attribute.
-  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D) ||
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, D) ||
       isa<AccessorDecl>(D))
     return;
 

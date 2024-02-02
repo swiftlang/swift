@@ -130,18 +130,20 @@ enum class ExternKind: uint8_t {
 enum : unsigned { NumExternKindBits =
   countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
 
-enum DeclAttrKind : unsigned {
-#define DECL_ATTR(_, NAME, ...) DAK_##NAME,
+enum class DeclAttrKind : unsigned {
+#define DECL_ATTR(_, CLASS, ...) CLASS,
 #include "swift/AST/Attr.def"
-  DAK_Count
+  Count
 };
 
-enum : unsigned { NumDeclAttrKindBits =
-  countBitsUsed(static_cast<unsigned>(DeclAttrKind::DAK_Count - 1)) };
+enum : unsigned {
+  NumDeclAttrKindBits =
+      countBitsUsed(static_cast<unsigned>(DeclAttrKind::Count) - 1)
+};
 
-// Define enumerators for each type attribute, e.g. TAK_Weak.
-enum TypeAttrKind {
-#define TYPE_ATTR(_, C) TAK_##C,
+// Define enumerators for each type attribute, e.g. TypeAttrKind::Weak.
+enum class TypeAttrKind {
+#define TYPE_ATTR(_, CLASS) CLASS,
 #include "swift/AST/Attr.def"
 };
 

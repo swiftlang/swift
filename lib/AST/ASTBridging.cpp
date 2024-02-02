@@ -355,10 +355,10 @@ BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
   auto kind = DeclAttribute::getAttrKindFromString(cStr.unbridged());
   switch (kind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
-  case DAK_##CLASS:                                                            \
+  case DeclAttrKind::CLASS:                                                    \
     return BridgedDeclAttrKind##CLASS;
 #include "swift/AST/Attr.def"
-  case DAK_Count:
+  case DeclAttrKind::Count:
     return BridgedDeclAttrKindNone;
   }
 }
@@ -367,10 +367,10 @@ DeclAttrKind unbridged(BridgedDeclAttrKind kind) {
   switch (kind) {
 #define DECL_ATTR(_, CLASS, ...)                                               \
   case BridgedDeclAttrKind##CLASS:                                             \
-    return DAK_##CLASS;
+    return DeclAttrKind::CLASS;
 #include "swift/AST/Attr.def"
   case BridgedDeclAttrKindNone:
-    return DAK_Count;
+    return DeclAttrKind::Count;
   }
 }
 
@@ -1947,7 +1947,7 @@ BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
     return BridgedTypeAttrKindNone;
   switch (*optKind) {
 #define TYPE_ATTR(_, CLASS)                                                    \
-  case TAK_##CLASS:                                                            \
+  case TypeAttrKind::CLASS:                                                    \
     return BridgedTypeAttrKind##CLASS;
 #include "swift/AST/Attr.def"
   }
@@ -1957,7 +1957,7 @@ static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
   switch (kind) {
 #define TYPE_ATTR(_, CLASS)                                                    \
   case BridgedTypeAttrKind##CLASS:                                             \
-    return TAK_##CLASS;
+    return TypeAttrKind::CLASS;
 #include "swift/AST/Attr.def"
   case BridgedTypeAttrKindNone:
     return llvm::None;

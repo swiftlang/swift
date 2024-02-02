@@ -61,7 +61,7 @@
 #include "swift/AST/PatternNodes.def"
 
 #ifndef DECL_ATTR
-#define SIMPLE_DECL_ATTR(X, CLASS, OPTIONS, CODE)
+#define SIMPLE_DECL_ATTR(...)
 #define DECL_ATTR(_, Id, ...) AST_BRIDGING_WRAPPER_NONNULL(Id##Attr)
 #endif
 #include "swift/AST/Attr.def"

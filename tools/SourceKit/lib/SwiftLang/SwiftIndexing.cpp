@@ -105,7 +105,7 @@ private:
       SwiftLangSupport::UIDsFromDeclAttributes(decl->getAttrs());
 
     // check if we should report an implicit @objc attribute
-    if (!decl->getAttrs().getAttribute(DeclAttrKind::DAK_ObjC)) {
+    if (!decl->getAttrs().getAttribute(DeclAttrKind::ObjC)) {
       if (auto *VD = dyn_cast<ValueDecl>(decl)) {
         if (VD->isObjC()) {
             uidAttrs.push_back(SwiftLangSupport::getUIDForObjCAttr());

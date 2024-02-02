@@ -470,7 +470,8 @@ public:
   /// of the 'unowned(unsafe)' attribute, the string passed in is 'unowned'.
   ///
   /// Also note that this recognizes both attributes like '@inline' (with no @)
-  /// and decl modifiers like 'final'.  This returns DAK_Count on failure.
+  /// and decl modifiers like 'final'.  This returns DeclAttrKind::Count on
+  /// failure.
   ///
   static DeclAttrKind getAttrKindFromString(StringRef Str);
 
@@ -500,16 +501,17 @@ public:
 };
 
 // Declare typedefs for all of the simple declaration attributes.
-#define SIMPLE_DECL_ATTR(_, CLASS, ...) \
- typedef SimpleDeclAttr<DAK_##CLASS> CLASS##Attr;
+#define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
+  typedef SimpleDeclAttr<DeclAttrKind::CLASS> CLASS##Attr;
 #include "swift/AST/Attr.def"
 
 /// Defines the @_silgen_name attribute.
 class SILGenNameAttr : public DeclAttribute {
 public:
-  SILGenNameAttr(StringRef Name, bool Raw, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_SILGenName, AtLoc, Range, Implicit),
-      Name(Name), Raw(Raw) {}
+  SILGenNameAttr(StringRef Name, bool Raw, SourceLoc AtLoc, SourceRange Range,
+                 bool Implicit)
+      : DeclAttribute(DeclAttrKind::SILGenName, AtLoc, Range, Implicit),
+        Name(Name), Raw(Raw) {}
 
   SILGenNameAttr(StringRef Name, bool Raw, bool Implicit)
     : SILGenNameAttr(Name, Raw, SourceLoc(), SourceRange(), Implicit) {}
@@ -521,7 +523,7 @@ public:
   bool Raw;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_SILGenName;
+    return DA->getKind() == DeclAttrKind::SILGenName;
   }
 };
 
@@ -529,8 +531,8 @@ public:
 class SectionAttr : public DeclAttribute {
 public:
   SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_Section, AtLoc, Range, Implicit),
-      Name(Name) {}
+      : DeclAttribute(DeclAttrKind::Section, AtLoc, Range, Implicit),
+        Name(Name) {}
 
   SectionAttr(StringRef Name, bool Implicit)
     : SectionAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
@@ -539,7 +541,7 @@ public:
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Section;
+    return DA->getKind() == DeclAttrKind::Section;
   }
 };
 
@@ -547,8 +549,8 @@ public:
 class CDeclAttr : public DeclAttribute {
 public:
   CDeclAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_CDecl, AtLoc, Range, Implicit),
-      Name(Name) {}
+      : DeclAttribute(DeclAttrKind::CDecl, AtLoc, Range, Implicit), Name(Name) {
+  }
 
   CDeclAttr(StringRef Name, bool Implicit)
     : CDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
@@ -557,7 +559,7 @@ public:
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_CDecl;
+    return DA->getKind() == DeclAttrKind::CDecl;
   }
 };
 
@@ -566,8 +568,8 @@ class SemanticsAttr : public DeclAttribute {
 public:
   SemanticsAttr(StringRef Value, SourceLoc AtLoc, SourceRange Range,
                 bool Implicit)
-  : DeclAttribute(DAK_Semantics, AtLoc, Range, Implicit),
-  Value(Value) {}
+      : DeclAttribute(DeclAttrKind::Semantics, AtLoc, Range, Implicit),
+        Value(Value) {}
 
   SemanticsAttr(StringRef Value, bool Implicit)
   : SemanticsAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
@@ -576,7 +578,7 @@ public:
   const StringRef Value;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Semantics;
+    return DA->getKind() == DeclAttrKind::Semantics;
   }
 };
 
@@ -585,14 +587,14 @@ class AlignmentAttr : public DeclAttribute {
 public:
   AlignmentAttr(unsigned Value, SourceLoc AtLoc, SourceRange Range,
                 bool Implicit)
-      : DeclAttribute(DAK_Alignment, AtLoc, Range, Implicit) {
+      : DeclAttribute(DeclAttrKind::Alignment, AtLoc, Range, Implicit) {
     Bits.AlignmentAttr.Value = Value;
   }
 
   unsigned getValue() const { return Bits.AlignmentAttr.Value; }
   
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Alignment;
+    return DA->getKind() == DeclAttrKind::Alignment;
   }
 };
 
@@ -608,17 +610,17 @@ public:
 /// override all the necessary NSObject refcounting methods.
 class SwiftNativeObjCRuntimeBaseAttr : public DeclAttribute {
 public:
-  SwiftNativeObjCRuntimeBaseAttr(Identifier BaseClassName,
-                                 SourceLoc AtLoc, SourceRange Range,
-                                 bool Implicit)
-    : DeclAttribute(DAK_SwiftNativeObjCRuntimeBase, AtLoc, Range, Implicit),
-      BaseClassName(BaseClassName) {}
-  
+  SwiftNativeObjCRuntimeBaseAttr(Identifier BaseClassName, SourceLoc AtLoc,
+                                 SourceRange Range, bool Implicit)
+      : DeclAttribute(DeclAttrKind::SwiftNativeObjCRuntimeBase, AtLoc, Range,
+                      Implicit),
+        BaseClassName(BaseClassName) {}
+
   // The base class's name.
   const Identifier BaseClassName;
   
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_SwiftNativeObjCRuntimeBase;
+    return DA->getKind() == DeclAttrKind::SwiftNativeObjCRuntimeBase;
   }
 };
 
@@ -666,27 +668,21 @@ public:
 #define INIT_VER_TUPLE(X)                                                      \
   X(X.empty() ? llvm::Optional<llvm::VersionTuple>() : X)
 
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
-                   PlatformKind Platform,
-                   StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
-                   const llvm::VersionTuple &Introduced,
-                   SourceRange IntroducedRange,
-                   const llvm::VersionTuple &Deprecated,
-                   SourceRange DeprecatedRange,
-                   const llvm::VersionTuple &Obsoleted,
-                   SourceRange ObsoletedRange,
-                   PlatformAgnosticAvailabilityKind PlatformAgnostic,
-                   bool Implicit,
-                   bool IsSPI)
-    : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
-      Message(Message), Rename(Rename), RenameDecl(RenameDecl),
-      INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
-      INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
-      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
-      PlatformAgnostic(PlatformAgnostic),
-      Platform(Platform),
-      IsSPI(IsSPI)
-  {}
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
+                StringRef Message, StringRef Rename, ValueDecl *RenameDecl,
+                const llvm::VersionTuple &Introduced,
+                SourceRange IntroducedRange,
+                const llvm::VersionTuple &Deprecated,
+                SourceRange DeprecatedRange,
+                const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
+                PlatformAgnosticAvailabilityKind PlatformAgnostic,
+                bool Implicit, bool IsSPI)
+      : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
+        Message(Message), Rename(Rename), RenameDecl(RenameDecl),
+        INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
+        INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
+        INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
+        PlatformAgnostic(PlatformAgnostic), Platform(Platform), IsSPI(IsSPI) {}
 
 #undef INIT_VER_TUPLE
 
@@ -807,7 +803,7 @@ public:
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Available;
+    return DA->getKind() == DeclAttrKind::Available;
   }
 };
 
@@ -822,7 +818,8 @@ class ObjCAttr final : public DeclAttribute,
 
   /// Create an implicit @objc attribute with the given (optional) name.
   explicit ObjCAttr(llvm::Optional<ObjCSelector> name, bool implicitName)
-      : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
+      : DeclAttribute(DeclAttrKind::ObjC, SourceLoc(), SourceRange(),
+                      /*Implicit=*/true),
         NameData(nullptr) {
     Bits.ObjCAttr.HasTrailingLocationInfo = false;
     Bits.ObjCAttr.ImplicitName = implicitName;
@@ -950,26 +947,28 @@ public:
   ObjCAttr *clone(ASTContext &context) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ObjC;
+    return DA->getKind() == DeclAttrKind::ObjC;
   }
 };
 
 class MainTypeAttr final : public DeclAttribute {
 public:
   MainTypeAttr(bool isImplicit)
-      : DeclAttribute(DAK_MainType, SourceLoc(), SourceLoc(), isImplicit) {}
+      : DeclAttribute(DeclAttrKind::MainType, SourceLoc(), SourceLoc(),
+                      isImplicit) {}
 
   MainTypeAttr(SourceLoc AtLoc, SourceLoc NameLoc)
-      : DeclAttribute(DAK_MainType, AtLoc,
+      : DeclAttribute(DeclAttrKind::MainType, AtLoc,
                       SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
                       /*Implicit=*/false) {}
 
   MainTypeAttr(SourceLoc NameLoc)
-      : DeclAttribute(DAK_MainType, SourceLoc(), SourceRange(NameLoc, NameLoc),
+      : DeclAttribute(DeclAttrKind::MainType, SourceLoc(),
+                      SourceRange(NameLoc, NameLoc),
                       /*Implicit=*/false) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_MainType;
+    return DA->getKind() == DeclAttrKind::MainType;
   }
 };
 
@@ -989,7 +988,7 @@ public:
     return SourceFile;
   }
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_PrivateImport;
+    return DA->getKind() == DeclAttrKind::PrivateImport;
   }
 };
 
@@ -1010,20 +1009,20 @@ class DynamicReplacementAttr final
                          SourceRange parenRange);
 
   DynamicReplacementAttr(DeclNameRef name, AbstractFunctionDecl *f)
-      : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
+      : DeclAttribute(DeclAttrKind::DynamicReplacement, SourceLoc(),
+                      SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name),
-        Resolver(nullptr), ResolverContextData(0) {
+        ReplacedFunctionName(name), Resolver(nullptr), ResolverContextData(0) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
-  DynamicReplacementAttr(DeclNameRef name,
-                         LazyMemberLoader *Resolver = nullptr,
+  DynamicReplacementAttr(DeclNameRef name, LazyMemberLoader *Resolver = nullptr,
                          uint64_t Data = 0)
-      : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
+      : DeclAttribute(DeclAttrKind::DynamicReplacement, SourceLoc(),
+                      SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name),
-        Resolver(Resolver), ResolverContextData(Data) {
+        ReplacedFunctionName(name), Resolver(Resolver),
+        ResolverContextData(Data) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
@@ -1066,7 +1065,7 @@ public:
   SourceLoc getRParenLoc() const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_DynamicReplacement;
+    return DA->getKind() == DeclAttrKind::DynamicReplacement;
   }
 };
 
@@ -1080,9 +1079,10 @@ class TypeEraserAttr final : public DeclAttribute {
 
   TypeEraserAttr(SourceLoc atLoc, SourceRange range, TypeExpr *typeEraserExpr,
                  LazyMemberLoader *Resolver, uint64_t Data)
-      : DeclAttribute(DAK_TypeEraser, atLoc, range, /*Implicit=*/false),
-        TypeEraserExpr(typeEraserExpr),
-        Resolver(Resolver), ResolverContextData(Data) {}
+      : DeclAttribute(DeclAttrKind::TypeEraser, atLoc, range,
+                      /*Implicit=*/false),
+        TypeEraserExpr(typeEraserExpr), Resolver(Resolver),
+        ResolverContextData(Data) {}
 
 public:
   static TypeEraserAttr *create(ASTContext &ctx,
@@ -1120,7 +1120,7 @@ public:
   Type getResolvedType(const ProtocolDecl *PD) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_TypeEraser;
+    return DA->getKind() == DeclAttrKind::TypeEraser;
   }
 };
 
@@ -1140,8 +1140,8 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_AccessControl ||
-           DA->getKind() == DAK_SetterAccess;
+    return DA->getKind() == DeclAttrKind::AccessControl ||
+           DA->getKind() == DeclAttrKind::SetterAccess;
   }
 };
 
@@ -1150,11 +1150,11 @@ class AccessControlAttr : public AbstractAccessControlAttr {
 public:
   AccessControlAttr(SourceLoc atLoc, SourceRange range, AccessLevel access,
                     bool implicit = false)
-      : AbstractAccessControlAttr(DAK_AccessControl, atLoc, range, access,
-                                  implicit) {}
+      : AbstractAccessControlAttr(DeclAttrKind::AccessControl, atLoc, range,
+                                  access, implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_AccessControl;
+    return DA->getKind() == DeclAttrKind::AccessControl;
   }
 };
 
@@ -1162,13 +1162,13 @@ public:
 /// declaration.
 class SetterAccessAttr : public AbstractAccessControlAttr {
 public:
-  SetterAccessAttr(SourceLoc atLoc, SourceRange range,
-                          AccessLevel access, bool implicit = false)
-      : AbstractAccessControlAttr(DAK_SetterAccess, atLoc, range, access,
-                                  implicit) {}
+  SetterAccessAttr(SourceLoc atLoc, SourceRange range, AccessLevel access,
+                   bool implicit = false)
+      : AbstractAccessControlAttr(DeclAttrKind::SetterAccess, atLoc, range,
+                                  access, implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_SetterAccess;
+    return DA->getKind() == DeclAttrKind::SetterAccess;
   }
 };
 
@@ -1200,7 +1200,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_SPIAccessControl;
+    return DA->getKind() == DeclAttrKind::SPIAccessControl;
   }
 };
 
@@ -1208,7 +1208,7 @@ public:
 class InlineAttr : public DeclAttribute {
 public:
   InlineAttr(SourceLoc atLoc, SourceRange range, InlineKind kind)
-      : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false) {
+      : DeclAttribute(DeclAttrKind::Inline, atLoc, range, /*Implicit=*/false) {
     Bits.InlineAttr.kind = unsigned(kind);
   }
 
@@ -1217,7 +1217,7 @@ public:
 
   InlineKind getKind() const { return InlineKind(Bits.InlineAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Inline;
+    return DA->getKind() == DeclAttrKind::Inline;
   }
 };
 
@@ -1225,7 +1225,8 @@ public:
 class OptimizeAttr : public DeclAttribute {
 public:
   OptimizeAttr(SourceLoc atLoc, SourceRange range, OptimizationMode mode)
-      : DeclAttribute(DAK_Optimize, atLoc, range, /*Implicit=*/false) {
+      : DeclAttribute(DeclAttrKind::Optimize, atLoc, range,
+                      /*Implicit=*/false) {
     Bits.OptimizeAttr.mode = unsigned(mode);
   }
 
@@ -1236,7 +1237,7 @@ public:
     return OptimizationMode(Bits.OptimizeAttr.mode);
   }
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Optimize;
+    return DA->getKind() == DeclAttrKind::Optimize;
   }
 };
 
@@ -1253,8 +1254,9 @@ private:
 
 public:
   ExclusivityAttr(SourceLoc atLoc, SourceRange range, Mode mode)
-     : DeclAttribute(DAK_Exclusivity, atLoc, range, /*Implicit=*/false),
-       mode(mode) {}
+      : DeclAttribute(DeclAttrKind::Exclusivity, atLoc, range,
+                      /*Implicit=*/false),
+        mode(mode) {}
 
   ExclusivityAttr(Mode mode)
     : ExclusivityAttr(SourceLoc(), SourceRange(), mode) {}
@@ -1262,7 +1264,7 @@ public:
   Mode getMode() const { return mode; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Exclusivity;
+    return DA->getKind() == DeclAttrKind::Exclusivity;
   }
 };
 
@@ -1273,13 +1275,13 @@ class EffectsAttr : public DeclAttribute {
 
 public:
   EffectsAttr(SourceLoc atLoc, SourceRange range, EffectsKind kind)
-      : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false) {
+      : DeclAttribute(DeclAttrKind::Effects, atLoc, range, /*Implicit=*/false) {
     Bits.EffectsAttr.kind = unsigned(kind);
   }
 
   EffectsAttr(SourceLoc atLoc, SourceRange range, StringRef customString,
               SourceLoc customStringLoc)
-      : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false),
+      : DeclAttribute(DeclAttrKind::Effects, atLoc, range, /*Implicit=*/false),
         customString(customString), customStringLoc(customStringLoc) {
     Bits.EffectsAttr.kind = unsigned(EffectsKind::Custom);
   }
@@ -1301,7 +1303,7 @@ public:
 
   EffectsKind getKind() const { return EffectsKind(Bits.EffectsAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Effects;
+    return DA->getKind() == DeclAttrKind::Effects;
   }
 
   EffectsAttr *clone(ASTContext &ctx) const {
@@ -1318,7 +1320,7 @@ public:
 class ReferenceOwnershipAttr : public DeclAttribute {
 public:
   ReferenceOwnershipAttr(SourceRange range, ReferenceOwnership kind)
-      : DeclAttribute(DAK_ReferenceOwnership, range.Start, range,
+      : DeclAttribute(DeclAttrKind::ReferenceOwnership, range.Start, range,
                       /*Implicit=*/false) {
     Bits.ReferenceOwnershipAttr.ownership = unsigned(kind);
   }
@@ -1336,7 +1338,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ReferenceOwnership;
+    return DA->getKind() == DeclAttrKind::ReferenceOwnership;
   }
 };
 
@@ -1348,14 +1350,14 @@ class RawDocCommentAttr : public DeclAttribute {
 
 public:
   RawDocCommentAttr(CharSourceRange CommentRange)
-      : DeclAttribute(DAK_RawDocComment, SourceLoc(), SourceRange(),
+      : DeclAttribute(DeclAttrKind::RawDocComment, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
         CommentRange(CommentRange) {}
 
   CharSourceRange getCommentRange() const { return CommentRange; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_RawDocComment;
+    return DA->getKind() == DeclAttrKind::RawDocComment;
   }
 };
 
@@ -1369,18 +1371,16 @@ class ObjCBridgedAttr : public DeclAttribute {
 
 public:
   ObjCBridgedAttr(ClassDecl *ObjCClass)
-    : DeclAttribute(DAK_ObjCBridged, SourceLoc(), SourceRange(),
-                    /*Implicit=*/true),
-      ObjCClass(ObjCClass)
-  {
-  }
+      : DeclAttribute(DeclAttrKind::ObjCBridged, SourceLoc(), SourceRange(),
+                      /*Implicit=*/true),
+        ObjCClass(ObjCClass) {}
 
   /// Retrieve the Objective-C class to which this foreign class is toll-free
   /// bridged.
   ClassDecl *getObjCClass() const { return ObjCClass; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ObjCBridged;
+    return DA->getKind() == DeclAttrKind::ObjCBridged;
   }
 };
 
@@ -1395,12 +1395,12 @@ class SynthesizedProtocolAttr : public DeclAttribute {
   ProtocolDecl *protocol;
 
 public:
-  SynthesizedProtocolAttr(ProtocolDecl *protocol,
-                          LazyConformanceLoader *Loader,
+  SynthesizedProtocolAttr(ProtocolDecl *protocol, LazyConformanceLoader *Loader,
                           bool isUnchecked)
-    : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
-                    /*Implicit=*/true), Loader(Loader), protocol(protocol)
-  {
+      : DeclAttribute(DeclAttrKind::SynthesizedProtocol, SourceLoc(),
+                      SourceRange(),
+                      /*Implicit=*/true),
+        Loader(Loader), protocol(protocol) {
     Bits.SynthesizedProtocolAttr.isUnchecked = unsigned(isUnchecked);
   }
 
@@ -1419,7 +1419,7 @@ public:
   LazyConformanceLoader *getLazyLoader() const { return Loader; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_SynthesizedProtocol;
+    return DA->getKind() == DeclAttrKind::SynthesizedProtocol;
   }
 };
 
@@ -1551,7 +1551,7 @@ public:
   getSpecializedSignature(const AbstractFunctionDecl *forDecl) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Specialize;
+    return DA->getKind() == DeclAttrKind::Specialize;
   }
 };
 
@@ -1593,7 +1593,7 @@ public:
                                          ArrayRef<Identifier> accesses);
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_StorageRestrictions;
+    return DA->getKind() == DeclAttrKind::StorageRestrictions;
   }
 };
 
@@ -1627,7 +1627,7 @@ public:
   DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Implements;
+    return DA->getKind() == DeclAttrKind::Implements;
   }
 };
 
@@ -1640,8 +1640,8 @@ class ObjCRuntimeNameAttr : public DeclAttribute {
 public:
   ObjCRuntimeNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range,
                       bool Implicit)
-    : DeclAttribute(DAK_ObjCRuntimeName, AtLoc, Range, Implicit),
-      Name(Name) {}
+      : DeclAttribute(DeclAttrKind::ObjCRuntimeName, AtLoc, Range, Implicit),
+        Name(Name) {}
 
   explicit ObjCRuntimeNameAttr(const ObjCAttr &Original)
     : ObjCRuntimeNameAttr(getSimpleName(Original), Original.AtLoc,
@@ -1650,7 +1650,7 @@ public:
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ObjCRuntimeName;
+    return DA->getKind() == DeclAttrKind::ObjCRuntimeName;
   }
 };
 
@@ -1659,15 +1659,16 @@ public:
 class RestatedObjCConformanceAttr : public DeclAttribute {
 public:
   explicit RestatedObjCConformanceAttr(ProtocolDecl *proto)
-    : DeclAttribute(DAK_RestatedObjCConformance, SourceLoc(), SourceRange(),
-                    /*Implicit=*/true),
-      Proto(proto) {}
+      : DeclAttribute(DeclAttrKind::RestatedObjCConformance, SourceLoc(),
+                      SourceRange(),
+                      /*Implicit=*/true),
+        Proto(proto) {}
 
   /// The protocol to which this type conforms.
   ProtocolDecl * const Proto;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_RestatedObjCConformance;
+    return DA->getKind() == DeclAttrKind::RestatedObjCConformance;
   }
 };
 
@@ -1702,9 +1703,9 @@ public:
 
   explicit ClangImporterSynthesizedTypeAttr(StringRef originalTypeName,
                                             Kind kind)
-    : DeclAttribute(DAK_ClangImporterSynthesizedType, SourceLoc(),
-                    SourceRange(), /*Implicit=*/true),
-      originalTypeName(originalTypeName) {
+      : DeclAttribute(DeclAttrKind::ClangImporterSynthesizedType, SourceLoc(),
+                      SourceRange(), /*Implicit=*/true),
+        originalTypeName(originalTypeName) {
     assert(!originalTypeName.empty());
     Bits.ClangImporterSynthesizedTypeAttr.kind = unsigned(kind);
   }
@@ -1728,7 +1729,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ClangImporterSynthesizedType;
+    return DA->getKind() == DeclAttrKind::ClangImporterSynthesizedType;
   }
 };
 
@@ -1788,7 +1789,7 @@ public:
   PatternBindingInitializer *getInitContext() const { return initContext; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Custom;
+    return DA->getKind() == DeclAttrKind::Custom;
   }
 
 private:
@@ -1811,17 +1812,17 @@ private:
 /// \c _projectedValuePropertyAttr($foo) to \c foo to record the link.
 class ProjectedValuePropertyAttr : public DeclAttribute {
 public:
-  ProjectedValuePropertyAttr(Identifier PropertyName,
-                              SourceLoc AtLoc, SourceRange Range,
-                              bool Implicit)
-    : DeclAttribute(DAK_ProjectedValueProperty, AtLoc, Range, Implicit),
-      ProjectionPropertyName(PropertyName) {}
+  ProjectedValuePropertyAttr(Identifier PropertyName, SourceLoc AtLoc,
+                             SourceRange Range, bool Implicit)
+      : DeclAttribute(DeclAttrKind::ProjectedValueProperty, AtLoc, Range,
+                      Implicit),
+        ProjectionPropertyName(PropertyName) {}
 
   // The projection property name.
   const Identifier ProjectionPropertyName;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ProjectedValueProperty;
+    return DA->getKind() == DeclAttrKind::ProjectedValueProperty;
   }
 };
 
@@ -1837,14 +1838,12 @@ public:
 class OriginallyDefinedInAttr: public DeclAttribute {
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
-                          StringRef OriginalModuleName,
-                          PlatformKind Platform,
-                          const llvm::VersionTuple MovedVersion,
-                          bool Implicit)
-    : DeclAttribute(DAK_OriginallyDefinedIn, AtLoc, Range, Implicit),
-      OriginalModuleName(OriginalModuleName),
-      Platform(Platform),
-      MovedVersion(MovedVersion) {}
+                          StringRef OriginalModuleName, PlatformKind Platform,
+                          const llvm::VersionTuple MovedVersion, bool Implicit)
+      : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range,
+                      Implicit),
+        OriginalModuleName(OriginalModuleName), Platform(Platform),
+        MovedVersion(MovedVersion) {}
 
   OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
@@ -1868,7 +1867,7 @@ public:
   /// The value provides more details about the active platform.
   llvm::Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_OriginallyDefinedIn;
+    return DA->getKind() == DeclAttrKind::OriginallyDefinedIn;
   }
 };
 
@@ -2015,7 +2014,7 @@ public:
   void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Differentiable;
+    return DA->getKind() == DeclAttrKind::Differentiable;
   }
 };
 
@@ -2154,7 +2153,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Derivative;
+    return DA->getKind() == DeclAttrKind::Derivative;
   }
 };
 
@@ -2238,7 +2237,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Transpose;
+    return DA->getKind() == DeclAttrKind::Transpose;
   }
 };
 
@@ -2258,9 +2257,8 @@ class NonSendableAttr : public DeclAttribute {
 public:
   NonSendableAttr(SourceLoc AtLoc, SourceRange Range,
                   NonSendableKind Specificity, bool Implicit = false)
-    : DeclAttribute(DAK_NonSendable, AtLoc, Range, Implicit),
-      Specificity(Specificity)
-  {}
+      : DeclAttribute(DeclAttrKind::NonSendable, AtLoc, Range, Implicit),
+        Specificity(Specificity) {}
 
   NonSendableAttr(NonSendableKind Specificity, bool Implicit = false)
     : NonSendableAttr(SourceLoc(), SourceRange(), Specificity, Implicit) {}
@@ -2269,7 +2267,7 @@ public:
   const NonSendableKind Specificity;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_NonSendable;
+    return DA->getKind() == DeclAttrKind::NonSendable;
   }
 };
 
@@ -2279,7 +2277,8 @@ class UnavailableFromAsyncAttr : public DeclAttribute {
 public:
   UnavailableFromAsyncAttr(StringRef Message, SourceLoc AtLoc,
                            SourceRange Range, bool Implicit)
-      : DeclAttribute(DAK_UnavailableFromAsync, AtLoc, Range, Implicit),
+      : DeclAttribute(DeclAttrKind::UnavailableFromAsync, AtLoc, Range,
+                      Implicit),
         Message(Message) {}
   UnavailableFromAsyncAttr(StringRef Message, bool Implicit)
       : UnavailableFromAsyncAttr(Message, SourceLoc(), SourceRange(),
@@ -2289,7 +2288,7 @@ public:
   bool hasMessage() const { return !Message.empty(); }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_UnavailableFromAsync;
+    return DA->getKind() == DeclAttrKind::UnavailableFromAsync;
   }
 };
 
@@ -2300,7 +2299,7 @@ class BackDeployedAttr : public DeclAttribute {
 public:
   BackDeployedAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
                    const llvm::VersionTuple Version, bool Implicit)
-      : DeclAttribute(DAK_BackDeployed, AtLoc, Range, Implicit),
+      : DeclAttribute(DeclAttrKind::BackDeployed, AtLoc, Range, Implicit),
         Platform(Platform), Version(Version) {}
 
   /// The platform the symbol is available for back deployment on.
@@ -2313,7 +2312,7 @@ public:
   bool isActivePlatform(const ASTContext &ctx) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_BackDeployed;
+    return DA->getKind() == DeclAttrKind::BackDeployed;
   }
 };
 
@@ -2323,7 +2322,8 @@ class ExposeAttr : public DeclAttribute {
 public:
   ExposeAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range,
              ExposureKind Kind, bool Implicit)
-      : DeclAttribute(DAK_Expose, AtLoc, Range, Implicit), Name(Name) {
+      : DeclAttribute(DeclAttrKind::Expose, AtLoc, Range, Implicit),
+        Name(Name) {
     Bits.ExposeAttr.kind = static_cast<unsigned>(Kind);
   }
 
@@ -2339,7 +2339,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Expose;
+    return DA->getKind() == DeclAttrKind::Expose;
   }
 };
 
@@ -2353,8 +2353,9 @@ public:
              llvm::Optional<StringRef> Name, SourceLoc AtLoc,
              SourceLoc LParenLoc, SourceLoc RParenLoc, SourceRange Range,
              ExternKind Kind, bool Implicit)
-      : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit), LParenLoc(LParenLoc),
-        RParenLoc(RParenLoc), ModuleName(ModuleName), Name(Name) {
+      : DeclAttribute(DeclAttrKind::Extern, AtLoc, Range, Implicit),
+        LParenLoc(LParenLoc), RParenLoc(RParenLoc), ModuleName(ModuleName),
+        Name(Name) {
     Bits.ExternAttr.kind = static_cast<unsigned>(Kind);
   }
 
@@ -2387,7 +2388,7 @@ public:
   static ExternAttr *find(DeclAttributes &attrs, ExternKind kind);
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Extern;
+    return DA->getKind() == DeclAttrKind::Extern;
   }
 };
 
@@ -2397,7 +2398,7 @@ class DocumentationAttr: public DeclAttribute {
 public:
   DocumentationAttr(SourceLoc AtLoc, SourceRange Range, StringRef Metadata,
                     llvm::Optional<AccessLevel> Visibility, bool Implicit)
-      : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
+      : DeclAttribute(DeclAttrKind::Documentation, AtLoc, Range, Implicit),
         Metadata(Metadata), Visibility(Visibility) {}
 
   DocumentationAttr(StringRef Metadata, llvm::Optional<AccessLevel> Visibility,
@@ -2409,7 +2410,7 @@ public:
   const llvm::Optional<AccessLevel> Visibility;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Documentation;
+    return DA->getKind() == DeclAttrKind::Documentation;
   }
 };
 
@@ -2420,8 +2421,8 @@ public:
   ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
                          SourceRange Range, bool Implicit = false,
                          bool isCategoryNameInvalid = false)
-    : DeclAttribute(DAK_ObjCImplementation, AtLoc, Range, Implicit),
-      CategoryName(CategoryName) {
+      : DeclAttribute(DeclAttrKind::ObjCImplementation, AtLoc, Range, Implicit),
+        CategoryName(CategoryName) {
     Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
   }
 
@@ -2434,7 +2435,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ObjCImplementation;
+    return DA->getKind() == DeclAttrKind::ObjCImplementation;
   }
 };
 
@@ -2443,7 +2444,7 @@ class NonisolatedAttr final : public DeclAttribute {
 public:
   NonisolatedAttr(SourceLoc atLoc, SourceRange range, bool unsafe,
                   bool implicit)
-      : DeclAttribute(DAK_Nonisolated, atLoc, range, implicit) {
+      : DeclAttribute(DeclAttrKind::Nonisolated, atLoc, range, implicit) {
     Bits.NonisolatedAttr.isUnsafe = unsafe;
     assert((isUnsafe() == unsafe) && "not enough bits for unsafe state");
   }
@@ -2454,7 +2455,7 @@ public:
   bool isUnsafe() const { return Bits.NonisolatedAttr.isUnsafe; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Nonisolated;
+    return DA->getKind() == DeclAttrKind::Nonisolated;
   }
 };
 
@@ -2504,7 +2505,7 @@ public:
   bool hasNameKind(MacroIntroducedDeclNameKind kind) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_MacroRole;
+    return DA->getKind() == DeclAttrKind::MacroRole;
   }
 };
 
@@ -2525,29 +2526,25 @@ class RawLayoutAttr final : public DeclAttribute {
 
 public:
   /// Construct a `@_rawLayout(like: T)` attribute.
-  RawLayoutAttr(TypeRepr *LikeType,
-                SourceLoc AtLoc,
-                SourceRange Range)
-    : DeclAttribute(DAK_RawLayout, AtLoc, Range, /*implicit*/false),
-      LikeType(LikeType), SizeOrCount(0), Alignment(~0u)
-  {}
-  
+  RawLayoutAttr(TypeRepr *LikeType, SourceLoc AtLoc, SourceRange Range)
+      : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
+                      /*implicit*/ false),
+        LikeType(LikeType), SizeOrCount(0), Alignment(~0u) {}
+
   /// Construct a `@_rawLayout(likeArrayOf: T, count: N)` attribute.
-  RawLayoutAttr(TypeRepr *LikeType, unsigned Count,
-                SourceLoc AtLoc,
+  RawLayoutAttr(TypeRepr *LikeType, unsigned Count, SourceLoc AtLoc,
                 SourceRange Range)
-    : DeclAttribute(DAK_RawLayout, AtLoc, Range, /*implicit*/false),
-      LikeType(LikeType), SizeOrCount(Count), Alignment(0)
-  {}
-  
+      : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
+                      /*implicit*/ false),
+        LikeType(LikeType), SizeOrCount(Count), Alignment(0) {}
+
   /// Construct a `@_rawLayout(size: N, alignment: M)` attribute.
-  RawLayoutAttr(unsigned Size, unsigned Alignment,
-                SourceLoc AtLoc,
+  RawLayoutAttr(unsigned Size, unsigned Alignment, SourceLoc AtLoc,
                 SourceRange Range)
-    : DeclAttribute(DAK_RawLayout, AtLoc, Range, /*implicit*/false),
-      LikeType(nullptr), SizeOrCount(Size), Alignment(Alignment)
-  {}
-  
+      : DeclAttribute(DeclAttrKind::RawLayout, AtLoc, Range,
+                      /*implicit*/ false),
+        LikeType(nullptr), SizeOrCount(Size), Alignment(Alignment) {}
+
   /// Return the type whose single-element layout the attribute type should get
   /// its layout from. Returns null if the attribute specifies an array or manual
   /// layout.
@@ -2604,7 +2601,7 @@ public:
   }
   
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_RawLayout;
+    return DA->getKind() == DeclAttrKind::RawLayout;
   }
 };
 
@@ -3042,10 +3039,11 @@ template <TypeAttrKind Kind>
 using SimpleTypeAttrWithArgs = SimpleTypeAttr<Kind, AtTypeAttrWithArgsBase>;
 
 #define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                                      \
-  using CLASS##TypeAttr = SimpleTypeAttr<TAK_##CLASS>;
+  using CLASS##TypeAttr = SimpleTypeAttr<TypeAttrKind::CLASS>;
 #include "swift/AST/Attr.def"
 
-class ConventionTypeAttr : public SimpleTypeAttrWithArgs<TAK_Convention> {
+class ConventionTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::Convention> {
   Located<StringRef> Name;
   DeclNameRef WitnessMethodProtocol;
   Located<StringRef> ClangType;
@@ -3076,7 +3074,7 @@ public:
 };
 
 class DifferentiableTypeAttr
-    : public SimpleTypeAttrWithArgs<TAK_Differentiable> {
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::Differentiable> {
   SourceLoc DifferentiabilityLoc;
 public:
   DifferentiableTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
@@ -3106,7 +3104,7 @@ public:
 };
 
 class OpaqueReturnTypeOfTypeAttr
-    : public SimpleTypeAttrWithArgs<TAK_OpaqueReturnTypeOf> {
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::OpaqueReturnTypeOf> {
   Located<StringRef> MangledName;
   SourceLoc IndexLoc;
 public:
@@ -3125,7 +3123,7 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-class OpenedTypeAttr : public SimpleTypeAttrWithArgs<TAK_Opened> {
+class OpenedTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Opened> {
   Located<UUID> ID;
   TypeRepr *ConstraintType;
 public:
@@ -3147,7 +3145,8 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-class PackElementTypeAttr : public SimpleTypeAttrWithArgs<TAK_PackElement> {
+class PackElementTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::PackElement> {
   Located<UUID> ID;
 public:
   PackElementTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,

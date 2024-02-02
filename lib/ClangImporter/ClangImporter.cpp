@@ -5651,11 +5651,11 @@ DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
   auto attrs = DeclAttributes();
   for (auto attr : decl->getAttrs()) {
     switch (attr->getKind()) {
-    case DAK_Available: {
+    case DeclAttrKind::Available: {
       attrs.add(cast<AvailableAttr>(attr)->clone(context, true));
       break;
     }
-    case DAK_Custom: {
+    case DeclAttrKind::Custom: {
       if (CustomAttr *cAttr = cast<CustomAttr>(attr)) {
         attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
                                      cAttr->getInitContext(), cAttr->getArgs(),
@@ -5663,23 +5663,23 @@ DeclAttributes cloneImportedAttributes(ValueDecl *decl, ASTContext &context) {
       }
       break;
     }
-    case DAK_DiscardableResult: {
+    case DeclAttrKind::DiscardableResult: {
       attrs.add(new (context) DiscardableResultAttr(true));
       break;
     }
-    case DAK_Effects: {
+    case DeclAttrKind::Effects: {
       attrs.add(cast<EffectsAttr>(attr)->clone(context));
       break;
     }
-    case DAK_Final: {
+    case DeclAttrKind::Final: {
       attrs.add(new (context) FinalAttr(true));
       break;
     }
-    case DAK_Transparent: {
+    case DeclAttrKind::Transparent: {
       attrs.add(new (context) TransparentAttr(true));
       break;
     }
-    case DAK_WarnUnqualifiedAccess: {
+    case DeclAttrKind::WarnUnqualifiedAccess: {
       attrs.add(new (context) WarnUnqualifiedAccessAttr(true));
       break;
     }

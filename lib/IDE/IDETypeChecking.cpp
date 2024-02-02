@@ -114,7 +114,7 @@ PrintOptions PrintOptions::printDocInterface() {
       PrintOptions::printModuleInterface(/*printFullConvention*/ false);
   result.PrintAccess = false;
   result.SkipUnavailable = false;
-  result.ExcludeAttrList.push_back(DAK_Available);
+  result.ExcludeAttrList.push_back(DeclAttrKind::Available);
   result.ArgAndParamPrinting =
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
   result.PrintDocumentationComments = false;

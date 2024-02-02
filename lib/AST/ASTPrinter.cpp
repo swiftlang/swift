@@ -360,13 +360,13 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PrintAccess = true;
 
   result.ExcludeAttrList = {
-    DAK_AccessControl,
-    DAK_SetterAccess,
-    DAK_Lazy,
-    DAK_ObjCImplementation,
-    DAK_StaticInitializeObjCMetadata,
-    DAK_RestatedObjCConformance,
-    DAK_NonSendable,
+      DeclAttrKind::AccessControl,
+      DeclAttrKind::SetterAccess,
+      DeclAttrKind::Lazy,
+      DeclAttrKind::ObjCImplementation,
+      DeclAttrKind::StaticInitializeObjCMetadata,
+      DeclAttrKind::RestatedObjCConformance,
+      DeclAttrKind::NonSendable,
   };
 
   return result;
@@ -801,18 +801,21 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAccess(const ValueDecl *D) {
-    assert(!llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl) ||
-           llvm::is_contained(Options.ExcludeAttrList, DAK_SetterAccess));
+    assert(!llvm::is_contained(Options.ExcludeAttrList,
+                               DeclAttrKind::AccessControl) ||
+           llvm::is_contained(Options.ExcludeAttrList,
+                              DeclAttrKind::SetterAccess));
 
     if (!Options.PrintAccess || isa<ProtocolDecl>(D->getDeclContext()))
       return;
     if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
-        !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
+        !llvm::is_contained(Options.ExcludeAttrList,
+                            DeclAttrKind::AccessControl))
       return;
 
     printAccess(D->getFormalAccess());
     bool shouldSkipSetterAccess =
-      llvm::is_contained(Options.ExcludeAttrList, DAK_SetterAccess);
+        llvm::is_contained(Options.ExcludeAttrList, DeclAttrKind::SetterAccess);
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getAccessor(AccessorKind::Set)) {
@@ -1200,7 +1203,7 @@ void PrintAST::printAttributes(const Decl *D) {
     // Don't print a redundant 'final' if we are printing a 'static' decl.
     if (D->getDeclContext()->getSelfClassDecl() &&
         getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
-      Options.ExcludeAttrList.push_back(DAK_Final);
+      Options.ExcludeAttrList.push_back(DeclAttrKind::Final);
     }
 
     if (auto vd = dyn_cast<VarDecl>(D)) {
@@ -1209,7 +1212,7 @@ void PrintAST::printAttributes(const Decl *D) {
       // @objcImplementation extension (where final properties should appear
       // computed).
       if (vd->isInitExposedToClients() || vd->isResilient() || isInObjCImpl(vd))
-        Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
+        Options.ExcludeAttrList.push_back(DeclAttrKind::HasInitialValue);
 
       if (!Options.PrintForSIL) {
         // Don't print @_hasStorage if the value is simply stored, or the
@@ -1217,27 +1220,28 @@ void PrintAST::printAttributes(const Decl *D) {
         if (vd->isResilient() ||
             (vd->getImplInfo().isSimpleStored() &&
              !hasLessAccessibleSetter(vd)))
-          Options.ExcludeAttrList.push_back(DAK_HasStorage);
+          Options.ExcludeAttrList.push_back(DeclAttrKind::HasStorage);
       }
     }
 
     // Add SPIs to both private and package interfaces
     if (!Options.printPublicInterface() &&
         DeclAttribute::canAttributeAppearOnDeclKind(
-          DAK_SPIAccessControl, D->getKind())) {
+            DeclAttrKind::SPIAccessControl, D->getKind())) {
       interleave(D->getSPIGroups(),
              [&](Identifier spiName) {
                Printer.printAttrName("_spi", true);
                Printer << "(" << spiName << ") ";
              },
              [&] { Printer << ""; });
-      Options.ExcludeAttrList.push_back(DAK_SPIAccessControl);
+      Options.ExcludeAttrList.push_back(DeclAttrKind::SPIAccessControl);
     }
 
     // Don't print any contextual decl modifiers.
     // We will handle 'mutating' and 'nonmutating' separately.
     if (isa<AccessorDecl>(D)) {
-#define EXCLUDE_ATTR(Class) Options.ExcludeAttrList.push_back(DAK_##Class);
+#define EXCLUDE_ATTR(Class)                                                    \
+  Options.ExcludeAttrList.push_back(DeclAttrKind::Class);
 #define CONTEXTUAL_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
@@ -1270,11 +1274,11 @@ void PrintAST::printAttributes(const Decl *D) {
 
   // We will handle ownership specifiers separately.
   if (isa<FuncDecl>(D)) {
-    Options.ExcludeAttrList.push_back(DAK_Mutating);
-    Options.ExcludeAttrList.push_back(DAK_NonMutating);
-    Options.ExcludeAttrList.push_back(DAK_LegacyConsuming);
-    Options.ExcludeAttrList.push_back(DAK_Consuming);
-    Options.ExcludeAttrList.push_back(DAK_Borrowing);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::Mutating);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::NonMutating);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::LegacyConsuming);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::Consuming);
+    Options.ExcludeAttrList.push_back(DeclAttrKind::Borrowing);
   }
 
   attrs.print(Printer, Options, D);
@@ -2229,24 +2233,24 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   switch (FD->getSelfAccessKind()) {
   case SelfAccessKind::Mutating:
     if ((!AD || AD->isAssumedNonMutating()) &&
-        !Options.excludeAttrKind(DAK_Mutating))
+        !Options.excludeAttrKind(DeclAttrKind::Mutating))
       Printer.printKeyword("mutating", Options, " ");
     break;
   case SelfAccessKind::NonMutating:
     if (AD && AD->isExplicitNonMutating() &&
-        !Options.excludeAttrKind(DAK_NonMutating))
+        !Options.excludeAttrKind(DeclAttrKind::NonMutating))
       Printer.printKeyword("nonmutating", Options, " ");
     break;
   case SelfAccessKind::LegacyConsuming:
-    if (!Options.excludeAttrKind(DAK_LegacyConsuming))
+    if (!Options.excludeAttrKind(DeclAttrKind::LegacyConsuming))
       Printer.printKeyword("__consuming", Options, " ");
     break;
   case SelfAccessKind::Consuming:
-    if (!Options.excludeAttrKind(DAK_Consuming))
+    if (!Options.excludeAttrKind(DeclAttrKind::Consuming))
       Printer.printKeyword("consuming", Options, " ");
     break;
   case SelfAccessKind::Borrowing:
-    if (!Options.excludeAttrKind(DAK_Borrowing))
+    if (!Options.excludeAttrKind(DeclAttrKind::Borrowing))
       Printer.printKeyword("borrowing", Options, " ");
     break;
   }
@@ -2693,7 +2697,7 @@ void PrintAST::printInherited(const Decl *decl) {
     if (inherited.isUnchecked())
       Printer << "@unchecked ";
     if (inherited.isRetroactive() &&
-        !llvm::is_contained(Options.ExcludeAttrList, TAK_Retroactive))
+        !llvm::is_contained(Options.ExcludeAttrList, TypeAttrKind::Retroactive))
       Printer << "@retroactive ";
     if (inherited.isPreconcurrency())
       Printer << "@preconcurrency ";
@@ -3348,7 +3352,7 @@ static bool usesFeatureUnsafeInheritExecutor(Decl *decl) {
 static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
                                         llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DAK_UnsafeInheritExecutor);
+  options.ExcludeAttrList.push_back(DeclAttrKind::UnsafeInheritExecutor);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -3382,7 +3386,7 @@ static void
 suppressingFeatureUnavailableFromAsync(PrintOptions &options,
                                        llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DAK_UnavailableFromAsync);
+  options.ExcludeAttrList.push_back(DeclAttrKind::UnavailableFromAsync);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -3671,9 +3675,9 @@ static void
 suppressingFeatureLexicalLifetimes(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DAK_EagerMove);
-  options.ExcludeAttrList.push_back(DAK_NoEagerMove);
-  options.ExcludeAttrList.push_back(DAK_LexicalLifetimes);
+  options.ExcludeAttrList.push_back(DeclAttrKind::EagerMove);
+  options.ExcludeAttrList.push_back(DeclAttrKind::NoEagerMove);
+  options.ExcludeAttrList.push_back(DeclAttrKind::LexicalLifetimes);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -3690,7 +3694,7 @@ static void suppressingFeatureRetroactiveAttribute(
   PrintOptions &options,
   llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<PrintOptions> originalOptions(options);
-  options.ExcludeAttrList.push_back(TAK_Retroactive);
+  options.ExcludeAttrList.push_back(TypeAttrKind::Retroactive);
   action();
 }
 
@@ -3733,7 +3737,7 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
     return true;
   }
   auto *fd = dyn_cast<FuncDecl>(decl);
-  if (fd && fd->getAttrs().getAttribute(DAK_ResultDependsOnSelf)) {
+  if (fd && fd->getAttrs().getAttribute(DeclAttrKind::ResultDependsOnSelf)) {
     return true;
   }
   auto *pd = dyn_cast<ParamDecl>(decl);
@@ -3851,7 +3855,7 @@ static bool usesFeatureExtern(Decl *decl) {
 static void suppressingFeatureExtern(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DAK_Extern);
+  options.ExcludeAttrList.push_back(DeclAttrKind::Extern);
   action();
   options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -4533,9 +4537,11 @@ static void printParameterFlags(ASTPrinter &printer,
                                 const ParamDecl *param,
                                 ParameterTypeFlags flags,
                                 bool escaping) {
-  if (!options.excludeAttrKind(TAK_Autoclosure) && flags.isAutoClosure())
+  if (!options.excludeAttrKind(TypeAttrKind::Autoclosure) &&
+      flags.isAutoClosure())
     printer.printAttrName("@autoclosure ");
-  if (!options.excludeAttrKind(TAK_NoDerivative) && flags.isNoDerivative())
+  if (!options.excludeAttrKind(TypeAttrKind::NoDerivative) &&
+      flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
   if (flags.isTransferring())
     printer.printAttrName("@transferring ");
@@ -4570,7 +4576,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (flags.hasResultDependsOn())
     printer.printKeyword("_resultDependsOn", options, " ");
 
-  if (!options.excludeAttrKind(TAK_Escaping) && escaping)
+  if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
 
   if (flags.isCompileTimeConst())
@@ -5021,7 +5027,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
     // @escaping is not valid in enum element position, even though the
     // attribute is implicitly added. Ignore it when printing the parameters.
-    Options.ExcludeAttrList.push_back(TAK_Escaping);
+    Options.ExcludeAttrList.push_back(TypeAttrKind::Escaping);
     printParameterList(PL, params,
                        /*isAPINameByDefault*/true);
     Options.ExcludeAttrList.pop_back();
@@ -6883,7 +6889,7 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (!Options.excludeAttrKind(TAK_Differentiable)) {
+    if (!Options.excludeAttrKind(TypeAttrKind::Differentiable)) {
       switch (info.getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
         Printer << "@differentiable ";
@@ -6908,8 +6914,7 @@ public:
       Printer << " ";
     }
 
-    if (!Options.excludeAttrKind(TAK_Sendable) &&
-        info.isSendable()) {
+    if (!Options.excludeAttrKind(TypeAttrKind::Sendable) && info.isSendable()) {
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
@@ -6919,7 +6924,7 @@ public:
       return;
     case PrintOptions::FunctionRepresentationMode::Full:
     case PrintOptions::FunctionRepresentationMode::NameOnly:
-      if (Options.excludeAttrKind(TAK_Convention) ||
+      if (Options.excludeAttrKind(TypeAttrKind::Convention) ||
           info.getSILRepresentation() == SILFunctionType::Representation::Thick)
         return;
 
@@ -6988,7 +6993,7 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (!Options.excludeAttrKind(TAK_Differentiable)) {
+    if (!Options.excludeAttrKind(TypeAttrKind::Differentiable)) {
       switch (info.getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
         Printer << "@differentiable ";
@@ -7013,7 +7018,7 @@ public:
       break;
     case PrintOptions::FunctionRepresentationMode::NameOnly:
     case PrintOptions::FunctionRepresentationMode::Full:
-      if (Options.excludeAttrKind(TAK_Convention) ||
+      if (Options.excludeAttrKind(TypeAttrKind::Convention) ||
           info.getRepresentation() == SILFunctionType::Representation::Thick)
         break;
 
