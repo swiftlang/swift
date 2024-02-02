@@ -27,8 +27,8 @@ func where1<T>(_ t: borrowing T) where T: ~Copyable {}
 func where2<T>(_ t: borrowing T) where T: NoCopyP, T: ~Copyable {}
 
 // CHECK-LABEL: .where3@
-// CHECK: Generic signature: <T where T : Equatable, T : Escapable>
-func where3<T>(_ t: borrowing T) where T: Equatable, T: ~Copyable {}
+// CHECK: Generic signature: <T where T : Escapable, T : Empty>
+func where3<T>(_ t: borrowing T) where T: Empty, T: ~Copyable {}
 
 // CHECK-LABEL: .where4@
 // CHECK: Generic signature: <T where T : Copyable>
@@ -39,8 +39,8 @@ func where4<T>(_ t: borrowing T) where T: ~Escapable {}
 func where5<T>(_ t: borrowing T) where T: Empty, T: ~Escapable {}
 
 // CHECK-LABEL: .where6@
-// CHECK: Generic signature: <T where T : Equatable, T : Escapable>
-func where6<T>(_ t: borrowing T) where T: Equatable, T: ~Copyable {}
+// CHECK: Generic signature: <T where T : Escapable, T : Empty>
+func where6<T>(_ t: borrowing T) where T: Empty, T: ~Copyable {}
 
 // CHECK-LABEL: .compose1@
 // CHECK: Generic signature: <T where T : NoCopyP>
@@ -58,9 +58,9 @@ func f1<T: NoCopyP>(_ t: T) {}
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable>
 func withSome(_ t: some Any) {}
 
-// CHECK-LABEL: .withSomeEquatable@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Equatable, τ_0_0 : Escapable>
-func withSomeEquatable(_ t: some Equatable) {}
+// CHECK-LABEL: .withSomeEmpty@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable, τ_0_0 : Empty>
+func withSomeEmpty(_ t: some Empty) {}
 
 // CHECK-LABEL: .withSomeProto@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : NoCopyP>
@@ -193,8 +193,10 @@ extension Cond: Copyable where T: Copyable {}
 // CHECK-NEXT: Canonical generic signature: <τ_0_0>
 struct ImplicitCond<T: ~Escapable & ~Copyable> {}
 
+// FIXME: At the moment, Sendable in the stdlib requires Escapable.
 // CHECK-LABEL: StructDecl name=ImplicitCond
-// CHECK-NEXT:    (normal_conformance type="ImplicitCond<T>" protocol="Sendable")
+// CHECK-NEXT:    (normal_conformance type="ImplicitCond<T>" protocol="Sendable"
+// CHECK-NEXT:      (assoc_conformance type="Self" proto="Escapable"
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ImplicitCond
 // CHECK: Generic signature: <T>

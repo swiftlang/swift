@@ -3,9 +3,6 @@
 
 // REQUIRES: noncopyable_generics
 
-// SIL verification failed: 'MoveOnly' types can only be copied in Raw SIL?!
-// REQUIRES: rdar118135397
-
 // Applying a computed property to a move-only field in a class should occur
 // entirely within a formal access to the class property. rdar://105794506
 

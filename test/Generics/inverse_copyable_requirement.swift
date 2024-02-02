@@ -231,22 +231,22 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 // FIXME: rdar://115752211 (deal with existing Swift modules that lack Copyable requirements)
 // the stdlib right now is not yet being compiled with NoncopyableGenerics
 func checkStdlibTypes(_ mo: borrowing MO) {
-  _ = "\(mo)" // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
-  let _: String = String(describing: mo) // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Subject' in 'init(describing:)'}}
+  _ = "\(mo)" // expected-error {{no exact matches in call to instance method 'appendInterpolation'}}
+  let _: String = String(describing: mo) // expected-error {{no exact matches in call to initializer}}
 
   let _: [MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
       [MO(), MO()]
   let _: [MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
       []
-  let _: [String: MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
+  let _: [String: MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
       ["hello" : MO()]  // expected-error{{type '(String, MO)' containing noncopyable element is not supported}}
 
-  _ = [MO()] // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Element' in 'Array'}}
+  _ = [MO()] // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Element' in 'Array'}}
 
-  let _: Array<MO> = .init() // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
-  _ = [MO]() // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  let _: Array<MO> = .init() // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  _ = [MO]() // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Element' in 'Array'}}
 
-  let _: String = "hello \(mo)" // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
+  let _: String = "hello \(mo)" // expected-error {{no exact matches in call to instance method 'appendInterpolation'}}
 }
 
 func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHashable) {
