@@ -363,10 +363,7 @@ void InverseRequirement::expandDefaults(
       
       auto protoTy = proto->getDeclaredInterfaceType();
       result.push_back({{RequirementKind::Conformance, gp, protoTy},
-                        SourceLoc(),
-                        /*inferred=*/true,
-                        /*default=*/true,
-                       });
+                        SourceLoc()});
     }
   }
 }

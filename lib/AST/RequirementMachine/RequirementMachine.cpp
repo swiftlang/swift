@@ -126,16 +126,10 @@
 // redundant rules. This is implemented in HomotopyReduction.cpp and
 // MinimalConformances.cpp.
 //
-// Minimization emits warnings about redundant rules by producing that
-// correspond to user-written requirements by producing RequirementError
-// values.
-//
 // After minimization, the remaining non-redundant rules are converted into
-// the Requirements of a minimal generic signature using the
-// RequirementBuilder.
-//
-// After minimization, the requirement machine undergoes a final state
-// transition into the immutable "frozen" state:
+// the Requirements of a minimal generic signature by the RequirementBuilder.
+// Then, the requirement machine undergoes a final state transition into the
+// immutable "frozen" state:
 //
 //   /-----------------------------\
 //  |  Complete RequirementMachine  |
