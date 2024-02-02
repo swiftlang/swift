@@ -617,7 +617,7 @@ public:
 
   /// Given a remote pointer to class metadata, attempt to discover its class
   /// instance size and whether fields should use the resilient layout strategy.
-  llvm::Optional<unsigned> readInstanceStartAndAlignmentFromClassMetadata(
+  llvm::Optional<unsigned> readInstanceStartFromClassMetadata(
       StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
