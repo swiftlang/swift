@@ -2244,6 +2244,9 @@ CONSTANT_TRANSLATION(WitnessMethodInst, AssignFresh)
 CONSTANT_TRANSLATION(IntegerLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(FloatLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(StringLiteralInst, AssignFresh)
+// Metatypes are Sendable, but AnyObject isn't
+CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, AssignFresh)
+CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, AssignFresh)
 
 //===---
 // Assign
@@ -2407,6 +2410,19 @@ CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
 CONSTANT_TRANSLATION(RebindMemoryInst, Require)
 CONSTANT_TRANSLATION(BindMemoryInst, Require)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
+// Require of the value we extract the metatype from.
+CONSTANT_TRANSLATION(ValueMetatypeInst, Require)
+// Require of the value we extract the metatype from.
+CONSTANT_TRANSLATION(ExistentialMetatypeInst, Require)
+
+//===---
+// Asserting If Non Sendable Parameter
+//
+
+// Takes metatypes as parameters and metatypes today are always sendable.
+CONSTANT_TRANSLATION(InitExistentialMetatypeInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, AssertingIfNonSendable)
 
 //===---
 // Terminators
@@ -2457,17 +2473,10 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Unhandled)
-CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Unhandled)
 CONSTANT_TRANSLATION(WeakCopyValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, Unhandled)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
-CONSTANT_TRANSLATION(ValueMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(ExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
-CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
-CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
 
 //===---
 // Differentiable
