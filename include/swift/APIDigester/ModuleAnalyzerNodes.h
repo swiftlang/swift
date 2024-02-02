@@ -492,7 +492,9 @@ public:
 class SDKNodeTypeFunc : public SDKNodeType {
 public:
   SDKNodeTypeFunc(SDKNodeInitInfo Info);
-  bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::TAK_noescape); }
+  bool isEscaping() const {
+    return hasTypeAttribute(TypeAttrKind::TAK_NoEscape);
+  }
   static bool classof(const SDKNode *N);
   void diagnose(SDKNode *Right) override;
 };

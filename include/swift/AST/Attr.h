@@ -3041,11 +3041,11 @@ public:
 template <TypeAttrKind Kind>
 using SimpleTypeAttrWithArgs = SimpleTypeAttr<Kind, AtTypeAttrWithArgsBase>;
 
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                \
-using CLASS##TypeAttr = SimpleTypeAttr<TAK_##SPELLING>;
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                                      \
+  using CLASS##TypeAttr = SimpleTypeAttr<TAK_##CLASS>;
 #include "swift/AST/Attr.def"
 
-class ConventionTypeAttr : public SimpleTypeAttrWithArgs<TAK_convention> {
+class ConventionTypeAttr : public SimpleTypeAttrWithArgs<TAK_Convention> {
   Located<StringRef> Name;
   DeclNameRef WitnessMethodProtocol;
   Located<StringRef> ClangType;
@@ -3075,7 +3075,8 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-class DifferentiableTypeAttr : public SimpleTypeAttrWithArgs<TAK_differentiable> {
+class DifferentiableTypeAttr
+    : public SimpleTypeAttrWithArgs<TAK_Differentiable> {
   SourceLoc DifferentiabilityLoc;
 public:
   DifferentiableTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
@@ -3105,7 +3106,7 @@ public:
 };
 
 class OpaqueReturnTypeOfTypeAttr
-    : public SimpleTypeAttrWithArgs<TAK__opaqueReturnTypeOf> {
+    : public SimpleTypeAttrWithArgs<TAK_OpaqueReturnTypeOf> {
   Located<StringRef> MangledName;
   SourceLoc IndexLoc;
 public:
@@ -3124,7 +3125,7 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-class OpenedTypeAttr : public SimpleTypeAttrWithArgs<TAK_opened> {
+class OpenedTypeAttr : public SimpleTypeAttrWithArgs<TAK_Opened> {
   Located<UUID> ID;
   TypeRepr *ConstraintType;
 public:
@@ -3146,7 +3147,7 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-class PackElementTypeAttr : public SimpleTypeAttrWithArgs<TAK_pack_element> {
+class PackElementTypeAttr : public SimpleTypeAttrWithArgs<TAK_PackElement> {
   Located<UUID> ID;
 public:
   PackElementTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,

@@ -156,8 +156,8 @@ void CompletionOverrideLookup::addValueOverride(
 
   PO.SkipUnderscoredKeywords = true;
   PO.PrintImplicitAttrs = false;
-  PO.ExclusiveAttrList.push_back(TAK_escaping);
-  PO.ExclusiveAttrList.push_back(TAK_autoclosure);
+  PO.ExclusiveAttrList.push_back(TAK_Escaping);
+  PO.ExclusiveAttrList.push_back(TAK_Autoclosure);
   // Print certain modifiers only when the introducer is not written.
   // Otherwise, the user can add it after the completion.
   if (!hasDeclIntroducer) {

@@ -83,8 +83,8 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
 
 SourceLoc TypeAttribute::getStartLoc() const {
   switch (getKind()) {
-#define TYPE_ATTR(SPELLING, CLASS)                                        \
-  case TAK_ ## SPELLING:                                                  \
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case TAK_##CLASS:                                                            \
     return static_cast<const CLASS##TypeAttr *>(this)->getStartLocImpl();
 #include "swift/AST/Attr.def"
   }
@@ -93,8 +93,8 @@ SourceLoc TypeAttribute::getStartLoc() const {
 
 SourceLoc TypeAttribute::getEndLoc() const {
   switch (getKind()) {
-#define TYPE_ATTR(SPELLING, CLASS)                                        \
-  case TAK_ ## SPELLING:                                                  \
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case TAK_##CLASS:                                                            \
     return static_cast<const CLASS##TypeAttr *>(this)->getEndLocImpl();
 #include "swift/AST/Attr.def"
   }
@@ -103,10 +103,10 @@ SourceLoc TypeAttribute::getEndLoc() const {
 
 SourceRange TypeAttribute::getSourceRange() const {
   switch (getKind()) {
-#define TYPE_ATTR(SPELLING, CLASS)                                        \
-  case TAK_ ## SPELLING: {                                                \
-    auto attr = static_cast<const CLASS##TypeAttr *>(this);               \
-    return SourceRange(attr->getStartLocImpl(), attr->getEndLocImpl());   \
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case TAK_##CLASS: {                                                          \
+    auto attr = static_cast<const CLASS##TypeAttr *>(this);                    \
+    return SourceRange(attr->getStartLocImpl(), attr->getEndLocImpl());        \
   }
 #include "swift/AST/Attr.def"
   }
@@ -119,15 +119,17 @@ SourceRange TypeAttribute::getSourceRange() const {
 llvm::Optional<TypeAttrKind>
 TypeAttribute::getAttrKindFromString(StringRef Str) {
   return llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(Str)
-#define TYPE_ATTR(X, C) .Case(#X, TAK_##X)
+#define TYPE_ATTR(X, C) .Case(#X, TAK_##C)
 #include "swift/AST/Attr.def"
-  .Default(llvm::Optional<TypeAttrKind>());
+      .Default(llvm::None);
 }
 
 /// Return the name (like "autoclosure") for an attribute ID.
 const char *TypeAttribute::getAttrName(TypeAttrKind kind) {
   switch (kind) {
-#define TYPE_ATTR(X, C) case TAK_##X: return #X;
+#define TYPE_ATTR(X, C)                                                        \
+  case TAK_##C:                                                                \
+    return #X;
 #include "swift/AST/Attr.def"
   }
   llvm_unreachable("unknown type attribute kind");
@@ -142,11 +144,11 @@ TypeAttribute *TypeAttribute::createSimple(const ASTContext &context,
   // The simple cases should all be doing the exact same thing, and we
   // can reasonably hope that the optimizer will unify them so that this
   // function doesn't actually need a switch.
-#define TYPE_ATTR(SPELLING, CLASS) \
-  case TAK_##SPELLING: \
+#define TYPE_ATTR(SPELLING, CLASS)                                             \
+  case TAK_##CLASS:                                                            \
     llvm_unreachable("not a simple attribute");
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) \
-  case TAK_##SPELLING: \
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                                      \
+  case TAK_##CLASS:                                                            \
     return new (context) CLASS##TypeAttr(atLoc, attrLoc);
 #include "swift/AST/Attr.def"
   }
@@ -162,17 +164,16 @@ void TypeAttribute::dump() const {
 void TypeAttribute::print(ASTPrinter &printer,
                           const PrintOptions &options) const {
   switch (getKind()) {
-#define TYPE_ATTR(SPELLING, CLASS)
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) \
-  case TAK_ ## SPELLING:
+#define TYPE_ATTR(_, CLASS)
+#define SIMPLE_TYPE_ATTR(_, CLASS) case TAK_##CLASS:
 #include "swift/AST/Attr.def"
     printer.printSimpleAttr(getAttrName(getKind()), /*needAt*/ true);
     return;
 
-#define TYPE_ATTR(SPELLING, CLASS)                                \
-  case TAK_ ## SPELLING:                                          \
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case TAK_##CLASS:                                                            \
     return cast<CLASS##TypeAttr>(this)->printImpl(printer, options);
-#define SIMPLE_TYPE_ATTR(SPELLING, C)
+#define SIMPLE_TYPE_ATTR(_, C)
 #include "swift/AST/Attr.def"
   }
   llvm_unreachable("bad kind");

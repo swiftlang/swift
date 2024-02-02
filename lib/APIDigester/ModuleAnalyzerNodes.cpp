@@ -708,11 +708,11 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_typeAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
         for (auto &N : *Seq) {
-          auto Result =
-            llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(GetScalarString(&N))
-  #define TYPE_ATTR(X, C) .Case(#X, TAK_##X)
-  #include "swift/AST/Attr.def"
-          .Default(llvm::Optional<TypeAttrKind>());
+          auto Result = llvm::StringSwitch<llvm::Optional<TypeAttrKind>>(
+                            GetScalarString(&N))
+#define TYPE_ATTR(X, C) .Case(#X, TAK_##C)
+#include "swift/AST/Attr.def"
+                            .Default(llvm::None);
 
           if (!Result)
             Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
@@ -1379,7 +1379,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     ParamValueOwnership(Info.ValueOwnership),
     HasDefaultArg(Info.hasDefaultArgument) {
   if (isFunctionTypeNoEscape(Ty))
-    TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
+    TypeAttrs.push_back(TypeAttrKind::TAK_NoEscape);
   // If this is a nominal type, get its Usr.
   if (auto *ND = Ty->getAnyNominal()) {
     Usr = calculateUsr(Ctx, ND);
@@ -2226,7 +2226,9 @@ namespace json {
 template<>
 struct ScalarEnumerationTraits<TypeAttrKind> {
   static void enumeration(Output &out, TypeAttrKind &value) {
-#define TYPE_ATTR(X, C) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
+// NOTE: For historical reasons. TypeAttribute uses the spelling, but
+// DeclAttribute uses the kind name.
+#define TYPE_ATTR(X, C) out.enumCase(value, #X, TypeAttrKind::TAK_##C);
 #include "swift/AST/Attr.def"
   }
 };
@@ -2234,6 +2236,8 @@ struct ScalarEnumerationTraits<TypeAttrKind> {
 template<>
 struct ScalarEnumerationTraits<DeclAttrKind> {
   static void enumeration(Output &out, DeclAttrKind &value) {
+// NOTE: For historical reasons. TypeAttribute uses the spelling, but
+// DeclAttribute uses the kind name.
 #define DECL_ATTR(_, Name, ...) out.enumCase(value, #Name, DeclAttrKind::DAK_##Name);
 #include "swift/AST/Attr.def"
   }

@@ -938,7 +938,7 @@ bool Parser::parseSpecializeAttributeArguments(
       for (auto req : requirements) {
         if (req.getKind() == RequirementReprKind::LayoutConstraint) {
           if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
-            if (attributedTy->has(TAK__noMetadata)) {
+            if (attributedTy->has(TAK_NoMetadata)) {
               typeErasedParamsCount += 1;
             }
           }
@@ -4746,8 +4746,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   // Simple type attributes don't need any further checking.
 #define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS)
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) \
-  case TAK_##SPELLING:
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) case TAK_##CLASS:
 #include "swift/AST/Attr.def"
   SimpleAttr:
     if (!justChecking) {
@@ -4757,12 +4756,11 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   // For simple SIL type attributes, check whether we're parsing SIL,
   // then return to the SimpleAttr case.
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) \
-  case TAK_##SPELLING:
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) case TAK_##CLASS:
 #include "swift/AST/Attr.def"
     if (!isInSILMode()) {
       if (!justChecking) {
-        if (attr == TAK_inout) {
+        if (attr == TAK_Inout) {
           diagnose(AtLoc, diag::inout_not_attribute);
         } else {
           // We could use diag::only_allowed_in_sil here, but it's better
@@ -4776,7 +4774,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   // All the non-simple attributes should get explicit cases here.
 
-  case TAK_opened: {
+  case TAK_Opened: {
     // Parse the opened existential ID string in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
     if (!consumeAttributeLParen()) {
@@ -4823,7 +4821,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
-  case TAK_pack_element: {
+  case TAK_PackElement: {
     if (!isInSILMode()) {
       if (!justChecking)
         diagnose(AtLoc, diag::only_allowed_in_sil, "pack_element");
@@ -4866,7 +4864,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
-  case TAK_differentiable: {
+  case TAK_Differentiable: {
     auto diffKind = DifferentiabilityKind::Normal;
     SourceLoc diffKindLoc;
     SourceRange parensRange;
@@ -4891,7 +4889,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
-  case TAK_convention: {
+  case TAK_Convention: {
     ConventionTypeAttr *convention = nullptr;
     if (parseConventionAttributeInternal(AtLoc, attrLoc, convention,
                                          justChecking)) {
@@ -4903,8 +4901,8 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     result = convention;
     return makeParserSuccess();
   }
-      
-  case TAK__opaqueReturnTypeOf: {
+
+  case TAK_OpaqueReturnTypeOf: {
     // Parse the mangled decl name and index.
     auto beginLoc = Tok.getLoc();
     if (!consumeIfAttributeLParen()) {

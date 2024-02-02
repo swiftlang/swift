@@ -2693,7 +2693,7 @@ void PrintAST::printInherited(const Decl *decl) {
     if (inherited.isUnchecked())
       Printer << "@unchecked ";
     if (inherited.isRetroactive() &&
-        !llvm::is_contained(Options.ExcludeAttrList, TAK_retroactive))
+        !llvm::is_contained(Options.ExcludeAttrList, TAK_Retroactive))
       Printer << "@retroactive ";
     if (inherited.isPreconcurrency())
       Printer << "@preconcurrency ";
@@ -3690,7 +3690,7 @@ static void suppressingFeatureRetroactiveAttribute(
   PrintOptions &options,
   llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<PrintOptions> originalOptions(options);
-  options.ExcludeAttrList.push_back(TAK_retroactive);
+  options.ExcludeAttrList.push_back(TAK_Retroactive);
   action();
 }
 
@@ -4533,9 +4533,9 @@ static void printParameterFlags(ASTPrinter &printer,
                                 const ParamDecl *param,
                                 ParameterTypeFlags flags,
                                 bool escaping) {
-  if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
+  if (!options.excludeAttrKind(TAK_Autoclosure) && flags.isAutoClosure())
     printer.printAttrName("@autoclosure ");
-  if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
+  if (!options.excludeAttrKind(TAK_NoDerivative) && flags.isNoDerivative())
     printer.printAttrName("@noDerivative ");
   if (flags.isTransferring())
     printer.printAttrName("@transferring ");
@@ -4570,7 +4570,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (flags.hasResultDependsOn())
     printer.printKeyword("_resultDependsOn", options, " ");
 
-  if (!options.excludeAttrKind(TAK_escaping) && escaping)
+  if (!options.excludeAttrKind(TAK_Escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
 
   if (flags.isCompileTimeConst())
@@ -5021,7 +5021,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
     // @escaping is not valid in enum element position, even though the
     // attribute is implicitly added. Ignore it when printing the parameters.
-    Options.ExcludeAttrList.push_back(TAK_escaping);
+    Options.ExcludeAttrList.push_back(TAK_Escaping);
     printParameterList(PL, params,
                        /*isAPINameByDefault*/true);
     Options.ExcludeAttrList.pop_back();
@@ -6883,7 +6883,7 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (!Options.excludeAttrKind(TAK_differentiable)) {
+    if (!Options.excludeAttrKind(TAK_Differentiable)) {
       switch (info.getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
         Printer << "@differentiable ";
@@ -6919,7 +6919,7 @@ public:
       return;
     case PrintOptions::FunctionRepresentationMode::Full:
     case PrintOptions::FunctionRepresentationMode::NameOnly:
-      if (Options.excludeAttrKind(TAK_convention) ||
+      if (Options.excludeAttrKind(TAK_Convention) ||
           info.getSILRepresentation() == SILFunctionType::Representation::Thick)
         return;
 
@@ -6988,7 +6988,7 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (!Options.excludeAttrKind(TAK_differentiable)) {
+    if (!Options.excludeAttrKind(TAK_Differentiable)) {
       switch (info.getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
         Printer << "@differentiable ";
@@ -7013,7 +7013,7 @@ public:
       break;
     case PrintOptions::FunctionRepresentationMode::NameOnly:
     case PrintOptions::FunctionRepresentationMode::Full:
-      if (Options.excludeAttrKind(TAK_convention) ||
+      if (Options.excludeAttrKind(TAK_Convention) ||
           info.getRepresentation() == SILFunctionType::Representation::Thick)
         break;
 

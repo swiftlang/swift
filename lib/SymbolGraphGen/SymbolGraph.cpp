@@ -75,15 +75,15 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define TYPE_ATTR(X, C) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
+#define TYPE_ATTR(X, C) ExcludeAttrs.insert(std::make_pair("TAK_" #C, TAK_##C));
 #include "swift/AST/Attr.def"
 
   // Allow the following type attributes:
-  ExcludeAttrs.erase("TAK_autoclosure");
-  ExcludeAttrs.erase("TAK_convention");
-  ExcludeAttrs.erase("TAK_noescape");
-  ExcludeAttrs.erase("TAK_escaping");
-  ExcludeAttrs.erase("TAK_inout");
+  ExcludeAttrs.erase("TAK_Autoclosure");
+  ExcludeAttrs.erase("TAK_Convention");
+  ExcludeAttrs.erase("TAK_NoEscape");
+  ExcludeAttrs.erase("TAK_Escaping");
+  ExcludeAttrs.erase("TAK_Inout");
 
   // Don't allow the following decl attributes:
   // These can be large and are already included elsewhere in
@@ -131,15 +131,14 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
 
   #define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
     Options.ExcludeAttrList.push_back(DAK_##CLASS);
-  #define TYPE_ATTR(X, C) \
-    Options.ExcludeAttrList.push_back(TAK_##X);
-  #include "swift/AST/Attr.def"
+#define TYPE_ATTR(X, C) Options.ExcludeAttrList.push_back(TAK_##C);
+#include "swift/AST/Attr.def"
 
   // Don't include these attributes in subheadings.
   Options.ExcludeAttrList.push_back(DAK_Final);
   Options.ExcludeAttrList.push_back(DAK_Mutating);
   Options.ExcludeAttrList.push_back(DAK_NonMutating);
-  Options.ExcludeAttrList.push_back(TAK_escaping);
+  Options.ExcludeAttrList.push_back(TAK_Escaping);
 
   return Options;
 }

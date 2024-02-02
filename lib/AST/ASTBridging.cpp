@@ -1944,22 +1944,22 @@ BridgedYieldStmt BridgedYieldStmt_createParsed(BridgedASTContext cContext,
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
   if (!optKind)
-    return BridgedTypeAttrKind_None;
+    return BridgedTypeAttrKindNone;
   switch (*optKind) {
-#define TYPE_ATTR(SPELLING, _)                                                 \
-  case TAK_##SPELLING:                                                         \
-    return BridgedTypeAttrKind_##SPELLING;
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case TAK_##CLASS:                                                            \
+    return BridgedTypeAttrKind##CLASS;
 #include "swift/AST/Attr.def"
   }
 }
 
 static llvm::Optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
   switch (kind) {
-#define TYPE_ATTR(SPELLING, _)                                                 \
-  case BridgedTypeAttrKind_##SPELLING:                                         \
-    return TAK_##SPELLING;
+#define TYPE_ATTR(_, CLASS)                                                    \
+  case BridgedTypeAttrKind##CLASS:                                             \
+    return TAK_##CLASS;
 #include "swift/AST/Attr.def"
-  case BridgedTypeAttrKind_None:
+  case BridgedTypeAttrKindNone:
     return llvm::None;
   }
   llvm_unreachable("unhandled enum value");

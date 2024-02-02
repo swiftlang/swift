@@ -139,14 +139,14 @@ enum DeclAttrKind : unsigned {
 enum : unsigned { NumDeclAttrKindBits =
   countBitsUsed(static_cast<unsigned>(DeclAttrKind::DAK_Count - 1)) };
 
-// Define enumerators for each type attribute, e.g. TAK_weak.
+// Define enumerators for each type attribute, e.g. TAK_Weak.
 enum TypeAttrKind {
-#define TYPE_ATTR(X, C) TAK_##X,
+#define TYPE_ATTR(_, C) TAK_##C,
 #include "swift/AST/Attr.def"
 };
 
 enum : unsigned {
-#define TYPE_ATTR(X, C) _counting_TAK_##X,
+#define TYPE_ATTR(_, C) _counting_TAK_##C,
 #include "swift/AST/Attr.def"
   NumTypeAttrKinds,
 

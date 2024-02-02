@@ -1553,9 +1553,9 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
     : InheritedEntry(typeLoc, /*isUnchecked=*/false, /*isRetroactive=*/false,
                      /*isPreconcurrency=*/false) {
   if (auto typeRepr = typeLoc.getTypeRepr()) {
-    IsUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
-    IsRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
-    IsPreconcurrency = typeRepr->findAttrLoc(TAK_preconcurrency).isValid();
+    IsUnchecked = typeRepr->findAttrLoc(TAK_Unchecked).isValid();
+    IsRetroactive = typeRepr->findAttrLoc(TAK_Retroactive).isValid();
+    IsPreconcurrency = typeRepr->findAttrLoc(TAK_Preconcurrency).isValid();
   }
 }
 
