@@ -21,7 +21,7 @@ import Distributed
 // Make sure there is no runtime record of the protocol descriptor.
 // CHECK-IR-NOT: $sxScA11DistributedHc
 
-// CHECK-SIL-LABEL: sil hidden @$s021distributed_actor_to_B011getAnyActor0aF0ScA_pxYi_t11Distributed0gF0RzlF : $@convention(thin) <τ_0_0 where τ_0_0 : DistributedActor> (@isolated @guaranteed τ_0_0) -> @owned any Actor
+// CHECK-SIL-LABEL: sil hidden @$s021distributed_actor_to_B011getAnyActor0aF0ScA_pxYi_t11Distributed0gF0RzlF : $@convention(thin) <τ_0_0 where τ_0_0 : DistributedActor> (@sil_isolated @guaranteed τ_0_0) -> @owned any Actor
 func getAnyActor(distributedActor: isolated some DistributedActor) -> any Actor {
   // CHECK-SIL: [[EXISTENTIAL:%.*]] = init_existential_ref %0 : $τ_0_0 : $τ_0_0, $any Actor
   // CHECK-SIL-NEXT: strong_retain [[EXISTENTIAL]] : $any Actor

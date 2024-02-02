@@ -103,7 +103,7 @@ SIMPLE_SIL_TYPE_ATTR(yield_many, YieldMany)
 SIMPLE_SIL_TYPE_ATTR(captures_generics, CapturesGenerics)
 // Used at the SIL level to mark a type as moveOnly.
 SIMPLE_SIL_TYPE_ATTR(moveOnly, MoveOnly)
-SIMPLE_SIL_TYPE_ATTR(isolated, Isolated)
+SIMPLE_SIL_TYPE_ATTR(sil_isolated, SILIsolated)
 
 // SIL metatype attributes.
 SIMPLE_SIL_TYPE_ATTR(thin, Thin)
