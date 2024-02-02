@@ -94,3 +94,14 @@ entry(%instance : $*GE<T>):
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin {{.*}} token: print_ast_type_lowering with: %instance
+// CHECK:       isTrivial: true
+// CHECK-LABEL: end {{.*}} token: print_ast_type_lowering with: %instance
+sil @token : $@convention(thin) (@in Builtin.RawPointer) -> () {
+entry(%addr : $*Builtin.RawPointer):
+  %ptr = address_to_pointer %addr : $*Builtin.RawPointer to $Builtin.RawPointer
+  %instance = builtin "once"(%ptr : $Builtin.RawPointer, undef : $()) : $Builtin.SILToken
+  specify_test "print_ast_type_lowering %instance"
+  return undef : $()
+}

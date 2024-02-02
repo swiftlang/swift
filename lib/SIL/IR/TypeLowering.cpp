@@ -2793,6 +2793,17 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 }
 
 namespace swift::test {
+static FunctionTest PrintASTTypeLowering(
+    "print_ast_type_lowering", [](auto &function, auto &arguments, auto &test) {
+      auto value = arguments.takeValue();
+      auto silTy = value->getType();
+      auto canTy = silTy.getRawASTType();
+      auto *ty = canTy.getPointer();
+      function.getModule()
+          .Types.getTypeLowering(AbstractionPattern(ty), ty, function)
+          .print(llvm::outs());
+    });
+
 // Arguments:
 // - value: whose type will be printed
 // Dumps:
@@ -3028,67 +3039,78 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
 
   if (lowering.isTrivial() && !conformance) {
-    // A trivial type can only lack a conformance if one of its leaves is a
-    // public type that doesn't conform.
+    // A trivial type can lack a conformance in a few cases:
+    // (1) containing or being a resilient type
+    // (2) containing or being a generic type which doesn't conform
+    //     unconditionally but in this particular instantiation is trivial
+    // (3) being a special type that's not worth forming a conformance for
+    //     - ModuleType
+    //     - SILTokenType
+    // (4) being an unowned(unsafe) reference to a class/class-bound existential
+    //     NOTE: ReferenceStorageType(C) does not conform HOWEVER the presence
+    //           of an unowned(unsafe) field within an aggregate DOES NOT allow
+    //           the aggregate to lack conformance.  In other words, this must
+    //           conform:
+    //             struct S {
+    //               unowned(unsafe) var o: AnyObject
+    //             }
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
-        /*isLeaf=*/
+        /*isLeafAggregate=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
-          // The field's type is an aggregate.  Treat it as a leaf if it is
-          // public.
           auto *nominal = ty.getAnyNominal();
-          // Non-nominal types are public iff their components are; visit the
-          // components.
+          // Non-nominal aggregates must not be responsible for non-conformance;
+          // walk into them.
           if (!nominal)
             return false;
 
-          // Nominals with generic parameters must be explicitly conformed to
-          // BitwiseCopyable.
-          auto *generic = ty.getAnyGeneric();
-          if (generic && generic->isGenericContext()) {
+          // Nominals with fields that are generic may not conform
+          // unconditionally (the only kind automatically derived currently)
+          // and so may lack a conformance (case (2)).
+          if (nominal->isGenericContext()) {
             return true;
           }
 
-          return nominal
-              ->getFormalAccessScope(/*useDC=*/nullptr,
-                                     /*treatUsableFromInlineAsPublic=*/true)
-              .isPublic();
+          // Resilient trivial types may not conform (case (1)).
+          return nominal->isResilient();
         },
         /*visit=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
           // Return false to indicate seeing a leaf which justifies the type
           // being trivial but not conforming to BitwiseCopyable.
 
+          auto isTopLevel = !field;
+
           // A BitwiseCopyable conformer appearing within its layout doesn't
           // explain why substType doesn't itself conform.
           if (M.checkConformance(ty, bitwiseCopyableProtocol))
             return true;
 
-          // ModuleTypes are trivial but don't warrant being given a conformance
-          // to BitwiseCopyable.
-          if (auto mt = dyn_cast<ModuleType>(ty)) {
-            // If one were to appear within a type, its lack of conformance
-            // wouldn't result in the type's failure to conform.  Conversely, if
-            // substType itself is the ModuleType, it is trivial and
-            // non-conformant; return false to indicate its the leaf which
-            // justifies substType being non-conformant.
-            return field;
+          // ModuleTypes are trivial but don't warrant being given a
+          // conformance to BitwiseCopyable (case (3)).
+          if (isa<ModuleType, SILTokenType>(ty)) {
+            // These types should never appear within aggregates.
+            assert(isTopLevel && "aggregate containing marker type!?");
+            // If they did, though, they would not justify the aggregate's
+            // non-conformance.
+            // top-level -> justified to be trivial and non-conformant  -> false
+            // leaf      -> must not be responsible for non-conformance -> true
+            return !isTopLevel;
           }
 
-          // Given a non-bitwise-copyable C, unowned(unsafe) C is still
-          // BitwiseCopyable.
+          // ReferenceStorageTypes with unmanaged ownership do not themselves
+          // conform (case (4)).
           auto rst = dyn_cast<ReferenceStorageType>(ty);
           if (rst && rst->getOwnership() == ReferenceOwnership::Unmanaged) {
-            // If a ReferenceStorageType appears as a component of an aggregate,
-            // that shouldn't stop the aggregate from being BitwiseCopyable.  If
-            // the whole type is the ReferenceStorageType, however, it does not
-            // conform.
-            return field;
+            // top-level -> justified to be trivial and non-conformant -> false
+            // leaf      -> must not be responsible for non-conformance -> true
+            return !isTopLevel;
           }
 
           auto *nominal = ty.getAnyNominal();
 
-          // Non-nominal types are trivial iff conforming.
+          // Non-nominal types (besides case (3) handled above) are trivial iff
+          // conforming.
           if (!nominal) {
             llvm::errs()
                 << "Non-nominal type without conformance to _BitwiseCopyable:\n"
@@ -3099,20 +3121,14 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return true;
           }
 
-          /// A non-conforming generic nominal type justifies substType not
-          /// conforming.
-          auto *generic = ty.getAnyGeneric();
-          if (generic && generic->isGenericContext()) {
+          // A generic type may be trivial when instantiated with particular
+          // types but lack a conformance (case (3)).
+          if (nominal->isGenericContext()) {
             return false;
           }
 
-          // The field is trivial and the whole type is nonconforming.  That's
-          // legal iff the type is public.
-          return !nominal
-                      ->getFormalAccessScope(
-                          /*useDC=*/nullptr,
-                          /*treatUsableFromInlineAsPublic=*/true)
-                      .isPublic();
+          // Resilient trivial types may not conform (case (1)).
+          return !nominal->isResilient();
         });
     if (hasNoNonconformingNode) {
       llvm::errs() << "Trivial type without a BitwiseCopyable conformance!?:\n"
@@ -3123,8 +3139,8 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   }
 
   if (!lowering.isTrivial() && conformance) {
-    // A non-trivial type can only conform if at least one of its leaves is a
-    // type parameter that conforms.
+    // A non-trivial type can have a conformance in one case:
+    // (1) contains a conforming archetype
     bool hasNoConformingArchetypeNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
@@ -3139,6 +3155,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                  "leaf of non-trivial BitwiseCopyable type that doesn't "
                  "conform to BitwiseCopyable!?");
 
+          // An archetype may conform but be non-trivial (case (2)).
           if (origTy.isTypeParameter())
             return false;
 
@@ -3148,6 +3165,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
       llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
+      llvm::errs() << "\n";
       assert(false);
     }
   }
