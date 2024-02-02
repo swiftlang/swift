@@ -196,11 +196,13 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::DifferentiableFunctionExtractInst:
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
@@ -2465,11 +2467,16 @@ CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Unhandled)
 CONSTANT_TRANSLATION(OpenExistentialValueInst, Unhandled)
-CONSTANT_TRANSLATION(DifferentiableFunctionInst, Unhandled)
-CONSTANT_TRANSLATION(LinearFunctionInst, Unhandled)
-CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, Unhandled)
-CONSTANT_TRANSLATION(LinearFunctionExtractInst, Unhandled)
-CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, Unhandled)
+
+//===---
+// Differentiable
+//
+
+CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, AssignFresh)
+CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, LookThrough)
+CONSTANT_TRANSLATION(LinearFunctionExtractInst, LookThrough)
+CONSTANT_TRANSLATION(LinearFunctionInst, Assign)
+CONSTANT_TRANSLATION(DifferentiableFunctionInst, Assign)
 
 //===---
 // Packs
