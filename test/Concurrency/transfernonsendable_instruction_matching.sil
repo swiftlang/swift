@@ -22,6 +22,7 @@ class NonSendableKlass {}
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
 sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+sil @useUnmanagedNonSendableKlass : $@convention(thin) (@guaranteed @sil_unmanaged NonSendableKlass) -> ()
 
 final class SendableKlass : Sendable {}
 
@@ -1602,6 +1603,27 @@ bb0:
   destroy_value %b : $NonSendableKlass
   destroy_value %value : $NonSendableKlass
   dealloc_stack %a : $*@sil_unowned NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @strong_copy_unmanaged_value_test : $@async @convention(thin) () -> () {
+bb0:
+  %constructFn = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %value = apply %constructFn() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%value) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () // expected-warning {{transferring value of non-Sendable type 'NonSendableKlass' from nonisolated context to global actor '<null>'-isolated context}}
+
+  %borrowedValue = begin_borrow %value : $NonSendableKlass
+  %v = ref_to_unmanaged %borrowedValue : $NonSendableKlass to $@sil_unmanaged NonSendableKlass
+  %v2 = unmanaged_to_ref %v : $@sil_unmanaged NonSendableKlass to $ NonSendableKlass
+  %v3 = ref_to_unmanaged %v2 : $NonSendableKlass to $@sil_unmanaged NonSendableKlass
+  %useFunc = function_ref @useUnmanagedNonSendableKlass : $@convention(thin) (@guaranteed @sil_unmanaged NonSendableKlass) -> ()
+  apply %useFunc(%v3) : $@convention(thin) (@guaranteed @sil_unmanaged NonSendableKlass) -> () // expected-note {{access here could race}}
+  end_borrow %borrowedValue : $NonSendableKlass
+  destroy_value %value : $NonSendableKlass
+
   %9999 = tuple ()
   return %9999 : $()
 }

@@ -225,6 +225,9 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::WeakCopyValueInst:
   case SILInstructionKind::StrongCopyWeakValueInst:
+  case SILInstructionKind::StrongCopyUnmanagedValueInst:
+  case SILInstructionKind::RefToUnmanagedInst:
+  case SILInstructionKind::UnmanagedToRefInst:
     return true;
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
@@ -2285,14 +2288,12 @@ CONSTANT_TRANSLATION(InitExistentialAddrInst, Assign)
 CONSTANT_TRANSLATION(InitExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, Assign)
-CONSTANT_TRANSLATION(RefToUnmanagedInst, Assign)
 CONSTANT_TRANSLATION(TailAddrInst, Assign)
 CONSTANT_TRANSLATION(ThickToObjCMetatypeInst, Assign)
 CONSTANT_TRANSLATION(ThinToThickFunctionInst, Assign)
 CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
-CONSTANT_TRANSLATION(UnmanagedToRefInst, Assign)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
 
 // These are used by SIL to aggregate values together in a gep like way. We
@@ -2346,6 +2347,9 @@ CONSTANT_TRANSLATION(BeginCOWMutationInst, LookThrough)
 CONSTANT_TRANSLATION(OpenExistentialValueInst, LookThrough)
 CONSTANT_TRANSLATION(WeakCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(StrongCopyWeakValueInst, LookThrough)
+CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, LookThrough)
+CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
+CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
 
 //===---
 // Store
@@ -2477,7 +2481,6 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 // Unhandled Instructions
 //
 
-CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, Unhandled)
 CONSTANT_TRANSLATION(InitExistentialValueInst, Unhandled)
 
 //===---
