@@ -2909,12 +2909,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DAK_SetterAccess:
     llvm_unreachable("handled by DAK_AccessControl");
 
-#define SIMPLE_DECL_ATTR(_, CLASS, ...) \
-  case DAK_##CLASS: \
-    if (!DiscardAttribute) \
-      Attributes.add(new (Context) CLASS##Attr(AtLoc, Loc)); \
-    break;
+#define SIMPLE_DECL_ATTR(_, CLASS, ...) case DAK_##CLASS:
 #include "swift/AST/Attr.def"
+    if (!DiscardAttribute)
+      Attributes.add(DeclAttribute::createSimple(Context, DK, AtLoc, Loc));
+    break;
 
   case DAK_MainType:
     if (!DiscardAttribute)

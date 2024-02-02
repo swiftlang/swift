@@ -473,6 +473,10 @@ public:
   /// and decl modifiers like 'final'.  This returns DAK_Count on failure.
   ///
   static DeclAttrKind getAttrKindFromString(StringRef Str);
+
+  static DeclAttribute *createSimple(const ASTContext &context,
+                                     DeclAttrKind kind, SourceLoc atLoc,
+                                     SourceLoc attrLoc);
 };
 
 /// Describes a "simple" declaration attribute that carries no data.

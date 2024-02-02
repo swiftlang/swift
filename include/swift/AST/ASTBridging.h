@@ -283,10 +283,10 @@ namespace swift {
 // Declare `.asDeclAttribute` on each BridgedXXXAttr type, which upcasts a
 // wrapper for a DeclAttribute subclass to a BridgedDeclAttribute.
 #define SIMPLE_DECL_ATTR(...)
-#define DECL_ATTR(_, Id, ...)                                                  \
-  SWIFT_NAME("getter:Bridged" #Id "Attr.asDeclAttribute(self:)")               \
-  BridgedDeclAttribute Bridged##Id##Attr_asDeclAttribute(                      \
-      Bridged##Id##Attr attr);
+#define DECL_ATTR(_, CLASS, ...)                                               \
+  SWIFT_NAME("getter:Bridged" #CLASS "Attr.asDeclAttribute(self:)")            \
+  BridgedDeclAttribute Bridged##CLASS##Attr_asDeclAttribute(                   \
+      Bridged##CLASS##Attr attr);
 #include "swift/AST/Attr.def"
 
 struct BridgedPatternBindingEntry {
@@ -422,7 +422,7 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
 //===----------------------------------------------------------------------===//
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedDeclAttrKind {
-#define DECL_ATTR(_, Id, ...) BridgedDeclAttrKind##Id,
+#define DECL_ATTR(_, CLASS, ...) BridgedDeclAttrKind##CLASS,
 #include "swift/AST/Attr.def"
   BridgedDeclAttrKindNone,
 };
@@ -1439,77 +1439,32 @@ void BridgedStmt_dump(BridgedStmt statement);
 //===----------------------------------------------------------------------===//
 
 // Bridged type attribute kinds, which mirror TypeAttrKind exactly.
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
-  BridgedTypeAttrKind_autoclosure,
-  BridgedTypeAttrKind_convention,
-  BridgedTypeAttrKind_noescape,
-  BridgedTypeAttrKind_escaping,
-  BridgedTypeAttrKind_differentiable,
-  BridgedTypeAttrKind_noDerivative,
-  BridgedTypeAttrKind_async,
-  BridgedTypeAttrKind_Sendable,
-  BridgedTypeAttrKind_retroactive,
-  BridgedTypeAttrKind_unchecked,
-  BridgedTypeAttrKind_preconcurrency,
-  BridgedTypeAttrKind__local,
-  BridgedTypeAttrKind__noMetadata,
-  BridgedTypeAttrKind__opaqueReturnTypeOf,
-  BridgedTypeAttrKind_block_storage,
-  BridgedTypeAttrKind_box,
-  BridgedTypeAttrKind_dynamic_self,
-  BridgedTypeAttrKind_sil_weak,
-  BridgedTypeAttrKind_sil_unowned,
-  BridgedTypeAttrKind_sil_unmanaged,
-  BridgedTypeAttrKind_error,
-  BridgedTypeAttrKind_error_indirect,
-  BridgedTypeAttrKind_error_unowned,
-  BridgedTypeAttrKind_out,
-  BridgedTypeAttrKind_direct,
-  BridgedTypeAttrKind_in,
-  BridgedTypeAttrKind_inout,
-  BridgedTypeAttrKind_inout_aliasable,
-  BridgedTypeAttrKind_in_guaranteed,
-  BridgedTypeAttrKind_in_constant,
-  BridgedTypeAttrKind_pack_owned,
-  BridgedTypeAttrKind_pack_guaranteed,
-  BridgedTypeAttrKind_pack_inout,
-  BridgedTypeAttrKind_pack_out,
-  BridgedTypeAttrKind_owned,
-  BridgedTypeAttrKind_unowned_inner_pointer,
-  BridgedTypeAttrKind_guaranteed,
-  BridgedTypeAttrKind_autoreleased,
-  BridgedTypeAttrKind_callee_owned,
-  BridgedTypeAttrKind_callee_guaranteed,
-  BridgedTypeAttrKind_objc_metatype,
-  BridgedTypeAttrKind_opened,
-  BridgedTypeAttrKind_pack_element,
-  BridgedTypeAttrKind_pseudogeneric,
-  BridgedTypeAttrKind_unimplementable,
-  BridgedTypeAttrKind_yields,
-  BridgedTypeAttrKind_yield_once,
-  BridgedTypeAttrKind_yield_many,
-  BridgedTypeAttrKind_captures_generics,
-  BridgedTypeAttrKind_moveOnly,
-  BridgedTypeAttrKind_thin,
-  BridgedTypeAttrKind_thick,
-  BridgedTypeAttrKind_Count,
-  BridgedTypeAttrKind_isolated,
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind {
+#define TYPE_ATTR(SPELLING, _) BridgedTypeAttrKind_##SPELLING,
+#include "swift/AST/Attr.def"
+  BridgedTypeAttrKind_None,
 };
 
 SWIFT_NAME("BridgedTypeAttrKind.init(from:)")
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr);
 
-SWIFT_NAME("BridgedTypeAttributes.init(context:)")
-BridgedTypeAttributes BridgedTypeAttributes_create(BridgedASTContext cContext);
+SWIFT_NAME("BridgedTypeAttributes.new()")
+BridgedTypeAttributes BridgedTypeAttributes_create();
 
-SWIFT_NAME("BridgedTypeAttributes.addSimpleAttr(self:kind:atLoc:attrLoc:)")
-void BridgedTypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
-                                         BridgedTypeAttrKind kind,
-                                         BridgedSourceLoc cAtLoc,
-                                         BridgedSourceLoc cAttrLoc);
+SWIFT_NAME("BridgedTypeAttributes.delete(self:)")
+void BridgedTypeAttributes_delete(BridgedTypeAttributes cAttributes);
+
+SWIFT_NAME("BridgedTypeAttributes.add(self:_:)")
+void BridgedTypeAttributes_add(BridgedTypeAttributes cAttributes,
+                               BridgedTypeAttribute cAttribute);
 
 SWIFT_NAME("getter:BridgedTypeAttributes.isEmpty(self:)")
 bool BridgedTypeAttributes_isEmpty(BridgedTypeAttributes cAttributes);
+
+SWIFT_NAME("BridgedTypeAttribute.createSimple(_:kind:atLoc:nameLoc:)")
+BridgedTypeAttribute BridgedTypeAttribute_createSimple(
+    BridgedASTContext cContext, BridgedTypeAttrKind cKind,
+    BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs
@@ -1545,9 +1500,10 @@ BridgedArrayTypeRepr BridgedArrayTypeRepr_createParsed(
     BridgedSourceLoc cLSquareLoc, BridgedSourceLoc cRSquareLoc);
 
 SWIFT_NAME(
-    "BridgedAttributedTypeRepr.createParsed(base:consumingAttributes:)")
+    "BridgedAttributedTypeRepr.createParsed(_:base:consumingAttributes:)")
 BridgedAttributedTypeRepr
-BridgedAttributedTypeRepr_createParsed(BridgedTypeRepr base,
+BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
+                                       BridgedTypeRepr base,
                                        BridgedTypeAttributes cAttributes);
 
 SWIFT_NAME("BridgedCompositionTypeRepr.createEmpty(_:anyKeywordLoc:)")

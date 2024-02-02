@@ -388,58 +388,13 @@ extension ASTGenVisitor {
     }
 
     // Handle type attributes.
-    if !node.attributes.isEmpty {
-      let typeAttributes = BridgedTypeAttributes(context: self.ctx)
-      for attributeElt in node.attributes {
-        // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
-        // but we don't have that ability right now.
-        guard case let .attribute(attribute) = attributeElt else {
-          continue
-        }
-
-        // Only handle simple attribute names right now.
-        guard let identType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
-          continue
-        }
-
-        let nameSyntax = identType.name
-        let typeAttrKind = BridgedTypeAttrKind(from: nameSyntax.rawText.bridged)
-        let atLoc = self.generateSourceLoc(attribute.atSign)
-        let attrLoc = self.generateSourceLoc(nameSyntax)
-        switch typeAttrKind {
-        // SIL attributes
-        // FIXME: Diagnose if not in SIL mode? Or should that move to the
-        // type checker?
-        case .out, .in, .owned, .unowned_inner_pointer, .guaranteed,
-          .autoreleased, .callee_owned, .callee_guaranteed, .objc_metatype,
-          .sil_weak, .sil_unowned, .inout, .block_storage, .box,
-          .dynamic_self, .sil_unmanaged, .error, .error_indirect,
-          .error_unowned, .direct, .inout_aliasable,
-          .in_guaranteed, .in_constant, .captures_generics, .moveOnly,
-          .isolated:
-          fallthrough
-
-        case .autoclosure, .escaping, .noescape, .noDerivative, .async,
-          .sendable, .retroactive, .unchecked, .preconcurrency, ._local,
-          ._noMetadata, .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
-          .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
-          .count, .unimplementable:
-          typeAttributes.addSimpleAttr(kind: typeAttrKind, atLoc: atLoc, attrLoc: attrLoc)
-
-        case .opened, .pack_element, .differentiable, .convention,
-          ._opaqueReturnTypeOf:
-          // FIXME: These require more complicated checks
-          break
-        }
-      }
-
-      if (!typeAttributes.isEmpty) {
-        type =
-          BridgedAttributedTypeRepr.createParsed(
-            base: type,
-            consumingAttributes: typeAttributes
-          ).asTypeRepr
-      }
+    if let typeAttributes = self.generateTypeAttributes(node) {
+      type =
+        BridgedAttributedTypeRepr.createParsed(
+          self.ctx,
+          base: type,
+          consumingAttributes: typeAttributes
+        ).asTypeRepr
     }
 
     return type
