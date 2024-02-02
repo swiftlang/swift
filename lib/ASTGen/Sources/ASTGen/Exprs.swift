@@ -197,6 +197,10 @@ extension ASTGenVisitor {
       preconditionFailure("should be handled in generate(sequenceExpr:)")
     case .unresolvedTernaryExpr:
       preconditionFailure("should be handled in generate(sequenceExpr:)")
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     preconditionFailure("isExprMigrated() mismatch")
   }

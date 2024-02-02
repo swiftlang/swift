@@ -101,6 +101,10 @@ extension ASTGenVisitor {
       return self.generate(suppressedType: node).asTypeRepr
     case .tupleType(let node):
       return self.generate(tupleType: node).asTypeRepr
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
     preconditionFailure("isTypeMigrated() mismatch")
   }

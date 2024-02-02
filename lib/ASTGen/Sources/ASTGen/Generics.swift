@@ -69,6 +69,10 @@ extension ASTGenVisitor {
       case .layoutRequirement(_):
         // FIXME: Implement layout requirement translation.
         fatalError("Translation of layout requirements not implemented!")
+#if RESILIENT_SWIFT_SYNTAX
+      @unknown default:
+        fatalError()
+#endif
       }
     }
 

@@ -45,6 +45,10 @@ extension ASTGenVisitor {
       return self.generate(valueBindingPattern: node).asPattern
     case .wildcardPattern(let node):
       return self.generate(wildcardPattern: node).asPattern
+#if RESILIENT_SWIFT_SYNTAX
+    @unknown default:
+      fatalError()
+#endif
     }
   }
 
