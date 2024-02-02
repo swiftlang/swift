@@ -18,6 +18,7 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
@@ -876,159 +877,124 @@ public:
     addCleanup([&object]{ object.~T(); });
   }
 
-  /// Get the runtime availability of the class metadata update callback
-  /// mechanism for the target platform.
-  AvailabilityContext getObjCMetadataUpdateCallbackAvailability();
+  /// Get the availability of features introduced in the specified version
+  /// of the Swift compiler for the target platform.
+  AvailabilityContext getSwiftAvailability(unsigned major, unsigned minor) const;
 
-  /// Get the runtime availability of the objc_getClass() hook for the target
-  /// platform.
-  AvailabilityContext getObjCGetClassHookAvailability();
-  
-  /// Get the runtime availability of features introduced in the Swift 5.0
-  /// compiler for the target platform.
-  AvailabilityContext getSwift50Availability();
+  // For each feature defined in FeatureAvailability, define two functions;
+  // the latter, with the suffix RuntimeAvailabilty, is for use with
+  // AvailabilityContext::forRuntimeTarget(), and only looks at the Swift
+  // runtime version.
+#define FEATURE(N, V)                                                       \
+  inline AvailabilityContext get##N##Availability() const {                 \
+    return getSwiftAvailability V;                                          \
+  }                                                                         \
+  inline AvailabilityContext get##N##RuntimeAvailability() const {          \
+    return AvailabilityContext(VersionRange::allGTE(llvm::VersionTuple V)); \
+  }
 
-  /// Get the runtime availability of the opaque types language feature for the
-  /// target platform.
-  AvailabilityContext getOpaqueTypeAvailability();
-
-  /// Get the runtime availability of the objc_loadClassref() entry point for
-  /// the target platform.
-  AvailabilityContext getObjCClassStubsAvailability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.1
-  /// compiler for the target platform.
-  AvailabilityContext getSwift51Availability();
-
-  /// Get the runtime availability of
-  /// swift_getTypeByMangledNameInContextInMetadataState.
-  AvailabilityContext getTypesInAbstractMetadataStateAvailability();
-
-  /// Get the runtime availability of support for prespecialized generic 
-  /// metadata.
-  AvailabilityContext getPrespecializedGenericMetadataAvailability();
-
-  /// Get the runtime availability of the swift_compareTypeContextDescriptors
-  /// for the target platform.
-  AvailabilityContext getCompareTypeContextDescriptorsAvailability();
-
-  /// Get the runtime availability of the
-  /// swift_compareProtocolConformanceDescriptors entry point for the target
-  /// platform.
-  AvailabilityContext getCompareProtocolConformanceDescriptorsAvailability();
-
-  /// Get the runtime availability of support for inter-module prespecialized
-  /// generic metadata.
-  AvailabilityContext getIntermodulePrespecializedGenericMetadataAvailability();
-
-  /// Get the runtime availability of support for concurrency.
-  AvailabilityContext getConcurrencyAvailability();
-
-  /// Get the runtime availability of task executors.
-  AvailabilityContext getTaskExecutorAvailability();
-
-  /// Get the runtime availability of the `DiscardingTaskGroup`,
-  /// and supporting runtime functions function
-  AvailabilityContext getConcurrencyDiscardingTaskGroupAvailability();
-
-  /// Get the back-deployed availability for concurrency.
-  AvailabilityContext getBackDeployedConcurrencyAvailability();
-
-  /// The the availability since when distributed actors are able to have custom
-  /// executors.
-  AvailabilityContext
-  getConcurrencyDistributedActorWithCustomExecutorAvailability();
-
-  /// Get the runtime availability of support for differentiation.
-  AvailabilityContext getDifferentiationAvailability();
-
-  /// Get the runtime availability of support for typed throws.
-  AvailabilityContext getTypedThrowsAvailability();
-
-  /// Get the runtime availability of getters and setters of multi payload enum
-  /// tag single payloads.
-  AvailabilityContext getMultiPayloadEnumTagSinglePayload();
-
-  /// Get the runtime availability of the Objective-C enabled
-  /// swift_isUniquelyReferenced functions.
-  AvailabilityContext getObjCIsUniquelyReferencedAvailability();
-
-  /// Get the runtime availability of metadata manipulation runtime functions
-  /// for extended existential types.
-  AvailabilityContext getParameterizedExistentialRuntimeAvailability();
-
-  /// Get the runtime availability of array buffers placed in constant data
-  /// sections.
-  AvailabilityContext getStaticReadOnlyArraysAvailability();
-
-  /// Get the runtime availability of runtime functions for
-  /// variadic generic types.
-  AvailabilityContext getVariadicGenericTypeAvailability();
-
-  /// Get the runtime availability of the conformsToProtocol runtime entrypoint
-  /// that takes a signed protocol descriptor pointer.
-  AvailabilityContext getSignedConformsToProtocolAvailability();
-
-  /// Get the runtime availability of runtime entrypoints that take signed type
-  /// descriptors.
-  AvailabilityContext getSignedDescriptorAvailability();
-
-  /// Get the runtime availability of the swift_initRawStructMetadata entrypoint
-  /// that fixes up the value witness table of @_rawLayout dependent types.
-  AvailabilityContext getInitRawStructMetadataAvailability();
-
-  /// Get the runtime availability of being able to use symbolic references to
-  /// objective c protocols.
-  AvailabilityContext getObjCSymbolicReferencesAvailability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.2
-  /// compiler for the target platform.
-  AvailabilityContext getSwift52Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.3
-  /// compiler for the target platform.
-  AvailabilityContext getSwift53Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.4
-  /// compiler for the target platform.
-  AvailabilityContext getSwift54Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.5
-  /// compiler for the target platform.
-  AvailabilityContext getSwift55Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.6
-  /// compiler for the target platform.
-  AvailabilityContext getSwift56Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.7
-  /// compiler for the target platform.
-  AvailabilityContext getSwift57Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.8
-  /// compiler for the target platform.
-  AvailabilityContext getSwift58Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.9
-  /// compiler for the target platform.
-  AvailabilityContext getSwift59Availability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.9
-  /// compiler for the target platform.
-  AvailabilityContext getSwift511Availability();
-  
-  // Note: Update this function if you add a new getSwiftXYAvailability above.
-  /// Get the runtime availability for a particular version of Swift (5.0+).
-  AvailabilityContext
-  getSwift5PlusAvailability(llvm::VersionTuple swiftVersion);
+  #include "swift/AST/FeatureAvailability.def"
 
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.
-  AvailabilityContext getSwiftFutureAvailability();
+  AvailabilityContext getSwiftFutureAvailability() const;
 
   /// Returns `true` if versioned availability annotations are supported for the
   /// target triple.
   bool supportsVersionedAvailability() const;
+
+  //===--------------------------------------------------------------------===//
+  // Compatibility availability functions
+  //===--------------------------------------------------------------------===//
+
+  // Note: Don't add more of these version-specific availability functions;
+  // just use getSwiftAvailability() instead.
+
+  /// Get the runtime availability of features introduced in the Swift 5.0
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift50Availability() const {
+    return getSwiftAvailability(5, 0);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.1
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift51Availability() const {
+    return getSwiftAvailability(5, 1);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.2
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift52Availability() const {
+    return getSwiftAvailability(5, 2);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.3
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift53Availability() const {
+    return getSwiftAvailability(5, 3);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.4
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift54Availability() const {
+    return getSwiftAvailability(5, 4);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.5
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift55Availability() const {
+    return getSwiftAvailability(5, 5);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.6
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift56Availability() const {
+    return getSwiftAvailability(5, 6);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.7
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift57Availability() const {
+    return getSwiftAvailability(5, 7);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.8
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift58Availability() const {
+    return getSwiftAvailability(5, 8);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.9
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift59Availability() const {
+    return getSwiftAvailability(5, 9);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.10
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift510Availability() const {
+    return getSwiftAvailability(5, 10);
+  }
+
+  /// Get the runtime availability of features introduced in the Swift 5.11
+  /// compiler for the target platform.
+  inline AvailabilityContext getSwift511Availability() const {
+    return getSwiftAvailability(5, 11);
+  }
+
+  /// Get the runtime availability for a particular version of Swift (5.0+).
+  inline AvailabilityContext
+  getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) const {
+    return getSwiftAvailability(swiftVersion.getMajor(),
+                                *swiftVersion.getMinor());
+  }
+
+  /// Get the runtime availability of getters and setters of multi payload enum
+  /// tag single payloads.
+  inline AvailabilityContext getMultiPayloadEnumTagSinglePayload() const {
+    // This didn't fit the pattern, so needed renaming
+    return getMultiPayloadEnumTagSinglePayloadAvailability();
+  }
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
