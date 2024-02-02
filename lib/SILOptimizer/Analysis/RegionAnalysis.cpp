@@ -2444,9 +2444,6 @@ CONSTANT_TRANSLATION(UnmanagedReleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
-CONSTANT_TRANSLATION(AssignInst, Unhandled)
-CONSTANT_TRANSLATION(AssignByWrapperInst, Unhandled)
-CONSTANT_TRANSLATION(AssignOrInitInst, Unhandled)
 
 //===---
 // Packs
@@ -2492,6 +2489,13 @@ CONSTANT_TRANSLATION(UnownedRetainInst, Asserting)
 // after adding an assert into the SILVerifier that this property is true.
 CONSTANT_TRANSLATION(AllocPackMetadataInst, Asserting)
 CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
+
+// All of these instructions should be removed by DI which runs before us in the
+// pass pipeline.
+CONSTANT_TRANSLATION(AssignInst, Asserting)
+CONSTANT_TRANSLATION(AssignByWrapperInst, Asserting)
+CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
+
 
 #undef CONSTANT_TRANSLATION
 
