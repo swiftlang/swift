@@ -2427,6 +2427,9 @@ CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 // Today, await_async_continuation just takes Sendable values
 // (UnsafeContinuation and UnsafeThrowingContinuation).
 CONSTANT_TRANSLATION(AwaitAsyncContinuationInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(GetAsyncContinuationInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, AssertingIfNonSendable)
+CONSTANT_TRANSLATION(ExtractExecutorInst, AssertingIfNonSendable)
 
 //===---
 // Existential Box
@@ -2463,9 +2466,6 @@ CONSTANT_TRANSLATION(LinearFunctionInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, Unhandled)
 CONSTANT_TRANSLATION(LinearFunctionExtractInst, Unhandled)
 CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, Unhandled)
-CONSTANT_TRANSLATION(GetAsyncContinuationInst, Unhandled)
-CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Unhandled)
-CONSTANT_TRANSLATION(ExtractExecutorInst, Unhandled)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Unhandled)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Unhandled)
 
